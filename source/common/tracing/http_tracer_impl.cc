@@ -27,14 +27,7 @@
 namespace Envoy {
 namespace Tracing {
 
-// Pre-allocate common response codes to minimize string creations.
 namespace {
-constexpr absl::string_view HttpResponseCode0 = "0";
-constexpr absl::string_view HttpResponseCode200 = "200";
-constexpr absl::string_view HttpResponseCode404 = "404";
-constexpr absl::string_view HttpResponseCode500 = "500";
-constexpr absl::string_view HttpResponseCode502 = "502";
-constexpr absl::string_view HttpResponseCode503 = "503";
 constexpr absl::string_view DefaultValue = "-";
 } // namespace
 
@@ -44,23 +37,8 @@ static absl::string_view buildResponseCode(const StreamInfo::StreamInfo& info,
   if (!info.responseCode()) {
     return HttpResponseCode0;
   }
-  const uint16_t code = info.responseCode().value();
-  switch (code) {
-  case 200:
-    return HttpResponseCode200;
-  case 404:
-    return HttpResponseCode404;
-  case 500:
-    return HttpResponseCode500;
-  case 502:
-    return HttpResponseCode502;
-  case 503:
-    return HttpResponseCode503;
-  default:
-    // Only allocate if code is uncommon
-    out_buffer = std::to_string(code);
-    return out_buffer;
-  }
+  out_buffer = std::to_string(info.responseCode().value());
+  return out_buffer;
 }
 
 static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
