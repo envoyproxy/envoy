@@ -26,7 +26,6 @@ envoy_cc_extension(
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/clusters/dns_srv/v3:pkg_cc_proto",
     ],

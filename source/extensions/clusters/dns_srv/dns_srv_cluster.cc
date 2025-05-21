@@ -1,26 +1,17 @@
 #include "source/extensions/clusters/dns_srv/dns_srv_cluster.h"
 
-// #include <sys/_types/_intptr_t.h>
-
 #include <algorithm>
 #include <chrono>
 #include <list>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/common/exception.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "source/common/common/dns_utils.h"
-#include "source/common/common/fmt.h"
-#include "source/common/config/utility.h"
-#include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
-#include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -43,7 +34,6 @@ DnsSrvCluster::DnsSrvCluster(
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
   for (const auto& n : dns_srv_cluster_.srv_names()) {
-    ENVOY_LOG(debug, "DnsSrvCluster::DnsSrvCluster {}", n.srv_name());
     load_assignment_.add_endpoints()->add_lb_endpoints()->set_endpoint_name(n.srv_name());
   }
   ENVOY_LOG(debug, "starting async DNS resolution for, length {}",
@@ -200,8 +190,9 @@ void DnsSrvCluster::allTargetsResolved() {
 DnsSrvCluster::ResolveList::ResolveList(DnsSrvCluster& parent) : parent_(parent) {}
 
 void DnsSrvCluster::ResolveList::addTarget(ResolveTargetPtr new_target) {
-  new_target->startResolve();
+  // new_target->startResolve();
   active_targets_.emplace_back(std::move(new_target));
+  active_targets_.back()->startResolve();
 }
 
 // callback, A/AAAA record resolved for one of the SRV record
@@ -287,6 +278,12 @@ DnsSrvClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context) {
   auto dns_resolver_or_error = selectDnsResolver(cluster, context);
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
+
+  if (cluster.typed_dns_resolver_config().name() != "envoy.network.dns_resolver.cares") {
+    return absl::InvalidArgumentError(std::format("Only c-ares supports resolve of SRV records, "
+      "please use typed_dns_resolver_config.name = 'envoy.network.dns_resolver.cares'. Current value: '{}'",
+      cluster.typed_dns_resolver_config().name());
+  }
 
   if (proto_config.srv_names_size() > 1) {
     return absl::InvalidArgumentError("SRV DNS Cluster can only contain one DNS record (so far)");
