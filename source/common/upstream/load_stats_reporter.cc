@@ -133,10 +133,10 @@ void LoadStatsReporter::sendLoadStatsRequest() {
               ENVOY_LOG(info, "Load report endpoint {}:{} count {}", host->address()->asString(),
                         host->address()->ip()->port(), hosts.size());
               // add upstream endpoint stats to locality stats
-              auto* upstream_endpoint_stats = locality_stats->add_upstream_endpoint_stats();
+              auto* const upstream_endpoint_stats = locality_stats->add_upstream_endpoint_stats();
               // add address and socket address port
-              auto* address = upstream_endpoint_stats->mutable_address();
-              auto* socket_address = address->mutable_socket_address();
+              auto* const address = upstream_endpoint_stats->mutable_address();
+              auto* const socket_address = address->mutable_socket_address();
               socket_address->set_address(host->address()->ip()->addressAsString());
               socket_address->set_port_value(host->address()->ip()->port());
 
@@ -151,7 +151,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
 
               // add load metric stats
               for (const auto& metric : load_metrics) {
-                auto* endpoint_metric_stats = upstream_endpoint_stats->add_load_metric_stats();
+                auto* const endpoint_metric_stats = upstream_endpoint_stats->add_load_metric_stats();
                 endpoint_metric_stats->set_metric_name(metric.first);
                 endpoint_metric_stats->set_num_requests_finished_with_metric(
                     metric.second.num_requests_with_metric);
