@@ -11,6 +11,7 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/common/fmt.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 
@@ -280,9 +281,11 @@ DnsSrvClusterFactory::createClusterWithConfig(
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
   if (cluster.typed_dns_resolver_config().name() != "envoy.network.dns_resolver.cares") {
-    return absl::InvalidArgumentError(std::format("Only c-ares supports resolve of SRV records, "
-      "please use typed_dns_resolver_config.name = 'envoy.network.dns_resolver.cares'. Current value: '{}'",
-      cluster.typed_dns_resolver_config().name());
+    return absl::InvalidArgumentError(
+        fmt::format("Only c-ares supports resolve of SRV records, "
+                    "please use typed_dns_resolver_config.name = "
+                    "'envoy.network.dns_resolver.cares'. Current value: '{}'",
+                    cluster.typed_dns_resolver_config().name()));
   }
 
   if (proto_config.srv_names_size() > 1) {
