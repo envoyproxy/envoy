@@ -45,7 +45,7 @@ platform(
     ],
     exec_properties = {
         "cache-silo-key": CACHE_SILO_KEY,
-        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:56b66cc84065c88a141963cedbbe4198850ffae0dacad769f516d0e9081439da",
+        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:116a6a4f7b2e7a43e07156a988b1aaf310d1d1b5c9339e076374bb4684e616dc",
         "OSFamily": "Linux",
     },
     parents = ["@local_config_platform//:host"],
