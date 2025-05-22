@@ -922,10 +922,10 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 }
 
 bool ConnectionImpl::setSocketOption(Network::Socket::Option::Details option) {
-  auto value = std::vector<uint8_t, Memory::AlignedAllocator<uint8_t, alignof(void*)>>(
-      option.value_.begin(), option.value_.end());
-
-  return SocketOptionImpl::setSocketOption(*socket_, option.name_, value.data(), value.size());
+  auto sockopt = std::make_shared<SocketOptionImpl>(option.name_, option.value_);
+  socket_->addOption(sockopt);
+  sockopt->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING);
+  return true;
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {

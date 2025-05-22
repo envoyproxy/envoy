@@ -1,3 +1,4 @@
+#include <asm-generic/socket.h>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -2581,11 +2582,12 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
 TEST_P(ConnectionImplTest, SetSocketOptionTest) {
   setUpBasicConnection();
 
-  // auto option = std::make_shared<MockSocketOption>();
-  // EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
-  //     .WillOnce(Return(true));
+  Envoy::Network::Socket::Option::Details option_details;
+  option_details.name_ = ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_KEEPALIVE);
+  option_details.value_ = 1;
+  EXPECT_TRUE(client_connection_->setSocketOption(option_details));
 
-  // EXPECT_TRUE(client_connection_->setSocketOption(option));
+  EXPECT_TRUE(client_connection_->socketOptions());
 
   disconnect(false);
 }
