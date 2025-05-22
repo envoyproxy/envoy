@@ -106,7 +106,7 @@ public:
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
     return socket_->options();
   }
-  bool setSocketOption(Network::Socket::OptionConstSharedPtr option) override;
+  bool setSocketOption(Network::Socket::Option::Details option) override;
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }

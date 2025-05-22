@@ -106,7 +106,7 @@ bool MultiConnectionBaseImpl::isHalfCloseEnabled() const {
   return connections_[0]->isHalfCloseEnabled();
 }
 
-bool MultiConnectionBaseImpl::setSocketOption(const Network::Socket::OptionConstSharedPtr option) {
+bool MultiConnectionBaseImpl::setSocketOption(const Network::Socket::Option::Details option) {
   bool success = true;
   for (auto& connection : connections_) {
     if (!connection->setSocketOption(option)) {

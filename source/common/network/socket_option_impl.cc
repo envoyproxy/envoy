@@ -14,7 +14,7 @@ namespace Network {
 
 // Socket::Option
 bool SocketOptionImpl::setOption(Socket& socket,
-                                 ::envoy::config::core::v3::SocketOption::SocketState state) const {
+                                 envoy::config::core::v3::SocketOption::SocketState state) const {
   if (in_state_ == state) {
     if (!optname_.hasValue()) {
       ENVOY_LOG(warn, "Failed to set unsupported option on socket");

@@ -97,7 +97,7 @@ public:
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));                     \
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));                                     \
-  MOCK_METHOD(bool, setSocketOption, (Network::Socket::OptionConstSharedPtr), ());                 \
+  MOCK_METHOD(bool, setSocketOption, (Network::Socket::Option::Details), ());                 \
   MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));
 
 class MockConnection : public Connection, public MockConnectionBase {

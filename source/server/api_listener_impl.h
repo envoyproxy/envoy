@@ -124,7 +124,7 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
-      bool setSocketOption(Network::Socket::OptionConstSharedPtr) override {
+      bool setSocketOption(const Network::Socket::Option::Details) override {
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }

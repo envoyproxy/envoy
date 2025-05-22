@@ -2085,11 +2085,6 @@ OptRef<const Tracing::Config> ConnectionManagerImpl::ActiveStream::tracingConfig
 
 const ScopeTrackedObject& ConnectionManagerImpl::ActiveStream::scope() { return *this; }
 
-bool ConnectionManagerImpl::ActiveStream::setDownstreamSocketOption(
-    const Network::Socket::OptionConstSharedPtr option) {
-  return connection_manager_.read_callbacks_->connection().setSocketOption(option);
-}
-
 Upstream::ClusterInfoConstSharedPtr ConnectionManagerImpl::ActiveStream::clusterInfo() {
   // NOTE: Refreshing route caches clusterInfo as well.
   if (!cached_route_.has_value()) {

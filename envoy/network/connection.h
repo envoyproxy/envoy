@@ -352,7 +352,7 @@ public:
    * @param option The socket option to set.
    * @return boolean telling if the socket option was set successfully.
    */
-  virtual bool setSocketOption(const Network::Socket::OptionConstSharedPtr option) PURE;
+  virtual bool setSocketOption(const Network::Socket::Option::Details option) PURE;
 
   /**
    * The StreamInfo object associated with this connection. This is typically

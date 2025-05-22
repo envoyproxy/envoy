@@ -99,7 +99,7 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
-  bool setSocketOption(const Network::Socket::OptionConstSharedPtr) override { return false; }
+  bool setSocketOption(const Network::Socket::Option::Details) override { return false; }
 
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
   using quic::QuicSession::PerformActionOnActiveStreams;

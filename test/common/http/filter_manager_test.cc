@@ -29,10 +29,7 @@ using testing::Return;
 namespace Envoy {
 namespace Http {
 namespace {
-
-using ::Envoy::Network::MockSocketOption;
 using Protobuf::util::MessageDifferencer;
-
 class FilterManagerTest : public testing::Test {
 public:
   void initialize() {

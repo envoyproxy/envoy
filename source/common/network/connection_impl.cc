@@ -921,7 +921,7 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
-bool ConnectionImpl::setSocketOption(Network::Socket::OptionConstSharedPtr option) {
+bool ConnectionImpl::setSocketOption(Network::Socket::Option::Details option) {
   return option->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_ANY);
 }
 
