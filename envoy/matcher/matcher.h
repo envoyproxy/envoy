@@ -180,15 +180,17 @@ protected:
       // Parent result's keep_matching skips the nested result.
       if (on_match->keep_matching_ && nested_result.match_state_ == MatchState::MatchComplete &&
           nested_result.on_match_.has_value()) {
-        if (skipped_match_cb)
+        if (skipped_match_cb) {
           skipped_match_cb(*nested_result.on_match_);
+        }
         return {MatchState::MatchComplete, absl::nullopt};
       }
       return nested_result;
     }
     if (on_match->action_cb_ && on_match->keep_matching_) {
-      if (skipped_match_cb)
+      if (skipped_match_cb) {
         skipped_match_cb(*on_match);
+      }
       return {MatchState::MatchComplete, absl::nullopt};
     }
     return {MatchState::MatchComplete, on_match};
