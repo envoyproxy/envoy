@@ -102,6 +102,9 @@ fi
 rm -rf "${COVERAGE_DIR}"
 mkdir -p "${COVERAGE_DIR}"
 
+
+find bazel-out/_coverage/
+
 if [[ ! -e bazel-out/_coverage/_coverage_report.dat ]]; then
     echo "ERROR: No coverage report found (bazel-out/_coverage/_coverage_report.dat)" >&2
     exit 1
