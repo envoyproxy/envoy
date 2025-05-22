@@ -2,6 +2,7 @@
 
 #include "envoy/common/optref.h"
 
+#include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz_base.h"
@@ -43,14 +44,17 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::RoundRobinLoadBalancerTestCase
       zone_aware_load_balancer_test_case.load_balancer_test_case());
 
   try {
+    Upstream::TypedRoundRobinLbConfig config(
+        zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
+        input.round_robin_lb_config());
+    const auto threshold = PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
+        healthy_panic_threshold, 100, 50);
     zone_aware_load_balancer_fuzz.lb_ = std::make_unique<RoundRobinLoadBalancer>(
         zone_aware_load_balancer_fuzz.priority_set_,
         zone_aware_load_balancer_fuzz.local_priority_set_.get(),
         zone_aware_load_balancer_fuzz.stats_, zone_aware_load_balancer_fuzz.runtime_,
-        zone_aware_load_balancer_fuzz.random_,
-        zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
-        makeOptRef<const envoy::config::cluster::v3::Cluster::RoundRobinLbConfig>(
-            input.round_robin_lb_config()),
+        zone_aware_load_balancer_fuzz.random_, threshold, config.lb_config_,
         zone_aware_load_balancer_fuzz.simTime());
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException; {}", e.what());

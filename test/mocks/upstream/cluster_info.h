@@ -18,6 +18,7 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -223,6 +224,9 @@ public:
   Upstream::TypedLoadBalancerFactory* lb_factory_ =
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.round_robin");
+  Upstream::LoadBalancerConfigPtr typed_lb_config_ =
+      std::make_unique<Upstream::TypedRoundRobinLbConfig>(
+          envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin());
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;

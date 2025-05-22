@@ -174,24 +174,28 @@ template <class ProtoType> class CorsPolicyImplBase : public CorsPolicy {
 public:
   CorsPolicyImplBase(const ProtoType& config,
                      Server::Configuration::CommonFactoryContext& factory_context)
-      : config_(config), loader_(factory_context.runtime()), allow_methods_(config.allow_methods()),
+      : filter_enabled_(
+            config.has_filter_enabled()
+                ? std::make_unique<const envoy::config::core::v3::RuntimeFractionalPercent>(
+                      config.filter_enabled())
+                : nullptr),
+        shadow_enabled_(
+            config.has_shadow_enabled()
+                ? std::make_unique<const envoy::config::core::v3::RuntimeFractionalPercent>(
+                      config.shadow_enabled())
+                : nullptr),
+        loader_(factory_context.runtime()), allow_methods_(config.allow_methods()),
         allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
-        max_age_(config.max_age()) {
+        max_age_(config.max_age()),
+        allow_credentials_(PROTOBUF_GET_OPTIONAL_WRAPPED(config, allow_credentials)),
+        allow_private_network_access_(
+            PROTOBUF_GET_OPTIONAL_WRAPPED(config, allow_private_network_access)),
+        forward_not_matching_preflights_(
+            PROTOBUF_GET_OPTIONAL_WRAPPED(config, forward_not_matching_preflights)) {
+    allow_origins_.reserve(config.allow_origin_string_match().size());
     for (const auto& string_match : config.allow_origin_string_match()) {
-      allow_origins_.push_back(
+      allow_origins_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl>(string_match, factory_context));
-    }
-    if (config.has_allow_credentials()) {
-      allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
-    }
-    if (config.has_allow_private_network_access()) {
-      allow_private_network_access_ =
-          PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
-    }
-
-    if (config.has_forward_not_matching_preflights()) {
-      forward_not_matching_preflights_ =
-          PROTOBUF_GET_WRAPPED_REQUIRED(config, forward_not_matching_preflights);
     }
   }
 
@@ -208,18 +212,16 @@ public:
     return allow_private_network_access_;
   };
   bool enabled() const override {
-    if (config_.has_filter_enabled()) {
-      const auto& filter_enabled = config_.filter_enabled();
-      return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
-                                               filter_enabled.default_value());
+    if (filter_enabled_ != nullptr) {
+      return loader_.snapshot().featureEnabled(filter_enabled_->runtime_key(),
+                                               filter_enabled_->default_value());
     }
     return true;
   };
   bool shadowEnabled() const override {
-    if (config_.has_shadow_enabled()) {
-      const auto& shadow_enabled = config_.shadow_enabled();
-      return loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
-                                               shadow_enabled.default_value());
+    if (shadow_enabled_ != nullptr) {
+      return loader_.snapshot().featureEnabled(shadow_enabled_->runtime_key(),
+                                               shadow_enabled_->default_value());
     }
     return false;
   };
@@ -228,7 +230,8 @@ public:
   }
 
 private:
-  const ProtoType config_;
+  const std::unique_ptr<const envoy::config::core::v3::RuntimeFractionalPercent> filter_enabled_;
+  const std::unique_ptr<const envoy::config::core::v3::RuntimeFractionalPercent> shadow_enabled_;
   Runtime::Loader& loader_;
   std::vector<Matchers::StringMatcherPtr> allow_origins_;
   const std::string allow_methods_;
