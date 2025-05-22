@@ -715,9 +715,9 @@ humanfriendly==10.0 \
     --hash=sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477 \
     --hash=sha256:6b0b831ce8f15f7300721aa49829fc4e83921a9a301cc7f606be6686a2288ddc
     # via coloredlogs
-icalendar==6.3.0 \
-    --hash=sha256:4287d5144963457541fc24f6a53e2a3721cfb39dbf2c696356cbcbaa914ad198 \
-    --hash=sha256:fc95bb2ebe8947580651618dbe1e0ce8e3bce7f2a88738ecb3325922c1d48a22
+icalendar==6.3.1 \
+    --hash=sha256:7ea1d1b212df685353f74cdc6ec9646bf42fa557d1746ea645ce8779fdfbecdd \
+    --hash=sha256:a697ce7b678072941e519f2745704fc29d78ef92a2dc53d9108ba6a04aeba466
     # via -r requirements.in
 idna==3.10 \
     --hash=sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9 \
@@ -1793,7 +1793,7 @@ zstandard==0.23.0 \
     # via envoy-base-utils
 
 # The following packages are considered to be unsafe in a requirements file:
-setuptools==80.7.1 \
-    --hash=sha256:ca5cc1069b85dc23070a6628e6bcecb3292acac802399c7f8edc0100619f9009 \
-    --hash=sha256:f6ffc5f0142b1bd8d0ca94ee91b30c0ca862ffd50826da1ea85258a06fd94552
+setuptools==80.8.0 \
+    --hash=sha256:49f7af965996f26d43c8ae34539c8d99c5042fbff34302ea151eaa9c207cd257 \
+    --hash=sha256:95a60484590d24103af13b686121328cc2736bee85de8936383111e421b9edc0
     # via -r requirements.in

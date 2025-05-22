@@ -33,14 +33,14 @@ public:
              const Protobuf::Message& config) override {
     ASSERT(dynamic_cast<const MaglevLbProto*>(&config) != nullptr);
     const MaglevLbProto& typed_config = dynamic_cast<const MaglevLbProto&>(config);
-    // TODO(wbocode): to merge the legacy and typed config and related constructors into one.
     return Upstream::LoadBalancerConfigPtr{new Upstream::TypedMaglevLbConfig(typed_config)};
   }
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadLegacy(Server::Configuration::ServerFactoryContext&,
              const Upstream::ClusterProto& cluster) override {
-    return Upstream::LoadBalancerConfigPtr{new Upstream::LegacyMaglevLbConfig(cluster)};
+    return Upstream::LoadBalancerConfigPtr{
+        new Upstream::TypedMaglevLbConfig(cluster.common_lb_config(), cluster.maglev_lb_config())};
   }
 };
 

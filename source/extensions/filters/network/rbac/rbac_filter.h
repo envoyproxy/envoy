@@ -100,7 +100,8 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  void setDynamicMetadata(std::string shadow_engine_result, std::string shadow_policy_id);
+  void setDynamicMetadata(const std::string& shadow_engine_result,
+                          const std::string& shadow_policy_id) const;
 
 private:
   RoleBasedAccessControlFilterConfigSharedPtr config_;
@@ -108,8 +109,8 @@ private:
   EngineResult engine_result_{Unknown};
   EngineResult shadow_engine_result_{Unknown};
 
-  Result checkEngine(Filters::Common::RBAC::EnforcementMode mode);
-  void closeConnection();
+  Result checkEngine(Filters::Common::RBAC::EnforcementMode mode) const;
+  void closeConnection() const;
   void resetTimerState();
   Event::TimerPtr delay_timer_{nullptr};
   bool is_delay_denied_{false};
