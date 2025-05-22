@@ -82,11 +82,9 @@ envoy_cc_library(
     name = "conn_pool_lib",
     srcs = [
         "conn_pool.cc",
-        "reverse_conn_pool_factory.cc",
     ],
     hdrs = [
         "conn_pool.h",
-        "reverse_conn_pool_factory.h",
     ],
     deps = [
         "//envoy/config:typed_config_interface",

@@ -60,9 +60,8 @@ public:
 
   std::string category() const override { return "envoy.upstreams.http.reverse_conn"; }
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<
-        envoy::extensions::upstreams::http::reverse_conn::v3::ReverseConnPoolProto>();
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return nullptr;
   }
 };
 

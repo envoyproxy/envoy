@@ -23,5 +23,5 @@ message RevConClusterConfig {
     repeated string http_header_names = 1;
 
     // Time interval after which envoy attempts to clean the stale host entries.
-    google.protobuf.Duration cleanup_interval = 2;
+    google.protobuf.Duration cleanup_interval = 2 [(validate.rules).duration = {gt {}}];
 }
