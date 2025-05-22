@@ -1633,19 +1633,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   maybeProcessOrcaLoadReport(*headers, upstream_request);
 
-  if (grpc_status.has_value()) {
-    upstream_request.upstreamHost()->outlierDetector().putResult(
-        grpc_to_http_status >= enumToInt(Http::Code::InternalServerError)
-            ? Upstream::Outlier::Result::ExtOriginRequestFailed
-            : Upstream::Outlier::Result::ExtOriginRequestSuccess,
-        grpc_to_http_status);
-  } else {
-    upstream_request.upstreamHost()->outlierDetector().putResult(
-        response_code > enumToInt(Http::Code::InternalServerError)
-            ? Upstream::Outlier::Result::ExtOriginRequestFailed
-            : Upstream::Outlier::Result::ExtOriginRequestSuccess,
-        response_code);
-  }
+  const uint64_t put_result_code = grpc_status.has_value() ? grpc_to_http_status : response_code;
+  upstream_request.upstreamHost()->outlierDetector().putResult(
+      put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
+                             : Upstream::Outlier::Result::ExtOriginRequestSuccess,
+      put_result_code);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(
