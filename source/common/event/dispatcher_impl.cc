@@ -184,11 +184,11 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
   // For Linux, the source address' network namespace is relevant for client connections, since that
   // is where the netns would be specified.
   Network::ClientConnectionPtr conn;
-  if (is_linux && source_address->networkNamespace().has_value()) {
+  if (is_linux && source_address && source_address->networkNamespace().has_value()) {
     auto f = [&]() -> bool {
       conn = factory->createClientConnection(
           *this, address, source_address, std::move(transport_socket), options, transport_options);
-      // The function has to return something because absl::StatusOr cannot wrap a void func.
+      // The function has to return something because absl::StatusOr cannot wrap a void type.
       return true;
     };
     auto result = Network::Utility::execInNetworkNamespace(
