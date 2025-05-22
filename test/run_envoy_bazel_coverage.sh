@@ -120,18 +120,17 @@ GCOVR_ARGS=(
     --root "${PWD}"
     --html-details "${COVERAGE_DIR}/index.html"
     --html-title "Envoy Coverage Report"
+    --json-summary coverage.json
     "${GCOVR_ARGS[@]}"
     "${COVERAGE_DATA}")
 
 # Run gcovr and extract coverage percentage
-COVERAGE_OUTPUT="$(bazel run //tools/gcovr -- "${GCOVR_ARGS[@]}" 2>&1 | tee /dev/stderr)"
-echo "DEBUG: gcovr output was:"
-echo "${COVERAGE_OUTPUT}"
-echo "DEBUG: Looking for coverage value..."
-COVERAGE_VALUE="$(echo "${COVERAGE_OUTPUT}" | grep -E "(lines|TOTAL)" | tail -1)"
-echo "DEBUG: Raw coverage line: ${COVERAGE_VALUE}"
-COVERAGE_VALUE="$(echo "${COVERAGE_VALUE}" | grep -oE '[0-9]+(\.[0-9]+)?%' | sed 's/%//' | tail -1)"
-echo "DEBUG: Extracted coverage value: ${COVERAGE_VALUE}"
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/gcovr -- "${GCOVR_ARGS[@]}"
+ls -alh "$COVERAGE_DIR"
+ls coverage.json
+cat coverage.json
+
+COVERAGE_VALUE="$(echo "${COVERAGE_OUTPUT}" | grep -E "TOTAL.*lines" | awk '{print $(NF-1)}' | sed 's/%//')"
 
 
 echo "Compressing coveraged data"
