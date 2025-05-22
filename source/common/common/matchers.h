@@ -98,7 +98,7 @@ public:
       : exact_(exact), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::EqualsIgnoreCase(value, exact_) : value == exact_;
   }
 
@@ -116,7 +116,7 @@ public:
       : prefix_(prefix), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::StartsWithIgnoreCase(value, prefix_)
                         : absl::StartsWith(value, prefix_);
   }
@@ -136,7 +136,7 @@ public:
       : suffix_(suffix), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::EndsWithIgnoreCase(value, suffix_) : absl::EndsWith(value, suffix_);
   }
 
@@ -161,7 +161,7 @@ public:
   RegexStringMatcher(RegexStringMatcher&& other) noexcept { regex_ = std::move(other.regex_); }
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return regex_->match(value);
   }
 
@@ -179,7 +179,7 @@ public:
         ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::StrContains(absl::AsciiStrToLower(value), contents_)
                         : absl::StrContains(value, contents_);
   }
@@ -206,7 +206,7 @@ public:
       : custom_(getExtensionStringMatcher(custom, context)) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context> context) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context> context) const {
     if (context) {
       return custom_->match(value, context.ref());
     }
@@ -240,8 +240,8 @@ public:
   }
 
   // StringMatcher
-  bool match(const absl::string_view value) const override { return doMatch(value, absl::nullopt); }
-  bool match(const absl::string_view value, const StringMatcher::Context& context) const override {
+  bool match(absl::string_view value) const override { return doMatch(value, absl::nullopt); }
+  bool match(absl::string_view value, const StringMatcher::Context& context) const override {
     return doMatch(value, makeOptRef(context));
   }
 
@@ -317,7 +317,7 @@ private:
     }
   }
 
-  bool doMatch(const absl::string_view value, OptRef<const StringMatcher::Context> context) const {
+  bool doMatch(absl::string_view value, OptRef<const StringMatcher::Context> context) const {
     // Implementing polymorphism for match(absl::string_value) on the different
     // types that can be in the matcher_ variant.
     auto call_match = [value, context](const auto& obj) -> bool {
@@ -421,7 +421,7 @@ public:
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
                   Server::Configuration::CommonFactoryContext& context);
 
-  bool match(const absl::string_view path) const override;
+  bool match(absl::string_view path) const override;
   const std::string& stringRepresentation() const { return matcher_.stringRepresentation(); }
 
 private:

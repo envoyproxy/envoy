@@ -9,9 +9,16 @@ namespace Extensions {
 namespace LoadBalancingPolices {
 namespace LeastRequest {
 
-LegacyLeastRequestLbConfig::LegacyLeastRequestLbConfig(const ClusterProto& cluster) {
-  if (cluster.has_least_request_lb_config()) {
-    lb_config_ = cluster.least_request_lb_config();
+TypedLeastRequestLbConfig::TypedLeastRequestLbConfig(const CommonLbConfigProto& common_lb_config,
+                                                     const LegacyLeastRequestLbProto& lb_config) {
+  Upstream::LoadBalancerConfigHelper::convertLocalityLbConfigTo(common_lb_config, lb_config_);
+
+  Upstream::LoadBalancerConfigHelper::convertSlowStartConfigTo(lb_config, lb_config_);
+  if (lb_config.has_choice_count()) {
+    *lb_config_.mutable_choice_count() = lb_config.choice_count();
+  }
+  if (lb_config.has_active_request_bias()) {
+    *lb_config_.mutable_active_request_bias() = lb_config.active_request_bias();
   }
 }
 
@@ -23,23 +30,14 @@ Upstream::LoadBalancerPtr LeastRequestCreator::operator()(
     const Upstream::ClusterInfo& cluster_info, const Upstream::PrioritySet&,
     Runtime::Loader& runtime, Random::RandomGenerator& random, TimeSource& time_source) {
 
-  auto active_or_legacy =
-      Common::ActiveOrLegacy<TypedLeastRequestLbConfig, LegacyLeastRequestLbConfig>::get(
-          lb_config.ptr());
+  const auto typed_lb_config = dynamic_cast<const TypedLeastRequestLbConfig*>(lb_config.ptr());
+  ASSERT(typed_lb_config != nullptr, "Invalid least request load balancer config");
 
-  if (active_or_legacy.hasActive()) {
-    return std::make_unique<Upstream::LeastRequestLoadBalancer>(
-        params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
-        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
-                                                       healthy_panic_threshold, 100, 50),
-        active_or_legacy.active()->lb_config_, time_source);
-  } else {
-    return std::make_unique<Upstream::LeastRequestLoadBalancer>(
-        params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
-        cluster_info.lbConfig(),
-        active_or_legacy.hasLegacy() ? active_or_legacy.legacy()->lbConfig() : absl::nullopt,
-        time_source);
-  }
+  return std::make_unique<Upstream::LeastRequestLoadBalancer>(
+      params.priority_set, params.local_priority_set, cluster_info.lbStats(), runtime, random,
+      PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
+                                                     healthy_panic_threshold, 100, 50),
+      typed_lb_config->lb_config_, time_source);
 }
 
 /**

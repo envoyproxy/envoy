@@ -18,25 +18,9 @@ namespace Upstream {
 
 using RingHashLbProto = envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash;
 using ClusterProto = envoy::config::cluster::v3::Cluster;
-using LegacyRingHashLbProto = ClusterProto::RingHashLbConfig;
 
-/**
- * Load balancer config that used to wrap legacy ring hash config.
- */
-class LegacyRingHashLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  LegacyRingHashLbConfig(const ClusterProto& cluster);
-
-  OptRef<const LegacyRingHashLbProto> lbConfig() const {
-    if (lb_config_.has_value()) {
-      return lb_config_.value();
-    }
-    return {};
-  };
-
-private:
-  absl::optional<LegacyRingHashLbProto> lb_config_;
-};
+using CommonLbConfigProto = envoy::config::cluster::v3::Cluster::CommonLbConfig;
+using LegacyRingHashLbProto = envoy::config::cluster::v3::Cluster::RingHashLbConfig;
 
 /**
  * Load balancer config that used to wrap typed ring hash config.
@@ -44,8 +28,10 @@ private:
 class TypedRingHashLbConfig : public Upstream::LoadBalancerConfig {
 public:
   TypedRingHashLbConfig(const RingHashLbProto& lb_config);
+  TypedRingHashLbConfig(const CommonLbConfigProto& common_lb_config,
+                        const LegacyRingHashLbProto& lb_config);
 
-  const RingHashLbProto lb_config_;
+  RingHashLbProto lb_config_;
 };
 
 /**
@@ -74,11 +60,6 @@ struct RingHashLoadBalancerStats {
  */
 class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
-  RingHashLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-                       Runtime::Loader& runtime, Random::RandomGenerator& random,
-                       OptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig> config,
-                       const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
-
   RingHashLoadBalancer(
       const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
       Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
@@ -87,7 +68,7 @@ public:
   const RingHashLoadBalancerStats& stats() const { return stats_; }
 
 private:
-  using HashFunction = envoy::config::cluster::v3::Cluster::RingHashLbConfig::HashFunction;
+  using HashFunction = RingHashLbProto::HashFunction;
 
   struct RingEntry {
     uint64_t hash_;

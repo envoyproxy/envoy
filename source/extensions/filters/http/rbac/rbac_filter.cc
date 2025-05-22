@@ -155,7 +155,7 @@ bool RoleBasedAccessControlFilter::evaluateShadowEngine(const Http::RequestHeade
 
   auto& fields = *metrics.mutable_fields();
   std::string effective_policy_id;
-  std::string shadow_response_code =
+  absl::string_view shadow_response_code =
       Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
 
   const bool per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
@@ -206,11 +206,12 @@ RoleBasedAccessControlFilter::evaluateEnforcedEngine(Http::RequestHeaderMap& hea
   const bool allowed = engine->handleAction(*callbacks_->connection(), headers,
                                             callbacks_->streamInfo(), &effective_policy_id);
 
-  const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
-
+  absl::string_view log_policy_id = effective_policy_id;
   if (!effective_policy_id.empty()) {
     *fields[config_->enforcedEffectivePolicyIdField(callbacks_)].mutable_string_value() =
         effective_policy_id;
+  } else {
+    log_policy_id = "none";
   }
 
   if (allowed) {

@@ -1,11 +1,6 @@
 #pragma once
 
-#include <string>
-
-#include "envoy/http/header_map.h"
 #include "envoy/stream_info/filter_state.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Router {
@@ -26,42 +21,26 @@ namespace Router {
  * TODO(mergeconflict): Keep this promise.
  */
 struct DebugConfig : public StreamInfo::FilterState::Object {
-
-  DebugConfig(bool append_cluster, absl::optional<Http::LowerCaseString> cluster_header,
-              bool append_upstream_host, absl::optional<Http::LowerCaseString> hostname_header,
-              absl::optional<Http::LowerCaseString> host_address_header, bool do_not_forward,
-              absl::optional<Http::LowerCaseString> not_forwarded_header);
+  DebugConfig(bool do_not_forward) : do_not_forward_(do_not_forward) {}
 
   /**
    * @return the string key for finding DebugConfig, if present, in FilterState.
    */
-  static const std::string& key();
-
-  /**
-   * Append cluster information as a response header if `append_cluster_` is true. The router will
-   * use `cluster_header_` as the header name, if specified, or 'x-envoy-cluster' by default.
-   */
-  bool append_cluster_{};
-  absl::optional<Http::LowerCaseString> cluster_header_;
-
-  /**
-   * Append upstream host name and address as response headers, if `append_upstream_host_` is true.
-   * The router will use `hostname_header_` and `host_address_header_` as the header names, if
-   * specified, or 'x-envoy-upstream-hostname' and 'x-envoy-upstream-host-address' by default.
-   */
-  bool append_upstream_host_{};
-  absl::optional<Http::LowerCaseString> hostname_header_;
-  absl::optional<Http::LowerCaseString> host_address_header_;
+  static absl::string_view key();
 
   /**
    * Do not forward the associated request to the upstream cluster, if `do_not_forward_` is true.
    * If the router would have forwarded it (assuming all other preconditions are met), it will
-   * instead respond with a 204 "no content." Append `not_forwarded_header_`, if specified, or
-   * 'x-envoy-not-forwarded' by default. Any debug headers specified above (or others introduced by
-   * other filters) will be appended to this empty response.
+   * instead respond with a 204 "no content.".
    */
   bool do_not_forward_{};
-  absl::optional<Http::LowerCaseString> not_forwarded_header_;
+};
+
+class DebugConfigFactory : public StreamInfo::FilterState::ObjectFactory {
+public:
+  std::string name() const override;
+  std::unique_ptr<StreamInfo::FilterState::Object>
+  createFromBytes(absl::string_view data) const override;
 };
 
 } // namespace Router
