@@ -18,7 +18,7 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-
+#include "source/extensions/filters/network/common/redis/utility.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -340,7 +340,19 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
       client->redis_client_ =
           client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
                                  auth_username_, auth_password_, false);
-      client->redis_client_->addConnectionCallbacks(*client);
+      auto shared_parent = parent_.lock();
+      if (shared_parent && shared_parent->aws_iam_authenticator_.has_value()) {
+        auto add_auth = [this, &shared_parent, &client](){
+            auth_password_ = shared_parent->aws_iam_authenticator_.value()->generateAuthToken();
+            Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(auth_username_, auth_password_);
+            client->redis_client_->makeRequest(auth_request, null_client_callbacks)
+        }
+        if(shared_parent->aws_iam_authenticator_.value()->addCallbackIfCredentialsPending([this](){add_auth();}) == false)
+        {
+          add_auth();
+        }
+      }
+        client->redis_client_->addConnectionCallbacks(*client);
     }
   }
   return client;

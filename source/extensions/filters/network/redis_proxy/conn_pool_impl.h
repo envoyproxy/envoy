@@ -80,6 +80,10 @@ public:
   AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,  std::string auth_user, absl::string_view cache_name,
                           absl::string_view service_name, absl::string_view region, uint16_t expiration_time);
     std::string generateAuthToken();
+    bool addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb)
+    {
+      return signer_->addCallbackIfCredentialsPending(std::move(cb));
+    };
 
   private:
     Envoy::Extensions::Common::Aws::SignerPtr signer_;
