@@ -35,8 +35,6 @@ private:
     AuthorityData(absl::flat_hash_set<std::string>&& authority_names, GrpcMuxSharedPtr&& grpc_mux)
         : authority_names_(std::move(authority_names)), grpc_mux_(std::move(grpc_mux)) {}
 
-    const absl::flat_hash_set<std::string>& authorityNames() const { return authority_names_; }
-
   private:
     // The set of authority names this config-source supports.
     // Note that only the `default_config_source` may have an empty list of authority names.

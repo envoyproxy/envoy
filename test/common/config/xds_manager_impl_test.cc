@@ -33,7 +33,7 @@ using testing::ReturnRef;
 // mux.
 class MockGrpcMuxFactory : public MuxFactory {
 public:
-  MockGrpcMuxFactory() {
+  MockGrpcMuxFactory(absl::string_view name = "envoy.config_mux.grpc_mux_factory") : name_(name) {
     ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
         .WillByDefault(Invoke(
             [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
@@ -46,7 +46,7 @@ public:
             }));
   }
 
-  std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
+  std::string name() const override { return name_; }
   void shutdownAll() override {}
 
   MOCK_METHOD(std::shared_ptr<Config::GrpcMux>, create,
@@ -55,6 +55,7 @@ public:
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>, bool));
+  const std::string name_;
 };
 
 // A fake cluster validator that exercises the code that uses ADS with
@@ -1028,6 +1029,55 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceNoAuthority) 
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(res.message(),
               HasSubstr("xdstp-based non-default config source must have at least one authority."));
+}
+
+// Test only a non-default config source with an authority using AGGREGATED_DELTA_GRPC.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory("envoy.config_mux.new_grpc_mux_factory");
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the created GrpcMux mock.
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return authority_A_mux_;
+          }));
+
+  // Have a single config_source with two authorities in it.
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_1.com
+    api_config_source:
+      api_type: AGGREGATED_DELTA_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source1_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source1_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 }
 
 // Test only a non-default config source defined with two authorities.
