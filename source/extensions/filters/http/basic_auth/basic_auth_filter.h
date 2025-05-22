@@ -1,10 +1,13 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/hash/algorithm_provider.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -35,6 +38,8 @@ struct User {
   std::string name;
   // the hashed password,  see https://httpd.apache.org/docs/2.4/misc/password_encryptions.html
   std::string hash;
+  // the algorithm provider for calculating hash of a given password
+  Hash::AlgorithmProviderSharedPtr algorithm_provider;
 };
 
 using UserMap = absl::flat_hash_map<std::string, User>;
