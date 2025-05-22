@@ -28,17 +28,24 @@ namespace Envoy {
 namespace Tracing {
 
 namespace {
+constexpr absl::string_view HttpResponseCode0 = "0";
+constexpr absl::string_view HttpResponseCode200 = "200";
 constexpr absl::string_view DefaultValue = "-";
 } // namespace
 
-// Helper for building response code string without excess allocations.
-static absl::string_view buildResponseCode(const StreamInfo::StreamInfo& info,
-                                           std::string& out_buffer) {
-  if (!info.responseCode()) {
-    return HttpResponseCode0;
+// Helper method to set http status code.
+static void setSpanHttpStatusCode(Span& span, const StreamInfo& info) {
+  if (!stream_info.responseCode()) {
+    span.setTag(Tracing::Tags::get().HttpStatusCode, HttpResponseCode0);
+  } else {
+    const uint16_t code = stream_info.responseCode().value();
+    if (code == 200) {
+      // Optimization for the hottest path to avoid string conversion.
+      span.setTag(Tracing::Tags::get().HttpStatusCode, HttpResponseCode200);
+    } else {
+      span.setTag(Tracing::Tags::get().HttpStatusCode, std::to_string(code));
+    }
   }
-  out_buffer = std::to_string(info.responseCode().value());
-  return out_buffer;
 }
 
 static absl::string_view valueOrDefault(const Http::HeaderEntry* header,
@@ -236,10 +243,7 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
                 cluster_info.value()->observabilityName());
   }
 
-  // Build the HTTP status code (avoid repeated string allocations).
-  std::string temp_code_buffer;
-  const absl::string_view response_code_str = buildResponseCode(stream_info, temp_code_buffer);
-  span.setTag(Tracing::Tags::get().HttpStatusCode, response_code_str);
+  setSpanHttpStatusCode(Span & span, const StreamInfo& info);
 
   span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
