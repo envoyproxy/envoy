@@ -269,6 +269,10 @@ build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 build:fuzz-coverage --test_tag_filters=-nocoverage
 build:fuzz-coverage --define=dynamic_link_tests=true
+# Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to
+# fuzz dependencies anyways. On the other hand, disabling WASM reduces the build time and
+# resources required to build and run the tests.
+build:fuzz-coverage --define=wasm=disabled
 
 build:cache-local --remote_cache=grpc://localhost:9092
 
