@@ -242,6 +242,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    - test/run_envoy_bazel_coverage.sh
   mobile-format:
     paths:
     - .bazelrc
