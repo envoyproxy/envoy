@@ -301,9 +301,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
 
   Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override;
-
-  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) override;
-
   Buffer::BufferMemoryAccountSharedPtr account() const override;
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override;
   absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstreamOverrideHost() const override;
@@ -594,11 +591,6 @@ public:
    * This is used for HTTP/1.1 codec.
    */
   virtual bool isHalfCloseEnabled() PURE;
-
-  /**
-   * Sets the provided socket option on the downstream connection's socket.
-   */
-  virtual bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr) PURE;
 };
 
 /**
@@ -930,8 +922,6 @@ public:
     filter_manager_callbacks_.sendGoAwayAndClose();
   }
 
-  virtual bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option);
-
 protected:
   struct State {
     State() = default;
@@ -1259,9 +1249,6 @@ public:
     return downstream_filter_load_shed_point_ != nullptr &&
            downstream_filter_load_shed_point_->shouldShedLoad();
   }
-
-  // Only this filter manager actually implements this feature.
-  bool setDownstreamSocketOption(const Network::Socket::OptionConstSharedPtr option) override;
 
 private:
   /**

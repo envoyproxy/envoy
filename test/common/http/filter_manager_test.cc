@@ -327,7 +327,6 @@ TEST_F(FilterManagerTest, MultipleOnLocalReply) {
   initialize();
 
   std::shared_ptr<MockStreamDecoderFilter> decoder_filter(new NiceMock<MockStreamDecoderFilter>());
-
   std::shared_ptr<MockStreamEncoderFilter> encoder_filter(new NiceMock<MockStreamEncoderFilter>());
   std::shared_ptr<MockStreamFilter> stream_filter(new NiceMock<MockStreamFilter>());
 
@@ -761,18 +760,6 @@ TEST_F(FilterManagerTest, IdleTimerResets) {
   filter_1->decoder_callbacks_->encodeTrailers(std::move(basic_resp_trailers));
   filter_manager_->destroyFilters();
 }
-
-TEST_F(FilterManagerTest, SetSocketOptionTest) {
-  initialize();
-
-  auto option = std::make_shared<MockSocketOption>();
-
-  EXPECT_CALL(filter_manager_callbacks_, setDownstreamSocketOption(_)).WillOnce(Return(true));
-
-  EXPECT_TRUE(filter_manager_->setDownstreamSocketOption(option));
-  filter_manager_->destroyFilters();
-}
-
 } // namespace
 } // namespace Http
 } // namespace Envoy

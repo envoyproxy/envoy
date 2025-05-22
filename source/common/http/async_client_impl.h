@@ -152,9 +152,6 @@ public:
   void sendData(Buffer::Instance& data, bool end_stream) override;
   void sendTrailers(RequestTrailerMap& trailers) override;
   void reset() override;
-
-  bool setDownstreamSocketOption(Network::Socket::OptionConstSharedPtr) override { return false; }
-
   bool isAboveWriteBufferHighWatermark() const override { return high_watermark_calls_ > 0; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }

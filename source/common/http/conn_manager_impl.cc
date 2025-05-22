@@ -769,10 +769,6 @@ void ConnectionManagerImpl::sendGoAwayAndClose() {
                     "forced_goaway");
 }
 
-bool ConnectionManagerImpl::setSocketOption(const Network::Socket::OptionConstSharedPtr option) {
-  return read_callbacks_->connection().setSocketOption(option);
-}
-
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
                                                ConnectionManagerTracingStats& tracing_stats) {
   switch (tracing_reason) {
