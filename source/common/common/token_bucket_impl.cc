@@ -106,15 +106,13 @@ double AtomicTokenBucketImpl::timeNowInSeconds() const {
 
 std::chrono::milliseconds AtomicTokenBucketImpl::nextTokenAvailable() const {
   // If there are tokens available, return immediately.
-  if (remainingTokens() >= 1) {
+  const double remaining_tokens = remainingTokens();
+  if (remaining_tokens >= 1) {
     return std::chrono::milliseconds(0);
   }
-
   // Calculate time since the last fill.
-  double current_time = timeNowInSeconds();
-  double last_time = time_in_seconds_.load();
   return std::chrono::milliseconds(
-      static_cast<uint64_t>(((1 / fill_rate_ - (current_time - last_time)) * 1000)));
+      static_cast<uint64_t>(((1 - remaining_tokens) / fill_rate_) * 1000));
 }
 
 } // namespace Envoy
