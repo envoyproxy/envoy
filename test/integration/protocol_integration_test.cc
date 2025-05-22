@@ -5742,4 +5742,33 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamCxStats) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_tx_bytes_total", 512);
 }
 
+// When upstream protocol is HTTP1, an OPTIONS request with no body will not
+// append transfer-encoding chunked.
+TEST_P(DownstreamProtocolIntegrationTest, OptionsWithNoBodyNotChunked) {
+  // This test is only relevant to H1 upstream.
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "OPTIONS"},
+      {":path", "/foo"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"access-control-request-method", "GET"},
+      {"origin", "test-origin"},
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().TransferEncoding(), nullptr);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
+}
+
 } // namespace Envoy
