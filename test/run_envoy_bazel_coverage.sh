@@ -120,7 +120,7 @@ GCOVR_ARGS=(
     --root "${PWD}"
     --html-details "${COVERAGE_DIR}/index.html"
     --html-title "Envoy Coverage Report"
-    --json-summary coverage.json
+    --json-summary "${PWD}/coverage.json"
     "${GCOVR_ARGS[@]}"
     "${COVERAGE_DATA}")
 
