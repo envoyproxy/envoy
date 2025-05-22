@@ -19,6 +19,14 @@ public:
   // Adds a child to the map.
   virtual void addChild(std::string value, OnMatch<DataType>&& on_match) PURE;
 
+  static typename MatchTree<DataType>::MatchResult
+  recurseMatch(const DataType& data, typename MatchTree<DataType>::MatchResult result) {
+    if (result.on_match_.has_value() && result.on_match_->matcher_) {
+      return recurseMatch(data, result.on_match_->matcher_->match(data));
+    }
+    return result;
+  }
+
   typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
     const auto input = data_input_->get(data);
     ENVOY_LOG(trace, "Attempting to match {}", input);
@@ -30,16 +38,13 @@ public:
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
       return {MatchState::MatchComplete, on_no_match_};
     }
-
-    const auto result = doMatch(absl::get<std::string>(input.data_), data);
-    if (result) {
-      if (result->matcher_) {
-        return result->matcher_->match(data);
-      } else {
-        return {MatchState::MatchComplete, OnMatch<DataType>{result->action_cb_, nullptr}};
-      }
-    } else if (input.data_availability_ ==
-               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
+    typename MatchTree<DataType>::MatchResult result =
+        recurseMatch(data, doMatch(data, absl::get<std::string>(input.data_)));
+    if (result.match_state_ == MatchState::UnableToMatch || result.on_match_.has_value()) {
+      return result;
+    }
+    if (input.data_availability_ ==
+        DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       // It's possible that we were attempting a lookup with a partial value, so delay matching
       // until we know that we actually failed.
       return {MatchState::UnableToMatch, absl::nullopt};
@@ -67,8 +72,8 @@ protected:
   // The inner match method. Attempts to match against the resulting data string. If the match
   // result was determined, the OnMatch will be returned. If a match result was determined to be no
   // match, {} will be returned.
-  virtual absl::optional<OnMatch<DataType>> doMatch(absl::string_view key,
-                                                    const DataType& data) PURE;
+  virtual typename MatchTree<DataType>::MatchResult doMatch(const DataType& data,
+                                                            absl::string_view key) PURE;
 };
 
 } // namespace Matcher

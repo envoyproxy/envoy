@@ -188,62 +188,6 @@ matcher_tree:
   EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
-TEST_F(MatcherTest, TestPrefixMatcherInnerMissDoesNotPerformOuterOnNoMatchWhenDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss", "false"}});
-  const std::string yaml = R"EOF(
-on_no_match:
-  action:
-    name: test_action
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.StringValue
-      value: one might expect this path to be taken, but it is not
-matcher_tree:
-  input:
-    name: outer_input
-    typed_config:
-      "@type": type.googleapis.com/google.protobuf.StringValue
-  prefix_match_map:
-    map:
-      val:
-        matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    name: inner_input
-                    typed_config:
-                      "@type": type.googleapis.com/google.protobuf.BoolValue
-                  value_match:
-                    exact: foo
-              on_match:
-                action:
-                  name: test_action
-                  typed_config:
-                    "@type": type.googleapis.com/google.protobuf.StringValue
-                    value: unexpected
-  )EOF";
-
-  envoy::config::common::matcher::v3::Matcher matcher;
-  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
-
-  TestUtility::validate(matcher);
-
-  auto outer_factory = TestDataInputStringFactory("value");
-  auto inner_factory = TestDataInputBoolFactory("bar");
-
-  EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
-  EXPECT_CALL(validation_visitor_,
-              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
-  auto match_tree = factory_.create(matcher);
-
-  const auto result = match_tree()->match(TestData());
-  EXPECT_THAT(result, HasNoMatch());
-}
-
 TEST_F(MatcherTest, TestPrefixMatcherWithRetryInnerMissPerformsOuterOnNoMatch) {
   const std::string yaml = R"EOF(
 on_no_match:
@@ -380,6 +324,75 @@ matcher_tree:
 
   const auto result = match_tree()->match(TestData());
   EXPECT_THAT(result, HasStringAction("expected!"));
+}
+
+TEST_F(MatcherTest, TestPrefixMatcherWithoutRetryInnerMissDoesNotRetryShorterPrefix) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss", "false"}});
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: outer_input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  prefix_match_map:
+    map:
+      val:
+        matcher:
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: bar
+              on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: expected!
+      valu:
+        matcher:
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    name: inner_input
+                    typed_config:
+                      "@type": type.googleapis.com/google.protobuf.BoolValue
+                  value_match:
+                    exact: foo
+              on_match:
+                action:
+                  name: test_action
+                  typed_config:
+                    "@type": type.googleapis.com/google.protobuf.StringValue
+                    value: not expected
+  )EOF";
+
+  envoy::config::common::matcher::v3::Matcher matcher;
+  MessageUtil::loadFromYaml(yaml, matcher, ProtobufMessage::getStrictValidationVisitor());
+
+  TestUtility::validate(matcher);
+
+  auto outer_factory = TestDataInputStringFactory("value");
+  auto inner_factory = TestDataInputBoolFactory("bar");
+
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
+  EXPECT_CALL(validation_visitor_,
+              performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"))
+      .Times(2);
+  auto match_tree = factory_.create(matcher);
+
+  const auto result = match_tree()->match(TestData());
+  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST_F(MatcherTest, TestInvalidFloatPrefixMapMatcher) {
