@@ -320,7 +320,6 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["server_fuzz_test.cc"],
     corpus = "server_corpus",
-    rbe_pool = "6gig",
     deps = [
         "//source/common/thread_local:thread_local_lib",
         "//source/server:server_lib",
