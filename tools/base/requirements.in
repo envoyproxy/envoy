@@ -25,6 +25,7 @@ envoy.gpg.identity>=0.1.1
 envoy.gpg.sign>=0.2.0
 flake8>=6
 frozendict>=2.3.7
+gcovr
 gitpython
 icalendar>=6.1.1
 jinja2

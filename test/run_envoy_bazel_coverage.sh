@@ -116,28 +116,17 @@ else
     cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 fi
 
-read -ra GENHTML_ARGS <<< "${GENHTML_ARGS:-}"
-# TEMP WORKAROUND FOR MOBILE
-CWDNAME="$(basename "${SRCDIR}")"
-if [[ "$CWDNAME" == "mobile" ]]; then
-    for arg in "${GENHTML_ARGS[@]}"; do
-        if [[ "$arg" == --erase-functions=* ]]; then
-            mobile_args_present=true
-        fi
-    done
-    if [[ "$mobile_args_present" != "true" ]]; then
-        GENHTML_ARGS+=(
-            --erase-functions=__cxx_global_var_init
-            --ignore-errors "category,corrupt,inconsistent")
-    fi
-fi
-GENHTML_ARGS=(
-    --prefix "${PWD}"
-    --output "${COVERAGE_DIR}"
-    "${GENHTML_ARGS[@]}"
+GCOVR_ARGS=(
+    --root "${PWD}"
+    --html-details "${COVERAGE_DIR}/index.html"
+    --html-title "Envoy Coverage Report"
+    "${GCOVR_ARGS[@]}"
     "${COVERAGE_DATA}")
-COVERAGE_VALUE="$(genhtml "${GENHTML_ARGS[@]}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
-COVERAGE_VALUE=${COVERAGE_VALUE%?}
+
+# Run gcovr and extract coverage percentage
+COVERAGE_OUTPUT="$(bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/gcovr -- "${GCOVR_ARGS[@]}" 2>&1 | tee /dev/stderr)"
+COVERAGE_VALUE="$(echo "${COVERAGE_OUTPUT}" | grep -E "TOTAL.*lines" | awk '{print $(NF-1)}' | sed 's/%//')"
+
 
 echo "Compressing coveraged data"
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
