@@ -114,6 +114,20 @@ else
 fi
 
 read -ra GENHTML_ARGS <<< "${GENHTML_ARGS:-}"
+# TEMP WORKAROUND FOR MOBILE
+CWDNAME="$(basename "${SRCDIR}")"
+if [[ "$CWDNAME" == "mobile" ]]; then
+    for arg in "${GENHTML_ARGS[@]}"; do
+        if [[ "$arg" == --erase-functions=* ]]; then
+            mobile_args_present=true
+        fi
+    done
+    if [[ "$mobile_args_present" != "true" ]]; then
+        GENHTML_ARGS+=(
+            --erase-functions=__cxx_global_var_init
+            --ignore-errors "category,corrupt,inconsistent")
+    fi
+fi
 GENHTML_ARGS=(
     --prefix "${PWD}"
     --output "${COVERAGE_DIR}"
