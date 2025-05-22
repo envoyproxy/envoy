@@ -41,6 +41,7 @@
 #include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Upstream {

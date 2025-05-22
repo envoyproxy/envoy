@@ -12,6 +12,7 @@
 #include "source/common/upstream/upstream_impl.h"
 
 #include "contrib/envoy/extensions/clusters/reverse_connection/v3alpha/reverse_connection.pb.h"
+#include "contrib/envoy/extensions/clusters/reverse_connection/v3alpha/reverse_connection.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -110,16 +111,17 @@ private:
 
 using RevConClusterSharedPtr = std::shared_ptr<RevConCluster>;
 
-class RevConClusterFactory : public Upstream::ClusterFactoryImplBase {
+class RevConClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
+                              envoy::extensions::clusters::reverse_connection::v3alpha::RevConClusterConfig> {
 public:
-  RevConClusterFactory() : Upstream::ClusterFactoryImplBase("envoy.clusters.reverse_connection") {}
-
-  absl::StatusOr<
-      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    Upstream::ClusterFactoryContext& context) override;
+  RevConClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.reverse_connection") {}
 
 private:
+  absl::StatusOr<
+      std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
+  createClusterWithConfig(const envoy::config::cluster::v3::Cluster& cluster,
+                         const envoy::extensions::clusters::reverse_connection::v3alpha::RevConClusterConfig& proto_config,
+                         Upstream::ClusterFactoryContext& context) override;
 };
 
 DECLARE_FACTORY(RevConClusterFactory);

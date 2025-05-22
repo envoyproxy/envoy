@@ -2,11 +2,15 @@
 
 #include <cstdint>
 
+
+#include "envoy/extensions/upstreams/http/reverse_conn/v3/reverse_conn_pool.pb.h"
+
 #include "envoy/event/dispatcher.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/http/http2/conn_pool.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,6 +39,11 @@ public:
       Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache = nullptr) override;
 
   std::string name() const override { return "envoy.upstreams.http.reverse_conn.default"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<
+        envoy::extensions::upstreams::http::reverse_conn::v3::ReverseConnPoolProto>();
+  }
 };
 
 DECLARE_FACTORY(ReverseConnPoolFactoryImpl);

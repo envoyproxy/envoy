@@ -157,8 +157,10 @@ RevConCluster::RevConCluster(
 }
 
 absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
-RevConClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                        Upstream::ClusterFactoryContext& context) {
+RevConClusterFactory::createClusterWithConfig(
+    const envoy::config::cluster::v3::Cluster& cluster,
+    const envoy::extensions::clusters::reverse_connection::v3alpha::RevConClusterConfig& proto_config,
+    Upstream::ClusterFactoryContext& context) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     return absl::InvalidArgumentError(
         fmt::format("cluster: LB policy {} is not valid for Cluster type {}. Only "
@@ -166,28 +168,15 @@ RevConClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluste
                     envoy::config::cluster::v3::Cluster::LbPolicy_Name(cluster.lb_policy()),
                     envoy::config::cluster::v3::Cluster::DiscoveryType_Name(cluster.type())));
   }
-  const auto& cluster_type = cluster.cluster_type();
-
-  if (cluster_type.name() != "envoy.clusters.reverse_connection") {
-    return absl::InvalidArgumentError(
-        fmt::format("Invalid cluster type name: '{}', expected 'envoy.clusters.reverse_connection'",
-                    cluster_type.name()));
-  }
 
   if (cluster.has_load_assignment()) {
     return absl::InvalidArgumentError(
         "Reverse Conn clusters must have no load assignment configured");
   }
 
-  // Parse and validate the typed_config as RevConClusterConfig.
-  envoy::extensions::clusters::reverse_connection::v3alpha::RevConClusterConfig rev_con_config;
-  if (!cluster_type.typed_config().UnpackTo(&rev_con_config)) {
-    return absl::InvalidArgumentError("Failed to unpack RevConClusterConfig");
-  }
-
   absl::Status creation_status = absl::OkStatus();
   auto new_cluster = std::shared_ptr<RevConCluster>(
-      new RevConCluster(cluster, context, creation_status, rev_con_config));
+      new RevConCluster(cluster, context, creation_status, proto_config));
   RETURN_IF_NOT_OK(creation_status);
   auto lb = std::make_unique<RevConCluster::ThreadAwareLoadBalancer>(new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
