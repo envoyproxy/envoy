@@ -154,9 +154,5 @@ new_features:
     added :ref:`enable_ja4_fingerprinting
     <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.enable_ja4_fingerprinting>` to create
     a JA4 fingerprint hash from the Client Hello message.
-- area: outlier detection
-  change: |
-    Added :ref:`extensions framework<envoy_v3_api_field_config.cluster.v3.OutlierDetection.monitors>` and implementation of
-    :ref:`consecutive errors extension<envoy_v3_api_msg_extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors>`.
 
 deprecated:
