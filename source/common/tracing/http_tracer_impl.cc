@@ -34,7 +34,7 @@ constexpr absl::string_view DefaultValue = "-";
 } // namespace
 
 // Helper method to set http status code.
-static void setSpanHttpStatusCode(Span& span, const StreamInfo& info) {
+static void setSpanHttpStatusCode(Span& span, const StreamInfo& stream_info) {
   if (!stream_info.responseCode()) {
     span.setTag(Tracing::Tags::get().HttpStatusCode, HttpResponseCode0);
   } else {
@@ -243,7 +243,7 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
                 cluster_info.value()->observabilityName());
   }
 
-  setSpanHttpStatusCode(Span & span, const StreamInfo& info);
+  setSpanHttpStatusCode(span, stream_info);
 
   span.setTag(Tracing::Tags::get().ResponseFlags,
               StreamInfo::ResponseFlagUtils::toShortString(stream_info));
