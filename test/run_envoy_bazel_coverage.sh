@@ -127,6 +127,9 @@ GCOVR_ARGS=(
 COVERAGE_OUTPUT="$(bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/gcovr -- "${GCOVR_ARGS[@]}" 2>&1 | tee /dev/stderr)"
 COVERAGE_VALUE="$(echo "${COVERAGE_OUTPUT}" | grep -E "TOTAL.*lines" | awk '{print $(NF-1)}' | sed 's/%//')"
 
+echo "COVERAGE GENERATED: ${COVERAGE_VALUE}"
+ls -alh "$COVERAGE_DIR"
+
 
 echo "Compressing coveraged data"
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
