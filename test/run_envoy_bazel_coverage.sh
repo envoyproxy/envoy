@@ -125,10 +125,12 @@ GCOVR_ARGS=(
 
 # Run gcovr and extract coverage percentage
 COVERAGE_OUTPUT="$(bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/gcovr -- "${GCOVR_ARGS[@]}" 2>&1 | tee /dev/stderr)"
+
+ls -alh "$COVERAGE_DIR"
+
 COVERAGE_VALUE="$(echo "${COVERAGE_OUTPUT}" | grep -E "TOTAL.*lines" | awk '{print $(NF-1)}' | sed 's/%//')"
 
 echo "COVERAGE GENERATED: ${COVERAGE_VALUE}"
-ls -alh "$COVERAGE_DIR"
 
 
 echo "Compressing coveraged data"
