@@ -22,6 +22,11 @@ described in the paper `IP-address lookup using
 LC-tries <https://www.csc.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/text.pdf>`_ by S. Nilsson and
 G. Karlsson.
 
+Ip tags can either be parsed from :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` api field or
+can be loaded from file if :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` api field is configured.
+Ip tags will be dynamically realoded if :ref:`ip_tags_datasource.watched_directory <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource.watched_directory>`
+is configured and :ref:`ip_tags_refresh_rate <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_refresh_rate>` is set to value greater than zero.
+
 
 Configuration
 -------------
@@ -41,6 +46,8 @@ the owning HTTP connection manager.
         <tag_name>.hit, Counter, Total number of requests that have the ``<tag_name>`` applied to it
         no_hit, Counter, Total number of requests with no applicable IP tags
         total, Counter, Total number of requests the IP Tagging Filter operated on
+        reload_success, Counter, Total number of successful reloads of ip tags file
+        reload_error, Counter, Total number of failed reloads of ip tags file
 
 Runtime
 -------
