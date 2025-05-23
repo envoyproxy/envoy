@@ -1,4 +1,5 @@
 #include <asm-generic/socket.h>
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -20,6 +21,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
@@ -2587,7 +2589,24 @@ TEST_P(ConnectionImplTest, SetSocketOptionTest) {
   option_details.value_ = 1;
   EXPECT_TRUE(client_connection_->setSocketOption(option_details));
 
+  SocketOptionImpl expected_opt(option_details.name_, option_details.value_);
+  std::vector<uint8_t> expected_key;
+  expected_opt.hashKey(expected_key);
+
   EXPECT_TRUE(client_connection_->socketOptions());
+  auto options = client_connection_->socketOptions();
+
+  bool opt_found = false;
+  for (const std::shared_ptr<const Socket::Option>& opt : *options) {
+    std::vector<uint8_t> key;
+    opt->hashKey(key);
+    EXPECT_EQ(key, expected_key);
+    if (key == expected_key) {
+      opt_found = true;
+    }
+  }
+
+  EXPECT_TRUE(opt_found);
 
   disconnect(false);
 }

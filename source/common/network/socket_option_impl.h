@@ -68,6 +68,8 @@ public:
                                                const void* value, size_t size);
 
 private:
+  // The state this option expects the socket to be in when it is applied. If the state is not set,
+  // then this option will be applied in any state.
   absl::optional<const envoy::config::core::v3::SocketOption::SocketState> in_state_;
   const Network::SocketOptionName optname_;
   // The vector's data() is used by the setsockopt syscall, which needs to be int-size-aligned on
