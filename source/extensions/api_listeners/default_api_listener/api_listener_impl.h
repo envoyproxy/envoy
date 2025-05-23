@@ -24,12 +24,14 @@
 #include "source/server/factory_context_impl.h"
 
 namespace Envoy {
-namespace Server {
+namespace Extensions {
+namespace ApiListeners {
+namespace DefaultApiListener {
 
 /**
  * Base class all ApiListeners.
  */
-class ApiListenerImplBase : public ApiListener,
+class ApiListenerImplBase : public Server::ApiListener,
                             public Network::DrainDecision,
                             Logger::Loggable<Logger::Id::http> {
 public:
@@ -194,7 +196,7 @@ protected:
   const envoy::config::listener::v3::Listener& config_;
   const std::string name_;
   Network::Address::InstanceConstSharedPtr address_;
-  FactoryContextImpl factory_context_;
+  Server::FactoryContextImpl factory_context_;
 };
 
 /**
@@ -227,9 +229,8 @@ public:
   // ApiListener
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }
   Http::ApiListenerPtr createHttpApiListener(Event::Dispatcher& dispatcher) override;
-  static absl::StatusOr<std::unique_ptr<HttpApiListener>>
-  create(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
-         const std::string& name);
+
+  friend class HttpApiListenerFactory;
 
 private:
   HttpApiListener(Network::Address::InstanceConstSharedPtr&& address,
@@ -242,5 +243,20 @@ private:
       http_connection_manager_factory_;
 };
 
-} // namespace Server
+class HttpApiListenerFactory : public Server::ApiListenerFactory {
+public:
+  ~HttpApiListenerFactory() override = default;
+
+  absl::StatusOr<std::unique_ptr<Server::ApiListener>>
+  create(const envoy::config::listener::v3::Listener& config, Server::Instance& server,
+         const std::string& name) override;
+
+  std::string name() const override { return "envoy.http_api_listener"; }
+};
+
+DECLARE_FACTORY(HttpApiListenerFactory);
+
+} // namespace DefaultApiListener
+} // namespace ApiListeners
+} // namespace Extensions
 } // namespace Envoy

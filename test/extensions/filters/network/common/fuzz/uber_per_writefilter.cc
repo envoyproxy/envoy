@@ -15,10 +15,6 @@ std::vector<absl::string_view> UberWriteFilterFuzzer::filterNames() {
     // See test/extensions/filters/network/common/fuzz/BUILD for more information.
     filter_names = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::registeredNames();
-    // http_connection_manager gets into the build by dependencies, but shall not be
-    // fuzzed in the write filter.
-    filter_names.erase(std::remove(filter_names.begin(), filter_names.end(),
-                                   "envoy.filters.network.http_connection_manager"));
   }
   return filter_names;
 }

@@ -1,4 +1,4 @@
-#include "source/server/api_listener_impl.h"
+#include "source/extensions/api_listeners/default_api_listener/api_listener_impl.h"
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/http/api_listener.h"
@@ -11,7 +11,9 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 
 namespace Envoy {
-namespace Server {
+namespace Extensions {
+namespace ApiListeners {
+namespace DefaultApiListener {
 
 ApiListenerImplBase::ApiListenerImplBase(Network::Address::InstanceConstSharedPtr&& address,
                                          const envoy::config::listener::v3::Listener& config,
@@ -19,7 +21,7 @@ ApiListenerImplBase::ApiListenerImplBase(Network::Address::InstanceConstSharedPt
     : config_(config), name_(name), address_(std::move(address)),
       factory_context_(server, *this, server.stats().createScope(""),
                        server.stats().createScope(fmt::format("listener.api.{}.", name_)),
-                       std::make_shared<ListenerInfoImpl>(config)) {}
+                       std::make_shared<Server::ListenerInfoImpl>(config)) {}
 
 void ApiListenerImplBase::SyntheticReadCallbacks::SyntheticConnection::raiseConnectionEvent(
     Network::ConnectionEvent event) {
@@ -41,9 +43,9 @@ HttpApiListener::ApiListenerWrapper::newStreamHandle(Http::ResponseEncoder& resp
   return http_connection_manager_->newStreamHandle(response_encoder, is_internally_created);
 }
 
-absl::StatusOr<std::unique_ptr<HttpApiListener>>
-HttpApiListener::create(const envoy::config::listener::v3::Listener& config,
-                        Server::Instance& server, const std::string& name) {
+absl::StatusOr<std::unique_ptr<Server::ApiListener>>
+HttpApiListenerFactory::create(const envoy::config::listener::v3::Listener& config,
+                               Server::Instance& server, const std::string& name) {
   auto address_or_error = Network::Address::resolveProtoAddress(config.address());
   RETURN_IF_NOT_OK_REF(address_or_error.status());
   absl::Status creation_status = absl::OkStatus();
@@ -92,5 +94,9 @@ Http::ApiListenerPtr HttpApiListener::createHttpApiListener(Event::Dispatcher& d
   return std::make_unique<ApiListenerWrapper>(*this, dispatcher);
 }
 
-} // namespace Server
+REGISTER_FACTORY(HttpApiListenerFactory, Server::ApiListenerFactory);
+
+} // namespace DefaultApiListener
+} // namespace ApiListeners
+} // namespace Extensions
 } // namespace Envoy

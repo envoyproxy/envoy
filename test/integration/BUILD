@@ -103,6 +103,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
         "//test/mocks/http:stream_encoder_mock",
         "//test/server:utility_lib",
     ],
@@ -1313,6 +1314,8 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",

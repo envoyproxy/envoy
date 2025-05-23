@@ -21,8 +21,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tls:94.4" # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
 "source/common/tls/cert_validator:94.7"
 "source/common/tls/private_key:88.9"
+"source/common/tracing:95.4"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:94.2" # increased by #32346, need coverage for terminate_handler and hot restart failures
+"source/extensions/api_listeners:55.0" # Many IS_ENVOY_BUG are not covered.
+"source/extensions/api_listeners/default_api_listener:55.0" # Many IS_ENVOY_BUG are not covered.
 "source/extensions/common/aws:96.3"
 "source/extensions/common/aws/credential_providers:94.4"
 "source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch

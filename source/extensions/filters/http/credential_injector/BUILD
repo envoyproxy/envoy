@@ -25,7 +25,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    visibility = ["//visibility:public"],
     deps = [
         ":credential_injector_lib",
         "//envoy/registry",

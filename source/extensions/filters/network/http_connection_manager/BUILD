@@ -16,8 +16,10 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # This is core Envoy config.
-    visibility = ["//visibility:public"],
+    extra_visibility = [
+        "//test/common:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/config:config_provider_manager_interface",
         "//envoy/filesystem:filesystem_interface",

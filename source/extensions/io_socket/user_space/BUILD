@@ -12,8 +12,10 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "config",
     hdrs = ["config.h"],
-    # for integration tests and bootstrap.internal_listener
-    visibility = ["//visibility:public"],
+    extra_visibility = [
+        "//test/common:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         ":io_handle_impl_lib",
     ],
