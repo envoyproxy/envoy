@@ -127,6 +127,12 @@ public:
     return &tcp_listener_config_provider_manager_;
   }
 
+protected:
+  absl::StatusOr<Network::SocketSharedPtr> createListenSocketInternal(
+      Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+      const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+      const Network::SocketCreationOptions& creation_options, uint32_t worker_index);
+
 private:
   Instance& server_;
   uint64_t next_listener_tag_{1};

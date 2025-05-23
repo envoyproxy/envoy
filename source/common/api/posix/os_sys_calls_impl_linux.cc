@@ -17,5 +17,10 @@ SysCallIntResult LinuxOsSysCallsImpl::sched_getaffinity(pid_t pid, size_t cpuset
   return {rc, errno};
 }
 
+SysCallIntResult LinuxOsSysCallsImpl::setns(int fd, int nstype) const {
+  const int rc = ::setns(fd, nstype);
+  return {rc, errno};
+}
+
 } // namespace Api
 } // namespace Envoy
