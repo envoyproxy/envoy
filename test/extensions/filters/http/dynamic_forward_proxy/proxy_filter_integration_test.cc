@@ -440,7 +440,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
   // just run this on v4 which is most likely to succeed. In v6 only environments this test won't
   // run at all but should still be covered in public CI.
   if (GetParam() != Network::Address::IpVersion::v4) {
-    return;
+    GTEST_SKIP() << "getaddrinfo is not reliable for IPv6";
   }
 
   // See https://github.com/envoyproxy/envoy/issues/28504.
@@ -517,6 +517,9 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, DisableResolveTimeout) {
+  if (GetParam() != Network::Address::IpVersion::v4) {
+    GTEST_SKIP() << "getaddrinfo is not reliable for IPv6";
+  }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -582,6 +585,9 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsFailedHost) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost) {
+  if (GetParam() != Network::Address::IpVersion::v4) {
+    GTEST_SKIP() << "getaddrinfo is not reliable for IPv6";
+  }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -665,6 +671,9 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
+  if (GetParam() != Network::Address::IpVersion::v4) {
+    GTEST_SKIP() << "getaddrinfo is not reliable for IPv6";
+  }
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
   Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
