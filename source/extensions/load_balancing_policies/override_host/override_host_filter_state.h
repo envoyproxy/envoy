@@ -20,6 +20,11 @@ public:
 
   OverrideHostFilterState(std::string&& host_list) : host_list_(std::move(host_list)) {}
   bool empty() const { return host_list_.empty(); }
+
+  /**
+   * @return consume next valid host from the list of selected hosts.
+   * Empty string view is returned if there are no more hosts.
+   */
   absl::string_view consumeNextHost() {
     for (; host_index_ < host_list_.size();) {
       auto host = absl::string_view(host_list_).substr(host_index_);
