@@ -165,7 +165,7 @@ OverrideHostLoadBalancer::LoadBalancerImpl::chooseHost(LoadBalancerContext* cont
         StreamInfo::FilterState::StateType::Mutable);
   }
 
-  if (override_host_state->selectedHosts().empty()) {
+  if (override_host_state->empty()) {
     ENVOY_LOG(trace, "No overriden hosts were found. Using fallback LB policy.");
     return fallback_picker_lb_->chooseHost(context);
   }
@@ -270,24 +270,17 @@ OverrideHostLoadBalancer::LoadBalancerImpl::findHost(absl::string_view endpoint)
 
 HostConstSharedPtr OverrideHostLoadBalancer::LoadBalancerImpl::getEndpoint(
     OverrideHostFilterState& override_host_state) {
-  uint64_t host_index = override_host_state.hostIndex();
-  const auto selected_hosts = override_host_state.selectedHosts();
-
-  for (; host_index < selected_hosts.size(); host_index++) {
-    if (HostConstSharedPtr host = findHost(selected_hosts[host_index]); host != nullptr) {
-      ENVOY_LOG(trace, "Selected endpoint {}: {}", host_index, selected_hosts[host_index]);
-      // Update the host index in the filter state to the next host. We will start from that
-      // index in the next call to getEndpoint.
-      override_host_state.setHostIndex(host_index + 1);
+  absl::string_view override_host = override_host_state.consumeNextHost();
+  while (!override_host.empty()) {
+    if (HostConstSharedPtr host = findHost(override_host); host != nullptr) {
+      ENVOY_LOG(trace, "Selected endpoint: {}", override_host);
       return host;
     }
+    override_host = override_host_state.consumeNextHost();
   }
 
   // If we reach here, it means that all the selected hosts are not available or have used.
-  ASSERT(host_index == selected_hosts.size());
-  override_host_state.setHostIndex(host_index);
-  ENVOY_LOG(trace, "Number of retry attempts has exceeded the number of failover endpoints {}",
-            selected_hosts.size());
+  ENVOY_LOG(trace, "Number of attempts has exceeded the number of override hosts.");
 
   return nullptr;
 }

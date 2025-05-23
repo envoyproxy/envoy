@@ -18,25 +18,25 @@ public:
   static constexpr absl::string_view kFilterStateKey =
       "envoy.extensions.load_balancing_policies.override_host.filter_state";
 
-  OverrideHostFilterState(std::string&& host_list)
-      : host_list_(std::move(host_list)), selected_hosts_(parseList(host_list_)) {}
+  OverrideHostFilterState(std::string&& host_list) : host_list_(std::move(host_list)) {}
+  bool empty() const { return host_list_.empty(); }
+  absl::string_view consumeNextHost() {
+    for (; host_index_ < host_list_.size();) {
+      auto host = absl::string_view(host_list_).substr(host_index_);
+      host = host.substr(0, host.find(','));
 
-  uint64_t hostIndex() const { return host_index_; }
-  void setHostIndex(uint64_t host_index) { host_index_ = host_index; }
+      host_index_ += host.size() + 1; // +1 for the delimiter
 
-  absl::Span<const absl::string_view> selectedHosts() const { return selected_hosts_; }
-
-private:
-  static absl::InlinedVector<absl::string_view, 8> parseList(absl::string_view list) {
-    absl::InlinedVector<absl::string_view, 8> result;
-    for (absl::string_view host : absl::StrSplit(list, ',', absl::SkipWhitespace())) {
-      result.push_back(absl::StripAsciiWhitespace(host));
+      // Skip senseless host.
+      if (host = absl::StripAsciiWhitespace(host); !host.empty()) {
+        return host;
+      }
     }
-    return result;
+    return {};
   }
 
+private:
   const std::string host_list_;
-  const absl::InlinedVector<absl::string_view, 8> selected_hosts_;
   uint64_t host_index_ = 0;
 };
 
