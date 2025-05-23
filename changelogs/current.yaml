@@ -138,6 +138,9 @@ new_features:
     <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.request_trailers_mutations>`
     to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
     for adding/removing trailers from the request and the response.
+- area: postgres
+  change: |
+    added support for requiring downstream SSL.
 - area: url_template
   change: |
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
