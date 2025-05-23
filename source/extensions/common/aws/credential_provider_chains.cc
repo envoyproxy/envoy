@@ -303,6 +303,11 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
 
   auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
+  if (!status.ok()) {
+    ENVOY_LOG(error, "Failed to initialize AWS Cluster Manager cluster for IAM Roles Anywhere, "
+                     "disabling this credential provider");
+    return nullptr;
+  }
 
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
@@ -312,7 +317,8 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
               : absl::nullopt);
   status = roles_anywhere_certificate_provider->initialize();
   if (!status.ok()) {
-    ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider");
+    ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider, disabling "
+                     "this credential provider");
     return nullptr;
   }
 
@@ -352,6 +358,11 @@ CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
 
   auto status = aws_cluster_manager->addManagedCluster(
       cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
+  if (!status.ok()) {
+    ENVOY_LOG(error, "Failed to initialize AWS Cluster Manager cluster for IAM Roles Anywhere, "
+                     "disabling this credential provider");
+    return nullptr;
+  }
 
   auto roles_anywhere_certificate_provider =
       std::make_shared<IAMRolesAnywhereX509CredentialsProvider>(
@@ -361,7 +372,8 @@ CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
               : absl::nullopt);
   status = roles_anywhere_certificate_provider->initialize();
   if (!status.ok()) {
-    ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider");
+    ENVOY_LOG(error, "Failed to initialize IAM Roles Anywhere X509 Credentials Provider, disabling "
+                     "this credential provider");
     return nullptr;
   }
 
