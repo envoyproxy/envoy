@@ -72,6 +72,9 @@ private:
 // and the DNS matching semantics must be followed.
 class DnsExactStringSanMatcher : public SanMatcher {
 public:
+  // To avoid hiding other implementations of match.
+  using SanMatcher::match;
+
   bool match(GENERAL_NAME const* general_name) const override;
   ~DnsExactStringSanMatcher() override = default;
 

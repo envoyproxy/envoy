@@ -88,6 +88,9 @@ public:
     });
   }
 
+  // To avoid hiding other implementations of match.
+  using Matchers::StringMatcher::match;
+
   bool match(absl::string_view value) const override { return (*tls_slot_)->match(value); }
 
 private:
