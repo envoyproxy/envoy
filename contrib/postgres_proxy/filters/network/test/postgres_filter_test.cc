@@ -38,7 +38,7 @@ public:
     PostgresFilterConfig::PostgresFilterConfigOptions config_options{
         stat_prefix_, true, false,
         envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE,
-        false};
+        envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE};
 
     config_ = std::make_shared<PostgresFilterConfig>(config_options, scope_);
     filter_ = std::make_unique<PostgresFilter>(config_);
@@ -406,9 +406,10 @@ TEST_F(PostgresFilterTest, TerminateSSL) {
 
 // Test verifies that filter verifies downstream ssl after ssl negotiation for ssl enabled client
 TEST_F(PostgresFilterTest, RequireDownstreamSsl) {
-  filter_->getConfig()->terminate_ssl_ = true;
-  // require_downstream_ssl_ and terminate_ssl_ must be set to true at the same time
-  filter_->getConfig()->require_downstream_ssl_ = true;
+  // deprecated field terminate_ssl is ignored when downstream_ssl is configured
+  filter_->getConfig()->terminate_ssl_ = false;
+  filter_->getConfig()->downstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE;
   // Before ssl negotiation, switched to tls initialized to false
   ASSERT_FALSE(filter_->isSwitchedToTls());
 
@@ -444,9 +445,10 @@ TEST_F(PostgresFilterTest, RequireDownstreamSsl) {
 
 // Test makes sure that filter verifies downstream ssl for unencrypted request
 TEST_F(PostgresFilterTest, DownstreamUnencryptedRequireSsl) {
-  filter_->getConfig()->terminate_ssl_ = true;
-  // require_downstream_ssl_ and terminate_ssl_ must be set to true at the same time
-  filter_->getConfig()->require_downstream_ssl_ = true;
+  // deprecated field terminate_ssl is ignored when downstream_ssl is configured
+  filter_->getConfig()->terminate_ssl_ = false;
+  filter_->getConfig()->downstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE;
   // Before ssl negotiation, switched to tls initialized to false
   ASSERT_FALSE(filter_->isSwitchedToTls());
 
@@ -464,6 +466,73 @@ TEST_F(PostgresFilterTest, DownstreamUnencryptedRequireSsl) {
   filter_->onData(data_, true);
 
   ASSERT_THAT('E', buf.peekBEInt<char>(0));
+  ASSERT_FALSE(filter_->isSwitchedToTls());
+}
+
+// Test verifies that filter tries to terminate ssl downstream client
+TEST_F(PostgresFilterTest, AllowDownstreamSsl) {
+  // deprecated field terminate_ssl is ignored when downstream_ssl is configured
+  filter_->getConfig()->terminate_ssl_ = false;
+  filter_->getConfig()->downstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::ALLOW;
+  // Before ssl negotiation, switched to tls initialized to false
+  ASSERT_FALSE(filter_->isSwitchedToTls());
+
+  // SSL negotiation with downstream
+  EXPECT_CALL(read_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+  Network::Connection::BytesSentCb cb;
+  EXPECT_CALL(connection_, addBytesSentCallback(_)).WillOnce(testing::SaveArg<0>(&cb));
+  Buffer::OwnedImpl buf;
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, false))
+      .WillOnce(testing::SaveArg<0>(&buf));
+  data_.writeBEInt<uint32_t>(8);
+  // 1234 in the most significant 16 bits and some code in the least significant 16 bits.
+  data_.writeBEInt<uint32_t>(80877103); // SSL code.
+  ASSERT_THAT(Network::FilterStatus::StopIteration, filter_->onData(data_, true));
+  ASSERT_THAT('S', buf.peekBEInt<char>(0));
+
+  // Now indicate through the callback that 1 bytes has been sent.
+  // Filter should call startSecureTransport and should not close the connection.
+  EXPECT_CALL(connection_, startSecureTransport()).WillOnce(testing::Return(true));
+  EXPECT_CALL(connection_, close(_)).Times(0);
+  cb(1);
+  // Make sure client has switched to TLS
+  ASSERT_TRUE(filter_->isSwitchedToTls());
+
+  // connection should not be closed as client ssl was verified
+  EXPECT_CALL(connection_, close(_)).Times(0);
+  // make sure envoy doesn't send back any error response
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _)).Times(0);
+  // client sends subsequent message
+  createInitialPostgresRequest(data_);
+  filter_->onData(data_, true);
+}
+
+// Test verifies that filter pass unencrypted traffic to upstream
+TEST_F(PostgresFilterTest, AllowDownstreamPlaintext) {
+  // deprecated field terminate_ssl is ignored when downstream_ssl is configured
+  filter_->getConfig()->terminate_ssl_ = false;
+  filter_->getConfig()->downstream_ssl_ =
+      envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::ALLOW;
+  // Before ssl negotiation, switched to tls initialized to false
+  ASSERT_FALSE(filter_->isSwitchedToTls());
+
+  // Set expectation that connection is not closed
+  EXPECT_CALL(connection_, close(_)).Times(0);
+  // Ensure any injected response is not an error or SSL denial
+  EXPECT_CALL(write_callbacks_, injectWriteDataToFilterChain(_, _))
+      .WillRepeatedly([](Buffer::Instance& buffer, bool) {
+        if (buffer.length() > 0) {
+          char first_byte = buffer.peekBEInt<char>(0);
+          EXPECT_NE(first_byte, 'E');
+          EXPECT_NE(first_byte, 'N');
+        }
+      });
+
+  createInitialPostgresRequest(data_);
+  filter_->onData(data_, true);
+
+  // did not switch to tls
   ASSERT_FALSE(filter_->isSwitchedToTls());
 }
 

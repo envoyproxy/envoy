@@ -73,7 +73,8 @@ public:
     bool terminate_ssl_;
     envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
         upstream_ssl_;
-    bool require_downstream_ssl_;
+    envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
+        downstream_ssl_;
   };
   PostgresFilterConfig(const PostgresFilterConfigOptions& config_options, Stats::Scope& scope);
 
@@ -82,7 +83,9 @@ public:
   envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
       upstream_ssl_{
           envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE};
-  bool require_downstream_ssl_{false};
+  envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::SSLMode
+      downstream_ssl_{
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE};
   Stats::Scope& scope_;
   PostgresProxyStats stats_;
 

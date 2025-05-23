@@ -18,7 +18,7 @@ PostgresFilterConfig::PostgresFilterConfig(const PostgresFilterConfigOptions& co
                                            Stats::Scope& scope)
     : enable_sql_parsing_(config_options.enable_sql_parsing_),
       terminate_ssl_(config_options.terminate_ssl_), upstream_ssl_(config_options.upstream_ssl_),
-      require_downstream_ssl_(config_options.require_downstream_ssl_), scope_{scope},
+      downstream_ssl_(config_options.downstream_ssl_), scope_{scope},
       stats_{generateStats(config_options.stats_prefix_, scope)} {}
 
 PostgresFilter::PostgresFilter(PostgresFilterConfigSharedPtr config) : config_{config} {
@@ -207,7 +207,9 @@ void PostgresFilter::processQuery(const std::string& sql) {
 }
 
 bool PostgresFilter::onSSLRequest() {
-  if (!config_->terminate_ssl_) {
+  if (config_->downstream_ssl_ ==
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::DISABLE &&
+      !config_->terminate_ssl_) {
     // Signal to the decoder to continue.
     return true;
   }
@@ -290,7 +292,9 @@ bool PostgresFilter::encryptUpstream(bool upstream_agreed, Buffer::Instance& dat
 }
 
 void PostgresFilter::verifyDownstreamSSL() {
-  if (config_->require_downstream_ssl_ && (!switched_to_tls_)) {
+  if (config_->downstream_ssl_ ==
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE &&
+      (!switched_to_tls_)) {
     ENVOY_LOG(debug, "postgres_proxy: closing connection because downstream ssl is required but no "
                      "ssl negotiation indicated.");
     closeConn();

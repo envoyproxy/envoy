@@ -149,7 +149,7 @@ public:
    )EOF",
                     TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
                     TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")),
-                "require_downstream_ssl: true"),
+                "downstream_ssl: REQUIRE"),
             NoUpstreamSSL) {}
 };
 
@@ -212,8 +212,8 @@ public:
   DownstreamSSLWrongConfigPostgresIntegrationTest()
       // Enable SSL termination but do not configure downstream transport socket.
       : PostgresBaseIntegrationTest(
-            std::make_tuple("terminate_ssl: true", "", "require_downstream_ssl: true"),
-            NoUpstreamSSL) {}
+            std::make_tuple("terminate_ssl: false", "", "downstream_ssl: REQUIRE"), NoUpstreamSSL) {
+  }
 };
 
 // Test verifies that Postgres filter closes connection when it is configured to
@@ -553,7 +553,7 @@ public:
    )EOF",
                     TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
                     TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")),
-                "require_downstream_ssl: true")) {}
+                "downstream_ssl: REQUIRE")) {}
 
   // Method changes IntegrationTcpClient's transport socket to TLS.
   // Sending any traffic to newly attached TLS transport socket will trigger
