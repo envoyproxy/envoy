@@ -1186,11 +1186,11 @@ private:
   }
 
   absl::StatusOr<PathMatcherSharedPtr>
-  buildPathMatcher(envoy::config::route::v3::Route route,
+  buildPathMatcher(const envoy::config::route::v3::Route& route,
                    ProtobufMessage::ValidationVisitor& validator) const;
 
   absl::StatusOr<PathRewriterSharedPtr>
-  buildPathRewriter(envoy::config::route::v3::Route route,
+  buildPathRewriter(const envoy::config::route::v3::Route& route,
                     ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr
