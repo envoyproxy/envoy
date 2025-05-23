@@ -134,13 +134,11 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_if_no_connections);
 // TODO(adisuissa): flip to true after this is out of alpha mode.
 FALSE_RUNTIME_GUARD(envoy_restart_features_xds_failover_support);
-// TODO(fredyw): evaluate and either make this a config knob or remove.
+// TODO(abeyad): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_set_ip_version_to_remove);
 // TODO(abeyad): evaluate and either make this the default or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_filter_unusable_ip_version);
-// TODO(alyssawilk): evaluate and make this a config knob or remove.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_reset_brokenness_on_nework_change);
-// TODO(abeyad): Remove this; it's used in experiments but has no associated source code usage.
+// TODO(abeyad): evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_drain_pools_on_network_change);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
@@ -162,15 +160,7 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 // before downstream.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
 
-// TODO(renjietang): Flip to true after prod testing.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_network_type_socket_option);
-// TODO(abeyad): Evaluate and either remove or make a config knob in
-// https://github.com/envoyproxy/envoy/blob/main/api/envoy/extensions/transport_sockets/tls/v3/tls.proto#L29.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_disable_client_early_data);
-
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
-// TODO(abeyad): Evaluate and either remove or make the default.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_drain_conn_pools_on_network_change);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
