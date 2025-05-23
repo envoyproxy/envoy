@@ -43,14 +43,13 @@ void UdpTapSink::UdpTapSinkHandle::submitTrace(TapCommon::TraceWrapperPtr&& trac
                                                envoy::config::tap::v3::OutputSink::Format format) {
   switch (format) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
-  case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
-    FALLTHRU;
   case envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED:
     // will implement above format if it is needed.
-    ENVOY_LOG_MISC(debug, "{}: Not support PROTO_BINARY and PROTO_BINARY_LENGTH_DELIMITEDT",
-                   __func__);
+    ENVOY_LOG_MISC(debug, "{}: Not support PROTO_BINARY_LENGTH_DELIMITEDT", __func__);
     break;
   case envoy::config::tap::v3::OutputSink::PROTO_TEXT:
+    FALLTHRU;
+  case envoy::config::tap::v3::OutputSink::PROTO_BINARY:
     FALLTHRU;
   case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
     FALLTHRU;
@@ -62,6 +61,12 @@ void UdpTapSink::UdpTapSinkHandle::submitTrace(TapCommon::TraceWrapperPtr&& trac
     std::string json_string;
     if (format == envoy::config::tap::v3::OutputSink::PROTO_TEXT) {
       json_string = MessageUtil::toTextProto(*trace);
+    } else if (format == envoy::config::tap::v3::OutputSink::PROTO_BINARY) {
+      int size = trace->ByteSizeLong();
+      json_string.resize(size);
+      if (!trace->SerializeToArray(&json_string[0], size)) {
+        break;
+      }
     } else {
       json_string = MessageUtil::getJsonStringFromMessageOrError(*trace, true, false);
     }

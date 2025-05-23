@@ -18,7 +18,7 @@ public:
   PerSocketTapperImpl(
       SocketTapConfigSharedPtr config,
       const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
-      const Network::Connection& connection);
+      const TransportTapStats& stats, const Network::Connection& connection);
 
   // PerSocketTapper
   void closeSocket(Network::ConnectionEvent event) override;
@@ -40,7 +40,15 @@ private:
     trace->mutable_socket_streamed_trace_segment()->set_trace_id(connection_.id());
     return trace;
   }
-
+  void pegReadWriteSubmitCounter(const bool onStreaming, const bool isRead);
+  void pegCloseSubmitCounter(const bool isStreaming);
+  void handleSendingTappedMsgPerConfigSize(const Buffer::Instance& data, const uint32_t totalBytes,
+                                           envoy::data::tap::v3::SocketEvent& event,
+                                           const bool isRead);
+  // This is the default value for min buffered bytes.
+  // (This means that per transport socket buffer trace, the minimum amount
+  // which triggering to send the tapped messages size is 9 byes).
+  static constexpr uint32_t DefaultMinBufferedBytes = 9;
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;
@@ -50,6 +58,11 @@ private:
   uint32_t rx_bytes_buffered_{};
   uint32_t tx_bytes_buffered_{};
   const bool should_output_conn_info_per_event_{false};
+  const bool should_peg_counter_{false};
+  const bool should_sending_tapped_msg_on_configured_size_{false};
+  const uint32_t min_sending_buffered_bytes_{};
+  uint32_t current_buffered_rx_tx_bytes_{};
+  const TransportTapStats stats_;
 };
 
 class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
@@ -66,8 +79,8 @@ public:
   // SocketTapConfig
   PerSocketTapperPtr createPerSocketTapper(
       const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
-      const Network::Connection& connection) override {
-    return std::make_unique<PerSocketTapperImpl>(shared_from_this(), tap_config, connection);
+      const TransportTapStats& stats, const Network::Connection& connection) override {
+    return std::make_unique<PerSocketTapperImpl>(shared_from_this(), tap_config, stats, connection);
   }
   TimeSource& timeSource() const override { return time_source_; }
 
