@@ -36,63 +36,6 @@ public:
   MatchTreeFactory<TestData, absl::string_view> factory_;
 };
 
-MATCHER_P(IsStringAction, m, "") {
-  // Accepts an ActionFactoryCb argument.
-  if (arg == nullptr) {
-    *result_listener << "action callback is nullptr";
-    return false;
-  }
-  ActionPtr action = arg();
-  StringAction string_action = action->getTyped<StringAction>();
-  return ::testing::ExplainMatchResult(m, string_action.string_, result_listener);
-}
-
-MATCHER_P(HasStringAction, m, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.on_match_ == absl::nullopt) {
-    *result_listener << "on_match_ is nullopt";
-    return false;
-  }
-  return ExplainMatchResult(IsStringAction(m), arg.on_match_->action_cb_, result_listener);
-}
-
-MATCHER(HasNoMatch, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.on_match_ != absl::nullopt) {
-    *result_listener << "on_match_ was not nullopt";
-    return false;
-  }
-  return true;
-}
-
-MATCHER(HasSubMatcher, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.on_match_ == absl::nullopt) {
-    *result_listener << "on_match_ is nullopt";
-    return false;
-  }
-  if (arg.on_match_->matcher_ == nullptr) {
-    *result_listener << "on_match_->matcher_ is nullptr, expected it to not be.";
-    if (arg.on_match_->action_cb_ != nullptr) {
-      *result_listener << "\non_match_->action_cb_ is not nullptr.";
-    }
-    return false;
-  }
-  return true;
-}
-
 TEST_F(MatcherTest, TestMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
