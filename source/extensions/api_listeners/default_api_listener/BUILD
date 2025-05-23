@@ -1,6 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_library",
+    "envoy_cc_extension",
     "envoy_extension_package",
 )
 
@@ -8,13 +8,17 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "api_listener_lib",
     srcs = [
         "api_listener_impl.cc",
     ],
     hdrs = [
         "api_listener_impl.h",
+    ],
+    extra_visibility = [
+        "//test/common:__subpackages__",
+        "//test/integration:__subpackages__",
     ],
     deps = [
         "//envoy/network:connection_interface",

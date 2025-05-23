@@ -2,11 +2,11 @@
 
 #include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/network/listener.h"
+#include "envoy/server/api_listener.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
-#include "source/server/api_listener_impl.h"
 
 namespace Envoy {
 namespace Server {

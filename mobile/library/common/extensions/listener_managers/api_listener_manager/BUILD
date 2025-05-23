@@ -18,6 +18,7 @@ envoy_cc_extension(
     ],
     repository = "@envoy",
     deps = [
+        "@envoy//envoy/server:api_listener_interface",
         "@envoy//envoy/server:instance_interface",
         "@envoy//envoy/server:listener_manager_interface",
         "@envoy//source/extensions/api_listeners/default_api_listener:api_listener_lib",
