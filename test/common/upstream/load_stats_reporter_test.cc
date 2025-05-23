@@ -133,9 +133,10 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
   foo_cluster.info_->eds_service_name_ = "bar";
   NiceMock<MockClusterMockPrioritySet> bar_cluster;
-  MockClusterManager::ClusterInfoMaps cluster_info{
-      {{"foo", foo_cluster}, {"bar", bar_cluster}}, {}, {}};
-  ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(foo_cluster)));
+  ON_CALL(cm_, getActiveCluster("bar"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(bar_cluster)));
   deliverLoadStatsResponse({"foo"});
   // Initial stats report for foo on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
@@ -145,7 +146,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
     envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
     foo_cluster_stats.set_cluster_service_name("bar");
-    foo_cluster_stats.set_total_dropped_requests(5);
+    foo_cluster_stats.set_total_dropped_requests(7);
     setDropOverload(foo_cluster_stats, 7);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
@@ -176,8 +177,8 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
         Protobuf::util::TimeUtil::MicrosecondsToDuration(24));
     envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
-    bar_cluster_stats.set_total_dropped_requests(1);
-    setDropOverload(bar_cluster_stats, 3);
+    bar_cluster_stats.set_total_dropped_requests(2);
+    setDropOverload(bar_cluster_stats, 8);
     bar_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(22));
     expectSendMessage({bar_cluster_stats, foo_cluster_stats});
@@ -228,8 +229,8 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
     envoy::config::endpoint::v3::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
     foo_cluster_stats.set_cluster_service_name("bar");
-    foo_cluster_stats.set_total_dropped_requests(1);
-    setDropOverload(foo_cluster_stats, 9);
+    foo_cluster_stats.set_total_dropped_requests(8);
+    setDropOverload(foo_cluster_stats, 17);
     foo_cluster_stats.mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(4));
     envoy::config::endpoint::v3::ClusterStats bar_cluster_stats;
@@ -316,8 +317,8 @@ TEST_P(LoadStatsReporterTestWithRqTotal, UpstreamLocalityStats) {
   addStats(host2, 10.01, 0, 20.02, 30.03);
 
   cluster.info_->eds_service_name_ = "bar";
-  MockClusterManager::ClusterInfoMaps cluster_info{{{"foo", cluster}}, {}, {}};
-  ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
   deliverLoadStatsResponse({"foo"});
   // First stats report on timer tick.
   time_system_.setMonotonicTime(std::chrono::microseconds(4));

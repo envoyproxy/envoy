@@ -333,6 +333,15 @@ public:
    */
   virtual ClusterInfoMaps clusters() const PURE;
 
+  /**
+   * Receives a cluster name and returns an active cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
+
   using ClusterSet = absl::flat_hash_set<std::string>;
 
   /**
