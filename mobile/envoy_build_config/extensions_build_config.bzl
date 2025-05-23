@@ -3,6 +3,7 @@ MOBILE_PACKAGE_VISIBILITY = ["@envoy//:mobile_library"]
 EXTENSION_CONFIG_VISIBILITY = ["//visibility:public"]
 EXTENSION_PACKAGE_VISIBILITY = ["//visibility:public"]
 EXTENSIONS = {
+    "envoy.http_api_listener":                             "//source/extensions/api_listener/default_api_listener:api_listener_lib",
     "envoy.clusters.dynamic_forward_proxy":                "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.static":                               "//source/extensions/clusters/static:static_cluster_lib",
     "envoy.filters.connection_pools.http.generic":         "//source/extensions/upstreams/http/generic:config",
