@@ -737,8 +737,7 @@ def _com_github_grpc_grpc():
         name = "com_github_grpc_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
-        # Needed until grpc updates its naming (v1.62.0)
-        repo_mapping = {"@com_github_cncf_udpa": "@com_github_cncf_xds"},
+        repo_mapping = {"@openssl": "@boringssl"},
     )
     external_http_archive("build_bazel_rules_apple")
 
@@ -755,6 +754,7 @@ def _com_github_grpc_grpc():
         name = "libcrypto",
         actual = "//external:crypto",
     )
+
     native.bind(
         name = "cares",
         actual = "@envoy//bazel/foreign_cc:ares",
