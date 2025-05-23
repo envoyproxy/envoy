@@ -556,7 +556,7 @@ HTTP only
   **UpstreamConnectionTermination**, **UC**, Upstream connection termination in addition to 503 response code.
   **DelayInjected**, **DI**, The request processing was delayed for a period specified via :ref:`fault injection <config_http_filters_fault_injection>`.
   **FaultInjected**, **FI**, The request was aborted with a response code specified via :ref:`fault injection <config_http_filters_fault_injection>`.
-  **RateLimited**, **RL**, The request was ratelimited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
+  **RateLimited**, **RL**, The request was rate-limited locally by the :ref:`HTTP rate limit filter <config_http_filters_rate_limit>` in addition to 429 response code.
   **UnauthorizedExternalService**, **UAEX**, The request was denied by the external authorization service.
   **RateLimitServiceError**, **RLSE**, The request was rejected because there was an error in rate limit service.
   **InvalidEnvoyRequestHeaders**, **IH**, The request was rejected because it set an invalid value for a :ref:`strictly-checked header <envoy_v3_api_field_extensions.filters.http.router.v3.Router.strict_check_headers>` in addition to 400 response code.
@@ -824,7 +824,7 @@ UDP
     An HTTP request header where X is the main HTTP header, Y is the alternative one, and Z is an
     optional parameter denoting string truncation up to Z characters long. The value is taken from
     the HTTP request header named X first and if it's not set, then request header Y is used. If
-    none of the headers are present '-' symbol will be in the log.
+    none of the headers are present ``"-"`` symbol will be in the log.
 
   TCP/UDP
     Not implemented ("-").
@@ -1035,10 +1035,10 @@ UDP
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
     Z is an optional parameter denoting string truncation up to Z characters long.
     F is an optional parameter used to indicate which method FilterState uses for serialization.
-    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
-    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
-    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
-    FIELD parameter should only be used with F set to 'FIELD'.
+    If `PLAIN` is set, the filter state object will be serialized as an unstructured string.
+    If `TYPED` is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to `FIELD`, the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to `FIELD`.
 
   TCP/UDP
     Same as HTTP, the filter state is from connection instead of a L7 request.
@@ -1059,17 +1059,17 @@ UDP
     If the serialized proto is unknown to Envoy it will be logged as protobuf debug string.
     Z is an optional parameter denoting string truncation up to Z characters long.
     F is an optional parameter used to indicate which method FilterState uses for serialization.
-    If 'PLAIN' is set, the filter state object will be serialized as an unstructured string.
-    If 'TYPED' is set or no F provided, the filter state object will be serialized as an JSON string.
-    If F is set to 'FIELD', the filter state object field with the name FIELD will be serialized.
-    FIELD parameter should only be used with F set to 'FIELD'.
+    If `PLAIN` is set, the filter state object will be serialized as an unstructured string.
+    If `TYPED` is set or no F provided, the filter state object will be serialized as an JSON string.
+    If F is set to `FIELD`, the filter state object field with the name FIELD will be serialized.
+    FIELD parameter should only be used with F set to `FIELD`.
 
   TCP/UDP
     Not implemented.
 
   .. note::
 
-    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`
+    This command operator is only available for :ref:`upstream_log <envoy_v3_api_field_extensions.filters.http.router.v3.Router.upstream_log>`.
 
 %REQUESTED_SERVER_NAME%
   HTTP/TCP/THRIFT
@@ -1207,7 +1207,7 @@ UDP
 
 %DOWNSTREAM_PEER_CHAIN_SERIALS%
   HTTP/TCP/THRIFT
-    The comma-separated wserial numbers of all client certificates used to establish the downstream TLS connection.
+    The comma-separated serial numbers of all client certificates used to establish the downstream TLS connection.
   UDP
     Not implemented ("-").
 
@@ -1221,9 +1221,9 @@ UDP
   HTTP/TCP/Thrift
     The JA3 fingerprint (MD5 hash) of the TLS Client Hello message from the downstream connection.
     Provides a way to fingerprint TLS clients based on various Client Hello parameters like cipher suites,
-    extensions, elliptic curves, etc. Will be ``-`` if TLS is not used or the handshake is incomplete.
+    extensions, elliptic curves, etc. Will be ``"-"`` if TLS is not used or the handshake is incomplete.
   UDP
-    Not implemented (``-``).
+    Not implemented ("-").
 
 %TLS_JA4_FINGERPRINT%
   HTTP/TCP/THRIFT
@@ -1398,7 +1398,7 @@ UDP
    A unique identifier (UUID) that is generated dynamically.
 
 %ENVIRONMENT(X):Z%
-  Environment value of environment variable X. If no valid environment variable X, '-' symbol will be used.
+  Environment value of environment variable X. If no valid environment variable X, ``"-"`` symbol will be used.
   Z is an optional parameter denoting string truncation up to Z characters long.
 
 %TRACE_ID%
@@ -1409,7 +1409,7 @@ UDP
 
 %QUERY_PARAM(X):Z%
   HTTP
-    The value of the query parameter X. If the query parameter X is not present, '-' symbol will be used.
+    The value of the query parameter X. If the query parameter X is not present, ``"-"`` symbol will be used.
     Z is an optional parameter denoting string truncation up to Z characters long.
   TCP/UDP
     Not implemented ("-").
