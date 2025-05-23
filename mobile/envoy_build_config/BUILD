@@ -24,7 +24,6 @@ envoy_cc_library(
         "@envoy//source/common/router:upstream_codec_filter_lib",
         "@envoy//source/common/tls/cert_validator:cert_validator_lib",
         "@envoy//source/common/upstream:default_local_address_selector_factory",
-        "@envoy//source/extensions/api_listeners/default_api_listener:api_listener_lib",
         "@envoy//source/extensions/clusters/dynamic_forward_proxy:cluster",
         "@envoy//source/extensions/compression/brotli/decompressor:config",
         "@envoy//source/extensions/compression/gzip/decompressor:config",
@@ -101,7 +100,6 @@ envoy_cc_library(
     # the time, while for iOS we have to force register the extensions, so test files must pull in
     # the TestExtensions module and call register_test_extensions().
     deps = [
-        "@envoy//source/extensions/api_listeners/default_api_listener:api_listener_lib",
         "@envoy//source/extensions/clusters/static:static_cluster_lib",
         "@envoy//source/extensions/filters/http/buffer:config",
         "@envoy//source/extensions/load_balancing_policies/round_robin:config",
