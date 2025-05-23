@@ -364,22 +364,6 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {nullptr};
   }
 
-  const Router::StringAccessor* dynamic_host_filter_state = nullptr;
-  if (context->requestStreamInfo()) {
-    dynamic_host_filter_state =
-        context->requestStreamInfo()->filterState()->getDataReadOnly<Router::StringAccessor>(
-            DynamicHostFilterStateKey);
-  }
-
-  absl::string_view raw_host;
-  if (dynamic_host_filter_state) {
-    raw_host = dynamic_host_filter_state->asString();
-  } else if (context->downstreamHeaders()) {
-    raw_host = context->downstreamHeaders()->getHostValue();
-  } else if (context->downstreamConnection()) {
-    raw_host = context->downstreamConnection()->requestedServerName();
-  }
-
   // For host lookup, we need to make sure to match the host of any DNS cache
   // insert. Two code points currently do DNS cache insert: the http DFP filter,
   // which inserts for HTTP traffic, and sets port based on the cluster's
@@ -389,21 +373,50 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
                              ->transportSocketMatcher()
                              .resolve(nullptr, nullptr)
                              .factory_.implementsSecureTransport();
-  uint32_t port = is_secure ? 443 : 80;
-  if (context->requestStreamInfo()) {
+  const uint32_t default_port = is_secure ? 443 : 80;
+
+  const auto* stream_info = context->requestStreamInfo();
+  const Router::StringAccessor* dynamic_host_filter_state = nullptr;
+  if (stream_info) {
+    dynamic_host_filter_state = stream_info->filterState().getDataReadOnly<Router::StringAccessor>(
+        DynamicHostFilterStateKey);
+  }
+
+  absl::string_view raw_host;
+  uint32_t port = default_port;
+
+  if (dynamic_host_filter_state) {
+    // Use dynamic host from filter state if available.
+    raw_host = dynamic_host_filter_state->asString();
+
+    // Try to get port from filter state first.
     const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
-        context->requestStreamInfo()->filterState()->getDataReadOnly<StreamInfo::UInt32Accessor>(
+        stream_info->filterState().getDataReadOnly<StreamInfo::UInt32Accessor>(
             DynamicPortFilterStateKey);
+
     if (dynamic_port_filter_state != nullptr && dynamic_port_filter_state->value() > 0 &&
         dynamic_port_filter_state->value() <= 65535) {
+      // Use dynamic port from filter state if available.
       port = dynamic_port_filter_state->value();
+    } else if (context->downstreamHeaders()) {
+      // Parse the original Host header to get the port as fallback.
+      const auto host_attributes =
+          Http::Utility::parseAuthority(context->downstreamHeaders()->getHostValue());
+      port = host_attributes.port_.value_or(default_port);
     }
+    // If no headers available, port remains ``default_port``.
+  } else if (context->downstreamHeaders()) {
+    raw_host = context->downstreamHeaders()->getHostValue();
+    // When no filter state is used, we let ``normalizeHostForDfp()`` handle the port parsing.
+  } else if (context->downstreamConnection()) {
+    raw_host = context->downstreamConnection()->requestedServerName();
   }
 
   if (raw_host.empty()) {
     ENVOY_LOG(debug, "host empty");
     return {nullptr, "empty_host_header"};
   }
+
   std::string hostname =
       Common::DynamicForwardProxy::DnsHostInfo::normalizeHostForDfp(raw_host, port);
 
@@ -420,7 +433,7 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
     return {host};
   }
 
-  // If the host is not found, the DFP cluster cluster can now do asynchronous lookup.
+  // If the host is not found, the DFP cluster can now do asynchronous lookup.
   Upstream::ResourceAutoIncDecPtr handle = cluster_.dns_cache_->canCreateDnsRequest();
 
   // Return an immediate failure if there's too many requests already.

@@ -67,6 +67,55 @@ To use :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_reso
 .. literalinclude:: _include/dns-cache-circuit-breaker-apple.yaml
     :language: yaml
 
+Dynamic Host Resolution via Filter State
+----------------------------------------
+
+The dynamic forward proxy filter supports dynamic host and port resolution through filter state when the
+:ref:allow_dynamic_host_from_filter_state <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>
+option is enabled. When this feature is enabled, the filter will check for the following filter state values
+before falling back to the HTTP Host header:
+
+* ``envoy.upstream.dynamic_host``: Specifies the target host for DNS resolution and connection.
+* ``envoy.upstream.dynamic_port``: Specifies the target port for connection.
+
+This behavior brings consistency with the SNI and UDP Dynamic Forward Proxy filters, allowing the same
+filter state mechanism to work across different proxy types.
+
+Host Resolution Priority
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+When ref:allow_dynamic_host_from_filter_state <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>
+is enabled, the filter resolves the target host and port using the following priority order:
+
+1. **Filter State Values:** ``envoy.upstream.dynamic_host`` and ``envoy.upstream.dynamic_port`` from the stream's filter state.
+2. **Host Rewrite Configuration:** Values specified in the route's or virtual host's ``typed_per_filter_config``.
+3. **HTTP Host Header:** The host and port from the incoming HTTP request's Host/Authority header.
+
+When ref:allow_dynamic_host_from_filter_state <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>
+is disabled (default behavior), the filter will only use host rewrite configuration and the HTTP Host header, maintaining backward compatibility.
+
+Filter State Usage Example
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The filter state values can be set by other filters in the filter chain before the dynamic forward proxy
+filter processes the request. For example, using a Set Filter State HTTP filter:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.set_filter_state
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.set_filter_state.v3.Config
+      on_request_headers:
+      - object_key: "envoy.upstream.dynamic_host"
+        format_string:
+          text_format_source:
+            inline_string: "example.com"
+      - object_key: "envoy.upstream.dynamic_port"
+        format_string:
+          text_format_source:
+            inline_string: "443"
+
 Statistics
 ----------
 
