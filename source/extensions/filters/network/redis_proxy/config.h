@@ -32,14 +32,6 @@ public:
     proto_config_.MergeFrom(proto_config);
   }
 
-  std::string authUsername(ABSL_ATTRIBUTE_UNUSED Api::Api& api) const {
-    return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_username_, true, api), std::string);
-  }
-
-  std::string authPassword(Api::Api& api) const {
-    return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);
-  }
-
   uint16_t expirationTime() const {
 
     return PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config_.aws_iam(), expiration_time,
@@ -99,6 +91,24 @@ public:
 
   std::string region() const { return proto_config_.aws_iam().region(); }
 
+    static const absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credentialProvider(const Upstream::ClusterInfoConstSharedPtr info) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options) {
+      return options->credentialProvider();
+    }
+    return absl::nullopt;
+  }
+
+  absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credentialProvider() const { 
+    absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> provider;
+    return proto_config_.aws_iam().has_credential_provider() ? proto_config_.aws_iam().credential_provider(): provider; }
+
+
+  std::string authUsername(ABSL_ATTRIBUTE_UNUSED Api::Api& api) const {
+    return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_username_, true, api), std::string);
+  }
+
   static const std::string authUsername(const Upstream::ClusterInfoConstSharedPtr info,
                                         Api::Api& api) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
@@ -107,6 +117,14 @@ public:
       return options->authUsername(api);
     }
     return EMPTY_STRING;
+  }
+
+    std::string authPassword(Api::Api& api) const {
+    if(proto_config_.has_aws_iam())
+    {
+      return {};
+    }
+    return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);
   }
 
   static const std::string authPassword(const Upstream::ClusterInfoConstSharedPtr info,

@@ -382,6 +382,7 @@ message RedisProtocolOptions {
 
   // Upstream server password as defined by the ``requirepass`` directive
   // `<https://redis.io/topics/config>`_ in the server's configuration file.
+  // If `aws_iam` is set, this field is ignored.
   config.core.v3.DataSource auth_password = 1 [(udpa.annotations.sensitive) = true];
 
   // Upstream server username as defined by the ``user`` directive
@@ -407,7 +408,7 @@ message AwsIam {
   string region = 4;
 
   // Number of seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
-  // Expiration of the authentication token will trigger generation of a new token on the next request.
+  // Expiration of the current authentication token will automatically trigger generation of a new token.
   google.protobuf.Duration expiration_time = 5 [(validate.rules).duration = {
     lte {seconds: 900}
     gte {}

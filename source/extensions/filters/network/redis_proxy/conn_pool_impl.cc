@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
@@ -138,7 +139,7 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
 AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
     Server::Configuration::ServerFactoryContext& context, std::string auth_user,
     absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
-    uint16_t expiration_time)
+    uint16_t expiration_time, absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider)
     : expiration_time_(expiration_time), auth_user_(auth_user),
       cache_name_(std::string(cache_name)), service_name_(std::string(service_name)),
       region_(std::string(region)), context_(context) {
@@ -147,7 +148,7 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
 
   credentials_provider_chain =
       std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context_, region_,
-                                                                                absl::nullopt);
+                                                                                credential_provider);
   signer_ = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name_, region_, credentials_provider_chain, context_,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_time_);
@@ -165,10 +166,11 @@ AwsIamAuthenticatorImplUniquePtr
 InstanceImpl::initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context,
                                       std::string auth_user, absl::string_view cache_name,
                                       absl::string_view service_name, absl::string_view region,
+                                      absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider,
                                       uint16_t expiration_time) {
 
   return std::make_unique<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name,
-                                                   region, expiration_time);
+                                                   region, expiration_time, credential_provider);
 }
 
 void AwsIamAuthenticatorImpl::generateAuthToken() {
