@@ -60,7 +60,7 @@ message PostgresProxy {
   // Refer to official documentation for details
   // `SSL Session Encryption Message Flow <https://www.postgresql.org/docs/current/protocol-flow.html#id-1.10.5.7.11>`_.
   // This field is deprecated.
-  // Please use :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy>`.
+  // Please use :ref:`downstream_ssl <envoy_v3_api_field_extensions.filters.network.postgres_proxy.v3alpha.PostgresProxy.downstream_ssl>`.
   bool terminate_ssl = 3
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
