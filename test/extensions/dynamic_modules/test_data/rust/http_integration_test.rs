@@ -186,11 +186,13 @@ impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
   fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
     Box::new(PerRouteFilter {
       value: self.value.clone(),
+      per_route_config: None,
     })
   }
 }
 struct PerRouteFilter {
   value: String,
+  per_route_config: Option<std::sync::Arc<dyn Any>>,
 }
 
 struct PerRoutePerRouteFilterConfig {
@@ -204,7 +206,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PerRouteFilter {
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
     envoy_filter.set_request_header("x-config", self.value.as_bytes());
-    if let Some(per_route_config) = envoy_filter.get_most_specific_route_config() {
+    self.per_route_config = envoy_filter.get_most_specific_route_config();
+    if let Some(ref per_route_config) = self.per_route_config {
       let per_route_config = per_route_config
         .downcast_ref::<PerRoutePerRouteFilterConfig>()
         .expect("wrong type for per route config");
@@ -212,6 +215,24 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PerRouteFilter {
     }
 
     envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    if let Some(ref per_route_config) = self.per_route_config {
+      let per_route_config = per_route_config
+        .downcast_ref::<PerRoutePerRouteFilterConfig>()
+        .expect("wrong type for per route config");
+      envoy_filter.set_response_header(
+        "x-per-route-config-response",
+        per_route_config.value.as_bytes(),
+      );
+    }
+
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
 }
 
