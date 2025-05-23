@@ -254,6 +254,8 @@ public:
   std::string name() const override { return "envoy.http_api_listener"; }
 };
 
+DECLARE_FACTORY(HttpApiListenerFactory);
+
 } // namespace DefaultApiListener
 } // namespace ApiListeners
 } // namespace Extensions
