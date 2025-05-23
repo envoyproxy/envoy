@@ -19,12 +19,12 @@ namespace Matcher {
 using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
-using ::Envoy::Matcher::evaluateMatch;
 using ::Envoy::Matcher::MatchState;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
 using ::Envoy::Matcher::OnMatchFactory;
 using ::Envoy::Matcher::OnMatchFactoryCb;
+using ::Envoy::Matcher::SkippedMatchCb;
 
 template <class DataType> struct TrieNode {
   size_t index_;
@@ -71,7 +71,8 @@ public:
     }
   }
 
-  typename MatchTree<DataType>::MatchResult match(const DataType& data) override {
+  typename MatchTree<DataType>::MatchResult
+  match(const DataType& data, SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
     if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
       return {MatchState::UnableToMatch, absl::nullopt};
@@ -93,22 +94,20 @@ public:
       if (!first && node.exclusive_) {
         continue;
       }
-      if (node.on_match_->action_cb_) {
-        return {MatchState::MatchComplete, OnMatch<DataType>{node.on_match_->action_cb_, nullptr}};
+      // handleRecursionAndSkips should only return match-failure, no-match, or an action cb.
+      typename MatchTree<DataType>::MatchResult processed_match =
+          MatchTree<DataType>::handleRecursionAndSkips(*node.on_match_, data, skipped_match_cb);
+
+      if (processed_match.match_state_ != MatchState::MatchComplete ||
+          processed_match.on_match_.has_value()) {
+        return processed_match;
       }
-      // Resume any subtree matching to preserve backtracking progress.
-      auto matched = evaluateMatch(*node.on_match_->matcher_, data);
-      if (matched.match_state_ == MatchState::UnableToMatch) {
-        return {MatchState::UnableToMatch, absl::nullopt};
-      }
-      if (matched.match_state_ == MatchState::MatchComplete && matched.result_) {
-        return {MatchState::MatchComplete, OnMatch<DataType>{matched.result_, nullptr}};
-      }
+      // No-match isn't definitive, so continue checking nodes.
       if (first) {
         first = false;
       }
     }
-    return {MatchState::MatchComplete, on_no_match_};
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
 
 private:
