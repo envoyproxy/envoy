@@ -245,6 +245,12 @@ void Tracer::flushSpans() {
 }
 
 void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
+  const uint64_t max_buffer_size =
+    runtime_.snapshot().getInteger("tracing.opentelemetry.max_buffer_size", 1000U);
+  if (span_buffer_.size() > max_buffer_size) {
+    ENVOY_LOG(warn, "Span buffer size exceeded maximum limit. Discarding span.");
+    return;
+  }
   span_buffer_.push_back(span);
   const uint64_t min_flush_spans =
       runtime_.snapshot().getInteger("tracing.opentelemetry.min_flush_spans", 5U);
