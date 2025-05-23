@@ -168,7 +168,7 @@ TEST_P(ProxyProtoIntegrationTest, AccessLog) {
 
   testRouterRequestAndResponseWithBody(1024, 512, false, false, &creator);
   const std::string log_line = waitForAccessLog(access_log_name_);
-  const std::vector<absl::string_view> tokens = StringUtil::splitToken(log_line, " ", false, true);
+  const auto tokens = StringUtil::splitToken(log_line, " ", false, true);
 
   ASSERT_EQ(2, tokens.size());
   EXPECT_EQ(tokens[0], Network::Test::getLoopbackAddressString(GetParam()));

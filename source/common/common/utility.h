@@ -439,10 +439,10 @@ public:
    * string views; default = false.
    * @return vector containing views of the split strings
    */
-  static std::vector<absl::string_view> splitToken(absl::string_view source,
-                                                   absl::string_view delimiters,
-                                                   bool keep_empty_string = false,
-                                                   bool trim_whitespace = false);
+  static absl::InlinedVector<absl::string_view, 8> splitToken(absl::string_view source,
+                                                              absl::string_view delimiters,
+                                                              bool keep_empty_string = false,
+                                                              bool trim_whitespace = false);
 
   /**
    * Remove tokens from a delimiter-separated string view. The tokens are trimmed before

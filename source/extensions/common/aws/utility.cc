@@ -149,7 +149,7 @@ Utility::createCanonicalRequest(absl::string_view method, absl::string_view path
  */
 std::string Utility::normalizePath(absl::string_view original_path) {
 
-  const auto path_segments = StringUtil::splitToken(original_path, std::string{PATH_SPLITTER});
+  const auto path_segments = StringUtil::splitToken(original_path, PATH_SPLITTER);
   std::vector<std::string> path_list;
   path_list.reserve(path_segments.size());
 

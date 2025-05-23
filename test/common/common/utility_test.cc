@@ -30,6 +30,8 @@ using testing::Not;
 
 namespace Envoy {
 
+using TokensVector = absl::InlinedVector<absl::string_view, 8>;
+
 TEST(TimeSpecToChrono, convertsCorrectly) {
   struct timespec t;
   t.tv_nsec = 456789;
@@ -514,25 +516,25 @@ TEST(StringUtil, StringViewSplit) {
     EXPECT_TRUE(std::find(tokens.begin(), tokens.end(), "five ") != tokens.end());
   }
   {
-    EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken(",hello", ","));
-    EXPECT_EQ(std::vector<absl::string_view>{}, StringUtil::splitToken("", ","));
-    EXPECT_EQ(std::vector<absl::string_view>{"a"}, StringUtil::splitToken("a", ","));
-    EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken("hello,", ","));
-    EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken(",hello", ","));
-    EXPECT_EQ(std::vector<absl::string_view>{"hello"}, StringUtil::splitToken("hello, ", ", "));
-    EXPECT_EQ(std::vector<absl::string_view>{}, StringUtil::splitToken(",,", ","));
+    EXPECT_EQ(TokensVector{"hello"}, StringUtil::splitToken(",hello", ","));
+    EXPECT_EQ(TokensVector{}, StringUtil::splitToken("", ","));
+    EXPECT_EQ(TokensVector{"a"}, StringUtil::splitToken("a", ","));
+    EXPECT_EQ(TokensVector{"hello"}, StringUtil::splitToken("hello,", ","));
+    EXPECT_EQ(TokensVector{"hello"}, StringUtil::splitToken(",hello", ","));
+    EXPECT_EQ(TokensVector{"hello"}, StringUtil::splitToken("hello, ", ", "));
+    EXPECT_EQ(TokensVector{}, StringUtil::splitToken(",,", ","));
 
-    EXPECT_THAT(std::vector<absl::string_view>({"h", "e", "l", "l", "o"}),
+    EXPECT_THAT(TokensVector({"h", "e", "l", "l", "o"}),
                 ContainerEq(StringUtil::splitToken("hello", "")));
-    EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
+    EXPECT_THAT(TokensVector({"hello", "world"}),
                 ContainerEq(StringUtil::splitToken("hello world", " ")));
-    EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
+    EXPECT_THAT(TokensVector({"hello", "world"}),
                 ContainerEq(StringUtil::splitToken("hello   world", " ")));
-    EXPECT_THAT(std::vector<absl::string_view>({"", "", "hello", "world"}),
+    EXPECT_THAT(TokensVector({"", "", "hello", "world"}),
                 ContainerEq(StringUtil::splitToken("  hello world", " ", true)));
-    EXPECT_THAT(std::vector<absl::string_view>({"hello", "world", ""}),
+    EXPECT_THAT(TokensVector({"hello", "world", ""}),
                 ContainerEq(StringUtil::splitToken("hello world ", " ", true)));
-    EXPECT_THAT(std::vector<absl::string_view>({"hello", "world"}),
+    EXPECT_THAT(TokensVector({"hello", "world"}),
                 ContainerEq(StringUtil::splitToken("hello world", " ", true)));
   }
   {

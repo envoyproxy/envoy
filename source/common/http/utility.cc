@@ -652,8 +652,7 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
 void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
                             const std::vector<Matchers::StringMatcherPtr>& matchers) {
   if (headers.Upgrade()) {
-    std::vector<absl::string_view> tokens =
-        Envoy::StringUtil::splitToken(headers.getUpgradeValue(), ",", false, true);
+    auto tokens = Envoy::StringUtil::splitToken(headers.getUpgradeValue(), ",", false, true);
 
     auto end = std::remove_if(tokens.begin(), tokens.end(), [&](absl::string_view token) {
       return std::any_of(
@@ -900,7 +899,7 @@ bool Utility::sanitizeConnectionHeader(Http::RequestHeaderMap& headers) {
   const auto& connection_header_value = headers.Connection()->value();
 
   StringUtil::CaseUnorderedSet headers_to_remove{};
-  std::vector<absl::string_view> connection_header_tokens =
+  const auto connection_header_tokens =
       StringUtil::splitToken(connection_header_value.getStringView(), ",", false);
 
   // If we have 10 or more nominated headers, fail this request

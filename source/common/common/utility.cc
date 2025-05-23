@@ -459,11 +459,11 @@ absl::string_view StringUtil::cropLeft(absl::string_view source, absl::string_vi
   return source;
 }
 
-std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
-                                                      absl::string_view delimiters,
-                                                      bool keep_empty_string,
-                                                      bool trim_whitespace) {
-  std::vector<absl::string_view> result;
+absl::InlinedVector<absl::string_view, 8> StringUtil::splitToken(absl::string_view source,
+                                                                 absl::string_view delimiters,
+                                                                 bool keep_empty_string,
+                                                                 bool trim_whitespace) {
+  absl::InlinedVector<absl::string_view, 8> result;
 
   if (keep_empty_string) {
     result = absl::StrSplit(source, absl::ByAnyChar(delimiters));

@@ -233,7 +233,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     host_->cluster().trafficStats()->upstream_rq_cancelled_.inc();
   } else if (config_->enableRedirection() && !is_transaction_client_ &&
              (value->type() == Common::Redis::RespType::Error)) {
-    std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
+    const auto err = StringUtil::splitToken(value->asString(), " ", false);
     if (err.size() == 3 &&
         (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK)) {
       // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash
