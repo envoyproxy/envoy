@@ -519,6 +519,7 @@ private:
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
     bool spawnUpstreamSpan() const override;
+    bool useSemanticConventions() const override;
 
     std::shared_ptr<bool> still_alive_ = std::make_shared<bool>(true);
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
