@@ -34,11 +34,10 @@ DnsSrvCluster::DnsSrvCluster(
 
   dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
 
-  for (const auto& n : dns_srv_cluster_.srv_names()) {
-    load_assignment_.add_endpoints()->add_lb_endpoints()->set_endpoint_name(n.srv_name());
-  }
-  ENVOY_LOG(debug, "starting async DNS resolution for, length {}",
-            dns_srv_cluster_.srv_names().size());
+  load_assignment_.add_endpoints()->add_lb_endpoints()->set_endpoint_name(
+      dns_srv_cluster_.srv_name());
+
+  ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_srv_cluster_.srv_name());
 }
 
 void DnsSrvCluster::startPreInit() {
@@ -55,14 +54,13 @@ DnsSrvCluster::~DnsSrvCluster() {
 }
 
 void DnsSrvCluster::startResolve() {
-  ENVOY_LOG(debug, "starting async DNS resolution for, length {}",
-            dns_srv_cluster_.srv_names().size());
+  ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_srv_cluster_.srv_name());
   info_->configUpdateStats().update_attempt_.inc();
 
   active_resolve_list_.reset(new ResolveList(*this));
 
   active_dns_query_ = dns_resolver_->resolveSrv(
-      dns_srv_cluster_.srv_names()[0].srv_name(), dns_lookup_family_,
+      dns_srv_cluster_.srv_name(), dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;
@@ -286,14 +284,6 @@ DnsSrvClusterFactory::createClusterWithConfig(
                     "please use typed_dns_resolver_config.name = "
                     "'envoy.network.dns_resolver.cares'. Current value: '{}'",
                     cluster.typed_dns_resolver_config().name()));
-  }
-
-  if (proto_config.srv_names_size() > 1) {
-    return absl::InvalidArgumentError("SRV DNS Cluster can only contain one DNS record (so far)");
-  }
-
-  if (proto_config.srv_names_size() < 1) {
-    return absl::InvalidArgumentError("SRV DNS Cluster must contain exactly one DNS record");
   }
 
   // TODO: Validate the name of the record
