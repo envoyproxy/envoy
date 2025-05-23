@@ -132,7 +132,7 @@ new_features:
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
 - area: connection
   change: |
-    Add support for setting a socket option on the underlying socket of a connection with the `setSocketOption`
+    Add support for setting a socket option on the underlying socket of a ``Connection` using the ``setSocketOption``
     function.
 - area: http
   change: |
