@@ -89,6 +89,13 @@ envoy.extensions.http.cache.simple:
   status: wip
   type_urls:
   - envoy.extensions.http.cache.simple_http_cache.v3.SimpleHttpCacheConfig
+envoy.extensions.http.cache.redis_http_cache:
+  categories:
+  - envoy.http.cache
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.cache.redis_http_cache.v3.RedisHttpCacheConfig
 envoy.clusters.aggregate:
   categories:
   - envoy.clusters
