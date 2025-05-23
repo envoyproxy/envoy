@@ -18,18 +18,18 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-
-  namespace {
-static constexpr uint16_t AwsIamDefaultExpiration = 5;
-  }
+namespace {
+static constexpr uint16_t AwsIamDefaultExpiration = 60;
+constexpr char DEFAULT_SERVICE_NAME[] = "elasticache";
+} // namespace
 
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions&
-        proto_config)
+          proto_config)
       : auth_username_(proto_config.auth_username()), auth_password_(proto_config.auth_password()) {
-   proto_config_.MergeFrom(proto_config);
+    proto_config_.MergeFrom(proto_config);
   }
 
   std::string authUsername(ABSL_ATTRIBUTE_UNUSED Api::Api& api) const {
@@ -42,15 +42,14 @@ public:
 
   uint16_t expirationTime() const {
 
-    return PROTOBUF_GET_SECONDS_OR_DEFAULT(
-      proto_config_.aws_iam(), expiration_time,
-      AwsIamDefaultExpiration);
+    return PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config_.aws_iam(), expiration_time,
+                                           AwsIamDefaultExpiration);
   }
 
   static uint16_t expirationTime(const Upstream::ClusterInfoConstSharedPtr info) {
-        auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
-        return options->expirationTime();
+    return options->expirationTime();
   }
 
   bool hasAwsIam() const { return proto_config_.has_aws_iam(); }
@@ -64,7 +63,6 @@ public:
     return false;
   }
 
-
   static std::string cacheName(const Upstream::ClusterInfoConstSharedPtr info) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
@@ -74,9 +72,7 @@ public:
     return EMPTY_STRING;
   }
 
-  std::string cacheName() const {
-    return proto_config_.aws_iam().cache_name();
-  }
+  std::string cacheName() const { return proto_config_.aws_iam().cache_name(); }
 
   static std::string serviceName(const Upstream::ClusterInfoConstSharedPtr info) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
@@ -84,13 +80,13 @@ public:
     if (options) {
       return options->serviceName();
     }
-    return EMPTY_STRING;
+    return DEFAULT_SERVICE_NAME;
   }
 
   std::string serviceName() const {
-    return proto_config_.aws_iam().service_name();
+    return proto_config_.aws_iam().service_name().empty() ? DEFAULT_SERVICE_NAME
+                                                          : proto_config_.aws_iam().service_name();
   }
-
 
   static const std::string region(const Upstream::ClusterInfoConstSharedPtr info) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
@@ -101,9 +97,7 @@ public:
     return EMPTY_STRING;
   }
 
-  std::string region() const {
-    return proto_config_.aws_iam().region();
-  }
+  std::string region() const { return proto_config_.aws_iam().region(); }
 
   static const std::string authUsername(const Upstream::ClusterInfoConstSharedPtr info,
                                         Api::Api& api) {
@@ -152,8 +146,6 @@ private:
       Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
-
-
 };
 
 } // namespace RedisProxy

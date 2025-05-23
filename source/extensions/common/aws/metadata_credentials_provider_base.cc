@@ -8,12 +8,11 @@ namespace Common {
 namespace Aws {
 
 MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer)
-    :  context_(context), create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
+    : context_(context), create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
       cluster_name_(cluster_name), cache_duration_(getCacheDuration()),
       refresh_state_(refresh_state), initialization_timer_(initialization_timer),
       aws_cluster_manager_(aws_cluster_manager) {

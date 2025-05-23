@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -21,6 +22,7 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
+#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/common/redis/cluster_refresh_manager.h"
 #include "source/extensions/filters/network/common/redis/client.h"
@@ -30,8 +32,6 @@
 #include "source/extensions/filters/network/redis_proxy/conn_pool.h"
 
 #include "absl/container/node_hash_map.h"
-#include "source/extensions/common/aws/signer.h"
-#include "envoy/event/timer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,55 +57,49 @@ public:
   void onFailure() override {};
 };
 
-  // class AwsIamAuthenticatorCredentials {
-
-//   absl::optional<std::string> getPassword() { return password_ };
-//   absl::optional<std::string> password_;
-// }
-
-class AwsIamAuthenticatorBase {
+class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
 public:
-  // AwsIamAuthenticatorBase() = default;
-  // ~AwsIamAuthenticatorBase() = default;
-
-  absl::StatusOr<absl::optional<std::string>> getCredentials();
-  absl::optional<std::string> getPassword() { return password_; };
-
-  absl::optional<std::string> password_;
+  virtual ~AwsIamAuthenticatorBase() = default;
+  virtual std::string getAuthToken() PURE;
+  virtual bool
+  addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb) PURE;
+  virtual void generateAuthToken() PURE;
 };
 
-
-  class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
+class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
 public:
-  AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,  std::string auth_user, absl::string_view cache_name,
-                          absl::string_view service_name, absl::string_view region, uint16_t expiration_time);
-    std::string generateAuthToken();
-    bool addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb)
-    {
-      return signer_->addCallbackIfCredentialsPending(std::move(cb));
-    };
-
-  private:
-    Envoy::Extensions::Common::Aws::SignerPtr signer_;
-    uint16_t expiration_time_;
-    std::string auth_user_;
-    std::string cache_name_;
-    std::string service_name_;
-    std::string region_;
-    Server::Configuration::ServerFactoryContext& context_;
-    Envoy::Event::TimerPtr cache_duration_timer_;
-
+  AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,
+                          std::string auth_user, absl::string_view cache_name,
+                          absl::string_view service_name, absl::string_view region,
+                          uint16_t expiration_time);
+  std::string getAuthToken() override;
+  bool addCallbackIfCredentialsPending(
+      Extensions::Common::Aws::CredentialsPendingCallback&& cb) override {
+    return signer_->addCallbackIfCredentialsPending(std::move(cb));
   };
+  void generateAuthToken() override;
 
-  using AwsIamAuthenticatorImplUniquePtr = std::unique_ptr<AwsIamAuthenticatorImpl>;
+private:
+  Envoy::Extensions::Common::Aws::SignerPtr signer_;
+  uint16_t expiration_time_;
+  std::string auth_user_;
+  std::string cache_name_;
+  std::string service_name_;
+  std::string region_;
+  Server::Configuration::ServerFactoryContext& context_;
+  Envoy::Event::TimerPtr cache_duration_timer_;
+  std::string auth_token_;
+};
+
+using AwsIamAuthenticatorImplUniquePtr = std::unique_ptr<AwsIamAuthenticatorImpl>;
 using AwsIamAuthenticatorImplUniquePtrOptRef = OptRef<AwsIamAuthenticatorImplUniquePtr>;
 
 class InstanceImpl : public Instance, public std::enable_shared_from_this<InstanceImpl> {
 public:
   InstanceImpl(
-     Server::Configuration::ServerFactoryContext& context,
-      const std::string& cluster_name, Upstream::ClusterManager& cm,
-      Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
+      Server::Configuration::ServerFactoryContext& context, const std::string& cluster_name,
+      Upstream::ClusterManager& cm, Common::Redis::Client::ClientFactory& client_factory,
+      ThreadLocal::SlotAllocator& tls,
       const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
           config,
       Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
@@ -134,7 +128,6 @@ public:
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::ClientCallbacks& callbacks);
   void init();
-
 
   // Allow the unit test to have access to private members.
   friend class RedisConnPoolImplTest;
@@ -262,9 +255,11 @@ private:
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   };
 
-  AwsIamAuthenticatorImplUniquePtr initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context, 
-  std::string auth_user, absl::string_view cache_name, 
-  absl::string_view service_name, absl::string_view region, uint16_t expiration_time);
+  AwsIamAuthenticatorImplUniquePtr
+  initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context,
+                          std::string auth_user, absl::string_view cache_name,
+                          absl::string_view service_name, absl::string_view region,
+                          uint16_t expiration_time);
 
   Server::Configuration::ServerFactoryContext& context_;
   const std::string cluster_name_;
@@ -280,7 +275,6 @@ private:
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
 
   absl::optional<AwsIamAuthenticatorImplUniquePtr> aws_iam_authenticator_;
-
 };
 
 } // namespace ConnPool

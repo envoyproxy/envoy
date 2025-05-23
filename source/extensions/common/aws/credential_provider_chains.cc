@@ -91,8 +91,8 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
   //   const auto cluster_name = stsClusterName(region);
 
   //   ENVOY_LOG(debug,
-  //             "Using assume role credentials provider with STS endpoint: {} and session name: {}",
-  //             sts_endpoint, assume_role_config.role_session_name());
+  //             "Using assume role credentials provider with STS endpoint: {} and session name:
+  //             {}", sts_endpoint, assume_role_config.role_session_name());
   //   add(factories.createAssumeRoleCredentialsProvider(context, aws_cluster_manager_, region,
   //                                                     assume_role_config));
   // }

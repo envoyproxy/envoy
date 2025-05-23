@@ -12,12 +12,12 @@ namespace Common {
 namespace Aws {
 
 ContainerCredentialsProvider::ContainerCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-    absl::string_view credential_uri, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view credential_uri,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view authorization_token,
     absl::string_view cluster_name)
-    : MetadataCredentialsProviderBase( context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}

@@ -129,7 +129,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
-  if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
+  if (!queue_enabled_ || encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
     flushBufferAndResetTimer();
   } else if (empty_buffer) {
     flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
@@ -145,6 +145,27 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
+  return &pending_requests_.back();
+}
+
+PoolRequest* ClientImpl::makeRequestImmediate(const RespValue& request,
+                                              ClientCallbacks& callbacks) {
+  ASSERT(connection_->state() == Network::Connection::State::Open);
+
+  Stats::StatName command;
+  if (config_->enableCommandStats()) {
+    // Only lowercase command and get StatName if we enable command stats
+    command = redis_command_stats_->getCommandFromRequest(request);
+    redis_command_stats_->updateStatsTotal(scope_, command);
+  } else {
+    // If disabled, we use a placeholder stat name "unused" that is not used
+    command = redis_command_stats_->getUnusedStatName();
+  }
+  Buffer::OwnedImpl immediate_buffer;
+  pending_requests_.emplace_back(*this, callbacks, command);
+  encoder_->encode(request, immediate_buffer);
+  connection_->write(immediate_buffer, false);
+  flushBufferAndResetTimer();
   return &pending_requests_.back();
 }
 

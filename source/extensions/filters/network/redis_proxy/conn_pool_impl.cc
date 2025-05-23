@@ -13,12 +13,13 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/stats/utility.h"
-#include "source/extensions/filters/network/redis_proxy/config.h"
-#include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/stats/utility.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/redis_proxy/config.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -42,9 +43,9 @@ static uint16_t default_port = 6379;
 } // namespace
 
 InstanceImpl::InstanceImpl(
-    Server::Configuration::ServerFactoryContext& context,
-    const std::string& cluster_name, Upstream::ClusterManager& cm,
-    Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
+    Server::Configuration::ServerFactoryContext& context, const std::string& cluster_name,
+    Upstream::ClusterManager& cm, Common::Redis::Client::ClientFactory& client_factory,
+    ThreadLocal::SlotAllocator& tls,
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
         config,
     Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
@@ -70,7 +71,6 @@ void InstanceImpl::init() {
     }
     return nullptr;
   });
-
 }
 
 uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().shardSize(); }
@@ -135,52 +135,72 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
   }
 }
 
-AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,  std::string auth_user, absl::string_view cache_name,
-                          absl::string_view service_name, absl::string_view region, uint16_t expiration_time):
-                          expiration_time_(expiration_time), auth_user_(auth_user), cache_name_(std::string(cache_name)),
-                          service_name_(std::string(service_name)),region_(std::string(region)),context_(context)
-{
+AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
+    Server::Configuration::ServerFactoryContext& context, std::string auth_user,
+    absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
+    uint16_t expiration_time)
+    : expiration_time_(expiration_time), auth_user_(auth_user),
+      cache_name_(std::string(cache_name)), service_name_(std::string(service_name)),
+      region_(std::string(region)), context_(context) {
 
   Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
 
   credentials_provider_chain =
-        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context_, region_,
-                                                                                  absl::nullopt);
+      std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context_, region_,
+                                                                                absl::nullopt);
   signer_ = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-        service_name_, region_, credentials_provider_chain, context_,
-        Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_time_);
+      service_name_, region_, credentials_provider_chain, context_,
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_time_);
 
   if (!cache_duration_timer_) {
-    cache_duration_timer_ = context_.mainThreadDispatcher().createTimer([this]() -> void {
-      generateAuthToken();
-    });
+    cache_duration_timer_ =
+        context_.mainThreadDispatcher().createTimer([this]() -> void { generateAuthToken(); });
   }
-  if (!cache_duration_timer_->enabled()) {
-    cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
-  }
+  // if (!cache_duration_timer_->enabled()) {
+  //   cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
+  // }
 }
 
-AwsIamAuthenticatorImplUniquePtr InstanceImpl::initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context, std::string auth_user, absl::string_view cache_name, 
-  absl::string_view service_name, absl::string_view region, uint16_t expiration_time) {
-  
-  return std::make_unique<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name, region, expiration_time);
+AwsIamAuthenticatorImplUniquePtr
+InstanceImpl::initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context,
+                                      std::string auth_user, absl::string_view cache_name,
+                                      absl::string_view service_name, absl::string_view region,
+                                      uint16_t expiration_time) {
+
+  return std::make_unique<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name,
+                                                   region, expiration_time);
 }
 
-std::string AwsIamAuthenticatorImpl::generateAuthToken()
-{
-  ENVOY_LOG_MISC(debug, "generating new auth token");
-
-  Http::RequestMessageImpl message; 
+void AwsIamAuthenticatorImpl::generateAuthToken() {
+  ENVOY_LOG(debug, "Generating new AWS IAM authentication token");
+  Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(cache_name_);
-  message.headers().setPath(fmt::format("/?Version=2011-06-15&Action=connect&User={}",Envoy::Http::Utility::PercentEncoding::encode(auth_user_)));
+  message.headers().setPath(fmt::format("/?Action=connect&User={}",
+                                        Envoy::Http::Utility::PercentEncoding::encode(auth_user_)));
 
   auto status = signer_->sign(message, true, region_);
-  ENVOY_LOG_MISC(debug, "signer path {}", message.headers().getPathValue());
-  cache_duration_timer_->enableTimer(std::chrono::seconds(expiration_time_));
-  return std::string(message.headers().getPathValue());
+  context_.mainThreadDispatcher().post(
+      [this]() { cache_duration_timer_->enableTimer(std::chrono::seconds(expiration_time_)); });
+  auth_token_ = cache_name_ + std::string(message.headers().getPathValue());
+  auto query_params =
+      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
+
+  query_params.overwrite(
+      Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSignature, "*****");
+  if (query_params.getFirstValue(
+          Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSecurityToken)) {
+    query_params.overwrite(
+        Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSecurityToken, "*****");
+  }
+  auto sanitised_query_string =
+      query_params.replaceQueryString(Http::HeaderString(message.headers().getPathValue()));
+  ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", cache_name_,
+            sanitised_query_string);
 }
+
+std::string AwsIamAuthenticatorImpl::getAuthToken() { return auth_token_; }
 
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
@@ -201,21 +221,21 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   ASSERT(cluster_ == nullptr);
   auto& cluster = get_cluster();
   cluster_ = &cluster;
-  if(ProtocolOptionsConfigImpl::hasAwsIam(cluster_->info()) && ! shared_parent->aws_iam_authenticator_.has_value())
-  {
-    shared_parent->aws_iam_authenticator_ = shared_parent->initAwsIamAuthenticator(shared_parent->context_, 
-    ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_), 
-    ProtocolOptionsConfigImpl::cacheName(cluster_->info()) , ProtocolOptionsConfigImpl::serviceName(cluster_->info()), 
-    ProtocolOptionsConfigImpl::region(cluster_->info()), ProtocolOptionsConfigImpl::expirationTime(cluster_->info()));
-    // shared_parent->aws_iam_authenticator_ = std::move(authenticator);
-    ENVOY_LOG_MISC(debug, "Redis connection pool has aws iam auth enabled");
-    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_); 
-    auth_password_ = shared_parent->aws_iam_authenticator_.value()->generateAuthToken();
-    ENVOY_LOG_MISC(debug, "User {} Password {}", auth_username_, auth_password_);
-  }
-  else {
+  if (ProtocolOptionsConfigImpl::hasAwsIam(cluster_->info()) &&
+      !shared_parent->aws_iam_authenticator_.has_value()) {
+    shared_parent->aws_iam_authenticator_ = shared_parent->initAwsIamAuthenticator(
+        shared_parent->context_,
+        ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_),
+        ProtocolOptionsConfigImpl::cacheName(cluster_->info()),
+        ProtocolOptionsConfigImpl::serviceName(cluster_->info()),
+        ProtocolOptionsConfigImpl::region(cluster_->info()),
+        ProtocolOptionsConfigImpl::expirationTime(cluster_->info()));
+    ENVOY_LOG(debug, "Redis connection pool has AWS IAM Authentication enabled");
+    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
+    auth_password_ = shared_parent->aws_iam_authenticator_.value()->getAuthToken();
+  } else {
     // Update username and password when cluster updates.
-    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_); 
+    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
     auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), shared_parent->api_);
   }
 
@@ -342,17 +362,22 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
                                  auth_username_, auth_password_, false);
       auto shared_parent = parent_.lock();
       if (shared_parent && shared_parent->aws_iam_authenticator_.has_value()) {
-        auto add_auth = [this, &shared_parent, &client](){
-            auth_password_ = shared_parent->aws_iam_authenticator_.value()->generateAuthToken();
-            Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(auth_username_, auth_password_);
-            client->redis_client_->makeRequest(auth_request, null_client_callbacks)
-        }
-        if(shared_parent->aws_iam_authenticator_.value()->addCallbackIfCredentialsPending([this](){add_auth();}) == false)
-        {
+        auto add_auth = [this, &shared_parent, &client]() {
+          shared_parent->aws_iam_authenticator_.value()->generateAuthToken();
+          auth_password_ = shared_parent->aws_iam_authenticator_.value()->getAuthToken();
+
+          Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
+              auth_username_, auth_password_);
+          client->redis_client_->queueRequests(true);
+          client->redis_client_->makeRequestImmediate(auth_request, null_client_callbacks);
+          client->redis_client_->queueRequests(false);
+        };
+        if (shared_parent->aws_iam_authenticator_.value()->addCallbackIfCredentialsPending(
+                [&add_auth]() { add_auth(); }) == false) {
           add_auth();
         }
       }
-        client->redis_client_->addConnectionCallbacks(*client);
+      client->redis_client_->addConnectionCallbacks(*client);
     }
   }
   return client;

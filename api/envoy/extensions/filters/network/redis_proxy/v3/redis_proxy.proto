@@ -389,17 +389,21 @@ message RedisProtocolOptions {
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 
   AwsIam aws_iam = 3;
-
 }
 
 // [#next-free-field: 6]
 message AwsIam {
+  // An AwsCredentialProvider, allowing the use of a specific credential provider chain or specific provider settings
   common.aws.v3.AwsCredentialProvider credential_provider = 1;
 
+  // The name of the cache, used when generating the authentication token.
   string cache_name = 2 [(validate.rules).string = {min_len: 1}];
 
+  // The optional service name to be used in AWS IAM authentication. If not provided, the service name will be set to `elasticache`
   string service_name = 3;
 
+  // The optional AWS region that your cache is located in. If not provided, the region will be deduced using the region provider chain
+  // as described in  :ref:`regions<_config_http_filters_aws_request_signing_region>`
   string region = 4;
 
   // Number of seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)

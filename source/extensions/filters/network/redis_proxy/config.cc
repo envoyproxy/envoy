@@ -4,6 +4,9 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
@@ -13,10 +16,6 @@
 #include "source/extensions/filters/network/redis_proxy/router_impl.h"
 
 #include "absl/container/flat_hash_set.h"
-
-#include "source/extensions/common/aws/credential_provider_chains.h"
-#include "source/common/http/message_impl.h"
-#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -78,11 +77,11 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
-    
+
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
-    auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(server_context,
-        cluster, server_context.clusterManager(),
+    auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
+        server_context, cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
         refresh_manager, filter_config->dns_cache_);

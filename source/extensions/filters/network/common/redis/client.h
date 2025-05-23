@@ -99,6 +99,10 @@ public:
    */
   virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
 
+  virtual PoolRequest* makeRequestImmediate(const RespValue& request,
+                                            ClientCallbacks& callbacks) PURE;
+  virtual void queueRequests(bool enable_queue) PURE;
+
   /**
    * Initialize the connection. Issue the auth command and readonly command as needed.
    * @param auth password for upstream host.

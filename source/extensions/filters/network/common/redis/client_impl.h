@@ -91,9 +91,11 @@ public:
   }
   void close() override;
   PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) override;
+  PoolRequest* makeRequestImmediate(const RespValue& request, ClientCallbacks& callbacks) override;
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
+  void queueRequests(bool enable_queue) override { queue_enabled_ = enable_queue; }
 
 private:
   friend class RedisClientImplTest;
@@ -152,6 +154,7 @@ private:
   Stats::Scope& scope_;
   bool is_transaction_client_;
   std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> aws_iam_auth_signer_;
+  bool queue_enabled_{false};
 };
 
 class ClientFactoryImpl : public ClientFactory {
