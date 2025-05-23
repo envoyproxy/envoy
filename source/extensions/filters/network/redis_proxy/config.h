@@ -91,7 +91,8 @@ public:
 
   std::string region() const { return proto_config_.aws_iam().region(); }
 
-    static const absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credentialProvider(const Upstream::ClusterInfoConstSharedPtr info) {
+  static const absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
+  credentialProvider(const Upstream::ClusterInfoConstSharedPtr info) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options) {
@@ -100,12 +101,15 @@ public:
     return absl::nullopt;
   }
 
-  absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credentialProvider() const { 
+  absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
+  credentialProvider() const {
     absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> provider;
-    return proto_config_.aws_iam().has_credential_provider() ? proto_config_.aws_iam().credential_provider(): provider; }
+    return proto_config_.aws_iam().has_credential_provider()
+               ? proto_config_.aws_iam().credential_provider()
+               : provider;
+  }
 
-
-  std::string authUsername(ABSL_ATTRIBUTE_UNUSED Api::Api& api) const {
+  std::string authUsername(Api::Api& api) const {
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_username_, true, api), std::string);
   }
 
@@ -119,9 +123,8 @@ public:
     return EMPTY_STRING;
   }
 
-    std::string authPassword(Api::Api& api) const {
-    if(proto_config_.has_aws_iam())
-    {
+  std::string authPassword(Api::Api& api) const {
+    if (proto_config_.has_aws_iam()) {
       return {};
     }
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);

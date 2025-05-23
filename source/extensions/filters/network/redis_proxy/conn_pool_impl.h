@@ -71,7 +71,9 @@ public:
   AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,
                           std::string auth_user, absl::string_view cache_name,
                           absl::string_view service_name, absl::string_view region,
-                          uint16_t expiration_time);
+                          uint16_t expiration_time,
+                          absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
+                              credential_provider);
   std::string getAuthToken() override;
   bool addCallbackIfCredentialsPending(
       Extensions::Common::Aws::CredentialsPendingCallback&& cb) override {
@@ -259,7 +261,9 @@ private:
   initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context,
                           std::string auth_user, absl::string_view cache_name,
                           absl::string_view service_name, absl::string_view region,
-                          uint16_t expiration_time);
+                          uint16_t expiration_time,
+                          absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
+                              credential_provider);
 
   Server::Configuration::ServerFactoryContext& context_;
   const std::string cluster_name_;
