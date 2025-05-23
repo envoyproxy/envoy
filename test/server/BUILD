@@ -24,6 +24,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/listener_manager:listener_manager_lib",
+        "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
         "//source/extensions/request_id/uuid:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:instance_mocks",

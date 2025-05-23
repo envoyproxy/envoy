@@ -36,7 +36,15 @@ ApiListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::L
           name));
     }
     if (!api_listener_ && !added_via_api) {
-      auto listener_or_error = HttpApiListener::create(config, server_, config.name());
+
+      auto* api_listener_factory = Registry::FactoryRegistry<Server::ApiListenerFactory>::
+        getFactory("envoy.http_api_listener");
+      if (api_listener_factory == nullptr) {
+        return absl::InvalidArgumentError(fmt::format(
+              "error adding listener named '{}': missing the API listener extension",
+              name));
+      }
+      auto listener_or_error = api_listener_factory->create(config, server_, config.name());
       RETURN_IF_NOT_OK(listener_or_error.status());
       api_listener_ = std::move(listener_or_error.value());
       return true;
