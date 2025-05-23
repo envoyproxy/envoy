@@ -968,7 +968,7 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
 }
 
 // TODO(RyanTheOptimist): Re-enable after figuring out how to cause this reset.
-// TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithEnvoyReset) {
+TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithEnvoyReset) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_act_upon_invalid_header",
       "false");
