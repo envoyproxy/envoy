@@ -108,33 +108,20 @@ if [[ ! -e bazel-out/_coverage/_coverage_report.dat ]]; then
 elif [[ ! -s bazel-out/_coverage/_coverage_report.dat ]]; then
     echo "ERROR: Coverage report is empty (bazel-out/_coverage/_coverage_report.dat)" >&2
     exit 1
-else
-    COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
-    cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 fi
-
-read -ra GENHTML_ARGS <<< "${GENHTML_ARGS:-}"
-# TEMP WORKAROUND FOR MOBILE
-CWDNAME="$(basename "${SRCDIR}")"
-if [[ "$CWDNAME" == "mobile" ]]; then
-    for arg in "${GENHTML_ARGS[@]}"; do
-        if [[ "$arg" == --erase-functions=* ]]; then
-            mobile_args_present=true
-        fi
-    done
-    if [[ "$mobile_args_present" != "true" ]]; then
-        GENHTML_ARGS+=(
-            --erase-functions=__cxx_global_var_init
-            --ignore-errors "category,corrupt,inconsistent")
-    fi
-fi
-GENHTML_ARGS=(
-    --prefix "${PWD}"
-    --output "${COVERAGE_DIR}"
-    "${GENHTML_ARGS[@]}"
-    "${COVERAGE_DATA}")
-COVERAGE_VALUE="$(genhtml "${GENHTML_ARGS[@]}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
-COVERAGE_VALUE=${COVERAGE_VALUE%?}
+COVERAGE_DATA="${COVERAGE_DIR}/coverage.info"
+cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
+BAZEL_BUILD_OPTIONS+=(--nobuild_tests_only)
+bazel run "${BAZEL_BUILD_OPTIONS[@]}" @envoy//tools/grcov \
+      -- -s "$PWD" \
+         -t html,markdown \
+         -o "${COVERAGE_DIR}" \
+         "${COVERAGE_DATA}"
+mv "${COVERAGE_DIR}/html/"* "${COVERAGE_DIR}"
+rm -rf "${COVERAGE_DIR}/html/"
+MARKDOWN_COVERAGE="${COVERAGE_DIR}/markdown.md"
+export MARKDOWN_COVERAGE
+COVERAGE_VALUE="$(tail -n 1 "${MARKDOWN_COVERAGE}" | grep -oE '[0-9]+\.[0-9]+')"
 
 echo "Compressing coveraged data"
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
