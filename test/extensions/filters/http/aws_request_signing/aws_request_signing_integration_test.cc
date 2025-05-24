@@ -616,7 +616,6 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
   // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);

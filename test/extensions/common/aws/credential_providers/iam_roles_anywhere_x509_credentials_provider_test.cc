@@ -1170,7 +1170,6 @@ TEST(ChainTooLarge, PemToDerB64) {
 }
 
 TEST(ChainParse, PemToDerB64) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   std::string converted_pem = "MIIDczCCAlugAwIBAgIQYy0lLc2af47/u52i06RCqDANBgkqhkiG9w0BAQsFADAT"
                               "MREwDwYDVQQDDAh0ZXN0LXJzYTAeFw0yNDExMTcyMzIzMzdaFw0yNTExMTgwMDIz"
