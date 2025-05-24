@@ -313,6 +313,29 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
   return fmt::format("sts.{}.amazonaws.com", single_region);
 }
 
+/**
+ * This function generates an RolesAnywhere Endpoint from a region string.
+ */
+std::string Utility::getRolesAnywhereEndpoint(const std::string& trust_anchor_arn) {
+  std::string region;
+  const std::vector<std::string> arn_split = absl::StrSplit(trust_anchor_arn, ':');
+  if (arn_split.size() < 3) {
+    region = "us-east-1";
+  } else {
+    region = arn_split[3];
+  }
+#ifdef ENVOY_SSL_FIPS
+  if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
+      region == "us-west-2" || region == "us-gov-east-1" || region == "us-gov-west-1") {
+    return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);
+  } else {
+    return fmt::format("rolesanywhere.{}.amazonaws.com", region);
+  }
+#else
+  return fmt::format("rolesanywhere.{}.amazonaws.com", region);
+#endif
+}
+
 envoy::config::cluster::v3::Cluster Utility::createInternalClusterStatic(
     absl::string_view cluster_name,
     const envoy::config::cluster::v3::Cluster::DiscoveryType cluster_type, absl::string_view uri) {
