@@ -274,6 +274,20 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverride) {
   testAutoSniOptions(dummy_option, headers, server_name);
 }
 
+TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverrideWithMultipleHeaderValues) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_override_auto_sni_header("x-host");
+
+  const auto server_name = "foo.bar";
+  const auto server_name2 = "bar.foo";
+
+  Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}, {"x-host", server_name2}};
+
+  // The first header value should be used as the server name.
+  testAutoSniOptions(dummy_option, headers, server_name);
+}
+
 TEST_F(RouterTest, UpdateServerNameFilterStateWithEmptyValueHeaderOverride) {
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
