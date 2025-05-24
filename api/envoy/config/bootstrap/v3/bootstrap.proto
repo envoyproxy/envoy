@@ -448,8 +448,8 @@ message Admin {
   // should apply to the admin interface or not.
   bool ignore_global_conn_limit = 6;
 
-  // Optional routes list for admin which are accessible
-  // if not specified, the allow list check will be skippped
+  // Optional list of routes accessible to the admin.
+  // If not specified, the allowlist check will be skipped.
   repeated string allow_listed_routes = 7;
 }
 
