@@ -75,8 +75,6 @@ declare -a KNOWN_LOW_COVERAGE=(
 )
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
-COVERAGE_DIR="${SRCDIR}"/generated/coverage
-COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 
 FAILED=0
 DEFAULT_COVERAGE_THRESHOLD=96.6
@@ -102,8 +100,23 @@ HIGH_COVERAGE_STRING=""
 while read -r DIRECTORY
 do
   get_coverage_target "$DIRECTORY"
-  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4 | tr -d '\n')
-  COVERAGE_VALUE=${COVERAGE_VALUE%?}
+
+  COVERAGE_VALUE=$(grep -E "^\| ${DIRECTORY}/" "${MARKDOWN_COVERAGE}" | \
+    awk -F'|' '{
+      # Extract covered/total from format like "145 / 148"
+      match($3, /([0-9]+) \/ ([0-9]+)/, arr);
+      if (arr[2] > 0) {
+        covered += arr[1];
+        total += arr[2];
+      }
+    } END {
+      if (total > 0) {
+        printf "%.2f", (covered/total)*100;
+      } else {
+        print "n";
+      }
+    }')
+
   # If the coverage number is 'n' (no data found) there is 0% coverage. This is
   # probably a directory without source code, so we skip checks.
   #

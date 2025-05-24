@@ -2,6 +2,7 @@ load("@com_google_googleapis//:repository_rules.bzl", "switched_rules_by_languag
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
+load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
 
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
 
@@ -235,7 +236,7 @@ def envoy_dependencies(skip_targets = []):
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-
+    grcov_repository()
     _com_github_wamr()
     _com_github_wasmtime()
 
