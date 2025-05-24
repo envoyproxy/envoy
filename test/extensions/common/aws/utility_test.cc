@@ -565,8 +565,7 @@ TEST(UtilityTest, RolesAnywhereEndpoint) {
   arn = "arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/"
         "8d105284-f0a7-4939-a7e6-8df768ea535f";
 #ifdef ENVOY_SSL_FIPS
-  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com",
-            Utility::getRolesAnywhereEndpoint(arn));
+  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
 #else
   EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
 
