@@ -902,6 +902,17 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
+   * Returns the HTTP status code to use when configured cluster is not found.
+   * @return Http::Code to use when configured cluster is not found.
+   */
+  virtual Http::Code clusterNotFoundResponseCode() const PURE;
+
+  /**
+   * @return const CorsPolicy* the CORS policy for this virtual host.
+   */
+  virtual const CorsPolicy* corsPolicy() const PURE;
+
+  /**
    * Returns the final host value for the request, taking into account route-level mutations.
    *
    * The value returned is computed with the following logic in order:
@@ -916,18 +927,8 @@ public:
    * @note This function will not attempt to restore the port in the host value. If port information
    *       is required, it should be handled separately.
    */
-  virtual const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const PURE;
-
-  /**
-   * Returns the HTTP status code to use when configured cluster is not found.
-   * @return Http::Code to use when configured cluster is not found.
-   */
-  virtual Http::Code clusterNotFoundResponseCode() const PURE;
-
-  /**
-   * @return const CorsPolicy* the CORS policy for this virtual host.
-   */
-  virtual const CorsPolicy* corsPolicy() const PURE;
+  virtual absl::optional<std::string>
+  finalizedRequestHost(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Returns the URL path as it will be calculated by finalizeRequestHeaders
@@ -946,11 +947,12 @@ public:
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
    * @param stream_info holds additional information about the request.
-   * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
+   * @param keep_original_host_or_path insert x-envoy-original-path header if path rewritten,
+   *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
-                                      bool insert_envoy_original_path) const PURE;
+                                      bool keep_original_host_or_path) const PURE;
 
   /**
    * Returns the request header transforms that would be applied if finalizeRequestHeaders were

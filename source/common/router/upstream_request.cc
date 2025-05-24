@@ -673,7 +673,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   const auto* route_entry = route().routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
-                                   route_entry->appendXfh());
+                                   route_entry->appendXfh(),
+                                   !parent_.config().suppress_envoy_headers_);
   }
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());

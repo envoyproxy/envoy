@@ -235,9 +235,9 @@ private:
   const std::string allow_headers_;
   const std::string expose_headers_;
   const std::string max_age_;
-  absl::optional<bool> allow_credentials_{};
-  absl::optional<bool> allow_private_network_access_{};
-  absl::optional<bool> forward_not_matching_preflights_{};
+  absl::optional<bool> allow_credentials_;
+  absl::optional<bool> allow_private_network_access_;
+  absl::optional<bool> forward_not_matching_preflights_;
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
@@ -487,7 +487,7 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
-  std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
+  std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
@@ -671,7 +671,8 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override;
+  absl::optional<std::string>
+  finalizedRequestHost(const Http::RequestHeaderMap& headers) const override;
   const RouteStatsContextOptRef routeStatsContext() const override {
     if (route_stats_context_ != nullptr) {
       return *route_stats_context_;
@@ -696,7 +697,7 @@ public:
   }
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
-                              bool insert_envoy_original_path) const override;
+                              bool keep_original_host_or_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
@@ -839,8 +840,9 @@ public:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
-    const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override {
-      return parent_->getRequestHostValue(headers);
+    absl::optional<std::string>
+    finalizedRequestHost(const Http::RequestHeaderMap& headers) const override {
+      return parent_->finalizedRequestHost(headers);
     }
     Http::Code clusterNotFoundResponseCode() const override {
       return parent_->clusterNotFoundResponseCode();
@@ -1117,8 +1119,8 @@ protected:
 
 private:
   struct RuntimeData {
-    std::string fractional_runtime_key_{};
-    envoy::type::v3::FractionalPercent fractional_runtime_default_{};
+    std::string fractional_runtime_key_;
+    envoy::type::v3::FractionalPercent fractional_runtime_default_;
   };
 
   /**

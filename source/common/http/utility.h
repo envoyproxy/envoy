@@ -202,8 +202,10 @@ void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
  * @param headers headers where authority should be updated.
  * @param hostname hostname that authority should be updated with.
  * @param append_xfh append the original authority to the x-forwarded-host header.
+ * @param keep_old insert the original authority in the x-envoy-original-host header.
  */
-void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool append_xfh);
+void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool append_xfh,
+                     bool keep_old);
 
 /**
  * Creates an SSL (https) redirect path based on the input host and path headers.

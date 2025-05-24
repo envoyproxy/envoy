@@ -1161,6 +1161,18 @@ message RouteAction {
   // [#extension-category: envoy.path.rewrite]
   core.v3.TypedExtensionConfig path_rewrite_policy = 41;
 
+  // If one of the host rewrite specifiers is set and the
+  // :ref:`suppress_envoy_headers
+  // <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` flag is not
+  // set to true, the router filter will place the original host header value before
+  // rewriting into the :ref:`x-envoy-original-host
+  // <config_http_filters_router_x-envoy-original-host>` header.
+  //
+  // And if the
+  // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+  // is set to true, the original host value will also be appended to the
+  // :ref:`config_http_conn_man_headers_x-forwarded-host` header.
+  //
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value. Using this option will append the
