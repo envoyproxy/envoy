@@ -13,6 +13,9 @@ namespace HttpFilters {
 
 using OnHttpConfigDestoryType = decltype(&envoy_dynamic_module_on_http_filter_config_destroy);
 using OnHttpFilterNewType = decltype(&envoy_dynamic_module_on_http_filter_new);
+
+using OnHttpPerRouteConfigDestoryType =
+    decltype(&envoy_dynamic_module_on_http_filter_per_route_config_destroy);
 using OnHttpFilterRequestHeadersType =
     decltype(&envoy_dynamic_module_on_http_filter_request_headers);
 using OnHttpFilterRequestBodyType = decltype(&envoy_dynamic_module_on_http_filter_request_body);
@@ -81,7 +84,28 @@ private:
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 };
 
+class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
+public:
+  DynamicModuleHttpPerRouteFilterConfig(
+      envoy_dynamic_module_type_http_filter_config_module_ptr config,
+      OnHttpPerRouteConfigDestoryType destroy)
+      : config_(config), destroy_(destroy) {}
+  ~DynamicModuleHttpPerRouteFilterConfig() override;
+
+  envoy_dynamic_module_type_http_filter_config_module_ptr config_;
+
+private:
+  OnHttpPerRouteConfigDestoryType destroy_;
+};
+
 using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttpFilterConfig>;
+using DynamicModuleHttpPerRouteFilterConfigConstSharedPtr =
+    std::shared_ptr<const DynamicModuleHttpPerRouteFilterConfig>;
+
+absl::StatusOr<DynamicModuleHttpPerRouteFilterConfigConstSharedPtr>
+newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name,
+                                   const absl::string_view filter_config,
+                                   Extensions::DynamicModules::DynamicModulePtr dynamic_module);
 
 /**
  * Creates a new DynamicModuleHttpFilterConfig for given configuration.

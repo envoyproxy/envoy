@@ -577,6 +577,19 @@ void envoy_dynamic_module_callback_http_clear_route_cache(
   filter->decoder_callbacks_->downstreamCallbacks()->clearRouteCache();
 }
 
+envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
+envoy_dynamic_module_callback_get_most_specific_route_config(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  const auto* config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<DynamicModuleHttpPerRouteFilterConfig>(
+          filter->decoder_callbacks_);
+  if (!config) {
+    return nullptr;
+  }
+  return config->config_;
+}
+
 bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id,
