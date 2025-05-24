@@ -556,7 +556,7 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
   filter->setDecoderFilterCallbacks(decoder_callbacks);
   filter->initializeInModuleFilter();
 
-  // No simulate a per-route config that is very short lived, and verify that the filter doesn't
+  // Now simulate a per-route config that is very short lived, and verify that the filter doesn't
   // segfaults if it uses it after after it discarded.
   {
     // do all per-route config in an inner scope to make sure the is destroyed before the filter
