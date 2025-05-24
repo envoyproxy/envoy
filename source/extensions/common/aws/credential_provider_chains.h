@@ -71,7 +71,7 @@ protected:
 };
 
 /**
- * Default AWS credentials provider chain.
+ * AWS credentials provider chain.
  *
  * Reference implementation:
  * https://github.com/aws/aws-sdk-cpp/blob/master/aws-cpp-sdk-core/source/auth/AWSCredentialsProviderChain.cpp#L44
@@ -90,9 +90,18 @@ public:
                                  AwsCredentialProviderOptRef credential_provider_config,
                                  CredentialsProviderChainFactories& factories);
 
+  /*
+   * Create a custom credential provider chain using config provided in credential_provider_config
+   */
+   
   static absl::StatusOr<CredentialsProviderChainSharedPtr> customCredentialsProviderChain(
       Server::Configuration::ServerFactoryContext& context, absl::string_view region,
       const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config);
+
+  /*
+   * Create the default credential provider chain
+   */
+
   static CredentialsProviderChainSharedPtr
   defaultCredentialsProviderChain(Server::Configuration::ServerFactoryContext& context,
                                   absl::string_view region);
