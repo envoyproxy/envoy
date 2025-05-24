@@ -62,6 +62,10 @@ bug_fixes:
     Fixes a bug where the lifetime of the HttpConnectionManager's ActiveStream can be out of sync
     with the lifetime of the codec stream.
 
+- area: http3
+  change: |
+    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.do_not_validate_http3_pseudo_headers`` to false.
+
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: websocket
