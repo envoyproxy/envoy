@@ -20,7 +20,6 @@ CommonCredentialsProviderChain::customCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
     const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config) {
   if (credential_provider_config.custom_credential_provider_chain() &&
-      !credential_provider_config.has_config_credential_provider() &&
       !credential_provider_config.has_container_credential_provider() &&
       !credential_provider_config.has_credentials_file_provider() &&
       !credential_provider_config.has_environment_credential_provider() &&

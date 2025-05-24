@@ -204,6 +204,7 @@ public:
   // Store the RAII handle for a subscription to credential provider notification
   void storeSubscription(CredentialSubscriberCallbacksHandlePtr);
 
+  // Returns the size of the credential provider chain
   size_t getNumProviders() { return providers_.size(); }
 
 private:
