@@ -18,7 +18,8 @@ public:
   static constexpr absl::string_view kFilterStateKey =
       "envoy.extensions.load_balancing_policies.override_host.filter_state";
 
-  OverrideHostFilterState(std::string&& host_list) : host_list_(std::move(host_list)) {}
+  OverrideHostFilterState(std::vector<std::string>&& host_list)
+      : host_list_(std::move(host_list)) {}
   bool empty() const { return host_list_.empty(); }
 
   /**
@@ -26,22 +27,14 @@ public:
    * Empty string view is returned if there are no more hosts.
    */
   absl::string_view consumeNextHost() {
-    for (; host_index_ < host_list_.size();) {
-      auto host = absl::string_view(host_list_).substr(host_index_);
-      host = host.substr(0, host.find(','));
-
-      host_index_ += host.size() + 1; // +1 for the delimiter
-
-      // Skip senseless host.
-      if (host = absl::StripAsciiWhitespace(host); !host.empty()) {
-        return host;
-      }
+    if (host_index_ >= host_list_.size()) {
+      return {};
     }
-    return {};
+    return host_list_[host_index_++];
   }
 
 private:
-  const std::string host_list_;
+  const std::vector<std::string> host_list_;
   uint64_t host_index_ = 0;
 };
 

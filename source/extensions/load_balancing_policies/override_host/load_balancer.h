@@ -150,7 +150,8 @@ private:
 
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
     // header or in the request metadata.
-    std::string getSelectedHosts(LoadBalancerContext* context);
+    // TODO(wbpcode): will absl::InlinedVector be used here be better?
+    std::vector<std::string> getSelectedHosts(LoadBalancerContext* context);
 
     // Return a list of endpoints selected by the LbTrafficExtension.
     // nullopt if the metadata is not present.

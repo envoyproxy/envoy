@@ -210,41 +210,39 @@ OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHostsFromHeader(
   return result[0]->value().getStringView();
 }
 
-std::string
+std::vector<std::string>
 OverrideHostLoadBalancer::LoadBalancerImpl::getSelectedHosts(LoadBalancerContext* context) {
   // This is checked by config validation.
   ASSERT(!config_.overrideHostSources().empty());
 
-  // Use single string to store all selected hosts to avoid multiple heap allocations.
-  std::string selected_hosts;
-  selected_hosts.reserve(256);
+  std::vector<std::string> selected_hosts;
+  selected_hosts.reserve(4);
 
   for (const auto& override_source : config_.overrideHostSources()) {
     // This is checked by config validation
     ASSERT(override_source.header_name.has_value() != override_source.metadata_key.has_value());
 
+    absl::optional<absl::string_view> hosts;
     if (override_source.header_name.has_value()) {
-      absl::optional<absl::string_view> host = getSelectedHostsFromHeader(
-          context->downstreamHeaders(), override_source.header_name.value());
-      if (host.has_value()) {
-        selected_hosts.append(host.value());
-        selected_hosts.push_back(',');
-      }
+      hosts = getSelectedHostsFromHeader(context->downstreamHeaders(),
+                                         override_source.header_name.value());
+    } else if (override_source.metadata_key.has_value()) {
+      // Lookup selected endpoints in the request metadata if the header based
+      // selection is not enabled.
+      hosts = getSelectedHostsFromMetadata(context->requestStreamInfo()->dynamicMetadata(),
+                                           override_source.metadata_key.value());
     }
 
-    // Lookup selected endpoints in the request metadata if the header based
-    // selection is not enabled.
-    if (override_source.metadata_key.has_value()) {
-      absl::optional<absl::string_view> host = getSelectedHostsFromMetadata(
-          context->requestStreamInfo()->dynamicMetadata(), override_source.metadata_key.value());
-      if (host.has_value()) {
-        selected_hosts.append(host.value());
-        selected_hosts.push_back(',');
-      }
+    if (!hosts.has_value()) {
+      continue;
+    }
+
+    for (absl::string_view host : absl::StrSplit(hosts.value(), ',', absl::SkipWhitespace())) {
+      selected_hosts.push_back(std::string(absl::StripAsciiWhitespace(host)));
     }
   }
 
-  ENVOY_LOG(trace, "Selected endpoints: {}", selected_hosts);
+  ENVOY_LOG(trace, "Selected endpoints: {}", absl::StrJoin(selected_hosts, ","));
   return selected_hosts;
 }
 
