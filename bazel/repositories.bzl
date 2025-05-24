@@ -159,6 +159,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_google_benchmark()
+    _com_github_google_highway()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
@@ -340,6 +341,11 @@ def _com_github_google_benchmark():
     external_http_archive(
         name = "libpfm",
         build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
+    )
+
+def _com_github_google_highway():
+    external_http_archive(
+        name = "com_github_google_highway",
     )
 
 def _com_github_google_libprotobuf_mutator():
@@ -688,10 +694,13 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
-            "@envoy//bazel:v8_include.patch",
             "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+            "@highway": "@com_github_google_highway",
+        },
     )
 
     # Needed by proxy_wasm_cpp_host.
