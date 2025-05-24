@@ -83,7 +83,8 @@ public:
    * Get the IAM Roles Anywhere Service endpoint for a given region:
    * rolesanywhere.<region>.amazonaws.com See:
    * https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-sign-process.html#authentication-task1
-   * @param trust_anchor_arn The configured roles anywhere trust anchor arn for the region to be extracted from
+   * @param trust_anchor_arn The configured roles anywhere trust anchor arn for the region to be
+   * extracted from
    * @return an sts endpoint url.
    */
 

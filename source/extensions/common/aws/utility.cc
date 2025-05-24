@@ -316,22 +316,19 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
 /**
  * This function generates an RolesAnywhere Endpoint from a region string.
  */
-// TODO: @nbaws - merge this code with sts endpoint code
-std::string Utility::getRolesAnywhereEndpoint(const std::string&  trust_anchor_arn) {
+std::string Utility::getRolesAnywhereEndpoint(const std::string& trust_anchor_arn) {
   std::string region;
-const std::vector<std::string> arn_split = absl::StrSplit(trust_anchor_arn, ':');
-if (arn_split.size() < 3) {
-  region = "us-east-1";
-}
-else {
-  region = arn_split[3];
-}
+  const std::vector<std::string> arn_split = absl::StrSplit(trust_anchor_arn, ':');
+  if (arn_split.size() < 3) {
+    region = "us-east-1";
+  } else {
+    region = arn_split[3];
+  }
 #ifdef ENVOY_SSL_FIPS
-      return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);   
+  return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);
 #else
-return fmt::format("rolesanywhere.{}.amazonaws.com", region);
+  return fmt::format("rolesanywhere.{}.amazonaws.com", region);
 #endif
-
 }
 
 envoy::config::cluster::v3::Cluster Utility::createInternalClusterStatic(

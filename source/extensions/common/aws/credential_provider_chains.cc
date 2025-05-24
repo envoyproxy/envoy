@@ -296,7 +296,8 @@ DefaultCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   const auto initialization_timer = std::chrono::seconds(2);
 
-  const auto cluster_host = Utility::getRolesAnywhereEndpoint(iam_roles_anywhere_config.trust_anchor_arn());
+  const auto cluster_host =
+      Utility::getRolesAnywhereEndpoint(iam_roles_anywhere_config.trust_anchor_arn());
   const auto uri = cluster_host + ":443";
 
   const auto cluster_name = absl::StrReplaceAll(cluster_host, {{".", "_"}});
@@ -351,7 +352,8 @@ CustomCredentialsProviderChain::createIAMRolesAnywhereCredentialsProvider(
   const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
   const auto initialization_timer = std::chrono::seconds(2);
 
-  const auto cluster_host = Utility::getRolesAnywhereEndpoint(iam_roles_anywhere_config.trust_anchor_arn());
+  const auto cluster_host =
+      Utility::getRolesAnywhereEndpoint(iam_roles_anywhere_config.trust_anchor_arn());
   const auto uri = cluster_host + ":443";
 
   const auto cluster_name = absl::StrReplaceAll(cluster_host, {{".", "_"}});
