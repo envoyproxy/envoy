@@ -317,38 +317,21 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
  * This function generates an RolesAnywhere Endpoint from a region string.
  */
 // TODO: @nbaws - merge this code with sts endpoint code
-std::string Utility::getRolesAnywhereEndpoint(absl::string_view region) {
-  std::string single_region;
-
-  // If we contain a comma or asterisk it looks like a region set.
-  if (absl::StrContains(region, ",") || (absl::StrContains(region, "*"))) {
-    // Use the first element from a region set if we have multiple regions specified.
-    const std::vector<std::string> region_v = absl::StrSplit(region, ',');
-    // If we still have a * in the first element, then send them to us-east-1 fips or global
-    // endpoint.
-    if (absl::StrContains(region_v[0], '*')) {
+std::string Utility::getRolesAnywhereEndpoint(const std::string&  trust_anchor_arn) {
+  std::string region;
+const std::vector<std::string> arn_split = absl::StrSplit(trust_anchor_arn, ':');
+if (arn_split.size() < 3) {
+  region = "us-east-1";
+}
+else {
+  region = arn_split[3];
+}
 #ifdef ENVOY_SSL_FIPS
-      return "rolesanywhere-fips.us-east-1.amazonaws.com";
+      return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);   
 #else
-      return "rolesanywhere.amazonaws.com";
+return fmt::format("rolesanywhere.{}.amazonaws.com", region);
 #endif
-    }
-    single_region = region_v[0];
-  } else {
-    // Otherwise it's a standard region, so use that.
-    single_region = region;
-  }
 
-  if (single_region == "cn-northwest-1" || single_region == "cn-north-1") {
-    return fmt::format("rolesanywhere.{}.amazonaws.com.cn", single_region);
-  }
-#ifdef ENVOY_SSL_FIPS
-  if (single_region == "us-east-1" || single_region == "us-east-2" ||
-      single_region == "us-west-1" || single_region == "us-west-2") {
-    return fmt::format("rolesanywhere-fips.{}.amazonaws.com", single_region);
-  }
-#endif
-  return fmt::format("rolesanywhere.{}.amazonaws.com", single_region);
 }
 
 envoy::config::cluster::v3::Cluster Utility::createInternalClusterStatic(
