@@ -427,14 +427,13 @@ case $CI_TARGET in
     coverage|fuzz_coverage)
         setup_clang_toolchain
         echo "${CI_TARGET} build with tests ${COVERAGE_TEST_TARGETS[*]}"
+        COVERAGE_THRESHOLD=96.1
         if [[ "$CI_TARGET" == "fuzz_coverage" ]]; then
             export FUZZ_COVERAGE=true
+            COVERAGE_THRESHOLD=23.75
         fi
+        export COVERAGE_THRESHOLD
         export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
-        ENVOY_GENHTML_ARGS=(
-            --ignore-errors "category,corrupt,inconsistent")
-        GENHTML_ARGS="${ENVOY_GENHTML_ARGS[*]}"
-        export GENHTML_ARGS
         "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
