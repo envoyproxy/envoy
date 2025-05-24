@@ -616,7 +616,11 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
+#ifdef ENVOY_SSL_FIPS
+  dnsSetup("rolesanywhere-fips.ap-southeast-2.amazonaws.com");
+#else
   dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
+#endif
   // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
@@ -640,7 +644,11 @@ TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
+#ifdef ENVOY_SSL_FIPS
+  dnsSetup("rolesanywhere-fips.ap-southeast-2.amazonaws.com");
+#else
   dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
+#endif
   // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
