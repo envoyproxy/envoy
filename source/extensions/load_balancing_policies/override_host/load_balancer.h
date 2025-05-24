@@ -19,7 +19,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
-#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/load_balancing_policies/override_host/override_host_filter_state.h"
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -145,14 +145,12 @@ private:
     }
 
   private:
-    HostConstSharedPtr getEndpoint(const std::vector<std::string>& selected_hosts,
-                                   StreamInfo::FilterState& filter_state);
+    HostConstSharedPtr getEndpoint(OverrideHostFilterState& override_host_state);
     HostConstSharedPtr findHost(absl::string_view endpoint);
 
     // Lookup the list of endpoints selected by the LbTrafficExtension in the
-    // header (if configured) or in the request metadata.
-    // nullptr if neither host nor metadata is present.
-    // Error if the metadata is present but cannot be parsed.
+    // header or in the request metadata.
+    // TODO(wbpcode): will absl::InlinedVector be used here be better?
     std::vector<std::string> getSelectedHosts(LoadBalancerContext* context);
 
     // Return a list of endpoints selected by the LbTrafficExtension.
