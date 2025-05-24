@@ -42,6 +42,11 @@ minor_behavior_changes:
    :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
    will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
 
+- area: ext_authz
+  change: |
+    Implement support for ext_authz grpc check to use ``append_action`` when given in upstream header handling to support
+    multi header fields.
+
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: conn_pool
