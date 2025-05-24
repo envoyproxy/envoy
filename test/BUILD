@@ -9,6 +9,8 @@ licenses(["notice"])  # Apache 2
 
 envoy_package()
 
+exports_files(["per_directory_coverage.yaml"])
+
 # TODO(htuch): remove when we have a solution for https://github.com/bazelbuild/bazel/issues/3510
 envoy_cc_test_library(
     name = "dummy_main",
