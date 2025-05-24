@@ -17,7 +17,7 @@ WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
     std::chrono::seconds initialization_timer,
     const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
         web_identity_config)
-    : MetadataCredentialsProviderBase( context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       role_arn_(web_identity_config.role_arn()),

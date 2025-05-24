@@ -2,8 +2,9 @@
 
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.h"
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
-#include "source/extensions/common/aws/credentials_provider.h"
+
 #include "source/common/common/logger.h"
+#include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {

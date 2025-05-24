@@ -1,13 +1,14 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 
-#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
+#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
+#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
+
 #include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/aws/credential_providers/inline_credentials_provider.h"
 #include "source/extensions/common/aws/region_provider_impl.h"
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/signers/sigv4a_signer_impl.h"
+#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
 namespace Envoy {
 namespace Extensions {

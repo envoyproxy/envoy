@@ -41,8 +41,8 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/extensions/common/aws:credential_provider_chains_lib",
         "//source/extensions/common/aws/credential_providers:config_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/aws_lambda/v3:pkg_cc_proto",
-        "//source/extensions/common/aws/credential_providers:inline_credentials_provider_lib",
     ],
 )

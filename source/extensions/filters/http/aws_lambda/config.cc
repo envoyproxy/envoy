@@ -1,4 +1,5 @@
 #include "source/extensions/filters/http/aws_lambda/config.h"
+
 #include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/aws/credential_providers/config_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"

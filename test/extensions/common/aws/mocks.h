@@ -111,13 +111,13 @@ public:
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
-              ( Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
+              (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, absl::string_view, absl::string_view,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                absl::string_view));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
-              ( Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
+              (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                std::chrono::seconds, absl::string_view));
 };

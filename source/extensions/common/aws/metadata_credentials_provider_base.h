@@ -37,8 +37,7 @@ public:
   friend class MetadataCredentialsProviderBaseFriend;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
-  MetadataCredentialsProviderBase(
-                                  Server::Configuration::ServerFactoryContext& context,
+  MetadataCredentialsProviderBase(Server::Configuration::ServerFactoryContext& context,
                                   AwsClusterManagerPtr aws_cluster_manager,
                                   absl::string_view cluster_name,
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,

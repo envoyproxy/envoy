@@ -8,9 +8,8 @@ namespace Common {
 namespace Aws {
 
 MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
-    Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer)
     : context_(context), create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
@@ -56,12 +55,7 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
 bool MetadataCredentialsProviderBase::credentialsPending() { return credentials_pending_; }
 
 Credentials MetadataCredentialsProviderBase::getCredentials() {
-
-  if (tls_slot_) {
-    return *(*tls_slot_)->credentials_.get();
-  } else {
-    return Credentials();
-  }
+  return *(*tls_slot_)->credentials_.get();
 }
 
 std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {

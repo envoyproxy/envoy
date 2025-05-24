@@ -1,5 +1,4 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
-#include "source/extensions/common/aws/credential_providers/inline_credentials_provider.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -49,77 +48,68 @@ public:
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _))
-      .Times(0);
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _)).Times(0);
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createContainerCredentialsProvider(
-                              Ref(*api_), _, _, _, _, "169.254.170.2:80/path/to/creds", _, _, ""));
+                              _, _, _, _, "169.254.170.2:80/path/to/creds", _, _, ""));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createContainerCredentialsProvider(
-                              Ref(*api_), _, _, _, _, "http://host/path/to/creds", _, _, ""));
+                              _, _, _, _, "http://host/path/to/creds", _, _, ""));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_,
-              createContainerCredentialsProvider(Ref(*api_), _, _, _, _,
-                                                 "http://host/path/to/creds", _, _, "auth_token"));
+  EXPECT_CALL(factories_, createContainerCredentialsProvider(
+                              _, _, _, _, "http://host/path/to/creds", _, _, "auth_token"));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
@@ -128,11 +118,10 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
   time_system_.setSystemTime(std::chrono::milliseconds(1234567890));
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
@@ -140,26 +129,24 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _));
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
   TestEnvironment::unsetEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE");
   TestEnvironment::unsetEnvVar("AWS_ROLE_ARN");
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _)).Times(0);
 
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
 }
 // These tests validate override of default credential provider with custom credential provider
 // settings
@@ -169,7 +156,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
 
   std::string role_session_name;
 
@@ -186,8 +173,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
   credential_provider_config.mutable_assume_role_with_web_identity_provider()
       ->set_role_session_name("custom-role-session-name");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
   EXPECT_EQ(role_session_name, "custom-role-session-name");
 }
 
@@ -196,7 +182,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
 
   std::string role_arn;
 
@@ -213,8 +199,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
   credential_provider_config.mutable_assume_role_with_web_identity_provider()->set_role_arn(
       "custom-role-arn");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
   EXPECT_EQ(role_arn, "custom-role-arn");
 }
 
@@ -223,7 +208,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
 
   std::string inline_string;
 
@@ -241,8 +226,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
       ->mutable_web_identity_token_data_source()
       ->set_inline_string("custom_token_string");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
   EXPECT_EQ(inline_string, "custom_token_string");
 }
 
@@ -262,7 +246,7 @@ TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileWithCustomDataSource)
             return nullptr;
           })));
 
-  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(Ref(*api_), _, _, _, _, _, _));
+  EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
 
   EXPECT_CALL(factories_, createWebIdentityCredentialsProvider(Ref(context_), _, _, _));
 
@@ -271,8 +255,7 @@ TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileWithCustomDataSource)
       ->mutable_credentials_data_source()
       ->set_inline_string("custom_inline_string");
 
-  DefaultCredentialsProviderChain chain(*api_, context_, "region", credential_provider_config,
-                                        factories_);
+  CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
   EXPECT_EQ(inline_string, "custom_inline_string");
 }
 
