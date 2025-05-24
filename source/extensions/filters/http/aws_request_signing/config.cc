@@ -104,9 +104,21 @@ AwsRequestSigningFilterFactory::createSigner(
   } else if (config.has_credential_provider() &&
              config.credential_provider().custom_credential_provider_chain()) {
     // Custom credential provider chain is true, so use configuration that has been provided
+       // Custom credential provider chain must have at least one configured provider
+        if (
+          config.credential_provider().has_assume_role_credential_provider() ||
+          config.credential_provider().has_config_credential_provider() ||
+config.credential_provider().has_container_credential_provider() ||
+config.credential_provider().has_credentials_file_provider() ||
+config.credential_provider().has_environment_credential_provider() ||
+  config.credential_provider().has_iam_roles_anywhere_credential_provider() ||
+  config.credential_provider().has_inline_credential() ||
+config.credential_provider().has_instance_profile_credential_provider() ||
+    config.credential_provider().has_assume_role_with_web_identity_provider()) {
     credentials_provider_chain =
         std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
             server_context, region, config.credential_provider());
+        }
   } else {
     credentials_provider_chain =
         std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
