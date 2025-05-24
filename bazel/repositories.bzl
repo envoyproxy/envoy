@@ -72,7 +72,9 @@ _default_envoy_build_config = repository_rule(
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
-    external_http_archive("grpc_httpjson_transcoding")
+    external_http_archive("grpc_httpjson_transcoding", patch_cmds = [
+        "sed -i.bak 's/pb::int64/int64_t/g' src/message_reader.cc",
+    ])
     external_http_archive(
         name = "com_google_protoconverter",
         patch_args = ["-p1"],
@@ -184,7 +186,7 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _com_github_envoyproxy_sqlparser()
+    _com_envoyproxy_protoc_gen_validate()
     _v8()
     _com_googlesource_chromium_base_trace_event_common()
     _com_github_google_quiche()
@@ -478,6 +480,12 @@ def _com_github_facebook_zstd():
 def _com_google_cel_cpp():
     external_http_archive(
         "com_google_cel_cpp",
+        patch_cmds = [
+            # Create a custom option to set compatibility mode for protobuf v31
+            "echo 'build --define=PROTOBUF_BACKWARD_COMPATIBLE=1' > .bazelrc",
+            # Apply macro definition directly to all C++ code in this repo
+            "echo 'build --copt=\"-DPROTOCOL_BUFFERS_BACKWARDS_COMPATIBILITY_MODE=1\"' >> .bazelrc",
+        ],
     )
 
 def _com_github_google_perfetto():
@@ -634,6 +642,7 @@ def _com_google_protobuf():
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@abseil-cpp": "@com_google_absl"},
     )
 
     # Needed by grpc, jwt_verify_lib, maybe others.
@@ -953,4 +962,59 @@ def _com_github_maxmind_libmaxminddb():
     external_http_archive(
         name = "com_github_maxmind_libmaxminddb",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def _com_envoyproxy_protoc_gen_validate():
+    external_http_archive(
+        name = "com_envoyproxy_protoc_gen_validate",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:protoc_gen_validate.patch"],
+        patch_cmds = [
+            """cat > validate/BUILD <<EOF
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_java//java:defs.bzl", "java_proto_library")
+load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:proto.bzl", "py_proto_library")
+
+package(default_visibility = ["//visibility:public"])
+
+proto_library(
+    name = "validate_proto",
+    srcs = ["validate.proto"],
+    deps = [
+        "@com_google_protobuf//:descriptor_proto",
+        "@com_google_protobuf//:duration_proto",
+        "@com_google_protobuf//:timestamp_proto",
+    ],
+)
+
+# Use standard cc_proto_library from com_google_protobuf
+cc_proto_library(
+    name = "validate_cc_proto",
+    deps = [":validate_proto"],
+)
+
+py_proto_library(
+    name = "validate_py",
+    deps = [":validate_proto"],
+)
+
+cc_library(
+    name = "cc_validate",
+    srcs = ["validate.h"],
+    visibility = ["//visibility:public"],
+)
+
+java_proto_library(
+    name = "validate_java",
+    deps = [":validate_proto"],
+)
+
+filegroup(
+    name = "validate_src",
+    srcs = ["validate.proto"],
+)
+EOF""",
+        ],
     )
