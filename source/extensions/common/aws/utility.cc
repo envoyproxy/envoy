@@ -325,7 +325,12 @@ std::string Utility::getRolesAnywhereEndpoint(const std::string& trust_anchor_ar
     region = arn_split[3];
   }
 #ifdef ENVOY_SSL_FIPS
-  return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);
+  if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
+      region == "us-west-2" || region == "us-gov-east-1" || region == "us-gov-west-1") {
+    return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);
+  } else {
+    return fmt::format("rolesanywhere.{}.amazonaws.com", region);
+  }
 #else
   return fmt::format("rolesanywhere.{}.amazonaws.com", region);
 #endif

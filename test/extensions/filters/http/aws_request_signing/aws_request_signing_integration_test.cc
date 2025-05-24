@@ -616,11 +616,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
-#ifdef ENVOY_SSL_FIPS
-  dnsSetup("rolesanywhere-fips.ap-southeast-2.amazonaws.com");
-#else
   dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
-#endif
   // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
@@ -631,24 +627,13 @@ TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
 
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE);
   initialize();
-#ifdef ENVOY_SSL_FIPS
-  test_server_->waitForCounterGe(
-      "aws.metadata_credentials_provider.rolesanywhere-fips_ap-southeast-2_"
-      "amazonaws_com.credential_refreshes_performed",
-      1);
-#else
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
                                  "amazonaws_com.credential_refreshes_performed",
                                  1);
-#endif
 }
 
 TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
-#ifdef ENVOY_SSL_FIPS
-  dnsSetup("rolesanywhere-fips.ap-southeast-2.amazonaws.com");
-#else
   dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
-#endif
   // RolesAnywhere credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
@@ -660,16 +645,9 @@ TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
 
   addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE_CUSTOM);
   initialize();
-#ifdef ENVOY_SSL_FIPS
-  test_server_->waitForCounterGe(
-      "aws.metadata_credentials_provider.rolesanywhere-fips_ap-southeast-2_"
-      "amazonaws_com.credential_refreshes_performed",
-      1);
-#else
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
                                  "amazonaws_com.credential_refreshes_performed",
                                  1);
-#endif
 }
 
 TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
