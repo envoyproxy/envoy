@@ -594,7 +594,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       (upstream_http_protocol_options.value().auto_sni() ||
        upstream_http_protocol_options.value().auto_san_validation())) {
     // Default the header to Host/Authority header.
-    std::string header_value = route_entry_->getRequestHostValue(headers);
+    std::string header_value =
+        route_entry_->finalizedRequestHost(headers).value_or(std::string(headers.getHostValue()));
 
     // Check whether `override_auto_sni_header` is specified.
     const auto override_auto_sni_header =

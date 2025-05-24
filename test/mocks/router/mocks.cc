@@ -99,8 +99,8 @@ MockPathMatchCriterion::~MockPathMatchCriterion() = default;
 
 MockRouteEntry::MockRouteEntry() {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
-  ON_CALL(*this, getRequestHostValue(_))
-      .WillByDefault([](const Http::RequestHeaderMap& headers) -> std::string {
+  ON_CALL(*this, finalizedRequestHost(_))
+      .WillByDefault([](const Http::RequestHeaderMap& headers) -> absl::optional<std::string> {
         return std::string(headers.getHostValue());
       });
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));

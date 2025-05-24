@@ -191,6 +191,7 @@ private:
   HEADER_FUNC(EnvoyRetriableHeaderNames)                                                           \
   HEADER_FUNC(EnvoyIsTimeoutRetry)                                                                 \
   HEADER_FUNC(EnvoyOriginalPath)                                                                   \
+  HEADER_FUNC(EnvoyOriginalHost)                                                                   \
   HEADER_FUNC(EnvoyOriginalUrl)                                                                    \
   HEADER_FUNC(EnvoyUpstreamAltStatName)                                                            \
   HEADER_FUNC(EnvoyUpstreamRequestTimeoutAltResponse)                                              \

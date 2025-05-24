@@ -344,6 +344,7 @@ void ConnectionManagerUtility::cleanInternalHeaders(
   request_headers.removeEnvoyForceTrace();
   request_headers.removeEnvoyIpTags();
   request_headers.removeEnvoyOriginalUrl();
+  request_headers.removeEnvoyOriginalHost();
   request_headers.removeEnvoyHedgeOnPerTryTimeout();
 
   for (const LowerCaseString& header : internal_only_headers) {
