@@ -93,7 +93,7 @@ public:
   /*
    * Create a custom credential provider chain using config provided in credential_provider_config
    */
-   
+
   static absl::StatusOr<CredentialsProviderChainSharedPtr> customCredentialsProviderChain(
       Server::Configuration::ServerFactoryContext& context, absl::string_view region,
       const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config);

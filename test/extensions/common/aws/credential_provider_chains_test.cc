@@ -52,6 +52,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(3, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
@@ -61,6 +62,7 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(2, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
@@ -70,6 +72,7 @@ TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(3, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
@@ -80,6 +83,7 @@ TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(4, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
@@ -90,6 +94,7 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(4, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
@@ -101,6 +106,7 @@ TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(4, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
@@ -110,6 +116,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(2, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
@@ -122,6 +129,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(3, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
@@ -135,6 +143,7 @@ TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(3, chain.getNumProviders());
 }
 
 TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
@@ -147,6 +156,7 @@ TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
 
   CommonCredentialsProviderChain chain(context_, "region", credential_provider_config, factories_);
+  EXPECT_EQ(3, chain.getNumProviders());
 }
 // These tests validate override of default credential provider with custom credential provider
 // settings

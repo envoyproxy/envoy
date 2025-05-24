@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.aws_lambda.v3;
 
-import "envoy/extensions/common/aws/v3/credential_provider.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -19,7 +17,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.filters.http.aws_lambda]
 
 // AWS Lambda filter config
-// [#next-free-field: 8]
+// [#next-free-field: 7]
 message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.aws_lambda.v2alpha.Config";
@@ -76,10 +74,6 @@ message Config {
   // .. warning::
   //   Distributing the AWS credentials via this configuration should not be done in production.
   Credentials credentials = 6;
-
-  // The credential provider for signing the request. This is optional and if not set,
-  // it will be retrieved using the procedure described in :ref:`config_http_filters_aws_request_signing`.
-  common.aws.v3.AwsCredentialProvider credential_provider = 7;
 }
 
 // AWS Lambda Credentials config.

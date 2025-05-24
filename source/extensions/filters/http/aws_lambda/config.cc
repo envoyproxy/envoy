@@ -1,12 +1,5 @@
 #include "source/extensions/filters/http/aws_lambda/config.h"
 
-#include "source/extensions/common/aws/credential_provider_chains.h"
-#include "source/extensions/common/aws/credential_providers/config_credentials_provider.h"
-#include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"
-#include "source/extensions/common/aws/credential_providers/inline_credentials_provider.h"
-#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
-#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -59,36 +52,8 @@ AwsLambdaFilterFactory::getCredentialsProvider(
         server_context, credential_file_config));
     return chain;
   }
-  absl::StatusOr<Envoy::Extensions::Common::Aws::CredentialsProviderChainSharedPtr>
-      credentials_provider =
-          absl::InvalidArgumentError("No credentials provider settings configured.");
-
-  if (proto_config.has_credential_provider()) {
-    if (proto_config.credential_provider().has_inline_credential()) {
-      // If inline credential provider is set, use it instead of the default or custom credentials
-      // chain
-      const auto& inline_credential = proto_config.credential_provider().inline_credential();
-      credentials_provider = std::make_shared<Extensions::Common::Aws::CredentialsProviderChain>();
-      auto inline_provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
-          inline_credential.access_key_id(), inline_credential.secret_access_key(),
-          inline_credential.session_token());
-      credentials_provider.value()->add(inline_provider);
-      return credentials_provider.value();
-
-    } else {
-      credentials_provider =
-          Extensions::Common::Aws::CommonCredentialsProviderChain::customCredentialsProviderChain(
-              server_context, region, proto_config.credential_provider());
-      if (!credentials_provider.ok()) {
-        return Extensions::Common::Aws::CommonCredentialsProviderChain::
-            defaultCredentialsProviderChain(server_context, region);
-      }
-      return credentials_provider.value();
-    }
-  } else {
-    return Extensions::Common::Aws::CommonCredentialsProviderChain::defaultCredentialsProviderChain(
-        server_context, region);
-  }
+  return Extensions::Common::Aws::CommonCredentialsProviderChain::defaultCredentialsProviderChain(
+      server_context, region);
 }
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(
