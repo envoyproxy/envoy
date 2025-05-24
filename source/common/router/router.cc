@@ -597,15 +597,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     std::string header_value = route_entry_->getRequestHostValue(headers);
 
     // Check whether `override_auto_sni_header` is specified.
-    const auto override_auto_sni_header =
+    const auto& override_auto_sni_header =
         upstream_http_protocol_options.value().override_auto_sni_header();
     if (!override_auto_sni_header.empty()) {
       // Use the header value from `override_auto_sni_header` to set the SNI value.
-      const auto overridden_header_value = Http::HeaderUtility::getAllOfHeaderAsString(
-          headers, Http::LowerCaseString(override_auto_sni_header));
-      if (overridden_header_value.result().has_value() &&
-          !overridden_header_value.result().value().empty()) {
-        header_value = overridden_header_value.result().value();
+      const auto overridden_header_value =
+          headers.get(Http::LowerCaseString(override_auto_sni_header));
+      if (!overridden_header_value.empty() && !overridden_header_value[0]->value().empty()) {
+        header_value = std::string(overridden_header_value[0]->value().getStringView());
       }
     }
     const auto parsed_authority = Http::Utility::parseAuthority(header_value);
