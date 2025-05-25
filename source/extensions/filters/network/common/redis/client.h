@@ -101,7 +101,21 @@ public:
 
   virtual PoolRequest* makeRequestImmediate(const RespValue& request,
                                             ClientCallbacks& callbacks) PURE;
-  virtual void queueRequests(bool enable_queue) PURE;
+
+  /*
+  * Enable or disable request queueing for the client.
+  * Enabling request queuing will cause the client to queue requests until the queue is disabled.
+  * The caller is responsible for calling flushBufferAndResetTimer when the queue is re-enabled.
+  * @param enable_queue true to enable request queueing, false to disable it.
+  */
+  // virtual void queueRequests(bool enable_queue) PURE;
+
+  /*
+  * Send AWS IAM authentication credentials. Will set the client to queue requests if we are still waiting
+  * on AWS credentials to be returned from a credentials provider.
+  * @param The shared pointer to an already initialized AWS IAM authenticator.
+  */
+  // virtual void sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator) PURE;
 
   /**
    * Initialize the connection. Issue the auth command and readonly command as needed.
@@ -214,9 +228,9 @@ public:
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                            const ConfigSharedPtr& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
-                           Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password, bool is_transaction_client,
-                           RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) PURE;
+                           Stats::Scope& scope, const std::string& auth_username, 
+                           const std::string& auth_password, bool is_transaction_client) PURE;
+                          //  RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

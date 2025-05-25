@@ -14,10 +14,9 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
-#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -91,12 +90,9 @@ public:
   }
   void close() override;
   PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) override;
-  PoolRequest* makeRequestImmediate(const RespValue& request, ClientCallbacks& callbacks) override;
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
-  void queueRequests(bool enable_queue) override { queue_enabled_ = enable_queue; }
-  void sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator);
 
 private:
   friend class RedisClientImplTest;
@@ -154,8 +150,6 @@ private:
   const RedisCommandStatsSharedPtr redis_command_stats_;
   Stats::Scope& scope_;
   bool is_transaction_client_;
-  std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> aws_iam_auth_signer_;
-  bool queue_enabled_{false};
 };
 
 class ClientFactoryImpl : public ClientFactory {
@@ -165,7 +159,7 @@ public:
                    const ConfigSharedPtr& config,
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
-                   bool is_transaction_client, RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) override;
+                   bool is_transaction_client) override;
 
   static ClientFactoryImpl instance_;
 

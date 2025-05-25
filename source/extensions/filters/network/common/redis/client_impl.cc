@@ -1,7 +1,7 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
+// #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -63,9 +63,11 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const ConfigSharedPtr& config,
                              const RedisCommandStatsSharedPtr& redis_command_stats,
+                            //  Stats::Scope& scope, bool is_transaction_client, RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) {
                              Stats::Scope& scope, bool is_transaction_client) {
   auto client =
       std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory, config,
+                                  //  redis_command_stats, scope, is_transaction_client, aws_iam_authenticator);
                                    redis_command_stats, scope, is_transaction_client);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
@@ -79,7 +81,7 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                        const ConfigSharedPtr& config,
                        const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-                       bool is_transaction_client)
+                       bool is_transaction_client, RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator))
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
@@ -333,7 +335,7 @@ void ClientImpl::sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticator
 
                                         queueRequests(true);
 
-  auto add_auth = [this, aws_iam_authenticator&]() {
+  auto add_auth = [this, &aws_iam_authenticator]() {
     aws_iam_authenticator->generateAuthToken();
     auto auth_password = aws_iam_authenticator->getAuthToken();
 
@@ -354,15 +356,17 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password, bool is_transaction_client,
-                                     RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) {
+                                    const std::string& auth_password, bool is_transaction_client
+                                    //  RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) {
+                                     ) {
   ClientPtr client =
       ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
+                        //  redis_command_stats, scope, is_transaction_client, aws_iam_authenticator);
                          redis_command_stats, scope, is_transaction_client);
 
-  if (aws_iam_authenticator.has_value()) {
-    client->sendIamAuthentication(aws_iam_authenticator.value());
-  }
+  // if (aws_iam_authenticator.has_value()) {
+  //   client->sendIamAuthentication(aws_iam_authenticator.value());
+  // }
   client->initialize(auth_username, auth_password);
   return client;
 }
