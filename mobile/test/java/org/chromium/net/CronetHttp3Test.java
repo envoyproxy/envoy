@@ -98,10 +98,8 @@ public class CronetHttp3Test {
     // Set up the Envoy engine.
     NativeCronvoyEngineBuilderImpl nativeCronetEngineBuilder =
         new NativeCronvoyEngineBuilderImpl(ApplicationProvider.getApplicationContext());
-    nativeCronetEngineBuilder.addRuntimeGuard("drain_conn_pools_on_network_change",
+    nativeCronetEngineBuilder.addRuntimeGuard("drain_pools_on_network_change",
                                               drainOnNetworkChange);
-    nativeCronetEngineBuilder.addRuntimeGuard("reset_brokenness_on_nework_change",
-                                              resetBrokennessOnNetworkChange);
 
     if (setUpLogging) {
       nativeCronetEngineBuilder.setLogger(logger);

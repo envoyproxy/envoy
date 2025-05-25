@@ -270,6 +270,10 @@ TEST_F(CredentialsFileCredentialsProviderTest, RefreshInterval) {
   EXPECT_EQ("default_token", credentials.sessionToken().value());
 }
 
+TEST_F(CredentialsFileCredentialsProviderTest, Coverage) {
+  EXPECT_EQ(provider_.providerName(), "CredentialsFileCredentialsProvider");
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

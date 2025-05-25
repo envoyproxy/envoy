@@ -157,6 +157,10 @@ public:
       : provider_(provider) {}
 
   void onClusterAddOrUpdate() { return provider_->onClusterAddOrUpdate(); }
+  void setMetadataFetcher(MetadataFetcherPtr fetcher) {
+    provider_->metadata_fetcher_ = std::move(fetcher);
+  }
+
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
 

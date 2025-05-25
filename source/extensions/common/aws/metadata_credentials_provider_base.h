@@ -9,7 +9,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
 constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
 constexpr char TOKEN[] = "Token";
