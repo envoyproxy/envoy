@@ -52,8 +52,8 @@ AwsLambdaFilterFactory::getCredentialsProvider(
         server_context, credential_file_config));
     return chain;
   }
-  return std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-      server_context.api(), server_context, region);
+  return Extensions::Common::Aws::CommonCredentialsProviderChain::defaultCredentialsProviderChain(
+      server_context, region);
 }
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(

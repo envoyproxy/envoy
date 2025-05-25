@@ -111,36 +111,15 @@ public:
        const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createContainerCredentialsProvider,
-              (Api::Api&, Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
+              (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, absl::string_view, absl::string_view,
                MetadataFetcher::MetadataReceiver::RefreshState, std::chrono::seconds,
                absl::string_view));
 
   MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
-              (Api::Api&, Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
+              (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                std::chrono::seconds, absl::string_view));
-};
-
-class MockCustomCredentialsProviderChainFactories : public CustomCredentialsProviderChainFactories {
-public:
-  MOCK_METHOD(
-      CredentialsProviderSharedPtr, mockCreateCredentialsFileCredentialsProvider,
-      (Server::Configuration::ServerFactoryContext&,
-       (const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)),
-      (const));
-
-  CredentialsProviderSharedPtr createCredentialsFileCredentialsProvider(
-      Server::Configuration::ServerFactoryContext& context,
-      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider& config)
-      const override {
-    return mockCreateCredentialsFileCredentialsProvider(context, config);
-  }
-
-  MOCK_METHOD(
-      CredentialsProviderSharedPtr, createWebIdentityCredentialsProvider,
-      (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr, absl::string_view,
-       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&));
 };
 
 class MockSigV4AKeyDerivation : public SigV4AKeyDerivationBase {
