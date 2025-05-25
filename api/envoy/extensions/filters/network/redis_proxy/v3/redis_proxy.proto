@@ -387,7 +387,7 @@ message RedisProtocolOptions {
 
   // Upstream server username as defined by the ``user`` directive
   // `<https://redis.io/topics/acl>`_ in the server's configuration file.
-  // If `aws_iam` is set, this field will be used as the authenticating user for redis IAM authentication. 
+  // If `aws_iam` is set, this field will be used as the authenticating user for redis IAM authentication.
   // See `Create a new IAM-enabled user` under `Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_ for more details.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
 
