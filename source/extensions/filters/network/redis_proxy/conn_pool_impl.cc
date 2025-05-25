@@ -14,12 +14,11 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
-#include "source/common/http/message_impl.h"
-#include "source/common/http/utility.h"
 #include "source/common/stats/utility.h"
-#include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
+#include "source/common/http/utility.h"
+#include "source/common/http/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -135,71 +134,6 @@ InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
     (*clients_to_drain_.begin())->redis_client_->close();
   }
 }
-
-AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
-    Server::Configuration::ServerFactoryContext& context, std::string auth_user,
-    absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
-    uint16_t expiration_time,
-    absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider)
-    : expiration_time_(expiration_time), auth_user_(auth_user),
-      cache_name_(std::string(cache_name)), service_name_(std::string(service_name)),
-      region_(std::string(region)), context_(context) {
-
-  Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
-
-  credentials_provider_chain =
-      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context_, region_, credential_provider);
-  signer_ = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-      service_name_, region_, credentials_provider_chain, context_,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_time_);
-
-  if (!cache_duration_timer_) {
-    cache_duration_timer_ =
-        context_.mainThreadDispatcher().createTimer([this]() -> void { generateAuthToken(); });
-  }
-}
-
-AwsIamAuthenticatorImplSharedPtr InstanceImpl::initAwsIamAuthenticator(
-    Server::Configuration::ServerFactoryContext& context, std::string auth_user,
-    absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
-    uint16_t expiration_time,
-    absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider) {
-
-  return std::make_shared<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name,
-                                                   region, expiration_time, credential_provider);
-}
-
-void AwsIamAuthenticatorImpl::generateAuthToken() {
-  ENVOY_LOG(debug, "Generating new AWS IAM authentication token");
-  Http::RequestMessageImpl message;
-  message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
-  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  message.headers().setHost(cache_name_);
-  message.headers().setPath(fmt::format("/?Action=connect&User={}",
-                                        Envoy::Http::Utility::PercentEncoding::encode(auth_user_)));
-
-  auto status = signer_->sign(message, true, region_);
-  context_.mainThreadDispatcher().post(
-      [this]() { cache_duration_timer_->enableTimer(std::chrono::seconds(expiration_time_)); });
-  auth_token_ = cache_name_ + std::string(message.headers().getPathValue());
-  auto query_params =
-      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
-
-  query_params.overwrite(
-      Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSignature, "*****");
-  if (query_params.getFirstValue(
-          Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSecurityToken)) {
-    query_params.overwrite(
-        Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSecurityToken, "*****");
-  }
-  auto sanitised_query_string =
-      query_params.replaceQueryString(Http::HeaderString(message.headers().getPathValue()));
-  ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", cache_name_,
-            sanitised_query_string);
-}
-
-std::string AwsIamAuthenticatorImpl::getAuthToken() { return auth_token_; }
 
 void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
     absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
@@ -740,6 +674,48 @@ void InstanceImpl::PendingRequest::cancel() {
   request_handler_ = nullptr;
   parent_.onRequestCompleted();
 }
+
+
+AwsIamAuthenticatorImplSharedPtr InstanceImpl::initAwsIamAuthenticator(
+    Server::Configuration::ServerFactoryContext& context, std::string auth_user,
+    absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
+    uint16_t expiration_time,
+    absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider) {
+
+  return std::make_shared<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name,
+                                                   region, expiration_time, credential_provider);
+}
+
+void AwsIamAuthenticatorImpl::generateAuthToken() {
+  ENVOY_LOG(debug, "Generating new AWS IAM authentication token");
+  Http::RequestMessageImpl message;
+  message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
+  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
+  message.headers().setHost(cache_name_);
+  message.headers().setPath(fmt::format("/?Action=connect&User={}",
+                                        Envoy::Http::Utility::PercentEncoding::encode(auth_user_)));
+
+  auto status = signer_->sign(message, true, region_);
+  context_.mainThreadDispatcher().post(
+      [this]() { cache_duration_timer_->enableTimer(std::chrono::seconds(expiration_time_)); });
+  auth_token_ = cache_name_ + std::string(message.headers().getPathValue());
+  auto query_params =
+      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
+
+  query_params.overwrite(
+      Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSignature, "*****");
+  if (query_params.getFirstValue(
+          Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSecurityToken)) {
+    query_params.overwrite(
+        Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSecurityToken, "*****");
+  }
+  auto sanitised_query_string =
+      query_params.replaceQueryString(Http::HeaderString(message.headers().getPathValue()));
+  ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", cache_name_,
+            sanitised_query_string);
+}
+
+std::string AwsIamAuthenticatorImpl::getAuthToken() { return auth_token_; }
 
 } // namespace ConnPool
 } // namespace RedisProxy

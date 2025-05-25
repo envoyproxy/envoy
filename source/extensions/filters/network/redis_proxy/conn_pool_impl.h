@@ -23,7 +23,6 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
-#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "source/extensions/common/redis/cluster_refresh_manager.h"
 #include "source/extensions/filters/network/common/redis/client.h"
@@ -57,6 +56,7 @@ public:
   void onResponse(Common::Redis::RespValuePtr&&) override {};
   void onFailure() override {};
 };
+
 
 class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
 public:

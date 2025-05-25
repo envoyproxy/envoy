@@ -6,13 +6,15 @@
 
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
-#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
+#include "source/extensions/common/aws/signer.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 namespace Client {
+
 
 /**
  * A handle to an outbound request.
@@ -99,6 +101,7 @@ public:
    */
   virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
 
+
   virtual PoolRequest* makeRequestImmediate(const RespValue& request,
                                             ClientCallbacks& callbacks) PURE;
 
@@ -108,14 +111,14 @@ public:
   * The caller is responsible for calling flushBufferAndResetTimer when the queue is re-enabled.
   * @param enable_queue true to enable request queueing, false to disable it.
   */
-  // virtual void queueRequests(bool enable_queue) PURE;
+  virtual void queueRequests(bool enable_queue) PURE;
 
   /*
   * Send AWS IAM authentication credentials. Will set the client to queue requests if we are still waiting
   * on AWS credentials to be returned from a credentials provider.
   * @param The shared pointer to an already initialized AWS IAM authenticator.
   */
-  // virtual void sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator) PURE;
+  virtual void sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator) PURE;
 
   /**
    * Initialize the connection. Issue the auth command and readonly command as needed.
@@ -222,15 +225,13 @@ public:
    * @param scope supplies the stats scope.
    * @param auth password for upstream host.
    * @param is_transaction_client true if this client was created to relay a transaction.
-   * @param aws_iam_authenticator optref to an AWS IAM authenticator. If set, we will enable iam authentication
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                            const ConfigSharedPtr& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
-                           Stats::Scope& scope, const std::string& auth_username, 
+                           Stats::Scope& scope, const std::string& auth_username,
                            const std::string& auth_password, bool is_transaction_client) PURE;
-                          //  RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) PURE;
 };
 
 // A MULTI command sent when starting a transaction.
