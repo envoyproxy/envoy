@@ -7,6 +7,7 @@
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
 #include "source/extensions/common/aws/signer.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -69,6 +70,16 @@ public:
   void onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {}
 };
 
+
+class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
+public:
+  virtual ~AwsIamAuthenticatorBase() = default;
+  virtual std::string getAuthToken() PURE;
+  virtual bool
+  addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb) PURE;
+  virtual void generateAuthToken() PURE;
+};
+
 /**
  * A single redis client connection.
  */
@@ -102,23 +113,6 @@ public:
   virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
 
 
-  virtual PoolRequest* makeRequestImmediate(const RespValue& request,
-                                            ClientCallbacks& callbacks) PURE;
-
-  /*
-  * Enable or disable request queueing for the client.
-  * Enabling request queuing will cause the client to queue requests until the queue is disabled.
-  * The caller is responsible for calling flushBufferAndResetTimer when the queue is re-enabled.
-  * @param enable_queue true to enable request queueing, false to disable it.
-  */
-  virtual void queueRequests(bool enable_queue) PURE;
-
-  /*
-  * Send AWS IAM authentication credentials. Will set the client to queue requests if we are still waiting
-  * on AWS credentials to be returned from a credentials provider.
-  * @param The shared pointer to an already initialized AWS IAM authenticator.
-  */
-  virtual void sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator) PURE;
 
   /**
    * Initialize the connection. Issue the auth command and readonly command as needed.
@@ -231,7 +225,10 @@ public:
                            const ConfigSharedPtr& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
                            Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password, bool is_transaction_client) PURE;
+                           const std::string& auth_password, bool is_transaction_client,
+                          Server::Configuration::ServerFactoryContext& context,
+                          absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
+                          ) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

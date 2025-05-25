@@ -68,10 +68,13 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                              const ConfigSharedPtr& config,
                              const RedisCommandStatsSharedPtr& redis_command_stats,
-                             Stats::Scope& scope, bool is_transaction_client) {
+                             Stats::Scope& scope, bool is_transaction_client,
+                                    Server::Configuration::ServerFactoryContext& context,
+                                    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
+                            ) {
   auto client =
       std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory, config,
-                                   redis_command_stats, scope, is_transaction_client);
+                                   redis_command_stats, scope, is_transaction_client, context, aws_iam_config);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -84,13 +87,18 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                        const ConfigSharedPtr& config,
                        const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-                       bool is_transaction_client)
+                       bool is_transaction_client,
+Server::Configuration::ServerFactoryContext& context,
+absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
+                      )
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope), is_transaction_client_(is_transaction_client) {
+      scope_(scope), is_transaction_client_(is_transaction_client), 
+      context_(context),
+      aws_iam_config_(aws_iam_config) {
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
   traffic_stats.upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
@@ -134,7 +142,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
-  if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
+  if (!queue_enabled_ || encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
     flushBufferAndResetTimer();
   } else if (empty_buffer) {
     flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
@@ -150,6 +158,27 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
+  return &pending_requests_.back();
+}
+
+PoolRequest* ClientImpl::makeRequestImmediate(const RespValue& request,
+                                              ClientCallbacks& callbacks) {
+  ASSERT(connection_->state() == Network::Connection::State::Open);
+
+  Stats::StatName command;
+  if (config_->enableCommandStats()) {
+    // Only lowercase command and get StatName if we enable command stats
+    command = redis_command_stats_->getCommandFromRequest(request);
+    redis_command_stats_->updateStatsTotal(scope_, command);
+  } else {
+    // If disabled, we use a placeholder stat name "unused" that is not used
+    command = redis_command_stats_->getUnusedStatName();
+  }
+  Buffer::OwnedImpl immediate_buffer;
+  pending_requests_.emplace_back(*this, callbacks, command);
+  encoder_->encode(request, immediate_buffer);
+  connection_->write(immediate_buffer, false);
+  flushBufferAndResetTimer();
   return &pending_requests_.back();
 }
 
@@ -319,10 +348,21 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password, bool is_transaction_client) {
+                                    const std::string& auth_password, bool is_transaction_client,
+                                    Server::Configuration::ServerFactoryContext& context,
+                                    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config){
   ClientPtr client =
       ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
-                         redis_command_stats, scope, is_transaction_client);
+                         redis_command_stats, scope, is_transaction_client, context, aws_iam_config);
+
+  // aws_iam_authenticator_ = initAwsIamAuthenticator(
+  //     context,
+  //     auth_username,
+  //     aws_iam_config->cache_name(),
+  //     aws_iam_config->service_name(),
+  //     aws_iam_config->region(),
+  //     aws_iam_config->expiration_time().seconds(), aws_iam->credential_provider());
+
   client->initialize(auth_username, auth_password);
   return client;
 }
@@ -350,6 +390,47 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
         context_.mainThreadDispatcher().createTimer([this]() -> void { generateAuthToken(); });
   }
 }
+
+
+AwsIamAuthenticatorImplSharedPtr initAwsIamAuthenticator(
+    Server::Configuration::ServerFactoryContext& context, std::string auth_user,
+    absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
+    uint16_t expiration_time,
+    absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider) {
+
+  return std::make_shared<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name,
+                                                   region, expiration_time, credential_provider);
+}
+
+void AwsIamAuthenticatorImpl::generateAuthToken() {
+  ENVOY_LOG(debug, "Generating new AWS IAM authentication token");
+  Http::RequestMessageImpl message;
+  message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
+  message.headers().setMethod(Http::Headers::get().MethodValues.Get);
+  message.headers().setHost(cache_name_);
+  message.headers().setPath(fmt::format("/?Action=connect&User={}",
+                                        Envoy::Http::Utility::PercentEncoding::encode(auth_user_)));
+
+  auto status = signer_->sign(message, true, region_);
+  context_.mainThreadDispatcher().post(
+      [this]() { cache_duration_timer_->enableTimer(std::chrono::seconds(expiration_time_)); });
+  auth_token_ = cache_name_ + std::string(message.headers().getPathValue());
+  auto query_params =
+      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
+
+  query_params.overwrite(
+      Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSignature, "*****");
+  if (query_params.getFirstValue(
+          Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSecurityToken)) {
+    query_params.overwrite(
+        Envoy::Extensions::Common::Aws::SignatureQueryParameterValues::AmzSecurityToken, "*****");
+  }
+  auto sanitised_query_string =
+      query_params.replaceQueryString(Http::HeaderString(message.headers().getPathValue()));
+  ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", cache_name_,
+            sanitised_query_string);
+}
+
 
 } // namespace Client
 } // namespace Redis

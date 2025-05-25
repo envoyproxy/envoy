@@ -71,18 +71,56 @@ private:
   uint32_t connection_rate_limit_per_sec_;
 };
 
+
+class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
+public:
+  AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,
+                          std::string auth_user, absl::string_view cache_name,
+                          absl::string_view service_name, absl::string_view region,
+                          uint16_t expiration_time,
+                          absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
+                              credential_provider);
+  std::string getAuthToken() override;
+  bool addCallbackIfCredentialsPending(
+      Extensions::Common::Aws::CredentialsPendingCallback&& cb) override {
+    return signer_->addCallbackIfCredentialsPending(std::move(cb));
+  };
+  void generateAuthToken() override;
+  std::string iamUsername() { return auth_user_;}
+
+private:
+  Envoy::Extensions::Common::Aws::SignerPtr signer_;
+  uint16_t expiration_time_;
+  std::string auth_user_;
+  std::string cache_name_;
+  std::string service_name_;
+  std::string region_;
+  Server::Configuration::ServerFactoryContext& context_;
+  Envoy::Event::TimerPtr cache_duration_timer_;
+  std::string auth_token_;
+};
+
+using AwsIamAuthenticatorImplSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
+using AwsIamAuthenticatorImplSharedPtrOptRef = OptRef<AwsIamAuthenticatorImplSharedPtr>;
+
 class ClientImpl : public Client, public DecoderCallbacks, public Network::ConnectionCallbacks {
 public:
   static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                           EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                           const ConfigSharedPtr& config,
                           const RedisCommandStatsSharedPtr& redis_command_stats,
-                          Stats::Scope& scope, bool is_transaction_client);
+                          Stats::Scope& scope, bool is_transaction_client,
+                          Server::Configuration::ServerFactoryContext& context,
+                          absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
+);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
              const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-             bool is_transaction_client);
+             bool is_transaction_client,
+                                                Server::Configuration::ServerFactoryContext& context,
+                                    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
+);
   ~ClientImpl() override;
 
   // Client
@@ -94,8 +132,33 @@ public:
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
-  void queueRequests(bool enable_queue) override { queue_enabled_ = enable_queue; }
-  void sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator);
+
+  /*
+  * Enable or disable request queueing for the client.
+  * Enabling request queuing will cause the client to queue requests until the queue is disabled.
+  * The caller is responsible for calling flushBufferAndResetTimer when the queue is re-enabled.
+  * @param enable_queue true to enable request queueing, false to disable it.
+  */
+
+  void queueRequests(bool enable_queue) { queue_enabled_ = enable_queue; }
+  /*
+  * Send AWS IAM authentication credentials. Will set the client to queue requests if we are still waiting
+  * on AWS credentials to be returned from a credentials provider.
+  * @param The shared pointer to an already initialized AWS IAM authenticator.
+  */
+
+  void sendIamAuthentication(AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator);
+
+  PoolRequest *makeRequestImmediate(const RespValue& request,
+                                              ClientCallbacks& callbacks);
+                                              
+    AwsIamAuthenticatorImplSharedPtr
+  initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context,
+                          std::string auth_user, absl::string_view cache_name,
+                          absl::string_view service_name, absl::string_view region,
+                          uint16_t expiration_time,
+                          absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
+                              credential_provider);
 
 private:
   friend class RedisClientImplTest;
@@ -155,6 +218,8 @@ private:
   bool is_transaction_client_;
   std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> aws_iam_auth_signer_;
   bool queue_enabled_{false};
+  Server::Configuration::ServerFactoryContext& context_;
+  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
 };
 
 class ClientFactoryImpl : public ClientFactory {
@@ -164,12 +229,17 @@ public:
                    const ConfigSharedPtr& config,
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
-                   bool is_transaction_client) override;
+                   bool is_transaction_client,
+                  Server::Configuration::ServerFactoryContext& context,
+                  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
+                  ) override;
 
   static ClientFactoryImpl instance_;
 
 private:
   DecoderFactoryImpl decoder_factory_;
+  AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator_;
+
 };
 
 } // namespace Client
