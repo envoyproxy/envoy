@@ -14,11 +14,11 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/stats/utility.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
-#include "source/common/http/utility.h"
-#include "source/common/http/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -107,7 +107,7 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
-      dns_cache_(dns_cache),
+      dns_cache_(dns_cache), context_(parent->context_),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
       client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
@@ -154,32 +154,13 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   ASSERT(cluster_ == nullptr);
   auto& cluster = get_cluster();
   cluster_ = &cluster;
+  auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
   if (ProtocolOptionsConfigImpl::hasAwsIam(cluster_->info())) {
-
     aws_iam_config_ = ProtocolOptionsConfigImpl::awsIam(cluster_->info());
-
-    // shared_parent->aws_iam_authenticator_ = shared_parent->initAwsIamAuthenticator(
-    //     shared_parent->context_,
-    //     ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_),
-    //     aws_iam->cache_name(),
-    //     aws_iam->service_name(),
-    //     aws_iam->region(),
-    //     aws_iam->expiration_time().seconds(), aws_iam->credential_provider());
-    ENVOY_LOG(debug, "Redis connection pool has AWS IAM Authentication enabled");
-    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
-    // auth_password_ = shared_parent->aws_iam_authenticator_.value()->getAuthToken();
   } else {
     // Update username and password when cluster updates.
-    auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
     auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), shared_parent->api_);
   }
-
-  // AwsIamAuthenticatorImplSharedPtr InstanceImpl::initAwsIamAuthenticator(
-  //     Server::Configuration::ServerFactoryContext& context, std::string auth_user,
-  //     absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
-  //     uint16_t expiration_time,
-  //     absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
-  //     credential_provider) {
 
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
@@ -301,25 +282,8 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
       client->host_ = host;
       client->redis_client_ =
           client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
-                                 auth_username_, auth_password_, false, parent_.context_,
-                                 aws_iam_config_);
-      // auto shared_parent = parent_.lock();
-      // if (shared_parent && shared_parent->aws_iam_authenticator_.has_value()) {
-      //   auto add_auth = [this, &shared_parent, &client]() {
-      //     shared_parent->aws_iam_authenticator_.value()->generateAuthToken();
-      //     auth_password_ = shared_parent->aws_iam_authenticator_.value()->getAuthToken();
+                                 auth_username_, auth_password_, false, context_, aws_iam_config_);
 
-      //     Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
-      //         auth_username_, auth_password_);
-      //     client->redis_client_->queueRequests(true);
-      //     client->redis_client_->makeRequestImmediate(auth_request, null_client_callbacks);
-      //     client->redis_client_->queueRequests(false);
-      //   };
-      //   if (shared_parent->aws_iam_authenticator_.value()->addCallbackIfCredentialsPending(
-      //           [&add_auth]() { add_auth(); }) == false) {
-      //     add_auth();
-      //   }
-      // }
       client->redis_client_->addConnectionCallbacks(*client);
     }
   }
@@ -481,8 +445,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& h
   if (transaction.active_ && !transaction.connection_established_) {
     transaction.clients_[client_idx] =
         client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_, true, parent_.context_,
-                                 aws_iam_config_);
+                               auth_username_, auth_password_, true, context_, aws_iam_config_);
     if (transaction.connection_cb_) {
       transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }

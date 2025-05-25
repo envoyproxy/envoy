@@ -43,7 +43,8 @@ public:
     return false;
   }
 
-  static absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIam(const Upstream::ClusterInfoConstSharedPtr info) {
+  static absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+  awsIam(const Upstream::ClusterInfoConstSharedPtr info) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options && options->hasAwsIam()) {

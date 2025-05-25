@@ -1,11 +1,12 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "source/extensions/common/aws/signer_base_impl.h"
-#include "source/extensions/common/aws/credential_provider_chains.h"
-#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
+
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,41 +65,61 @@ ConfigImpl::ConfigImpl(
   }
 }
 
-ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                             EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const ConfigSharedPtr& config,
-                             const RedisCommandStatsSharedPtr& redis_command_stats,
-                             Stats::Scope& scope, bool is_transaction_client,
-                                    Server::Configuration::ServerFactoryContext& context,
-                                    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
-                            ) {
-  auto client =
-      std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory, config,
-                                   redis_command_stats, scope, is_transaction_client, context, aws_iam_config);
+ClientPtr ClientImpl::create(
+    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+    DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
+    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+    bool is_transaction_client, Server::Configuration::ServerFactoryContext& context,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    const std::string& auth_username) {
+  auto client = std::make_unique<ClientImpl>(
+      host, dispatcher, std::move(encoder), decoder_factory, config, redis_command_stats, scope,
+      is_transaction_client, context, aws_iam_config, auth_username);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
   client->connection_->noDelay(true);
+
+  if (aws_iam_config.has_value()) {
+    ENVOY_LOG(debug, "Redis connection pool has AWS IAM Authentication enabled");
+    client->aws_iam_authenticator_ = client->initAwsIamAuthenticator(
+        context, auth_username, aws_iam_config->cache_name(), aws_iam_config->service_name(),
+        aws_iam_config->region(), aws_iam_config->expiration_time().seconds(),
+        aws_iam_config->credential_provider());
+    client->queueRequests(true);
+
+    auto add_auth = [&client]() {
+      client->aws_iam_authenticator_->generateAuthToken();
+      const auto auth_password = client->aws_iam_authenticator_->getAuthToken();
+
+      Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
+          client->aws_iam_authenticator_->iamUsername(), auth_password);
+      client->makeRequestImmediate(auth_request, null_pool_callbacks);
+      client->queueRequests(false);
+    };
+    if (client->aws_iam_authenticator_->addCallbackIfCredentialsPending(
+            [&add_auth]() { add_auth(); }) == false) {
+      add_auth();
+    }
+  }
   return client;
 }
 
-ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                       const ConfigSharedPtr& config,
-                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-                       bool is_transaction_client,
-Server::Configuration::ServerFactoryContext& context,
-absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
-                      )
+ClientImpl::ClientImpl(
+    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+    DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
+    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+    bool is_transaction_client, Server::Configuration::ServerFactoryContext& context,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    const std::string& auth_username)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope), is_transaction_client_(is_transaction_client), 
-      context_(context),
-      aws_iam_config_(aws_iam_config) {
+      scope_(scope), is_transaction_client_(is_transaction_client), context_(context),
+      aws_iam_config_(aws_iam_config), auth_username_(auth_username) {
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
   traffic_stats.upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
@@ -344,31 +365,24 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
-ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
-                                    const RedisCommandStatsSharedPtr& redis_command_stats,
-                                    Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password, bool is_transaction_client,
-                                    Server::Configuration::ServerFactoryContext& context,
-                                    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config){
-  ClientPtr client =
-      ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
-                         redis_command_stats, scope, is_transaction_client, context, aws_iam_config);
+ClientPtr ClientFactoryImpl::create(
+    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
+    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+    const std::string& auth_username, const std::string& auth_password, bool is_transaction_client,
+    Server::Configuration::ServerFactoryContext& context,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config) {
+  ClientPtr client = ClientImpl::create(
+      host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
+      redis_command_stats, scope, is_transaction_client, context, aws_iam_config, auth_username);
 
-  // aws_iam_authenticator_ = initAwsIamAuthenticator(
-  //     context,
-  //     auth_username,
-  //     aws_iam_config->cache_name(),
-  //     aws_iam_config->service_name(),
-  //     aws_iam_config->region(),
-  //     aws_iam_config->expiration_time().seconds(), aws_iam->credential_provider());
-
-  client->initialize(auth_username, auth_password);
+  if (!aws_iam_config.has_value()) {
+    client->initialize(auth_username, auth_password);
+  }
   return client;
 }
 
 AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
-    Server::Configuration::ServerFactoryContext& context, std::string auth_user,
+    Server::Configuration::ServerFactoryContext& context, const std::string auth_user,
     absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
     uint16_t expiration_time,
     absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider)
@@ -378,9 +392,17 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
 
   Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
 
-  credentials_provider_chain =
-      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
-          context_, region_, credential_provider);
+  if (credential_provider.has_value()) {
+    credentials_provider_chain =
+        std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+            context_.api(), context_, region_, credential_provider.value());
+  } 
+  else {
+      credentials_provider_chain =
+        std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
+            context_.api(), context_, region_);
+  }
+
   signer_ = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name_, region_, credentials_provider_chain, context_,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_time_);
@@ -390,7 +412,6 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
         context_.mainThreadDispatcher().createTimer([this]() -> void { generateAuthToken(); });
   }
 }
-
 
 AwsIamAuthenticatorImplSharedPtr initAwsIamAuthenticator(
     Server::Configuration::ServerFactoryContext& context, std::string auth_user,
@@ -430,7 +451,6 @@ void AwsIamAuthenticatorImpl::generateAuthToken() {
   ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", cache_name_,
             sanitised_query_string);
 }
-
 
 } // namespace Client
 } // namespace Redis

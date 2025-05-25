@@ -201,7 +201,7 @@ private:
     std::list<Upstream::HostSharedPtr> created_via_redirect_hosts_;
     std::list<ThreadLocalActiveClientPtr> clients_to_drain_;
     std::list<PendingRequest> pending_requests_;
-
+    Server::Configuration::ServerFactoryContext& context_;
     /* This timer is used to poll the active clients in clients_to_drain_ to determine whether they
      * have been drained (have no active requests) or not. It is only enabled after a client has
      * been added to clients_to_drain_, and is only re-enabled as long as that list is not empty. A
@@ -217,7 +217,6 @@ private:
     RedisClusterStats redis_cluster_stats_;
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
-
   };
 
   Server::Configuration::ServerFactoryContext& context_;
@@ -232,7 +231,6 @@ private:
   RedisClusterStats redis_cluster_stats_;
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
-
 };
 
 } // namespace ConnPool

@@ -2,12 +2,12 @@
 
 #include <cstdint>
 
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
-#include "source/extensions/common/aws/signer.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +15,6 @@ namespace NetworkFilters {
 namespace Common {
 namespace Redis {
 namespace Client {
-
 
 /**
  * A handle to an outbound request.
@@ -70,7 +69,6 @@ public:
   void onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {}
 };
 
-
 class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
 public:
   virtual ~AwsIamAuthenticatorBase() = default;
@@ -111,8 +109,6 @@ public:
    *         for some reason.
    */
   virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
-
-
 
   /**
    * Initialize the connection. Issue the auth command and readonly command as needed.
@@ -221,14 +217,13 @@ public:
    * @param is_transaction_client true if this client was created to relay a transaction.
    * @return ClientPtr a new connection pool client.
    */
-  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const ConfigSharedPtr& config,
-                           const RedisCommandStatsSharedPtr& redis_command_stats,
-                           Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password, bool is_transaction_client,
-                          Server::Configuration::ServerFactoryContext& context,
-                          absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
-                          ) PURE;
+  virtual ClientPtr
+  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+         const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
+         Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
+         bool is_transaction_client, Server::Configuration::ServerFactoryContext& context,
+         absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+             aws_iam_config) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

@@ -53,6 +53,7 @@ envoy_cc_library(
         ":redis_command_stats_lib",
         "//envoy/upstream:cluster_manager_interface",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -75,6 +76,7 @@ envoy_cc_library(
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+        "//source/extensions/common/aws:credential_provider_chains_lib"
     ],
 )
 
