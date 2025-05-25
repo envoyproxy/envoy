@@ -148,7 +148,7 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
   Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
 
   credentials_provider_chain =
-      std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
+      std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
           context_, region_, credential_provider);
   signer_ = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name_, region_, credentials_provider_chain, context_,
@@ -158,18 +158,15 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
     cache_duration_timer_ =
         context_.mainThreadDispatcher().createTimer([this]() -> void { generateAuthToken(); });
   }
-  // if (!cache_duration_timer_->enabled()) {
-  //   cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
-  // }
 }
 
-AwsIamAuthenticatorImplUniquePtr InstanceImpl::initAwsIamAuthenticator(
+AwsIamAuthenticatorImplSharedPtr InstanceImpl::initAwsIamAuthenticator(
     Server::Configuration::ServerFactoryContext& context, std::string auth_user,
     absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
     uint16_t expiration_time,
     absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider) {
 
-  return std::make_unique<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name,
+  return std::make_shared<AwsIamAuthenticatorImpl>(context, auth_user, cache_name, service_name,
                                                    region, expiration_time, credential_provider);
 }
 
@@ -225,21 +222,31 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   cluster_ = &cluster;
   if (ProtocolOptionsConfigImpl::hasAwsIam(cluster_->info()) &&
       !shared_parent->aws_iam_authenticator_.has_value()) {
+
+    auto aws_iam = ProtocolOptionsConfigImpl::awsIam(cluster_->info());
+
     shared_parent->aws_iam_authenticator_ = shared_parent->initAwsIamAuthenticator(
         shared_parent->context_,
         ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_),
-        ProtocolOptionsConfigImpl::cacheName(cluster_->info()),
-        ProtocolOptionsConfigImpl::serviceName(cluster_->info()),
-        ProtocolOptionsConfigImpl::region(cluster_->info()),
-        ProtocolOptionsConfigImpl::expirationTime(cluster_->info()));
+        aws_iam->cache_name(),
+        aws_iam->service_name(),
+        aws_iam->region(),
+        aws_iam->expiration_time().seconds(), aws_iam->credential_provider());
     ENVOY_LOG(debug, "Redis connection pool has AWS IAM Authentication enabled");
     auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
-    auth_password_ = shared_parent->aws_iam_authenticator_.value()->getAuthToken();
+    // auth_password_ = shared_parent->aws_iam_authenticator_.value()->getAuthToken();
   } else {
     // Update username and password when cluster updates.
     auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
     auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), shared_parent->api_);
   }
+
+  // AwsIamAuthenticatorImplSharedPtr InstanceImpl::initAwsIamAuthenticator(
+  //     Server::Configuration::ServerFactoryContext& context, std::string auth_user,
+  //     absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
+  //     uint16_t expiration_time,
+  //     absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
+  //     credential_provider) {
 
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(

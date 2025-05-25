@@ -1,7 +1,7 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-
+#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -329,17 +329,40 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
   }
 }
 
+void ClientImpl::sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator) {
+
+                                        queueRequests(true);
+
+  auto add_auth = [this, aws_iam_authenticator&]() {
+    aws_iam_authenticator->generateAuthToken();
+    auto auth_password = aws_iam_authenticator->getAuthToken();
+
+    Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
+         aws_iam_authenticator->iamUsername(),  aws_iam_authenticator->getAuthToken());
+    makeRequestImmediate(auth_request, null_pool_callbacks);
+    queueRequests(false);
+  };
+  if (aws_iam_authenticator->addCallbackIfCredentialsPending(
+          [&add_auth]() { add_auth(); }) == false) {
+    add_auth();
+  }
+}
+
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
 ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password, bool is_transaction_client) {
+                                    const std::string& auth_password, bool is_transaction_client,
+                                     RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) {
   ClientPtr client =
       ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
                          redis_command_stats, scope, is_transaction_client);
 
+  if (aws_iam_authenticator.has_value()) {
+    client->sendIamAuthentication(aws_iam_authenticator.value());
+  }
   client->initialize(auth_username, auth_password);
   return client;
 }

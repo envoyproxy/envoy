@@ -6,7 +6,7 @@
 
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
-
+#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -208,13 +208,15 @@ public:
    * @param scope supplies the stats scope.
    * @param auth password for upstream host.
    * @param is_transaction_client true if this client was created to relay a transaction.
+   * @param aws_iam_authenticator optref to an AWS IAM authenticator. If set, we will enable iam authentication
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
                            const ConfigSharedPtr& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
                            Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password, bool is_transaction_client) PURE;
+                           const std::string& auth_password, bool is_transaction_client,
+                           RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

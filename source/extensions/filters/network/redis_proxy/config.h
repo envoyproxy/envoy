@@ -32,18 +32,6 @@ public:
     proto_config_.MergeFrom(proto_config);
   }
 
-  uint16_t expirationTime() const {
-
-    return PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config_.aws_iam(), expiration_time,
-                                           AwsIamDefaultExpiration);
-  }
-
-  static uint16_t expirationTime(const Upstream::ClusterInfoConstSharedPtr info) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    return options->expirationTime();
-  }
-
   bool hasAwsIam() const { return proto_config_.has_aws_iam(); }
 
   static bool hasAwsIam(const Upstream::ClusterInfoConstSharedPtr info) {
@@ -55,58 +43,17 @@ public:
     return false;
   }
 
-  static std::string cacheName(const Upstream::ClusterInfoConstSharedPtr info) {
+  static absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIam(const Upstream::ClusterInfoConstSharedPtr info) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      return options->cacheName();
-    }
-    return EMPTY_STRING;
-  }
-
-  std::string cacheName() const { return proto_config_.aws_iam().cache_name(); }
-
-  static std::string serviceName(const Upstream::ClusterInfoConstSharedPtr info) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      return options->serviceName();
-    }
-    return DEFAULT_SERVICE_NAME;
-  }
-
-  std::string serviceName() const {
-    return proto_config_.aws_iam().service_name().empty() ? DEFAULT_SERVICE_NAME
-                                                          : proto_config_.aws_iam().service_name();
-  }
-
-  static const std::string region(const Upstream::ClusterInfoConstSharedPtr info) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      return options->region();
-    }
-    return EMPTY_STRING;
-  }
-
-  std::string region() const { return proto_config_.aws_iam().region(); }
-
-  static const absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
-  credentialProvider(const Upstream::ClusterInfoConstSharedPtr info) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      return options->credentialProvider();
+    if (options && options->hasAwsIam()) {
+      return options->awsIam();
     }
     return absl::nullopt;
   }
 
-  absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
-  credentialProvider() const {
-    absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> provider;
-    return proto_config_.aws_iam().has_credential_provider()
-               ? proto_config_.aws_iam().credential_provider()
-               : provider;
+  envoy::extensions::filters::network::redis_proxy::v3::AwsIam awsIam() const {
+    return proto_config_.aws_iam();
   }
 
   std::string authUsername(Api::Api& api) const {

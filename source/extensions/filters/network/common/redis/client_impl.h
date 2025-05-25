@@ -17,7 +17,7 @@
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
-
+#include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -96,6 +96,7 @@ public:
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
   void queueRequests(bool enable_queue) override { queue_enabled_ = enable_queue; }
+  void sendIamAuthentication(RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator);
 
 private:
   friend class RedisClientImplTest;
@@ -164,7 +165,7 @@ public:
                    const ConfigSharedPtr& config,
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
-                   bool is_transaction_client) override;
+                   bool is_transaction_client, RedisProxy::ConnPool::AwsIamAuthenticatorImplSharedPtrOptRef aws_iam_authenticator) override;
 
   static ClientFactoryImpl instance_;
 

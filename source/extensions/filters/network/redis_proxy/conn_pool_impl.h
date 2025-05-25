@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/event/timer.h"
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -80,6 +81,7 @@ public:
     return signer_->addCallbackIfCredentialsPending(std::move(cb));
   };
   void generateAuthToken() override;
+  std::string iamUsername() { return auth_user_;}
 
 private:
   Envoy::Extensions::Common::Aws::SignerPtr signer_;
@@ -93,8 +95,8 @@ private:
   std::string auth_token_;
 };
 
-using AwsIamAuthenticatorImplUniquePtr = std::unique_ptr<AwsIamAuthenticatorImpl>;
-using AwsIamAuthenticatorImplUniquePtrOptRef = OptRef<AwsIamAuthenticatorImplUniquePtr>;
+using AwsIamAuthenticatorImplSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
+using AwsIamAuthenticatorImplSharedPtrOptRef = OptRef<AwsIamAuthenticatorImplSharedPtr>;
 
 class InstanceImpl : public Instance, public std::enable_shared_from_this<InstanceImpl> {
 public:
@@ -257,7 +259,7 @@ private:
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   };
 
-  AwsIamAuthenticatorImplUniquePtr
+  AwsIamAuthenticatorImplSharedPtr
   initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context,
                           std::string auth_user, absl::string_view cache_name,
                           absl::string_view service_name, absl::string_view region,
@@ -278,7 +280,7 @@ private:
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
 
-  absl::optional<AwsIamAuthenticatorImplUniquePtr> aws_iam_authenticator_;
+  absl::optional<AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator_;
 };
 
 } // namespace ConnPool
