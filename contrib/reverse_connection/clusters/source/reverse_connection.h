@@ -122,6 +122,8 @@ public:
 private:
 };
 
+DECLARE_FACTORY(RevConClusterFactory);
+
 } // namespace ReverseConnection
 } // namespace Extensions
 } // namespace Envoy

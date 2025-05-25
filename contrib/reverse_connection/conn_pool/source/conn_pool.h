@@ -34,7 +34,7 @@ public:
       absl::optional<Http::HttpServerPropertiesCache::Origin> origin = absl::nullopt,
       Http::HttpServerPropertiesCacheSharedPtr http_server_properties_cache = nullptr) override;
 
-  std::string name() const override { return "envoy.http.reverse_conn.default"; }
+  std::string name() const override { return "envoy.upstreams.http.reverse_conn.default"; }
 };
 
 DECLARE_FACTORY(ReverseConnPoolFactoryImpl);

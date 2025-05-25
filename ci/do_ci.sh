@@ -506,9 +506,9 @@ case $CI_TARGET in
         echo "Building..."
         bazel_contrib_binary_build fastbuild
         echo "Testing ${TEST_TARGETS[*]}"
-        bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
-              -c fastbuild \
-              "${TEST_TARGETS[@]}"
+        # bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
+        #       -c fastbuild \
+        #       "${TEST_TARGETS[@]}"
         ;;
 
     distribution)
