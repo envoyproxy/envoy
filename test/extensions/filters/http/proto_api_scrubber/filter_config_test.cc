@@ -25,7 +25,134 @@ using xds::type::matcher::v3::HttpAttributesCelMatchInput;
 using MatchTreeHttpMatchingDataSharedPtr = Matcher::MatchTreeSharedPtr<HttpMatchingData>;
 using testing::NiceMock;
 
-// Base class for testing filter config related capabilities eg, parsing and storing the filter
+// Structured test-case for parameterized tests of method name validation.
+struct MethodNameValidationTestCase {
+  std::string method_name;
+  absl::StatusCode expected_status_code;
+  std::string expected_status_message;
+};
+
+// A class to test method names which are provided in the filter config.
+class MethodNameValidation : public testing::TestWithParam<MethodNameValidationTestCase> {};
+
+TEST_P(MethodNameValidation, ValidateSingleMethodConfig) {
+  std::string filter_conf_string = absl::StrFormat(
+      R"pb(
+    restrictions: {
+      method_restrictions: {
+        key: "%s"
+        value: { }
+      }
+    }
+  )pb",
+      GetParam().method_name);
+  ProtoApiScrubberConfig proto_config;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config));
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
+      ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
+  EXPECT_EQ(filter_config.status().code(), GetParam().expected_status_code);
+  EXPECT_EQ(filter_config.status().message(), GetParam().expected_status_message);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MethodNameValidationTestSuite, MethodNameValidation,
+    testing::ValuesIn<MethodNameValidationTestCase>({
+        {"", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: ''. Method name is "
+         "empty."},
+        {"/library.BookService/*", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: "
+         "'/library.BookService/*'. Method name contains '*' which is not supported."},
+        {"/library.*/*", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: '/library.*/*'. "
+         "Method name contains '*' which is not supported."},
+        {"*", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: '*'. Method name "
+         "contains '*' which is not supported."},
+        {"/library.BookService.GetBook", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: "
+         "'/library.BookService.GetBook'. Method name should follow the gRPC format "
+         "('/package.ServiceName/MethodName')."},
+        {"library.BookService/GetBook", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: "
+         "'library.BookService/GetBook'. Method name should follow the gRPC format "
+         "('/package.ServiceName/MethodName')."},
+        {"library.BookService.GetBook", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: "
+         "'library.BookService.GetBook'. Method name should follow the gRPC format "
+         "('/package.ServiceName/MethodName')."},
+        {"/library_BookService/GetBook", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: "
+         "'/library_BookService/GetBook'. Method name should follow the gRPC format "
+         "('/package.ServiceName/MethodName')."},
+        {"/library/BookService/GetBook", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: "
+         "'/library/BookService/GetBook'. Method name should follow the gRPC format "
+         "('/package.ServiceName/MethodName')."},
+        {"/library.BookService/", absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Invalid method name: "
+         "'/library.BookService/'. Method name should follow the gRPC format "
+         "('/package.ServiceName/MethodName')."},
+        {"/library.BookService/GetBook", absl::StatusCode::kOk, ""},
+    }));
+
+// Structured test-case for parameterized tests of field mask validation.
+struct FieldMaskValidationTestCase {
+  std::string field_mask;
+  absl::StatusCode expected_status_code;
+  std::string expected_status_message;
+};
+
+// A class to test field masks for request and response fields which are provided in the filter
+// config.
+class FieldMaskValidation : public testing::TestWithParam<FieldMaskValidationTestCase> {};
+
+TEST_P(FieldMaskValidation, ValidateSingleFieldMaskConfig) {
+  std::string filter_conf_string = absl::StrFormat(
+      R"pb(
+        restrictions: {
+          method_restrictions: {
+            key: "/library.BookService/GetBook"
+            value: {
+              response_field_restrictions: {
+                key: "%s"
+                value: {}
+              }
+            }
+          }
+        }
+  )pb",
+      GetParam().field_mask);
+  ProtoApiScrubberConfig proto_config;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config));
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
+      ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
+  EXPECT_EQ(filter_config.status().code(), GetParam().expected_status_code);
+  EXPECT_EQ(filter_config.status().message(), GetParam().expected_status_message);
+}
+
+INSTANTIATE_TEST_SUITE_P(FieldMaskValidationTestSuite, FieldMaskValidation,
+                         testing::ValuesIn<FieldMaskValidationTestCase>({
+                             {"", absl::StatusCode::kInvalidArgument,
+                              "Error encountered during config initialization. Invalid field mask: "
+                              "''. Field mask is empty."},
+                             {"*", absl::StatusCode::kInvalidArgument,
+                              "Error encountered during config initialization. Invalid field mask: "
+                              "'*'. Field mask contains '*' which is not supported."},
+                             {"book.*", absl::StatusCode::kInvalidArgument,
+                              "Error encountered during config initialization. Invalid field mask: "
+                              "'book.*'. Field mask contains '*' which is not supported."},
+                             {"*.book", absl::StatusCode::kInvalidArgument,
+                              "Error encountered during config initialization. Invalid field mask: "
+                              "'*.book'. Field mask contains '*' which is not supported."},
+                             {"book", absl::StatusCode::kOk, ""},
+                             {"book.inner_book", absl::StatusCode::kOk, ""},
+                             {"book.inner_book.debug_info", absl::StatusCode::kOk, ""},
+                         }));
+
+// A class for testing filter config related capabilities eg, parsing and storing the filter
 // config in internal data structures, etc.
 class ProtoApiScrubberFilterConfigTest : public ::testing::Test {
 protected:
@@ -199,124 +326,6 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
                                                        "non.existent.field.mask");
   ASSERT_EQ(match_tree, nullptr);
 }
-
-struct MethodNameValidationTestCase {
-  std::string method_name;
-  absl::StatusCode expected_status_code;
-  std::string expected_status_message;
-};
-
-class MethodNameValidation : public testing::TestWithParam<MethodNameValidationTestCase> {};
-
-TEST_P(MethodNameValidation, ValidateSingleMethodConfig) {
-  std::string filter_conf_string = absl::StrFormat(
-      R"pb(
-    restrictions: {
-      method_restrictions: {
-        key: "%s"
-        value: { }
-      }
-    }
-  )pb",
-      GetParam().method_name);
-  ProtoApiScrubberConfig proto_config;
-  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config));
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
-      ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
-  EXPECT_EQ(filter_config.status().code(), GetParam().expected_status_code);
-  EXPECT_EQ(filter_config.status().message(), GetParam().expected_status_message);
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    MethodNameValidationTestSuite, MethodNameValidation,
-    testing::ValuesIn<MethodNameValidationTestCase>({
-        {"", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: ''. Method name is "
-         "empty."},
-        {"/library.BookService/*", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: "
-         "'/library.BookService/*'. Method name contains '*' which is not supported."},
-        {"/library.*/*", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: '/library.*/*'. "
-         "Method name contains '*' which is not supported."},
-        {"*", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: '*'. Method name "
-         "contains '*' which is not supported."},
-        {"/library.BookService.GetBook", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: "
-         "'/library.BookService.GetBook'. Method name should follow the gRPC format "
-         "('/package.ServiceName/MethodName')."},
-        {"library.BookService/GetBook", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: "
-         "'library.BookService/GetBook'. Method name should follow the gRPC format "
-         "('/package.ServiceName/MethodName')."},
-        {"library.BookService.GetBook", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: "
-         "'library.BookService.GetBook'. Method name should follow the gRPC format "
-         "('/package.ServiceName/MethodName')."},
-        {"/library_BookService/GetBook", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: "
-         "'/library_BookService/GetBook'. Method name should follow the gRPC format "
-         "('/package.ServiceName/MethodName')."},
-        {"/library/BookService/GetBook", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: "
-         "'/library/BookService/GetBook'. Method name should follow the gRPC format "
-         "('/package.ServiceName/MethodName')."},
-        {"/library.BookService/", absl::StatusCode::kInvalidArgument,
-         "Error encountered during config initialization. Invalid method name: "
-         "'/library.BookService/'. Method name should follow the gRPC format "
-         "('/package.ServiceName/MethodName')."},
-        {"/library.BookService/GetBook", absl::StatusCode::kOk, ""},
-    }));
-
-/*
- *UTs - Filter mode
- * method name validation
- * field_mask name validation
- * Factory creation failure - empty CEL expression (maybe a try catch is needed for empty cel
-expression) Code to test envoy message exception as well
-
-TEST(ProcessConfigurationTest, ThrowsEnvoyExceptionWithCorrectMessageForEmptyConfig) {
-    std::string expected_message = "Configuration value cannot be empty.";
-    try {
-        processConfiguration("");
-        FAIL() << "Expected Envoy::EnvoyException to be thrown."; // This line should not be reached
-    } catch (const Envoy::EnvoyException& e) {
-        // Compare the exception message with the expected message
-        // e.what() returns a const char*
-        EXPECT_STREQ(expected_message.c_str(), e.what());
-        // If e.what() could be compared as std::string, you could use EXPECT_EQ:
-        // EXPECT_EQ(expected_message, std::string(e.what()));
-    } catch (...) {
-        // Optional: Catch any other unexpected exception types
-        FAIL() << "Expected Envoy::EnvoyException but caught a different type of exception.";
-    }
-}
-
-TEST(ProcessConfigurationTest, ThrowsEnvoyExceptionWithCorrectMessageForInvalidData) {
-    std::string expected_message = "Invalid data encountered in configuration.";
-    try {
-        processConfiguration("invalid_data");
-        FAIL() << "Expected Envoy::EnvoyException to be thrown.";
-    } catch (const Envoy::EnvoyException& e) {
-        EXPECT_STREQ(expected_message.c_str(), e.what());
-    }
-    // No need to catch (...) if you are sure only EnvoyException can be thrown or
-    // if other exceptions would correctly indicate a different test failure.
-}
-
-*/
-
-/*
-TEST_F(ProtoApiScrubberFilterConfigTest, FieldNameValidation) {
-
-}
-
-TEST_F(ProtoApiScrubberFilterConfigTest, RestrictionConfigValidation) {
-
-}
-*/
 
 } // namespace
 } // namespace ProtoApiScrubber

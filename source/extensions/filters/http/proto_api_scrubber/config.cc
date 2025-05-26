@@ -23,6 +23,7 @@ Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoT
   absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
       ProtoApiScrubberFilterConfig::create(proto_config, context);
   if (!filter_config.ok()) {
+    // ENVOY_LOG(error, filter_config.status().message());
     // TODO: This should be allowed. No way to convert this to absl::Status. Check with Adi once.
     // throw Envoy::ProtoValidationException(std::string(filter_config.status().message()));
   }

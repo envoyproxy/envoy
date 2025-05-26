@@ -34,19 +34,32 @@ using StringPairToMatchTreeMap =
 // once and shared among filters for better performance.
 class ProtoApiScrubberFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
+
+  // Creates and returns an instance of ProtoApiScrubberConfig.
   static absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>>
   create(const ProtoApiScrubberConfig& proto_config,
-         Envoy::Server::Configuration::FactoryContext& context);
+         Server::Configuration::FactoryContext& context);
+
+  // Returns the match tree for a request payload field mask.
   MatchTreeHttpMatchingDataSharedPtr getRequestFieldMatcher(std::string method_name,
                                                             std::string field_mask) const;
+
+  // Returns the match tree for a response payload field mask.
   MatchTreeHttpMatchingDataSharedPtr getResponseFieldMatcher(std::string method_name,
                                                              std::string field_mask) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
 private:
+  // Private constructor to make sure that this class is used in a factory fashion using the
+  // public `create` method.
   ProtoApiScrubberFilterConfig();
 
+  absl::Status validateFilteringMode(FilteringMode);
+  absl::Status validateMethodName(absl::string_view);
+  absl::Status validateFieldMask(absl::string_view);
+
+  // Initializes the request and response field mask maps using the proto_config.
   absl::Status initialize(const ProtoApiScrubberConfig& proto_config,
                           Envoy::Server::Configuration::FactoryContext& context);
   absl::Status initializeMethodRestrictions(std::string method_name,
@@ -54,12 +67,8 @@ private:
                                             Map<std::string, RestrictionConfig> restrictions,
                                             Server::Configuration::FactoryContext& context);
 
-  absl::Status validateFilteringMode(FilteringMode);
-  absl::Status validateMethodName(absl::string_view);
-  absl::Status validateFieldMask(absl::string_view);
 
   FilteringMode filtering_mode_;
-
   StringPairToMatchTreeMap request_field_restrictions_;
   StringPairToMatchTreeMap response_field_restrictions_;
 };
@@ -80,6 +89,8 @@ public:
 };
 
 // Action class for the RemoveFieldAction.
+// RemoveFieldAction semantically denotes removing a field from request or response protobuf payload
+// based on the field_mask and corresponding the restriction config provided.
 class RemoveFieldAction : public Matcher::ActionBase<ProtoApiScrubberRemoveFieldAction> {};
 
 // ActionFactory for the RemoveFieldAction.
