@@ -153,8 +153,9 @@ INSTANTIATE_TEST_SUITE_P(FieldMaskValidationTestSuite, FieldMaskValidation,
 
 // Structured test-case for parameterized tests of filtering mode validation.
 struct FilteringModeValidationTestCase {
-  std::string filtering_mode_str;
-  FilteringMode expected_filtering_mode;
+  // Note that its type is kept as integer to test the unsupported values for FilteringMode enum.
+  int filtering_mode_as_integer;
+  absl::optional<FilteringMode> expected_filtering_mode;
   absl::StatusCode expected_status_code;
   std::string expected_status_message;
 };
@@ -163,25 +164,27 @@ struct FilteringModeValidationTestCase {
 class FilteringModeValidation : public testing::TestWithParam<FilteringModeValidationTestCase> {};
 
 TEST_P(FilteringModeValidation, ValidateSingleMethodConfig) {
-  std::string filter_conf_string = GetParam().filtering_mode_str;
   ProtoApiScrubberConfig proto_config;
-  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config));
-  std::cout << "Proto filtering mode: " << proto_config.filtering_mode();
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(
+      absl::StrFormat(R"pb(filtering_mode: %d)pb", GetParam().filtering_mode_as_integer),
+      &proto_config));
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
       ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
-  EXPECT_EQ(filter_config.value()->filteringMode(), GetParam().expected_filtering_mode);
   EXPECT_EQ(filter_config.status().code(), GetParam().expected_status_code);
   EXPECT_EQ(filter_config.status().message(), GetParam().expected_status_message);
+  if (GetParam().expected_filtering_mode.has_value()) {
+    EXPECT_EQ(filter_config.value()->filteringMode(), GetParam().expected_filtering_mode.value());
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(
     FilteringModeValidationTestSuite, FilteringModeValidation,
     testing::ValuesIn<FilteringModeValidationTestCase>({
-        {"filtering_mode: OVERRIDE", FilteringMode::ProtoApiScrubberConfig_FilteringMode_OVERRIDE,
+        {0, absl::make_optional(FilteringMode::ProtoApiScrubberConfig_FilteringMode_OVERRIDE),
          absl::StatusCode::kOk, ""},
-        {"filtering_mode: 0", FilteringMode::ProtoApiScrubberConfig_FilteringMode_OVERRIDE,
-         absl::StatusCode::kOk, ""},
+        {999, absl::nullopt, absl::StatusCode::kInvalidArgument,
+         "Error encountered during config initialization. Unsupported 'filtering_mode': ."},
     }));
 
 // A class for testing filter config related capabilities eg, parsing and storing the filter

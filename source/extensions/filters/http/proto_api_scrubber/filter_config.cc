@@ -141,13 +141,9 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
     if (factory_cb.has_value()) {
       field_restrictions[std::make_pair(method_name, field_mask)] = factory_cb.value()();
     } else {
-      return absl::InvalidArgumentError(
-          fmt::format("{} Failed to initialize matcher factory callback for method {} and field "
-                      "mask {}. Most likely an issue with the value of "
-                      "'ProtoApiScrubberConfig::restrictions::method_restrictions::[request, "
-                      "response]_field_restrictions::matcher'. Double-check the config to fix any "
-                      "syntax errors.",
-                      kConfigInitializationError, method_name, field_mask));
+      return absl::InvalidArgumentError(fmt::format(
+          "{} Failed to initialize matcher factory callback for method {} and field mask {}.",
+          kConfigInitializationError, method_name, field_mask));
     }
   }
 
