@@ -503,6 +503,13 @@ RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_ur
                                  bool include_scheme = false);
 
 /**
+ * Returns the path without the query string.
+ * @param path supplies a absl::string_view& possibly containing a query string.
+ * @return std::string the path without query string.
+ */
+absl::string_view stripQueryParamsAndAnchors(const absl::string_view& path);
+
+/**
  * Returns string representation of StreamResetReason.
  */
 const std::string resetReasonToString(const Http::StreamResetReason reset_reason);
