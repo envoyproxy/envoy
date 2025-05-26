@@ -6,7 +6,6 @@
 
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-#include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
@@ -75,6 +74,12 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
 
+  if(proto_config.settings().has_aws_iam())
+  {
+      aws_iam_authenticator_ = Common::Redis::Client::AwsIamAuthenticatorImpl::initAwsIamAuthenticator(
+          server_context, proto_config.settings().aws_iam());
+  }
+
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
 
@@ -84,8 +89,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
         server_context, cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
-        refresh_manager, filter_config->dns_cache_);
-    conn_pool_ptr->init();
+        refresh_manager, filter_config->dns_cache_, aws_iam_authenticator_);
+    conn_pool_ptr->init(); 
     upstreams.emplace(cluster, conn_pool_ptr);
   }
 

@@ -71,37 +71,6 @@ private:
   uint32_t connection_rate_limit_per_sec_;
 };
 
-class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
-public:
-  AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,
-                          const std::string auth_user, absl::string_view cache_name,
-                          absl::string_view service_name, absl::string_view region,
-                          uint16_t expiration_time,
-                          absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
-                              credential_provider);
-  std::string getAuthToken() override;
-  bool addCallbackIfCredentialsPending(
-      Extensions::Common::Aws::CredentialsPendingCallback&& cb) override {
-    return signer_->addCallbackIfCredentialsPending(std::move(cb));
-  };
-  void generateAuthToken() override;
-  std::string iamUsername() { return auth_user_; }
-
-private:
-  Envoy::Extensions::Common::Aws::SignerPtr signer_;
-  uint16_t expiration_time_;
-  const std::string auth_user_;
-  std::string cache_name_;
-  std::string service_name_;
-  std::string region_;
-  Server::Configuration::ServerFactoryContext& context_;
-  Envoy::Event::TimerPtr cache_duration_timer_;
-  std::string auth_token_;
-};
-
-using AwsIamAuthenticatorImplSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
-using AwsIamAuthenticatorImplSharedPtrOptRef = OptRef<AwsIamAuthenticatorImplSharedPtr>;
-
 class ClientImpl : public Client,
                    public DecoderCallbacks,
                    public Network::ConnectionCallbacks,
@@ -111,17 +80,15 @@ public:
       Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
       DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-      bool is_transaction_client, Server::Configuration::ServerFactoryContext& context,
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-      const std::string& auth_username);
+      bool is_transaction_client,
+      const std::string& auth_username, absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator);
 
   ClientImpl(
       Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
       DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-      bool is_transaction_client, Server::Configuration::ServerFactoryContext& context,
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-      const std::string& auth_username);
+      bool is_transaction_client,
+      const std::string& auth_username, absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator);
   ~ClientImpl() override;
 
   // Client
@@ -151,14 +118,6 @@ public:
   void sendIamAuthentication(AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator);
 
   PoolRequest* makeRequestImmediate(const RespValue& request, ClientCallbacks& callbacks);
-
-  AwsIamAuthenticatorImplSharedPtr
-  initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context,
-                          std::string auth_user, absl::string_view cache_name,
-                          absl::string_view service_name, absl::string_view region,
-                          uint16_t expiration_time,
-                          absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
-                              credential_provider);
 
 private:
   friend class RedisClientImplTest;
@@ -218,10 +177,8 @@ private:
   bool is_transaction_client_;
   std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> aws_iam_auth_signer_;
   bool queue_enabled_{false};
-  Server::Configuration::ServerFactoryContext& context_;
-  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
-  AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator_;
   const std::string& auth_username_;
+  absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator_;
 };
 
 class ClientFactoryImpl : public ClientFactory {
@@ -231,9 +188,8 @@ public:
                    const ConfigSharedPtr& config,
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
-                   bool is_transaction_client, Server::Configuration::ServerFactoryContext& context,
-                   absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
-                       aws_iam_config) override;
+                   bool is_transaction_client,
+                   absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator) override;
 
   static ClientFactoryImpl instance_;
 

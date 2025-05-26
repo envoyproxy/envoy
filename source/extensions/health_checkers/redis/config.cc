@@ -20,7 +20,7 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
       context.cluster(), config,
       getRedisHealthCheckConfig(config, context.messageValidationVisitor()),
       context.mainThreadDispatcher(), context.runtime(), context.eventLogger(), context.api(),
-      NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_);
+      NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_, absl::nullopt);
 };
 
 /**

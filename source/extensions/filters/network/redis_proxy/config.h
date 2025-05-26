@@ -12,7 +12,7 @@
 #include "source/common/config/datasource.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
-
+#include "source/extensions/filters/network/common/redis/client.h"
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -32,31 +32,6 @@ public:
     proto_config_.MergeFrom(proto_config);
   }
 
-  bool hasAwsIam() const { return proto_config_.has_aws_iam(); }
-
-  static bool hasAwsIam(const Upstream::ClusterInfoConstSharedPtr info) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options) {
-      return options->hasAwsIam();
-    }
-    return false;
-  }
-
-  static absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
-  awsIam(const Upstream::ClusterInfoConstSharedPtr info) {
-    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
-        NetworkFilterNames::get().RedisProxy);
-    if (options && options->hasAwsIam()) {
-      return options->awsIam();
-    }
-    return absl::nullopt;
-  }
-
-  envoy::extensions::filters::network::redis_proxy::v3::AwsIam awsIam() const {
-    return proto_config_.aws_iam();
-  }
-
   std::string authUsername(Api::Api& api) const {
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_username_, true, api), std::string);
   }
@@ -72,9 +47,6 @@ public:
   }
 
   std::string authPassword(Api::Api& api) const {
-    if (proto_config_.has_aws_iam()) {
-      return {};
-    }
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);
   }
 
@@ -115,6 +87,9 @@ private:
       Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
+
+  absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator_;
+
 };
 
 } // namespace RedisProxy
