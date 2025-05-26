@@ -1,6 +1,5 @@
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
-#include "envoy/common/exception.h"
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
 #include "envoy/matcher/matcher.h"
 
@@ -32,20 +31,31 @@ static constexpr absl::string_view kConfigInitializationError =
 
 } // namespace
 
-ProtoApiScrubberFilterConfig::ProtoApiScrubberFilterConfig(
-    const ProtoApiScrubberConfig& proto_config,
-    Envoy::Server::Configuration::FactoryContext& context) {
+ProtoApiScrubberFilterConfig::ProtoApiScrubberFilterConfig() {}
+
+absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>>
+ProtoApiScrubberFilterConfig::create(const ProtoApiScrubberConfig& proto_config,
+                                     Envoy::Server::Configuration::FactoryContext& context) {
+  auto filter_config_ptr =
+      std::shared_ptr<ProtoApiScrubberFilterConfig>(new ProtoApiScrubberFilterConfig());
+  if (absl::Status status = filter_config_ptr->initialize(proto_config, context); !status.ok()) {
+    return status;
+  }
+
+  return filter_config_ptr;
+}
+
+absl::Status
+ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_config,
+                                         Envoy::Server::Configuration::FactoryContext& context) {
   // tODo: UT on what happens if none is provided. Also add UTs, just for filtering mode.
   ENVOY_LOG(debug, "Initializing filter config from the proto config: {}",
             proto_config.DebugString());
   FilteringMode filtering_mode = proto_config.filtering_mode();
-  if (!isFilteringModeSupported(filtering_mode)) {
-    std::string error_message =
-        fmt::format("{} Unsupported 'filtering_mode': {}.", kConfigInitializationError,
-                    envoy::extensions::filters::http::proto_api_scrubber::v3::
-                        ProtoApiScrubberConfig_FilteringMode_Name(filtering_mode));
-    ENVOY_LOG(error, error_message);
-    throw EnvoyException(error_message);
+  if (absl::Status status = validateFilteringMode(filtering_mode); !status.ok()) {
+    // Todo: Should we log it here or at top level only?
+    ENVOY_LOG(error, status.message());
+    return status;
   }
 
   filtering_mode_ = filtering_mode;
@@ -53,85 +63,95 @@ ProtoApiScrubberFilterConfig::ProtoApiScrubberFilterConfig(
   // TODO: UTs if restriction.method_restrictions.empty (Maybe proto creates a default instance)
   for (const auto& method_restriction : proto_config.restrictions().method_restrictions()) {
     std::string method_name = method_restriction.first;
-    // TODO: UT for method name validations.
-    if (absl::optional<std::string> validation_error = validateMethodName(method_name)) {
-      std::string error_message =
-          fmt::format("{} Invalid method name: {}. {}", kConfigInitializationError, method_name,
-                      *validation_error);
-      ENVOY_LOG(error, error_message);
-      throw EnvoyException(error_message);
+    if (absl::Status status = validateMethodName(method_name); !status.ok()) {
+      return status;
     }
 
     // TODO: UT to check what happens if method_restriction.second is empty and when
     // method_restriction.second.request_field_restrictions is empty. Initialize method's request
     // field restrictions.
-    initializeMethodRestrictions(method_name, request_field_restrictions_,
-                                 method_restriction.second.request_field_restrictions(), context);
+    if (absl::Status status = initializeMethodRestrictions(
+            method_name, request_field_restrictions_,
+            method_restriction.second.request_field_restrictions(), context);
+        !status.ok()) {
+      return status;
+    }
 
     // Initialize method's response field restrictions.
-    initializeMethodRestrictions(method_name, response_field_restrictions_,
-                                 method_restriction.second.response_field_restrictions(), context);
+    if (absl::Status status = initializeMethodRestrictions(
+            method_name, response_field_restrictions_,
+            method_restriction.second.response_field_restrictions(), context);
+        !status.ok()) {
+      return status;
+    }
   }
 
   ENVOY_LOG(debug, "Filter config initialized successfully.");
+  return absl::OkStatus();
 }
 
-bool ProtoApiScrubberFilterConfig::isFilteringModeSupported(FilteringMode filtering_mode) {
+absl::Status ProtoApiScrubberFilterConfig::validateFilteringMode(FilteringMode filtering_mode) {
   switch (filtering_mode) {
   case FilteringMode::ProtoApiScrubberConfig_FilteringMode_OVERRIDE:
-    return true;
+    return absl::OkStatus();
   default:
-    return false;
+    return absl::InvalidArgumentError(
+        fmt::format("{} Unsupported 'filtering_mode': {}.", kConfigInitializationError,
+                    envoy::extensions::filters::http::proto_api_scrubber::v3::
+                        ProtoApiScrubberConfig_FilteringMode_Name(filtering_mode)));
   }
 }
 
-absl::optional<std::string>
-ProtoApiScrubberFilterConfig::validateMethodName(absl::string_view method_name) {
-  std::string error_message;
+absl::Status ProtoApiScrubberFilterConfig::validateMethodName(absl::string_view method_name) {
   if (method_name.empty()) {
-    return "Method name is empty";
+    return absl::InvalidArgumentError(
+        fmt::format("{} Invalid method name: '{}'. Method name is empty.",
+                    kConfigInitializationError, method_name));
   }
 
   if (absl::StrContains(method_name, '*')) {
-    return "Method name contains '*' which is not supported.";
+    return absl::InvalidArgumentError(fmt::format(
+        "{} Invalid method name: '{}'. Method name contains '*' which is not supported.",
+        kConfigInitializationError, method_name));
   }
 
   std::vector<absl::string_view> method_name_parts = absl::StrSplit(method_name, '/');
   if (method_name_parts.size() != 3 || !method_name_parts[0].empty() ||
       method_name_parts[1].empty() || !absl::StrContains(method_name_parts[1], '.') ||
       method_name_parts[2].empty()) {
-    return "Method name should follow the gRPC format ('/package.ServiceName/MethodName').";
+    return absl::InvalidArgumentError(
+        fmt::format("{} Invalid method name: '{}'. Method name should follow the gRPC format "
+                    "('/package.ServiceName/MethodName').",
+                    kConfigInitializationError, method_name));
   }
 
-  return std::nullopt;
+  return absl::OkStatus();
 }
 
-absl::optional<std::string>
-ProtoApiScrubberFilterConfig::validateFieldMask(absl::string_view field_mask) {
-  std::string error_message;
+absl::Status ProtoApiScrubberFilterConfig::validateFieldMask(absl::string_view field_mask) {
   if (field_mask.empty()) {
-    return "Field mask is empty.";
+    return absl::InvalidArgumentError(fmt::format("{} Invalid field mask: {}. Field mask is empty.",
+                                                  kConfigInitializationError, field_mask));
   }
 
   if (absl::StrContains(field_mask, '*')) {
-    return "Field mask contains '*' which is not supported.";
+    return absl::InvalidArgumentError(
+        fmt::format("{} Invalid field mask: {}. Field mask contains '*' which is not supported.",
+                    kConfigInitializationError, field_mask));
   }
 
-  return std::nullopt;
+  return absl::OkStatus();
 }
 
-void ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
+absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
     std::string method_name, StringPairToMatchTreeMap& field_restrictions,
     const Map<std::string, RestrictionConfig> restrictions,
     Envoy::Server::Configuration::FactoryContext& context) {
   for (const auto& restriction : restrictions) {
     std::string field_mask = restriction.first;
-    if (absl::optional<std::string> validation_error = validateFieldMask(field_mask)) {
-      std::string error_message =
-          fmt::format("{} Invalid field name: {} for method {}. {}", kConfigInitializationError,
-                      field_mask, method_name, *validation_error);
-      ENVOY_LOG(error, error_message);
-      throw EnvoyException(error_message);
+    if (absl::Status status = validateFieldMask(field_mask); !status.ok()) {
+      ENVOY_LOG(error, status.message());
+      return status;
     }
 
     // TODO: UT to check whether it returns nullptr or a default object if nothing is provided in
@@ -147,17 +167,21 @@ void ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
     absl::optional<Matcher::MatchTreeFactoryCb<HttpMatchingData>> factory_cb =
         matcher_factory.create(restriction.second.matcher());
     if (factory_cb.has_value()) {
-      // TODO: Move to single statement
-      auto fcbv = factory_cb.value();
-      field_restrictions[std::make_pair(method_name, field_mask)] = fcbv();
+      // TODO: This throws when CEL is empty. Catch it and test it. Or, basically it should be
+      // validated beforehand.
+      field_restrictions[std::make_pair(method_name, field_mask)] = factory_cb.value()();
     } else {
-      std::string error_message = fmt::format(
-          "{} Failed to initialize matcher factory callback for method {} and field mask {}",
-          kConfigInitializationError, method_name, field_mask);
-      ENVOY_LOG(error, error_message);
-      throw EnvoyException(error_message);
+      return absl::InvalidArgumentError(
+          fmt::format("{} Failed to initialize matcher factory callback for method {} and field "
+                      "mask {}. Most likely an issue with the value of "
+                      "'ProtoApiScrubberConfig::restrictions::method_restrictions::[request, "
+                      "response]_field_restrictions::matcher'. Double-check the config to fix any "
+                      "syntax errors.",
+                      kConfigInitializationError, method_name, field_mask));
     }
   }
+
+  return absl::OkStatus();
 }
 
 MatchTreeHttpCelInputSharedPtr

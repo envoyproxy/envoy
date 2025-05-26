@@ -34,9 +34,9 @@ using StringPairToMatchTreeMap =
 // once and shared among filters for better performance.
 class ProtoApiScrubberFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit ProtoApiScrubberFilterConfig(const ProtoApiScrubberConfig&,
-                                        Server::Configuration::FactoryContext&);
-
+  static absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>>
+  create(const ProtoApiScrubberConfig& proto_config,
+         Envoy::Server::Configuration::FactoryContext& context);
   MatchTreeHttpMatchingDataSharedPtr getRequestFieldMatcher(std::string method_name,
                                                             std::string field_mask) const;
   MatchTreeHttpMatchingDataSharedPtr getResponseFieldMatcher(std::string method_name,
@@ -45,14 +45,18 @@ public:
   FilteringMode filteringMode() const { return filtering_mode_; }
 
 private:
-  void initializeMethodRestrictions(std::string method_name,
-                                    StringPairToMatchTreeMap& field_restrictions,
-                                    Map<std::string, RestrictionConfig> restrictions,
-                                    Server::Configuration::FactoryContext& context);
+  ProtoApiScrubberFilterConfig();
 
-  bool isFilteringModeSupported(FilteringMode);
-  absl::optional<std::string> validateMethodName(absl::string_view);
-  absl::optional<std::string> validateFieldMask(absl::string_view);
+  absl::Status initialize(const ProtoApiScrubberConfig& proto_config,
+                          Envoy::Server::Configuration::FactoryContext& context);
+  absl::Status initializeMethodRestrictions(std::string method_name,
+                                            StringPairToMatchTreeMap& field_restrictions,
+                                            Map<std::string, RestrictionConfig> restrictions,
+                                            Server::Configuration::FactoryContext& context);
+
+  absl::Status validateFilteringMode(FilteringMode);
+  absl::Status validateMethodName(absl::string_view);
+  absl::Status validateFieldMask(absl::string_view);
 
   FilteringMode filtering_mode_;
 
