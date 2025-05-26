@@ -351,12 +351,16 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
   ASSERT_EQ(match_result2.match_state_, Matcher::MatchState::MatchComplete);
   EXPECT_FALSE(match_result2.on_match_.has_value());
 
-  // Test invalid method name.
+  // Validate invalid method name for request and response field matchers.
+  match_tree = filter_config_->getRequestFieldMatcher("/non.existent.service/method", "book");
+  ASSERT_EQ(match_tree, nullptr);
   match_tree =
       filter_config_->getResponseFieldMatcher("/non.existent.service/method", "book.debug_info");
   ASSERT_EQ(match_tree, nullptr);
 
-  // Test invalid field mask.
+  // Validate invalid field mask for request and response field matchers.
+  match_tree = filter_config_->getRequestFieldMatcher("/library.BookService/GetBook",
+                                                      "non.existent.field.mask");
   match_tree = filter_config_->getResponseFieldMatcher("/library.BookService/GetBook",
                                                        "non.existent.field.mask");
   ASSERT_EQ(match_tree, nullptr);
