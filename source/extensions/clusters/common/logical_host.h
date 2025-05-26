@@ -124,6 +124,9 @@ public:
   absl::optional<MonotonicTime> lastHcPassTime() const override {
     return logical_host_->lastHcPassTime();
   }
+
+  const absl::string_view getHostId() const override { return logical_host_->getHostId(); }
+
   uint32_t priority() const override { return logical_host_->priority(); }
   Network::UpstreamTransportSocketFactory&
   resolveTransportSocketFactory(const Network::Address::InstanceConstSharedPtr& dest_address,
@@ -147,6 +150,7 @@ public:
   void setLastHcPassTime(MonotonicTime) override {}
   void priority(uint32_t) override {}
   void setLbPolicyData(HostLbPolicyDataPtr) override {}
+  void setHostId(const std::string) override {}
 
 private:
   const Network::Address::InstanceConstSharedPtr address_;

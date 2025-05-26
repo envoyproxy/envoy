@@ -324,6 +324,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void stopDecodingIfNonTerminalFilterEncodedEndStream(bool encoded_end_stream);
   StreamDecoderFilters::Iterator entry() const { return entry_; }
 
+  void setReverseConnForceLocalReply(bool value) override;
+
   StreamDecoderFilterSharedPtr handle_;
   StreamDecoderFilters::Iterator entry_{};
   bool is_grpc_request_{};
@@ -912,6 +914,8 @@ public:
 
   virtual bool shouldLoadShed() { return false; };
 
+  void setReverseConnForceLocalReply(bool value) { reverse_conn_force_local_reply_ = value; }
+
   void sendGoAwayAndClose() {
     // Stop filter chain iteration by checking encoder or decoder chain.
     if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
@@ -1108,6 +1112,7 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
+  bool reverse_conn_force_local_reply_{false};
 
   StreamDecoderFilters decoder_filters_;
   StreamEncoderFilters encoder_filters_;
