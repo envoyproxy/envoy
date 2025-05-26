@@ -69,6 +69,7 @@ public:
           return std::move(metadata_fetcher_);
         },
         refresh_state, initialization_timer, "credentials_provider_cluster");
+    EXPECT_EQ(provider_->providerName(), "InstanceProfileCredentialsProvider");
   }
 
   void expectSessionToken(const uint64_t status_code, const std::string&& token) {
@@ -772,6 +773,31 @@ TEST_F(InstanceProfileCredentialsProviderTest,
   EXPECT_FALSE(credentials.accessKeyId().has_value());
   EXPECT_FALSE(credentials.secretAccessKey().has_value());
   EXPECT_FALSE(credentials.sessionToken().has_value());
+}
+
+TEST_F(InstanceProfileCredentialsProviderTest, TestCancel) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  expectDocument(200, std::move(R"EOF(
+not json
+)EOF"));
+
+  setupProvider();
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  auto mock_fetcher = std::make_unique<MockMetadataFetcher>();
+
+  EXPECT_CALL(*mock_fetcher, cancel);
+  EXPECT_CALL(*mock_fetcher, fetch(_, _, _));
+  // Ensure we have a metadata fetcher configured, so we expect this to receive a cancel
+  provider_friend.setMetadataFetcher(std::move(mock_fetcher));
+
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+  delete (raw_metadata_fetcher_);
 }
 
 } // namespace Aws
