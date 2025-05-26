@@ -1,0 +1,19 @@
+on:
+  push:
+    branches:
+    - main
+
+permissions:
+  contents: read
+
+
+jobs:
+  diskspace:
+    name: Diskspace debug
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Debug diskspace
+      run: |
+        df -h
+        lsblk -f
+        blkid
