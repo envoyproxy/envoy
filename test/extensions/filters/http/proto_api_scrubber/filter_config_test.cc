@@ -1,5 +1,4 @@
 #include "source/common/matcher/matcher.h"
-#include "source/extensions/filters/http/proto_api_scrubber/config.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
 #include "test/mocks/http/mocks.h"
@@ -152,6 +151,39 @@ INSTANTIATE_TEST_SUITE_P(FieldMaskValidationTestSuite, FieldMaskValidation,
                              {"book.inner_book.debug_info", absl::StatusCode::kOk, ""},
                          }));
 
+// Structured test-case for parameterized tests of filtering mode validation.
+struct FilteringModeValidationTestCase {
+  std::string filtering_mode_str;
+  FilteringMode expected_filtering_mode;
+  absl::StatusCode expected_status_code;
+  std::string expected_status_message;
+};
+
+// A class to test method names which are provided in the filter config.
+class FilteringModeValidation : public testing::TestWithParam<FilteringModeValidationTestCase> {};
+
+TEST_P(FilteringModeValidation, ValidateSingleMethodConfig) {
+  std::string filter_conf_string = GetParam().filtering_mode_str;
+  ProtoApiScrubberConfig proto_config;
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config));
+  std::cout << "Proto filtering mode: " << proto_config.filtering_mode();
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
+      ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
+  EXPECT_EQ(filter_config.value()->filteringMode(), GetParam().expected_filtering_mode);
+  EXPECT_EQ(filter_config.status().code(), GetParam().expected_status_code);
+  EXPECT_EQ(filter_config.status().message(), GetParam().expected_status_message);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    FilteringModeValidationTestSuite, FilteringModeValidation,
+    testing::ValuesIn<FilteringModeValidationTestCase>({
+        {"filtering_mode: OVERRIDE", FilteringMode::ProtoApiScrubberConfig_FilteringMode_OVERRIDE,
+         absl::StatusCode::kOk, ""},
+        {"filtering_mode: 0", FilteringMode::ProtoApiScrubberConfig_FilteringMode_OVERRIDE,
+         absl::StatusCode::kOk, ""},
+    }));
+
 // A class for testing filter config related capabilities eg, parsing and storing the filter
 // config in internal data structures, etc.
 class ProtoApiScrubberFilterConfigTest : public ::testing::Test {
@@ -167,7 +199,7 @@ protected:
         method_restrictions: {
           key: "/library.BookService/GetBook"
           value: {
-            response_field_restrictions: {
+            request_field_restrictions: {
               key: "debug_info"
               value: {
                 matcher: {
@@ -296,7 +328,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
   // The match expression in hardcoded to `true` for `debug_info` which should result in a match
   // and a corresponding action named `RemoveFieldAction`.
   MatchTreeHttpMatchingDataSharedPtr match_tree =
-      filter_config_->getResponseFieldMatcher("/library.BookService/GetBook", "debug_info");
+      filter_config_->getRequestFieldMatcher("/library.BookService/GetBook", "debug_info");
   ASSERT_NE(match_tree, nullptr);
   Matcher::MatchTree<HttpMatchingData>::MatchResult match_result =
       match_tree->match(http_matching_data_impl);
