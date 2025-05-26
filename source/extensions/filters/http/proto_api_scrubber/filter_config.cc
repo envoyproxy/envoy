@@ -70,7 +70,6 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   return absl::OkStatus();
 }
 
-
 absl::Status ProtoApiScrubberFilterConfig::validateFilteringMode(FilteringMode filtering_mode) {
   switch (filtering_mode) {
   case FilteringMode::ProtoApiScrubberConfig_FilteringMode_OVERRIDE:

@@ -34,7 +34,6 @@ using StringPairToMatchTreeMap =
 // once and shared among filters for better performance.
 class ProtoApiScrubberFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
-
   // Creates and returns an instance of ProtoApiScrubberConfig.
   static absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>>
   create(const ProtoApiScrubberConfig& proto_config,
@@ -66,7 +65,6 @@ private:
                                             StringPairToMatchTreeMap& field_restrictions,
                                             Map<std::string, RestrictionConfig> restrictions,
                                             Server::Configuration::FactoryContext& context);
-
 
   FilteringMode filtering_mode_;
   StringPairToMatchTreeMap request_field_restrictions_;
