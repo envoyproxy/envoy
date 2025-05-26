@@ -2,6 +2,12 @@
 
 set -e
 
+# TMP TEST HACK
+ENVOY_DOCKER_BUILD_DIR=/mnt/workspace
+sudo mkdir -p /mnt/workspace
+sudo chown runner:runner /mnt/workspace
+df -h
+
 CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 # shellcheck source=ci/envoy_build_sha.sh
