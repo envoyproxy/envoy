@@ -94,7 +94,7 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
   Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
       Extensions::Common::Tap::makeTraceWrapper();
 
-  // case2 format PROTO_BINARY_LENGTH_DELIMITED
+  // case for format PROTO_BINARY_LENGTH_DELIMITED
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED);
 }

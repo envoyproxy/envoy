@@ -47,7 +47,7 @@ private:
                                            const bool isRead);
   // This is the default value for min buffered bytes.
   // (This means that per transport socket buffer trace, the minimum amount
-  // which triggering to send the tapped messages size is 9 byes).
+  // which triggering to send the tapped messages size is 9 bytes).
   static constexpr uint32_t DefaultMinBufferedBytes = 9;
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
