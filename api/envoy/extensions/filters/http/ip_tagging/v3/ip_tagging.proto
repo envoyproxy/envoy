@@ -97,7 +97,7 @@ message IPTagging {
 
   // When :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` is configured
   // the ip tags will be reloaded from file every ``ip_tags_refresh_rate`` milliseconds.
-  // Deafults to 0, in this case no refresh will be attempted.
+  // Defaults to 0, in this case no refresh will be attempted.
   google.protobuf.Duration ip_tags_refresh_rate = 7
       [(validate.rules).duration = {gt {}}];
 }
