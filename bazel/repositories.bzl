@@ -129,6 +129,9 @@ def envoy_dependencies(skip_targets = []):
     # Setup external Bazel rules
     _foreign_cc_dependencies()
 
+    # Setup GCC toolchain
+    _gcc_toolchain()
+
     # Binding to an alias pointing to the selected version of BoringSSL:
     # - BoringSSL FIPS from @boringssl_fips//:ssl,
     # - non-FIPS BoringSSL from @boringssl//:ssl.
@@ -947,6 +950,11 @@ def _foreign_cc_dependencies():
         name = "rules_foreign_cc",
         patches = ["@envoy//bazel:rules_foreign_cc.patch"],
         patch_args = ["-p1"],
+    )
+
+def _gcc_toolchain():
+    external_http_archive(
+        name = "gcc_toolchain",
     )
 
 def _com_github_maxmind_libmaxminddb():

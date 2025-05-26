@@ -1434,6 +1434,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    gcc_toolchain = dict(
+        project_name = "Bazel GCC toolchain",
+        project_desc = "A fully-hermetic Bazel GCC toolchain for Linux",
+        project_url = "https://github.com/f0rmiga/gcc-toolchain",
+        version = "0.6.0",
+        sha256 = "8aa7129247f06e12ab356797f79eea13f2387f32ae8f7184074e8e6402790299",
+        strip_prefix = "gcc-toolchain-{version}",
+        urls = ["https://github.com/f0rmiga/gcc-toolchain/archive/refs/tags/{version}.tar.gz"],
+        release_date = "2024-05-01",
+        use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/f0rmiga/gcc-toolchain/blob/v{version}/LICENSE",
+    ),
     # After updating you may need to run:
     #
     #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
