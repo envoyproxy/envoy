@@ -157,5 +157,9 @@ new_features:
 - area: local_ratelimit
   change: |
     ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
-
+- area: oauth2
+  change: |
+    Added ``end_session_endpoint`` to the oauth2 filter to support OIDC RP initiated logout. This field is only used when
+    `openid` is in the ``auth_scopes`` field. If configured, the OAuth2 filter will redirect users to this endpoint when
+    they access the signout_path. This allows users to be logged out of the Authorization server.
 deprecated:
