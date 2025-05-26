@@ -2,9 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ip_tagging.v3;
 
-import "google/protobuf/duration.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/data/ip_tagging/v3/ip_tagging.proto";
+
+import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
@@ -94,10 +95,8 @@ message IPTagging {
   // See :ref:`watched_directory <envoy_v3_api_msg_config.core.v3.DataSource>` for more information about the ``watched_directory`` field.
   config.core.v3.DataSource ip_tags_datasource = 6;
 
-
   // When :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` is configured
   // the ip tags will be reloaded from file every ``ip_tags_refresh_rate`` milliseconds.
   // Defaults to 0, in this case no refresh will be attempted.
-  google.protobuf.Duration ip_tags_refresh_rate = 7
-      [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration ip_tags_refresh_rate = 7 [(validate.rules).duration = {gt {}}];
 }
