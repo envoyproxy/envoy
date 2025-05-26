@@ -41,6 +41,7 @@
 #include "source/common/upstream/load_stats_reporter.h"
 #include "source/common/upstream/priority_conn_pool_map.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "envoy/registry/registry.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -48,7 +49,8 @@ namespace Upstream {
 /**
  * Production implementation of ClusterManagerFactory.
  */
-class ProdClusterManagerFactory : public ClusterManagerFactory {
+class ProdClusterManagerFactory : public ClusterManagerFactory,
+                                  public Logger::Loggable<Logger::Id::pool> {
 public:
   using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
 

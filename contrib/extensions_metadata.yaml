@@ -23,6 +23,13 @@ envoy.compression.qatzstd.compressor:
   - envoy.compression.compressor
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: alpha
+envoy.filters.http.reverse_conn:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.reverse_conn.v3alpha.ReverseConn
 envoy.filters.http.squash:
   categories:
   - envoy.filters.http
@@ -33,6 +40,13 @@ envoy.filters.http.sxg:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.filters.listener.reverse_connection:
+  categories:
+  - envoy.filters.listener
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.listener.reverse_connection.v3alpha.ReverseConnection
 envoy.filters.network.client_ssl_auth:
   categories:
   - envoy.filters.network
@@ -88,6 +102,32 @@ envoy.tls.key_providers.qat:
   - envoy.tls.key_providers
   security_posture: robust_to_untrusted_downstream
   status: alpha
+envoy.bootstrap.reverse_connection:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_connection.v3alpha.ReverseConnection
+envoy.clusters.reverse_connection:
+  categories:
+  - envoy.cluster
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.clusters.reverse_connection.v3alpha.RevConClusterConfig
+envoy.reverse_connection.conn_pool:
+  categories:
+  - envoy.reverse_connection
+  security_posture: unknown
+  status: wip
+envoy.reverse_connection.reverse_connection_listener_config:
+  categories:
+  - envoy.reverse_connection
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.reverse_connection.reverse_connection_listener_config.v3alpha.ReverseConnectionListenerConfig
 envoy.bootstrap.vcl:
   categories:
   - envoy.bootstrap

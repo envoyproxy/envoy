@@ -106,6 +106,8 @@ public:
   MOCK_METHOD(void, priority, (uint32_t));
   MOCK_METHOD(absl::optional<MonotonicTime>, lastHcPassTime, (), (const));
   MOCK_METHOD(void, setLastHcPassTime, (MonotonicTime last_hc_pass_time));
+  MOCK_METHOD(const absl::string_view, getHostId, (), (const));
+  MOCK_METHOD(void, setHostId, (const std::string host_id));
   Stats::StatName localityZoneStatName() const override {
     locality_zone_stat_name_ =
         std::make_unique<Stats::StatNameManagedStorage>(locality().zone(), *symbol_table_);
@@ -183,6 +185,8 @@ public:
               (), (const));
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));
   MOCK_METHOD(void, healthFlagClear, (HealthFlag flag));
+  MOCK_METHOD(const absl::string_view, getHostId, (), (const));
+  MOCK_METHOD(void, setHostId, (const std::string host_id));
   MOCK_METHOD(bool, healthFlagGet, (HealthFlag flag), (const));
   MOCK_METHOD(void, healthFlagSet, (HealthFlag flag));
   MOCK_METHOD(uint32_t, healthFlagsGetAll, (), (const));
