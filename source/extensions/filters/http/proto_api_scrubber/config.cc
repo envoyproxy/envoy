@@ -19,10 +19,10 @@ FilterFactoryCreator::FilterFactoryCreator() : FactoryBase(kFilterName) {}
 Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
         proto_config,
-    const std::string&, Envoy::Server::Configuration::FactoryContext&) {
-  auto filter_config = std::make_shared<FilterConfig>(proto_config);
+    const std::string&, Envoy::Server::Configuration::FactoryContext& context) {
+  auto filter_config = std::make_shared<ProtoApiScrubberFilterConfig>(proto_config, context);
   return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(*filter_config));
+    callbacks.addStreamFilter(std::make_shared<ProtoApiScrubberFilter>(*filter_config));
   };
 }
 
