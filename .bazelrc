@@ -315,12 +315,8 @@ build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
-build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
-build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --config=clang-msan
 
-build:rbe-toolchain-tsan --linkopt=-L/opt/libcxx_tsan/lib
-build:rbe-toolchain-tsan --linkopt=-Wl,-rpath,/opt/libcxx_tsan/lib
 build:rbe-toolchain-tsan --config=clang-tsan
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
