@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.common.expr.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.common.expr.v3";
+option java_outer_classname = "CelProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/common/expr/v3;exprv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: CEL Evaluator Configuration]
+// Configuration for the Common Expression Language (CEL) evaluator.
+// This configuration allows fine-tuning of CEL expression evaluation behavior.
+
+// Configuration for the CEL evaluator.
+message CelEvaluatorConfig {
+  // Whether to enable string conversion in CEL expressions.
+  // When enabled, CEL expressions can convert values to strings.
+  // This is disabled by default for security reasons.
+  bool enable_string_conversion = 1;
+
+  // Whether to enable string concatenation in CEL expressions.
+  // When enabled, CEL expressions can concatenate strings using the '+' operator.
+  // This is disabled by default for security reasons.
+  bool enable_string_concat = 2;
+} 

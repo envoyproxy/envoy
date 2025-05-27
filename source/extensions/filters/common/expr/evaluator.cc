@@ -101,7 +101,7 @@ ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
                                             response_trailers);
 }
 
-BuilderPtr createBuilder(Protobuf::Arena* arena) {
+BuilderPtr createBuilder(Protobuf::Arena* arena, const envoy::extensions::filters::common::expr::v3::CelEvaluatorConfig* config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   google::api::expr::runtime::InterpreterOptions options;
 
@@ -110,8 +110,16 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   options.enable_regex = true;
   options.regex_max_program_size = 100;
   options.enable_qualified_identifier_rewrites = true;
-  options.enable_string_conversion = false;
-  options.enable_string_concat = false;
+  
+  // Use configuration if provided, otherwise use defaults
+  if (config != nullptr) {
+    options.enable_string_conversion = config->enable_string_conversion();
+    options.enable_string_concat = config->enable_string_concat();
+  } else {
+    options.enable_string_conversion = false;
+    options.enable_string_concat = false;
+  }
+  
   options.enable_list_concat = false;
 
   // Performance-oriented defaults
@@ -146,7 +154,22 @@ SINGLETON_MANAGER_REGISTRATION(expression_builder);
 BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
   return context.singletonManager().getTyped<BuilderInstance>(
       SINGLETON_MANAGER_REGISTERED_NAME(expression_builder),
-      [] { return std::make_shared<BuilderInstance>(createBuilder(nullptr)); });
+      [&context]() -> std::shared_ptr<BuilderInstance> {
+        auto& server_context = dynamic_cast<Server::Configuration::GenericFactoryContext&>(context).serverFactoryContext();
+        const auto& bootstrap = server_context.bootstrap();
+        const auto& extensions = bootstrap.bootstrap_extensions();
+        const envoy::extensions::filters::common::expr::v3::CelEvaluatorConfig* config = nullptr;
+        for (const auto& extension : extensions) {
+          if (extension.name() == "envoy.bootstrap.cel") {
+            auto message = std::make_unique<envoy::extensions::filters::common::expr::v3::CelEvaluatorConfig>();
+            if (extension.typed_config().UnpackTo(message.get())) {
+              config = message.release();
+              break;
+            }
+          }
+        }
+        return std::make_shared<BuilderInstance>(createBuilder(nullptr, config));
+      });
 }
 
 // Converts from CEL canonical to CEL v1alpha1

@@ -157,5 +157,9 @@ new_features:
 - area: local_ratelimit
   change: |
     ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
+- area: CEL
+  change: |
+    Added configuration options for CEL evaluator to control string conversion and concatenation behavior.
+    See :ref:`CelEvaluatorConfig <envoy_v3_api_msg_extensions.filters.common.expr.v3.CelEvaluatorConfig>` for more details.
 
 deprecated:
