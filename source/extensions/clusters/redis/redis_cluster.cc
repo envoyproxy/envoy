@@ -64,6 +64,8 @@ RedisCluster::RedisCluster(
       load_assignment_(cluster.load_assignment()),
       local_info_(context.serverFactoryContext().localInfo()),
       random_(context.serverFactoryContext().api().randomGenerator()),
+      /* absl::nullopt here disables AWS IAM authentication in redis client which is not supported
+       */
       redis_discovery_session_(
           std::make_shared<RedisDiscoverySession>(*this, redis_client_factory, absl::nullopt)),
       lb_factory_(std::move(lb_factory)),
@@ -246,16 +248,16 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
 RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     Envoy::Extensions::Clusters::Redis::RedisCluster& parent,
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-    absl::optional<Extensions::NetworkFilters::Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator
-)
+    absl::optional<
+        Extensions::NetworkFilters::Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
+        aws_iam_authenticator)
     : parent_(parent), dispatcher_(parent.dispatcher_),
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolveRedis(); })),
       client_factory_(client_factory), buffer_timeout_(0),
       redis_command_stats_(
           NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
               parent_.info()->statsScope().symbolTable())),
-          aws_iam_authenticator_(aws_iam_authenticator)
-              {}
+      aws_iam_authenticator_(aws_iam_authenticator) {}
 
 // Convert the cluster slot IP/Port response to an address, return null if the response
 // does not match the expected type.
@@ -331,9 +333,9 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(host, dispatcher_, shared_from_this(),
-                                             redis_command_stats_, parent_.info()->statsScope(),
-                                             parent_.auth_username_, parent_.auth_password_, false, aws_iam_authenticator_);
+    client->client_ = client_factory_.create(
+        host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
+        parent_.auth_username_, parent_.auth_password_, false, aws_iam_authenticator_);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());

@@ -51,27 +51,29 @@ InstanceImpl::InstanceImpl(
     Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache, 
-  absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator)
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+    absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator)
     : context_(context), cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
       stats_scope_(std::move(stats_scope)), redis_command_stats_(redis_command_stats),
       redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache), aws_iam_authenticator_(aws_iam_authenticator) {}
+      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache),
+      aws_iam_authenticator_(aws_iam_authenticator) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
   // That may be shorter than the tls callback if the listener is torn down shortly after it is
   // created. We use a weak pointer to make sure this object outlives the tls callbacks.
   std::weak_ptr<InstanceImpl> this_weak_ptr = this->shared_from_this();
-  tls_->set([this_weak_ptr](
-                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    if (auto this_shared_ptr = this_weak_ptr.lock()) {
-      return std::make_shared<ThreadLocalPool>(
-          this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->dns_cache_, this_shared_ptr->aws_iam_authenticator_);
-    }
-    return nullptr;
-  });
+  tls_->set(
+      [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        if (auto this_shared_ptr = this_weak_ptr.lock()) {
+          return std::make_shared<ThreadLocalPool>(
+              this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_,
+              this_shared_ptr->dns_cache_, this_shared_ptr->aws_iam_authenticator_);
+        }
+        return nullptr;
+      });
 }
 
 uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().shardSize(); }
@@ -106,7 +108,7 @@ InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache, 
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
     absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       dns_cache_(dns_cache), context_(parent->context_),

@@ -198,13 +198,11 @@ public:
 
 using ConfigSharedPtr = std::shared_ptr<const Config>;
 
-
 class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
 public:
   AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,
-                          absl::string_view cache_name,
-                          absl::string_view service_name, absl::string_view region,
-                          uint16_t expiration_time,
+                          absl::string_view cache_name, absl::string_view service_name,
+                          absl::string_view region, uint16_t expiration_time,
                           absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
                               credential_provider);
   bool addCallbackIfCredentialsPending(
@@ -216,9 +214,10 @@ public:
 
   using AwsIamAuthenticatorImplSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
 
-  static AwsIamAuthenticatorImplSharedPtr
-  initAwsIamAuthenticator(Server::Configuration::ServerFactoryContext& context,
-                          envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config);
+  static AwsIamAuthenticatorImplSharedPtr initAwsIamAuthenticator(
+      Server::Configuration::ServerFactoryContext& context,
+      envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config);
+
 private:
   Envoy::Extensions::Common::Aws::SignerPtr signer_;
   uint16_t expiration_time_;
@@ -252,12 +251,13 @@ public:
    * @param is_transaction_client true if this client was created to relay a transaction.
    * @return ClientPtr a new connection pool client.
    */
-  virtual ClientPtr
-  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-         const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
-         Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
-         bool is_transaction_client, 
-         absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator) PURE;
+  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                           const ConfigSharedPtr& config,
+                           const RedisCommandStatsSharedPtr& redis_command_stats,
+                           Stats::Scope& scope, const std::string& auth_username,
+                           const std::string& auth_password, bool is_transaction_client,
+                           absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
+                               aws_iam_authenticator) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

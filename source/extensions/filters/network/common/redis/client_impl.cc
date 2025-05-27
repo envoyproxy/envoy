@@ -69,8 +69,8 @@ ClientPtr ClientImpl::create(
     Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    bool is_transaction_client,
-    const std::string& auth_username, absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator) {
+    bool is_transaction_client, const std::string& auth_username,
+    absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator) {
   auto client = std::make_unique<ClientImpl>(
       host, dispatcher, std::move(encoder), decoder_factory, config, redis_command_stats, scope,
       is_transaction_client, auth_username, aws_iam_authenticator);
@@ -81,11 +81,12 @@ ClientPtr ClientImpl::create(
   client->connection_->noDelay(true);
 
   if (aws_iam_authenticator.has_value()) {
-    ENVOY_LOG(debug, "Redis connection pool has AWS IAM Authentication enabled");
+    ENVOY_LOG(debug, "Redis client has AWS IAM Authentication enabled");
     client->queueRequests(true);
 
     auto add_auth = [&client, auth_username]() {
-      const auto auth_password = client->aws_iam_authenticator_.value()->getAuthToken(auth_username);
+      const auto auth_password =
+          client->aws_iam_authenticator_.value()->getAuthToken(auth_username);
 
       Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
           auth_username, auth_password);
@@ -104,15 +105,15 @@ ClientImpl::ClientImpl(
     Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    bool is_transaction_client,
-    const std::string& auth_username, absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator)
+    bool is_transaction_client, const std::string& auth_username,
+    absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope), is_transaction_client_(is_transaction_client),
-      auth_username_(auth_username), aws_iam_authenticator_(aws_iam_authenticator) {
+      scope_(scope), is_transaction_client_(is_transaction_client), auth_username_(auth_username),
+      aws_iam_authenticator_(aws_iam_authenticator) {
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
   traffic_stats.upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
@@ -374,13 +375,11 @@ ClientPtr ClientFactoryImpl::create(
 }
 
 AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
-    Server::Configuration::ServerFactoryContext& context,
-    absl::string_view cache_name, absl::string_view service_name, absl::string_view region,
-    uint16_t expiration_time,
+    Server::Configuration::ServerFactoryContext& context, absl::string_view cache_name,
+    absl::string_view service_name, absl::string_view region, uint16_t expiration_time,
     absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider> credential_provider)
-    : expiration_time_(expiration_time), 
-      cache_name_(std::string(cache_name)), service_name_(std::string(service_name)),
-      region_(std::string(region)), context_(context) {
+    : expiration_time_(expiration_time), cache_name_(std::string(cache_name)),
+      service_name_(std::string(service_name)), region_(std::string(region)), context_(context) {
 
   Extensions::Common::Aws::CredentialsProviderChainSharedPtr credentials_provider_chain;
 
@@ -388,9 +387,8 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
     credentials_provider_chain =
         std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
             context_.api(), context_, region_, credential_provider.value());
-  } 
-  else {
-      credentials_provider_chain =
+  } else {
+    credentials_provider_chain =
         std::make_shared<Extensions::Common::Aws::DefaultCredentialsProviderChain>(
             context_.api(), context_, region_);
   }
@@ -398,17 +396,16 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(
   signer_ = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       service_name_, region_, credentials_provider_chain, context_,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true, expiration_time_);
-
 }
 
 AwsIamAuthenticatorImplSharedPtr AwsIamAuthenticatorImpl::initAwsIamAuthenticator(
     Server::Configuration::ServerFactoryContext& context,
     envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config) {
 
-  return std::make_shared<AwsIamAuthenticatorImpl>(context, aws_iam_config.cache_name(), 
-  aws_iam_config.service_name(),
-                                                   aws_iam_config.region(), PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60),
-                                                   aws_iam_config.credential_provider());
+  return std::make_shared<AwsIamAuthenticatorImpl>(
+      context, aws_iam_config.cache_name(), aws_iam_config.service_name(), aws_iam_config.region(),
+      PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60),
+      aws_iam_config.credential_provider());
 }
 
 std::string AwsIamAuthenticatorImpl::getAuthToken(std::string auth_user) {
@@ -421,8 +418,7 @@ std::string AwsIamAuthenticatorImpl::getAuthToken(std::string auth_user) {
                                         Envoy::Http::Utility::PercentEncoding::encode(auth_user)));
 
   auto status = signer_->sign(message, true, region_);
-  context_.mainThreadDispatcher().post(
-      [this]() { cache_duration_timer_->enableTimer(std::chrono::seconds(expiration_time_)); });
+
   auth_token_ = cache_name_ + std::string(message.headers().getPathValue());
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
