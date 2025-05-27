@@ -475,19 +475,20 @@ const XDSLookupValues& XDSLookupValues::get() {
              }
              const auto upstream_info = wrapper.info_->upstreamInfo();
              if (upstream_info && upstream_info->upstreamHost()) {
-               Upstream::HostDescriptionConstSharedPtr upstream_host =
-                   upstream_info->upstreamHost();
-               // upstream_host->medata() corresponds to the endpoint level medata.
-               // If that is not available, we fallback to the locality level medata.
-               Upstream::MetadataConstSharedPtr host_medata = upstream_host->metadata();
-               if (host_medata) {
-                 return CelProtoWrapper::CreateMessage(host_medata.get(), &wrapper.arena_);
-               }
-               Upstream::MetadataConstSharedPtr locality_metadata =
-                   upstream_host->localityMetadata();
-               if (locality_metadata) {
-                 return CelProtoWrapper::CreateMessage(locality_metadata.get(), &wrapper.arena_);
-               }
+               return CelProtoWrapper::CreateMessage(
+                   upstream_info->upstreamHost()->metadata().get(), &wrapper.arena_);
+             }
+             return {};
+           }},
+          {UpstreamHostLocalityMetadata,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr) {
+               return {};
+             }
+             const auto upstream_info = wrapper.info_->upstreamInfo();
+             if (upstream_info && upstream_info->upstreamHost()) {
+               return CelProtoWrapper::CreateMessage(
+                   upstream_info->upstreamHost()->localityMetadata().get(), &wrapper.arena_);
              }
              return {};
            }},
