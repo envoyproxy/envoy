@@ -80,7 +80,7 @@ message IPTagging {
 
   // The set of IP tags for the filter.
   // Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
-  // or :ref:`ip_tags_path <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_path>`
+  // or :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
   // can be set for the Ip Tagging filter.
   repeated data.ip_tagging.v3.IPTag ip_tags = 4;
 
