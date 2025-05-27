@@ -34,8 +34,7 @@ std::string generateCertificateHash(const std::string& cert_data) {
   Buffer::OwnedImpl buffer(cert_data);
 
   // Calculate SHA-256 hash of cert data and take first 8 chars
-  auto hash = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer));
+  auto hash = Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer));
 
   return hash.substr(0, 8);
 }
@@ -55,7 +54,8 @@ std::vector<TlsCertificateConfigProviderWithName> getTlsCertificateConfigProvide
 
       std::string cert_id = "unnamed_cert_";
       if (tls_certificate.has_certificate_chain()) {
-        const std::string hash_id = generateCertificateHash(tls_certificate.certificate_chain().inline_bytes());
+        const std::string hash_id =
+            generateCertificateHash(tls_certificate.certificate_chain().inline_bytes());
         absl::StrAppend(&cert_id, hash_id);
       }
 
@@ -139,8 +139,8 @@ CertificateValidationContextConfigProviderWithName getCertificateValidationConte
     std::string ca_cert_id = "unnamed_ca_cert";
     const auto& validation_context = config.validation_context();
     if (validation_context.has_trusted_ca()) {
-      const std::string hash_id = generateCertificateHash(
-        validation_context.trusted_ca().inline_bytes());
+      const std::string hash_id =
+          generateCertificateHash(validation_context.trusted_ca().inline_bytes());
       if (!hash_id.empty()) {
         ca_cert_id = absl::StrCat(ca_cert_id, "_", hash_id);
       }
@@ -150,7 +150,7 @@ CertificateValidationContextConfigProviderWithName getCertificateValidationConte
         factory_context.serverFactoryContext()
             .secretManager()
             .createInlineCertificateValidationContextProvider(config.validation_context())};
-  } 
+  }
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kValidationContextSdsSecretConfig: {
     const auto& sds_secret_config = config.validation_context_sds_secret_config();

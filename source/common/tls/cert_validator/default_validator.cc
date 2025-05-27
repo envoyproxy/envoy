@@ -598,7 +598,8 @@ void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
     return;
   }
 
-  absl::optional<uint64_t> expiration_unix_time_in_seconds = Utility::getExpirationUnixTime(ca_cert_.get());
+  absl::optional<uint64_t> expiration_unix_time_in_seconds =
+      Utility::getExpirationUnixTime(ca_cert_.get());
   if (!cert_stats_) {
     cert_stats_ = std::make_unique<CertStats>(generateCertStats(scope, config_->caCertName()));
   }
