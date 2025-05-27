@@ -156,14 +156,15 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   case Result::LocalOriginConnectFailed:
     return localOriginFailure();
   // EXT_ORIGIN_REQUEST_FAILED is used when connection to server was successful, but transaction on
-  // server level failed. Since it it similar to HTTP 5xx, map it to 5xx handler.
+  // server level failed. Since it it similar to HTTP 5xx, map it to 5xx if HTTP code is not
+  // provided.
   case Result::ExtOriginRequestFailed:
     // map it to http code and call http handler.
     putHttpResponseCode(code.value_or(enumToInt(Http::Code::ServiceUnavailable)));
     break;
-  // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with non-http server was
+  // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with upstream server was
   // completed successfully. This means that connection and server level transactions were
-  // successful. Map it to http code 200 OK.
+  // successful. Map it to http code 200 OK if HTTP code is not provided.
   case Result::ExtOriginRequestSuccess:
     putHttpResponseCode(code.value_or(enumToInt(Http::Code::OK)));
     break;
