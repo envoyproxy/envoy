@@ -600,6 +600,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         !override_header.empty()) {
       // Use the header value from `override_auto_sni_header` to set the SNI value.
       const auto override_header_value = headers.get(Http::LowerCaseString(override_header));
+      if (override_header_value.size() > 1) {
+        ENVOY_STREAM_LOG(info, "Multiple values for auto sni header '{}' and use the first one",
+                         *callbacks_, override_header);
+      }
       if (!override_header_value.empty() && !override_header_value[0]->value().empty()) {
         header_value = std::string(override_header_value[0]->value().getStringView());
       }
