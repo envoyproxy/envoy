@@ -6,10 +6,12 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
 
+#include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -20,6 +22,7 @@ namespace Redis {
 namespace AwsIamAuthenticator {
 
 using testing::An;
+using testing::InSequence;
 using testing::Return;
 
 class AwsIamAuthenticatorTest : public testing::Test {
@@ -37,7 +40,6 @@ public:
 };
 
 TEST_F(AwsIamAuthenticatorTest, NormalAuthentication) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   aws_iam_config.set_region("region");
   aws_iam_config.set_cache_name("cachename");
   aws_iam_config.set_service_name("elasticache");
@@ -57,7 +59,7 @@ TEST_F(AwsIamAuthenticatorTest, NormalAuthentication) {
 
 class MockAwsIamAuthenticator : public AwsIamAuthenticatorBase {
 public:
-  ~MockAwsIamAuthenticator() override { ENVOY_LOG_MISC(debug, "destructor called"); };
+  ~MockAwsIamAuthenticator() override = default;
   MOCK_METHOD(std::string, getAuthToken, (std::string auth_user));
   MOCK_METHOD(bool, addCallbackIfCredentialsPending,
               (Extensions::Common::Aws::CredentialsPendingCallback && cb));
@@ -73,7 +75,8 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
 
   Envoy::Extensions::Common::Aws::CredentialsPendingCallback capture;
   Upstream::MockHost::MockCreateConnectionData conn_info;
-  conn_info.connection_ = new NiceMock<Network::MockClientConnection>();
+  auto mock_connection = new NiceMock<Network::MockClientConnection>();
+  conn_info.connection_ = mock_connection;
 
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
 
@@ -87,12 +90,29 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
               addCallbackIfCredentialsPending(
                   An<Envoy::Extensions::Common::Aws::CredentialsPendingCallback&&>()))
       .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
-
+  // We should get a write from the auth command
+  EXPECT_CALL(*mock_connection, write(_, _)).Times(0);
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client = factory.create(
       host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username", "password",
       false,
       absl::optional<Envoy::Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
                          AwsIamAuthenticatorSharedPtr>(mock_authenticator));
+
+  Common::Redis::RespValue request1;
+  Client::MockClientCallbacks callbacks;
+  // Add a request and it should be buffered, until the capture callback is called which will
+  // disable queue and flush
+  Client::PoolRequest* handle1 = client->makeRequest(request1, callbacks);
+  EXPECT_NE(nullptr, handle1);
+  // One write for AUTH command, one write for buffer
+  InSequence s;
+
+  // Auth is 45 bytes
+  EXPECT_CALL(*mock_connection, write(testing::Property(&Buffer::OwnedImpl::length, 45), false));
+  // RespValue is 5 bytes
+  EXPECT_CALL(*mock_connection, write(testing::Property(&Buffer::OwnedImpl::length, 5), false));
+  // Handle callback for close
+  EXPECT_CALL(callbacks, onFailure());
 
   capture();
   client->close();

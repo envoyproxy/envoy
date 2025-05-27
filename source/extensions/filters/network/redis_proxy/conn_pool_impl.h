@@ -7,8 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/event/timer.h"
-#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"

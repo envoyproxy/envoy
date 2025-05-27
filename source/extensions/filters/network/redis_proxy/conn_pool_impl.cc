@@ -159,9 +159,10 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   ASSERT(cluster_ == nullptr);
   auto& cluster = get_cluster();
   cluster_ = &cluster;
+  // Update username and password when cluster updates. authPassword is ignored by the client when
+  // AWS IAM Authentication is enabled.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
   auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), shared_parent->api_);
-
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,

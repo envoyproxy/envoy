@@ -88,6 +88,7 @@ public:
   MOCK_METHOD(PoolRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
   MOCK_METHOD(void, initialize, (const std::string& username, const std::string& password));
+  MOCK_METHOD(void, sendAwsIamAuth, (const std::string&));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
   std::list<ClientCallbacks*> client_callbacks_;

@@ -157,5 +157,8 @@ new_features:
 - area: local_ratelimit
   change: |
     ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
+- area: redis
+  change: |
+    ``redis_proxy`` filter now supports AWS IAM Authentication.
 
 deprecated:

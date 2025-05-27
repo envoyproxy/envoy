@@ -115,6 +115,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:redis_command_stats_lib",
+        "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/extensions/filters/network/common/redis:test_utils_lib",
         "//test/mocks/server:server_factory_context_mocks",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",

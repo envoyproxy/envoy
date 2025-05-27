@@ -144,15 +144,33 @@ As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy s
 
 AWS IAM Authentication
 ----------------------
-The redis proxy filter supports authentication with AWS IAM credentials. To configure AWS IAM Authentication, additional fields are required in the
-upstream cluster configuration. Specifically, the `auth_username` field must be configured with the user that has been added to your cache, as per
-`Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_. If `region` is not specified, the region will be deduced using the
-region provider chain as described in  :ref:`regions<_config_http_filters_aws_request_signing_region>`.
+The redis proxy filter supports authentication with AWS IAM credentials. To configure AWS IAM Authentication, additional fields are required under the filter
+settings.
+If `region` is not specified, the region will be deduced using the region provider chain as described in  :ref:`regions<_config_http_filters_aws_request_signing_region>`.
 `cache_name` is required and is set to the name of your cache. Both `auth_usernam` and `cache_name` are used when calculating the IAM authentication token.
 `auth_password` is not used in AWS IAM configuration and the password value is automatically calculated by envoy.
+In your upstream cluster, the `auth_username` field must be configured with the user that has been added to your cache, as per
+`Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_. Different upstreams may use different usernames, and credentials will be generated
+correctly based on the cluster the traffic is destined to.
 
 .. code-block:: yaml
 
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.redis_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: egress_redis
+          settings:
+            op_timeout: 5s
+            aws_iam:
+              region: ap-southeast-2
+              service_name: elasticache
+              cache_name: testcache
+              expiration_time: 900s
+          prefix_routes:
+            catch_all_route:
+              cluster: redis_cluster
   clusters:
   - name: redis_cluster
     connect_timeout: 1s
@@ -170,9 +188,4 @@ region provider chain as described in  :ref:`regions<_config_http_filters_aws_re
       envoy.filters.network.redis_proxy:
         "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
         auth_username:
-          inline_string: aws_iam_user
-        aws_iam:
-          region: ap-southeast-2
-          service_name: elasticache
-          cache_name: example_cache
-          expiration_time: 900s
+          inline_string: test
