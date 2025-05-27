@@ -152,7 +152,6 @@ message OAuth2Config {
   // For more information, see https://openid.net/specs/openid-connect-rpinitiated-1_0.html
   //
   // If configured, the OAuth2 filter will redirect users to this endpoint when they access the signout_path.
-  // [#not-implemented-hide:]
   string end_session_endpoint = 23;
 
   // Credentials used for OAuth.
