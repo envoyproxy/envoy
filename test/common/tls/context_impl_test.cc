@@ -2464,18 +2464,28 @@ TEST_F(CertificateNamingTest, TlsCertificateInlineNaming) {
 }
 
 TEST_F(CertificateNamingTest, CACertificateInlineNaming) {
-  std::string cert_data = TestEnvironment::readFileToStringForTest(
+  std::string ca_cert_data = TestEnvironment::readFileToStringForTest(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  std::string tls_cert_data = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"));
+  std::string key_data = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"));
 
-  // Setup context with inline CA cert
+  // Setup context with both TLS cert and CA cert
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  // Add TLS certificate first (required for server context)
+  auto* tls_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_inline_bytes(tls_cert_data);
+  tls_cert->mutable_private_key()->set_inline_bytes(key_data);
+
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       ->mutable_trusted_ca()
-      ->set_inline_bytes(cert_data);
+      ->set_inline_bytes(ca_cert_data);
 
   // Calculate expected hash
-  Buffer::OwnedImpl buffer(cert_data);
+  Buffer::OwnedImpl buffer(ca_cert_data);
   std::string expected_hash =
       Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer))
           .substr(0, 8);
