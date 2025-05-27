@@ -110,9 +110,7 @@ public:
                                                    *store_.rootScope());
   }
 
-  void initialize() {
-    validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_, *store_.rootScope());
-  }
+  void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_); }
 
   // Getter.
   SPIFFEValidator& validator() { return *validator_; }
