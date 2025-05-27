@@ -139,7 +139,7 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
     return absl::FailedPreconditionError(fmt::format("getaddrinfo error: {}", rc.return_value_));
   }
   sockaddr_in6 sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
-  freeaddrinfo(res);
+  Api::OsSysCallsSingleton::get().freeaddrinfo(res);
   sa6.sin6_port = htons(port);
   return sa6;
 }

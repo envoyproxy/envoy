@@ -12,16 +12,103 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::HasSubstr;
 
 namespace Envoy {
 namespace {
 
+class OsSysCallsWithMockedDns : public Api::OsSysCallsImpl {
+public:
+  static addrinfo* makeAddrInfo(const Network::Address::InstanceConstSharedPtr& addr) {
+    addrinfo* ai = reinterpret_cast<addrinfo*>(malloc(sizeof(addrinfo)));
+    memset(ai, 0, sizeof(addrinfo));
+    ai->ai_protocol = IPPROTO_TCP;
+    ai->ai_socktype = SOCK_STREAM;
+    if (addr->ip()->ipv4() != nullptr) {
+      ai->ai_family = AF_INET;
+    } else {
+      ai->ai_family = AF_INET6;
+    }
+    sockaddr_storage* storage =
+        reinterpret_cast<sockaddr_storage*>(malloc(sizeof(sockaddr_storage)));
+    ai->ai_addr = reinterpret_cast<sockaddr*>(storage);
+    memcpy(ai->ai_addr, addr->sockAddr(), addr->sockAddrLen());
+    ai->ai_addrlen = addr->sockAddrLen();
+    return ai;
+  }
+
+  Api::SysCallIntResult getaddrinfo(const char* node, const char* /*service*/,
+                                    const addrinfo* hints, addrinfo** res) override {
+    *res = nullptr;
+    if (hints && (hints->ai_flags & AI_NUMERICHOST)) {
+      auto it = numeric_addrs_.find(node);
+      if (it == numeric_addrs_.end()) {
+        return {EAI_NONAME, 0};
+      }
+      *res = makeAddrInfo(it->second.front());
+      return {0, 0};
+    }
+    if (absl::string_view{"localhost"} == node) {
+      if (ip_version_ == Network::Address::IpVersion::v6) {
+        *res = makeAddrInfo(ipv6_localhost_);
+      } else {
+        *res = makeAddrInfo(ipv4_localhost_);
+      }
+      return {0, 0};
+    }
+    if (nonexisting_addresses_.find(node) != nonexisting_addresses_.end()) {
+      return {EAI_NONAME, 0};
+    }
+    std::cerr << "Mock DNS does not have entry for: " << node << std::endl;
+    return {-1, 128};
+  }
+  void freeaddrinfo(addrinfo* ai) override {
+    while (ai != nullptr) {
+      addrinfo* p = ai;
+      ai = ai->ai_next;
+      free(p->ai_addr);
+      free(p);
+    }
+  }
+
+  void setIpVersion(Network::Address::IpVersion version) { ip_version_ = version; }
+
+  // resolveUrl must be completed before the mock table is injected,
+  // because otherwise generating these address structures calls
+  // getaddrinfo - if it's already mocked this is infinite recursion.
+  Network::Address::InstanceConstSharedPtr ipv6_any_ =
+      Network::Utility::resolveUrl(fmt::format("tcp://{}:1", Network::Test::getAnyAddressUrlString(
+                                                                 Network::Address::IpVersion::v6)))
+          .value();
+  Network::Address::InstanceConstSharedPtr ipv4_localhost_ =
+      Network::Utility::resolveUrl(
+          fmt::format("tcp://{}:1",
+                      Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v4)))
+          .value();
+  Network::Address::InstanceConstSharedPtr ipv6_localhost_ =
+      Network::Utility::resolveUrl(
+          fmt::format("tcp://{}:1",
+                      Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v6)))
+          .value();
+  Network::Address::IpVersion ip_version_ = Network::Address::IpVersion::v4;
+  absl::flat_hash_map<std::string, std::vector<Network::Address::InstanceConstSharedPtr>>
+      numeric_addrs_ = {
+          {"::", {ipv6_any_}},
+          {"::1", {ipv6_localhost_}},
+          {"::99", {Network::Utility::resolveUrl("tcp://[::99]:1").value()}},
+          {"127.0.0.1", {ipv4_localhost_}},
+      };
+  absl::flat_hash_set<absl::string_view> nonexisting_addresses_ = {"doesnotexist.example.com",
+                                                                   "itdoesnotexist"};
+};
+
 class ProxyFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                    public HttpIntegrationTest {
 public:
   ProxyFilterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+    mock_os_sys_calls_.setIpVersion(GetParam());
     upstream_tls_ = true;
     filename_ = TestEnvironment::temporaryPath("dns_cache.txt");
     ::unlink(filename_.c_str());
@@ -349,6 +436,8 @@ typed_config:
     }
   }
 
+  OsSysCallsWithMockedDns mock_os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&mock_os_sys_calls_};
   bool upstream_tls_{};
   bool low_stream_limits_{};
   std::string upstream_cert_name_{"upstreamlocalhost"};
@@ -422,9 +511,8 @@ TEST_P(ProxyFilterIntegrationTest, MultiPortTest) {
   requestWithBodyTest();
 
   // Create a second upstream, and send a request there.
-  // The second upstream is autonomous where the first was not so we'll only get a 200-ok if we hit
-  // the new port.
-  // this regression tests https://github.com/envoyproxy/envoy/issues/27331
+  // The second upstream is autonomous where the first was not so we'll only get a 200-ok if we
+  // hit the new port. this regression tests https://github.com/envoyproxy/envoy/issues/27331
   autonomous_upstream_ = true;
   createUpstream(Network::Test::getCanonicalLoopbackAddress(version_), upstreamConfig());
   default_request_headers_.setHost(
@@ -436,16 +524,6 @@ TEST_P(ProxyFilterIntegrationTest, MultiPortTest) {
 
 // Do a sanity check using the getaddrinfo() resolver.
 TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
-  // getaddrinfo() does not reliably return v6 addresses depending on the environment. For now
-  // just run this on v4 which is most likely to succeed. In v6 only environments this test won't
-  // run at all but should still be covered in public CI.
-  if (GetParam() != Network::Address::IpVersion::v4) {
-    GTEST_SKIP() << "getaddrinfo is not reliable for IPv6";
-  }
-
-  // See https://github.com/envoyproxy/envoy/issues/28504.
-  DISABLE_UNDER_WINDOWS;
-
   requestWithBodyTest(R"EOF(
     typed_dns_resolver_config:
       name: envoy.network.dns_resolver.getaddrinfo
@@ -517,9 +595,6 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, DisableResolveTimeout) {
-  if (GetParam() != Network::Address::IpVersion::v4) {
-    GTEST_SKIP() << "getaddrinfo is not reliable for IPv6";
-  }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -585,9 +660,6 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsFailedHost) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost) {
-  if (GetParam() != Network::Address::IpVersion::v4) {
-    GTEST_SKIP() << "getaddrinfo is not reliable for IPv6";
-  }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -671,9 +743,6 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
 }
 
 TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
-  if (GetParam() != Network::Address::IpVersion::v4) {
-    GTEST_SKIP() << "getaddrinfo is not reliable for IPv6";
-  }
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
   Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
@@ -886,7 +955,8 @@ TEST_P(ProxyFilterIntegrationTest, UpstreamCleartext) {
   checkSimpleRequestSuccess(0, 0, response.get());
 }
 
-// Regression test a bug where the host header was used for cache lookups rather than host:port key
+// Regression test a bug where the host header was used for cache lookups rather than host:port
+// key
 TEST_P(ProxyFilterIntegrationTest, CacheSansPort) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initializeWithArgs();
