@@ -132,7 +132,7 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
     std::string field_mask = restriction.first;
     RETURN_IF_ERROR(validateFieldMask(field_mask));
     ProtoApiScrubberRemoveFieldAction remove_field_action;
-    ActionValidatorVisitor validation_visitor;
+    MatcherInputValidatorVisitor validation_visitor;
     Matcher::MatchTreeFactory<HttpMatchingData, ProtoApiScrubberRemoveFieldAction> matcher_factory(
         remove_field_action, context.serverFactoryContext(), validation_visitor);
 

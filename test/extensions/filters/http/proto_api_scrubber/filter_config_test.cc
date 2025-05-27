@@ -187,6 +187,117 @@ INSTANTIATE_TEST_SUITE_P(
          "Error encountered during config initialization. Unsupported 'filtering_mode': ."},
     }));
 
+// Structured test-case for parameterized tests of filtering mode validation.
+struct MatcherInputTypeValidationTestCase {
+  // Specifies the type_url of the input type.
+  std::string input_type_url;
+  bool exception_expected;
+  absl::optional<std::string> expected_exception_message;
+  absl::optional<absl::StatusCode> expected_status_code;
+  absl::optional<std::string> expected_status_message;
+};
+
+// A class to test method names which are provided in the filter config.
+class MatcherInputTypeValidation
+    : public testing::TestWithParam<MatcherInputTypeValidationTestCase> {};
+
+TEST_P(MatcherInputTypeValidation, ValidateSingleMethodConfig) {
+  ProtoApiScrubberConfig proto_config;
+  std::string proto_config_str = absl::StrFormat(R"pb(
+      restrictions: {
+        method_restrictions: {
+          key: "/library.BookService/GetBook"
+          value: {
+            request_field_restrictions: {
+              key: "debug_info"
+              value: {
+                matcher: {
+                  matcher_list: {
+                    matchers: {
+                      predicate: {
+                        single_predicate: {
+                          input: {
+                            typed_config: {
+                              [%s] { }
+                            }
+                          }
+                          custom_match: {
+                            typed_config: {
+                              [type.googleapis.com/xds.type.matcher.v3.CelMatcher] {
+                                expr_match: {
+                                  cel_expr_parsed: {
+                                    expr: {
+                                      id: 1
+                                      const_expr: {
+                                        bool_value: true
+                                      }
+                                    }
+                                    source_info: {
+                                      syntax_version: "cel1"
+                                      location: "inline_expression"
+                                      positions: {
+                                        key: 1
+                                        value: 0
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                      on_match: {
+                        action: {
+                          typed_config: {
+                            [type.googleapis.com/envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction] { }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    )pb",
+                                                 GetParam().input_type_url);
+  ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(proto_config_str, &proto_config));
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  if (GetParam().exception_expected) {
+    try {
+      absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
+          ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
+      FAIL() << "Expected exception to be thrown.";
+    } catch (EnvoyException ex) {
+      EXPECT_EQ(ex.what(), GetParam().expected_exception_message.value());
+    } catch (...) {
+      FAIL() << "Expected EnvoyException to be thrown but some other kind of Exception was thrown.";
+    }
+  } else {
+    absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
+        ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
+    EXPECT_EQ(filter_config.status().code(), GetParam().expected_status_code.value());
+    EXPECT_EQ(filter_config.status().message(), GetParam().expected_status_message.value());
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MatcherInputTypeValidationTestSuite, MatcherInputTypeValidation,
+    testing::ValuesIn<MatcherInputTypeValidationTestCase>({
+        {"type.googleapis.com/xds.type.matcher.v3.HttpAttributesCelMatchInput", false,
+         absl::nullopt, absl::StatusCode::kOk, ""},
+        {"type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput", true,
+         "Unsupported data input type: string. The matcher supports input type: cel_data_input",
+         absl::nullopt, absl::nullopt},
+        {"type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput",
+         true,
+         "Unsupported data input type: string. The matcher supports input type: cel_data_input",
+         absl::nullopt, absl::nullopt},
+    }));
+
 // A class for testing filter config related capabilities eg, parsing and storing the filter
 // config in internal data structures, etc.
 class ProtoApiScrubberFilterConfigTest : public ::testing::Test {

@@ -61,6 +61,9 @@ private:
   // Initializes the request and response field mask maps using the proto_config.
   absl::Status initialize(const ProtoApiScrubberConfig& proto_config,
                           Envoy::Server::Configuration::FactoryContext& context);
+
+  // Initializes the method's request and response restrictions using the restrictions configured
+  // in the proto config.
   absl::Status initializeMethodRestrictions(std::string method_name,
                                             StringPairToMatchTreeMap& field_restrictions,
                                             Map<std::string, RestrictionConfig> restrictions,
@@ -71,9 +74,11 @@ private:
   StringPairToMatchTreeMap response_field_restrictions_;
 };
 
-// A class to validate the actions specified on on_match of the unified matcher in the config.
-class ActionValidatorVisitor : public Matcher::MatchTreeValidationVisitor<HttpMatchingData> {
+// A class to validate the input type specified for the unified matcher in the config.
+class MatcherInputValidatorVisitor : public Matcher::MatchTreeValidationVisitor<HttpMatchingData> {
 public:
+  // Validates whether the input type for the matcher is in the list of supported input types.
+  // Currently, only CEL input type (i.e., HttpAttributesCelMatchInput) is supported.
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<HttpMatchingData>&,
                                           absl::string_view type_url) override {
     if (type_url == TypeUtil::descriptorFullNameToTypeUrl(
