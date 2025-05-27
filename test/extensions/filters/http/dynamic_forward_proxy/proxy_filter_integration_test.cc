@@ -40,16 +40,8 @@ public:
   }
 
   Api::SysCallIntResult getaddrinfo(const char* node, const char* /*service*/,
-                                    const addrinfo* hints, addrinfo** res) override {
+                                    const addrinfo* /*hints*/, addrinfo** res) override {
     *res = nullptr;
-    if (hints && (hints->ai_flags & AI_NUMERICHOST)) {
-      auto it = numeric_addrs_.find(node);
-      if (it == numeric_addrs_.end()) {
-        return {EAI_NONAME, 0};
-      }
-      *res = makeAddrInfo(it->second.front());
-      return {0, 0};
-    }
     if (absl::string_view{"localhost"} == node) {
       if (ip_version_ == Network::Address::IpVersion::v6) {
         *res = makeAddrInfo(Network::Utility::getIpv6LoopbackAddress());
@@ -77,15 +69,6 @@ public:
 
   Network::Address::IpVersion ip_version_ = Network::Address::IpVersion::v4;
 
-  // It's important that IPv6 addresses are initialized before the
-  // mock getaddrinfo is installed, as otherwise the mock is involved
-  // in the numeric address resolution which provokes infinite recursion.
-  absl::flat_hash_map<std::string, std::vector<Network::Address::InstanceConstSharedPtr>>
-      numeric_addrs_ = {
-          {"::", {Network::Utility::getIpv6AnyAddress()}},
-          {"::1", {Network::Utility::getIpv6LoopbackAddress()}},
-          {"::99", {Network::Utility::resolveUrl("tcp://[::99]:1").value()}},
-      };
   absl::flat_hash_set<absl::string_view> nonexisting_addresses_ = {"doesnotexist.example.com",
                                                                    "itdoesnotexist"};
 };

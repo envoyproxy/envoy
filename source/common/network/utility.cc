@@ -133,13 +133,23 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
   // we consume only the first element (if the call succeeds).
   hints.ai_socktype = SOCK_DGRAM;
   hints.ai_protocol = IPPROTO_UDP;
-  const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getaddrinfo(
-      ip_address.c_str(), /*service=*/nullptr, &hints, &res);
+
+  // We want to use the interface of OsSysCalls for this for the
+  // platform-independence, but we don't want to use the common
+  // OsSysCallsSingleton because it can be overridden by injection
+  // in tests, and often we need to parse numeric IP strings as
+  // part of mocked DNS - if we used the singleton here, attempting
+  // to do that would feed back into the mock provoking an infinite
+  // loop.
+  static Api::OsSysCallsImpl os_sys_calls;
+
+  const Api::SysCallIntResult rc =
+      os_sys_calls.getaddrinfo(ip_address.c_str(), /*service=*/nullptr, &hints, &res);
   if (rc.return_value_ != 0) {
     return absl::FailedPreconditionError(fmt::format("getaddrinfo error: {}", rc.return_value_));
   }
   sockaddr_in6 sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
-  Api::OsSysCallsSingleton::get().freeaddrinfo(res);
+  os_sys_calls.freeaddrinfo(res);
   sa6.sin6_port = htons(port);
   return sa6;
 }
