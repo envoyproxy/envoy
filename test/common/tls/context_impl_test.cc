@@ -7,6 +7,7 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/crypto/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/stats/isolated_store_impl.h"
@@ -2433,6 +2434,58 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   ASSERT_TRUE(stat.has_value());
   EXPECT_EQ(1, stat->get().value());
 #endif
+}
+
+class CertificateNamingTest : public SslCertsTest {};
+
+TEST_F(CertificateNamingTest, TlsCertificateInlineNaming) {
+  std::string cert_data = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"));
+
+  // Setup CommonTlsContext with inline certificate
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto* tls_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_inline_bytes(cert_data);
+  tls_cert->mutable_private_key()->set_inline_string("dummy_key");
+
+  // Calculate expected hash
+  Buffer::OwnedImpl buffer(cert_data);
+  std::string expected_hash = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer)).substr(0, 8);
+
+  // Create and check the context config
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+
+  auto tls_certs = server_context_config->tlsCertificates();
+  ASSERT_EQ(1, tls_certs.size());
+  EXPECT_EQ("unnamed_cert_" + expected_hash, tls_certs[0].get().certificateName());
+}
+
+TEST_F(CertificateNamingTest, CACertificateInlineNaming) {
+  std::string cert_data = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+
+  // Setup context with inline CA cert
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_inline_bytes(cert_data);
+
+  // Calculate expected hash
+  Buffer::OwnedImpl buffer(cert_data);
+  std::string expected_hash = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer)).substr(0, 8);
+
+  // Create the context config
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+
+  // Verify the CA cert name
+  ASSERT_NE(nullptr, server_context_config->certificateValidationContext());
+  EXPECT_EQ("unnamed_ca_cert_" + expected_hash,
+          server_context_config->certificateValidationContext()->caCertName());
 }
 
 } // namespace Tls
