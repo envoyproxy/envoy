@@ -271,7 +271,7 @@ TEST_P(MatcherInputTypeValidation, ValidateSingleMethodConfig) {
       absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>> filter_config =
           ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
       FAIL() << "Expected exception to be thrown.";
-    } catch (EnvoyException ex) {
+    } catch (EnvoyException& ex) {
       EXPECT_EQ(ex.what(), GetParam().expected_exception_message.value());
     } catch (...) {
       FAIL() << "Expected EnvoyException to be thrown but some other kind of Exception was thrown.";
