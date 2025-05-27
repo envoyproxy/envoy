@@ -39,6 +39,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/http/grpc_field_extraction @taoxuy @nareddyt @yanavlasov
 # proto_message_extraction http filter extension
 /*/extensions/filters/http/proto_message_extraction @dchakarwarti @taoxuy @shuoyang2016 @yanavlasov
+# proto_api_scrubber http filter extension
+/*/extensions/filters/http/proto_api_scrubber @sumitkmr2 @adisuissa
 # grpc_http1_reverse_bridge http filter extension
 /*/extensions/filters/http/grpc_http1_reverse_bridge @zuercher @mattklein123
 # alts transport socket extension
@@ -389,6 +391,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/clusters/common/ @UNOWNED @UNOWNED
 /*/extensions/clusters/eds/ @UNOWNED @UNOWNED
 /*/extensions/clusters/dns @UNOWNED @UNOWNED
+/*/source/extensions/api_listeners/default_api_listener @UNOWNED @UNOWNED
 /*/source/extensions/listener_managers/listener_manager @yanavlasov @ggreenway
 /*/source/extensions/listener_managers/validation_listener_manager @adisuissa @ggreenway
 /*/source/extensions/config_subscription/ @adisuissa @UNOWNED
