@@ -116,6 +116,7 @@ private:
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;
+  Stats::Scope& scope_;
   CertStatsPtr cert_stats_;
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;

@@ -46,15 +46,13 @@ namespace Tls {
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
     Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope)
-    : config_(config), stats_(stats), context_(context),
+    : config_(config), stats_(stats), context_(context), scope_(scope),
       auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
                                    envoy::extensions::transport_sockets::tls::v3::
                                        CertificateValidationContext::ACCEPT_UNTRUSTED;
   }
-
-  initializeCertExpirationStats(scope);
 };
 
 absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
@@ -198,6 +196,8 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
       verify_mode = verify_mode_validation_context;
     }
   }
+
+  initializeCertExpirationStats(scope_);
 
   return verify_mode;
 }
