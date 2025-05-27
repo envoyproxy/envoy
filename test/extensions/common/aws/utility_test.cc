@@ -184,13 +184,21 @@ TEST(UtilityTest, MinimalCanonicalRequest) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
+}
 
+TEST(UtilityTest, CanonicalRequestNoPathDontNormalizeURI) {
+  std::map<std::string, std::string> headers;
+  const auto request =
+      Utility::createCanonicalRequest("GET", "", headers, "content-hash", false, false);
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
+}
 
-
-content-hash)",
-            request);
+TEST(UtilityTest, CanonicalRequestNoPathNormalizeURI) {
+  std::map<std::string, std::string> headers;
+  const auto request =
+      Utility::createCanonicalRequest("GET", "", headers, "content-hash", true, false);
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
 }
 
 TEST(UtilityTest, CanonicalRequestWithQueryString) {
@@ -198,13 +206,7 @@ TEST(UtilityTest, CanonicalRequestWithQueryString) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "?query", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
-query=
-
-
-content-hash)",
-            request);
+  EXPECT_EQ("GET\n/\nquery=\n\n\ncontent-hash", request);
 }
 
 TEST(UtilityTest, CanonicalRequestWithHeaders) {
@@ -216,16 +218,10 @@ TEST(UtilityTest, CanonicalRequestWithHeaders) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
-
-header1:value1
-header2:value2
-header3:value3
-
-header1;header2;header3
-content-hash)",
-            request);
+  EXPECT_EQ(
+      "GET\n/"
+      "\n\nheader1:value1\nheader2:value2\nheader3:value3\n\nheader1;header2;header3\ncontent-hash",
+      request);
 }
 
 TEST(UtilityTest, normalizePathReturnSlash) {

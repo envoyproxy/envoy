@@ -68,7 +68,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # tracers.datadog extension
 /*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @suniltheta @mattklein123 @nbaws
+/*/extensions/tracers/xray @mattklein123 @nbaws
 # tracers.skywalking extension
 /*/extensions/tracers/skywalking @wbpcode @Shikugawa
 # tracers.opentelemetry extension
@@ -96,11 +96,11 @@ extensions/filters/common/original_src @klarose @mattklein123
 # previous hosts
 /*/extensions/retry/host/previous_hosts @nezdolik @mattklein123
 # HTTP caching extension
-/*/extensions/filters/http/cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
-/*/extensions/http/cache/simple_http_cache @toddmgreer @jmarantz @penguingao @mpwarres @capoferro
+/*/extensions/filters/http/cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
+/*/extensions/http/cache/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 # aws_iam grpc credentials
-/*/extensions/grpc_credentials/aws_iam @suniltheta @mattklein123 @nbaws @niax
-/*/extensions/common/aws @suniltheta @mattklein123 @nbaws @niax
+/*/extensions/grpc_credentials/aws_iam @mattklein123 @nbaws @niax
+/*/extensions/common/aws @mattklein123 @nbaws @niax
 # adaptive concurrency limit extension.
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123
 # admission control extension.
@@ -139,10 +139,10 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/grpc_credentials/example @wozz @yanavlasov
 /*/extensions/grpc_credentials/file_based_metadata @wozz @yanavlasov
 /*/extensions/internal_redirect @botengyao @penguingao
-/*/extensions/stat_sinks/dog_statsd @taiki45 @jmarantz
+/*/extensions/stat_sinks/dog_statsd @taiki45 @paul-r-gall
 /*/extensions/stat_sinks/graphite_statsd @vaccarium @mattklein123
-/*/extensions/stat_sinks/hystrix @trabetti @jmarantz
-/*/extensions/stat_sinks/metrics_service @ramaraochavali @jmarantz
+/*/extensions/stat_sinks/hystrix @trabetti @paul-r-gall
+/*/extensions/stat_sinks/metrics_service @ramaraochavali @paul-r-gall
 /*/extensions/stat_sinks/open_telemetry @ohadvano @mattklein123
 # webassembly stat-sink extensions
 /*/extensions/stat_sinks/wasm @mpwarres @kyessenov @lizan
@@ -165,8 +165,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @yanavlasov @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @delong-coder
-/*/extensions/filters/http/aws_request_signing @derekargueta @suniltheta @mattklein123 @marcomagdy @nbaws @niax
-/*/extensions/filters/http/aws_lambda @suniltheta @mattklein123 @marcomagdy @nbaws @niax
+/*/extensions/filters/http/aws_request_signing @derekargueta @mattklein123 @marcomagdy @nbaws @niax
+/*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @nbaws @niax
 /*/extensions/filters/http/buffer @adisuissa @mattklein123
 /*/extensions/transport_sockets/raw_buffer @botengyao @mattklein123
 # Watchdog Extensions
@@ -203,9 +203,9 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/io_socket/user_space @kyessenov @lambdai
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
 # Default UUID4 request ID extension
-/*/extensions/request_id/uuid @mattklein123 @jmarantz
+/*/extensions/request_id/uuid @mattklein123 @botengyao
 # HTTP header formatters
-/*/extensions/http/header_formatters/preserve_case @mattklein123 @jmarantz
+/*/extensions/http/header_formatters/preserve_case @mattklein123 @yanavlasov
 # External Rate Limit
 /*/extensions/filters/common/ratelimit @esmet @mattklein123
 /*/extensions/filters/http/ratelimit @esmet @mattklein123
@@ -239,7 +239,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # File system based extensions
 /*/extensions/common/async_files @mattklein123 @ravenblackx
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
-/*/extensions/http/cache/file_system_http_cache @jmarantz @ravenblackx
+/*/extensions/http/cache/file_system_http_cache @ggreenway @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
@@ -279,13 +279,14 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/access_loggers/fluentd @ohadvano @wbpcode
 /*/extensions/access_loggers/grpc @wbpcode @cpakulski @giantcroc @gyohuangxin
 # stats
-/*/extensions/stat_sinks/statsd @mattklein123 @suniltheta
-/*/extensions/stat_sinks/common @mattklein123 @suniltheta
-/*/extensions/stat_sinks/common/statsd @mattklein123 @suniltheta
+/*/extensions/stat_sinks/statsd @mattklein123 @mathetake @nbaws
+/*/extensions/stat_sinks/common @mattklein123 @mathetake @nbaws
+/*/extensions/stat_sinks/common/statsd @mattklein123 @mathetake @nbaws
 # access loggers
 /*/extensions/access_loggers/file @wbpcode @cpakulski @giantcroc
 # Stateful session
 /*/extensions/http/stateful_session/cookie @wbpcode @cpakulski
+/*/extensions/http/stateful_session/envelope @wbpcode @adisuissa
 /*/extensions/http/stateful_session/header @ramaraochavali @wbpcode @cpakulski
 /*/extensions/filters/http/stateful_session @wbpcode @cpakulski @adisuissa
 # tracers
@@ -340,6 +341,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/load_balancing_policies/subset @wbpcode @zuercher @nezdolik
 /*/extensions/load_balancing_policies/cluster_provided @wbpcode @zuercher
 /*/extensions/load_balancing_policies/client_side_weighted_round_robin @wbpcode @adisuissa @efimki
+/*/extensions/load_balancing_policies/override_host @yanavlasov @tonya11en
 # Early header mutation
 /*/extensions/http/early_header_mutation/header_mutation @wbpcode @tyxia
 # Network matching extensions

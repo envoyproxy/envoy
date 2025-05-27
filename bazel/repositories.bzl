@@ -192,6 +192,7 @@ def envoy_dependencies(skip_targets = []):
     _io_hyperscan()
     _io_vectorscan()
     _io_opentelemetry_api_cpp()
+    _llvm_source()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
@@ -394,6 +395,12 @@ def _com_github_lz4_lz4():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
+def _llvm_source():
+    external_http_archive(
+        name = "llvm_source",
+        build_file_content = BUILD_ALL_CONTENT,
+    )
+
 def _com_github_jbeder_yaml_cpp():
     external_http_archive(
         name = "com_github_jbeder_yaml_cpp",
@@ -572,6 +579,10 @@ def _com_google_googletest():
         "com_google_googletest",
         patches = ["@envoy//bazel:googletest.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+            "@re2": "@com_googlesource_code_re2",
+        },
     )
 
 # TODO(jmarantz): replace the use of bind and external_deps with just
@@ -733,8 +744,7 @@ def _com_github_grpc_grpc():
         name = "com_github_grpc_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
-        # Needed until grpc updates its naming (v1.62.0)
-        repo_mapping = {"@com_github_cncf_udpa": "@com_github_cncf_xds"},
+        repo_mapping = {"@openssl": "@boringssl"},
     )
     external_http_archive("build_bazel_rules_apple")
 
@@ -751,6 +761,7 @@ def _com_github_grpc_grpc():
         name = "libcrypto",
         actual = "//external:crypto",
     )
+
     native.bind(
         name = "cares",
         actual = "@envoy//bazel/foreign_cc:ares",
