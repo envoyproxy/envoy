@@ -452,6 +452,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       return;
     }
 
+    if (modify_headers_from_upstream_lb_) {
+      modify_headers_from_upstream_lb_(headers);
+    }
+
     route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
 
     if (attempt_count_ == 0 || !route_entry_->includeAttemptCountInResponse()) {
