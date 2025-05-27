@@ -2439,8 +2439,8 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
 class CertificateNamingTest : public SslCertsTest {};
 
 TEST_F(CertificateNamingTest, TlsCertificateInlineNaming) {
-  std::string cert_data = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"));
+  std::string cert_data = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"));
 
   // Setup CommonTlsContext with inline certificate
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
@@ -2450,8 +2450,9 @@ TEST_F(CertificateNamingTest, TlsCertificateInlineNaming) {
 
   // Calculate expected hash
   Buffer::OwnedImpl buffer(cert_data);
-  std::string expected_hash = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer)).substr(0, 8);
+  std::string expected_hash =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer))
+          .substr(0, 8);
 
   // Create and check the context config
   auto server_context_config =
@@ -2475,8 +2476,9 @@ TEST_F(CertificateNamingTest, CACertificateInlineNaming) {
 
   // Calculate expected hash
   Buffer::OwnedImpl buffer(cert_data);
-  std::string expected_hash = Hex::encode(
-      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer)).substr(0, 8);
+  std::string expected_hash =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer))
+          .substr(0, 8);
 
   // Create the context config
   auto server_context_config =
@@ -2485,7 +2487,7 @@ TEST_F(CertificateNamingTest, CACertificateInlineNaming) {
   // Verify the CA cert name
   ASSERT_NE(nullptr, server_context_config->certificateValidationContext());
   EXPECT_EQ("unnamed_ca_cert_" + expected_hash,
-          server_context_config->certificateValidationContext()->caCertName());
+            server_context_config->certificateValidationContext()->caCertName());
 }
 
 } // namespace Tls
