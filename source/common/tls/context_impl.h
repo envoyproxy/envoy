@@ -74,8 +74,8 @@ struct TlsContext {
                           const std::string& password, bool fips_mode);
   absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
                                bool fips_mode);
-  absl::Status createCertStats(Stats::Scope& scope, std::string cert_name);
-  absl::Status setExpirationOnCertStats(std::chrono::duration<uint64_t> duration);
+  void createCertStats(Stats::Scope& scope, std::string cert_name);
+  void setExpirationOnCertStats(std::chrono::duration<uint64_t> duration);
 };
 } // namespace Ssl
 
@@ -106,7 +106,6 @@ public:
 
   static int sslSocketIndex();
   // Ssl::Context
-  void updateCertStats() override;
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
@@ -152,6 +151,8 @@ protected:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, SSL* ssl);
 
   void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
+
+  void updateCertStats();
 
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we

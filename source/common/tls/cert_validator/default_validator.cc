@@ -46,13 +46,15 @@ namespace Tls {
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
     Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope)
-    : config_(config), stats_(stats), context_(context), scope_(scope),
+    : config_(config), stats_(stats), context_(context),
       auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
                                    envoy::extensions::transport_sockets::tls::v3::
                                        CertificateValidationContext::ACCEPT_UNTRUSTED;
   }
+
+  initializeCertExpirationStats(scope);
 };
 
 absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
@@ -590,21 +592,21 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
   return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), context_.timeSource());
 }
 
-void DefaultCertValidator::refreshCertStatsWithExpirationTime() {
+void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
   // Early return if no certificate or no config
   if (ca_cert_ == nullptr || config_ == nullptr) {
     return;
   }
 
-  absl::optional<uint64_t> expiration_unix_time = Utility::getExpirationUnixTime(ca_cert_.get());
+  absl::optional<uint64_t> expiration_unix_time_in_seconds = Utility::getExpirationUnixTime(ca_cert_.get());
   if (!cert_stats_) {
-    cert_stats_ = std::make_unique<CertStats>(generateCertStats(scope_, config_->caCertName()));
+    cert_stats_ = std::make_unique<CertStats>(generateCertStats(scope, config_->caCertName()));
   }
-  if (expiration_unix_time.has_value()) {
-    cert_stats_->expiration_unix_time_.set(expiration_unix_time.value());
+  if (expiration_unix_time_in_seconds.has_value()) {
+    cert_stats_->expiration_unix_time_in_seconds_.set(expiration_unix_time_in_seconds.value());
   } else {
     // For certificates with no expiration time, set to max uint64_t (effectively "never expires")
-    cert_stats_->expiration_unix_time_.set(std::numeric_limits<uint64_t>::max());
+    cert_stats_->expiration_unix_time_in_seconds_.set(std::numeric_limits<uint64_t>::max());
   }
 }
 

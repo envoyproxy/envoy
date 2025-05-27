@@ -109,10 +109,6 @@ public:
                                         uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                         unsigned hash_length) PURE;
 
-  /**
-   * Called to refresh the cert stats with the expiration time.
-   */
-  virtual void refreshCertStatsWithExpirationTime() PURE;
   virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
   virtual std::string getCaFileName() const PURE;
   virtual Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const PURE;

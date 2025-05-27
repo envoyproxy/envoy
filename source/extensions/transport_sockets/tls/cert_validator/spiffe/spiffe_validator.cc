@@ -160,7 +160,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                  Server::Configuration::CommonFactoryContext& context,
                                  Stats::Scope& scope)
     : api_(config->api()), cert_name_(config->caCertName()), stats_(stats),
-      time_source_(context.timeSource()), scope_(scope) {
+      time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
@@ -201,6 +201,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
       initializeCertificateRefresh(context);
     }
 
+    initializeCertExpirationStats(scope);
     return;
   }
 
@@ -255,6 +256,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     }
     spiffe_data_->trust_bundle_stores_[domain.name()] = std::move(store);
   }
+
+  initializeCertExpirationStats(scope);
 }
 
 absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
@@ -441,24 +444,23 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
-void SPIFFEValidator::refreshCertStatsWithExpirationTime() {
+void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope) {
   // TODO(peterl328): Due to current interface, we only receive one cert name.
   // Since we may have multiple certificates here, we will use the provided cert name and append
   // an index to it. Assumes the order in the ca_certs_ vector doesn't change.
   int idx = 0;
   for (bssl::UniquePtr<X509>& cert : spiffe_data_->ca_certs_) {
-    const absl::optional<uint64_t> expiration_unix_time =
+    const absl::optional<uint64_t> expiration_unix_time_in_seconds =
         Utility::getExpirationUnixTime(cert.get());
-    if (expiration_unix_time.has_value()) {
+    if (expiration_unix_time_in_seconds.has_value()) {
       // Add underscore between cert name and index to avoid collisions
       std::string cert_name = absl::StrCat(cert_name_, "_", idx);
 
-      // Use operator[] and reference for cleaner code
       std::unique_ptr<CertStats>& cert_stats = cert_stats_map_[cert_name];
       if (cert_stats == nullptr) {
-        cert_stats = std::make_unique<CertStats>(generateCertStats(scope_, cert_name));
+        cert_stats = std::make_unique<CertStats>(generateCertStats(scope, cert_name));
       }
-      cert_stats->expiration_unix_time_.set(expiration_unix_time.value());
+      cert_stats->expiration_unix_time_in_seconds.set(expiration_unix_time_in_seconds.value());
     }
     idx++;
   }

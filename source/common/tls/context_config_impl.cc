@@ -8,6 +8,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/datasource.h"
+#include "source/common/crypto/utility.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
@@ -25,20 +26,46 @@ namespace Tls {
 
 namespace {
 
+std::string generateCertificateHash(const std::string& cert_data) {
+  if (cert_data.empty()) {
+    return "";
+  }
+
+  Buffer::OwnedImpl buffer(cert_data);
+
+  // Calculate SHA-256 hash of cert data and take first 8 chars
+  auto hash = Hex::encode(
+      Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer));
+
+  return hash.substr(0, 8);
+}
+
 std::vector<TlsCertificateConfigProviderWithName> getTlsCertificateConfigProviders(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status) {
   std::vector<TlsCertificateConfigProviderWithName> providers;
   if (!config.tls_certificates().empty()) {
-    int unnamed_cert_idx = 0;
+    uint32_t unnamed_cert_idx = 0;
     for (const auto& tls_certificate : config.tls_certificates()) {
       if (!tls_certificate.has_private_key_provider() && !tls_certificate.has_certificate_chain() &&
           !tls_certificate.has_private_key() && !tls_certificate.has_pkcs12()) {
         continue;
       }
+
+      std::string cert_id = "unnamed_cert_";
+      if (tls_certificate.has_certificate_chain()) {
+        const std::string hash_id = generateCertificateHash(tls_certificate.certificate_chain().inline_bytes());
+        absl::StrAppend(&cert_id, hash_id);
+      }
+
+      // Fall back to unnamed_cert_idx if we couldn't generate a hash-based name
+      if (cert_id.empty()) {
+        absl::StrAppend(&cert_id, unnamed_cert_idx++);
+      }
+
       providers.push_back(TlsCertificateConfigProviderWithName{
-          absl::StrCat("unnamed_cert_", unnamed_cert_idx++),
+          cert_id,
           factory_context.serverFactoryContext().secretManager().createInlineTlsCertificateProvider(
               tls_certificate)});
     }
@@ -108,12 +135,22 @@ CertificateValidationContextConfigProviderWithName getCertificateValidationConte
     absl::Status& creation_status) {
   switch (config.validation_context_type_case()) {
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
-      kValidationContext:
+      kValidationContext: {
+    std::string ca_cert_id = "unnamed_ca_cert";
+    const auto& validation_context = config.validation_context();
+    if (validation_context.has_trusted_ca()) {
+      const std::string hash_id = generateCertificateHash(
+        validation_context.trusted_ca().inline_bytes());
+      if (!hash_id.empty()) {
+        ca_cert_id = absl::StrCat(ca_cert_id, "_", hash_id);
+      }
+    }
     return CertificateValidationContextConfigProviderWithName{
-        "unnamed_ca_cert",
+        ca_cert_id,
         factory_context.serverFactoryContext()
             .secretManager()
             .createInlineCertificateValidationContextProvider(config.validation_context())};
+  } 
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kValidationContextSdsSecretConfig: {
     const auto& sds_secret_config = config.validation_context_sds_secret_config();

@@ -39,10 +39,9 @@ struct SpiffeData {
 
 class SPIFFEValidator : public CertValidator, Logger::Loggable<Logger::Id::secret> {
 public:
-  SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context,
-                  Stats::Scope& scope)
+  SPIFFEValidator(SslStats& stats, Server::Configuration::CommonFactoryContext& context)
       : spiffe_data_(std::make_shared<SpiffeData>()), api_(context.api()), stats_(stats),
-        time_source_(context.timeSource()), scope_(scope) {};
+        time_source_(context.timeSource()) {};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                   Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope);
 
@@ -63,7 +62,6 @@ public:
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
-  void refreshCertStatsWithExpirationTime() override;
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_name_; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
@@ -86,6 +84,7 @@ private:
                                             std::string& error_details);
 
   void initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
+  void initializeCertExpirationStats(Stats::Scope& scope);
   absl::StatusOr<std::shared_ptr<SpiffeData>>
   parseTrustBundles(const std::string& trust_bundles_str);
 
@@ -123,7 +122,6 @@ private:
   const std::string cert_name_;
   SslStats& stats_;
   TimeSource& time_source_;
-  Stats::Scope& scope_;
 };
 
 } // namespace Tls

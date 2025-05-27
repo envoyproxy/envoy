@@ -523,7 +523,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   certificate_name.value_ = "server_cert";
 
   listener_address.value_ = "0.0.0.0_0";
-  regex_tester.testRegex("listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time",
+  regex_tester.testRegex("listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_in_seconds",
                          "listener.ssl.certificate", {listener_address, certificate_name});
 }
 

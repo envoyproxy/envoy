@@ -110,10 +110,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     // No need to store cert name for default tls context as there are no TLS certificates.
     if (!tls_certificates.empty()) {
       ctx.cert_name_ = tls_certificates[i].get().certificateName();
-      creation_status = ctx.createCertStats(scope, ctx.cert_name_);
-      if (!creation_status.ok()) {
-        return;
-      }
+      ctx.createCertStats(scope, ctx.cert_name_);
     }
 
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
@@ -585,19 +582,13 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
 }
 
 void ContextImpl::updateCertStats() {
-  // Update CA cert expiration time.
-  cert_validator_->refreshCertStatsWithExpirationTime();
-
   // Update TLS certs' expiration time.
   for (Ssl::TlsContext& ctx : tls_contexts_) {
-    absl::optional<uint64_t> expiration_unix_time =
+    absl::optional<uint64_t> expiration_unix_time_in_seconds =
         Utility::getExpirationUnixTime(ctx.cert_chain_.get());
-    if (expiration_unix_time.has_value()) {
-      absl::Status status = ctx.setExpirationOnCertStats(
-          std::chrono::duration<uint64_t>(expiration_unix_time.value()));
-      if (!status.ok()) {
-        // ignore for now.
-      }
+    if (expiration_unix_time_in_seconds.has_value()) {
+      ctx.setExpirationOnCertStats(
+          std::chrono::duration<uint64_t>(expiration_unix_time_in_seconds.value()));
     }
   }
 }
@@ -837,15 +828,13 @@ absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
   return absl::OkStatus();
 }
 
-absl::Status TlsContext::createCertStats(Stats::Scope& scope, std::string cert_name) {
+void TlsContext::createCertStats(Stats::Scope& scope, std::string cert_name) {
   cert_stats_ = std::make_unique<Extensions::TransportSockets::Tls::CertStats>(
       Extensions::TransportSockets::Tls::generateCertStats(scope, cert_name));
-  return absl::OkStatus();
 }
 
-absl::Status TlsContext::setExpirationOnCertStats(std::chrono::duration<uint64_t> duration) {
-  cert_stats_->expiration_unix_time_.set(duration.count());
-  return absl::OkStatus();
+void TlsContext::setExpirationOnCertStats(std::chrono::duration<uint64_t> duration) {
+  cert_stats_->expiration_unix_time_in_seconds_.set(duration.count());
 }
 
 } // namespace Ssl

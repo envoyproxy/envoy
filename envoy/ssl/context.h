@@ -24,11 +24,6 @@ public:
   virtual ~Context() = default;
 
   /**
-   * @brief Updates the certificate stats for this context.
-   */
-  virtual void updateCertStats() PURE;
-
-  /**
    * @return the number of days in this context until the next certificate will expire, the value is
    * set when not expired.
    */

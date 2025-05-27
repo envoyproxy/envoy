@@ -86,7 +86,6 @@ public:
   MockClientContext();
   ~MockClientContext() override;
 
-  MOCK_METHOD(void, updateCertStats, (), ());
   MOCK_METHOD(absl::optional<uint32_t>, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(absl::optional<uint64_t>, secondsUntilFirstOcspResponseExpires, (), (const));
   MOCK_METHOD(CertificateDetailsPtr, getCaCertInformation, (), (const));
