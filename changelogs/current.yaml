@@ -159,7 +159,7 @@ new_features:
     ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
 - area: aws
   change: |
-    implementation of `IAM Roles Anywhere support <https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html>`_ in the
+    Implementation of `IAM Roles Anywhere support <https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html>`_ in the
     AWS common components, providing this capability to the AWS Lambda and AWS Request Signing extensions.
 
 deprecated:

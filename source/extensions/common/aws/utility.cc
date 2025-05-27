@@ -309,6 +309,7 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
       single_region == "us-west-1" || single_region == "us-west-2") {
     return fmt::format("sts-fips.{}.amazonaws.com", single_region);
   }
+  ENVOY_LOG(warn, "FIPS Support is enabled, but an STS FIPS endpoint is not available in the configured region ({})", region);
 #endif
   return fmt::format("sts.{}.amazonaws.com", single_region);
 }
@@ -329,6 +330,7 @@ std::string Utility::getRolesAnywhereEndpoint(const std::string& trust_anchor_ar
       region == "us-west-2" || region == "us-gov-east-1" || region == "us-gov-west-1") {
     return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);
   } else {
+    ENVOY_LOG(warn, "FIPS Support is enabled, but a rolesanywhere FIPS endpoint is not available in the configured region ({})", region);
     return fmt::format("rolesanywhere.{}.amazonaws.com", region);
   }
 #else
