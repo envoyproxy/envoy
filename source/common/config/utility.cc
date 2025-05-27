@@ -226,6 +226,20 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
   return rate_limit_settings;
 }
 
+namespace {
+// Returns true iff the api_type is AGGREGATED_GRPC or AGGREGATED_DELTA_GRPC.
+bool isApiTypeAggregated(const envoy::config::core::v3::ApiConfigSource::ApiType api_type) {
+  return (api_type == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC) ||
+         (api_type == envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+}
+
+// Returns true iff the api_type is GRPC or DELTA_GRPC.
+bool isApiTypeNonAggregated(const envoy::config::core::v3::ApiConfigSource::ApiType api_type) {
+  return (api_type == envoy::config::core::v3::ApiConfigSource::GRPC) ||
+         (api_type == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+}
+} // namespace
+
 absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
@@ -235,17 +249,14 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
       Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support") ? 2 : 1));
 
   if (xdstp_config_source) {
-    if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC &&
-        api_config_source.api_type() !=
-            envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC) {
+    if (!isApiTypeAggregated(api_config_source.api_type())) {
       return absl::InvalidArgumentError(fmt::format("{} type must be of aggregated gRPC: {}",
                                                     api_config_source.GetTypeName(),
                                                     api_config_source.DebugString()));
     }
   } else {
-    if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
-        api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-      return absl::InvalidArgumentError(fmt::format("{} type must be gRPC: {}",
+    if (!isApiTypeNonAggregated(api_config_source.api_type())) {
+      return absl::InvalidArgumentError(fmt::format("{} type must be of non-aggregated gRPC: {}",
                                                     api_config_source.GetTypeName(),
                                                     api_config_source.DebugString()));
     }

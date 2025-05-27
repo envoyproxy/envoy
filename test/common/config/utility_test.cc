@@ -209,12 +209,12 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_cluster_names("foo");
-    EXPECT_THAT(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope,
-                                               false, 0, false)
-            .status()
-            .message(),
-        ContainsRegex(fmt::format("{} type must be gRPC:", api_config_source.GetTypeName())));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, false, 0, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{} type must be of non-aggregated gRPC:",
+                                          api_config_source.GetTypeName())));
   }
 
   {
@@ -361,12 +361,12 @@ TEST(UtilityTest, AggregatedFactoryForGrpcApiConfigSource) {
     envoy::config::core::v3::ApiConfigSource api_config_source;
     api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
-    EXPECT_THAT(
-        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope, true,
-                                               0, false)
-            .status()
-            .message(),
-        ContainsRegex(fmt::format("{} type must be gRPC", api_config_source.GetTypeName())));
+    EXPECT_THAT(Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source,
+                                                       scope, true, 0, false)
+                    .status()
+                    .message(),
+                ContainsRegex(fmt::format("{} type must be of non-aggregated gRPC",
+                                          api_config_source.GetTypeName())));
   }
 
   // Validates that if AGGREGATED_{DELTA_}GRPC is expected then non-AGGREGATED_ types are rejected.

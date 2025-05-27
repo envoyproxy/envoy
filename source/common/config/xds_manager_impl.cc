@@ -207,6 +207,7 @@ XdsManagerImpl::addAuthority(const envoy::config::core::v3::ConfigSource& config
 
   // Validate that the authority names in the config source don't have repeated values.
   absl::flat_hash_set<std::string> config_source_authorities;
+  config_source_authorities.reserve(config_source.authorities().size());
   for (const auto& authority : config_source.authorities()) {
     const auto ret = config_source_authorities.emplace(authority.name());
     if (!ret.second) {
