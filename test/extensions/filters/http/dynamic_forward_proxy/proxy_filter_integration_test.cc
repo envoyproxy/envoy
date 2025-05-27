@@ -52,9 +52,9 @@ public:
     }
     if (absl::string_view{"localhost"} == node) {
       if (ip_version_ == Network::Address::IpVersion::v6) {
-        *res = makeAddrInfo(ipv6_localhost_);
+        *res = makeAddrInfo(Network::Utility::getIpv6LoopbackAddress());
       } else {
-        *res = makeAddrInfo(ipv4_localhost_);
+        *res = makeAddrInfo(Network::Utility::getCanonicalIpv4LoopbackAddress());
       }
       return {0, 0};
     }
@@ -75,30 +75,16 @@ public:
 
   void setIpVersion(Network::Address::IpVersion version) { ip_version_ = version; }
 
-  // resolveUrl must be completed before the mock table is injected,
-  // because otherwise generating these address structures calls
-  // getaddrinfo - if it's already mocked this is infinite recursion.
-  Network::Address::InstanceConstSharedPtr ipv6_any_ =
-      Network::Utility::resolveUrl(fmt::format("tcp://{}:1", Network::Test::getAnyAddressUrlString(
-                                                                 Network::Address::IpVersion::v6)))
-          .value();
-  Network::Address::InstanceConstSharedPtr ipv4_localhost_ =
-      Network::Utility::resolveUrl(
-          fmt::format("tcp://{}:1",
-                      Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v4)))
-          .value();
-  Network::Address::InstanceConstSharedPtr ipv6_localhost_ =
-      Network::Utility::resolveUrl(
-          fmt::format("tcp://{}:1",
-                      Network::Test::getLoopbackAddressUrlString(Network::Address::IpVersion::v6)))
-          .value();
   Network::Address::IpVersion ip_version_ = Network::Address::IpVersion::v4;
+
+  // It's important that IPv6 addresses are initialized before the
+  // mock getaddrinfo is installed, as otherwise the mock is involved
+  // in the numeric address resolution which provokes infinite recursion.
   absl::flat_hash_map<std::string, std::vector<Network::Address::InstanceConstSharedPtr>>
       numeric_addrs_ = {
-          {"::", {ipv6_any_}},
-          {"::1", {ipv6_localhost_}},
+          {"::", {Network::Utility::getIpv6AnyAddress()}},
+          {"::1", {Network::Utility::getIpv6LoopbackAddress()}},
           {"::99", {Network::Utility::resolveUrl("tcp://[::99]:1").value()}},
-          {"127.0.0.1", {ipv4_localhost_}},
       };
   absl::flat_hash_set<absl::string_view> nonexisting_addresses_ = {"doesnotexist.example.com",
                                                                    "itdoesnotexist"};
