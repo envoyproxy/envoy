@@ -217,11 +217,8 @@ private:
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
         public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
         public std::enable_shared_from_this<RedisDiscoverySession> {
-    RedisDiscoverySession(
-        RedisCluster& parent, NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-        absl::optional<
-            Extensions::NetworkFilters::Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
-            aws_iam_authenticator);
+    RedisDiscoverySession(RedisCluster& parent,
+                          NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
     ~RedisDiscoverySession() override;
 
@@ -282,9 +279,6 @@ private:
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
     const std::chrono::milliseconds buffer_timeout_;
     NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
-    absl::optional<
-        Extensions::NetworkFilters::Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
-        aws_iam_authenticator_;
   };
 
   Upstream::ClusterManager& cluster_manager_;

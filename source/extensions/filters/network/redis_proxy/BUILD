@@ -153,6 +153,7 @@ envoy_cc_extension(
         "//source/extensions/common/redis:cluster_refresh_manager_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "//source/extensions/filters/network/common/redis:aws_iam_authenticator_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
         "//source/extensions/filters/network/common/redis:fault_lib",
         "//source/extensions/filters/network/common/redis:redis_command_stats_lib",

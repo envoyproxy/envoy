@@ -308,6 +308,93 @@ static_resources:
 )EOF",
                                                                       Platform::null_device_path);
 
+const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM =
+    fmt::format(R"EOF(
+admin:
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    - name: cluster_0
+      type: STATIC
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+          auth_password: {{ inline_string: cluster_0_password }}
+      lb_policy: RANDOM
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+    - name: cluster_1
+      type: STATIC
+      lb_policy: RANDOM
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+          auth_password: {{ inline_string: cluster_1_password }}
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+    - name: cluster_2
+      type: STATIC
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+          auth_password: {{ inline_string: cluster_2_password }}
+      lb_policy: RANDOM
+      load_assignment:
+        cluster_name: cluster_2
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: redis
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: redis_stats
+          settings:
+            op_timeout: 5s
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
+            routes:
+            - prefix: "foo:"
+              cluster: cluster_1
+            - prefix: "baz:"
+              cluster: cluster_2
+)EOF",
+                Platform::null_device_path);
+
 // This is a configuration with fault injection enabled.
 const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
           faults:

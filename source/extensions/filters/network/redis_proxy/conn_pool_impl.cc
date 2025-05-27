@@ -43,17 +43,17 @@ static uint16_t default_port = 6379;
 } // namespace
 
 InstanceImpl::InstanceImpl(
-    Server::Configuration::ServerFactoryContext& context, const std::string& cluster_name,
-    Upstream::ClusterManager& cm, Common::Redis::Client::ClientFactory& client_factory,
-    ThreadLocal::SlotAllocator& tls,
+    const std::string& cluster_name, Upstream::ClusterManager& cm,
+    Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
     const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::ConnPoolSettings&
         config,
     Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-    absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator)
-    : context_(context), cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
+    : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
       stats_scope_(std::move(stats_scope)), redis_command_stats_(redis_command_stats),
       redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(*stats_scope_))},
@@ -109,9 +109,10 @@ InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-    absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator)
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
-      dns_cache_(dns_cache), context_(parent->context_),
+      dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
       client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),

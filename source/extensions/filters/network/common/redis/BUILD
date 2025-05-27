@@ -24,6 +24,20 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "aws_iam_authenticator_lib",
+    srcs = ["aws_iam_authenticator_impl.cc"],
+    hdrs = ["aws_iam_authenticator_impl.h"],
+    deps = [
+        ":utility_lib",
+        "//source/extensions/common/aws:credential_provider_chains_lib",
+        "//source/extensions/common/aws:signer_interface",
+        "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
+        "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "codec_lib",
     srcs = ["codec_impl.cc"],
     hdrs = ["codec_impl.h"],
@@ -49,6 +63,7 @@ envoy_cc_library(
     name = "client_interface",
     hdrs = ["client.h"],
     deps = [
+        ":aws_iam_authenticator_lib",
         ":codec_lib",
         ":redis_command_stats_lib",
         "//envoy/upstream:cluster_manager_interface",
@@ -62,6 +77,7 @@ envoy_cc_library(
     srcs = ["client_impl.cc"],
     hdrs = ["client_impl.h"],
     deps = [
+        ":aws_iam_authenticator_lib",
         ":client_interface",
         ":codec_lib",
         ":utility_lib",
@@ -75,7 +91,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:upstream_lib",
-        "//source/extensions/common/aws:credential_provider_chains_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

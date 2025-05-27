@@ -14,7 +14,7 @@
 #include "source/common/singleton/const_singleton.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
+#include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
 
@@ -76,20 +76,21 @@ class ClientImpl : public Client,
                    public Network::ConnectionCallbacks,
                    public Logger::Loggable<Logger::Id::redis> {
 public:
-  static ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                          EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                          const ConfigSharedPtr& config,
-                          const RedisCommandStatsSharedPtr& redis_command_stats,
-                          Stats::Scope& scope, bool is_transaction_client,
-                          const std::string& auth_username,
-                          absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
-                              aws_iam_authenticator);
+  static ClientPtr
+  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+         DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
+         const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+         bool is_transaction_client, const std::string& auth_username,
+         const std::string& auth_password,
+         absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+             aws_iam_authenticator);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
              const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
              bool is_transaction_client, const std::string& auth_username,
-             absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
+             const std::string& auth_password,
+             absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
                  aws_iam_authenticator);
   ~ClientImpl() override;
 
@@ -102,6 +103,7 @@ public:
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
+  void sendAwsIamAuth(const std::string& auth_username) override;
 
   /*
    * Enable or disable request queueing for the client.
@@ -117,7 +119,8 @@ public:
    * @param The shared pointer to an already initialized AWS IAM authenticator.
    */
 
-  void sendIamAuthentication(AwsIamAuthenticatorImplSharedPtr aws_iam_authenticator);
+  void
+  sendIamAuthentication(AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr aws_iam_authenticator);
 
   PoolRequest* makeRequestImmediate(const RespValue& request, ClientCallbacks& callbacks);
 
@@ -177,13 +180,12 @@ private:
   const RedisCommandStatsSharedPtr redis_command_stats_;
   Stats::Scope& scope_;
   bool is_transaction_client_;
-  std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> aws_iam_auth_signer_;
   bool queue_enabled_{false};
-  const std::string& auth_username_;
-  absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr> aws_iam_authenticator_;
+  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+      aws_iam_authenticator_;
 };
 
-class ClientFactoryImpl : public ClientFactory {
+class ClientFactoryImpl : public ClientFactory, public Logger::Loggable<Logger::Id::redis> {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
   ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
@@ -191,7 +193,7 @@ public:
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
                    bool is_transaction_client,
-                   absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
+                   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
                        aws_iam_authenticator) override;
 
   static ClientFactoryImpl instance_;

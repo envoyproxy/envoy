@@ -150,7 +150,7 @@ private:
   const std::string auth_username_;
   const std::string auth_password_;
   absl::optional<
-      Extensions::NetworkFilters::Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
+      Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
   Server::Configuration::ServerFactoryContext& context_;
 };

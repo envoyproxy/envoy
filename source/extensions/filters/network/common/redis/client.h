@@ -5,7 +5,7 @@
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
 
@@ -69,14 +69,6 @@ public:
   void onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {}
 };
 
-class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
-public:
-  virtual ~AwsIamAuthenticatorBase() = default;
-  virtual std::string getAuthToken(std::string auth_user) PURE;
-  virtual bool
-  addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb) PURE;
-};
-
 /**
  * A single redis client connection.
  */
@@ -114,6 +106,8 @@ public:
    * @param auth password for upstream host.
    */
   virtual void initialize(const std::string& auth_username, const std::string& auth_password) PURE;
+
+  virtual void sendAwsIamAuth(const std::string& auth_username) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -198,41 +192,6 @@ public:
 
 using ConfigSharedPtr = std::shared_ptr<const Config>;
 
-class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
-public:
-  AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,
-                          absl::string_view cache_name, absl::string_view service_name,
-                          absl::string_view region, uint16_t expiration_time,
-                          absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
-                              credential_provider);
-  bool addCallbackIfCredentialsPending(
-      Extensions::Common::Aws::CredentialsPendingCallback&& cb) override {
-    return signer_->addCallbackIfCredentialsPending(std::move(cb));
-  };
-
-  std::string getAuthToken(std::string auth_user) override;
-
-  using AwsIamAuthenticatorImplSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
-
-  static AwsIamAuthenticatorImplSharedPtr initAwsIamAuthenticator(
-      Server::Configuration::ServerFactoryContext& context,
-      envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config);
-
-private:
-  Envoy::Extensions::Common::Aws::SignerPtr signer_;
-  uint16_t expiration_time_;
-  const std::string auth_user_;
-  std::string cache_name_;
-  std::string service_name_;
-  std::string region_;
-  Server::Configuration::ServerFactoryContext& context_;
-  Envoy::Event::TimerPtr cache_duration_timer_;
-  std::string auth_token_;
-};
-
-using AwsIamAuthenticatorImplSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
-using AwsIamAuthenticatorImplSharedPtrOptRef = OptRef<AwsIamAuthenticatorImplSharedPtr>;
-
 /**
  * A factory for individual redis client connections.
  */
@@ -251,13 +210,13 @@ public:
    * @param is_transaction_client true if this client was created to relay a transaction.
    * @return ClientPtr a new connection pool client.
    */
-  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const ConfigSharedPtr& config,
-                           const RedisCommandStatsSharedPtr& redis_command_stats,
-                           Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password, bool is_transaction_client,
-                           absl::optional<Common::Redis::Client::AwsIamAuthenticatorImplSharedPtr>
-                               aws_iam_authenticator) PURE;
+  virtual ClientPtr
+  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+         const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
+         Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
+         bool is_transaction_client,
+         absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+             aws_iam_authenticator) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

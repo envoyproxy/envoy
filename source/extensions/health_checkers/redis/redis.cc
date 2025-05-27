@@ -30,8 +30,8 @@ RedisHealthChecker::RedisHealthChecker(
 
 {
   if (redis_config.has_aws_iam()) {
-    aws_iam_authenticator_ = Extensions::NetworkFilters::Common::Redis::Client::
-        AwsIamAuthenticatorImpl::initAwsIamAuthenticator(context, redis_config.aws_iam());
+    aws_iam_authenticator_ = Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+        AwsIamAuthenticatorFactory::initAwsIamAuthenticator(context, redis_config.aws_iam());
   }
   if (!key_.empty()) {
     type_ = Type::Exists;
