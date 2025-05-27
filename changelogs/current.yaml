@@ -154,5 +154,8 @@ new_features:
     added :ref:`enable_ja4_fingerprinting
     <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.enable_ja4_fingerprinting>` to create
     a JA4 fingerprint hash from the Client Hello message.
+- area: local_ratelimit
+  change: |
+    ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
 
 deprecated:

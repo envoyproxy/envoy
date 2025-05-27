@@ -2,11 +2,11 @@ agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
   repo: envoyproxy/envoy-build-ubuntu
-  sha: e483bc180b91b577f1d95b6a37a28263ad88990acc21b2017b8eacfab637a6a6
-  mobile-sha: a06b0b6d8df64617c7dc662131702566f9355c58b2b1e14a7a815d0f1369af22
+  sha: 0d07f501d83ba77ace96a5d8181c56fc7d00a0ad386d9b2f8847b4a57211f35d
+  mobile-sha: 2ed5804f57e10ae5245ec796fed9fb537112179c65f87386b30af2dd727ffc21
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: 116a6a4f7b2e7a43e07156a988b1aaf310d1d1b5c9339e076374bb4684e616dc
-  tag: a2aa71100aa4f39e2f9006f83f2167d66a6239ab
+  gcr-sha: a1739972e31cd142e2fc37e420e7f86c80f5a971328d0f50ee6522abac2fdde2
+  tag: c510c356a9fc5bc9075ef03690cbdfe48fc4bd22
 
 config:
   envoy:
@@ -242,6 +242,7 @@ run:
     - mobile/.bazelrc
     - mobile/**/*
     - tools/code_format/check_format.py
+    - test/run_envoy_bazel_coverage.sh
   mobile-format:
     paths:
     - .bazelrc

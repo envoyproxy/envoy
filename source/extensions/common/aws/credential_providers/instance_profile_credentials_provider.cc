@@ -34,10 +34,6 @@ void InstanceProfileCredentialsProvider::refresh() {
   token_req_message.headers().setCopy(Http::LowerCaseString(EC2_IMDS_TOKEN_TTL_HEADER),
                                       EC2_IMDS_TOKEN_TTL_DEFAULT_VALUE);
 
-  // Stop any existing timer.
-  if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
-    cache_duration_timer_->disableTimer();
-  }
   // Using Http async client to fetch the AWS credentials where we first get the token.
   if (!metadata_fetcher_) {
     metadata_fetcher_ = create_metadata_fetcher_cb_(context_.clusterManager(), clusterName());
