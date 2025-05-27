@@ -20,3 +20,13 @@ jobs:
         df -h
         lsblk -f
         blkid
+
+  diskspace-arm64:
+    name: Diskspace debug
+    runs-on: ubuntu-24.04-arm64
+    steps:
+    - name: Debug diskspace
+      run: |
+        df -h
+        lsblk -f
+        blkid
