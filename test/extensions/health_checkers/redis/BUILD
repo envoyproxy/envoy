@@ -33,6 +33,8 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+        "//test/mocks/server:server_factory_context_mocks",
+
     ],
 )
 
