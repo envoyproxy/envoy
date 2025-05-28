@@ -1,7 +1,7 @@
 licenses(["notice"])  # Apache 2
 
 xcode_version(
-    name = "xcode_16_3_0",
+    name = "xcode_16_2_0",
     default_ios_sdk_version = "17.4",
     default_macos_sdk_version = "14.4",
     default_tvos_sdk_version = "17.4",
@@ -20,18 +20,18 @@ xcode_version(
 
 available_xcodes(
     name = "local_xcodes",
-    default = ":xcode_16_3_0",
+    default = ":xcode_16_2_0",
     versions = [
-        ":xcode_16_3_0",
+        ":xcode_16_2_0",
         ":xcode_15_3_0",
     ],
 )
 
 available_xcodes(
     name = "remote_xcodes",
-    default = ":xcode_16_3_0",
+    default = ":xcode_16_2_0",
     versions = [
-        ":xcode_16_3_0",
+        ":xcode_16_2_0",
         ":xcode_15_3_0",
     ],
 )
