@@ -2,8 +2,10 @@
 
 #include <cstdint>
 
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
 #include "source/extensions/filters/network/common/redis/codec_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
 
@@ -104,6 +106,8 @@ public:
    * @param auth password for upstream host.
    */
   virtual void initialize(const std::string& auth_username, const std::string& auth_password) PURE;
+
+  virtual void sendAwsIamAuth(const std::string& auth_username) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -206,11 +210,13 @@ public:
    * @param is_transaction_client true if this client was created to relay a transaction.
    * @return ClientPtr a new connection pool client.
    */
-  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                           const ConfigSharedPtr& config,
-                           const RedisCommandStatsSharedPtr& redis_command_stats,
-                           Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password, bool is_transaction_client) PURE;
+  virtual ClientPtr
+  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+         const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
+         Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
+         bool is_transaction_client,
+         absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+             aws_iam_authenticator) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

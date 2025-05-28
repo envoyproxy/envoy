@@ -41,7 +41,10 @@ public:
       const envoy::extensions::health_checkers::redis::v3::Redis& redis_config,
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
-      Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
+      Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
+      absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+                         AwsIamAuthenticatorSharedPtr>
+          aws_iam_authenticator);
 
   static const NetworkFilters::Common::Redis::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();
@@ -148,6 +151,9 @@ private:
   RedisHealthCheckerStats redis_stats_;
   const std::string auth_username_;
   const std::string auth_password_;
+  absl::optional<
+      Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+      aws_iam_authenticator_;
 };
 
 } // namespace RedisHealthChecker

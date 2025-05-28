@@ -65,7 +65,9 @@ public:
       Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
-      const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache);
+      const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+          aws_iam_authenticator);
   uint16_t shardSize() override;
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
@@ -152,7 +154,9 @@ private:
                            public Logger::Loggable<Logger::Id::redis> {
     ThreadLocalPool(std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
                     std::string cluster_name,
-                    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache);
+                    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+                    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+                        aws_iam_authenticator);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
     uint16_t shardSize();
@@ -198,7 +202,6 @@ private:
     std::list<Upstream::HostSharedPtr> created_via_redirect_hosts_;
     std::list<ThreadLocalActiveClientPtr> clients_to_drain_;
     std::list<PendingRequest> pending_requests_;
-
     /* This timer is used to poll the active clients in clients_to_drain_ to determine whether they
      * have been drained (have no active requests) or not. It is only enabled after a client has
      * been added to clients_to_drain_, and is only re-enabled as long as that list is not empty. A
@@ -213,6 +216,8 @@ private:
     Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
     RedisClusterStats redis_cluster_stats_;
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator_;
   };
 
   const std::string cluster_name_;
@@ -226,6 +231,8 @@ private:
   RedisClusterStats redis_cluster_stats_;
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
+  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+      aws_iam_authenticator_;
 };
 
 } // namespace ConnPool
