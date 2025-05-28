@@ -45,8 +45,8 @@ namespace Tls {
 
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Server::Configuration::CommonFactoryContext& context)
-    : config_(config), stats_(stats), context_(context),
+    Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope)
+    : config_(config), stats_(stats), context_(context), scope_(scope),
       auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
@@ -196,6 +196,8 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
       verify_mode = verify_mode_validation_context;
     }
   }
+
+  initializeCertExpirationStats(scope_);
 
   return verify_mode;
 }
@@ -590,6 +592,25 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
   return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), context_.timeSource());
 }
 
+void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
+  // Early return if no certificate or no config
+  if (ca_cert_ == nullptr || config_ == nullptr) {
+    return;
+  }
+
+  absl::optional<uint64_t> expiration_unix_time_in_seconds =
+      Utility::getExpirationUnixTime(ca_cert_.get());
+  if (!cert_stats_) {
+    cert_stats_ = std::make_unique<CertStats>(generateCertStats(scope, config_->caCertName()));
+  }
+  if (expiration_unix_time_in_seconds.has_value()) {
+    cert_stats_->expiration_unix_time_in_seconds_.set(expiration_unix_time_in_seconds.value());
+  } else {
+    // For certificates with no expiration time, set to max uint64_t (effectively "never expires")
+    cert_stats_->expiration_unix_time_in_seconds_.set(std::numeric_limits<uint64_t>::max());
+  }
+}
+
 absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), context_.timeSource());
 }
@@ -598,8 +619,9 @@ class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
-    return std::make_unique<DefaultCertValidator>(config, stats, context);
+                      Server::Configuration::CommonFactoryContext& context,
+                      Stats::Scope& scope) override {
+    return std::make_unique<DefaultCertValidator>(config, stats, context, scope);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.default"; }
