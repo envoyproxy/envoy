@@ -6,7 +6,7 @@ xcode_version(
     default_macos_sdk_version = "14.4",
     default_tvos_sdk_version = "17.4",
     default_watchos_sdk_version = "10.4",
-    version = "16.3",
+    version = "16.2",
 )
 
 xcode_version(
