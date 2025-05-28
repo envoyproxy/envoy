@@ -587,7 +587,8 @@ TEST(HttpUtility, updateAuthority) {
             EXPECT_EQ(new_host, headers.getHostValue());
 
             if (old_host.empty() || !append_xfh_or_keep_old_hosdt) {
-              // No original host or the flag not allowing to append xfh or keep old host.
+              // No original host or the flag not allowing to append x-forwarded-host or keep
+              // original host.
               EXPECT_EQ(old_xfh, headers.getForwardedHostValue());
               EXPECT_EQ("", headers.getEnvoyOriginalHostValue());
               return;

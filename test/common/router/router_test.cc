@@ -6105,6 +6105,7 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   HttpTestUtility::addDefaultHeaders(outgoing_headers);
   outgoing_headers.setHost(cm_.thread_local_cluster_.conn_pool_.host_->hostname_);
   outgoing_headers.setForwardedHost(req_host);
+  outgoing_headers.setEnvoyOriginalHost(req_host);
 
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
