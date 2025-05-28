@@ -213,8 +213,9 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
-  if (!enable_ja3_fingerprinting) {
+std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting,
+                                             bool enable_ja4_fingerprinting) {
+  if (!enable_ja3_fingerprinting && !enable_ja4_fingerprinting) {
     return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
@@ -227,6 +228,7 @@ name: "envoy.filters.listener.tls_inspector"
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   enable_ja3_fingerprinting: true
+  enable_ja4_fingerprinting: true
 )EOF";
 }
 

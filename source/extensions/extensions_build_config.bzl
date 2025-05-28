@@ -178,7 +178,7 @@ EXTENSIONS = {
     "envoy.filters.http.oauth2":                        "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
     "envoy.filters.http.original_src":                  "//source/extensions/filters/http/original_src:config",
-    "envoy.filters.http.proto_message_extraction":       "//source/extensions/filters/http/proto_message_extraction:config",
+    "envoy.filters.http.proto_message_extraction":      "//source/extensions/filters/http/proto_message_extraction:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
     "envoy.filters.http.rbac":                          "//source/extensions/filters/http/rbac:config",
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
@@ -406,6 +406,7 @@ EXTENSIONS = {
     #
 
     "envoy.http.stateful_session.cookie":                "//source/extensions/http/stateful_session/cookie:config",
+    "envoy.http.stateful_session.envelope":              "//source/extensions/http/stateful_session/envelope:config",
     "envoy.http.stateful_session.header":                "//source/extensions/http/stateful_session/header:config",
 
     #

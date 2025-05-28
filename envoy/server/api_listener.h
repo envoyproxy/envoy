@@ -1,9 +1,13 @@
 #pragma once
 
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/http/api_listener.h"
 
 namespace Envoy {
 namespace Server {
+
+class Instance;
 
 /**
  * Listener that allows consumer to interact with Envoy via a designated API.
@@ -40,6 +44,17 @@ public:
 
 using ApiListenerPtr = std::unique_ptr<ApiListener>;
 using ApiListenerOptRef = absl::optional<std::reference_wrapper<ApiListener>>;
+
+class ApiListenerFactory : public Config::UntypedFactory {
+public:
+  ~ApiListenerFactory() override = default;
+
+  virtual absl::StatusOr<std::unique_ptr<ApiListener>>
+  create(const envoy::config::listener::v3::Listener& config, Instance& server,
+         const std::string& name) PURE;
+
+  std::string category() const override { return "envoy.api_listener_impl"; }
+};
 
 } // namespace Server
 } // namespace Envoy
