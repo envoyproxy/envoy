@@ -44,9 +44,4 @@ cc_binary(
         "@envoy//source/exe:platform_impl_lib",
         "@envoy//source/exe:process_wide_lib",
     ],
-    linkopts = [
-        "-framework CFNetwork",
-        "-framework CoreFoundation",
-        "-framework SystemConfiguration",
-    ],
 )
