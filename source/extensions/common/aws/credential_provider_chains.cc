@@ -4,8 +4,10 @@
 
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
+#include "source/extensions/common/aws/credential_providers/assume_role_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
