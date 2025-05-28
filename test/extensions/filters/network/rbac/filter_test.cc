@@ -28,6 +28,15 @@ namespace RBACFilter {
 
 class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
+  static void SetUpTestSuite() {
+    // Set debug log level to ensure coverage of debug log statements
+    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  }
+
+  RoleBasedAccessControlNetworkFilterTest() {
+    // No per-logger log level setting needed
+  }
+
   void
   setupPolicy(bool with_policy = true, bool continuous = false,
               envoy::config::rbac::v3::RBAC::Action action = envoy::config::rbac::v3::RBAC::ALLOW,
@@ -584,6 +593,33 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherAllowNoChangeLog) {
   EXPECT_EQ(stream_info_.dynamicMetadata().filter_metadata().end(),
             stream_info_.dynamicMetadata().filter_metadata().find(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
+  setupPolicy();
+  setDestinationPort(123);
+  setRequestedServerName("www.cncf.io");
+
+  // Force debug level on
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  // Mock SSL setup
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> uri_sans{"uri-san-value"};
+  std::vector<std::string> dns_sans{"dns-san-value"};
+  static const std::string subject_str = "subject";
+  ON_CALL(*connection_info, uriSanPeerCertificate()).WillByDefault(Return(uri_sans));
+  ON_CALL(*connection_info, dnsSansPeerCertificate()).WillByDefault(Return(dns_sans));
+  ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(subject_str));
+  ON_CALL(callbacks_.connection_, ssl()).WillByDefault(Return(connection_info));
+
+  // Call onData to trigger the debug log code path
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  // Explicitly verify any counters that would be affected by this code path
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
 }
 
 } // namespace RBACFilter

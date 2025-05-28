@@ -64,10 +64,7 @@ void WebIdentityCredentialsProvider::refresh() {
   // Use the Accept header to ensure that AssumeRoleWithWebIdentityResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
-  // Stop any existing timer.
-  if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
-    cache_duration_timer_->disableTimer();
-  }
+
   // Using Http async client to fetch the AWS credentials.
   if (!metadata_fetcher_) {
     metadata_fetcher_ = create_metadata_fetcher_cb_(context_.clusterManager(), clusterName());

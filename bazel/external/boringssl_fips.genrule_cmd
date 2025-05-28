@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -evxo pipefail
+set -eo pipefail
 
 export CXXFLAGS=''
 export LDFLAGS=''
