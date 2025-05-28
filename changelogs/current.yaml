@@ -157,5 +157,11 @@ new_features:
 - area: local_ratelimit
   change: |
     ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
+- area: dfp
+  change: |
+    Added a new flag
+    :ref:`allow_dynamic_host_from_filter_state
+    <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
+    to allow HTTP DFP filter to use the filter state values for host and port lookups.
 
 deprecated:
