@@ -20,7 +20,7 @@ use(
     },
     {
        "owner": "envoyproxy/coverage-shephards",
-       "path": "(test/per_directory_coverage.yaml)",
+       "path": "(test/coverage.yaml)",
        "github_status_label": "changes to Envoy coverage scripts",
        "auto_assign": True,
     },

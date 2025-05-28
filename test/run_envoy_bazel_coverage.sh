@@ -7,22 +7,19 @@ CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \([0
 LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \([0-9.]*\).*/\1/')
 LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
 
-if [ "${CLANG_VERSION}" != "${LLVM_VERSION}" ]
-then
-  echo "ERROR: clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}" >&2
-  exit 1
+if [[ -z "$ENVOY_RBE" && "${CLANG_VERSION}" != "${LLVM_VERSION}" ]]; then
+    echo "ERROR: clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}" >&2
+    exit 1
 fi
 
-if [ "${LLVM_COV_VERSION}" != "${LLVM_VERSION}" ]
-then
-  echo "ERROR: llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}" >&2
-  exit 1
+if [[ -z "$ENVOY_RBE" && "${LLVM_COV_VERSION}" != "${LLVM_VERSION}" ]]; then
+    echo "ERROR: llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}" >&2
+    exit 1
 fi
 
-if [ "${LLVM_PROFDATA_VERSION}" != "${LLVM_VERSION}" ]
-then
-  echo "ERROR: llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}" >&2
-  exit 1
+if [[ -z "$ENVOY_RBE" && "${LLVM_PROFDATA_VERSION}" != "${LLVM_VERSION}" ]]; then
+    echo "ERROR: llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}" >&2
+    exit 1
 fi
 
 # This is a little hacky
@@ -41,11 +38,6 @@ COVERAGE_TARGET="${COVERAGE_TARGET:-}"
 read -ra BAZEL_BUILD_OPTIONS <<< "${BAZEL_BUILD_OPTION_LIST:-}"
 read -ra BAZEL_GLOBAL_OPTIONS <<< "${BAZEL_GLOBAL_OPTION_LIST:-}"
 
-echo "Starting run_envoy_bazel_coverage.sh..."
-echo "    PWD=$(pwd)"
-echo "    SRCDIR=${SRCDIR}"
-echo "    VALIDATE_COVERAGE=${VALIDATE_COVERAGE}"
-
 # This is the target that will be run to generate coverage data. It can be overridden by consumer
 # projects that want to run coverage on a different/combined target.
 # Command-line arguments take precedence over ${COVERAGE_TARGET}.
@@ -58,6 +50,7 @@ else
 fi
 
 BAZEL_COVERAGE_OPTIONS=(--heap_dump_on_oom)
+BAZEL_VALIDATE_OPTIONS=()
 
 if [[ -n "${BAZEL_GRPC_LOG}" ]]; then
     BAZEL_COVERAGE_OPTIONS+=(--remote_grpc_log="${BAZEL_GRPC_LOG}")
@@ -69,11 +62,10 @@ if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     COVERAGE_TARGETS=()
     while read -r line; do COVERAGE_TARGETS+=("$line"); done \
         <<< "$_targets"
-    BAZEL_COVERAGE_OPTIONS+=(
-        "--config=fuzz-coverage")
+    BAZEL_COVERAGE_OPTIONS+=("--config=fuzz-coverage")
+    BAZEL_VALIDATE_OPTIONS+=("--config=fuzz-coverage-config")
 else
-    BAZEL_COVERAGE_OPTIONS+=(
-        "--config=test-coverage")
+    BAZEL_COVERAGE_OPTIONS+=("--config=test-coverage")
 fi
 
 # Output unusually long logs due to trace logging.
@@ -84,37 +76,48 @@ if [[ ${FUZZ_COVERAGE} == "true" ]]; then
     COVERAGE_DIR="${SRCDIR}"/generated/fuzz_coverage
 fi
 
-echo "Running bazel coverage with:"
-echo "  Options: ${BAZEL_BUILD_OPTIONS[*]} ${BAZEL_COVERAGE_OPTIONS[*]}"
-echo "  Targets: ${COVERAGE_TARGETS[*]}"
+run_coverage() {
+    echo "Running bazel coverage with:"
+    echo "  Options: ${BAZEL_BUILD_OPTIONS[*]} ${BAZEL_COVERAGE_OPTIONS[*]}"
+    echo "  Targets: ${COVERAGE_TARGETS[*]}"
 
-bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
+    bazel coverage "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_COVERAGE_OPTIONS[@]}" "${COVERAGE_TARGETS[@]}"
 
-if [[ ! -e bazel-out/_coverage/_coverage_report.dat ]]; then
-    echo "ERROR: No coverage report found (bazel-out/_coverage/_coverage_report.dat)" >&2
-    exit 1
-elif [[ ! -s bazel-out/_coverage/_coverage_report.dat ]]; then
-    echo "ERROR: Coverage report is empty (bazel-out/_coverage/_coverage_report.dat)" >&2
-    exit 1
-fi
+    if [[ ! -e bazel-out/_coverage/_coverage_report.dat ]]; then
+        echo "ERROR: No coverage report found (bazel-out/_coverage/_coverage_report.dat)" >&2
+        exit 1
+    elif [[ ! -s bazel-out/_coverage/_coverage_report.dat ]]; then
+        echo "ERROR: Coverage report is empty (bazel-out/_coverage/_coverage_report.dat)" >&2
+        exit 1
+    fi
+}
 
-rm -rf "${COVERAGE_DIR}"
-mkdir -p "${COVERAGE_DIR}"
-rm -f bazel-out/_coverage/_coverage_report.tar.zst
-mv bazel-out/_coverage/_coverage_report.dat bazel-out/_coverage/_coverage_report.tar.zst
-bazel run "${BAZEL_BUILD_OPTIONS[@]}" --nobuild_tests_only @envoy//tools/zstd -- -d -c "${PWD}/bazel-out/_coverage/_coverage_report.tar.zst" \
-    | tar -xf - -C "${COVERAGE_DIR}"
-COVERAGE_JSON="${COVERAGE_DIR}/coverage.json"
+unpack_coverage_report() {
+    rm -rf "${COVERAGE_DIR}"
+    mkdir -p "${COVERAGE_DIR}"
+    rm -f bazel-out/_coverage/_coverage_report.tar.zst
+    mv bazel-out/_coverage/_coverage_report.dat bazel-out/_coverage/_coverage_report.tar.zst
+    bazel run "${BAZEL_BUILD_OPTIONS[@]}" --nobuild_tests_only @envoy//tools/zstd -- -d -c "${PWD}/bazel-out/_coverage/_coverage_report.tar.zst" \
+        | tar -xf - -C "${COVERAGE_DIR}"
+    COVERAGE_JSON="${COVERAGE_DIR}/coverage.json"
+}
 
-if [[ "$VALIDATE_COVERAGE" != "true" || -z "$COVERAGE_THRESHOLD" ]]; then
+validate_coverage() {
+    bazel run \
+          "${BAZEL_BUILD_OPTIONS[@]}" \
+          "${BAZEL_VALIDATE_OPTIONS[@]}" \
+          --nobuild_tests_only \
+          @envoy//tools/coverage:validate \
+          "$COVERAGE_JSON" \
+          "$FUZZ_COVERAGE" \
+          "$IS_MOBILE"
+}
+
+run_coverage
+unpack_coverage_report
+
+if [[ "$VALIDATE_COVERAGE" != "true" ]]; then
     exit 0
 fi
 
-bazel run \
-      "${BAZEL_BUILD_OPTIONS[@]}" \
-      --nobuild_tests_only \
-      @envoy//tools/coverage:validate \
-      "$COVERAGE_JSON" \
-      "$COVERAGE_THRESHOLD" \
-      "$FUZZ_COVERAGE" \
-      "$IS_MOBILE"
+validate_coverage
