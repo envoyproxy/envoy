@@ -142,8 +142,12 @@ As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy s
         dns_lookup_family: V4_ONLY
         max_hosts: 100
 
+
+.. _config_network_filters_redis_proxy_aws_iam:
+
 AWS IAM Authentication
 ----------------------
+
 The redis proxy filter supports authentication with AWS IAM credentials. To configure AWS IAM Authentication, additional fields are required under the filter
 settings.
 If `region` is not specified, the region will be deduced using the region provider chain as described in  :ref:`regions<_config_http_filters_aws_request_signing_region>`.

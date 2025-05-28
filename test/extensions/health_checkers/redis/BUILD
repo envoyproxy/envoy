@@ -26,6 +26,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/redis_proxy:redis_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_priority_set_mocks",
         "//test/mocks/upstream:health_check_event_logger_mocks",
         "//test/mocks/upstream:host_mocks",
@@ -33,8 +34,6 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:priority_set_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
-        "//test/mocks/server:server_factory_context_mocks",
-
     ],
 )
 

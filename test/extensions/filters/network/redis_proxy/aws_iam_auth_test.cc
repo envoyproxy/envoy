@@ -8,6 +8,7 @@
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
+#include "test/extensions/filters/network/redis_proxy/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 
@@ -57,15 +58,7 @@ TEST_F(AwsIamAuthenticatorTest, NormalAuthentication) {
       "3bf9d8841acb6db28373efcab8b9ccf1076a7a9ab39faf489002fa0555a1f89c&X-Amz-SignedHeaders=host");
 }
 
-class MockAwsIamAuthenticator : public AwsIamAuthenticatorBase {
-public:
-  ~MockAwsIamAuthenticator() override = default;
-  MOCK_METHOD(std::string, getAuthToken, (std::string auth_user));
-  MOCK_METHOD(bool, addCallbackIfCredentialsPending,
-              (Extensions::Common::Aws::CredentialsPendingCallback && cb));
-};
-
-// Verify filter decodeData functionality when credentials are pending.
+// Verify filter correctly pauses requests when credentials are pending.
 TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats;
   NiceMock<Stats::MockIsolatedStatsStore> stats;
@@ -83,7 +76,8 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(stats.symbolTable());
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientFactoryImpl factory;
-  auto mock_authenticator = std::make_shared<MockAwsIamAuthenticator>();
+  auto mock_authenticator = std::make_shared<Envoy::Extensions::NetworkFilters::RedisProxy::Common::
+                                                 AwsIamAuthenticator::MockAwsIamAuthenticator>();
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
   EXPECT_CALL(*mock_authenticator, getAuthToken("username")).WillOnce(Return("auth_token"));
   EXPECT_CALL(*mock_authenticator,
@@ -115,6 +109,33 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   EXPECT_CALL(callbacks, onFailure());
 
   capture();
+  client->close();
+}
+
+// Verify that we cleanly handle the case of no username being configured at cluster level
+TEST_F(AwsIamAuthenticatorTest, UsernameNotConfigured) {
+  Common::Redis::RedisCommandStatsSharedPtr redis_command_stats;
+  NiceMock<Stats::MockIsolatedStatsStore> stats;
+  std::shared_ptr<Upstream::MockHost> host{new NiceMock<Upstream::MockHost>()};
+  Event::MockDispatcher dispatcher;
+  auto config = std::make_shared<Client::ConfigImpl>(Client::createConnPoolSettings());
+
+  Upstream::MockHost::MockCreateConnectionData conn_info;
+  auto mock_connection = new NiceMock<Network::MockClientConnection>();
+  conn_info.connection_ = mock_connection;
+
+  EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
+  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientFactoryImpl factory;
+  auto mock_authenticator = std::make_shared<Envoy::Extensions::NetworkFilters::RedisProxy::Common::
+                                                 AwsIamAuthenticator::MockAwsIamAuthenticator>();
+  EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
+  EXPECT_CALL(*mock_authenticator, addCallbackIfCredentialsPending(_)).Times(0);
+
+  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client = factory.create(
+      host, dispatcher, config, redis_command_stats, *stats.rootScope(), "", "password", false,
+      absl::optional<Envoy::Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+                         AwsIamAuthenticatorSharedPtr>(mock_authenticator));
+
   client->close();
 }
 

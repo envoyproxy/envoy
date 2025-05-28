@@ -369,8 +369,13 @@ ClientPtr ClientFactoryImpl::create(
   if (!aws_iam_authenticator.has_value()) {
     client->initialize(auth_username, auth_password);
   } else {
-    ENVOY_LOG(debug, "Redis client has AWS IAM Authentication enabled");
-    client->sendAwsIamAuth(auth_username);
+    if (auth_username.empty()) {
+      ENVOY_LOG(error, "Redis proxy has AWS IAM Authentication enabled, but auth_username is not "
+                       "set in the cluster configuration. IAM Authentication will be disabled.");
+    } else {
+      ENVOY_LOG(debug, "Redis proxy has AWS IAM Authentication enabled");
+      client->sendAwsIamAuth(auth_username);
+    }
   }
   return client;
 }

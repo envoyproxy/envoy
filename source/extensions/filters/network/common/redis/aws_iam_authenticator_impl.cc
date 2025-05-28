@@ -6,7 +6,6 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/common/aws/credential_provider_chains.h"
 #include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
-#include "source/extensions/filters/network/common/redis/utility.h"
 
 namespace Envoy {
 namespace Extensions {

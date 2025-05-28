@@ -111,6 +111,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.network.redis_proxy"],
     rbe_pool = "6gig",
     deps = [
+        ":redis_mocks",
         "//source/extensions/filters/network/common/redis:aws_iam_authenticator_lib",
         "//source/extensions/filters/network/common/redis:client_interface",
         "//source/extensions/filters/network/common/redis:client_lib",

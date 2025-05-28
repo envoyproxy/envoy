@@ -17,7 +17,9 @@ RedisHealthChecker::RedisHealthChecker(
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
     Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-    Server::Configuration::ServerFactoryContext& context)
+    absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+                       AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
                             std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()),
@@ -26,13 +28,9 @@ RedisHealthChecker::RedisHealthChecker(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(cluster.info(), api)),
       auth_password_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(cluster.info(), api)),
-      context_(context)
+      aws_iam_authenticator_(aws_iam_authenticator)
 
 {
-  if (redis_config.has_aws_iam()) {
-    aws_iam_authenticator_ = Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
-        AwsIamAuthenticatorFactory::initAwsIamAuthenticator(context, redis_config.aws_iam());
-  }
   if (!key_.empty()) {
     type_ = Type::Exists;
   } else {

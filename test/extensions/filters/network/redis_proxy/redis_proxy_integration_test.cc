@@ -327,7 +327,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
-          auth_password: {{ inline_string: cluster_0_password }}
+          auth_username: {{ inline_string: cluster_0_username }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -344,7 +344,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
-          auth_password: {{ inline_string: cluster_1_password }}
+          auth_username: {{ inline_string: cluster_1_username }}
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -359,7 +359,7 @@ static_resources:
       typed_extension_protocol_options:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
-          auth_password: {{ inline_string: cluster_2_password }}
+          auth_username: {{ inline_string: cluster_2_username }}
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2
@@ -384,6 +384,11 @@ static_resources:
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
+            aws_iam:
+              region: us-east-1
+              service_name: elasticache
+              cache_name: testcache
+              expiration_time: 900s
           prefix_routes:
             catch_all_route:
               cluster: cluster_0
@@ -439,13 +444,18 @@ std::string makeBulkStringArray(std::vector<std::string>&& command_strings) {
   return result.str();
 }
 
-class RedisProxyIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class RedisProxyIntegrationTest : public Event::TestUsingSimulatedTime,
+                                  public testing::TestWithParam<Network::Address::IpVersion>,
                                   public BaseIntegrationTest {
 public:
   RedisProxyIntegrationTest(const std::string& config = CONFIG, int num_upstreams = 2)
       : BaseIntegrationTest(GetParam(), config), num_upstreams_(num_upstreams),
         version_(GetParam()) {}
 
+  void setSystemTime(int64_t epoch_milliseconds) {
+    std::chrono::milliseconds ms(epoch_milliseconds);
+    simTime().setSystemTime(std::chrono::duration_cast<std::chrono::microseconds>(ms));
+  }
   // This method encodes a fake upstream's IP address and TCP port in the
   // same format as one would expect from a Redis server in
   // an ask/moved redirection error.
@@ -536,6 +546,14 @@ public:
                                const std::string& response, IntegrationTcpClientPtr& redis_client,
                                FakeRawConnectionPtr& fake_upstream_connection,
                                const std::string& auth_username, const std::string& auth_password);
+
+  void roundtripToUpstreamStepAwsIam(FakeUpstreamPtr& upstream, const std::string& request,
+                                     const std::string& response,
+                                     IntegrationTcpClientPtr& redis_client,
+                                     FakeRawConnectionPtr& fake_upstream_connection,
+                                     const std::string& auth_username,
+                                     const std::string& auth_password);
+
   /**
    * A upstream server expects the request on the upstream and respond with the response.
    * @param upstream a handle to the server that will respond to the request.
@@ -551,6 +569,12 @@ public:
                                      FakeRawConnectionPtr& fake_upstream_connection,
                                      const std::string& auth_username = "",
                                      const std::string& auth_password = "");
+
+  void expectUpstreamRequestResponseAwsIam(FakeUpstreamPtr& upstream, const std::string& request,
+                                           const std::string& response,
+                                           FakeRawConnectionPtr& fake_upstream_connection,
+                                           const std::string& auth_username,
+                                           const std::string& auth_password);
 
 protected:
   const int num_upstreams_;
@@ -618,6 +642,12 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS, 3) {}
 };
 
+class RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM, 3) {}
+};
+
 class RedisProxyWithMirrorsIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyWithMirrorsIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_MIRROR, 6) {}
@@ -635,8 +665,7 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_FAULT_INJECTION, 2) {}
 };
 
-class RedisProxyWithExternalAuthIntegrationTest : public Event::TestUsingSimulatedTime,
-                                                  public Grpc::BaseGrpcClientIntegrationParamTest,
+class RedisProxyWithExternalAuthIntegrationTest : public Grpc::BaseGrpcClientIntegrationParamTest,
                                                   public RedisProxyIntegrationTest {
 
 public:
@@ -750,6 +779,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsIntegra
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -791,6 +824,24 @@ void RedisProxyIntegrationTest::roundtripToUpstreamStep(
   EXPECT_EQ(response, redis_client->data());
 }
 
+void RedisProxyIntegrationTest::roundtripToUpstreamStepAwsIam(
+    FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
+    IntegrationTcpClientPtr& redis_client, FakeRawConnectionPtr& fake_upstream_connection,
+    const std::string& auth_username, const std::string& auth_password) {
+  redis_client->clearData();
+  if (fake_upstream_connection.get() != nullptr) {
+    fake_upstream_connection->clearData();
+  }
+  ASSERT_TRUE(redis_client->write(request));
+
+  expectUpstreamRequestResponseAwsIam(upstream, request, response, fake_upstream_connection,
+                                      auth_username, auth_password);
+
+  redis_client->waitForData(response);
+  // The original response should be received by the fake Redis client.
+  EXPECT_EQ(response, redis_client->data());
+}
+
 void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
     FakeRawConnectionPtr& fake_upstream_connection, const std::string& auth_username,
@@ -820,6 +871,28 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
     // The original request should be the same as the data received by the server.
     EXPECT_EQ(request, proxy_to_server);
   }
+
+  EXPECT_TRUE(fake_upstream_connection->write(response));
+}
+
+void RedisProxyIntegrationTest::expectUpstreamRequestResponseAwsIam(
+    FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
+    FakeRawConnectionPtr& fake_upstream_connection, const std::string& auth_username,
+    const std::string& auth_password) {
+  std::string proxy_to_server;
+  std::string ok = "+OK\r\n";
+
+  if (fake_upstream_connection.get() == nullptr) {
+    EXPECT_TRUE(upstream->waitForRawConnection(fake_upstream_connection));
+  }
+
+  std::string auth_command = makeBulkStringArray({"auth", auth_username, auth_password});
+  EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
+                                                    &proxy_to_server));
+  // The original request should be the same as the data received by the server.
+  EXPECT_EQ(auth_command + request, proxy_to_server);
+  // Send back an OK for the auth command.
+  EXPECT_TRUE(fake_upstream_connection->write(ok));
 
   EXPECT_TRUE(fake_upstream_connection->write(response));
 }
@@ -1188,8 +1261,10 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, BadRedirectStrings) {
 }
 
 // This test verifies that an upstream connection failure during ask redirection processing is
-// handled correctly. In this case the "asking" command and original client request have been sent
-// to the target server, and then the connection is closed. The fake Redis client should receive an
+// handled correctly. In this case the "asking" command and original client request have been
+// sent
+// to the target server, and then the connection is closed. The fake Redis client should receive
+// an
 // upstream failure error in response to its request.
 
 TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingResponse) {
@@ -1218,7 +1293,8 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingRe
   // response.
   EXPECT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
 
-  // The server, fake_upstreams_[1], should receive an "asking" command before the original request.
+  // The server, fake_upstreams_[1], should receive an "asking" command before the original
+  // request.
   std::string asking_request = makeBulkStringArray({"asking"});
   EXPECT_TRUE(fake_upstream_connection_2->waitForData(asking_request.size() + request.size(),
                                                       &proxy_to_server));
@@ -1236,8 +1312,10 @@ TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingRe
   redis_client->close();
 }
 
-// This test verifies that a ASK redirection error as a response to an "asking" command is ignored.
-// This is a negative test scenario that should never happen since a Redis server will reply to an
+// This test verifies that a ASK redirection error as a response to an "asking" command is
+// ignored.
+// This is a negative test scenario that should never happen since a Redis server will reply to
+// an
 // "asking" command with either a "cluster support not enabled" error or "OK".
 
 TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
@@ -1416,6 +1494,55 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentic
   roundtripToUpstreamStep(fake_upstreams_[2], makeBulkStringArray({"get", "baz:123"}),
                           "$3\r\nbar\r\n", redis_client, fake_upstream_connection[2], "",
                           "cluster_2_password");
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  EXPECT_TRUE(fake_upstream_connection[1]->close());
+  EXPECT_TRUE(fake_upstream_connection[2]->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAuthentication) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Event::SimulatedTimeSystem time_system;
+  time_system.setSystemTime(std::chrono::milliseconds(1514862245000));
+  TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
+  TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
+  TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
+
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
+
+  // roundtrip to cluster_0 (catch_all route)
+  roundtripToUpstreamStepAwsIam(
+      fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n", redis_client,
+      fake_upstream_connection[0], "cluster_0_username",
+      "testcache/"
+      "?Action=connect&User=cluster_0_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
+      "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
+      "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
+      "b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host");
+
+  // roundtrip to cluster_1 (prefix "foo:" route)
+  roundtripToUpstreamStepAwsIam(
+      fake_upstreams_[1], makeBulkStringArray({"get", "foo:123"}), "$3\r\nbar\r\n", redis_client,
+      fake_upstream_connection[1], "cluster_1_username",
+      "testcache/"
+      "?Action=connect&User=cluster_1_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
+      "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
+      "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
+      "8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host");
+
+  // roundtrip to cluster_2 (prefix "baz:" route)
+  roundtripToUpstreamStepAwsIam(
+      fake_upstreams_[2], makeBulkStringArray({"get", "baz:123"}), "$3\r\nbar\r\n", redis_client,
+      fake_upstream_connection[2], "cluster_2_username",
+      "testcache/"
+      "?Action=connect&User=cluster_2_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
+      "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
+      "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
+      "0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host");
 
   EXPECT_TRUE(fake_upstream_connection[0]->close());
   EXPECT_TRUE(fake_upstream_connection[1]->close());
