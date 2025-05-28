@@ -9,12 +9,18 @@
 
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
+class ProtoApiScrubberFilterConfig;
+
+using MatchTreeHttpMatchingDataSharedPtr =
+    Envoy::Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>;
+using StringPairToMatchTreeMap =
+    absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
-
 using ::envoy::extensions::filters::http::proto_api_scrubber::v3::DescriptorSet;
 using ::envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
 using ::envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
@@ -25,9 +31,7 @@ using xds::type::matcher::v3::HttpAttributesCelMatchInput;
 using FilteringMode = ProtoApiScrubberConfig::FilteringMode;
 using ProtoApiScrubberRemoveFieldAction =
     ::envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction;
-using MatchTreeHttpMatchingDataSharedPtr = Matcher::MatchTreeSharedPtr<HttpMatchingData>;
-using StringPairToMatchTreeMap =
-    absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
+
 } // namespace
 
 // The config for Proto API Scrubber filter. As a thread-safe class, it should be constructed only
@@ -35,7 +39,7 @@ using StringPairToMatchTreeMap =
 class ProtoApiScrubberFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   // Creates and returns an instance of ProtoApiScrubberConfig.
-  static absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>>
+  static absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
   create(const ProtoApiScrubberConfig& proto_config,
          Server::Configuration::FactoryContext& context);
 
@@ -52,7 +56,7 @@ public:
 private:
   // Private constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
-  ProtoApiScrubberFilterConfig();
+  ProtoApiScrubberFilterConfig() = default;
 
   absl::Status validateFilteringMode(FilteringMode);
   absl::Status validateMethodName(absl::string_view);
@@ -64,13 +68,17 @@ private:
 
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
-  absl::Status initializeMethodRestrictions(std::string method_name,
+  absl::Status initializeMethodRestrictions(absl::string_view method_name,
                                             StringPairToMatchTreeMap& field_restrictions,
-                                            Map<std::string, RestrictionConfig> restrictions,
+                                            const Map<std::string, RestrictionConfig>& restrictions,
                                             Server::Configuration::FactoryContext& context);
 
   FilteringMode filtering_mode_;
+
+  // A map from {method_name, field_mask} to the respective match tree for request fields.
   StringPairToMatchTreeMap request_field_restrictions_;
+
+  // A map from {method_name, field_mask} to the respective match tree for response fields.
   StringPairToMatchTreeMap response_field_restrictions_;
 };
 
@@ -111,8 +119,6 @@ public:
 
   std::string name() const override { return "removeFieldAction"; }
 };
-
-using FilterConfigSharedPtr = std::shared_ptr<const ProtoApiScrubberFilterConfig>;
 
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters
