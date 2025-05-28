@@ -984,9 +984,16 @@ virtual_hosts:
     EXPECT_FALSE(route_entry->currentUrlPathAfterRewrite(headers).has_value());
     route_entry->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("new_host", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("api.lyft.com", headers.getEnvoyOriginalHostValue());
     // Config setting append_x_forwarded_host is false (by default). Expect empty x-forwarded-host
     // header value.
     EXPECT_EQ("", headers.get_(Http::Headers::get().ForwardedHost));
+
+    Http::TestRequestHeaderMapImpl headers2 = genHeaders("api.lyft.com", "/host/rewrite/me", "GET");
+    // Host rewrite testing with x-envoy-* headers suppressed.
+    route_entry->finalizeRequestHeaders(headers2, stream_info, false);
+    EXPECT_EQ("new_host", headers2.get_(Http::Headers::get().Host));
+    EXPECT_EQ("", headers2.getEnvoyOriginalHostValue());
   }
 
   // Rewrites host using supplied header.
@@ -997,6 +1004,7 @@ virtual_hosts:
     EXPECT_FALSE(route_entry->currentUrlPathAfterRewrite(headers).has_value());
     route_entry->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("rewrote", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("api.lyft.com", headers.getEnvoyOriginalHostValue());
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
@@ -1008,6 +1016,7 @@ virtual_hosts:
     EXPECT_FALSE(route_entry->currentUrlPathAfterRewrite(headers).has_value());
     route_entry->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("", headers.getEnvoyOriginalHostValue());
     EXPECT_EQ("", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
@@ -1019,6 +1028,7 @@ virtual_hosts:
     EXPECT_FALSE(route_entry->currentUrlPathAfterRewrite(headers).has_value());
     route_entry->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("envoyproxy.io", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("api.lyft.com", headers.getEnvoyOriginalHostValue());
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().ForwardedHost));
   }
 
@@ -1030,6 +1040,7 @@ virtual_hosts:
     EXPECT_FALSE(route_entry->currentUrlPathAfterRewrite(headers).has_value());
     route_entry->finalizeRequestHeaders(headers, stream_info, true);
     EXPECT_EQ("envoyproxy.io", headers.get_(Http::Headers::get().Host));
+    EXPECT_EQ("api.lyft.com", headers.getEnvoyOriginalHostValue());
     EXPECT_EQ("api.lyft.com", headers.get_(Http::Headers::get().ForwardedHost));
   }
 

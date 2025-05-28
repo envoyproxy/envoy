@@ -108,6 +108,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
+    used to record the original host header value before it is mutated by the router filter.
 - area: stateful_session
   change: |
     Supports envelope stateful session extension to keep the exist session header value
