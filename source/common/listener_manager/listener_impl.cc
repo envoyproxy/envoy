@@ -1161,12 +1161,13 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
   for (auto& other_addr : other.addresses()) {
     if (other_addr->ip() == nullptr ||
         (other_addr->ip() != nullptr && (other_addr->ip()->port() != 0 || !bindToPort()))) {
-      if (find_if(addresses_.begin(), addresses_.end(),
-                  [&other_addr](const Network::Address::InstanceConstSharedPtr& addr) {
-                    const bool same_netns =
-                        addr->networkNamespace() == other_addr->networkNamespace();
-                    return same_netns && *other_addr == *addr;
-                  }) != addresses_.end()) {
+      auto is_dup_addr = [&other_addr](const Network::Address::InstanceConstSharedPtr& addr) {
+        const bool same_netns = addr->networkNamespace() == other_addr->networkNamespace();
+        const bool same_address = *other_addr == *addr;
+        return same_netns && same_address;
+      };
+
+      if (find_if(addresses_.begin(), addresses_.end(), is_dup_addr) != addresses_.end()) {
         return true;
       }
     }
