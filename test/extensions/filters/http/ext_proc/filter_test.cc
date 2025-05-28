@@ -2932,7 +2932,8 @@ TEST_F(HttpFilterTest, ProtocolConfigEncodingPerRouteTest) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
   EXPECT_TRUE(last_request_.has_protocol_config());
   EXPECT_EQ(last_request_.protocol_config().request_body_mode(), ProcessingMode::STREAMED);
-  EXPECT_EQ(last_request_.protocol_config().response_body_mode(), ProcessingMode::FULL_DUPLEX_STREAMED);
+  EXPECT_EQ(last_request_.protocol_config().response_body_mode(),
+            ProcessingMode::FULL_DUPLEX_STREAMED);
   filter_->onDestroy();
 }
 
