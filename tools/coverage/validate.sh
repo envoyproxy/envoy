@@ -2,10 +2,8 @@
 set -eo pipefail
 
 COVERAGE_JSON="${1}"
-COVERAGE_THRESHOLD="${2}"
-FUZZ_COVERAGE="${3}"
-IS_MOBILE="${4}"
-
+FUZZ_COVERAGE="${2}"
+IS_MOBILE="${3}"
 
 if [[ -z "$COVERAGE_JSON" || ! -f "$COVERAGE_JSON" ]]; then
     echo "ERROR: Coverage JSON file not provided or not found: $COVERAGE_JSON" >&2
@@ -17,111 +15,25 @@ if [[ -z "$COVERAGE_CONFIG" || ! -f "$COVERAGE_CONFIG" ]]; then
     exit 1
 fi
 
-RETURNS=0
-COVERAGE_VALUE="$($JQ_BIN '.summary.coverage_percent' "$COVERAGE_JSON")"
-COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
-if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
-    echo "ERROR: Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}" >&2
-    RETURNS=1
-else
-    echo "Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}"
-fi
+THRESHOLD_REACHED="$($JQ_BIN '.summary.threshold_reached' "$COVERAGE_JSON")"
+SUMMARY_MESSAGE="$($JQ_BIN -r '.summary_message' "$COVERAGE_JSON")"
+
 if [[ "${FUZZ_COVERAGE}" == "true" || "${IS_MOBILE}" == "true" ]]; then
-    exit "$RETURNS"
-fi
-DEFAULT_COVERAGE_THRESHOLD=96.6
-FAILED=0
-echo "Checking per-directory coverage..."
-echo
-
-# Find all directories containing .cc files in the source tree
-DIRECTORIES=$(find "${BUILD_WORKING_DIRECTORY}/source" -name "*.cc" -type f -printf '%h\n' | sed "s|^${BUILD_WORKING_DIRECTORY}/||" | sort -u)
-
-declare -a FAILED_COVERAGE=()
-declare -a LOW_COVERAGE=()
-declare -a EXCELLENT_COVERAGE=()
-declare -a HIGH_COVERAGE_ADJUSTABLE=()
-
-while IFS= read -r DIRECTORY; do
-    [[ -z "$DIRECTORY" ]] && continue
-    COVERAGE_VALUE=$(${JQ_BIN} -r ".per_directory_coverage[\"${DIRECTORY}\"].coverage_percent // \"n\"" "$COVERAGE_JSON")
-    if [[ "$COVERAGE_VALUE" == "n" ]]; then
-        continue
+    echo "$SUMMARY_MESSAGE"
+    if [[ "${THRESHOLD_REACHED}" == "false" ]]; then
+        exit 1
     fi
-    COVERAGE_THRESHOLD=$(${JQ_BIN} -r ".\"${DIRECTORY}\" // ${DEFAULT_COVERAGE_THRESHOLD}" "$COVERAGE_CONFIG")
-    if (( $(echo "$COVERAGE_VALUE < $COVERAGE_THRESHOLD" | bc -l) )); then
-        # Coverage is below the threshold for this directory
-        FAILED_COVERAGE+=("${DIRECTORY}: ${COVERAGE_VALUE}% (threshold: ${COVERAGE_THRESHOLD}%)")
-        FAILED=1
-    else
-        # Coverage meets or exceeds the threshold
-        if (( $(echo "$COVERAGE_THRESHOLD < $DEFAULT_COVERAGE_THRESHOLD" | bc -l) )); then
-            # This directory has a configured exception (lower threshold)
-            LOW_COVERAGE+=("${DIRECTORY}: ${COVERAGE_VALUE}% (configured threshold: ${COVERAGE_THRESHOLD}%)")
-
-            # Check if coverage is significantly higher than the configured threshold
-            if (( $(echo "$COVERAGE_VALUE > $COVERAGE_THRESHOLD" | bc -l) )); then
-                HIGH_COVERAGE_ADJUSTABLE+=("${DIRECTORY}: ${COVERAGE_VALUE}% (current threshold: ${COVERAGE_THRESHOLD}%)")
-            fi
-        elif (( $(echo "$COVERAGE_VALUE >= $DEFAULT_COVERAGE_THRESHOLD" | bc -l) )); then
-            # Excellent coverage (meets default threshold)
-            EXCELLENT_COVERAGE+=("${DIRECTORY}: ${COVERAGE_VALUE}%")
-        fi
-    fi
-done <<< "$DIRECTORIES"
-
-echo "================== Per-Directory Coverage Report =================="
-echo
-
-if [[ ${#EXCELLENT_COVERAGE[@]} -gt 0 ]]; then
-    echo "Directories with excellent coverage (>=${DEFAULT_COVERAGE_THRESHOLD}%):"
-    for dir in "${EXCELLENT_COVERAGE[@]}"; do
-        echo "  ✓ $dir"
-    done
-    echo
+    exit 0
 fi
 
-if [[ ${#LOW_COVERAGE[@]} -gt 0 ]]; then
-    echo "Directories with known low coverage (meeting configured thresholds):"
-    for dir in "${LOW_COVERAGE[@]}"; do
-        echo "  ⚠ $dir"
-    done
-    echo
+FAILED_COUNT=$($JQ_BIN '.validation_summary.failed_count' "$COVERAGE_JSON")
+ADJUSTABLE_COUNT=$($JQ_BIN '.validation_summary.adjustable_count' "$COVERAGE_JSON")
+if [[ "$FAILED_COUNT" -gt 0 || "$ADJUSTABLE_COUNT" -gt 0 ]]; then
+    $JQ_BIN -r '.summary_report' "$COVERAGE_JSON"
+else
+    echo "$SUMMARY_MESSAGE"
 fi
-
-if [[ ${#HIGH_COVERAGE_ADJUSTABLE[@]} -gt 0 ]]; then
-    echo "WARNING: Coverage in the following directories may be adjusted up:"
-    for dir in "${HIGH_COVERAGE_ADJUSTABLE[@]}"; do
-        echo "  ⬆ $dir"
-    done
-    echo
-fi
-
-if [[ ${#FAILED_COVERAGE[@]} -gt 0 ]]; then
-    echo "FAILED: Directories not meeting coverage thresholds:"
-    for dir in "${FAILED_COVERAGE[@]}"; do
-        echo "  ✗ $dir"
-    done
-    echo
-fi
-
-TOTAL_COVERAGE=$(${JQ_BIN} -r '.summary.coverage_percent' "$COVERAGE_JSON")
-SOURCE_DIR_COUNT=$(echo "$DIRECTORIES" | wc -l)
-echo "=================================================================="
-echo "Overall Coverage: ${TOTAL_COVERAGE}%"
-echo "Source directories checked: ${SOURCE_DIR_COUNT}"
-echo "Failed: ${#FAILED_COVERAGE[@]}"
-echo "Low coverage (configured): ${#LOW_COVERAGE[@]}"
-echo "Excellent coverage: ${#EXCELLENT_COVERAGE[@]}"
-if [[ ${#HIGH_COVERAGE_ADJUSTABLE[@]} -gt 0 ]]; then
-    echo "Can be adjusted up: ${#HIGH_COVERAGE_ADJUSTABLE[@]}"
-fi
-echo "=================================================================="
-
-if [[ $FAILED -eq 1 ]]; then
-    echo
-    echo "ERROR: Coverage check failed. Some directories are below their thresholds."
+if [[ "$FAILED_COUNT" -gt 0 || "${THRESHOLD_REACHED}" == "false" ]]; then
     exit 1
 fi
-
-exit "$RETURNS"
+exit 0

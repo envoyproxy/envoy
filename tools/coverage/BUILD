@@ -1,5 +1,4 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
-load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//bazel:envoy_build_system.bzl", "envoy_package")
@@ -54,20 +53,26 @@ jq(
 # is injected here. This means CoverageReportGenerator cannot
 # run remote.
 genrule(
-    name = "coverage_report_generator_script",
-    srcs = ["coverage_report_generator.sh.template"],
-    outs = ["coverage_report_generator.sh"],
+    name = "report_generator_script",
+    srcs = ["report_generator.sh.template"],
+    outs = ["report_generator.sh"],
     cmd = "sed 's|@@WORKSPACE_PATH@@|$$(realpath %s)|g' $< > $@" % PATH,
-    tools = ["//tools/coverage:grcov_bin"],
+)
+
+label_flag(
+    name = "config",
+    build_setting_default = "//test:coverage_config",
+    visibility = ["//visibility:public"],
 )
 
 sh_binary(
-    name = "coverage_report_generator",
-    srcs = [":coverage_report_generator_script"],
+    name = "report_generator",
+    srcs = [":report_generator_script"],
     data = [
+        ":config",
+        ":filter.jq",
         ":grcov_bin",
         ":grcov_config",
-        ":markdown_to_json.jq",
         ":templates/base.html",
         ":templates/index.html",
         ":templates/macros.html",
@@ -78,23 +83,16 @@ sh_binary(
     visibility = ["//visibility:public"],
 )
 
-yq(
-    name = "coverage_config",
-    srcs = ["//test:per_directory_coverage.yaml"],
-    outs = ["coverage_config.json"],
-    args = ["-o=json"],
-)
-
 sh_binary(
     name = "validate",
     srcs = [":validate.sh"],
     data = [
-        ":coverage_config",
+        ":config",
         "@jq_toolchains//:resolved_toolchain",
     ],
     env = {
         "JQ_BIN": "$(JQ_BIN)",
-        "COVERAGE_CONFIG": "$(location :coverage_config)",
+        "COVERAGE_CONFIG": "$(location :config)",
     },
     toolchains = ["@jq_toolchains//:resolved_toolchain"],
     visibility = ["//visibility:public"],
