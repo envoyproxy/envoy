@@ -1,10 +1,13 @@
 #pragma once
 
 #include "envoy/stream_info/stream_info.h"
+#include "envoy/common/exception.h"
+#include "envoy/singleton/manager.h"
 
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/context.h"
+#include "source/common/runtime/runtime_features.h"
 
 // CEL-CPP does not enforce unused parameter checks consistently, so we relax it here.
 
@@ -18,6 +21,12 @@
 #include "eval/public/cel_value.h"
 
 #include "xds/type/v3/cel.pb.h"
+
+#include "cel/expr/syntax.pb.h"
+#include "eval/public/builtin_func_registrar.h"
+#include "eval/public/cel_expr_builder_factory.h"
+
+#include "envoy/extensions/filters/common/expr/v3/cel.pb.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -89,7 +98,7 @@ using BuilderInstanceSharedPtr = std::shared_ptr<BuilderInstance>;
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder(Protobuf::Arena* arena);
+BuilderPtr createBuilder(Protobuf::Arena* arena, const envoy::extensions::filters::common::expr::v3::CelEvaluatorConfig* config = nullptr);
 
 // Gets the singleton expression builder. Must be called on the main thread.
 BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context);
