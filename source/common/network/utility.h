@@ -410,10 +410,9 @@ public:
 
     // Restore the original network namespace before returning the function result.
     setns_result = Api::LinuxOsSysCallsSingleton().get().setns(og_netns_fd, CLONE_NEWNET);
-    if (setns_result.return_value_ != 0) {
-      return absl::InternalError(fmt::format("failed to restore original netns (fd={}): {}",
-                                             netns_fd, errorDetails(errno)));
-    }
+    RELEASE_ASSERT(
+        setns_result.return_value_ == 0,
+        fmt::format("failed to restore original netns (fd={}): {}", netns_fd, errorDetails(errno)));
 
     return result;
   }
