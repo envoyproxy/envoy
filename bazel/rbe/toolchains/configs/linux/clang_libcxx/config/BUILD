@@ -45,7 +45,7 @@ platform(
     ],
     exec_properties = {
         "cache-silo-key": CACHE_SILO_KEY,
-        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:a1739972e31cd142e2fc37e420e7f86c80f5a971328d0f50ee6522abac2fdde2",
+        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:a41f69c56ba636856576949a22cc2ec450c48a7a37487554d8a31827e0d54c03",
         "OSFamily": "Linux",
     },
     parents = ["@local_config_platform//:host"],
@@ -74,7 +74,7 @@ platform(
         "@bazel_tools//tools/cpp:clang",
     ],
     exec_properties = {
-        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:a1739972e31cd142e2fc37e420e7f86c80f5a971328d0f50ee6522abac2fdde2",
+        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:a41f69c56ba636856576949a22cc2ec450c48a7a37487554d8a31827e0d54c03",
         "OSFamily": "Linux",
         "Pool": "arm",
     },
