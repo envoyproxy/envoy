@@ -154,6 +154,12 @@ envoy_cc_library(
         ],
         "//conditions:default": [],
     }),
+    linkopts = select({
+        "@envoy//bazel:apple": [
+            "-framework CFNetwork",
+        ],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [
@@ -167,12 +173,6 @@ envoy_cc_library(
             "@envoy//envoy/event:dispatcher_interface",
             "@envoy//source/common/common:thread_impl_lib_posix",
             "@envoy//source/common/common:thread_lib",
-        ],
-        "//conditions:default": [],
-    }),
-    linkopts = select({
-        "@envoy//bazel:apple": [
-            "-framework CFNetwork",
         ],
         "//conditions:default": [],
     }),
