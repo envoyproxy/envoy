@@ -14,7 +14,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/data/ip_taggin
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Ip Tagging Data]
-// :ref:`Ip Tagging Filter config overview <_config_http_filters_ip_tagging>`.
+// :ref:`Ip Tagging Filter config overview <config_http_filters_ip_tagging>`.
 
 // Supplies the IP tag name and the IP address subnets.
 message IPTag {

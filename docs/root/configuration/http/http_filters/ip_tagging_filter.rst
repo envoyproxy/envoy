@@ -24,8 +24,10 @@ G. Karlsson.
 
 Ip tags can either be parsed from :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` api field or
 can be loaded from file if :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` api field is configured.
-Ip tags will be dynamically realoded if *watched_directory* is configured for :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
-is configured and :ref:`ip_tags_refresh_rate <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_refresh_rate>` is set to value greater than zero.
+Both :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` and file with *filename* from :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
+use :ref:`IPTag <envoy_v3_api_msg_data.ip_tagging.v3.IPTag>` proto format for defining individual ip tags.
+Ip tags will be dynamically reloaded if *watched_directory* is configured for :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
+and :ref:`ip_tags_refresh_rate <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_refresh_rate>` is set to value greater than zero.
 
 Configuration
 -------------
