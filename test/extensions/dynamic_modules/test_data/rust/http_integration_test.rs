@@ -20,9 +20,10 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {
       immediate_end_of_stream: config == b"immediate_end_of_stream",
     })),
-    "send_response" => Some(Box::new(SendResponseHttpFilterConfig {
-      on_request_headers: config == b"on_request_headers",
+    "http_callouts" => Some(Box::new(HttpCalloutsFilterConfig {
+      cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
+    "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -252,21 +253,34 @@ impl Drop for BodyCallbacksFilter {
 }
 
 struct SendResponseHttpFilterConfig {
-  on_request_headers: bool,
+  f: SendResponseHttpFilter,
+}
+
+impl SendResponseHttpFilterConfig {
+  fn new(config: &[u8]) -> Self {
+    let f = match config {
+      b"on_request_headers" => SendResponseHttpFilter::OnRequestHeader,
+      b"on_request_body" => SendResponseHttpFilter::OnRequestBody,
+      b"on_response_headers" => SendResponseHttpFilter::OnResponseHeader,
+      _ => panic!("Unknown filter name: {:?}", config),
+    };
+    Self { f }
+  }
 }
 
 impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
   for SendResponseHttpFilterConfig
 {
   fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(SendResponseHttpFilter {
-      on_request_headers: self.on_request_headers,
-    })
+    Box::new(self.f.clone())
   }
 }
 
-struct SendResponseHttpFilter {
-  on_request_headers: bool,
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SendResponseHttpFilter {
+  OnRequestHeader,
+  OnRequestBody,
+  OnResponseHeader,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
@@ -275,7 +289,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    if self.on_request_headers {
+    if self == &SendResponseHttpFilter::OnRequestHeader {
       envoy_filter.send_response(
         200,
         vec![("some_header", b"some_value")],
@@ -292,11 +306,132 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseHttpFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
+    if self == &SendResponseHttpFilter::OnRequestBody {
+      envoy_filter.send_response(
+        200,
+        vec![("some_header", b"some_value")],
+        Some(b"local_response_body_from_on_request_body"),
+      );
+      envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer
+    } else {
+      envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
+    }
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    if self == &SendResponseHttpFilter::OnResponseHeader {
+      envoy_filter.send_response(
+        500,
+        vec![("some_header", b"some_value")],
+        Some(b"local_response_body_from_on_response_headers"),
+      );
+      return envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration;
+    }
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+}
+
+struct HttpCalloutsFilterConfig {
+  cluster_name: String,
+}
+
+impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+  for HttpCalloutsFilterConfig
+{
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(HttpCalloutsFilter {
+      cluster_name: self.cluster_name.clone(),
+    })
+  }
+}
+
+struct HttpCalloutsFilter {
+  cluster_name: String,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let result = envoy_filter.send_http_callout(
+      1234,
+      &self.cluster_name,
+      vec![
+        (":path", b"/"),
+        (":method", b"GET"),
+        ("host", b"example.com"),
+      ],
+      Some(b"http_callout_body"),
+      1000,
+    );
+    if result != envoy_dynamic_module_type_http_callout_init_result::Success {
+      envoy_filter.send_response(500, vec![("foo", b"bar")], None);
+    } else {
+      // Try sending the same callout id, which should fail.
+      assert_eq!(
+        envoy_filter.send_http_callout(
+          1234,
+          &self.cluster_name,
+          vec![
+            (":path", b"/"),
+            (":method", b"GET"),
+            ("host", b"example.com"),
+          ],
+          None,
+          1000,
+        ),
+        abi::envoy_dynamic_module_type_http_callout_init_result::DuplicateCalloutId
+      );
+    }
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_http_callout_done(
+    &mut self,
+    envoy_filter: &mut EHF,
+    callout_id: u32,
+    result: abi::envoy_dynamic_module_type_http_callout_result,
+    response_headers: Option<&[(EnvoyBuffer, EnvoyBuffer)]>,
+    response_body: Option<&[EnvoyBuffer]>,
+  ) {
+    if self.cluster_name == "resetting_cluster" {
+      assert_eq!(result, envoy_dynamic_module_type_http_callout_result::Reset);
+      return;
+    }
+    assert_eq!(
+      result,
+      envoy_dynamic_module_type_http_callout_result::Success
+    );
+    assert_eq!(callout_id, 1234);
+    assert!(response_headers.is_some());
+    assert!(response_body.is_some());
+    let response_headers = response_headers.unwrap();
+    let response_body = response_body.unwrap();
+    let mut found_header = false;
+    for (name, value) in response_headers {
+      if name.as_slice() == b"some_header" {
+        assert_eq!(value.as_slice(), b"some_value");
+        found_header = true;
+        break;
+      }
+    }
+    assert!(found_header, "Expected header 'some_header' not found");
+    let mut body = String::new();
+    for chunk in response_body {
+      body.push_str(std::str::from_utf8(chunk.as_slice()).unwrap());
+    }
+    assert_eq!(body, "response_body_from_callout");
+
     envoy_filter.send_response(
       200,
       vec![("some_header", b"some_value")],
-      Some(b"local_response_body_from_on_request_body"),
+      Some(b"local_response_body"),
     );
-    envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer
   }
 }

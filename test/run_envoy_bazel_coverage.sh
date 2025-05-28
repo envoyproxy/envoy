@@ -9,19 +9,19 @@ LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/
 
 if [ "${CLANG_VERSION}" != "${LLVM_VERSION}" ]
 then
-  echo "clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}"
+  echo "ERROR: clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}" >&2
   exit 1
 fi
 
 if [ "${LLVM_COV_VERSION}" != "${LLVM_VERSION}" ]
 then
-  echo "llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}"
+  echo "ERROR: llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}" >&2
   exit 1
 fi
 
 if [ "${LLVM_PROFDATA_VERSION}" != "${LLVM_VERSION}" ]
 then
-  echo "llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}"
+  echo "ERROR: llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}" >&2
   exit 1
 fi
 
@@ -103,17 +103,37 @@ rm -rf "${COVERAGE_DIR}"
 mkdir -p "${COVERAGE_DIR}"
 
 if [[ ! -e bazel-out/_coverage/_coverage_report.dat ]]; then
-    echo "No coverage report found (bazel-out/_coverage/_coverage_report.dat)" >&2
+    echo "ERROR: No coverage report found (bazel-out/_coverage/_coverage_report.dat)" >&2
     exit 1
 elif [[ ! -s bazel-out/_coverage/_coverage_report.dat ]]; then
-    echo "Coverage report is empty (bazel-out/_coverage/_coverage_report.dat)" >&2
+    echo "ERROR: Coverage report is empty (bazel-out/_coverage/_coverage_report.dat)" >&2
     exit 1
 else
     COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
     cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 fi
 
-COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
+read -ra GENHTML_ARGS <<< "${GENHTML_ARGS:-}"
+# TEMP WORKAROUND FOR MOBILE
+CWDNAME="$(basename "${SRCDIR}")"
+if [[ "$CWDNAME" == "mobile" ]]; then
+    for arg in "${GENHTML_ARGS[@]}"; do
+        if [[ "$arg" == --erase-functions=* ]]; then
+            mobile_args_present=true
+        fi
+    done
+    if [[ "$mobile_args_present" != "true" ]]; then
+        GENHTML_ARGS+=(
+            --erase-functions=__cxx_global_var_init
+            --ignore-errors "category,corrupt,inconsistent")
+    fi
+fi
+GENHTML_ARGS=(
+    --prefix "${PWD}"
+    --output "${COVERAGE_DIR}"
+    "${GENHTML_ARGS[@]}"
+    "${COVERAGE_DATA}")
+COVERAGE_VALUE="$(genhtml "${GENHTML_ARGS[@]}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
 COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
 echo "Compressing coveraged data"
@@ -140,7 +160,7 @@ if [[ "$VALIDATE_COVERAGE" == "true" ]]; then
   COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
   if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
       echo "##vso[task.setvariable variable=COVERAGE_FAILED]${COVERAGE_FAILED}"
-      echo "Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}"
+      echo "ERROR: Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}" >&2
       exit 1
   else
       echo "Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}"

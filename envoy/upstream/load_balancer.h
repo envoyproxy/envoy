@@ -145,6 +145,14 @@ public:
    */
   virtual Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const PURE;
 
+  /**
+   * Upstream override host. The first element is the target host address and the second element is
+   * a boolean indicating whether the host should be selected strictly or not.
+   * If the host should be selected strictly and no valid host is found, the load balancer should
+   * return  nullptr.
+   * If the host should not be selected strictly, the load balancer will select another host is the
+   * target host is not valid.
+   */
   using OverrideHost = std::pair<absl::string_view, bool>;
   /**
    * Returns the host the load balancer should select directly. If the expected host exists and
@@ -158,6 +166,15 @@ public:
    * @param details gives optional details about the resolution success/failure.
    */
   virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string&& details) PURE;
+
+  /**
+   * Called by the load balancer to set the headers modifier that will be used to modify the
+   * response headers before sending them downstream.
+   * NOTE: this should be called only once per request, no matter how many times the retrying
+   * happens.
+   * @param modifier supplies the function that will modify the response headers.
+   */
+  virtual void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) PURE;
 };
 
 /**

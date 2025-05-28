@@ -933,21 +933,10 @@ void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
       active_span_.get()};
 
-  const bool filter_access_loggers_first =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.filter_access_loggers_first");
-
-  if (!filter_access_loggers_first) {
-    for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
-      access_logger->log(log_context, filter_manager_.streamInfo());
-    }
-  }
-
   filter_manager_.log(log_context);
 
-  if (filter_access_loggers_first) {
-    for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
-      access_logger->log(log_context, filter_manager_.streamInfo());
-    }
+  for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
+    access_logger->log(log_context, filter_manager_.streamInfo());
   }
 }
 

@@ -1,18 +1,13 @@
-#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
-
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 
 #include "test/extensions/common/aws/mocks.h"
-#include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/test_runtime.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::_;
 using testing::Eq;
-using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
 namespace Envoy {
@@ -54,7 +49,6 @@ messageMatches(const Http::TestRequestHeaderMapImpl& expected_headers) {
   return testing::MakeMatcher(new MessageMatcher(expected_headers));
 }
 
-// Begin unit test for new option via Http Async client.
 class InstanceProfileCredentialsProviderTest : public testing::Test {
 public:
   InstanceProfileCredentialsProviderTest()
@@ -65,19 +59,17 @@ public:
                      std::chrono::seconds initialization_timer = std::chrono::seconds(2)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
-    base_manager_ = std::dynamic_pointer_cast<AwsClusterManager>(mock_manager_);
-
-    manager_optref_.emplace(base_manager_);
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
         .WillRepeatedly(Return("169.254.170.2:80/path/to/doc"));
 
     provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
-        *api_, context_, manager_optref_, nullptr,
+        *api_, context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
         },
         refresh_state, initialization_timer, "credentials_provider_cluster");
+    EXPECT_EQ(provider_->providerName(), "InstanceProfileCredentialsProvider");
   }
 
   void expectSessionToken(const uint64_t status_code, const std::string&& token) {
@@ -241,9 +233,7 @@ public:
   Upstream::ClusterUpdateCallbacks* cluster_update_callbacks_{};
   Event::MockTimer* timer_{};
   std::chrono::milliseconds expected_duration_;
-  OptRef<std::shared_ptr<AwsClusterManager>> manager_optref_;
   std::shared_ptr<MockAwsClusterManager> mock_manager_;
-  std::shared_ptr<AwsClusterManager> base_manager_;
 };
 
 TEST_F(InstanceProfileCredentialsProviderTest, FailedCredentialListingIMDSv1) {
@@ -785,326 +775,30 @@ TEST_F(InstanceProfileCredentialsProviderTest,
   EXPECT_FALSE(credentials.sessionToken().has_value());
 }
 
-// End unit test for new option via Http Async client.
+TEST_F(InstanceProfileCredentialsProviderTest, TestCancel) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-// Begin unit test for deprecated option using Libcurl client.
-// TODO(suniltheta): Remove this test class once libcurl is removed from Envoy.
-class InstanceProfileCredentialsProviderUsingLibcurlTest : public testing::Test {
-public:
-  InstanceProfileCredentialsProviderUsingLibcurlTest()
-      : api_(Api::createApiForTest(time_system_)) {}
-
-  void setupProvider() {
-
-    provider_ = std::make_shared<InstanceProfileCredentialsProvider>(
-        *api_, absl::nullopt, absl::nullopt,
-        [this](Http::RequestMessage& message) -> absl::optional<std::string> {
-          return this->fetch_metadata_.fetch(message);
-        },
-        nullptr, MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
-        "credentials_provider_cluster");
-  }
-
-  void expectSessionToken(const absl::optional<std::string>& token) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/api/token"},
-                                           {":authority", "169.254.169.254:80"},
-                                           {":scheme", "http"},
-                                           {":method", "PUT"},
-                                           {"X-aws-ec2-metadata-token-ttl-seconds", "21600"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(token));
-  }
-
-  void expectCredentialListing(const absl::optional<std::string>& listing) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
-                                           {":authority", "169.254.169.254:80"},
-                                           {":scheme", "http"},
-                                           {":method", "GET"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
-  }
-
-  void expectCredentialListingIMDSv2(const absl::optional<std::string>& listing) {
-    Http::TestRequestHeaderMapImpl headers{{":path", "/latest/meta-data/iam/security-credentials"},
-                                           {":authority", "169.254.169.254:80"},
-                                           {":scheme", "http"},
-                                           {":method", "GET"},
-                                           {"X-aws-ec2-metadata-token", "TOKEN"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(listing));
-  }
-
-  void expectDocument(const absl::optional<std::string>& document) {
-    Http::TestRequestHeaderMapImpl headers{
-        {":path", "/latest/meta-data/iam/security-credentials/doc1"},
-        {":authority", "169.254.169.254:80"},
-        {":scheme", "http"},
-        {":method", "GET"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
-  }
-
-  void expectDocumentIMDSv2(const absl::optional<std::string>& document) {
-    Http::TestRequestHeaderMapImpl headers{
-        {":path", "/latest/meta-data/iam/security-credentials/doc1"},
-        {":authority", "169.254.169.254:80"},
-        {":scheme", "http"},
-        {":method", "GET"},
-        {"X-aws-ec2-metadata-token", "TOKEN"}};
-    EXPECT_CALL(fetch_metadata_, fetch(messageMatches(headers))).WillOnce(Return(document));
-  }
-
-  TestScopedRuntime scoped_runtime_;
-  Event::SimulatedTimeSystem time_system_;
-  Api::ApiPtr api_;
-  NiceMock<MockFetchMetadata> fetch_metadata_;
-  InstanceProfileCredentialsProviderPtr provider_;
-};
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingIMDSv1) {
-  setupProvider();
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing(absl::optional<std::string>());
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FailedCredentialListingIMDSv2) {
-  setupProvider();
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2(absl::optional<std::string>());
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingIMDSv1) {
-  setupProvider();
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing("");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyCredentialListingIMDSv2) {
-  setupProvider();
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2("\n");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingIMDSv1) {
-  setupProvider();
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing("\n");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyListCredentialListingIMDSv2) {
-  setupProvider();
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2("");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentIMDSv1) {
-  setupProvider();
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing("doc1\ndoc2\ndoc3");
-  expectDocument(absl::optional<std::string>());
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MissingDocumentIMDSv2) {
-  setupProvider();
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2("doc1\ndoc2\ndoc3");
-  expectDocumentIMDSv2(absl::optional<std::string>());
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentIMDSv1) {
-  setupProvider();
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing("doc1");
-  expectDocument(R"EOF(
+  expectDocument(200, std::move(R"EOF(
 not json
- )EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
+)EOF"));
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, MalformedDocumentIMDSv2) {
   setupProvider();
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2("doc1");
-  expectDocumentIMDSv2(R"EOF(
-not json
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesIMDSv1) {
-  setupProvider();
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing("doc1");
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "",
-  "SecretAccessKey": "",
-  "Token": ""
-}
- )EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  auto mock_fetcher = std::make_unique<MockMetadataFetcher>();
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, EmptyValuesIMDSv2) {
-  setupProvider();
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2("doc1");
-  expectDocumentIMDSv2(R"EOF(
-{
-  "AccessKeyId": "",
-  "SecretAccessKey": "",
-  "Token": ""
-}
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_FALSE(credentials.accessKeyId().has_value());
-  EXPECT_FALSE(credentials.secretAccessKey().has_value());
-  EXPECT_FALSE(credentials.sessionToken().has_value());
-}
+  EXPECT_CALL(*mock_fetcher, cancel);
+  EXPECT_CALL(*mock_fetcher, fetch(_, _, _));
+  // Ensure we have a metadata fetcher configured, so we expect this to receive a cancel
+  provider_friend.setMetadataFetcher(std::move(mock_fetcher));
 
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsIMDSv1) {
-  setupProvider();
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing("doc1");
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token"
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+  delete (raw_metadata_fetcher_);
 }
- )EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials.sessionToken().value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, FullCachedCredentialsIMDSv2) {
-  setupProvider();
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2("doc1");
-  expectDocumentIMDSv2(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token"
-}
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-  const auto cached_credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", cached_credentials.accessKeyId().value());
-  EXPECT_EQ("secret", cached_credentials.secretAccessKey().value());
-  EXPECT_EQ("token", cached_credentials.sessionToken().value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationIMDSv1) {
-  setupProvider();
-  InSequence sequence;
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing("doc1");
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token"
-}
- )EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-  time_system_.advanceTimeWait(std::chrono::hours(2));
-  expectSessionToken(absl::optional<std::string>());
-  expectCredentialListing("doc1");
-  expectDocument(R"EOF(
-{
-  "AccessKeyId": "new_akid",
-  "SecretAccessKey": "new_secret",
-  "Token": "new_token"
-}
- )EOF");
-  const auto new_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", new_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", new_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", new_credentials.sessionToken().value());
-}
-
-TEST_F(InstanceProfileCredentialsProviderUsingLibcurlTest, CredentialExpirationIMDSv2) {
-  setupProvider();
-  InSequence sequence;
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2("doc1");
-  expectDocumentIMDSv2(R"EOF(
-{
-  "AccessKeyId": "akid",
-  "SecretAccessKey": "secret",
-  "Token": "token"
-}
-)EOF");
-  const auto credentials = provider_->getCredentials();
-  EXPECT_EQ("akid", credentials.accessKeyId().value());
-  EXPECT_EQ("secret", credentials.secretAccessKey().value());
-  EXPECT_EQ("token", credentials.sessionToken().value());
-  time_system_.advanceTimeWait(std::chrono::hours(2));
-  expectSessionToken("TOKEN");
-  expectCredentialListingIMDSv2("doc1");
-  expectDocumentIMDSv2(R"EOF(
-{
-  "AccessKeyId": "new_akid",
-  "SecretAccessKey": "new_secret",
-  "Token": "new_token"
-}
-)EOF");
-  const auto new_credentials = provider_->getCredentials();
-  EXPECT_EQ("new_akid", new_credentials.accessKeyId().value());
-  EXPECT_EQ("new_secret", new_credentials.secretAccessKey().value());
-  EXPECT_EQ("new_token", new_credentials.sessionToken().value());
-}
-// End unit test for deprecated option using Libcurl client.
 
 } // namespace Aws
 } // namespace Common

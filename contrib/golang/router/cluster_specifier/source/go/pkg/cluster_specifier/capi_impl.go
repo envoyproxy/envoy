@@ -30,6 +30,7 @@ package cluster_specifier
 */
 import "C"
 import (
+	"runtime"
 	"unsafe"
 
 	"github.com/envoyproxy/envoy/contrib/golang/router/cluster_specifier/source/go/pkg/api"
@@ -42,6 +43,34 @@ type httpCApiImpl struct{}
 func (c *httpCApiImpl) HttpGetHeader(headerPtr uint64, key *string, value *string) bool {
 	found := C.envoyGoClusterSpecifierGetHeader(C.ulonglong(headerPtr), unsafe.Pointer(key), unsafe.Pointer(value))
 	return int(found) == foundHeaderValue
+}
+
+func (c *httpCApiImpl) HttpGetAllHeaders(headerPtr uint64) map[string][]string {
+	var headerNum uint64
+	var headerBytes uint64
+	C.envoyGoClusterSpecifierGetNumHeadersAndByteSize(C.ulonglong(headerPtr), unsafe.Pointer(&headerNum), unsafe.Pointer(&headerBytes))
+
+	m := make(map[string][]string, headerNum)
+	if headerNum == 0 {
+		return m
+	}
+
+	strs := make([]string, headerNum*2)
+	buf := make([]byte, headerBytes)
+	C.envoyGoClusterSpecifierGetAllHeaders(C.ulonglong(headerPtr), unsafe.Pointer(unsafe.SliceData(strs)), unsafe.Pointer(unsafe.SliceData(buf)))
+
+	for i := uint64(0); i < headerNum*2; i += 2 {
+		key := strs[i]
+		value := strs[i+1]
+
+		if v, found := m[key]; !found {
+			m[key] = []string{value}
+		} else {
+			m[key] = append(v, value)
+		}
+	}
+	runtime.KeepAlive(buf)
+	return m
 }
 
 func (c *httpCApiImpl) HttpLogError(pluginPtr uint64, msg *string) {

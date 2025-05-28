@@ -1310,7 +1310,7 @@ RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
 }
 
 absl::StatusOr<PathRewriterSharedPtr>
-RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
+RouteEntryImplBase::buildPathRewriter(const envoy::config::route::v3::Route& route,
                                       ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.route().has_path_rewrite_policy()) {
     return nullptr;
@@ -1329,7 +1329,7 @@ RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
 }
 
 absl::StatusOr<PathMatcherSharedPtr>
-RouteEntryImplBase::buildPathMatcher(envoy::config::route::v3::Route route,
+RouteEntryImplBase::buildPathMatcher(const envoy::config::route::v3::Route& route,
                                      ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.match().has_path_match_policy()) {
     return nullptr;
@@ -1938,15 +1938,15 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
                 factory_context.routerContext().virtualClusterStatNames().vcluster_});
     virtual_cluster_catch_all_ = std::make_unique<CatchAllVirtualCluster>(
         *vcluster_scope_, factory_context.routerContext().virtualClusterStatNames());
+    virtual_clusters_.reserve(virtual_host.virtual_clusters().size());
     for (const auto& virtual_cluster : virtual_host.virtual_clusters()) {
       if (virtual_cluster.headers().empty()) {
         creation_status = absl::InvalidArgumentError("virtual clusters must define 'headers'");
         return;
       }
 
-      virtual_clusters_.push_back(
-          VirtualClusterEntry(virtual_cluster, *vcluster_scope_, factory_context,
-                              factory_context.routerContext().virtualClusterStatNames()));
+      virtual_clusters_.emplace_back(virtual_cluster, *vcluster_scope_, factory_context,
+                                     factory_context.routerContext().virtualClusterStatNames());
     }
   }
 

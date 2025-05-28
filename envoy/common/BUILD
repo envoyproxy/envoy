@@ -77,6 +77,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "matchers_interface",
     hdrs = ["matchers.h"],
+    deps = [
+        ":optref_lib",
+        "//envoy/stream_info:stream_info_interface",
+    ],
 )
 
 envoy_cc_library(

@@ -4,7 +4,6 @@
 #include "envoy/common/time.h"
 
 #include "source/common/common/cleanup.h"
-#include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
 
 #include "absl/types/optional.h"
@@ -17,6 +16,8 @@ namespace Aws {
 constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
 constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
 constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
+constexpr std::chrono::hours REFRESH_INTERVAL{1};
+constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 
 /**
  * AWS credentials containers
@@ -208,7 +209,7 @@ private:
 protected:
   std::list<CredentialsProviderSharedPtr> providers_;
   Thread::MutexBasicLockable mu_;
-  std::vector<CredentialsPendingCallback> credential_pending_callbacks_ ABSL_GUARDED_BY(mu_) = {};
+  std::vector<CredentialsPendingCallback> credential_pending_callbacks_ ABSL_GUARDED_BY(mu_);
   std::list<CredentialSubscriberCallbacksHandlePtr> subscriber_handles_;
 };
 

@@ -333,6 +333,14 @@ public:
   using HostURLMetadataMap = std::map<std::string, HostMetadata>;
 
   void initLbConfigAndLB(LoadBalancerSubsetInfoPtr subset_info = nullptr, bool zone_aware = false) {
+    if (child_lb_config_ == nullptr) {
+      // NOTE: the child lb config should never be null.
+      auto factory =
+          Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
+      auto proto_message = factory->createEmptyConfigProto();
+      child_lb_config_ = factory->loadConfig(server_context_, *proto_message).value();
+    }
+
     lb_config_ = std::make_unique<SubsetLoadBalancerConfig>(
         [&]() -> LoadBalancerSubsetInfoPtr {
           if (subset_info == nullptr) {
@@ -1727,6 +1735,8 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallback) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(2));
 
@@ -1772,6 +1782,8 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackAfterUpdate) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(2));
 
@@ -1838,6 +1850,8 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubset) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(2));
 
@@ -1895,6 +1909,8 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareFallbackDefaultSubsetAfterUpdate) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(2));
 
@@ -1965,6 +1981,8 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareBalancesSubsets) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(2));
 
@@ -2020,6 +2038,8 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareBalancesSubsetsAfterUpdate) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(2));
 
@@ -2092,6 +2112,8 @@ TEST_F(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsets) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(2));
 
@@ -2159,6 +2181,8 @@ TEST_P(SubsetLoadBalancerTest, ZoneAwareComplicatedBalancesSubsetsAfterUpdate) {
       .WillRepeatedly(Return(50));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
       .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
       .WillRepeatedly(Return(2));
 
@@ -3313,6 +3337,9 @@ TEST(LoadBalancerContextWrapperTest, LoadBalancingContextWrapperTest) {
 
   EXPECT_CALL(mock_context, overrideHostToSelect());
   wrapper.overrideHostToSelect();
+
+  EXPECT_CALL(mock_context, setHeadersModifier(_));
+  wrapper.setHeadersModifier(nullptr);
 }
 
 } // namespace

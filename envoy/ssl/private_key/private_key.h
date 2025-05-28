@@ -14,7 +14,8 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 // Prevent a dependency loop with the forward declaration.
-class TransportSocketFactoryContext;
+class GenericFactoryContext;
+using TransportSocketFactoryContext = GenericFactoryContext;
 } // namespace Configuration
 } // namespace Server
 

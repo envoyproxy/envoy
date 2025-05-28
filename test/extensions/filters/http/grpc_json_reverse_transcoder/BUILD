@@ -33,6 +33,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.filters.http.grpc_json_reverse_transcoder"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/protobuf",
         "//source/extensions/filters/http/grpc_json_reverse_transcoder:filter",
         "//test/mocks/server:factory_context_mocks",
         "//test/proto:apikeys_proto_cc_proto",

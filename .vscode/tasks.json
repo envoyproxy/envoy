@@ -24,13 +24,13 @@
     {
       "label": "Refresh Compilation Database",
       "type": "shell",
-      "command": "ENVOY_GEN_COMPDB_OPTIONS=\"--vscode\" ./ci/do_ci.sh refresh_compdb",
+      "command": "ENVOY_GEN_COMPDB_OPTIONS=\"--vscode --include_headers\" ./ci/do_ci.sh refresh_compdb",
       "problemMatcher": []
     },
     {
       "label": "Refresh Compilation Database Exclude Contrib",
       "type": "shell",
-      "command": "ENVOY_GEN_COMPDB_OPTIONS=\"--vscode --exclude_contrib\" ./ci/do_ci.sh refresh_compdb",
+      "command": "ENVOY_GEN_COMPDB_OPTIONS=\"--vscode --include_headers --exclude_contrib\" ./ci/do_ci.sh refresh_compdb",
       "problemMatcher": []
     },
     {
