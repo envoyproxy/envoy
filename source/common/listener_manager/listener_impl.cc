@@ -1163,8 +1163,8 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
         (other_addr->ip() != nullptr && (other_addr->ip()->port() != 0 || !bindToPort()))) {
       if (find_if(addresses_.begin(), addresses_.end(),
                   [&other_addr](const Network::Address::InstanceConstSharedPtr& addr) {
-                    const bool same_netns = addr->networkNamespace().value_or("") ==
-                                            other_addr->networkNamespace().value_or("");
+                    const bool same_netns =
+                        addr->networkNamespace() == other_addr->networkNamespace();
                     return same_netns && *other_addr == *addr;
                   }) != addresses_.end()) {
         return true;
