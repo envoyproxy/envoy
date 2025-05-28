@@ -51,7 +51,7 @@ void AssumeRoleCredentialsProvider::onMetadataError(Failure reason) {
 }
 
 void AssumeRoleCredentialsProvider::refresh() {
-  // We can have assumerole credentials pending at this point, as the signers credential provider
+  // We can have assume role credentials pending at this point, as the signers credential provider
   // chain is potentially async
   if (assume_role_signer_->addCallbackIfCredentialsPending([this]() { continueRefresh(); }) ==
       false) {
