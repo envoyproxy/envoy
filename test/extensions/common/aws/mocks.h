@@ -122,18 +122,6 @@ public:
               (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                std::chrono::seconds, absl::string_view));
-
-  MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
-              (Server::Configuration::ServerFactoryContext & context,
-               AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
-               const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
-                   iam_roles_anywhere_config),
-              (const));
-  MOCK_METHOD(
-      CredentialsProviderSharedPtr, createAssumeRoleCredentialsProvider,
-      (Server::Configuration::ServerFactoryContext & context,
-       AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
-       const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config));
 };
 
 class MockSigV4AKeyDerivation : public SigV4AKeyDerivationBase {

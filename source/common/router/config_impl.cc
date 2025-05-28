@@ -1310,7 +1310,7 @@ RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
 }
 
 absl::StatusOr<PathRewriterSharedPtr>
-RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
+RouteEntryImplBase::buildPathRewriter(const envoy::config::route::v3::Route& route,
                                       ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.route().has_path_rewrite_policy()) {
     return nullptr;
@@ -1329,7 +1329,7 @@ RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
 }
 
 absl::StatusOr<PathMatcherSharedPtr>
-RouteEntryImplBase::buildPathMatcher(envoy::config::route::v3::Route route,
+RouteEntryImplBase::buildPathMatcher(const envoy::config::route::v3::Route& route,
                                      ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.match().has_path_match_policy()) {
     return nullptr;

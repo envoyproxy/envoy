@@ -52,9 +52,8 @@ AwsLambdaFilterFactory::getCredentialsProvider(
         server_context, credential_file_config));
     return chain;
   }
-  // TODO: @nbaws extend the API to support credential provider field
-  return std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-      server_context, region, absl::nullopt);
+  return Extensions::Common::Aws::CommonCredentialsProviderChain::defaultCredentialsProviderChain(
+      server_context, region);
 }
 
 absl::StatusOr<Http::FilterFactoryCb> AwsLambdaFilterFactory::createFilterFactoryFromProtoTyped(

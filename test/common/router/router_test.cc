@@ -274,6 +274,20 @@ TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverride) {
   testAutoSniOptions(dummy_option, headers, server_name);
 }
 
+TEST_F(RouterTest, UpdateServerNameFilterStateWithHeaderOverrideWithMultipleHeaderValues) {
+  auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  dummy_option.value().set_override_auto_sni_header("x-host");
+
+  const auto server_name = "foo.bar";
+  const auto server_name2 = "bar.foo";
+
+  Http::TestRequestHeaderMapImpl headers{{"x-host", server_name}, {"x-host", server_name2}};
+
+  // The first header value should be used as the server name.
+  testAutoSniOptions(dummy_option, headers, server_name);
+}
+
 TEST_F(RouterTest, UpdateServerNameFilterStateWithEmptyValueHeaderOverride) {
   auto dummy_option = absl::make_optional<envoy::config::core::v3::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
@@ -545,6 +559,38 @@ TEST_F(RouterTest, HashPolicyNoHash) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
             callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+}
+
+TEST_F(RouterTest, AddHeadersFromUpstreamLb) {
+  ON_CALL(cm_.thread_local_cluster_, chooseHost(_))
+      .WillByDefault(Invoke([this](Upstream::LoadBalancerContext* context) {
+        context->setHeadersModifier([](Http::ResponseHeaderMap& headers) {
+          headers.setCopy(Http::LowerCaseString("test-key"), "test-value");
+        });
+        return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+      }));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  EXPECT_CALL(callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([](const Http::HeaderMap& headers, const bool) -> void {
+        EXPECT_EQ(headers.get(Http::LowerCaseString("test-key"))[0]->value().getStringView(),
+                  "test-value");
+      }));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_EQ(callbacks_.details(), "via_upstream");
+  // When the router filter gets reset we should cancel the pool request.
+  router_->onDestroy();
 }
 
 TEST_F(RouterTest, HashKeyNoHashPolicy) {

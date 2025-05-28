@@ -1,8 +1,9 @@
 #include "source/extensions/common/aws/credential_provider_chains.h"
 
+#include <memory>
+
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 
-#include "source/extensions/common/aws/credential_providers/assume_role_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 #include "source/extensions/common/aws/credential_providers/instance_profile_credentials_provider.h"
 #include "source/extensions/common/aws/utility.h"
@@ -13,6 +14,30 @@ namespace Common {
 namespace Aws {
 
 SINGLETON_MANAGER_REGISTRATION(aws_cluster_manager);
+
+absl::StatusOr<CredentialsProviderChainSharedPtr>
+CommonCredentialsProviderChain::customCredentialsProviderChain(
+    Server::Configuration::ServerFactoryContext& context, absl::string_view region,
+    const envoy::extensions::common::aws::v3::AwsCredentialProvider& credential_provider_config) {
+  if (credential_provider_config.custom_credential_provider_chain() &&
+      !credential_provider_config.has_container_credential_provider() &&
+      !credential_provider_config.has_credentials_file_provider() &&
+      !credential_provider_config.has_environment_credential_provider() &&
+      !credential_provider_config.has_iam_roles_anywhere_credential_provider() &&
+      !credential_provider_config.has_inline_credential() &&
+      !credential_provider_config.has_instance_profile_credential_provider() &&
+      !credential_provider_config.has_assume_role_with_web_identity_provider()) {
+    return absl::InvalidArgumentError(
+        "Custom credential provider chain must have at least one credential provider");
+  }
+
+  return std::make_shared<CommonCredentialsProviderChain>(context, region,
+                                                          credential_provider_config);
+}
+CredentialsProviderChainSharedPtr CommonCredentialsProviderChain::defaultCredentialsProviderChain(
+    Server::Configuration::ServerFactoryContext& context, absl::string_view region) {
+  return std::make_shared<CommonCredentialsProviderChain>(context, region, absl::nullopt);
+}
 
 CommonCredentialsProviderChain::CommonCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region,
@@ -82,19 +107,6 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
     ENVOY_LOG(debug, "Using credentials file credentials provider");
     add(factories.createCredentialsFileCredentialsProvider(
         context, chain_to_create.credentials_file_provider()));
-  }
-
-  if (chain_to_create.has_assume_role_credential_provider()) {
-    const auto& assume_role_config = chain_to_create.assume_role_credential_provider();
-
-    const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
-    const auto cluster_name = stsClusterName(region);
-
-    ENVOY_LOG(debug,
-              "Using assumerole credentials provider with STS endpoint: {} and session name: {}",
-              sts_endpoint, assume_role_config.role_session_name());
-    add(factories.createAssumeRoleCredentialsProvider(context, aws_cluster_manager_, region,
-                                                      assume_role_config));
   }
 
   if (chain_to_create.has_assume_role_with_web_identity_provider()) {
@@ -174,60 +186,6 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
 
 SINGLETON_MANAGER_REGISTRATION(container_credentials_provider);
 SINGLETON_MANAGER_REGISTRATION(instance_profile_credentials_provider);
-
-CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCredentialsProvider(
-    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
-    absl::string_view region,
-    const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config) {
-
-  const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
-  const auto initialization_timer = std::chrono::seconds(2);
-
-  auto cluster_name = stsClusterName(region);
-  auto uri = Utility::getSTSEndpoint(region) + ":443";
-
-  auto status = aws_cluster_manager->addManagedCluster(
-      cluster_name, envoy::config::cluster::v3::Cluster::LOGICAL_DNS, uri);
-
-  CredentialsProviderChainSharedPtr credentials_provider_chain;
-
-  if (assume_role_config.has_credential_provider()) {
-    // If a custom chain has been configured in the assume role provider, ensure we do not allow the
-    // user to specify another assume role provider.
-
-    envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config;
-    credential_provider_config.CopyFrom(assume_role_config.credential_provider());
-    credential_provider_config.clear_assume_role_credential_provider();
-    credentials_provider_chain =
-        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-            context, region, credential_provider_config);
-  } else {
-    credentials_provider_chain =
-        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context, region,
-                                                                                  absl::nullopt);
-  }
-
-  // Create our own signer specifically for signing AssumeRole API call
-  auto signer = std::make_unique<SigV4SignerImpl>(
-      STS_SERVICE_NAME, region, credentials_provider_chain, context,
-      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
-
-  auto credential_provider = std::make_shared<AssumeRoleCredentialsProvider>(
-      context, aws_cluster_manager, cluster_name, MetadataFetcher::create, region, refresh_state,
-      initialization_timer, std::move(signer), assume_role_config);
-
-  auto handleOr = aws_cluster_manager->addManagedClusterUpdateCallbacks(
-      cluster_name,
-      *std::dynamic_pointer_cast<AwsManagedClusterUpdateCallbacks>(credential_provider));
-
-  if (handleOr.ok()) {
-    credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
-  }
-
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
-  return credential_provider;
-};
 
 CredentialsProviderSharedPtr CommonCredentialsProviderChain::createContainerCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,

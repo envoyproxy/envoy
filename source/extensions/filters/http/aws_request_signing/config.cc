@@ -1,5 +1,13 @@
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
+#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
+#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
+
+#include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/extensions/common/aws/credential_providers/inline_credentials_provider.h"
+#include "source/extensions/common/aws/region_provider_impl.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
+#include "source/extensions/common/aws/signers/sigv4a_signer_impl.h"
 #include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 
 namespace Envoy {
@@ -92,37 +100,26 @@ AwsRequestSigningFilterFactory::createSigner(
       credentials_provider_chain =
           absl::InvalidArgumentError("No credentials provider settings configured.");
 
-  if (config.has_credential_provider() && config.credential_provider().has_inline_credential()) {
-    // If inline credential provider is set, use it instead of a credentials chain
-    const auto& inline_credential = config.credential_provider().inline_credential();
-    credentials_provider_chain =
-        std::make_shared<Extensions::Common::Aws::CredentialsProviderChain>();
-    auto inline_provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
-        inline_credential.access_key_id(), inline_credential.secret_access_key(),
-        inline_credential.session_token());
-    credentials_provider_chain.value()->add(inline_provider);
-  } else if (config.has_credential_provider() &&
-             config.credential_provider().custom_credential_provider_chain()) {
-    // Custom credential provider chain is true, so use configuration that has been provided
-       // Custom credential provider chain must have at least one configured provider
-        if (
-          config.credential_provider().has_assume_role_credential_provider() ||
-          config.credential_provider().has_config_credential_provider() ||
-config.credential_provider().has_container_credential_provider() ||
-config.credential_provider().has_credentials_file_provider() ||
-config.credential_provider().has_environment_credential_provider() ||
-  config.credential_provider().has_iam_roles_anywhere_credential_provider() ||
-  config.credential_provider().has_inline_credential() ||
-config.credential_provider().has_instance_profile_credential_provider() ||
-    config.credential_provider().has_assume_role_with_web_identity_provider()) {
-    credentials_provider_chain =
-        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-            server_context, region, config.credential_provider());
-        }
+  if (config.has_credential_provider()) {
+    if (config.credential_provider().has_inline_credential()) {
+      // If inline credential provider is set, use it instead of the default or custom credentials
+      // chain
+      const auto& inline_credential = config.credential_provider().inline_credential();
+      credentials_provider = std::make_shared<Extensions::Common::Aws::CredentialsProviderChain>();
+      auto inline_provider = std::make_shared<Extensions::Common::Aws::InlineCredentialProvider>(
+          inline_credential.access_key_id(), inline_credential.secret_access_key(),
+          inline_credential.session_token());
+      credentials_provider.value()->add(inline_provider);
+
+    } else {
+      credentials_provider =
+          Extensions::Common::Aws::CommonCredentialsProviderChain::customCredentialsProviderChain(
+              server_context, region, config.credential_provider());
+    }
   } else {
-    credentials_provider_chain =
-        std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-            server_context, region, absl::nullopt);
+    credentials_provider =
+        Extensions::Common::Aws::CommonCredentialsProviderChain::defaultCredentialsProviderChain(
+            server_context, region);
   }
 
   if (!credentials_provider_chain.ok()) {

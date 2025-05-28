@@ -81,7 +81,6 @@ protected:
 
   virtual void refresh() PURE;
 
-  // The optional server factory context.
   Server::Configuration::ServerFactoryContext& context_;
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;

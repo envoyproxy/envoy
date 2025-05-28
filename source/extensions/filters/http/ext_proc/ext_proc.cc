@@ -775,8 +775,8 @@ void Filter::encodeProtocolConfig(ProcessingRequest& req) {
   ENVOY_STREAM_LOG(debug, "Trying to encode filter protocol configurations", *decoder_callbacks_);
   if (!protocol_config_encoded_ && !config_->observabilityMode()) {
     auto* protocol_config = req.mutable_protocol_config();
-    protocol_config->set_request_body_mode(config_->processingMode().request_body_mode());
-    protocol_config->set_response_body_mode(config_->processingMode().response_body_mode());
+    protocol_config->set_request_body_mode(decoding_state_.bodyMode());
+    protocol_config->set_response_body_mode(encoding_state_.bodyMode());
     protocol_config->set_send_body_without_waiting_for_header_response(
         config_->sendBodyWithoutWaitingForHeaderResponse());
     protocol_config_encoded_ = true;

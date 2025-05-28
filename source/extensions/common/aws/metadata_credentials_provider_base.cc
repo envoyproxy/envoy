@@ -55,12 +55,7 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
 bool MetadataCredentialsProviderBase::credentialsPending() { return credentials_pending_; }
 
 Credentials MetadataCredentialsProviderBase::getCredentials() {
-
-  if (tls_slot_) {
-    return *(*tls_slot_)->credentials_.get();
-  } else {
-    return Credentials();
-  }
+  return *(*tls_slot_)->credentials_.get();
 }
 
 std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {

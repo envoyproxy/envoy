@@ -41,6 +41,10 @@ minor_behavior_changes:
    :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
    :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
    will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
+- area: aws
+  change: |
+    :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
+    providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -157,6 +161,14 @@ new_features:
 - area: local_ratelimit
   change: |
     ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
+- area: oauth2
+  change: |
+    Added :ref:`end_session_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.end_session_endpoint>`
+    to the oauth2 filter to support OIDC RP initiated logout. This field is only used when
+    ``openid`` is in the :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_scopes>` field.
+    If configured, the OAuth2 filter will redirect users to this endpoint when they access the
+    :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`. This allows users to
+    be logged out of the Authorization server.
 - area: aws
   change: |
     Added ``assume_role_credential_provider`` to add support for role chaining in AWS filters. This allows envoy to
