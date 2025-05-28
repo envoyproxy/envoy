@@ -8,10 +8,10 @@ FROM scratch AS binary
 ARG TARGETPLATFORM
 ENV TARGETPLATFORM=${TARGETPLATFORM:-linux/amd64}
 ARG ENVOY_BINARY=envoy-contrib
-ARG ENVOY_BINARY_SUFFIX=_stripped
-ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_fastbuild${ENVOY_BINARY_SUFFIX}/envoy* /usr/local/bin/
+ARG ENVOY_BINARY_SUFFIX=
+ADD ${TARGETPLATFORM}/build_${ENVOY_BINARY}_debug${ENVOY_BINARY_SUFFIX}/envoy* /usr/local/bin/
 ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
-COPY ${TARGETPLATFORM}/build_${ENVOY_BINARY}_fastbuild/schema_validator_tool /usr/local/bin/schema_validator_tool
+# COPY ${TARGETPLATFORM}/build_${ENVOY_BINARY}_debug/schema_validator_tool /usr/local/bin/schema_validator_tool
 COPY ci/docker-entrypoint.sh /
 
 

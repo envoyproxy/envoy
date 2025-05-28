@@ -504,7 +504,7 @@ case $CI_TARGET in
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel fastbuild build with contrib extensions and tests..."
         echo "Building..."
-        bazel_contrib_binary_build fastbuild
+        bazel_contrib_binary_build debug
         echo "Testing ${TEST_TARGETS[*]}"
         # bazel test "${BAZEL_BUILD_OPTIONS[@]}" \
         #       -c fastbuild \

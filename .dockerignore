@@ -8,6 +8,8 @@
 !/linux/amd64/schema_validator_tool
 !/linux/amd64/build_envoy-contrib_fastbuild
 !/linux/amd64/build_envoy-contrib_fastbuild_stripped
+!/linux/amd64/build_envoy-contrib_debug_stripped
+!/linux/amd64/build_envoy-contrib_debug
 !/linux/amd64/router_check_tool
 !/linux/amd64/config_load_check_tool
 !/linux/arm64/release.tar.zst
