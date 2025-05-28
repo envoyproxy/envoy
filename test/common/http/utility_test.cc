@@ -591,7 +591,7 @@ TEST(HttpUtility, updateAuthority) {
               // original host.
               EXPECT_EQ(old_xfh, headers.getForwardedHostValue());
               EXPECT_EQ("", headers.getEnvoyOriginalHostValue());
-              return;
+              continue;
             }
 
             EXPECT_EQ(old_xfh.empty() ? std::string(old_host)
