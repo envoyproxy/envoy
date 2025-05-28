@@ -296,7 +296,7 @@ ConnectionSocketPtr ConnectionImpl::moveSocket() {
   ASSERT(isSocketReused());
 
   // Clean up connection internals but don't close the socket.
-  cleanUpConnectionImpl();
+  // cleanUpConnectionImpl();
 
   // Transfer socket ownership to the caller.
   return std::move(socket_);
