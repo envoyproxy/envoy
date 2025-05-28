@@ -20,6 +20,7 @@
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 using testing::_;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -1464,6 +1465,51 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
       upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY), EnvoyException,
       "Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` "
       "and/or `upstream_port_range`");
+}
+
+// This test specifically verifies the fix for issue #39479 by testing the case where:
+// 1. Only an enforced engine exists (explicitly no shadow rules)
+// 2. The enforced engine allows access (returns Continue)
+// 3. Metadata should still be set in this case
+TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineOnlyAllowsAccessMetadataTest) {
+  // Create RBAC config with ONLY enforced rules (explicitly no shadow rules)
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+  envoy::config::rbac::v3::Policy policy;
+  auto policy_rules = policy.add_permissions()->mutable_or_rules();
+  policy_rules->add_rules()->set_destination_port(123);
+  policy.add_principals()->set_any(true);
+  config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+  (*config.mutable_rules()->mutable_policies())["enforced_only_policy"] = policy;
+  config.set_rules_stat_prefix("rules_stat_prefix_");
+
+  // Create config with only the enforced engine
+  auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor());
+  setupConfig(std::move(config_ptr));
+
+  setDestinationPort(123);
+  setMetadata();
+
+  // Call the filter's decodeHeaders (should continue since policy allows access)
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+
+  // Verify that allowed counter is incremented
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+
+  // Verify that dynamic metadata is set correctly even though there's no shadow
+  // engine and the enforced engine returned Continue
+  EXPECT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+
+  // Verify the metadata contents
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("allowed",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "enforced_only_policy",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
 }
 
 } // namespace

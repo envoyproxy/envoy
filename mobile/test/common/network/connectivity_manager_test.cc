@@ -243,7 +243,6 @@ TEST_F(ConnectivityManagerTest, IgnoresDuplicatedProxySettingsUpdates) {
 }
 
 TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_network_type_socket_option", true);
   auto options1 = std::make_shared<Socket::Options>();
   connectivity_manager_->addUpstreamSocketOptions(options1);
   std::vector<uint8_t> hash1;
