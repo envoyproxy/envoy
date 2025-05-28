@@ -974,17 +974,8 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
   return false;
 }
 
-void ListenerImpl::dumpConfig(ProtobufWkt::Any& dump) const {
-  if (!configInternal().has_fcds_config()) {
-    // If FCDS is not used, the config is expected to have the full filter chain list.
-    dump.PackFrom(config_maybe_partial_filter_chains_);
-    return;
-  }
-
-  envoy::config::listener::v3::Listener config(config_maybe_partial_filter_chains_);
-  // If FCDS is used, the filter chain manager is expected to have the full filter chain list.
-  filter_chain_manager_->dumpFcdsFilterChains(config);
-  dump.PackFrom(config);
+void ListenerImpl::dumpListenerConfig(ProtobufWkt::Any& dump) const {
+  dump.PackFrom(config_maybe_partial_filter_chains_);
 }
 
 void ListenerImpl::debugLog(const std::string& message) {

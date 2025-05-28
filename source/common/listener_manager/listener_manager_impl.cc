@@ -71,7 +71,7 @@ envoy::admin::v3::ListenersConfigDump::DynamicListener* getOrCreateDynamicListen
 void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
-  listener.dumpConfig(*state.mutable_listener());
+  listener.dumpListenerConfig(*state.mutable_listener());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 } // namespace
@@ -388,7 +388,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
     }
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
-      listener->dumpConfig(*static_listener.mutable_listener());
+      listener->dumpListenerConfig(*static_listener.mutable_listener());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
       continue;
