@@ -18,16 +18,16 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class CommonCredentialsProviderChainTest : public testing::Test {
+class DefaultCredentialsProviderChainTest : public testing::Test {
 public:
-  CommonCredentialsProviderChainTest() : api_(Api::createApiForTest(time_system_)) {
+  DefaultCredentialsProviderChainTest() : api_(Api::createApiForTest(time_system_)) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
     cluster_manager_.initializeThreadLocalClusters({"credentials_provider_cluster"});
     EXPECT_CALL(factories_, createEnvironmentCredentialsProvider());
   }
 
   void SetUp() override {
-    // Implicit environment clear for each CommonCredentialsProviderChainTest
+    // Implicit environment clear for each DefaultCredentialsProviderChainTest
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI");
     TestEnvironment::unsetEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN");
@@ -46,7 +46,7 @@ public:
   NiceMock<MockCredentialsProviderChainFactories> factories_;
 };
 
-TEST_F(CommonCredentialsProviderChainTest, NoEnvironmentVars) {
+TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
@@ -55,7 +55,7 @@ TEST_F(CommonCredentialsProviderChainTest, NoEnvironmentVars) {
   EXPECT_EQ(3, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, MetadataDisabled) {
+TEST_F(DefaultCredentialsProviderChainTest, MetadataDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _)).Times(0);
@@ -65,7 +65,7 @@ TEST_F(CommonCredentialsProviderChainTest, MetadataDisabled) {
   EXPECT_EQ(2, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, MetadataNotDisabled) {
+TEST_F(DefaultCredentialsProviderChainTest, MetadataNotDisabled) {
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "false", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
@@ -75,7 +75,7 @@ TEST_F(CommonCredentialsProviderChainTest, MetadataNotDisabled) {
   EXPECT_EQ(3, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, RelativeUri) {
+TEST_F(DefaultCredentialsProviderChainTest, RelativeUri) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/path/to/creds", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createContainerCredentialsProvider(
@@ -86,7 +86,7 @@ TEST_F(CommonCredentialsProviderChainTest, RelativeUri) {
   EXPECT_EQ(4, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
+TEST_F(DefaultCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createContainerCredentialsProvider(
@@ -97,7 +97,7 @@ TEST_F(CommonCredentialsProviderChainTest, FullUriNoAuthorizationToken) {
   EXPECT_EQ(4, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
+TEST_F(DefaultCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://host/path/to/creds", 1);
   TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
@@ -109,7 +109,7 @@ TEST_F(CommonCredentialsProviderChainTest, FullUriWithAuthorizationToken) {
   EXPECT_EQ(4, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, NoWebIdentityRoleArn) {
+TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityRoleArn) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
@@ -119,7 +119,7 @@ TEST_F(CommonCredentialsProviderChainTest, NoWebIdentityRoleArn) {
   EXPECT_EQ(3, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, NoWebIdentitySessionName) {
+TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentitySessionName) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   time_system_.setSystemTime(std::chrono::milliseconds(1234567890));
@@ -132,7 +132,7 @@ TEST_F(CommonCredentialsProviderChainTest, NoWebIdentitySessionName) {
   EXPECT_EQ(4, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, WebIdentityWithSessionName) {
+TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithSessionName) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
@@ -146,7 +146,7 @@ TEST_F(CommonCredentialsProviderChainTest, WebIdentityWithSessionName) {
   EXPECT_EQ(4, chain.getNumProviders());
 }
 
-TEST_F(CommonCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
+TEST_F(DefaultCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
   TestEnvironment::unsetEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE");
   TestEnvironment::unsetEnvVar("AWS_ROLE_ARN");
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
@@ -161,7 +161,7 @@ TEST_F(CommonCredentialsProviderChainTest, NoWebIdentityWithBlankConfig) {
 // These tests validate override of default credential provider with custom credential provider
 // settings
 
-TEST_F(CommonCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
+TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
@@ -187,7 +187,7 @@ TEST_F(CommonCredentialsProviderChainTest, WebIdentityWithCustomSessionName) {
   EXPECT_EQ(role_session_name, "custom-role-session-name");
 }
 
-TEST_F(CommonCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
+TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
@@ -213,7 +213,7 @@ TEST_F(CommonCredentialsProviderChainTest, WebIdentityWithCustomRoleArn) {
   EXPECT_EQ(role_arn, "custom-role-arn");
 }
 
-TEST_F(CommonCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
+TEST_F(DefaultCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
@@ -240,7 +240,7 @@ TEST_F(CommonCredentialsProviderChainTest, WebIdentityWithCustomDataSource) {
   EXPECT_EQ(inline_string, "custom_token_string");
 }
 
-TEST_F(CommonCredentialsProviderChainTest, CredentialsFileWithCustomDataSource) {
+TEST_F(DefaultCredentialsProviderChainTest, CredentialsFileWithCustomDataSource) {
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
