@@ -147,7 +147,7 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
 } // namespace
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
-                                                                      uint16_t port, bool v13only) {
+                                                                      uint16_t port, bool v6only) {
   StatusOr<sockaddr_in> sa4 = parseV4Address(ip_address, port);
   if (sa4.ok()) {
     return instanceOrNull(
