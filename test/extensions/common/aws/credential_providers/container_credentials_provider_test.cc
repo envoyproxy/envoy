@@ -117,7 +117,7 @@ public:
     auto credential_uri = "169.254.170.2:80/path/to/doc";
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, mock_manager_,
+        context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
@@ -401,7 +401,7 @@ public:
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     provider_ = std::make_shared<ContainerCredentialsProvider>(
-        *api_, context_, mock_manager_,
+        context_, mock_manager_,
         [this](Upstream::ClusterManager&, absl::string_view) {
           metadata_fetcher_.reset(raw_metadata_fetcher_);
           return std::move(metadata_fetcher_);
