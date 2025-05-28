@@ -43,8 +43,20 @@ host when forwarding. See the example below within the configured routes.
 
 .. _dns_cache_circuit_breakers:
 
-  Dynamic forward proxy uses circuit breakers built in to the DNS cache with the configuration
-  of :ref:`DNS cache circuit breakers <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>`.
+Circuit Breakers
+----------------
+
+Dynamic Forward Proxy cluster has two types of circuit breakers:
+
+1. **DNS Cache Circuit Breakers**: These are specific to the DNS resolution process. They limit the number of
+   pending DNS requests and prevent overwhelming the resolver. These circuit breakers are configured through
+   the :ref:`dns_cache_circuit_breaker <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_cache_circuit_breaker>`
+   field in the DNS cache configuration.
+
+2. **Cluster Circuit Breakers**: In addition to the DNS-specific circuit breakers, the standard
+   :ref:`cluster circuit breakers <config_cluster_manager_cluster_circuit_breakers>` also apply to the Dynamic
+   Forward Proxy cluster. These limit connections, requests, retries, etc. to the upstream hosts and are configured
+   like any other Envoy cluster.
 
 .. literalinclude:: _include/dns-cache-circuit-breaker.yaml
     :language: yaml

@@ -386,6 +386,7 @@ TEST_F(AggregateClusterTest, LBContextTest) {
   EXPECT_EQ(context.downstreamHeaders(), nullptr);
   EXPECT_EQ(context.upstreamSocketOptions(), nullptr);
   EXPECT_EQ(context.upstreamTransportSocketOptions(), nullptr);
+  context.setHeadersModifier(nullptr);
 }
 
 TEST_F(AggregateClusterTest, ContextDeterminePriorityLoad) {
