@@ -92,6 +92,14 @@ public:
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
+  void TearDown() override {
+    // Shut down the server and upstreams before os_calls_ goes out of scope to avoid syscalls
+    // during its removal racing with the unlatching of the mocks.
+    test_server_.reset();
+    cleanupUpstreamAndDownstream();
+    fake_upstreams_.clear();
+  }
+
   void initialize() override { initializeWithArgs(); }
 
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
