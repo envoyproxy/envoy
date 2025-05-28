@@ -109,6 +109,10 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
   cluster2->info_->lb_factory_ =
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.ring_hash");
+  auto proto_message = cluster2->info_->lb_factory_->createEmptyConfigProto();
+  cluster2->info_->typed_lb_config_ =
+      cluster2->info_->lb_factory_->loadConfig(*server_.server_factory_context_, *proto_message)
+          .value();
 
   // This part tests static init.
   InSequence s;

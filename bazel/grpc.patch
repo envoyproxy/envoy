@@ -1,8 +1,8 @@
 diff --git a/BUILD b/BUILD
-index 06b69411a8..05cd878ae8 100644
+index 848e65dabb857..84aea6256b976 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -29,7 +29,7 @@ licenses(["reciprocal"])
+@@ -33,7 +33,7 @@ package(
      default_visibility = ["//visibility:public"],
      features = [
          "-parse_headers",
@@ -10,12 +10,12 @@ index 06b69411a8..05cd878ae8 100644
 +        "-layering_check",
      ],
  )
- 
+
 diff --git a/src/core/BUILD b/src/core/BUILD
-index 1bb970e049..81265483e9 100644
+index e8bf5e85629c4..442348ddf70ca 100644
 --- a/src/core/BUILD
 +++ b/src/core/BUILD
-@@ -24,7 +24,7 @@ licenses(["reciprocal"])
+@@ -27,7 +27,7 @@ licenses(["reciprocal"])
  package(
      default_visibility = ["//:__subpackages__"],
      features = [
@@ -23,17 +23,199 @@ index 1bb970e049..81265483e9 100644
 +        "-layering_check",
      ],
  )
- 
-diff --git a/bazel/generate_cc.bzl b/bazel/generate_cc.bzl
-index a2c7f3a1bb..cd023ebb06 100644
---- a/bazel/generate_cc.bzl
-+++ b/bazel/generate_cc.bzl
-@@ -134,7 +134,7 @@ def generate_cc_impl(ctx):
- 
-     # Include the output directory so that protoc puts the generated code in the
-     # right directory.
--    arguments.append("--proto_path={0}{1}".format(dir_out, proto_root))
-+    arguments.append("--proto_path={0}".format(dir_out))
-     arguments += [_get_srcs_file_path(proto) for proto in protos]
- 
-     # create a list of well known proto files if the argument is non-None
+
+diff --git a/src/proto/grpc/health/v1/BUILD b/src/proto/grpc/health/v1/BUILD
+--- a/src/proto/grpc/health/v1/BUILD
++++ b/src/proto/grpc/health/v1/BUILD
+@@ -44,3 +44,10 @@
+         "health.proto",
+     ],
+ )
++
++# This alias is required by Envoy's build
++alias(
++    name = "_health_proto_only",
++    actual = ":health_proto",
++    visibility = ["//visibility:public"],
++)
+diff --git a/third_party/BUILD b/third_party/BUILD
+--- a/third_party/BUILD
++++ b/third_party/BUILD
+@@ -49,7 +49,7 @@
+
+ alias(
+     name = "madler_zlib",
+-    actual = "@zlib//:zlib",
++    actual = "@envoy//bazel/foreign_cc:zlib",
+     tags = ["manual"],
+ )
+
+@@ -80,7 +80,7 @@
+
+ alias(
+     name = "cares",
+-    actual = "@com_github_cares_cares//:ares",
++    actual = "@envoy//bazel/foreign_cc:ares",
+     tags = ["manual"],
+ )
+
+diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
+--- a/src/core/lib/promise/detail/promise_factory.h
++++ b/src/core/lib/promise/detail/promise_factory.h
+@@ -119,11 +119,10 @@ struct OnceToken {};
+ // Promote a callable(A) -> T | Poll<T> to a PromiseFactory(A) -> Promise<T> by
+ // capturing A.
+ template <typename Token, typename A, typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
+-    absl::enable_if_t<!IsVoidCallable<ResultOf<F(A)>>::value,
+-                      PromiseLike<Curried<RemoveCVRef<F>, A>>>
+-    PromiseFactoryImpl(Token, F&& f, A&& arg) {
++absl::enable_if_t<!IsVoidCallable<ResultOf<F(A)>>::value,
++                  PromiseLike<Curried<RemoveCVRef<F>, A>>>
++PromiseFactoryImpl(Token, F&& f, A&& arg) {
+   return Curried<RemoveCVRef<F>, A>(std::forward<F>(f), std::forward<A>(arg));
+ }
+
+@@ -131,7 +130,7 @@ template <typename Token, typename A, typename F>
+ // Promote a callable() -> T|Poll<T> to a PromiseFactory(A) -> Promise<T>
+ // by dropping the argument passed to the factory.
+ template <typename A, typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline absl::enable_if_t<
++inline absl::enable_if_t<
+     !IsVoidCallable<ResultOf<F()>>::value, PromiseLike<RemoveCVRef<F>>>
+ PromiseFactoryImpl(OnceToken, F f, A&&) {
+   return PromiseLike<F>(std::move(f));
+@@ -140,7 +139,7 @@ PromiseFactoryImpl(OnceToken, F f, A&&) {
+
+ // Promote a callable() -> Poll<T> to a PromiseFactory() -> Promise<T>
+ template <typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline absl::enable_if_t<
++inline absl::enable_if_t<
+     !IsVoidCallable<ResultOf<F()>>::value &&
+         PollTraits<ResultOf<F()>>::is_poll(),
+     PromiseLike<RemoveCVRef<F>>>
+@@ -150,7 +149,7 @@ PromiseFactoryImpl(OnceToken, F f) {
+
+ // Promote a callable() -> T to a PromiseFactory() -> Immediate<T>
+ template <typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline auto PromiseFactoryImpl(
++inline auto PromiseFactoryImpl(
+     std::enable_if_t<!IsVoidCallable<ResultOf<F()>>::value &&
+                          !PollTraits<ResultOf<F()>>::is_poll() &&
+                          !std::is_same_v<ResultOf<F()>, void>,
+@@ -160,7 +159,7 @@ GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline auto PromiseFactoryImpl(
+   return PromiseLike<decltype(f2)>(std::move(f2));
+ }
+ template <typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline auto PromiseFactoryImpl(
++inline auto PromiseFactoryImpl(
+     std::enable_if_t<!IsVoidCallable<ResultOf<F()>>::value &&
+                          !PollTraits<ResultOf<F()>>::is_poll() &&
+                          std::is_same_v<ResultOf<F()>, void>,
+@@ -173,7 +172,7 @@ GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline auto PromiseFactoryImpl(
+
+ // Given a callable(A) -> Promise<T>, name it a PromiseFactory and use it.
+ template <typename Token, typename A, typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline absl::enable_if_t<
++inline absl::enable_if_t<
+     IsVoidCallable<ResultOf<F(A)>>::value,
+     PromiseLike<decltype(std::declval<F>()(std::declval<A>()))>>
+ PromiseFactoryImpl(Token, F&& f, A&& arg) {
+@@ -182,7 +181,7 @@ PromiseFactoryImpl(Token, F&& f, A&& arg) {
+
+ // Given a callable(A) -> Promise<T>, name it a PromiseFactory and use it.
+ template <typename Token, typename A, typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline absl::enable_if_t<
++inline absl::enable_if_t<
+     IsVoidCallable<ResultOf<F(A)>>::value,
+     PromiseLike<decltype(std::declval<F>()(std::declval<A>()))>>
+ PromiseFactoryImpl(Token, F& f, A&& arg) {
+@@ -192,10 +191,9 @@ PromiseFactoryImpl(Token, F& f, A&& arg) {
+ // Given a callable() -> Promise<T>, promote it to a
+ // PromiseFactory(A) -> Promise<T> by dropping the first argument.
+ template <typename Token, typename A, typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
+-    absl::enable_if_t<IsVoidCallable<ResultOf<F()>>::value,
+-                      PromiseLike<decltype(std::declval<F>()())>>
+-    PromiseFactoryImpl(Token, F&& f, A&&) {
++absl::enable_if_t<IsVoidCallable<ResultOf<F()>>::value,
++                  PromiseLike<decltype(std::declval<F>()())>>
++PromiseFactoryImpl(Token, F&& f, A&&) {
+   return f();
+ }
+
+@@ -203,10 +201,9 @@ template <typename Token, typename A, typename F>
+ // Given a callable() -> Promise<T>, name it a PromiseFactory and use it.
+ template <typename Token, typename F>
+-GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION
+-    absl::enable_if_t<IsVoidCallable<ResultOf<F()>>::value,
+-                      PromiseLike<decltype(std::declval<F>()())>>
+-    PromiseFactoryImpl(Token, F&& f) {
++absl::enable_if_t<IsVoidCallable<ResultOf<F()>>::value,
++                  PromiseLike<decltype(std::declval<F>()())>>
++PromiseFactoryImpl(Token, F&& f) {
+   return f();
+ }
+
+@@ -224,13 +221,13 @@ class OncePromiseFactory {
+   using Promise = decltype(PromiseFactoryImpl(OnceToken{}, std::move(f_),
+                                               std::declval<A>()));
+
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit OncePromiseFactory(F f)
++  explicit OncePromiseFactory(F f)
+       : f_(std::move(f)) {}
+
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Promise Make(Arg&& a) {
++  Promise Make(Arg&& a) {
+     return PromiseFactoryImpl(OnceToken{}, std::move(f_), std::forward<Arg>(a));
+   }
+ };
+
+@@ -242,11 +239,11 @@ class OncePromiseFactory<void, F> {
+   using Arg = void;
+   using Promise = decltype(PromiseFactoryImpl(OnceToken{}, std::move(f_)));
+
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit OncePromiseFactory(F f)
++  explicit OncePromiseFactory(F f)
+       : f_(std::move(f)) {}
+
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Promise Make() {
++  Promise Make() {
+     return PromiseFactoryImpl(OnceToken{}, std::move(f_));
+   }
+ };
+@@ -264,15 +261,15 @@ class RepeatedPromiseFactory {
+   using Promise =
+       decltype(PromiseFactoryImpl(RepeatableToken{}, f_, std::declval<A>()));
+
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit RepeatedPromiseFactory(F f)
++  explicit RepeatedPromiseFactory(F f)
+       : f_(std::move(f)) {}
+
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Promise Make(Arg&& a) const {
++  Promise Make(Arg&& a) const {
+     return PromiseFactoryImpl(RepeatableToken{}, f_, std::forward<Arg>(a));
+   }
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Promise Make(Arg&& a) {
++  Promise Make(Arg&& a) {
+     return PromiseFactoryImpl(RepeatableToken{}, f_, std::forward<Arg>(a));
+   }
+ };
+
+@@ -285,13 +282,13 @@ class RepeatedPromiseFactory<void, F> {
+   using Arg = void;
+   using Promise = decltype(PromiseFactoryImpl(RepeatableToken{}, f_));
+
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION explicit RepeatedPromiseFactory(F f)
++  explicit RepeatedPromiseFactory(F f)
+       : f_(std::move(f)) {}
+
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Promise Make() const {
++  Promise Make() const {
+     return PromiseFactoryImpl(RepeatableToken{}, f_);
+   }
+-  GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION Promise Make() {
++  Promise Make() {
+     return PromiseFactoryImpl(RepeatableToken{}, f_);
+   }
+ };

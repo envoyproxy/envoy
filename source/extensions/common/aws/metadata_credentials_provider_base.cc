@@ -8,18 +8,17 @@ namespace Common {
 namespace Aws {
 
 MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
-    Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer)
-    : api_(api), context_(context), create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
+    : context_(context), create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
       cluster_name_(cluster_name), cache_duration_(getCacheDuration()),
       refresh_state_(refresh_state), initialization_timer_(initialization_timer),
       aws_cluster_manager_(aws_cluster_manager) {
 
   // Set up metadata credentials statistics
-  scope_ = api.rootScope().createScope(
+  scope_ = context_.api().rootScope().createScope(
       fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
   stats_ = std::make_shared<MetadataCredentialsProviderStats>(MetadataCredentialsProviderStats{
       ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))});
@@ -56,12 +55,7 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
 bool MetadataCredentialsProviderBase::credentialsPending() { return credentials_pending_; }
 
 Credentials MetadataCredentialsProviderBase::getCredentials() {
-
-  if (tls_slot_) {
-    return *(*tls_slot_)->credentials_.get();
-  } else {
-    return Credentials();
-  }
+  return *(*tls_slot_)->credentials_.get();
 }
 
 std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {
@@ -87,7 +81,7 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
       }
     } else {
       // If our returned token had an expiration time, use that to set the cache duration
-      const auto now = api_.timeSource().systemTime();
+      const auto now = context_.api().timeSource().systemTime();
       if (expiration_time_.has_value() && (expiration_time_.value() > now)) {
         cache_duration_ =
             std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);

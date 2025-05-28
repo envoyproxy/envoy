@@ -61,9 +61,15 @@ public:
 
 } // namespace
 
-LegacyMaglevLbConfig::LegacyMaglevLbConfig(const ClusterProto& cluster) {
-  if (cluster.has_maglev_lb_config()) {
-    lb_config_ = cluster.maglev_lb_config();
+TypedMaglevLbConfig::TypedMaglevLbConfig(const CommonLbConfigProto& common_lb_config,
+                                         const LegacyMaglevLbProto& lb_config) {
+  LoadBalancerConfigHelper::convertHashLbConfigTo(common_lb_config, lb_config_);
+  if (common_lb_config.has_locality_weighted_lb_config()) {
+    lb_config_.mutable_locality_weighted_lb_config();
+  }
+
+  if (lb_config.has_table_size()) {
+    *lb_config_.mutable_table_size() = lb_config.table_size();
   }
 }
 
@@ -284,32 +290,6 @@ HostSelectionResponse CompactMaglevTable::chooseHost(uint64_t hash, uint32_t att
 
 uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
   return (entry.offset_ + (entry.skip_ * entry.next_)) % table_size_;
-}
-
-MaglevLoadBalancer::MaglevLoadBalancer(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random,
-    OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> config,
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
-    : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random,
-                                  PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
-                                      common_config, healthy_panic_threshold, 100, 50),
-                                  common_config.has_locality_weighted_lb_config()),
-      scope_(scope.createScope("maglev_lb.")), stats_(generateStats(*scope_)),
-      table_size_(config ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.ref(), table_size,
-                                                           MaglevTable::DefaultTableSize)
-                         : MaglevTable::DefaultTableSize),
-      use_hostname_for_hashing_(
-          common_config.has_consistent_hashing_lb_config()
-              ? common_config.consistent_hashing_lb_config().use_hostname_for_hashing()
-              : false),
-      hash_balance_factor_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          common_config.consistent_hashing_lb_config(), hash_balance_factor, 0)) {
-  ENVOY_LOG(debug, "maglev table size: {}", table_size_);
-  // The table size must be prime number.
-  if (!Primes::isPrime(table_size_)) {
-    throw EnvoyException("The table size of maglev must be prime number");
-  }
 }
 
 MaglevLoadBalancer::MaglevLoadBalancer(
