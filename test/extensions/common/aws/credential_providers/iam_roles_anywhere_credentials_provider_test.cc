@@ -244,6 +244,7 @@ public:
         },
         "ap-southeast-2", refresh_state, initialization_timer, std::move(roles_anywhere_signer),
         iam_roles_anywhere_config_);
+    EXPECT_EQ(provider_->providerName(), "IAMRolesAnywhereCredentialsProvider");
   }
 
   Event::DispatcherPtr setupDispatcher() {
@@ -1030,6 +1031,35 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi5xx) {
   EXPECT_FALSE(creds.accessKeyId().has_value());
   EXPECT_FALSE(creds.secretAccessKey().has_value());
   EXPECT_FALSE(creds.sessionToken().has_value());
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, TestCancel) {
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+
+  expectDocument(200, std::move(R"EOF(
+not json
+)EOF"),
+                 message);
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
+                server_root_chain_rsa_pem);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  auto mock_fetcher = std::make_unique<MockMetadataFetcher>();
+
+  EXPECT_CALL(*mock_fetcher, cancel);
+  EXPECT_CALL(*mock_fetcher, fetch(_, _, _));
+  // Ensure we have a metadata fetcher configured, so we expect this to receive a cancel
+  provider_friend.setMetadataFetcher(std::move(mock_fetcher));
+
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+  delete (raw_metadata_fetcher_);
 }
 
 class IamRolesAnywhereCredentialsProviderBadCredentialsTest : public testing::Test {

@@ -85,6 +85,9 @@ private:
 
 class UniversalStringMatcher : public StringMatcher {
 public:
+  // To avoid hiding other implementations of match.
+  using StringMatcher::match;
+
   bool match(absl::string_view) const override { return true; }
 };
 
@@ -410,6 +413,9 @@ public:
   PathMatcher(const envoy::type::matcher::v3::StringMatcher& matcher,
               Server::Configuration::CommonFactoryContext& context)
       : matcher_(matcher, context) {}
+
+  // To avoid hiding other implementations of match.
+  using StringMatcher::match;
 
   static PathMatcherConstSharedPtr
   createExact(const std::string& exact, bool ignore_case,

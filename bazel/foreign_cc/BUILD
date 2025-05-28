@@ -441,3 +441,89 @@ envoy_cc_library(
         "//conditions:default": [],
     }),
 )
+
+envoy_cmake(
+    name = "libcxx_msan",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_INSTALL_PREFIX": ".",
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON",
+        "LLVM_ENABLE_RUNTIMES": "libcxxabi;libcxx;libunwind",
+        "LLVM_USE_LINKER": "lld",
+        "LLVM_USE_SANITIZER": "MemoryWithOrigins",
+        "CMAKE_SHARED_LINKER_FLAGS": "-shared -Wl,-S -fuse-ld=lld",
+        "CMAKE_MODULE_LINKER_FLAGS": "-shared -Wl,-S -fuse-ld=lld",
+        "CMAKE_EXE_LINKER_FLAGS": "-Wl,-S -fuse-ld=lld",
+        "BUILD_SHARED_LIBS": "OFF",
+        "LIBCXX_ENABLE_SHARED": "OFF",
+        "LIBCXX_ENABLE_STATIC": "ON",
+        "LIBCXXABI_ENABLE_SHARED": "OFF",
+        "LIBCXXABI_ENABLE_STATIC": "ON",
+        "LIBUNWIND_ENABLE_SHARED": "OFF",
+        "LIBUNWIND_ENABLE_STATIC": "ON",
+    },
+    env = {
+        "CXXFLAGS": "-nostdinc++ -nostdlib++",
+        "LDFLAGS": "-nostdlib++",
+    },
+    lib_source = "@llvm_source//:all",
+    out_static_libs = [
+        "libc++.a",
+        "libc++abi.a",
+    ],
+    tags = ["skip_on_windows"],
+    working_directory = "runtimes",
+)
+
+envoy_cmake(
+    name = "libcxx_tsan",
+    cache_entries = {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_INSTALL_PREFIX": ".",
+        "CMAKE_POSITION_INDEPENDENT_CODE": "ON",
+        "LLVM_ENABLE_RUNTIMES": "libcxxabi;libcxx;libunwind",
+        "LLVM_USE_LINKER": "lld",
+        "LLVM_USE_SANITIZER": "Thread",
+        "CMAKE_SHARED_LINKER_FLAGS": "-shared -Wl,-S -fuse-ld=lld",
+        "CMAKE_MODULE_LINKER_FLAGS": "-shared -Wl,-S -fuse-ld=lld",
+        "CMAKE_EXE_LINKER_FLAGS": "-Wl,-S -fuse-ld=lld",
+        "BUILD_SHARED_LIBS": "OFF",
+        "LIBCXX_ENABLE_SHARED": "OFF",
+        "LIBCXX_ENABLE_STATIC": "ON",
+        "LIBCXXABI_ENABLE_SHARED": "OFF",
+        "LIBCXXABI_ENABLE_STATIC": "ON",
+        "LIBUNWIND_ENABLE_SHARED": "OFF",
+        "LIBUNWIND_ENABLE_STATIC": "ON",
+    },
+    env = {
+        "CXXFLAGS": "-nostdinc++ -nostdlib++",
+        "LDFLAGS": "-nostdlib++",
+    },
+    lib_source = "@llvm_source//:all",
+    out_static_libs = [
+        "libc++.a",
+        "libc++abi.a",
+    ],
+    tags = ["skip_on_windows"],
+    working_directory = "runtimes",
+)
+
+cc_library(
+    name = "libcxx_msan_wrapper",
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//bazel:msan_build": [":libcxx_msan"],
+        "//conditions:default": [],
+    }),
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "libcxx_tsan_wrapper",
+    visibility = ["//visibility:public"],
+    deps = select({
+        "//bazel:tsan_build": [":libcxx_tsan"],
+        "//conditions:default": [],
+    }),
+    alwayslink = 1,
+)
