@@ -1163,7 +1163,7 @@ message RouteAction {
 
   // If one of the host rewrite specifiers is set and the
   // :ref:`suppress_envoy_headers
-  // <envoy_api_field_config.filter.http.router.v3.Router.suppress_envoy_headers>` flag is not
+  // <envoy_v3_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag is not
   // set to true, the router filter will place the original host header value before
   // rewriting into the :ref:`x-envoy-original-host
   // <config_http_filters_router_x-envoy-original-host>` header.
