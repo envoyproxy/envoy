@@ -31,7 +31,7 @@ IAMRolesAnywhereCredentialsProvider::IAMRolesAnywhereCredentialsProvider(
     const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider
         iam_roles_anywhere_config)
 
-    : MetadataCredentialsProviderBase( context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       role_arn_(iam_roles_anywhere_config.role_arn()),
