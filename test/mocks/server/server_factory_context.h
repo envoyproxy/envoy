@@ -30,6 +30,7 @@
 #include "test/mocks/server/server_lifecycle_notifier.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -78,6 +79,7 @@ public:
   MOCK_METHOD(Api::Api&, api, ());
   MOCK_METHOD(Secret::SecretManager&, secretManager, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
   Http::Context& httpContext() override { return http_context_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
@@ -113,6 +115,7 @@ public:
   testing::NiceMock<MockServerLifecycleNotifier> lifecycle_notifier_;
   testing::NiceMock<Http::MockHttpServerPropertiesCacheManager>
       http_server_properties_cache_manager_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
@@ -194,6 +197,7 @@ public:
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
   MOCK_METHOD(Secret::SecretManager&, secretManager, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
+  MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());
 };
 
 } // namespace Configuration

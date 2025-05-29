@@ -46,6 +46,7 @@ MockServerFactoryContext::MockServerFactoryContext()
     return *secret_manager_;
   }));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
+  ON_CALL(*this, streamInfo()).WillByDefault(ReturnRef(stream_info_));
 }
 MockServerFactoryContext::~MockServerFactoryContext() = default;
 
