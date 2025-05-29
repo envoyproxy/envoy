@@ -110,7 +110,7 @@ message AwsRequestSigning {
   QueryString query_string = 7;
 
   // The credential provider for signing the request. This is optional and if not set,
-  // it will be retrieved from the procedure described in :ref:`config_http_filters_aws_request_signing`.
+  // it will be retrieved using the procedure described in :ref:`config_http_filters_aws_request_signing`.
   common.aws.v3.AwsCredentialProvider credential_provider = 8;
 }
 
