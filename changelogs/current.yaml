@@ -7,6 +7,10 @@ behavior_changes:
     As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
     grpc_credentials/aws_iam extension is being deleted. Any configuration referencing this extension
     will fail to load.
+- area: server
+  change: |
+    Envoy will automatically raise the soft limit on the file descriptors to the hard limit. This behavior
+    can be reverted using the runtime guard ``envoy_restart_features_raise_file_limits``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
