@@ -11,7 +11,6 @@ namespace Matcher {
 namespace {
 
 using ::testing::ElementsAre;
-using MatchResult = MatchTree<TestData>::MatchResult;
 
 TEST(ListMatcherTest, BasicUsage) {
   ListMatcher<TestData> matcher(absl::nullopt);
@@ -19,8 +18,7 @@ TEST(ListMatcherTest, BasicUsage) {
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                      stringOnMatch<TestData>("match"));
 
-  EXPECT_TRUE(matcher.match(TestData()).on_match_.has_value());
-  EXPECT_EQ(matcher.match(TestData()).match_state_, MatchState::MatchComplete);
+  EXPECT_THAT(matcher.match(TestData()), HasStringAction("match"));
 }
 
 TEST(ListMatcherTest, MissingData) {
@@ -31,8 +29,7 @@ TEST(ListMatcherTest, MissingData) {
           "string", [](auto) { return true; }, DataInputGetResult::DataAvailability::NotAvailable),
       stringOnMatch<TestData>("match"));
 
-  EXPECT_FALSE(matcher.match(TestData()).on_match_.has_value());
-  EXPECT_EQ(matcher.match(TestData()).match_state_, MatchState::UnableToMatch);
+  EXPECT_THAT(matcher.match(TestData()), HasInsufficientData());
 }
 
 TEST(ListMatcherTest, KeepMatching) {
@@ -44,8 +41,8 @@ TEST(ListMatcherTest, KeepMatching) {
                      stringOnMatch<TestData>("matched", /*keep_matching=*/false));
 
   std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
   auto result = matcher.match(TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasStringAction("matched"));
@@ -60,8 +57,8 @@ TEST(ListMatcherTest, KeepMatchingOnNoMatch) {
                      stringOnMatch<TestData>("keep matching 2", /*keep_matching=*/true));
 
   std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](const ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
   auto result = matcher.match(TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasStringAction("on no match"));
@@ -97,8 +94,8 @@ TEST(ListMatcherTest, KeepMatchingWithRecursion) {
                                        /*.keep_matching=*/false});
 
   std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
   MatchResult result = matcher.match(TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasStringAction("match 2"));
@@ -133,8 +130,8 @@ TEST(ListMatcherTest, KeepMatchingWithRecursiveOnNoMatch) {
       OnMatch<TestData>{/*action_cb=*/nullptr, /*matcher=*/sub_matcher_2, /*keep_matching=*/false});
 
   std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
   MatchResult result = matcher.match(TestData(), skipped_match_cb);
   EXPECT_THAT(result, HasStringAction("on_no_match sub on_no_match"));

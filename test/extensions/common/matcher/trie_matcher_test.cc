@@ -30,12 +30,10 @@ namespace {
 using ::Envoy::Matcher::ActionFactory;
 using ::Envoy::Matcher::CustomMatcherFactory;
 using ::Envoy::Matcher::DataInputGetResult;
-using ::Envoy::Matcher::evaluateMatch;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MatchTreePtr;
 using ::Envoy::Matcher::MatchTreeSharedPtr;
-using ::Envoy::Matcher::MaybeMatchResult;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::StringAction;
 using ::Envoy::Matcher::StringActionFactory;
@@ -102,7 +100,7 @@ public:
   MatchTreeFactory<TestData, absl::string_view> factory_;
   xds::type::matcher::v3::Matcher matcher_;
   // If expecting keep_matching matchers, set this cb & mark its support in the validation_visitor_.
-  SkippedMatchCb<TestData> skipped_match_cb_ = nullptr;
+  SkippedMatchCb skipped_match_cb_ = nullptr;
 };
 
 TEST_F(TrieMatcherTest, TestMatcher) {
