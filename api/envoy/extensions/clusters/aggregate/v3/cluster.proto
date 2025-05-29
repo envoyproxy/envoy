@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.aggregate.v3;
 
-import "config/core/v3/config_source.proto";
+import "envoy/config/core/v3/config_source.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
