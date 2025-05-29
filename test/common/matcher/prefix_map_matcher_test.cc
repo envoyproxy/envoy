@@ -124,5 +124,23 @@ TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableMatch) {
   verifyImmediateMatch(result, "match");
 }
 
+TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatchThenMatchDoesNotPerformSecondMatch) {
+  std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+      stringOnMatch<TestData>("no_match"));
+  std::unique_ptr<PrefixMapMatcher<TestData>> child_matcher = *PrefixMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+      absl::nullopt);
+
+  matcher->addChild("match", {nullptr, std::move(child_matcher)});
+  matcher->addChild("mat", stringOnMatch<TestData>("second_match"));
+
+  TestData data;
+  const auto result = matcher->match(data);
+  verifyNotEnoughDataForMatch(result);
+}
+
 } // namespace Matcher
 } // namespace Envoy
