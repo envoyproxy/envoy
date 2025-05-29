@@ -139,7 +139,7 @@ TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatchThenMatchDoesNotPerfor
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNotEnoughDataForMatch(result);
+  EXPECT_THAT(result, HasNotEnoughData());
 }
 
 } // namespace Matcher
