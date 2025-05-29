@@ -21,7 +21,7 @@ TEST(ExactMapMatcherTest, NoMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNoMatch(result);
+  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST(ExactMapMatcherTest, NoMatchDueToNoData) {
@@ -32,7 +32,7 @@ TEST(ExactMapMatcherTest, NoMatchDueToNoData) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNoMatch(result);
+  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST(ExactMapMatcherTest, NoMatchWithFallback) {
@@ -43,7 +43,7 @@ TEST(ExactMapMatcherTest, NoMatchWithFallback) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "no_match");
+  EXPECT_THAT(result, HasStringAction("no_match"));
 }
 
 TEST(ExactMapMatcherTest, Match) {
@@ -56,7 +56,7 @@ TEST(ExactMapMatcherTest, Match) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "match");
+  EXPECT_THAT(result, HasStringAction("match"));
 }
 
 TEST(ExactMapMatcherTest, DataNotAvailable) {
@@ -69,7 +69,7 @@ TEST(ExactMapMatcherTest, DataNotAvailable) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNotEnoughDataForMatch(result);
+  EXPECT_THAT(result, HasNotEnoughData());
 }
 
 TEST(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
@@ -82,7 +82,7 @@ TEST(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNotEnoughDataForMatch(result);
+  EXPECT_THAT(result, HasNotEnoughData());
 }
 
 TEST(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
@@ -95,7 +95,7 @@ TEST(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "match");
+  EXPECT_THAT(result, HasStringAction("match"));
 }
 
 TEST(ExactMapMatcherTest, RecursiveMatching) {
@@ -114,7 +114,7 @@ TEST(ExactMapMatcherTest, RecursiveMatching) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "match");
+  EXPECT_THAT(result, HasStringAction("match"));
 }
 
 TEST(ExactMapMatcherTest, RecursiveMatchingOnNoMatch) {
@@ -133,7 +133,7 @@ TEST(ExactMapMatcherTest, RecursiveMatchingOnNoMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "nested_match");
+  EXPECT_THAT(result, HasStringAction("nested_match"));
 }
 
 TEST(ExactMapMatcherTest, RecursiveMatchingWithKeepMatching) {
