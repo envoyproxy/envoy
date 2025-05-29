@@ -6180,6 +6180,7 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
   Http::TestRequestHeaderMapImpl outgoing_headers;
   HttpTestUtility::addDefaultHeaders(outgoing_headers);
   outgoing_headers.setHost(cm_.thread_local_cluster_.conn_pool_.host_->hostname_);
+  outgoing_headers.setEnvoyOriginalHost(req_host);
   outgoing_headers.setForwardedHost(req_host);
 
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
