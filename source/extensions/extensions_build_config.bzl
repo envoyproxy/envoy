@@ -326,6 +326,13 @@ EXTENSIONS = {
     "envoy.retry_host_predicates.omit_canary_hosts":    "//source/extensions/retry/host/omit_canary_hosts:config",
     "envoy.retry_host_predicates.omit_host_metadata":   "//source/extensions/retry/host/omit_host_metadata:config",
 
+
+    #
+    # Outlier Detection Monitors
+    #
+    #
+    "envoy.outlier_detection_monitors.consecutive_errors": "//source/extensions/outlier_detection_monitors/consecutive_errors:consecutive_errors_monitor_lib",
+
     #
     # Retry priorities
     #

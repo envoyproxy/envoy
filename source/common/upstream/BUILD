@@ -351,6 +351,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:codes_lib",
         "//source/common/protobuf",
+        "//source/extensions/outlier_detection_monitors/common:outlier_detection_monitors_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v3:pkg_cc_proto",
     ],
