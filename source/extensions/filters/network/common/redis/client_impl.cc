@@ -152,7 +152,8 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   encoder_->encode(request, encoder_buffer_);
 
   // If buffer is full, flush. If the buffer was empty before the request, start the timer.
-  if (!queue_enabled_ && encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
+  // if (!queue_enabled_ && encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
+  if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
     flushBufferAndResetTimer();
   } else if (empty_buffer) {
     flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
