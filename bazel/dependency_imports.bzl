@@ -21,6 +21,7 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
+load("//bazel:gcc_toolchain.bzl", "gcc_toolchain_setup")
 
 # go version for rules_go
 GO_VERSION = "1.23.1"
@@ -32,6 +33,7 @@ BUF_VERSION = "v1.50.0"
 
 def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION, buf_version = BUF_VERSION):
     rules_foreign_cc_dependencies()
+    gcc_toolchain_setup()
     go_rules_dependencies()
     go_register_toolchains(go_version)
     if go_version != "host":

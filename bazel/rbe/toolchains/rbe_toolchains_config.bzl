@@ -30,11 +30,6 @@ _CLANG_LIBCXX_ENV = dicts.add(_CLANG_ENV, {
 
 _GCC_ENV = {
     "BAZEL_COMPILER": "gcc",
-    "BAZEL_LINKLIBS": "-l%:libstdc++.a",
-    "BAZEL_LINKOPTS": "-lm:-fuse-ld=gold",
-    "CC": "gcc",
-    "CXX": "g++",
-    "PATH": "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin",
 }
 
 _MSVC_CL_ENV = {}

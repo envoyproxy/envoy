@@ -96,24 +96,16 @@ build:clang --incompatible_enable_cc_toolchain_resolution=false
 build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
 
-# Use gold linker for gcc compiler.
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
-build:gcc --test_env=HEAPCHECK=
 build:gcc --action_env=BAZEL_COMPILER=gcc
-build:gcc --action_env=CC=gcc --action_env=CXX=g++
-# This is to work around a bug in GCC that makes debug-types-section
-# option not play well with fission:
-# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110885
+build:gcc --incompatible_enable_cc_toolchain_resolution
+build:gcc --platforms=@gcc_toolchain//platforms:x86_64_linux
+build:gcc --extra_toolchains=@gcc_toolchain_x86_64//:all
 build:gcc --copt=-fno-debug-types-section
-# These trigger errors in multiple places both in Envoy dependecies
-# and in Envoy code itself when using GCC.
-# And in all cases the reports appear to be clear false positives.
 build:gcc --copt=-Wno-error=restrict
 build:gcc --copt=-Wno-error=uninitialized
 build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
-build:gcc --incompatible_enable_cc_toolchain_resolution=false
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
@@ -320,10 +312,10 @@ build:rbe-toolchain-msan --config=clang-msan
 build:rbe-toolchain-tsan --config=clang-tsan
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
-build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:rbe-toolchain-gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:rbe-toolchain-gcc --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/gcc/cc:toolchain
-build:rbe-toolchain-gcc --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain
+build:rbe-toolchain-gcc --incompatible_enable_cc_toolchain_resolution
+build:rbe-toolchain-gcc --platforms=@gcc_toolchain//platforms:x86_64_linux_remote
+build:rbe-toolchain-gcc --host_platform=@gcc_toolchain//platforms:x86_64_linux_remote
+build:rbe-toolchain-gcc --extra_toolchains=@gcc_toolchain_x86_64//:all
 
 build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
@@ -350,7 +342,6 @@ build:remote-arm64-clang-libc++ --config=remote
 build:remote-arm64-clang-libc++ --config=rbe-toolchain-arm64-clang-libc++
 
 build:remote-gcc --config=remote
-build:remote-gcc --config=gcc
 build:remote-gcc --config=rbe-toolchain-gcc
 
 build:remote-asan --config=remote
@@ -410,7 +401,6 @@ build:docker-clang-libc++ --config=docker-sandbox
 build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
-build:docker-gcc --config=gcc
 build:docker-gcc --config=rbe-toolchain-gcc
 
 build:docker-asan --config=docker-sandbox
