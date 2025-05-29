@@ -249,15 +249,15 @@ TEST_F(MaxmindProviderConfigTest, ProviderConfigWithCorrectProto) {
   )EOF";
   MaxmindProviderConfig provider_config;
   auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
-  auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
+  auto isp_db_path = genGeoDbFilePath("GeoIP2-ISP-Test.mmdb");
   auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
   auto processed_provider_config_yaml =
-      absl::StrFormat(provider_config_yaml, city_db_path, asn_db_path, anon_db_path);
+      absl::StrFormat(provider_config_yaml, city_db_path, isp_db_path, anon_db_path);
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver =
       factory.createGeoipProviderDriver(provider_config, "maxmind", context_);
-  EXPECT_THAT(driver, AllOf(HasCityDbPath(city_db_path), HasIspDbPath(asn_db_path),
+  EXPECT_THAT(driver, AllOf(HasCityDbPath(city_db_path), HasIspDbPath(isp_db_path),
                             HasAnonDbPath(anon_db_path), HasCountryHeader("x-geo-country"),
                             HasCityHeader("x-geo-city"), HasRegionHeader("x-geo-region"),
                             HasAsnHeader("x-geo-asn"), HasAnonVpnHeader("x-anon-vpn"),
@@ -330,13 +330,15 @@ TEST_F(MaxmindProviderConfigTest, ReusesProviderInstanceForSameProtoConfig) {
     city_db_path: %s
     isp_db_path: %s
     anon_db_path: %s
+    asn_db_path: %s
   )EOF";
   MaxmindProviderConfig provider_config;
   auto city_db_path = genGeoDbFilePath("GeoLite2-City-Test.mmdb");
   auto asn_db_path = genGeoDbFilePath("GeoLite2-ASN-Test.mmdb");
   auto anon_db_path = genGeoDbFilePath("GeoIP2-Anonymous-IP-Test.mmdb");
+  auto isp_db_path = genGeoDbFilePath("GeoIP2-ISP-Test.mmdb");
   auto processed_provider_config_yaml =
-      absl::StrFormat(provider_config_yaml, city_db_path, asn_db_path, anon_db_path);
+      absl::StrFormat(provider_config_yaml, city_db_path, isp_db_path, anon_db_path, asn_db_path);
   TestUtility::loadFromYaml(processed_provider_config_yaml, provider_config);
   MaxmindProviderFactory factory;
   Geolocation::DriverSharedPtr driver1 =
