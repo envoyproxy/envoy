@@ -1,0 +1,32 @@
+on:
+  pull_request:
+    branches:
+    - main
+  push:
+    branches:
+    - main
+
+permissions:
+  contents: read
+
+
+jobs:
+  diskspace:
+    name: Diskspace debug
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Debug diskspace
+      run: |
+        df -h
+        lsblk -f
+        blkid
+
+  diskspace-arm64:
+    name: Diskspace debug
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - name: Debug diskspace
+      run: |
+        df -h
+        lsblk -f
+        blkid
