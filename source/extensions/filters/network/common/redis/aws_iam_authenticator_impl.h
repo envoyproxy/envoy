@@ -15,6 +15,11 @@ namespace Common {
 namespace Redis {
 namespace AwsIamAuthenticator {
 
+namespace {
+static constexpr uint16_t AwsIamDefaultExpiration = 60;
+constexpr char DEFAULT_SERVICE_NAME[] = "elasticache";
+} // namespace
+
 class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
 public:
   virtual ~AwsIamAuthenticatorBase() = default;
@@ -25,11 +30,9 @@ public:
 
 class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
 public:
-  AwsIamAuthenticatorImpl(Server::Configuration::ServerFactoryContext& context,
-                          absl::string_view cache_name, absl::string_view service_name,
-                          absl::string_view region, uint16_t expiration_time,
-                          absl::optional<envoy::extensions::common::aws::v3::AwsCredentialProvider>
-                              credential_provider);
+  AwsIamAuthenticatorImpl(absl::string_view cache_name, absl::string_view region,
+                          Envoy::Extensions::Common::Aws::SignerPtr signer);
+
   bool addCallbackIfCredentialsPending(
       Extensions::Common::Aws::CredentialsPendingCallback&& cb) override {
     return signer_->addCallbackIfCredentialsPending(std::move(cb));
@@ -41,21 +44,18 @@ public:
 
 private:
   Envoy::Extensions::Common::Aws::SignerPtr signer_;
-  uint16_t expiration_time_;
   const std::string auth_user_;
   std::string cache_name_;
-  std::string service_name_;
-  std::string region_;
-  Server::Configuration::ServerFactoryContext& context_;
   std::string auth_token_;
+  std::string region_;
 };
 
 using AwsIamAuthenticatorSharedPtr = std::shared_ptr<AwsIamAuthenticatorBase>;
 using AwsIamAuthenticatorSharedPtrOptRef = OptRef<AwsIamAuthenticatorSharedPtr>;
 
-class AwsIamAuthenticatorFactory {
+class AwsIamAuthenticatorFactory : public Logger::Loggable<Logger::Id::aws> {
 public:
-  static AwsIamAuthenticatorSharedPtr initAwsIamAuthenticator(
+  static absl::optional<AwsIamAuthenticatorSharedPtr> initAwsIamAuthenticator(
       Server::Configuration::ServerFactoryContext& context,
       envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config);
 };

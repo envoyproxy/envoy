@@ -19,11 +19,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-namespace {
-static constexpr uint16_t AwsIamDefaultExpiration = 60;
-constexpr char DEFAULT_SERVICE_NAME[] = "elasticache";
-} // namespace
-
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(

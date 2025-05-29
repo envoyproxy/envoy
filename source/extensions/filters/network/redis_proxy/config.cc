@@ -73,6 +73,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
 
+  // Create the AWS IAM authenticator if required
   if (proto_config.settings().has_aws_iam()) {
     aws_iam_authenticator_ =
         Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
