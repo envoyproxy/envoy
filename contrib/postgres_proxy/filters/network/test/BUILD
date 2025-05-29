@@ -90,7 +90,9 @@ envoy_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//source/extensions/transport_sockets/starttls:config",
         "//test/integration:integration_lib",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha:pkg_cc_proto",
     ],
 )
