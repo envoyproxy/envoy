@@ -4,6 +4,7 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.4"
+"source/common/api/posix:96.3" # requires sandboxing to fully exercise some POSIX syscalls
 "source/common/common/posix:96.2" # flaky due to posix: be careful adjusting
 "source/common/config:96.4"
 "source/common/crypto:95.5"

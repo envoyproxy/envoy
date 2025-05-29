@@ -16,6 +16,10 @@ behavior_changes:
     ``envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss`` to false.
     If the old behavior is desired more permanently, this can be achieved in config by setting
     an ``on_no_match`` action that responds with 404 for each subtree.
+- area: server
+  change: |
+    Envoy will automatically raise the soft limit on the file descriptors to the hard limit. This behavior
+    can be reverted using the runtime guard ``envoy_restart_features_raise_file_limits``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

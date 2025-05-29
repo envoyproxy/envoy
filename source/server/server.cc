@@ -389,6 +389,30 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   return absl::OkStatus();
 }
 
+void InstanceUtil::raiseFileLimits() {
+  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
+    return;
+  }
+  struct rlimit rlim;
+  if (const auto result = Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+      result.return_value_ != 0) {
+    ENVOY_LOG(warn, "Failed to read file descriptor limit, error {}.", errorDetails(result.errno_));
+    return;
+  }
+  const auto old = rlim.rlim_cur;
+  if (old == rlim.rlim_max) {
+    return;
+  }
+  rlim.rlim_cur = rlim.rlim_max;
+  if (const auto result = Api::OsSysCallsSingleton::get().setrlimit(RLIMIT_NOFILE, &rlim);
+      result.return_value_ != 0) {
+    ENVOY_LOG(warn, "Failed to raise file descriptor limit to maximum, error {}.",
+              errorDetails(result.errno_));
+    return;
+  }
+  ENVOY_LOG(info, "Raised file descriptor limits from {} to {}.", old, rlim.rlim_max);
+}
+
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   std::function set_up_logger = [&] {
@@ -715,6 +739,13 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // load things may grab a reference to the loader for later use.
   runtime_ = component_factory.createRuntime(*this, initial_config);
   validation_context_.setRuntime(runtime());
+
+#ifndef WIN32
+  // Envoy automatically raises soft file limits, but we do it here in order to allow
+  // a runtime override to disable this feature. Once the feature defaults to always on,
+  // we can move this as the first thing to occur during the process initialization.
+  InstanceUtil::raiseFileLimits();
+#endif
 
   if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
     assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
