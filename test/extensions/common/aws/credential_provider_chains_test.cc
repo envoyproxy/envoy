@@ -47,6 +47,8 @@ public:
 };
 
 TEST_F(DefaultCredentialsProviderChainTest, NoEnvironmentVars) {
+    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
   EXPECT_CALL(factories_, mockCreateCredentialsFileCredentialsProvider(Ref(context_), _));
   EXPECT_CALL(factories_, createInstanceProfileCredentialsProvider(_, _, _, _, _, _));
   envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
