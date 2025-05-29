@@ -7,26 +7,18 @@
 
 #include "source/common/matcher/matcher.h"
 
-#include "xds/type/matcher/v3/http_inputs.pb.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
-using Protobuf::Map;
-using ProtoApiScrubberRemoveFieldAction =
-    ::envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::Restrictions;
-using Http::HttpMatchingData;
-using xds::type::matcher::v3::HttpAttributesCelMatchInput;
-using FilteringMode = ProtoApiScrubberConfig::FilteringMode;
 
 static constexpr absl::string_view kConfigInitializationError =
     "Error encountered during config initialization.";
 
+// Returns whether the fully qualified `api_name` is valid or not.
+// Checks for separator '.' in the name and verifies each substring between these separators are
+// non-empty. Note that it does not verify whether the API actually exists or not.
 bool isApiNameValid(absl::string_view api_name) {
   const std::vector<absl::string_view> api_name_parts = absl::StrSplit(api_name, '.');
   if (api_name_parts.size() <= 1) {
@@ -156,8 +148,8 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
 }
 
 MatchTreeHttpMatchingDataSharedPtr
-ProtoApiScrubberFilterConfig::getRequestFieldMatcher(std::string method_name,
-                                                     std::string field_mask) const {
+ProtoApiScrubberFilterConfig::getRequestFieldMatcher(const std::string& method_name,
+                                                     const std::string& field_mask) const {
   if (auto it = request_field_restrictions_.find(std::make_pair(method_name, field_mask));
       it != request_field_restrictions_.end()) {
     return it->second;
@@ -167,8 +159,8 @@ ProtoApiScrubberFilterConfig::getRequestFieldMatcher(std::string method_name,
 }
 
 MatchTreeHttpMatchingDataSharedPtr
-ProtoApiScrubberFilterConfig::getResponseFieldMatcher(std::string method_name,
-                                                      std::string field_mask) const {
+ProtoApiScrubberFilterConfig::getResponseFieldMatcher(const std::string& method_name,
+                                                      const std::string& field_mask) const {
   if (auto it = response_field_restrictions_.find(std::make_pair(method_name, field_mask));
       it != response_field_restrictions_.end()) {
     return it->second;
