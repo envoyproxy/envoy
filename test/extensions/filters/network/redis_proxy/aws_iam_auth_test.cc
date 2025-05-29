@@ -48,7 +48,7 @@ TEST_F(AwsIamAuthenticatorTest, NormalAuthentication) {
   auto aws_iam_authenticator =
       AwsIamAuthenticatorFactory::initAwsIamAuthenticator(context_, aws_iam_config);
 
-  auto token = aws_iam_authenticator->getAuthToken("test");
+  auto token = aws_iam_authenticator.value()->getAuthToken("test");
   EXPECT_EQ(
       token,
       "cachename/"

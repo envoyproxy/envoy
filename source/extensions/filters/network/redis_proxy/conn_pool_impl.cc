@@ -129,6 +129,9 @@ InstanceImpl::ThreadLocalPool::ThreadLocalPool(
 }
 
 InstanceImpl::ThreadLocalPool::~ThreadLocalPool() {
+  ENVOY_LOG(debug, "Authenticator reference count: {}", aws_iam_authenticator_.has_value()
+                                                          ? aws_iam_authenticator_->use_count()
+                                                          : 0);
   while (!pending_requests_.empty()) {
     pending_requests_.pop_front();
   }

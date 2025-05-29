@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/server/factory_context.h"
 
@@ -20,9 +19,9 @@ static constexpr uint16_t AwsIamDefaultExpiration = 60;
 constexpr char DEFAULT_SERVICE_NAME[] = "elasticache";
 } // namespace
 
-class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
+class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws>, public Singleton::Instance {
 public:
-  virtual ~AwsIamAuthenticatorBase() = default;
+  ~AwsIamAuthenticatorBase() override = default;
   virtual std::string getAuthToken(std::string auth_user) PURE;
   virtual bool
   addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb) PURE;

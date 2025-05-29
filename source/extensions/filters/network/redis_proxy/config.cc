@@ -79,7 +79,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
         Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
             server_context, proto_config.settings().aws_iam());
   }
-
+  auth_ = aws_iam_authenticator_.value();
+  
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
 

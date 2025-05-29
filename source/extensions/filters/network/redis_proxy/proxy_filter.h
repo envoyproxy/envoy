@@ -93,7 +93,7 @@ public:
   ProxyFilter(Common::Redis::DecoderFactory& factory, Common::Redis::EncoderPtr&& encoder,
               CommandSplitter::Instance& splitter, ProxyFilterConfigSharedPtr config,
               ExternalAuth::ExternalAuthClientPtr&& auth_client);
-  ~ProxyFilter() override;
+  ~ProxyFilter() override; 
 
   // Network::ReadFilter
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;

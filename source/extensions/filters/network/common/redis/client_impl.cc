@@ -151,12 +151,15 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   pending_requests_.emplace_back(*this, callbacks, command);
   encoder_->encode(request, encoder_buffer_);
 
-  // If buffer is full, flush. If the buffer was empty before the request, start the timer.
-  // if (!queue_enabled_ && encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
-  if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
-    flushBufferAndResetTimer();
-  } else if (empty_buffer) {
-    flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
+  if(!queue_enabled_)
+  {
+    // If buffer is full, flush. If the buffer was empty before the request, start the timer.
+    // if (!queue_enabled_ && encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
+    if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
+      flushBufferAndResetTimer();
+    } else if (empty_buffer) {
+      flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
+    }
   }
 
   // Only boost the op timeout if:
