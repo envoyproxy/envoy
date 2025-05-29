@@ -24,10 +24,10 @@ public:
       FieldMatchResult result = matcher.first->match(matching_data);
 
       // One of the matchers don't have enough information, bail on evaluating the match.
-      if (result.match_state_ == MatchState::UnableToMatch) {
+      if (result.isUnableToMatch()) {
         return {MatchState::UnableToMatch, absl::nullopt};
       }
-      if (!result.result()) {
+      if (result.isNoMatch()) {
         continue;
       }
 

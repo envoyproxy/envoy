@@ -261,6 +261,18 @@ createSingleMatcher(absl::optional<absl::string_view> input,
       .value();
 }
 
+void PrintTo(const FieldMatchResult& result, std::ostream* os) {
+  if (result.isUnableToMatch()) {
+    *os << "UnableToMatch";
+  } else if (result.isNoMatch()) {
+    *os << "NoMatch";
+  } else if (result.isMatched()) {
+    *os << "Matched";
+  } else {
+    *os << "UnknownState";
+  }
+}
+
 // Creates a StringAction from a provided string.
 std::unique_ptr<StringAction> stringValue(absl::string_view value) {
   return std::make_unique<StringAction>(std::string(value));
