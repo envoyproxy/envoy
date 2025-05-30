@@ -15,6 +15,8 @@ namespace Common {
 namespace Redis {
 namespace AwsIamAuthenticator {
 
+absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::authenticator_handle_;
+
 SINGLETON_MANAGER_REGISTRATION(aws_iam_authenticator);
 
 AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(absl::string_view cache_name,
@@ -22,9 +24,23 @@ AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(absl::string_view cache_name,
                                                  Envoy::Extensions::Common::Aws::SignerPtr signer)
     : signer_(std::move(signer)), cache_name_(std::string(cache_name)), region_(region) {}
 
+void AwsIamAuthenticatorImpl::shutDown() {
+  ENVOY_LOG_MISC(debug, "****** INSIDE SHUTDOWN ******");
+    signer_.reset();
+  }
+
 absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
     Server::Configuration::ServerFactoryContext& context,
     envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config) {
+
+  context.lifecycleNotifier().registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
+                                                       [&](Event::PostCb) { 
+                                                          ENVOY_LOG_MISC(debug, "****** INSIDE PRE SHUTDOWN ******");
+                                                        if(authenticator_handle_.has_value())
+                                                        {
+                                                          authenticator_handle_.value()->shutDown();
+                                                        }
+                                                      });
 
   absl::StatusOr<Extensions::Common::Aws::CredentialsProviderChainSharedPtr>
       credentials_provider_chain;
@@ -50,6 +66,9 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
     }
     region = regionOpt.value();
   }
+  else {
+    region = aws_iam_config.region();
+  }
 
   if (aws_iam_config.has_credential_provider()) {
     credentials_provider_chain =
@@ -72,7 +91,7 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
   //     Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
   //     PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60));
 
-        return context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
+        authenticator_handle_ = context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
       [&aws_iam_config, credentials_provider_chain, &context, &region]()  { 
           auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
@@ -84,6 +103,8 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
         return std::make_shared<AwsIamAuthenticatorImpl>(aws_iam_config.cache_name(),  region, std::move(signer)); 
       
       }, false);
+
+      return authenticator_handle_;
 
   // aws_cluster_manager_ =
   //     context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(

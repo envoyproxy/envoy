@@ -1,5 +1,6 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
+#include "client.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
@@ -14,6 +15,17 @@ namespace {
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
 // "asking".
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+
+// Custom authentication callback handler for AWS IAM authentication
+class AuthCallbackHandler : public DoNothingPoolCallbacks
+{
+  void onResponse(Common::Redis::RespValuePtr&& resp) override
+  {
+    ENVOY_LOG_MISC(debug, "AWS IAM Authentication Response: {}",resp->toString());
+  }
+};
+
+AuthCallbackHandler auth_callbacks;
 } // namespace
 
 ConfigImpl::ConfigImpl(
@@ -85,7 +97,7 @@ void ClientImpl::sendAwsIamAuth(const std::string& auth_username) {
     const auto auth_password = aws_iam_authenticator_.value()->getAuthToken(auth_username);
     Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
         auth_username, auth_password);
-    makeRequestImmediate(auth_request, null_pool_callbacks);
+    makeRequestImmediate(auth_request, auth_callbacks);
     queueRequests(false);
   };
 
@@ -192,6 +204,7 @@ PoolRequest* ClientImpl::makeRequestImmediate(const RespValue& request,
   pending_requests_.emplace_back(*this, callbacks, command);
   encoder_->encode(request, immediate_buffer);
   connection_->write(immediate_buffer, false);
+  // Flush buffer if we've queued up any requests while waiting for authentication credentials
   if (encoder_buffer_.length()) {
     flushBufferAndResetTimer();
   }
