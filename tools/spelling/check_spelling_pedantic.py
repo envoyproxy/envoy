@@ -88,6 +88,10 @@ QUOTED_WORD = re.compile(r'((["\'])[A-Za-z0-9.:-]+(\2))|(\*[A-Za-z0-9.:-]+\*)')
 # Backtick-quoted words that look like code. Note the overlap with RST_LINK.
 QUOTED_EXPR = re.compile(r'`[A-Za-z0-9:()<>_.,/{}\[\]&*-]+`')
 
+# Words with underscores are likely variable names and as such
+# should not be spell checked.
+UNDERSCORE_EXPR = re.compile(r'_[A-Za-z0-9_]*|[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]*')
+
 # Tuple expressions like (abc, def).
 TUPLE_EXPR = re.compile(r'\([A-Za-z0-9]+(?:, *[A-Za-z0-9]+){1,}\)')
 
@@ -418,6 +422,8 @@ def check_comment(checker, offset, comment):
     comment, found = mask_with_regex(comment, RST_LINK, 0)
     if not found:
         comment, _ = mask_with_regex(comment, QUOTED_EXPR, 0)
+
+    comment, _ = mask_with_regex(comment, UNDERSCORE_EXPR, 0)
 
     comment, _ = mask_with_regex(comment, TUPLE_EXPR, 0)
 

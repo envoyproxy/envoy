@@ -9,3 +9,6 @@ Heer too.
 /**
  * As well as this.
  */
+
+// An underscore should negate spell checking as it
+// implies a variable name, e.g. ai_flags should be fine.
