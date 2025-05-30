@@ -40,7 +40,6 @@ public:
 
   std::string getAuthToken(std::string auth_user) override;
   void shutDown() override;
-  using AwsIamAuthenticatorSharedPtr = std::shared_ptr<AwsIamAuthenticatorBase>;
 
 private:
   Envoy::Extensions::Common::Aws::SignerPtr signer_;
@@ -51,13 +50,13 @@ private:
 };
 
 using AwsIamAuthenticatorSharedPtr = std::shared_ptr<AwsIamAuthenticatorBase>;
-using AwsIamAuthenticatorSharedPtrOptRef = OptRef<AwsIamAuthenticatorSharedPtr>;
 
 class AwsIamAuthenticatorFactory : public Logger::Loggable<Logger::Id::aws> {
 public:
   static absl::optional<AwsIamAuthenticatorSharedPtr> initAwsIamAuthenticator(
       Server::Configuration::ServerFactoryContext& context,
       envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config);
+  static absl::optional<AwsIamAuthenticatorSharedPtr> getInstance() { return authenticator_handle_;}
 
   static absl::optional<AwsIamAuthenticatorSharedPtr> authenticator_handle_;
 };

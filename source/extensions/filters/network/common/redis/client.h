@@ -217,8 +217,7 @@ public:
   create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
          const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
          Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
-         bool is_transaction_client,
-             Server::Configuration::ServerFactoryContext& context) PURE;
+         bool is_transaction_client) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

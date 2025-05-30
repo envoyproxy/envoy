@@ -74,14 +74,16 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
 
   // // Create the AWS IAM authenticator if required
-  // if (proto_config.settings().has_aws_iam()) {
-  //   aws_iam_authenticator_ =
-  //       Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
-  //           server_context, proto_config.settings().aws_iam());
-  // }
-  // ENVOY_LOG_MISC(debug, "RedisProxyFilterConfigFactory::createFilterFactoryFromProtoTyped authenticator reference count: {}", aws_iam_authenticator_.has_value()
-  //                                                         ? aws_iam_authenticator_->use_count()
-  //                                                         : 0);
+  if (proto_config.settings().has_aws_iam()) {
+    aws_iam_authenticator_ =
+        Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
+            server_context, proto_config.settings().aws_iam());
+  if(!aws_iam_authenticator_.has_value())
+  {
+      ENVOY_LOG_MISC(debug, "Redis proxy AWS IAM Authentication could not be enabled");
+  }
+}
+
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
 
@@ -91,7 +93,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
         cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
-        refresh_manager, filter_config->dns_cache_, server_context);
+        refresh_manager, filter_config->dns_cache_);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }

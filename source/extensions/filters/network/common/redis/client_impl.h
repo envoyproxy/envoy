@@ -84,15 +84,14 @@ public:
          DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
          const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
          bool is_transaction_client, const std::string& auth_username,
-         const std::string& auth_password,
-    Server::Configuration::ServerFactoryContext& context);
+         const std::string& auth_password
+    );
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
              const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
              bool is_transaction_client, const std::string& auth_username,
-             const std::string& auth_password,
-    Server::Configuration::ServerFactoryContext& context);
+             const std::string& auth_password);
   ~ClientImpl() override;
 
   // Client
@@ -182,8 +181,6 @@ private:
   Stats::Scope& scope_;
   bool is_transaction_client_;
   bool queue_enabled_{false};
-  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-      aws_iam_authenticator_;
 };
 
 class ClientFactoryImpl : public ClientFactory, public Logger::Loggable<Logger::Id::redis> {
@@ -193,8 +190,7 @@ public:
                    const ConfigSharedPtr& config,
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
-                   bool is_transaction_client,
-    Server::Configuration::ServerFactoryContext& context) override;
+                   bool is_transaction_client) override;
 
   static ClientFactoryImpl instance_;
 
