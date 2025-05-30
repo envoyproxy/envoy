@@ -20,7 +20,7 @@ build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules
 build --features=swift.debug_prefix_map
 build --host_force_python=PY3
-build --macos_minimum_os=13.3
+build --macos_minimum_os=13.4
 # Use MINIMUM_IOS_VERSION in config.bzl instead
 # build --ios_minimum_os=16.3
 build --verbose_failures

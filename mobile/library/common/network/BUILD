@@ -154,6 +154,12 @@ envoy_cc_library(
         ],
         "//conditions:default": [],
     }),
+    linkopts = select({
+        "@envoy//bazel:apple": [
+            "-framework CFNetwork",
+        ],
+        "//conditions:default": [],
+    }),
     repository = "@envoy",
     deps = select({
         "@envoy//bazel:apple": [

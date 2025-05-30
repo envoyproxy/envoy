@@ -97,6 +97,7 @@ constexpr absl::string_view RouteMetadata = "route_metadata";
 constexpr absl::string_view VirtualHostName = "virtual_host_name";
 constexpr absl::string_view VirtualHostMetadata = "virtual_host_metadata";
 constexpr absl::string_view UpstreamHostMetadata = "upstream_host_metadata";
+constexpr absl::string_view UpstreamHostLocalityMetadata = "upstream_host_locality_metadata";
 constexpr absl::string_view FilterChainName = "filter_chain_name";
 constexpr absl::string_view ListenerMetadata = "listener_metadata";
 constexpr absl::string_view ListenerDirection = "listener_direction";

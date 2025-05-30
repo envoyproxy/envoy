@@ -2909,6 +2909,34 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+TEST_F(HttpFilterTest, ProtocolConfigEncodingPerRouteTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+  )EOF");
+
+  // Route configuration overrides the processing mode.
+  ExtProcPerRoute route_proto;
+  auto* processing_mode = route_proto.mutable_overrides()->mutable_processing_mode();
+  processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+  processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillOnce(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_TRUE(last_request_.has_protocol_config());
+  EXPECT_EQ(last_request_.protocol_config().request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(last_request_.protocol_config().response_body_mode(),
+            ProcessingMode::FULL_DUPLEX_STREAMED);
+  filter_->onDestroy();
+}
+
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate
 // callback on the filter for inbound traffic when header modifications are also present.
 // Also verify it does not make the callback for outbound traffic.
