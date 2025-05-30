@@ -423,8 +423,6 @@ def check_comment(checker, offset, comment):
     if not found:
         comment, _ = mask_with_regex(comment, QUOTED_EXPR, 0)
 
-    comment, _ = mask_with_regex(comment, UNDERSCORE_EXPR, 0)
-
     comment, _ = mask_with_regex(comment, TUPLE_EXPR, 0)
 
     # Command flags:
@@ -445,6 +443,8 @@ def check_comment(checker, offset, comment):
 
     if checker.suffix_re is not None:
         comment, _ = mask_with_regex(comment, checker.suffix_re, 1)
+
+    comment, _ = mask_with_regex(comment, UNDERSCORE_EXPR, 0)
 
     # Everything got masked, return early.
     if comment == "" or comment.strip() == "":
