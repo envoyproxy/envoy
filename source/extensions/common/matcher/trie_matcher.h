@@ -19,7 +19,7 @@ namespace Matcher {
 using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
-using ::Envoy::Matcher::MatchState;
+using ::Envoy::Matcher::MatchResult;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
 using ::Envoy::Matcher::OnMatchFactory;
@@ -77,12 +77,12 @@ public:
       return MatchResult::insufficientData();
     }
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
-      return handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
+      return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
     const Network::Address::InstanceConstSharedPtr addr =
         Network::Utility::parseInternetAddressNoThrow(absl::get<std::string>(input.data_));
     if (!addr) {
-      return handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
+      return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
     auto values = trie_->getData(addr);
     // The candidates returned by the LC trie are not in any specific order, so we
