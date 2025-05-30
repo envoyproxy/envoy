@@ -1,54 +1,50 @@
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include <algorithm>
+
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/matcher_actions.pb.h"
 #include "envoy/matcher/matcher.h"
 
 #include "source/common/matcher/matcher.h"
-
-#include "xds/type/matcher/v3/http_inputs.pb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
-using Protobuf::Map;
-using ProtoApiScrubberRemoveFieldAction =
-    ::envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::Restrictions;
-using Http::HttpMatchingData;
-using xds::type::matcher::v3::HttpAttributesCelMatchInput;
-using MatchTreeHttpCelInputSharedPtr = Matcher::MatchTreeSharedPtr<HttpMatchingData>;
-using FilteringMode = ProtoApiScrubberConfig::FilteringMode;
-
-using StringPairToMatchTreeMap =
-    absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
 
 static constexpr absl::string_view kConfigInitializationError =
     "Error encountered during config initialization.";
 
-} // namespace
-
-ProtoApiScrubberFilterConfig::ProtoApiScrubberFilterConfig() {}
-
-absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>>
-ProtoApiScrubberFilterConfig::create(const ProtoApiScrubberConfig& proto_config,
-                                     Server::Configuration::FactoryContext& context) {
-  auto filter_config_ptr =
-      std::shared_ptr<ProtoApiScrubberFilterConfig>(new ProtoApiScrubberFilterConfig());
-  if (absl::Status status = filter_config_ptr->initialize(proto_config, context); !status.ok()) {
-    return status;
+// Returns whether the fully qualified `api_name` is valid or not.
+// Checks for separator '.' in the name and verifies each substring between these separators are
+// non-empty. Note that it does not verify whether the API actually exists or not.
+bool isApiNameValid(absl::string_view api_name) {
+  const std::vector<absl::string_view> api_name_parts = absl::StrSplit(api_name, '.');
+  if (api_name_parts.size() <= 1) {
+    return false;
   }
 
+  // Returns true if all of the api_name_parts are non-empty, otherwise returns false.
+  return !std::any_of(api_name_parts.cbegin(), api_name_parts.cend(),
+                      [](const absl::string_view s) { return s.empty(); });
+}
+
+} // namespace
+
+absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
+ProtoApiScrubberFilterConfig::create(const ProtoApiScrubberConfig& proto_config,
+                                     Server::Configuration::FactoryContext& context) {
+  std::shared_ptr<ProtoApiScrubberFilterConfig> filter_config_ptr =
+      std::shared_ptr<ProtoApiScrubberFilterConfig>(new ProtoApiScrubberFilterConfig());
+  RETURN_IF_ERROR(filter_config_ptr->initialize(proto_config, context));
   return filter_config_ptr;
 }
 
 absl::Status
 ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_config,
                                          Server::Configuration::FactoryContext& context) {
-  ENVOY_LOG(debug, "Initializing filter config from the proto config: {}",
+  ENVOY_LOG(trace, "Initializing filter config from the proto config: {}",
             proto_config.DebugString());
 
   FilteringMode filtering_mode = proto_config.filtering_mode();
@@ -66,7 +62,7 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
         method_restriction.second.response_field_restrictions(), context));
   }
 
-  ENVOY_LOG(debug, "Filter config initialized successfully.");
+  ENVOY_LOG(trace, "Filter config initialized successfully.");
   return absl::OkStatus();
 }
 
@@ -95,9 +91,9 @@ absl::Status ProtoApiScrubberFilterConfig::validateMethodName(absl::string_view 
         kConfigInitializationError, method_name));
   }
 
-  std::vector<absl::string_view> method_name_parts = absl::StrSplit(method_name, '/');
+  const std::vector<absl::string_view> method_name_parts = absl::StrSplit(method_name, '/');
   if (method_name_parts.size() != 3 || !method_name_parts[0].empty() ||
-      method_name_parts[1].empty() || !absl::StrContains(method_name_parts[1], '.') ||
+      method_name_parts[1].empty() || !isApiNameValid(method_name_parts[1]) ||
       method_name_parts[2].empty()) {
     return absl::InvalidArgumentError(
         fmt::format("{} Invalid method name: '{}'. Method name should follow the gRPC format "
@@ -125,11 +121,11 @@ absl::Status ProtoApiScrubberFilterConfig::validateFieldMask(absl::string_view f
 }
 
 absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
-    std::string method_name, StringPairToMatchTreeMap& field_restrictions,
-    const Map<std::string, RestrictionConfig> restrictions,
+    absl::string_view method_name, StringPairToMatchTreeMap& field_restrictions,
+    const Map<std::string, RestrictionConfig>& restrictions,
     Envoy::Server::Configuration::FactoryContext& context) {
   for (const auto& restriction : restrictions) {
-    std::string field_mask = restriction.first;
+    absl::string_view field_mask = restriction.first;
     RETURN_IF_ERROR(validateFieldMask(field_mask));
     ProtoApiScrubberRemoveFieldAction remove_field_action;
     MatcherInputValidatorVisitor validation_visitor;
@@ -139,7 +135,8 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
     absl::optional<Matcher::MatchTreeFactoryCb<HttpMatchingData>> factory_cb =
         matcher_factory.create(restriction.second.matcher());
     if (factory_cb.has_value()) {
-      field_restrictions[std::make_pair(method_name, field_mask)] = factory_cb.value()();
+      field_restrictions[std::make_pair(std::string(method_name), std::string(field_mask))] =
+          factory_cb.value()();
     } else {
       return absl::InvalidArgumentError(fmt::format(
           "{} Failed to initialize matcher factory callback for method {} and field mask {}.",
@@ -150,9 +147,9 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
   return absl::OkStatus();
 }
 
-MatchTreeHttpCelInputSharedPtr
-ProtoApiScrubberFilterConfig::getRequestFieldMatcher(std::string method_name,
-                                                     std::string field_mask) const {
+MatchTreeHttpMatchingDataSharedPtr
+ProtoApiScrubberFilterConfig::getRequestFieldMatcher(const std::string& method_name,
+                                                     const std::string& field_mask) const {
   if (auto it = request_field_restrictions_.find(std::make_pair(method_name, field_mask));
       it != request_field_restrictions_.end()) {
     return it->second;
@@ -161,9 +158,9 @@ ProtoApiScrubberFilterConfig::getRequestFieldMatcher(std::string method_name,
   return nullptr;
 }
 
-MatchTreeHttpCelInputSharedPtr
-ProtoApiScrubberFilterConfig::getResponseFieldMatcher(std::string method_name,
-                                                      std::string field_mask) const {
+MatchTreeHttpMatchingDataSharedPtr
+ProtoApiScrubberFilterConfig::getResponseFieldMatcher(const std::string& method_name,
+                                                      const std::string& field_mask) const {
   if (auto it = response_field_restrictions_.find(std::make_pair(method_name, field_mask));
       it != response_field_restrictions_.end()) {
     return it->second;

@@ -14,17 +14,14 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 namespace {
-
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::DescriptorSet;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
-using ::envoy::extensions::filters::http::proto_api_scrubber::v3::Restrictions;
+using envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig;
+using envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionConfig;
 using Http::HttpMatchingData;
 using Protobuf::Map;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
-using FilteringMode = ProtoApiScrubberConfig::FilteringMode;
 using ProtoApiScrubberRemoveFieldAction =
-    ::envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction;
+    envoy::extensions::filters::http::proto_api_scrubber::v3::RemoveFieldAction;
+using FilteringMode = ProtoApiScrubberConfig::FilteringMode;
 using MatchTreeHttpMatchingDataSharedPtr = Matcher::MatchTreeSharedPtr<HttpMatchingData>;
 using StringPairToMatchTreeMap =
     absl::flat_hash_map<std::pair<std::string, std::string>, MatchTreeHttpMatchingDataSharedPtr>;
@@ -35,27 +32,39 @@ using StringPairToMatchTreeMap =
 class ProtoApiScrubberFilterConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   // Creates and returns an instance of ProtoApiScrubberConfig.
-  static absl::StatusOr<std::shared_ptr<ProtoApiScrubberFilterConfig>>
+  static absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
   create(const ProtoApiScrubberConfig& proto_config,
          Server::Configuration::FactoryContext& context);
 
   // Returns the match tree for a request payload field mask.
-  MatchTreeHttpMatchingDataSharedPtr getRequestFieldMatcher(std::string method_name,
-                                                            std::string field_mask) const;
+  MatchTreeHttpMatchingDataSharedPtr getRequestFieldMatcher(const std::string& method_name,
+                                                            const std::string& field_mask) const;
 
   // Returns the match tree for a response payload field mask.
-  MatchTreeHttpMatchingDataSharedPtr getResponseFieldMatcher(std::string method_name,
-                                                             std::string field_mask) const;
+  MatchTreeHttpMatchingDataSharedPtr getResponseFieldMatcher(const std::string& method_name,
+                                                             const std::string& field_mask) const;
 
   FilteringMode filteringMode() const { return filtering_mode_; }
 
 private:
   // Private constructor to make sure that this class is used in a factory fashion using the
   // public `create` method.
-  ProtoApiScrubberFilterConfig();
+  ProtoApiScrubberFilterConfig() = default;
 
+  // Validates the filtering mode. Currently, only FilteringMode::OVERRIDE is supported.
+  // For any unsupported FilteringMode, it returns absl::InvalidArgument.
   absl::Status validateFilteringMode(FilteringMode);
+
+  // Validates the method name in the filter config.
+  // The method should name should be of gRPC method name format i.e., '/package.service/method'
+  // For any invalid method name, it returns absl::InvalidArgument with an appropriate error
+  // message.
   absl::Status validateMethodName(absl::string_view);
+
+  // Validates the field mask in the filter config.
+  // The currently supported field mask is of format 'a.b.c'
+  // Wildcards (e.g., '*') are not supported.
+  // For any invalid field mask, it returns absl::InvalidArgument with an appropriate error message.
   absl::Status validateFieldMask(absl::string_view);
 
   // Initializes the request and response field mask maps using the proto_config.
@@ -64,13 +73,17 @@ private:
 
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
-  absl::Status initializeMethodRestrictions(std::string method_name,
+  absl::Status initializeMethodRestrictions(absl::string_view method_name,
                                             StringPairToMatchTreeMap& field_restrictions,
-                                            Map<std::string, RestrictionConfig> restrictions,
+                                            const Map<std::string, RestrictionConfig>& restrictions,
                                             Server::Configuration::FactoryContext& context);
 
   FilteringMode filtering_mode_;
+
+  // A map from {method_name, field_mask} to the respective match tree for request fields.
   StringPairToMatchTreeMap request_field_restrictions_;
+
+  // A map from {method_name, field_mask} to the respective match tree for response fields.
   StringPairToMatchTreeMap response_field_restrictions_;
 };
 
@@ -111,8 +124,6 @@ public:
 
   std::string name() const override { return "removeFieldAction"; }
 };
-
-using FilterConfigSharedPtr = std::shared_ptr<const ProtoApiScrubberFilterConfig>;
 
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters

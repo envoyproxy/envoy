@@ -192,7 +192,6 @@ def envoy_dependencies(skip_targets = []):
     _io_hyperscan()
     _io_vectorscan()
     _io_opentelemetry_api_cpp()
-    _llvm_source()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
@@ -215,6 +214,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_examples")
+    external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
 
@@ -392,12 +392,6 @@ def _com_github_qat_zstd():
 def _com_github_lz4_lz4():
     external_http_archive(
         name = "com_github_lz4_lz4",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-
-def _llvm_source():
-    external_http_archive(
-        name = "llvm_source",
         build_file_content = BUILD_ALL_CONTENT,
     )
 

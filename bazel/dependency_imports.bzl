@@ -8,6 +8,7 @@ load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
+load("@envoy_toolshed//compile:sanitizer_libs.bzl", "setup_sanitizer_libs")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
@@ -72,6 +73,8 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     parser_deps()
 
     rules_buf_toolchains(version = buf_version)
+
+    setup_sanitizer_libs()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     # These repos also have transient dependencies - `build_external` allows them to use them.

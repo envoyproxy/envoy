@@ -193,12 +193,19 @@ public:
     providers_.emplace_back(credentials_provider);
   }
 
+  // Store a callback if credentials are pending from a credential provider, to be called when
+  // credentials are available
   bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
 
+  // Loop through all credential providers in a chain and return credentials from the first one that
+  // has credentials available
   Credentials chainGetCredentials();
 
   // Store the RAII handle for a subscription to credential provider notification
   void storeSubscription(CredentialSubscriberCallbacksHandlePtr);
+
+  // Returns the size of the credential provider chain
+  size_t getNumProviders() { return providers_.size(); }
 
 private:
   // Callback to notify on credential updates occurring from a chain member
