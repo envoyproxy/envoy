@@ -347,12 +347,9 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
-  Http::FilterHeadersStatus
-  continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster, Http::RequestHeaderMap& headers,
-                        bool end_stream,
-                        std::function<void(Http::ResponseHeaderMap&)> modify_headers,
-                        bool* should_continue_decoding, Upstream::HostConstSharedPtr&& host,
-                        absl::optional<std::string> host_selection_detailsi = {});
+  bool continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster, Http::RequestHeaderMap& headers,
+                             bool end_stream, Upstream::HostConstSharedPtr&& host,
+                             absl::optional<std::string> host_selection_detailsi = {});
 
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap& trailers) override;
@@ -451,6 +448,9 @@ public:
       return {};
     }
     return callbacks_->upstreamOverrideHost();
+  }
+  void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) override {
+    modify_headers_from_upstream_lb_ = std::move(modifier);
   }
 
   void onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string&& details) override;
@@ -596,8 +596,7 @@ private:
                                    UpstreamRequest& upstream_request, bool end_stream,
                                    uint64_t grpc_to_http_status);
   Http::Context& httpContext() { return config_->http_context_; }
-  bool checkDropOverload(Upstream::ThreadLocalCluster& cluster,
-                         std::function<void(Http::ResponseHeaderMap&)>& modify_headers);
+  bool checkDropOverload(Upstream::ThreadLocalCluster& cluster);
   // Process Orca Load Report if necessary (e.g. cluster has lrsReportMetricNames).
   void maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or_trailers,
                                   UpstreamRequest& upstream_request);
@@ -625,7 +624,8 @@ private:
   MonotonicTime downstream_request_complete_time_;
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
-  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
+  std::function<void(Http::ResponseHeaderMap&)> modify_headers_from_upstream_lb_;
+  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_;
   std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
   std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.
@@ -640,7 +640,7 @@ private:
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  uint32_t attempt_count_{1};
+  uint32_t attempt_count_{0};
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
   FilterUtility::HedgingParams hedging_params_;

@@ -422,11 +422,8 @@ Filter::StreamOpenState Filter::openStream() {
     ExternalProcessorStreamPtr stream_object =
         grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
-    if (processing_complete_) {
-      // Stream failed while starting and either onGrpcError or onGrpcClose was already called
-      // Asserts that `stream_object` is nullptr since it is not valid to be used any further
-      // beyond this point.
-      ASSERT(stream_object == nullptr);
+    if (processing_complete_ || stream_object == nullptr) {
+      // Stream failed while starting and either onGrpcError or onGrpcClose was already called.
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
@@ -778,8 +775,8 @@ void Filter::encodeProtocolConfig(ProcessingRequest& req) {
   ENVOY_STREAM_LOG(debug, "Trying to encode filter protocol configurations", *decoder_callbacks_);
   if (!protocol_config_encoded_ && !config_->observabilityMode()) {
     auto* protocol_config = req.mutable_protocol_config();
-    protocol_config->set_request_body_mode(config_->processingMode().request_body_mode());
-    protocol_config->set_response_body_mode(config_->processingMode().response_body_mode());
+    protocol_config->set_request_body_mode(decoding_state_.bodyMode());
+    protocol_config->set_response_body_mode(encoding_state_.bodyMode());
     protocol_config->set_send_body_without_waiting_for_header_response(
         config_->sendBodyWithoutWaitingForHeaderResponse());
     protocol_config_encoded_ = true;

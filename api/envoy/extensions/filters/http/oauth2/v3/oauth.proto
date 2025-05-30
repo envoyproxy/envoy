@@ -126,7 +126,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 23]
+// [#next-free-field: 24]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -145,6 +145,14 @@ message OAuth2Config {
 
   // The endpoint redirect to for authorization in response to unauthorized requests.
   string authorization_endpoint = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The endpoint at the authorization server to request the user be logged out of the Authorization server.
+  // This field is optional and should be set only if openid is in the auth_scopes and the authorization server
+  // supports the OpenID Connect RP-Initiated Logout specification.
+  // For more information, see https://openid.net/specs/openid-connect-rpinitiated-1_0.html
+  //
+  // If configured, the OAuth2 filter will redirect users to this endpoint when they access the signout_path.
+  string end_session_endpoint = 23;
 
   // Credentials used for OAuth.
   OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
