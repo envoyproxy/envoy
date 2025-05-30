@@ -146,7 +146,7 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
   // the mock *here* then mocking DNS causes infinite recursion.
   //
   // We don't ever need to mock *this* getaddrinfo() call, because
-  // it's only used to parse numeric IP addresses, per ai_flags,
+  // it's only used to parse numeric IP addresses, per `ai_flags`,
   // so it should be deterministic resolution; there's no need to
   // mock it to test failure cases.
   static Api::OsSysCallsImpl os_sys_calls;
