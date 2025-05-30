@@ -136,11 +136,19 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
 
   // We want to use the interface of OsSysCalls for this for the
   // platform-independence, but we don't want to use the common
-  // OsSysCallsSingleton because it can be overridden by injection
-  // in tests, and often we need to parse numeric IP strings as
-  // part of mocked DNS - if we used the singleton here, attempting
-  // to do that would feed back into the mock provoking an infinite
-  // loop.
+  // OsSysCallsSingleton.
+  //
+  // The problem with using OsSysCallsSingleton is that we likely
+  // want to override getaddrinfo() for DNS lookups in tests, but
+  // typically that override would resolve a name to e.g.
+  // the address from resolveUrl("tcp://[::1]:80") - but resolveUrl
+  // calls parseV6Address, which calls getaddrinfo(), so if we use
+  // the mock *here* then mocking DNS causes infinite recursion.
+  //
+  // We don't ever need to mock *this* getaddrinfo() call, because
+  // it's only used to parse numeric IP addresses, per ai_flags,
+  // so it should be deterministic resolution; there's no need to
+  // mock it to test failure cases.
   static Api::OsSysCallsImpl os_sys_calls;
 
   const Api::SysCallIntResult rc =
