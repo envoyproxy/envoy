@@ -9,9 +9,6 @@ namespace Matcher {
 
 /**
  * Implementation of a map matcher which performs matches against the data provided by DataType.
- * If the match could not be completed, {MatchState::UnableToMatch, {}} will be returned. If the
- * match result was determined, {MatchState::MatchComplete, OnMatch} will be returned. If a match
- * result was determined to be no match, {MatchState::MatchComplete, {}} will be returned.
  */
 template <class DataType>
 class MapMatcher : public MatchTree<DataType>, Logger::Loggable<Logger::Id::matcher> {

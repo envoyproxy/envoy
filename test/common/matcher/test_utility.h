@@ -338,6 +338,16 @@ MATCHER(HasInsufficientData, "") {
   return arg.isInsufficientData();
 }
 
+MATCHER_P(IsActionWithType, matcher, "") {
+  // Takes an ActionFactoryCb argument, and compares its action type against matcher.
+  if (arg == nullptr) {
+    return false;
+  }
+  ActionPtr action = arg();
+  return ::testing::ExplainMatchResult(testing::Matcher<absl::string_view>(matcher),
+                                       action->typeUrl(), result_listener);
+}
+
 MATCHER_P(IsStringAction, matcher, "") {
   // Takes an ActionFactoryCb argument, and compares its StringAction's string against matcher.
   if (arg == nullptr) {
@@ -359,6 +369,16 @@ MATCHER_P(HasStringAction, matcher, "") {
     return false;
   }
   return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.actionFactory(),
+                                       result_listener);
+}
+
+MATCHER_P(HasActionWithType, matcher, "") {
+  // Takes a MatchResult& and validates that it
+  // has an action whose type matches matcher.
+  if (!arg.isMatch()) {
+    return false;
+  }
+  return ::testing::ExplainMatchResult(IsActionWithType(matcher), arg.actionFactory(),
                                        result_listener);
 }
 
