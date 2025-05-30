@@ -104,7 +104,7 @@ RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const MatchInput& request) 
   }
 
   ENVOY_LOG(debug, "failed to match incoming request: {}",
-            match.isNoMatch() ? "no match" : "insufficient data");
+            match_result.isNoMatch() ? "no match" : "insufficient data");
   return nullptr;
 }
 

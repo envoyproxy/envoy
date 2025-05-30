@@ -134,7 +134,7 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
     StreamInfo::StreamInfo& info, std::string* effective_policy_id) const {
   Http::Matching::HttpMatchingDataImpl data(info);
   data.onRequestHeaders(headers);
-  const Matcher::MatchResult result =
+  const ::Envoy::Matcher::MatchResult result =
       Envoy::Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
   ASSERT(result.isComplete());
   if (result.isMatch()) {
