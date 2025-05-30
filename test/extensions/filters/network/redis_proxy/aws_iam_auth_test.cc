@@ -89,8 +89,7 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client = factory.create(
       host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username", "password",
       false,
-      absl::optional<Envoy::Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
-                         AwsIamAuthenticatorSharedPtr>(mock_authenticator));
+      context_);
 
   Common::Redis::RespValue request1;
   Client::MockClientCallbacks callbacks;
@@ -133,8 +132,7 @@ TEST_F(AwsIamAuthenticatorTest, UsernameNotConfigured) {
 
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client = factory.create(
       host, dispatcher, config, redis_command_stats, *stats.rootScope(), "", "password", false,
-      absl::optional<Envoy::Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
-                         AwsIamAuthenticatorSharedPtr>(mock_authenticator));
+      context_);
 
   client->close();
 }

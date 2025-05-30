@@ -57,6 +57,7 @@ public:
   ReadPolicy readPolicy() const override { return read_policy_; }
   bool connectionRateLimitEnabled() const override { return connection_rate_limit_enabled_; }
   uint32_t connectionRateLimitPerSec() const override { return connection_rate_limit_per_sec_; }
+  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig() const override { return aws_iam_config_;};
 
 private:
   const std::chrono::milliseconds op_timeout_;
@@ -69,6 +70,8 @@ private:
   ReadPolicy read_policy_;
   bool connection_rate_limit_enabled_;
   uint32_t connection_rate_limit_per_sec_;
+  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+      aws_iam_config_;
 };
 
 class ClientImpl : public Client,
@@ -82,16 +85,14 @@ public:
          const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
          bool is_transaction_client, const std::string& auth_username,
          const std::string& auth_password,
-         absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-             aws_iam_authenticator);
+    Server::Configuration::ServerFactoryContext& context);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
              const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
              bool is_transaction_client, const std::string& auth_username,
              const std::string& auth_password,
-             absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-                 aws_iam_authenticator);
+    Server::Configuration::ServerFactoryContext& context);
   ~ClientImpl() override;
 
   // Client
@@ -193,8 +194,7 @@ public:
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
                    bool is_transaction_client,
-                   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-                       aws_iam_authenticator) override;
+    Server::Configuration::ServerFactoryContext& context) override;
 
   static ClientFactoryImpl instance_;
 

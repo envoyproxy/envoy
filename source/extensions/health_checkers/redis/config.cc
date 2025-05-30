@@ -18,17 +18,12 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
     Server::Configuration::HealthCheckerFactoryContext& context) {
 
   auto redis_config = getRedisHealthCheckConfig(config, context.messageValidationVisitor());
-  if (redis_config.has_aws_iam()) {
-    aws_iam_authenticator_ =
-        Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::
-            initAwsIamAuthenticator(context.serverFactoryContext(), redis_config.aws_iam());
-  }
 
   return std::make_shared<RedisHealthChecker>(
       context.cluster(), config,
       getRedisHealthCheckConfig(config, context.messageValidationVisitor()),
       context.mainThreadDispatcher(), context.runtime(), context.eventLogger(), context.api(),
-      NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_, aws_iam_authenticator_);
+      NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_, context.serverFactoryContext());
 };
 
 /**

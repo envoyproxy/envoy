@@ -66,16 +66,19 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
               credentials_provider_chain.status().message());
     return absl::nullopt;
   }
+
   // auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
   //     aws_iam_config.service_name().empty() ? DEFAULT_SERVICE_NAME : aws_iam_config.service_name(),
   //     region, credentials_provider_chain.value(), context,
   //     Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
   //     PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60));
 
-        return context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
+
+                    return context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
       SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
-      [&aws_iam_config, credentials_provider_chain, &context, &region]()  { 
-          auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+      [&aws_iam_config, region, &credentials_provider_chain, &context ]() -> std::shared_ptr<Singleton::Instance> { 
+
+                  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       aws_iam_config.service_name().empty() ? DEFAULT_SERVICE_NAME : aws_iam_config.service_name(),
       region, credentials_provider_chain.value(), context,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
@@ -84,15 +87,7 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
         return std::make_shared<AwsIamAuthenticatorImpl>(aws_iam_config.cache_name(),  region, std::move(signer)); 
       
       }, false);
-
-  // aws_cluster_manager_ =
-  //     context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
-  //         SINGLETON_MANAGER_REGISTERED_NAME(aws_cluster_manager),
-  //         [&context] {
-  //           return std::make_shared<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(context);
-  //         },
-  //         true);
-
+    
   // return std::make_shared<AwsIamAuthenticatorImpl>( aws_iam_config.cache_name(),  region, std::move(signer) );
 }
 

@@ -218,7 +218,7 @@ private:
         public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
         public std::enable_shared_from_this<RedisDiscoverySession> {
     RedisDiscoverySession(RedisCluster& parent,
-                          NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
+                          NetworkFilters::Common::Redis::Client::ClientFactory& client_factory, Server::Configuration::ServerFactoryContext& context);
 
     ~RedisDiscoverySession() override;
 
@@ -267,6 +267,8 @@ private:
     void finishClusterHostnameResolution(ClusterSlotsSharedPtr slots);
     void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
 
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig() const override { return absl::nullopt;};
+
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
     std::string current_host_address_;
@@ -279,6 +281,7 @@ private:
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory_;
     const std::chrono::milliseconds buffer_timeout_;
     NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
+    Server::Configuration::ServerFactoryContext& context_;
   };
 
   Upstream::ClusterManager& cluster_manager_;
