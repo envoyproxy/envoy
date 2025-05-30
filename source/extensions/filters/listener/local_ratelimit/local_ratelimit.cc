@@ -24,7 +24,7 @@ FilterConfig::FilterConfig(
 bool FilterConfig::canCreateConnection() { return rate_limiter_.requestAllowed({}).allowed; }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  constexpr absl::string_view kPrefix = "listener_local_ratelimit.";
+  static constexpr absl::string_view kPrefix = "listener_local_ratelimit.";
   return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, absl::StrCat(kPrefix, prefix)))};
 }
 
