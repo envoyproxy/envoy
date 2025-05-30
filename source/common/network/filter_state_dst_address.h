@@ -10,9 +10,10 @@ namespace Network {
 /**
  * Overrides the address selection for extensions, e.g. ORIGINAL_DST cluster.
  */
-class AddressObject : public StreamInfo::FilterState::Object, public Hashable {
+class AddressObject : public Address::InstanceAccessor, public Hashable {
 public:
-  AddressObject(Network::Address::InstanceConstSharedPtr address) : address_(address) {}
+  AddressObject(Network::Address::InstanceConstSharedPtr address)
+      : Address::InstanceAccessor(address), address_(address) {}
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
   absl::optional<std::string> serializeAsString() const override {
     return address_ ? absl::make_optional(address_->asString()) : absl::nullopt;
