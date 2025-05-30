@@ -2245,6 +2245,25 @@ TEST_F(HostImplTest, HealthPipeAddress) {
             "Invalid host configuration: non-zero port for non-IP address");
 }
 
+// Test that a network namespace specified for a host is invalid.
+TEST_F(HostImplTest, NetnsInvalid) {
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
+  config.set_port_value(8000);
+  auto dest_addr =
+      Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:9999", true, "/netns/filepath");
+  std::cout << "@tallen " << dest_addr->asString() << std::endl;
+  std::cout << "@tallen has netns value: " << std::boolalpha
+            << dest_addr->networkNamespace().has_value() << std::endl;
+  EXPECT_EQ(
+      HostDescriptionImpl::create(info, "", dest_addr, nullptr, nullptr,
+                                  envoy::config::core::v3::Locality().default_instance(), config, 1,
+                                  simTime())
+          .status()
+          .message(),
+      "Invalid host configuration: hosts cannot specify network namespaces with their address");
+}
+
 TEST_F(HostImplTest, HostAddressList) {
   MockClusterMockPrioritySet cluster;
   HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);

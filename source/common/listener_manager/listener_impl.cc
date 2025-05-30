@@ -1167,7 +1167,7 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
         return same_netns && same_address;
       };
 
-      if (find_if(addresses_.begin(), addresses_.end(), is_dup_addr) != addresses_.end()) {
+      if (std::any_of(addresses_.begin(), addresses_.end(), is_dup_addr)) {
         return true;
       }
     }

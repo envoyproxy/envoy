@@ -498,6 +498,13 @@ HostDescriptionImplBase::HostDescriptionImplBase(
     // for a pipe address is a misconfiguration.
     creation_status = absl::InvalidArgumentError(
         fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+    return;
+  }
+
+  if (dest_address->networkNamespace().has_value()) {
+    creation_status = absl::InvalidArgumentError(
+        "Invalid host configuration: hosts cannot specify network namespaces with their address");
+    return;
   }
 }
 
