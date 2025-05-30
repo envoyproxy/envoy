@@ -83,7 +83,6 @@ ClientPtr ClientImpl::create(
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
     bool is_transaction_client, const std::string& auth_username, const std::string& auth_password) {
 
-
   auto client = std::make_unique<ClientImpl>(
       host, dispatcher, std::move(encoder), decoder_factory, config, redis_command_stats, scope,
       is_transaction_client, auth_username, auth_password);
@@ -92,6 +91,16 @@ ClientPtr ClientImpl::create(
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
   client->connection_->noDelay(true);
+
+  if (config->awsIamConfig().has_value() && AwsIamAuthenticator::AwsIamAuthenticatorFactory::getInstance().has_value()) {
+    if (auth_username.empty()) {
+      ENVOY_LOG(error, "Redis proxy has AWS IAM Authentication enabled, but auth_username is not "
+                      "set in the cluster configuration. IAM Authentication will be disabled.");
+    } else {
+      client->sendAwsIamAuth(auth_username);
+    }
+  }
+
   return client;
 }
 
@@ -115,7 +124,7 @@ ClientImpl::ClientImpl(
     Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    bool is_transaction_client, const std::string& auth_username, const std::string&)
+    bool is_transaction_client, const std::string&, const std::string&)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
@@ -124,15 +133,6 @@ ClientImpl::ClientImpl(
       scope_(scope), is_transaction_client_(is_transaction_client)
       {
 
-  if (config->awsIamConfig().has_value() && AwsIamAuthenticator::AwsIamAuthenticatorFactory::getInstance().has_value()) {
-      if (auth_username.empty()) {
-        ENVOY_LOG(error, "Redis proxy has AWS IAM Authentication enabled, but auth_username is not "
-                        "set in the cluster configuration. IAM Authentication will be disabled.");
-      } else {
-        sendAwsIamAuth(auth_username);
-      }
-  }
-  
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
   traffic_stats.upstream_cx_total_.inc();
   host->stats().cx_total_.inc();

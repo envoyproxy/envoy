@@ -34,7 +34,7 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
     envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config) {
 
   context.lifecycleNotifier().registerCallback(Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-                                                       [&](Event::PostCb) { 
+                                                       [&]() { 
                                                           ENVOY_LOG_MISC(debug, "****** INSIDE PRE SHUTDOWN ******");
                                                         if(authenticator_handle_.has_value())
                                                         {
