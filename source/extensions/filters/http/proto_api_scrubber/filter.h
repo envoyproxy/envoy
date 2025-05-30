@@ -22,7 +22,7 @@ inline constexpr const char kFilterName[] = "envoy.filters.http.proto_api_scrubb
 class ProtoApiScrubberFilter : public Http::PassThroughFilter,
                                Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit ProtoApiScrubberFilter(ProtoApiScrubberFilterConfig&);
+  explicit ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig&) {};
 
   Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
@@ -30,12 +30,17 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
 private:
+  // Rejects requests and sends local reply back to the client.
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
 
+  // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and
+  // vice-versa.
   GrpcFieldExtraction::MessageConverterPtr request_msg_converter_ = nullptr;
+
+  // Response message converter which converts Envoy Buffer data to StreamMessage (for scrubbing)
+  // and vice-versa.
   GrpcFieldExtraction::MessageConverterPtr response_msg_converter_ = nullptr;
-  bool request_scrubbing_done_ = false;
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {
