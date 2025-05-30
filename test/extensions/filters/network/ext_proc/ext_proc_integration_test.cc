@@ -662,8 +662,8 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleDataChunks) {
   EXPECT_EQ(request1.read_data().end_of_stream(), false);
 
   sendReadGrpcMessage("chunk1_processed", false, true);
-  size_t total_upstream_data = 16;  // Already received "chunk1_processed"
-  ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));  // "chunk1_processed"
+  size_t total_upstream_data = 16; // Already received "chunk1_processed"
+  ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data)); // "chunk1_processed"
 
   ASSERT_TRUE(tcp_client->write("chunk2", true));
 
@@ -703,7 +703,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleDataChunks) {
 
     sendReadGrpcMessage("chunk2_processed", true);
 
-    total_upstream_data += 16;  // "chunk2_processed"
+    total_upstream_data += 16; // "chunk2_processed"
     ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
   }
 
