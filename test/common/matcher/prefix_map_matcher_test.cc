@@ -19,7 +19,7 @@ TEST(PrefixMapMatcherTest, NoMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNoMatch(result);
+  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST(PrefixMapMatcherTest, NoMatchDueToNoData) {
@@ -30,7 +30,7 @@ TEST(PrefixMapMatcherTest, NoMatchDueToNoData) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNoMatch(result);
+  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST(PrefixMapMatcherTest, NoMatchWithFallback) {
@@ -41,7 +41,7 @@ TEST(PrefixMapMatcherTest, NoMatchWithFallback) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "no_match");
+  EXPECT_THAT(result, HasStringAction("no_match"));
 }
 
 TEST(PrefixMapMatcherTest, Match) {
@@ -54,7 +54,7 @@ TEST(PrefixMapMatcherTest, Match) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "match");
+  EXPECT_THAT(result, HasStringAction("match"));
 }
 
 TEST(PrefixMapMatcherTest, PrefixMatch) {
@@ -67,7 +67,7 @@ TEST(PrefixMapMatcherTest, PrefixMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "mat");
+  EXPECT_THAT(result, HasStringAction("mat"));
 }
 
 TEST(PrefixMapMatcherTest, LongestPrefixMatch) {
@@ -82,7 +82,7 @@ TEST(PrefixMapMatcherTest, LongestPrefixMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "match");
+  EXPECT_THAT(result, HasStringAction("match"));
 }
 
 TEST(PrefixMapMatcherTest, DataNotAvailable) {
@@ -95,7 +95,7 @@ TEST(PrefixMapMatcherTest, DataNotAvailable) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNotEnoughDataForMatch(result);
+  EXPECT_THAT(result, HasNotEnoughData());
 }
 
 TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
@@ -108,7 +108,7 @@ TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyNotEnoughDataForMatch(result);
+  EXPECT_THAT(result, HasNotEnoughData());
 }
 
 TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableMatch) {
@@ -121,7 +121,25 @@ TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  verifyImmediateMatch(result, "match");
+  EXPECT_THAT(result, HasStringAction("match"));
+}
+
+TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatchThenMatchDoesNotPerformSecondMatch) {
+  std::unique_ptr<PrefixMapMatcher<TestData>> matcher = *PrefixMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+      stringOnMatch<TestData>("no_match"));
+  std::unique_ptr<PrefixMapMatcher<TestData>> child_matcher = *PrefixMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(DataInputGetResult{
+          DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
+      absl::nullopt);
+
+  matcher->addChild("match", {nullptr, std::move(child_matcher)});
+  matcher->addChild("mat", stringOnMatch<TestData>("second_match"));
+
+  TestData data;
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasNotEnoughData());
 }
 
 } // namespace Matcher
