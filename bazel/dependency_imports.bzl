@@ -23,6 +23,7 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
+load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 
 # go version for rules_go
 GO_VERSION = "1.24.6"
@@ -41,6 +42,15 @@ def envoy_dependency_imports(
         buf_version = BUF_VERSION):
     compatibility_proxy_repo()
     rules_foreign_cc_dependencies()
+    llvm_toolchain(
+        name = "llvm_toolchain",
+        llvm_version = "18.1.8",
+        sysroot = {
+            # "linux-x86_64": "@org_chromium_sysroot_linux_x64//:sysroot",
+            "linux-x86_64": "@sysroot_linux_amd64//:sysroot",
+            "linux-aarch64": "@sysroot_linux_arm64//:sysroot",
+        },
+    )
     go_rules_dependencies()
     go_register_toolchains(go_version)
     if go_version != "host":

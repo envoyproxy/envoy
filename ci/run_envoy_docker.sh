@@ -2,8 +2,8 @@
 
 set -e
 
-# TODO(phlax): Add a check that a usable version of docker compose is available
-
+# HACK: REMOVE
+sudo rm -rf /opt/hostedtoolcache
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

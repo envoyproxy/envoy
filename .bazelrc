@@ -11,6 +11,9 @@
 # TODO: Adding just to test android
 startup --host_jvm_args=-Xmx3g
 
+# DEBUG: REMOVE
+# common --toolchain_resolution_debug=.*
+
 common --noenable_bzlmod
 
 fetch --color=yes
@@ -37,11 +40,10 @@ build --incompatible_merge_fixed_and_default_shell_env
 # A workaround for slow ICU download.
 build --http_timeout_scaling=6.0
 
-# Pass CC, CXX and LLVM_CONFIG variables from the environment.
+# Pass CC, CXX variables from the environment.
 # We assume they have stable values, so this won't cause action cache misses.
 build --action_env=CC --host_action_env=CC
 build --action_env=CXX --host_action_env=CXX
-build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
 # Do not pass through PATH however.
 # It tends to have machine-specific values, such as dynamically created temp folders.
 # This would make it impossible to share remote action cache hits among machines.
@@ -95,7 +97,8 @@ build:clang-common --action_env=BAZEL_COMPILER=clang
 build:clang-common --linkopt=-fuse-ld=lld
 build:clang-common --action_env=CC=clang --host_action_env=CC=clang
 build:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
-build:clang-common --incompatible_enable_cc_toolchain_resolution=false
+build:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:clang --incompatible_enable_cc_toolchain_resolution=true
 
 # Clang with libc++ (default)
 build:clang --config=clang-common
@@ -177,6 +180,7 @@ build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/u
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
 build:macos --cxxopt=-Wno-nullability-completeness
+build:macos --incompatible_enable_cc_toolchain_resolution=false
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
@@ -227,8 +231,11 @@ build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 build:libc++ --@envoy//bazel:libc++=true
 
+# build:clang-libc++ --config=clang
+# build:clang-libc++ --config=libc++
+# build:clang-libc++ --action_env=ARFLAGS=r
 
-
+# build:arm64-clang-libc++ --config=clang-libc++
 
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os
@@ -282,10 +289,6 @@ build:fuzz-coverage-config --//tools/coverage:config=@envoy//test:fuzz_coverage_
 
 build:cache-local --remote_cache=grpc://localhost:9092
 
-# Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
-build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:rbe-toolchain --incompatible_enable_cc_toolchain_resolution=false
-
 build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --config=clang
 build:rbe-toolchain-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
@@ -303,11 +306,25 @@ build:rbe-toolchain-arm64-clang --crosstool_top=@envoy//bazel/rbe/toolchains/con
 build:rbe-toolchain-arm64-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain-arm64
 build:rbe-toolchain-arm64-clang --action_env=CC=clang --action_env=CXX=clang++
 
+# build:rbe-toolchain-clang-libc++ --config=libc++
+# build:rbe-toolchain-clang-libc++ --config=clang
+# build:rbe-toolchain-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_x64_platform
+# build:rbe-toolchain-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_x64_platform
+# build:rbe-toolchain-clang-libc++ --extra_toolchains=@llvm_toolchain//:cc-toolchain-x86_64-linux
+#
+# build:rbe-toolchain-arm64-clang-libc++ --config=libc++
+# build:rbe-toolchain-arm64-clang-libc++ --config=clang
+# build:rbe-toolchain-arm64-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_platform
+# build:rbe-toolchain-arm64-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_platform
+# build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@llvm_toolchain//:cc-toolchain-aarch64-linux
+
 
 # Sanitizer configs - CI uses the *-common configs directly
 # Note: clang config comes from rbe-toolchain-clang to avoid duplication
 
-build:rbe-toolchain-gcc --config=rbe-toolchain
+# build:rbe-toolchain-msan --config=clang-msan
+# build:rbe-toolchain-tsan --config=clang-tsan
+
 build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 build:rbe-toolchain-gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 build:rbe-toolchain-gcc --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/gcc/cc:toolchain
@@ -382,7 +399,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=docker.io/envoyproxy/envoy-build-ubuntu:f4a881a1205e8e6db1a57162faf3df7aed88eae8@sha256:b10346fe2eee41733dbab0e02322c47a538bf3938d093a5daebad9699860b814
+build:docker-sandbox --experimental_docker_image=docker.io/envoyproxy/envoy-build-ubuntu:0e6c302f99465aa73bb43e4971014aceb661d711@sha256:5396fc18c2ebfa2a5bb05a9ef28b60585a0ca9a5a07eddec95c7b5aa81da6319
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -553,7 +570,7 @@ common:bes-envoy-engflow --bes_timeout=3600s
 common:bes-envoy-engflow --bes_upload_mode=fully_async
 common:bes-envoy-engflow --nolegacy_important_outputs
 common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:95d7afdea0f0f8881e88fa5e581db4f50907d0745ac8d90e00357ac1a316abe5
+common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:92a34e0d3e878d596c8330722d8195bd61d905b0f5ba502363fe3845f1c6d479
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
 
