@@ -77,8 +77,9 @@ build:linux --copt=-fdebug-types-section
 build:linux --copt=-fPIC
 build:linux --cxxopt=-fsized-deallocation --host_cxxopt=-fsized-deallocation
 build:linux --conlyopt=-fexceptions
-build:linux --fission=dbg,opt
-build:linux --features=per_object_debug_info
+# build:linux --fission=dbg,opt
+build:linux --fission=dbg
+# build:linux --features=per_object_debug_info
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
@@ -97,12 +98,14 @@ build:clang-common --action_env=BAZEL_COMPILER=clang
 build:clang-common --linkopt=-fuse-ld=lld
 build:clang-common --action_env=CC=clang --host_action_env=CC=clang
 build:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
-build:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:clang --incompatible_enable_cc_toolchain_resolution=true
+build:clang-common --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:clang-common --incompatible_enable_cc_toolchain_resolution=true
 
 # Clang with libc++ (default)
 build:clang --config=clang-common
 build:clang --config=libc++
+build:clang --action_env=ARFLAGS=r
+build:arm64-clang --config=clang
 
 build:arm64-clang --config=clang
 
@@ -231,12 +234,6 @@ build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
 build:libc++ --@envoy//bazel:libc++=true
 
-# build:clang-libc++ --config=clang
-# build:clang-libc++ --config=libc++
-# build:clang-libc++ --action_env=ARFLAGS=r
-
-# build:arm64-clang-libc++ --config=clang-libc++
-
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os
 
@@ -289,22 +286,19 @@ build:fuzz-coverage-config --//tools/coverage:config=@envoy//test:fuzz_coverage_
 
 build:cache-local --remote_cache=grpc://localhost:9092
 
-build:rbe-toolchain-clang --config=rbe-toolchain
+# build:rbe-toolchain-clang --config=rbe-toolchain
 build:rbe-toolchain-clang --config=clang
-build:rbe-toolchain-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
-build:rbe-toolchain-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
-build:rbe-toolchain-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
-build:rbe-toolchain-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain
-build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++
+build:rbe-toolchain-clang --config=libc++
+build:rbe-toolchain-clang --config=clang
+build:rbe-toolchain-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_x64_clang_platform
+build:rbe-toolchain-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_x64_clang_platform
+build:rbe-toolchain-clang --extra_toolchains=@llvm_toolchain//:cc-toolchain-x86_64-linux
 
-
-build:rbe-toolchain-arm64-clang --config=rbe-toolchain
+build:rbe-toolchain-arm64-clang --config=libc++
 build:rbe-toolchain-arm64-clang --config=clang
 build:rbe-toolchain-arm64-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_platform
 build:rbe-toolchain-arm64-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_platform
-build:rbe-toolchain-arm64-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
-build:rbe-toolchain-arm64-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain-arm64
-build:rbe-toolchain-arm64-clang --action_env=CC=clang --action_env=CXX=clang++
+build:rbe-toolchain-arm64-clang --extra_toolchains=@llvm_toolchain//:cc-toolchain-aarch64-linux
 
 # build:rbe-toolchain-clang-libc++ --config=libc++
 # build:rbe-toolchain-clang-libc++ --config=clang
@@ -319,14 +313,8 @@ build:rbe-toolchain-arm64-clang --action_env=CC=clang --action_env=CXX=clang++
 # build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@llvm_toolchain//:cc-toolchain-aarch64-linux
 
 
-# Sanitizer configs - CI uses the *-common configs directly
-# Note: clang config comes from rbe-toolchain-clang to avoid duplication
-
-# build:rbe-toolchain-msan --config=clang-msan
-# build:rbe-toolchain-tsan --config=clang-tsan
-
-build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
-build:rbe-toolchain-gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
+build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_x64_linux_gcc_platform
+build:rbe-toolchain-gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_x64_linux_gcc_platform
 build:rbe-toolchain-gcc --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/gcc/cc:toolchain
 build:rbe-toolchain-gcc --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/gcc/config:cc-toolchain
 
@@ -398,8 +386,7 @@ build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
 
 # Docker sandbox
-# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=docker.io/envoyproxy/envoy-build-ubuntu:0e6c302f99465aa73bb43e4971014aceb661d711@sha256:5396fc18c2ebfa2a5bb05a9ef28b60585a0ca9a5a07eddec95c7b5aa81da6319
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build:cf4371e4fae99779fd3c2ee74edfdf45b65dd04a@sha256:8a34c868875877a44861df60396b21334c7f4a2a8ebc1cd31fbfe22f23dd0b9e
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -547,7 +534,7 @@ build:rbe-engflow --remote_executor=grpcs://envoy.cluster.engflow.com
 build:rbe-engflow --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:rbe-engflow --bes_results_url=https://envoy.cluster.engflow.com/invocation/
 build:rbe-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:rbe-engflow --grpc_keepalive_time=60s
+build:rbe-engflow --grpc_keepalive_time=120s
 build:rbe-engflow --grpc_keepalive_timeout=30s
 build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s
@@ -557,12 +544,12 @@ build:rbe-engflow --nolegacy_important_outputs
 # RBE (Engflow Envoy)
 common:common-envoy-engflow --google_default_credentials=false
 common:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-common:common-envoy-engflow --grpc_keepalive_time=60s
+common:common-envoy-engflow --grpc_keepalive_time=120s
 common:common-envoy-engflow --grpc_keepalive_timeout=30s
 common:common-envoy-engflow --remote_cache_compression
 
 common:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
-common:cache-envoy-engflow --remote_timeout=3600s
+common:cache-envoy-engflow --remote_timeout=7200s
 # common:cache-envoy-engflow --remote_instance_name=llvm-18
 common:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
 common:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
@@ -570,9 +557,28 @@ common:bes-envoy-engflow --bes_timeout=3600s
 common:bes-envoy-engflow --bes_upload_mode=fully_async
 common:bes-envoy-engflow --nolegacy_important_outputs
 common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:92a34e0d3e878d596c8330722d8195bd61d905b0f5ba502363fe3845f1c6d479
+common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build:cf4371e4fae99779fd3c2ee74edfdf45b65dd04a@sha256:6143c723473780799230775152b956de4d196b5847666a41fe0c9411455385d0
+
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
+
+
+# build:rbe-envoy-engflow --copt=-gsplit-dwarf
+# build:rbe-envoy-engflow --copt=-g0 --compilation_mode=opt
+# build:rbe-envoy-engflow --linkopt=-Wl,-S
+
+build:opt --copt=-g0
+build:opt --copt=-O2
+build:opt --copt=-D_FORTIFY_SOURCE=1
+build:opt --copt=-DNDEBUG
+build:opt --copt=-ffunction-sections
+build:opt --copt=-fdata-sections
+build:opt --linkopt=-Wl,--gc-sections
+
+build:dbg --features=per_object_debug_info
+build:dbg --copt=-g
+build:dbg --copt=-gsplit-dwarf
+
 
 common:remote-envoy-engflow --config=common-envoy-engflow
 common:remote-envoy-engflow --config=cache-envoy-engflow

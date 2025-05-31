@@ -16,3 +16,4 @@
 !/local
 !/test/config/integration/certs
 !/windows
+!/entrypoint.sh

@@ -1,6 +1,6 @@
 x-envoy-build-base: &envoy-build-base
   image: >-
-    ${ENVOY_BUILD_IMAGE:-docker.io/envoyproxy/envoy-build-ubuntu:f4a881a1205e8e6db1a57162faf3df7aed88eae8@sha256:b10346fe2eee41733dbab0e02322c47a538bf3938d093a5daebad9699860b814}
+    ${ENVOY_BUILD_IMAGE:-docker.io/envoyproxy/envoy-build:ci-cf4371e4fae99779fd3c2ee74edfdf45b65dd04a@sha256:7b69121a68ecb12f55569257789e90a3362768594fb218b2597334341eb917b9}
   cpus: ${ENVOY_DOCKER_CPUS:-0}
   user: root:root
   working_dir: ${ENVOY_DOCKER_SOURCE_DIR:-/source}
@@ -75,15 +75,7 @@ x-envoy-build-base: &envoy-build-base
   - "/bin/bash"
   - "-c"
   - |
-    groupadd --gid ${DOCKER_GID:-${USER_GID:-$(id -g)}} -f envoygroup
-    useradd -o \
-        --uid ${USER_UID:-$(id -u)} \
-        --gid ${DOCKER_GID:-${USER_GID:-$(id -g)}} \
-        --no-create-home \
-        -s /bin/bash \
-        --home-dir /build envoybuild
-    usermod -a -G pcap envoybuild
-    chown envoybuild:envoygroup /build
+    chown envoybuild:envoybuild /build
     chown envoybuild /proc/self/fd/2 2>/dev/null || true
     [[ -e /entrypoint-extra.sh ]] && /entrypoint-extra.sh
     sudo -EHs -u envoybuild bash -c 'cd ${ENVOY_DOCKER_SOURCE_DIR:-/source} && exec ${DOCKER_COMMAND:-bash}'

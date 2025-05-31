@@ -1,12 +1,16 @@
 agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
-  repo: envoyproxy/envoy-build-ubuntu
-  sha: 5396fc18c2ebfa2a5bb05a9ef28b60585a0ca9a5a07eddec95c7b5aa81da6319
-  mobile-sha: e968c48d215eedda6d624b3aa3aa46d3b14c52a9d74346e4be85cb5cd255edee
+  repo: envoyproxy/envoy-build
+  sha: 7b69121a68ecb12f55569257789e90a3362768594fb218b2597334341eb917b9
+  mobile-sha: 8a34c868875877a44861df60396b21334c7f4a2a8ebc1cd31fbfe22f23dd0b9e
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: 92a34e0d3e878d596c8330722d8195bd61d905b0f5ba502363fe3845f1c6d479
-  tag: 0e6c302f99465aa73bb43e4971014aceb661d711
+  gcr-sha: 6143c723473780799230775152b956de4d196b5847666a41fe0c9411455385d0
+  tag: cf4371e4fae99779fd3c2ee74edfdf45b65dd04a
+
+# worker - 73bfc92636f8e76d9d70f766b2bc24471d983d09a1431f9a12aca39696e29151
+# worker/gcp - 6143c723473780799230775152b956de4d196b5847666a41fe0c9411455385d0
+# mobile - cf4371e4fae99779fd3c2ee74edfdf45b65dd04a@sha256:8a34c868875877a44861df60396b21334c7f4a2a8ebc1cd31fbfe22f23dd0b9e
 
 config:
   envoy:
@@ -390,7 +394,7 @@ tables:
     title: Build image
     table-title: Container image/s (as used in this CI run)
     filter: |
-      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
       | .request["build-image"]
       | del(.changed)
       | with_entries(
@@ -402,7 +406,7 @@ tables:
     title: Build image (current)
     table-title: Current or previous container image
     filter: |
-      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
       | if .request["build-image"].changed then
           .request["build-image-current"]
           | with_entries(

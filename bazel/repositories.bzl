@@ -321,8 +321,8 @@ def _com_github_axboe_liburing():
     external_http_archive(
         name = "com_github_axboe_liburing",
         build_file_content = BUILD_ALL_CONTENT,
-        patches = ["@envoy//bazel/foreign_cc:liburing_debug.patch"],
-        patch_args = ["-p1"],
+        # patches = ["@envoy//bazel/foreign_cc:liburing_debug.patch"],
+        # patch_args = ["-p1"],
     )
 
 def _com_github_bazel_buildtools():
@@ -753,9 +753,9 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_python.patch",
             "@envoy//bazel:v8_ppc64le.patch",
             # https://issues.chromium.org/issues/423403090
-            "@envoy//bazel:v8_python.patch",
         ],
         patch_args = ["-p1"],
         patch_cmds = [
