@@ -232,6 +232,10 @@ def envoy_dependencies(skip_targets = []):
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
+    _toolchains_llvm()
+    _org_chromium_sysroot_linux_x64()
+    _org_chromium_sysroot_linux_arm64()
+
     _cc_deps()
     _go_deps(skip_targets)
     _rust_deps()
@@ -286,6 +290,8 @@ def _com_github_axboe_liburing():
     external_http_archive(
         name = "com_github_axboe_liburing",
         build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:liburing_debug.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_bazel_buildtools():
@@ -856,6 +862,35 @@ def _com_github_wamr():
     native.bind(
         name = "wamr",
         actual = "@envoy//bazel/foreign_cc:wamr",
+    )
+
+def _toolchains_llvm():
+    external_http_archive(
+        name = "toolchains_llvm",
+    )
+
+def _org_chromium_sysroot_linux_x64():
+    external_http_archive(
+        name = "org_chromium_sysroot_linux_x64",
+        build_file_content = """
+filegroup(
+    name = "sysroot",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+
+def _org_chromium_sysroot_linux_arm64():
+    external_http_archive(
+        name = "org_chromium_sysroot_linux_arm64",
+        build_file_content = """
+filegroup(
+    name = "sysroot",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+""",
     )
 
 def _com_github_wasmtime():

@@ -1058,3 +1058,18 @@ cc_library(
         "//conditions:default": ["//bazel/foreign_cc:gperftools"],
     }),
 )
+
+bool_flag(
+    name = "enable_liburing",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "liburing_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        ":enable_liburing": "True",
+    },
+)
