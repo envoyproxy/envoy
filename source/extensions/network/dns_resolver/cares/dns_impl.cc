@@ -655,9 +655,9 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
     if (parse_srv_status == ARES_SUCCESS) {
       std::list<DnsResponse> srv_records;
       for (ares_srv_reply* current_reply = srv_reply; current_reply != nullptr;
-          current_reply = current_reply->next) {
-        auto response = DnsResponse(current_reply->host, current_reply->port, current_reply->priority,
-                                    current_reply->weight);
+           current_reply = current_reply->next) {
+        auto response = DnsResponse(current_reply->host, current_reply->port,
+                                    current_reply->priority, current_reply->weight);
 
         srv_records.emplace_back(std::move(response));
       }
@@ -672,13 +672,15 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
     }
 
     pending_response_.status_ = ResolutionStatus::Failure;
-    pending_response_.details_ = fmt::format("srv resolve: ares_parse_srv_reply = {}", ares_strerror(parse_srv_status));
+    pending_response_.details_ =
+        fmt::format("srv resolve: ares_parse_srv_reply = {}", ares_strerror(parse_srv_status));
 
     ares_free_data(srv_reply);
   } else {
     // resolve failed
     pending_response_.status_ = ResolutionStatus::Failure;
-    pending_response_.details_ = fmt::format("srv resolve: cares_failure = {}", ares_strerror(status));
+    pending_response_.details_ =
+        fmt::format("srv resolve: cares_failure = {}", ares_strerror(status));
   }
 
   finishResolve();
