@@ -3,6 +3,7 @@
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -85,6 +86,16 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
         LoadMetricStats::StatMap load_metrics;
+
+        // Store per-host stats for endpoint granularity reporting
+        struct EndpointStats {
+          uint64_t rq_success;
+          uint64_t rq_error;
+          uint64_t rq_active;
+          uint64_t rq_issued;
+        };
+        absl::flat_hash_map<const Host*, EndpointStats> endpoint_stats_map;
+
         for (const HostSharedPtr& host : hosts) {
           uint64_t host_rq_success = host->stats().rq_success_.latch();
           uint64_t host_rq_error = host->stats().rq_error_.latch();
@@ -106,7 +117,11 @@ void LoadStatsReporter::sendLoadStatsRequest() {
               }
             }
           }
+          // Store endpoint stats for this host
+          endpoint_stats_map[host.get()] = {host_rq_success, host_rq_error, host_rq_active,
+                                            host_rq_issued};
         }
+
         bool should_send_locality_stats = rq_success + rq_error + rq_active != 0;
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.report_load_with_rq_issued")) {
@@ -126,6 +141,36 @@ void LoadStatsReporter::sendLoadStatsRequest() {
             load_metric_stats->set_num_requests_finished_with_metric(
                 metric.second.num_requests_with_metric);
             load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+          }
+          // Check if endpoint granularity should be reported.
+          if (message_->report_endpoint_granularity()) {
+            for (const HostSharedPtr& host : hosts) {
+              ENVOY_LOG(trace, "Load report endpoint {}:{} count {}", host->address()->asString(),
+                        host->address()->ip()->port(), hosts.size());
+              // Add upstream endpoint stats to locality stats.
+              auto* const upstream_endpoint_stats = locality_stats->add_upstream_endpoint_stats();
+              // Add address to upstream endpoint stats.
+              Network::Utility::addressToProtobufAddress(
+                  *host->address(), *upstream_endpoint_stats->mutable_address());
+
+              // Add endpoint stats (successful requests, requests in progress, error requests, and
+              // issued requests).
+              const auto& stats = endpoint_stats_map[host.get()];
+              upstream_endpoint_stats->set_total_successful_requests(stats.rq_success);
+              upstream_endpoint_stats->set_total_requests_in_progress(stats.rq_active);
+              upstream_endpoint_stats->set_total_error_requests(stats.rq_error);
+              upstream_endpoint_stats->set_total_issued_requests(stats.rq_issued);
+
+              // Add load metric stats.
+              for (const auto& metric : load_metrics) {
+                auto* const endpoint_metric_stats =
+                    upstream_endpoint_stats->add_load_metric_stats();
+                endpoint_metric_stats->set_metric_name(metric.first);
+                endpoint_metric_stats->set_num_requests_finished_with_metric(
+                    metric.second.num_requests_with_metric);
+                endpoint_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+              }
+            }
           }
         }
       }
