@@ -75,18 +75,6 @@ envoy_py_data(
     src = ":data_srcs",
 )
 
-pkg_files(
-    name = "xformed_files",
-    srcs = ["//tools/protoxform:api_protoxform"],
-    strip_prefix = strip_prefix.from_pkg(),
-)
-
-pkg_tar(
-    name = "xformed",
-    srcs = [":xformed_files"],
-    extension = "tar.gz",
-)
-
 py_binary(
     name = "format_api",
     srcs = ["format_api.py"],
@@ -103,13 +91,11 @@ genrule(
     cmd = """
     $(location :format_api) \
         --outfile=$@ \
-        --xformed=$(location :xformed) \
         --build_file=$(location //tools/type_whisperer:api_build_file) \
         --protoprinted=$(location //tools/protoprint:protoprinted) \
     """,
     tools = [
         ":format_api",
-        ":xformed",
         "//tools/protoprint:protoprinted",
         "//tools/type_whisperer:api_build_file",
     ],
