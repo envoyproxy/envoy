@@ -653,29 +653,35 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
     struct ares_srv_reply* srv_reply = nullptr;
     int parse_srv_status = ares_parse_srv_reply(buf, len, &srv_reply);
     if (parse_srv_status == ARES_SUCCESS) {
-      for (ares_srv_reply* current_reply = srv_reply; current_reply != NULL;
-           current_reply = current_reply->next) {
+      std::list<DnsResponse> srv_records;
+      for (ares_srv_reply* current_reply = srv_reply; current_reply != nullptr;
+          current_reply = current_reply->next) {
+        auto response = DnsResponse(current_reply->host, current_reply->port, current_reply->priority,
+                                    current_reply->weight);
+
+        srv_records.emplace_back(std::move(response));
       }
+
+      pending_response_.status_ = ResolutionStatus::Completed;
+      pending_response_.details_ = "srv resolve: cares_success";
+
+      ares_free_data(srv_reply);
+      onAresSrvFinishCallback(std::move(srv_records));
+
+      return;
     }
 
-    std::list<DnsResponse> srv_records;
-    for (ares_srv_reply* current_reply = srv_reply; current_reply != NULL;
-         current_reply = current_reply->next) {
-      auto response = DnsResponse(current_reply->host, current_reply->port, current_reply->priority,
-                                  current_reply->weight);
-
-      srv_records.emplace_back(std::move(response));
-    }
+    pending_response_.status_ = ResolutionStatus::Failure;
+    pending_response_.details_ = fmt::format("srv resolve: ares_parse_srv_reply = {}", ares_strerror(parse_srv_status));
 
     ares_free_data(srv_reply);
-    pending_response_.status_ = ResolutionStatus::Completed;
-    pending_response_.details_ = "srv resolve: cares_success";
-    onAresSrvFinishCallback(std::move(srv_records));
   } else {
     // resolve failed
     pending_response_.status_ = ResolutionStatus::Failure;
-    finishResolve();
+    pending_response_.details_ = fmt::format("srv resolve: cares_failure = {}", ares_strerror(status));
   }
+
+  finishResolve();
 
   if (timeouts > 0) {
     ENVOY_LOG(debug, "DNS request timed out {} times while querying for SRV records", timeouts);
@@ -684,7 +690,6 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, i
 
 void DnsResolverImpl::PendingSrvResolution::onAresSrvFinishCallback(
     std::list<DnsResponse>&& srv_records) {
-  // fireCallback(std::move(srv_records));
   pending_response_.address_list_.swap(srv_records);
   finishResolve();
 }
