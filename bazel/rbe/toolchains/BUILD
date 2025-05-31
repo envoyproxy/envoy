@@ -3,33 +3,31 @@ load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe
 licenses(["notice"])  # Apache 2
 
 platform(
-    name = "rbe_linux_clang_platform",
+    name = "rbe_linux_x64_platform",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:x86_64",
+    ],
     exec_properties = create_rbe_exec_properties_dict(
         docker_add_capabilities = "SYS_PTRACE,NET_RAW,NET_ADMIN",
         docker_network = "standard",
         docker_privileged = True,
+        container_image = "docker://gcr.io/envoy-ci/envoy-build@sha256:a41f69c56ba636856576949a22cc2ec450c48a7a37487554d8a31827e0d54c03",
     ),
-    parents = ["//bazel/rbe/toolchains/configs/linux/clang/config:platform"],
 )
 
 platform(
-    name = "rbe_linux_clang_libcxx_platform",
+    name = "rbe_linux_arm64_platform",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
     exec_properties = create_rbe_exec_properties_dict(
         docker_add_capabilities = "SYS_PTRACE,NET_RAW,NET_ADMIN",
         docker_network = "standard",
         docker_privileged = True,
+        container_image = "docker://gcr.io/envoy-ci/envoy-build@sha256:a41f69c56ba636856576949a22cc2ec450c48a7a37487554d8a31827e0d54c03",
     ),
-    parents = ["//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:platform"],
-)
-
-platform(
-    name = "rbe_linux_arm64_clang_libcxx_platform",
-    exec_properties = create_rbe_exec_properties_dict(
-        docker_add_capabilities = "SYS_PTRACE,NET_RAW,NET_ADMIN",
-        docker_network = "standard",
-        docker_privileged = True,
-    ),
-    parents = ["//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:platform-arm64"],
 )
 
 platform(
@@ -37,6 +35,6 @@ platform(
     exec_properties = create_rbe_exec_properties_dict(
         docker_add_capabilities = "SYS_PTRACE,NET_RAW,NET_ADMIN",
         docker_network = "standard",
+        container_image = "docker://gcr.io/envoy-ci/envoy-build@sha256:a41f69c56ba636856576949a22cc2ec450c48a7a37487554d8a31827e0d54c03",
     ),
-    parents = ["//bazel/rbe/toolchains/configs/linux/gcc/config:platform"],
 )

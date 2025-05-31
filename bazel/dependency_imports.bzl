@@ -17,6 +17,7 @@ load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_depende
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
+load("@toolchains_llvm//toolchain:rules.bzl", "llvm_toolchain")
 load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
@@ -32,6 +33,14 @@ BUF_VERSION = "v1.50.0"
 
 def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION, buf_version = BUF_VERSION):
     rules_foreign_cc_dependencies()
+    llvm_toolchain(
+        name = "llvm_toolchain",
+        llvm_version = "18.1.8",
+        sysroot = {
+            "linux-x86_64": "@sysroot_linux_amd64//:sysroot",
+            "linux-aarch64": "@sysroot_linux_arm64//:sysroot",
+        }
+    )
     go_rules_dependencies()
     go_register_toolchains(go_version)
     if go_version != "host":

@@ -1,0 +1,11 @@
+--- a/configure
++++ b/configure
+@@ -351,7 +351,7 @@ print_config "__kernel_timespec" "$__kernel_timespec"
+ ##########################################
+ # check for open_how
+ open_how="no"
+-cat > $TMPC << EOF
++cat > $TMPC << EOF_DISABLED
+ #include <sys/types.h>
+ #include <fcntl.h>
+ #include <string.h>
