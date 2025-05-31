@@ -247,8 +247,7 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
 // RedisCluster
 RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     Envoy::Extensions::Clusters::Redis::RedisCluster& parent,
-    NetworkFilters::Common::Redis::Client::ClientFactory& client_factory
-  )
+    NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
       resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolveRedis(); })),
       client_factory_(client_factory), buffer_timeout_(0),
@@ -330,9 +329,9 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(
-        host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
-        parent_.auth_username_, parent_.auth_password_, false);
+    client->client_ = client_factory_.create(host, dispatcher_, shared_from_this(),
+                                             redis_command_stats_, parent_.info()->statsScope(),
+                                             parent_.auth_username_, parent_.auth_password_, false);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());

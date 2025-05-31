@@ -308,38 +308,7 @@ static_resources:
 )EOF",
                                                                       Platform::null_device_path);
 
-// This is a configuration with fault injection enabled.
-const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
-          faults:
-          - fault_type: ERROR
-            fault_enabled:
-              default_value:
-                numerator: 100
-                denominator: HUNDRED
-            commands:
-            - GET
-          - fault_type: DELAY
-            fault_enabled:
-              default_value:
-                numerator: 20
-                denominator: HUNDRED
-              runtime_key: "bogus_key"
-            delay: 2s
-            commands:
-            - SET
-)EOF";
-
-const std::string CONFIG_WITH_EXTERNAL_AUTH = CONFIG + R"EOF(
-          external_auth_provider:
-            enable_auth_expiration: true
-            grpc_service:
-              timeout: 2s
-              envoy_grpc:
-                cluster_name: fake_auth
-)EOF";
-
-                const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM =
-    fmt::format(R"EOF(
+                                                                      const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM = fmt::format(R"EOF(
 admin:
   access_log:
   - name: envoy.access_loggers.file
@@ -418,7 +387,7 @@ static_resources:
               region: us-east-1
               service_name: elasticache
               cache_name: testcache
-              expiration_time: 900s
+              expiration_time: 900s            
           prefix_routes:
             catch_all_route:
               cluster: cluster_0
@@ -428,8 +397,37 @@ static_resources:
             - prefix: "baz:"
               cluster: cluster_2
 )EOF",
-                Platform::null_device_path);
+                                                                      Platform::null_device_path);
 
+// This is a configuration with fault injection enabled.
+const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
+          faults:
+          - fault_type: ERROR
+            fault_enabled:
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+            commands:
+            - GET
+          - fault_type: DELAY
+            fault_enabled:
+              default_value:
+                numerator: 20
+                denominator: HUNDRED
+              runtime_key: "bogus_key"
+            delay: 2s
+            commands:
+            - SET
+)EOF";
+
+const std::string CONFIG_WITH_EXTERNAL_AUTH = CONFIG + R"EOF(
+          external_auth_provider:
+            enable_auth_expiration: true
+            grpc_service:
+              timeout: 2s
+              envoy_grpc:
+                cluster_name: fake_auth
+)EOF";
 
 // This function encodes commands as an array of bulkstrings as transmitted by Redis clients to
 // Redis servers, according to the Redis protocol.
@@ -558,19 +556,6 @@ public:
                                      const std::string& auth_username = "",
                                      const std::string& auth_password = "");
 
-                                       void expectUpstreamRequestResponseAwsIam(FakeUpstreamPtr& upstream, const std::string& request,
-                                           const std::string& response,
-                                           FakeRawConnectionPtr& fake_upstream_connection,
-                                           const std::string& auth_username,
-                                           const std::string& auth_password);
-
-                                       void roundtripToUpstreamStepAwsIam(FakeUpstreamPtr& upstream, const std::string& request,
-                                     const std::string& response,
-                                     IntegrationTcpClientPtr& redis_client,
-                                     FakeRawConnectionPtr& fake_upstream_connection,
-                                     const std::string& auth_username,
-                                     const std::string& auth_password);
-
 protected:
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
@@ -614,6 +599,11 @@ public:
   RedisProxyWithBatchingIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_BATCHING, 2) {}
 };
 
+class RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest : public Event::TestUsingSimulatedTime, public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM, 3) {}
+};
+
 class RedisProxyWithRoutesIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyWithRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 6) {}
@@ -654,24 +644,10 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_FAULT_INJECTION, 2) {}
 };
 
-class RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest : 
-public Event::TestUsingSimulatedTime,
-public RedisProxyIntegrationTest {
-public:
-  RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest()
-      : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM, 3) {
-
-// simTime().setSystemTime(std::chrono::duration_cast<std::chrono::microseconds>(
-//     std::chrono::milliseconds(1514862245000)));
-
-      }
-};
-
 class RedisProxyWithExternalAuthIntegrationTest : public Event::TestUsingSimulatedTime,
                                                   public Grpc::BaseGrpcClientIntegrationParamTest,
                                                   public RedisProxyIntegrationTest {
 
-                                                    
 public:
   RedisProxyWithExternalAuthIntegrationTest()
       : RedisProxyIntegrationTest(CONFIG_WITH_EXTERNAL_AUTH, 2) {}
@@ -767,6 +743,10 @@ public:
 //                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 //                          TestUtility::ipTestParamsToString);
 
+                         INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 // INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesIntegrationTest,
 //                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 //                          TestUtility::ipTestParamsToString);
@@ -798,10 +778,6 @@ public:
 // INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithExternalAuthIntegrationTest,
 //                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 //                          TestUtility::ipTestParamsToString);
-
-                         INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
 
 void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
@@ -859,48 +835,6 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
   }
 
   EXPECT_TRUE(fake_upstream_connection->write(response));
-}
-
-void RedisProxyIntegrationTest::expectUpstreamRequestResponseAwsIam(
-    FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
-    FakeRawConnectionPtr& fake_upstream_connection, const std::string& auth_username,
-    const std::string& auth_password) {
-  std::string proxy_to_server;
-  std::string ok = "+OK\r\n";
-
-  if (fake_upstream_connection.get() == nullptr) {
-    EXPECT_TRUE(upstream->waitForRawConnection(fake_upstream_connection));
-  }
-
-  std::string auth_command = makeBulkStringArray({"auth", auth_username, auth_password});
-  // EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
-  //                                                   &proxy_to_server));
-  EXPECT_TRUE(fake_upstream_connection->waitForData(request.size(),
-                                                    &proxy_to_server));
-  // The original request should be the same as the data received by the server.
-  EXPECT_EQ(auth_command + request, proxy_to_server);
-  // Send back an OK for the auth command.
-  EXPECT_TRUE(fake_upstream_connection->write(ok));
-
-  EXPECT_TRUE(fake_upstream_connection->write(response));
-}
-
-void RedisProxyIntegrationTest::roundtripToUpstreamStepAwsIam(
-    FakeUpstreamPtr& upstream, const std::string& request, const std::string& response,
-    IntegrationTcpClientPtr& redis_client, FakeRawConnectionPtr& fake_upstream_connection,
-    const std::string& auth_username, const std::string& auth_password) {
-  redis_client->clearData();
-  if (fake_upstream_connection.get() != nullptr) {
-    fake_upstream_connection->clearData();
-  }
-  ASSERT_TRUE(redis_client->write(request));
-
-  expectUpstreamRequestResponseAwsIam(upstream, request, response, fake_upstream_connection,
-                                      auth_username, auth_password);
-
-  redis_client->waitForData(response);
-  // The original response should be received by the fake Redis client.
-  EXPECT_EQ(response, redis_client->data());
 }
 
 void RedisProxyIntegrationTest::simpleRoundtripToUpstream(FakeUpstreamPtr& upstream,
@@ -999,1021 +933,997 @@ void RedisProxyWithRedirectionIntegrationTest::simpleRedirection(
 // back to the client. The request and response should
 // make it through the envoy proxy server code unchanged.
 
-// TEST_P(RedisProxyIntegrationTest, SimpleRequestAndResponse) {
-//   initialize();
-//   simpleRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
-// }
-
-// TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
-//   initialize();
-//   std::string request = makeBulkStringArray({"mget", "foo"});
-//   std::string upstream_response = "$3\r\nbar\r\n";
-//   std::string downstream_response =
-//       "*1\r\n" + upstream_response; // Downstream response is array of length 1
-
-//   // Make MGET request from downstream
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   redis_client->clearData();
-//   ASSERT_TRUE(redis_client->write(request));
-
-//   // Make GET request to upstream (MGET is turned into GETs for upstream)
-//   FakeUpstreamPtr& upstream = fake_upstreams_[0];
-//   FakeRawConnectionPtr fake_upstream_connection;
-//   std::string auth_username = "";
-//   std::string auth_password = "";
-//   std::string upstream_request = makeBulkStringArray({"get", "foo"});
-//   expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
-//                                 fake_upstream_connection, auth_username, auth_password);
-
-//   // Downstream response for MGET
-//   redis_client->waitForData(downstream_response);
-//   EXPECT_EQ(downstream_response, redis_client->data());
-
-//   // Cleanup
-//   EXPECT_TRUE(fake_upstream_connection->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyIntegrationTest, KEYSRequestAndResponse) {
-//   initialize();
-//   std::string request = makeBulkStringArray({"keys", "*"});
-//   std::string upstream_response = "*2\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n";
-//   std::string downstream_response = upstream_response;
-
-//   // Make KEYS request from downstream
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   redis_client->clearData();
-//   ASSERT_TRUE(redis_client->write(request));
-
-//   // Make KEYS request to upstream
-//   FakeUpstreamPtr& upstream = fake_upstreams_[0];
-//   FakeRawConnectionPtr fake_upstream_connection;
-//   std::string auth_username = "";
-//   std::string auth_password = "";
-//   std::string upstream_request = makeBulkStringArray({"keys", "*"});
-//   expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
-//                                 fake_upstream_connection, auth_username, auth_password);
-
-//   // Downstream response for KEYS
-//   redis_client->waitForData(downstream_response);
-//   EXPECT_EQ(downstream_response, redis_client->data());
-
-//   // Cleanup
-//   EXPECT_TRUE(fake_upstream_connection->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyIntegrationTest, QUITRequestAndResponse) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client->write(makeBulkStringArray({"quit"}), false, false));
-//   redis_client->waitForData("+OK\r\n");
-//   redis_client->waitForDisconnect();
-//   EXPECT_EQ(redis_client->data(), "+OK\r\n");
-//   redis_client->close();
-// }
-
-// // This test sends an invalid Redis command from a fake
-// // downstream client to the envoy proxy. Envoy will respond
-// // with an ERR unknown command error.
-
-// TEST_P(RedisProxyIntegrationTest, UnknownCommand) {
-//   std::stringstream error_response;
-//   error_response << "-"
-//                  << "ERR unknown command 'foo', with args beginning with: "
-//                  << "\r\n";
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"foo"}), error_response.str());
-// }
-
-// // This test sends an invalid Redis command from a fake
-// // downstream client to the envoy proxy. Envoy will respond
-// // with an ERR unknown command error.
-
-// TEST_P(RedisProxyIntegrationTest, UnknownCommandWithArgs) {
-//   std::stringstream error_response;
-//   error_response << "-"
-//                  << "ERR unknown command 'hello', with args beginning with: world"
-//                  << "\r\n";
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
-// }
-
-// // This test sends an invalid Redis command from a fake
-// // downstream client to the envoy proxy. Envoy will respond
-// // with an ERR unknown command error.
-
-// TEST_P(RedisProxyIntegrationTest, HelloCommand) {
-//   std::stringstream error_response;
-//   error_response << "-"
-//                  << "ERR unknown command 'hello', with args beginning with: world"
-//                  << "\r\n";
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
-// }
-
-// // This test sends an invalid Redis command from a fake
-// // downstream client to the envoy proxy. Envoy will respond
-// // with an invalid request error.
-
-// TEST_P(RedisProxyIntegrationTest, InvalidRequest) {
-//   std::stringstream error_response;
-//   error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"keys"}), error_response.str());
-// }
-
-// // This test sends an invalid Redis command from a fake
-// // downstream client to the envoy proxy. Envoy will respond
-// // with an invalid request error.
-
-// TEST_P(RedisProxyIntegrationTest, InvalidArgsRequest) {
-//   std::stringstream error_response;
-//   error_response << "-"
-//                  << "wrong number of arguments for 'keys' command"
-//                  << "\r\n";
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"keys", "a*", "b*"}), error_response.str());
-// }
-
-// // This test sends a simple Redis command to a fake upstream
-// // Redis server. The server replies with a MOVED or ASK redirection
-// // error, and that error is passed unchanged to the fake downstream
-// // since redirection support has not been enabled (by default).
-
-// TEST_P(RedisProxyIntegrationTest, RedirectWhenNotEnabled) {
-//   std::string request = makeBulkStringArray({"get", "foo"});
-//   initialize();
-//   if (version_ == Network::Address::IpVersion::v4) {
-//     simpleRequestAndResponse(request, "-MOVED 1111 127.0.0.1:34123\r\n");
-//     simpleRequestAndResponse(request, "-ASK 1111 127.0.0.1:34123\r\n");
-//   } else {
-//     simpleRequestAndResponse(request, "-MOVED 1111 ::1:34123\r\n");
-//     simpleRequestAndResponse(request, "-ASK 1111 ::1:34123\r\n");
-//   }
-// }
-
-// // This test sends an AUTH command from the fake downstream client to
-// // the Envoy proxy. Envoy will respond with a no-password-set error since
-// // no downstream_auth_password has been set for the filter.
-
-// TEST_P(RedisProxyIntegrationTest, DownstreamAuthWhenNoPasswordSet) {
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"auth", "somepassword"}),
-//                       "-ERR Client sent AUTH, but no password is set\r\n");
-// }
-
-// // This test sends a simple Redis command to a sequence of fake upstream
-// // Redis servers. The first server replies with a MOVED or ASK redirection
-// // error that specifies the second upstream server in the static configuration
-// // as its target. The target server responds to a possibly transformed
-// // request, and its response is received unchanged by the fake Redis client.
-
-// TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToKnownServer) {
-//   std::string request = makeBulkStringArray({"get", "foo"});
-//   initialize();
-//   std::stringstream redirection_error;
-//   redirection_error << "-MOVED 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
-//   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
-
-//   redirection_error.str("");
-//   redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
-//   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
-// }
-
-// // This test sends a simple Redis command to a sequence of fake upstream
-// // Redis servers. The first server replies with a MOVED redirection
-// // error that specifies the hostname as its target.
-// // The target server responds to a possibly transformed request, and its response
-// // is received unchanged by the fake Redis client.
-// TEST_P(RedisProxyWithRedirectionAndDNSIntegrationTest, RedirectUsingHostname) {
-//   std::string request = makeBulkStringArray({"get", "foo"});
-//   initialize();
-//   std::stringstream redirection_error;
-//   redirection_error << "-MOVED 1111 " << redisHostnameAndPort(fake_upstreams_[1]) << "\r\n";
-//   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
-// }
-
-// // This test sends a simple Redis commands to a sequence of fake upstream
-// // Redis servers. The first server replies with a MOVED or ASK redirection
-// // error that specifies an unknown upstream server not in its static configuration
-// // as its target. The target server responds to a possibly transformed
-// // request, and its response is received unchanged by the fake Redis client.
-
-// TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
-//   std::string request = makeBulkStringArray({"get", "foo"});
-//   initialize();
-
-//   FakeUpstreamPtr target_server{std::make_unique<FakeUpstream>(0, version_, upstreamConfig())};
-
-//   std::stringstream redirection_error;
-//   redirection_error << "-MOVED 1111 " << redisAddressAndPortNoThrow(target_server) << "\r\n";
-//   simpleRedirection(target_server, request, redirection_error.str(), "$3\r\nbar\r\n");
-
-//   redirection_error.str("");
-//   redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(target_server) << "\r\n";
-//   simpleRedirection(target_server, request, redirection_error.str(), "$3\r\nbar\r\n");
-// }
-
-// // This test verifies that various forms of bad MOVED/ASK redirection errors
-// // from a fake Redis server are not acted upon, and are passed unchanged
-// // to the fake Redis client.
-
-// TEST_P(RedisProxyWithRedirectionIntegrationTest, BadRedirectStrings) {
-//   initialize();
-//   std::string request = makeBulkStringArray({"get", "foo"});
-
-//   // Test with truncated moved errors.
-//   simpleRequestAndResponse(request, "-MOVED 1111\r\n");
-//   simpleRequestAndResponse(request, "-MOVED\r\n");
-//   // Test with truncated ask errors.
-//   simpleRequestAndResponse(request, "-ASK 1111\r\n");
-//   simpleRequestAndResponse(request, "-ASK\r\n");
-//   // Test with a badly specified IP address and TCP port field.
-//   simpleRequestAndResponse(request, "-MOVED 2222 badfield\r\n");
-//   simpleRequestAndResponse(request, "-ASK 2222 badfield\r\n");
-//   // Test with a bad IP address specification.
-//   if (version_ == Network::Address::IpVersion::v4) {
-//     simpleRequestAndResponse(request, "-MOVED 2222 127.0:3333\r\n");
-//     simpleRequestAndResponse(request, "-ASK 2222 127.0:3333\r\n");
-//   } else {
-//     simpleRequestAndResponse(request, "-MOVED 2222 ::11111:3333\r\n");
-//     simpleRequestAndResponse(request, "-ASK 2222 ::11111:3333\r\n");
-//   }
-//   // Test with a bad IP address specification (not numeric).
-//   if (version_ == Network::Address::IpVersion::v4) {
-//     simpleRequestAndResponse(request, "-MOVED 2222 badaddress:3333\r\n");
-//     simpleRequestAndResponse(request, "-ASK 2222 badaddress:3333\r\n");
-//   } else {
-//     simpleRequestAndResponse(request, "-MOVED 2222 badaddress:3333\r\n");
-//     simpleRequestAndResponse(request, "-ASK 2222 badaddress:3333\r\n");
-//   }
-//   // Test with a bad TCP port specification (out of range).
-//   if (version_ == Network::Address::IpVersion::v4) {
-//     simpleRequestAndResponse(request, "-MOVED 2222 127.0.0.1:100000\r\n");
-//     simpleRequestAndResponse(request, "-ASK 2222 127.0.0.1:100000\r\n");
-//   } else {
-//     simpleRequestAndResponse(request, "-MOVED 2222 ::1:1000000\r\n");
-//     simpleRequestAndResponse(request, "-ASK 2222 ::1:1000000\r\n");
-//   }
-//   // Test with a bad TCP port specification (not numeric).
-//   if (version_ == Network::Address::IpVersion::v4) {
-//     simpleRequestAndResponse(request, "-MOVED 2222 127.0.0.1:badport\r\n");
-//     simpleRequestAndResponse(request, "-ASK 2222 127.0.0.1:badport\r\n");
-//   } else {
-//     simpleRequestAndResponse(request, "-MOVED 2222 ::1:badport\r\n");
-//     simpleRequestAndResponse(request, "-ASK 2222 ::1:badport\r\n");
-//   }
-// }
-
-// // This test verifies that an upstream connection failure during ask redirection processing is
-// // handled correctly. In this case the "asking" command and original client request have been sent
-// // to the target server, and then the connection is closed. The fake Redis client should receive an
-// // upstream failure error in response to its request.
-
-// TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingResponse) {
-//   initialize();
-
-//   std::string request = makeBulkStringArray({"get", "foo"});
-//   std::stringstream redirection_error;
-//   redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
-
-//   std::string proxy_to_server;
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client->write(request));
-
-//   FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
-
-//   // Data from the client should always be routed to fake_upstreams_[0] by the load balancer.
-//   EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_1));
-//   EXPECT_TRUE(fake_upstream_connection_1->waitForData(request.size(), &proxy_to_server));
-//   // The data in request should be received by the first server, fake_upstreams_[0].
-//   EXPECT_EQ(request, proxy_to_server);
-//   proxy_to_server.clear();
-
-//   // Send the redirection_response from the first fake Redis server back to the proxy.
-//   EXPECT_TRUE(fake_upstream_connection_1->write(redirection_error.str()));
-//   // The proxy should initiate a new connection to the fake redis server, target_server, in
-//   // response.
-//   EXPECT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
-
-//   // The server, fake_upstreams_[1], should receive an "asking" command before the original request.
-//   std::string asking_request = makeBulkStringArray({"asking"});
-//   EXPECT_TRUE(fake_upstream_connection_2->waitForData(asking_request.size() + request.size(),
-//                                                       &proxy_to_server));
-//   EXPECT_EQ(asking_request + request, proxy_to_server);
-//   // Close the upstream connection before responding to the "asking" command.
-//   EXPECT_TRUE(fake_upstream_connection_2->close());
-
-//   // The fake Redis client should receive an upstream failure error from the proxy.
-//   std::stringstream error_response;
-//   error_response << "-" << RedisCmdSplitter::Response::get().UpstreamFailure << "\r\n";
-//   redis_client->waitForData(error_response.str());
-//   EXPECT_EQ(error_response.str(), redis_client->data());
-
-//   EXPECT_TRUE(fake_upstream_connection_1->close());
-//   redis_client->close();
-// }
-
-// // This test verifies that a ASK redirection error as a response to an "asking" command is ignored.
-// // This is a negative test scenario that should never happen since a Redis server will reply to an
-// // "asking" command with either a "cluster support not enabled" error or "OK".
-
-// TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
-//   initialize();
-//   std::string request = makeBulkStringArray({"get", "foo"});
-//   std::stringstream redirection_error, asking_response;
-//   redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
-//   asking_response << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[0]) << "\r\n";
-//   simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n",
-//                     asking_response.str());
-// }
-
-// // This test verifies that batching works properly. If batching is enabled, when multiple
-// // clients make a request to a Redis server within a certain time window, they will be batched
-// // together. The below example, two clients send "GET foo", and Redis receives those two as
-// // a single concatenated request.
-
-// TEST_P(RedisProxyWithBatchingIntegrationTest, SimpleBatching) {
-//   initialize();
-
-//   const std::string& request = makeBulkStringArray({"get", "foo"});
-//   const std::string& response = "$3\r\nbar\r\n";
-
-//   std::string proxy_to_server;
-//   IntegrationTcpClientPtr redis_client_1 = makeTcpConnection(lookupPort("redis_proxy"));
-//   IntegrationTcpClientPtr redis_client_2 = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client_1->write(request));
-//   ASSERT_TRUE(redis_client_2->write(request));
-
-//   FakeRawConnectionPtr fake_upstream_connection;
-//   EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-//   EXPECT_TRUE(fake_upstream_connection->waitForData(request.size() * 2, &proxy_to_server));
-//   // The original request should be the same as the data received by the server.
-//   EXPECT_EQ(request + request, proxy_to_server);
-
-//   EXPECT_TRUE(fake_upstream_connection->write(response + response));
-//   redis_client_1->waitForData(response);
-//   redis_client_2->waitForData(response);
-//   // The original response should be received by the fake Redis client.
-//   EXPECT_EQ(response, redis_client_1->data());
-//   EXPECT_EQ(response, redis_client_2->data());
-
-//   redis_client_1->close();
-//   EXPECT_TRUE(fake_upstream_connection->close());
-//   redis_client_2->close();
-//   EXPECT_TRUE(fake_upstream_connection->close());
-// }
-
-// // This test verifies that it's possible to route keys to 3 different upstream pools.
-
-// TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPrefix) {
-//   initialize();
-
-//   // roundtrip to cluster_0 (catch_all route)
-//   simpleRoundtripToUpstream(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}),
-//                             "$3\r\nbar\r\n");
-
-//   // roundtrip to cluster_1 (prefix "foo:" route)
-//   simpleRoundtripToUpstream(fake_upstreams_[2], makeBulkStringArray({"get", "foo:123"}),
-//                             "$3\r\nbar\r\n");
-
-//   // roundtrip to cluster_2 (prefix "baz:" route)
-//   simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "baz:123"}),
-//                             "$3\r\nbar\r\n");
-// }
-
-// // This test verifies that a client connection cannot issue a command to an upstream
-// // server until it supplies a valid Redis AUTH command when downstream_auth_password
-// // is set for the redis_proxy filter. It also verifies the errors sent by the proxy
-// // when no password or the wrong password is received.
-
-// TEST_P(RedisProxyWithDownstreamAuthIntegrationTest,
-//        DEPRECATED_FEATURE_TEST(ErrorsUntilCorrectPasswordSent)) {
-//   initialize();
-
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   FakeRawConnectionPtr fake_upstream_connection;
-
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   std::stringstream error_response;
-//   error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
-//   proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"auth", "wrongpassword"}), "-ERR invalid password\r\n",
-//                     redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"auth", "somepassword"}), "+OK\r\n", redis_client);
-
-//   roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
-//                           redis_client, fake_upstream_connection, "", "");
-
-//   EXPECT_TRUE(fake_upstream_connection->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithMultipleDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSent1) {
-//   initialize();
-
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   FakeRawConnectionPtr fake_upstream_connection;
-
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   std::stringstream error_response;
-//   error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
-//   proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"auth", "wrongpassword"}), "-ERR invalid password\r\n",
-//                     redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"auth", "somepassword"}), "+OK\r\n", redis_client);
-
-//   roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
-//                           redis_client, fake_upstream_connection, "", "");
-
-//   EXPECT_TRUE(fake_upstream_connection->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithMultipleDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSent2) {
-//   initialize();
-
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   FakeRawConnectionPtr fake_upstream_connection;
-
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   std::stringstream error_response;
-//   error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
-//   proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"auth", "wrongpassword"}), "-ERR invalid password\r\n",
-//                     redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   proxyResponseStep(makeBulkStringArray({"auth", "someotherpassword"}), "+OK\r\n", redis_client);
-
-//   roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
-//                           redis_client, fake_upstream_connection, "", "");
-
-//   EXPECT_TRUE(fake_upstream_connection->close());
-//   redis_client->close();
-// }
-
-// // This test verifies that upstream server connections are transparently authenticated if an
-// // auth_password is specified for each cluster.
-
-// TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentication) {
-//   initialize();
-
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
-
-//   // roundtrip to cluster_0 (catch_all route)
-//   roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n",
-//                           redis_client, fake_upstream_connection[0], "", "cluster_0_password");
-
-//   // roundtrip to cluster_1 (prefix "foo:" route)
-//   roundtripToUpstreamStep(fake_upstreams_[1], makeBulkStringArray({"get", "foo:123"}),
-//                           "$3\r\nbar\r\n", redis_client, fake_upstream_connection[1], "",
-//                           "cluster_1_password");
-
-//   // roundtrip to cluster_2 (prefix "baz:" route)
-//   roundtripToUpstreamStep(fake_upstreams_[2], makeBulkStringArray({"get", "baz:123"}),
-//                           "$3\r\nbar\r\n", redis_client, fake_upstream_connection[2], "",
-//                           "cluster_2_password");
-
-//   EXPECT_TRUE(fake_upstream_connection[0]->close());
-//   EXPECT_TRUE(fake_upstream_connection[1]->close());
-//   EXPECT_TRUE(fake_upstream_connection[2]->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
-//   initialize();
-
-//   std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
-//   const std::string& request = makeBulkStringArray({"get", "toto"});
-//   const std::string& response = "$3\r\nbar\r\n";
-//   // roundtrip to cluster_0 (catch_all route)
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client->write(request));
-
-//   expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
-
-//   // mirror to cluster_1 and cluster_2
-//   expectUpstreamRequestResponse(fake_upstreams_[2], request, "$4\r\nbar1\r\n",
-//                                 fake_upstream_connection[1]);
-//   expectUpstreamRequestResponse(fake_upstreams_[4], request, "$4\r\nbar2\r\n",
-//                                 fake_upstream_connection[2]);
-
-//   redis_client->waitForData(response);
-//   // The original response from the cluster_0 should be received by the fake Redis client and the
-//   // response from mirrored requests are ignored.
-//   EXPECT_EQ(response, redis_client->data());
-
-//   EXPECT_TRUE(fake_upstream_connection[0]->close());
-//   EXPECT_TRUE(fake_upstream_connection[1]->close());
-//   EXPECT_TRUE(fake_upstream_connection[2]->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredTransaction) {
-//   initialize();
-
-//   std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
-
-//   std::string request = makeBulkStringArray({"MULTI"}) +
-//                         makeBulkStringArray({"set", "foo", "bar"}) +
-//                         makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
-//   const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
-
-//   // roundtrip to cluster_0 (catch_all route)
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client->write(request));
-
-//   expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
-
-//   // mirror to cluster_1 and cluster_2
-//   expectUpstreamRequestResponse(fake_upstreams_[2], request, "$4\r\nbar1\r\n",
-//                                 fake_upstream_connection[1]);
-//   expectUpstreamRequestResponse(fake_upstreams_[4], request, "$4\r\nbar2\r\n",
-//                                 fake_upstream_connection[2]);
-
-//   redis_client->waitForData(response);
-//   // The original response from the cluster_0 should be received by the fake Redis client and the
-//   // response from mirrored requests are ignored.
-//   EXPECT_EQ(response, redis_client->data());
-
-//   EXPECT_TRUE(fake_upstream_connection[0]->close());
-//   EXPECT_TRUE(fake_upstream_connection[1]->close());
-//   EXPECT_TRUE(fake_upstream_connection[2]->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
-//   initialize();
-
-//   std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
-//   const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
-//   const std::string& set_response = ":1\r\n";
-
-//   // roundtrip to cluster_0 (write_only route)
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client->write(set_request));
-
-//   expectUpstreamRequestResponse(fake_upstreams_[0], set_request, set_response,
-//                                 fake_upstream_connection[0]);
-
-//   // mirror to cluster_1
-//   expectUpstreamRequestResponse(fake_upstreams_[2], set_request, ":2\r\n",
-//                                 fake_upstream_connection[1]);
-
-//   // The original response from the cluster_1 should be received by the fake Redis client
-//   redis_client->waitForData(set_response);
-//   EXPECT_EQ(set_response, redis_client->data());
-
-//   EXPECT_TRUE(fake_upstream_connection[0]->close());
-//   EXPECT_TRUE(fake_upstream_connection[1]->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
-//   initialize();
-
-//   FakeRawConnectionPtr cluster_0_connection;
-//   const std::string& get_request = makeBulkStringArray({"get", "write_only:toto"});
-//   const std::string& get_response = "$3\r\nbar\r\n";
-
-//   // roundtrip to cluster_0 (write_only route)
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client->write(get_request));
-
-//   expectUpstreamRequestResponse(fake_upstreams_[0], get_request, get_response,
-//                                 cluster_0_connection);
-
-//   // command is not mirrored to cluster 1
-//   FakeRawConnectionPtr cluster_1_connection;
-//   EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection,
-//                                                         std::chrono::milliseconds(500)));
-
-//   redis_client->waitForData(get_response);
-//   EXPECT_EQ(get_response, redis_client->data());
-
-//   EXPECT_TRUE(cluster_0_connection->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
-//   initialize();
-
-//   std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
-//   // When random_value is < 50, the percentage:* will be mirrored, random() default is 0
-//   const std::string& request = makeBulkStringArray({"get", "percentage:toto"});
-//   const std::string& response = "$3\r\nbar\r\n";
-//   // roundtrip to cluster_0 (catch_all route)
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client->write(request));
-
-//   expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
-
-//   // mirror to cluster_1
-//   expectUpstreamRequestResponse(fake_upstreams_[2], request, "$4\r\nbar1\r\n",
-//                                 fake_upstream_connection[1]);
-
-//   redis_client->waitForData(response);
-//   // The original response from the cluster_0 should be received by the fake Redis client and the
-//   // response from mirrored requests are ignored.
-//   EXPECT_EQ(response, redis_client->data());
-
-//   EXPECT_TRUE(fake_upstream_connection[0]->close());
-//   EXPECT_TRUE(fake_upstream_connection[1]->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
-//   std::string fault_response =
-//       fmt::format("-{}\r\n", Extensions::NetworkFilters::Common::Redis::FaultMessages::get().Error);
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"get", "foo"}), fault_response);
-
-//   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error")->value());
-//   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error_fault")->value());
-// }
-
-// TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
-//   const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
-//   const std::string& set_response = ":1\r\n";
-//   initialize();
-//   simpleRequestAndResponse(set_request, set_response);
-
-//   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.success")->value());
-//   EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.delay_fault")->value());
-// }
-
-// // This test sends a MULTI Redis command from a fake
-// // downstream client to the envoy proxy. Envoy will respond
-// // with an OK.
-
-// TEST_P(RedisProxyIntegrationTest, SendMulti) {
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"multi"}), "+OK\r\n");
-// }
-
-// // This test sends a nested MULTI Redis command from a fake
-// // downstream client to the envoy proxy. Envoy will respond with an
-// // error.
-
-// TEST_P(RedisProxyIntegrationTest, SendNestedMulti) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-//   proxyResponseStep(makeBulkStringArray({"multi"}), "-MULTI calls can not be nested\r\n",
-//                     redis_client);
-
-//   redis_client->close();
-// }
-
-// // This test sends an EXEC command without a MULTI command
-// // preceding it. The proxy responds with an error.
-
-// TEST_P(RedisProxyIntegrationTest, ExecWithoutMulti) {
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"exec"}), "-EXEC without MULTI\r\n");
-// }
-
-// // This test sends an DISCARD command without a MULTI command
-// // preceding it. The proxy responds with an error.
-
-// TEST_P(RedisProxyIntegrationTest, DiscardWithoutMulti) {
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"discard"}), "-DISCARD without MULTI\r\n");
-// }
-
-// // This test executes an empty transaction. The proxy responds
-// // with an empty array.
-
-// TEST_P(RedisProxyIntegrationTest, ExecuteEmptyTransaction) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-//   proxyResponseStep(makeBulkStringArray({"exec"}), "*0\r\n", redis_client);
-
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyIntegrationTest, UnwatchNoTransactionNoOp) {
-//   initialize();
-//   simpleProxyResponse(makeBulkStringArray({"unwatch"}), "+OK\r\n");
-// }
-
-// TEST_P(RedisProxyIntegrationTest, UnwatchWithTransactionNoOp) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-//   proxyResponseStep(makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client);
-
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyIntegrationTest, WatchUnwatchNoTransaction) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   FakeUpstreamPtr& upstream = fake_upstreams_[0];
-//   FakeRawConnectionPtr fake_upstream_conn;
-
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
-//                           fake_upstream_conn, "", "");
-
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+OK\r\n", redis_client,
-//                           fake_upstream_conn, "", "");
-
-//   EXPECT_TRUE(fake_upstream_conn->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyIntegrationTest, WatchUnwatchUnrelatedTransaction) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   FakeUpstreamPtr& upstream = fake_upstreams_[0];
-//   FakeRawConnectionPtr fake_upstream_conn;
-
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
-//                           fake_upstream_conn, "", "");
-
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+OK\r\n", redis_client,
-//                           fake_upstream_conn, "", "");
-
-//   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-//   proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
-
-//   EXPECT_TRUE(fake_upstream_conn->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyIntegrationTest, WatchUnwatchInTransaction) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   FakeUpstreamPtr& upstream = fake_upstreams_[0];
-//   FakeRawConnectionPtr fake_upstream_conn;
-
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
-//                           fake_upstream_conn, "", "");
-
-//   // MULTI will create a new connection, for the transaction.
-//   FakeRawConnectionPtr fake_upstream_conn2;
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"multi"}), "+OK\r\n", redis_client,
-//                           fake_upstream_conn2, "", "");
-
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client,
-//                           fake_upstream_conn2, "", "");
-
-//   EXPECT_TRUE(fake_upstream_conn->close());
-//   EXPECT_TRUE(fake_upstream_conn2->close());
-//   redis_client->close();
-// }
-// // This test discards an empty transaction. The proxy responds
-// // with an OK.
-
-// TEST_P(RedisProxyIntegrationTest, DiscardEmptyTransaction) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-//   proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
-
-//   redis_client->close();
-// }
-
-// // MultiKey commands are allowed to go through. The underlying server may fail with
-// // CROSSSLOT or MOVED errors, and the client must handle it.
-// TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   FakeUpstreamPtr& upstream = fake_upstreams_[0];
-//   FakeRawConnectionPtr fake_upstream_conn;
-
-//   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-
-//   ASSERT_TRUE(redis_client->write(makeBulkStringArray({"del", "b"})));
-//   expectUpstreamRequestResponse(upstream,
-//                                 makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"del", "b"}),
-//                                 "+QUEUED\r\n", fake_upstream_conn, "", "");
-
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "a"}),
-//                           "-ERR MOVED 15495 0.0.0.0:6379\r\n", redis_client, fake_upstream_conn, "",
-//                           "");
-
-//   roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "b", "a"}),
-//                           "-ERR CROSSSLOT Keys in request don't hash to the same slot\r\n",
-//                           redis_client, fake_upstream_conn, "", "");
-
-//   EXPECT_TRUE(fake_upstream_conn->close());
-//   redis_client->close();
-// }
-
-// // This test verifies that a multi command is sent before the first
-// // simple command of the transaction.
-
-// TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransaction) {
-//   initialize();
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-
-//   proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
-
-//   std::string request = makeBulkStringArray({"set", "foo", "bar"});
-//   ASSERT_TRUE(redis_client->write(request));
-
-//   // The upstream will receive a MULTI command before the SET command.
-//   FakeUpstreamPtr& upstream = fake_upstreams_[0];
-//   FakeRawConnectionPtr fake_upstream_connection;
-//   std::string auth_username = "";
-//   std::string auth_password = "";
-//   std::string upstream_request =
-//       makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"});
-//   std::string upstream_response = "";
-//   expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
-//                                 fake_upstream_connection, auth_username, auth_password);
-
-//   EXPECT_TRUE(fake_upstream_connection->close());
-//   redis_client->close();
-// }
-
-// // This test verifies that a transaction can be pipelined.
-// TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
-//   initialize();
-
-//   std::array<FakeRawConnectionPtr, 1> fake_upstream_connection;
-//   std::string transaction_commands =
-//       makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"}) +
-//       makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
-//   const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   ASSERT_TRUE(redis_client->write(transaction_commands));
-
-//   expectUpstreamRequestResponse(fake_upstreams_[0], transaction_commands, response,
-//                                 fake_upstream_connection[0]);
-
-//   redis_client->waitForData(response);
-//   EXPECT_EQ(response, redis_client->data());
-
-//   EXPECT_TRUE(fake_upstream_connection[0]->close());
-//   redis_client->close();
-// }
-
-// // TODO: Add full transaction test.
-
-// TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSentExternal) {
-//   initialize();
-
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   FakeRawConnectionPtr fake_upstream_redis_connection;
-//   FakeHttpConnectionPtr fake_upstream_external_auth;
-
-//   // Trying to get a key without authenticating should return NOAUTH error.
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   // Sending an AUTH command without a password should return an error.
-//   std::stringstream error_response;
-//   error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
-//   proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
-
-//   // Sending an AUTH command with the wrong password should return an error.
-//   proxyRequestStep(makeBulkStringArray({"auth", "wrongpassword"}), redis_client);
-//   FakeStreamPtr auth_request1;
-//   expectExternalAuthRequest(fake_upstream_external_auth, auth_request1, "wrongpassword");
-//   sendExternalAuthResponse(auth_request1, false, 0);
-//   proxyResponseOnlyStep("-ERR Unauthorized\r\n", redis_client);
-
-//   // Sending a command after unsuccessful auth should return NOAUTH error.
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   // Sending an AUTH command with the correct password should return OK.
-//   proxyRequestStep(makeBulkStringArray({"auth", "somepassword"}), redis_client);
-//   FakeStreamPtr auth_request2;
-//   expectExternalAuthRequest(fake_upstream_external_auth, auth_request2, "somepassword", true);
-//   auto expiration_time = timeSystem().systemTime() + std::chrono::hours(1);
-//   sendExternalAuthResponse(
-//       auth_request2, true,
-//       duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
-//   proxyResponseOnlyStep("+OK\r\n", redis_client);
-
-//   // Further requests should be successful.
-//   roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
-//                           redis_client, fake_upstream_redis_connection, "", "");
-
-//   // Expiration passes
-//   timeSystem().advanceTimeWait(std::chrono::hours(2));
-
-//   // Sending a command after expiration should return NOAUTH error.
-//   proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
-//                     redis_client);
-
-//   EXPECT_TRUE(fake_upstream_redis_connection->close());
-//   EXPECT_TRUE(fake_upstream_external_auth->close());
-//   redis_client->close();
-// }
-
-// TEST_P(RedisProxyWithExternalAuthIntegrationTest, ExternalAuthRespectsPipelining) {
-//   initialize();
-
-//   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-//   FakeHttpConnectionPtr fake_upstream_external_auth;
-
-//   // Send an AUTH command followed immediately by a PING command should return OK and PONG.
-//   proxyRequestStep(makeBulkStringArray({"AUTH", "somepassword"}), redis_client);
-//   FakeStreamPtr auth_request;
-//   expectExternalAuthRequest(fake_upstream_external_auth, auth_request, "somepassword");
-//   auto expiration_time = timeSystem().systemTime() + std::chrono::hours(1);
-//   // PING is sent before the response to the AUTH command is received.
-//   proxyRequestStep(makeBulkStringArray({"PING"}), redis_client);
-//   sendExternalAuthResponse(
-//       auth_request, true,
-//       duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
-//   proxyResponseOnlyStep("+OK\r\n+PONG\r\n", redis_client);
-
-//   EXPECT_TRUE(fake_upstream_external_auth->close());
-//   redis_client->close();
-// }
-
-TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAuthentication) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
-  // Event::SimulatedTimeSystem time_system;
-  // time_system.setSystemTime(std::chrono::milliseconds(1514862245000));
-//  std::chrono::milliseconds ms(epoch_milliseconds);
-    // simTime().setSystemTime(std::chrono::duration_cast<std::chrono::microseconds>(1514862245000));
-  TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
-  TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
-  TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
-
+TEST_P(RedisProxyIntegrationTest, SimpleRequestAndResponse) {
+  initialize();
+  simpleRequestAndResponse(makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n");
+}
+
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, MGETRequestAndResponse) {
+  initialize();
+  std::string request = makeBulkStringArray({"mget", "foo"});
+  std::string upstream_response = "$3\r\nbar\r\n";
+  std::string downstream_response =
+      "*1\r\n" + upstream_response; // Downstream response is array of length 1
+
+  // Make MGET request from downstream
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->clearData();
+  ASSERT_TRUE(redis_client->write(request));
+
+  // Make GET request to upstream (MGET is turned into GETs for upstream)
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username = "";
+  std::string auth_password = "";
+  std::string upstream_request = makeBulkStringArray({"get", "foo"});
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  // Downstream response for MGET
+  redis_client->waitForData(downstream_response);
+  EXPECT_EQ(downstream_response, redis_client->data());
+
+  // Cleanup
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, KEYSRequestAndResponse) {
+  initialize();
+  std::string request = makeBulkStringArray({"keys", "*"});
+  std::string upstream_response = "*2\r\n$4\r\nbar1\r\n$4\r\nbar2\r\n";
+  std::string downstream_response = upstream_response;
+
+  // Make KEYS request from downstream
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->clearData();
+  ASSERT_TRUE(redis_client->write(request));
+
+  // Make KEYS request to upstream
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username = "";
+  std::string auth_password = "";
+  std::string upstream_request = makeBulkStringArray({"keys", "*"});
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  // Downstream response for KEYS
+  redis_client->waitForData(downstream_response);
+  EXPECT_EQ(downstream_response, redis_client->data());
+
+  // Cleanup
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, QUITRequestAndResponse) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"quit"}), false, false));
+  redis_client->waitForData("+OK\r\n");
+  redis_client->waitForDisconnect();
+  EXPECT_EQ(redis_client->data(), "+OK\r\n");
+  redis_client->close();
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, UnknownCommand) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'foo', with args beginning with: "
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"foo"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, UnknownCommandWithArgs) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'hello', with args beginning with: world"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an ERR unknown command error.
+
+TEST_P(RedisProxyIntegrationTest, HelloCommand) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "ERR unknown command 'hello', with args beginning with: world"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"hello", "world"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an invalid request error.
+
+TEST_P(RedisProxyIntegrationTest, InvalidRequest) {
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"keys"}), error_response.str());
+}
+
+// This test sends an invalid Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an invalid request error.
+
+TEST_P(RedisProxyIntegrationTest, InvalidArgsRequest) {
+  std::stringstream error_response;
+  error_response << "-"
+                 << "wrong number of arguments for 'keys' command"
+                 << "\r\n";
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"keys", "a*", "b*"}), error_response.str());
+}
+
+// This test sends a simple Redis command to a fake upstream
+// Redis server. The server replies with a MOVED or ASK redirection
+// error, and that error is passed unchanged to the fake downstream
+// since redirection support has not been enabled (by default).
+
+TEST_P(RedisProxyIntegrationTest, RedirectWhenNotEnabled) {
+  std::string request = makeBulkStringArray({"get", "foo"});
+  initialize();
+  if (version_ == Network::Address::IpVersion::v4) {
+    simpleRequestAndResponse(request, "-MOVED 1111 127.0.0.1:34123\r\n");
+    simpleRequestAndResponse(request, "-ASK 1111 127.0.0.1:34123\r\n");
+  } else {
+    simpleRequestAndResponse(request, "-MOVED 1111 ::1:34123\r\n");
+    simpleRequestAndResponse(request, "-ASK 1111 ::1:34123\r\n");
+  }
+}
+
+// This test sends an AUTH command from the fake downstream client to
+// the Envoy proxy. Envoy will respond with a no-password-set error since
+// no downstream_auth_password has been set for the filter.
+
+TEST_P(RedisProxyIntegrationTest, DownstreamAuthWhenNoPasswordSet) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"auth", "somepassword"}),
+                      "-ERR Client sent AUTH, but no password is set\r\n");
+}
+
+// This test sends a simple Redis command to a sequence of fake upstream
+// Redis servers. The first server replies with a MOVED or ASK redirection
+// error that specifies the second upstream server in the static configuration
+// as its target. The target server responds to a possibly transformed
+// request, and its response is received unchanged by the fake Redis client.
+
+TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToKnownServer) {
+  std::string request = makeBulkStringArray({"get", "foo"});
+  initialize();
+  std::stringstream redirection_error;
+  redirection_error << "-MOVED 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
+
+  redirection_error.str("");
+  redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
+}
+
+// This test sends a simple Redis command to a sequence of fake upstream
+// Redis servers. The first server replies with a MOVED redirection
+// error that specifies the hostname as its target.
+// The target server responds to a possibly transformed request, and its response
+// is received unchanged by the fake Redis client.
+TEST_P(RedisProxyWithRedirectionAndDNSIntegrationTest, RedirectUsingHostname) {
+  std::string request = makeBulkStringArray({"get", "foo"});
+  initialize();
+  std::stringstream redirection_error;
+  redirection_error << "-MOVED 1111 " << redisHostnameAndPort(fake_upstreams_[1]) << "\r\n";
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n");
+}
+
+// This test sends a simple Redis commands to a sequence of fake upstream
+// Redis servers. The first server replies with a MOVED or ASK redirection
+// error that specifies an unknown upstream server not in its static configuration
+// as its target. The target server responds to a possibly transformed
+// request, and its response is received unchanged by the fake Redis client.
+
+TEST_P(RedisProxyWithRedirectionIntegrationTest, RedirectToUnknownServer) {
+  std::string request = makeBulkStringArray({"get", "foo"});
+  initialize();
+
+  FakeUpstreamPtr target_server{std::make_unique<FakeUpstream>(0, version_, upstreamConfig())};
+
+  std::stringstream redirection_error;
+  redirection_error << "-MOVED 1111 " << redisAddressAndPortNoThrow(target_server) << "\r\n";
+  simpleRedirection(target_server, request, redirection_error.str(), "$3\r\nbar\r\n");
+
+  redirection_error.str("");
+  redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(target_server) << "\r\n";
+  simpleRedirection(target_server, request, redirection_error.str(), "$3\r\nbar\r\n");
+}
+
+// This test verifies that various forms of bad MOVED/ASK redirection errors
+// from a fake Redis server are not acted upon, and are passed unchanged
+// to the fake Redis client.
+
+TEST_P(RedisProxyWithRedirectionIntegrationTest, BadRedirectStrings) {
+  initialize();
+  std::string request = makeBulkStringArray({"get", "foo"});
+
+  // Test with truncated moved errors.
+  simpleRequestAndResponse(request, "-MOVED 1111\r\n");
+  simpleRequestAndResponse(request, "-MOVED\r\n");
+  // Test with truncated ask errors.
+  simpleRequestAndResponse(request, "-ASK 1111\r\n");
+  simpleRequestAndResponse(request, "-ASK\r\n");
+  // Test with a badly specified IP address and TCP port field.
+  simpleRequestAndResponse(request, "-MOVED 2222 badfield\r\n");
+  simpleRequestAndResponse(request, "-ASK 2222 badfield\r\n");
+  // Test with a bad IP address specification.
+  if (version_ == Network::Address::IpVersion::v4) {
+    simpleRequestAndResponse(request, "-MOVED 2222 127.0:3333\r\n");
+    simpleRequestAndResponse(request, "-ASK 2222 127.0:3333\r\n");
+  } else {
+    simpleRequestAndResponse(request, "-MOVED 2222 ::11111:3333\r\n");
+    simpleRequestAndResponse(request, "-ASK 2222 ::11111:3333\r\n");
+  }
+  // Test with a bad IP address specification (not numeric).
+  if (version_ == Network::Address::IpVersion::v4) {
+    simpleRequestAndResponse(request, "-MOVED 2222 badaddress:3333\r\n");
+    simpleRequestAndResponse(request, "-ASK 2222 badaddress:3333\r\n");
+  } else {
+    simpleRequestAndResponse(request, "-MOVED 2222 badaddress:3333\r\n");
+    simpleRequestAndResponse(request, "-ASK 2222 badaddress:3333\r\n");
+  }
+  // Test with a bad TCP port specification (out of range).
+  if (version_ == Network::Address::IpVersion::v4) {
+    simpleRequestAndResponse(request, "-MOVED 2222 127.0.0.1:100000\r\n");
+    simpleRequestAndResponse(request, "-ASK 2222 127.0.0.1:100000\r\n");
+  } else {
+    simpleRequestAndResponse(request, "-MOVED 2222 ::1:1000000\r\n");
+    simpleRequestAndResponse(request, "-ASK 2222 ::1:1000000\r\n");
+  }
+  // Test with a bad TCP port specification (not numeric).
+  if (version_ == Network::Address::IpVersion::v4) {
+    simpleRequestAndResponse(request, "-MOVED 2222 127.0.0.1:badport\r\n");
+    simpleRequestAndResponse(request, "-ASK 2222 127.0.0.1:badport\r\n");
+  } else {
+    simpleRequestAndResponse(request, "-MOVED 2222 ::1:badport\r\n");
+    simpleRequestAndResponse(request, "-ASK 2222 ::1:badport\r\n");
+  }
+}
+
+// This test verifies that an upstream connection failure during ask redirection processing is
+// handled correctly. In this case the "asking" command and original client request have been sent
+// to the target server, and then the connection is closed. The fake Redis client should receive an
+// upstream failure error in response to its request.
+
+TEST_P(RedisProxyWithRedirectionIntegrationTest, ConnectionFailureBeforeAskingResponse) {
+  initialize();
+
+  std::string request = makeBulkStringArray({"get", "foo"});
+  std::stringstream redirection_error;
+  redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
+
+  std::string proxy_to_server;
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(request));
+
+  FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
+
+  // Data from the client should always be routed to fake_upstreams_[0] by the load balancer.
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_1));
+  EXPECT_TRUE(fake_upstream_connection_1->waitForData(request.size(), &proxy_to_server));
+  // The data in request should be received by the first server, fake_upstreams_[0].
+  EXPECT_EQ(request, proxy_to_server);
+  proxy_to_server.clear();
+
+  // Send the redirection_response from the first fake Redis server back to the proxy.
+  EXPECT_TRUE(fake_upstream_connection_1->write(redirection_error.str()));
+  // The proxy should initiate a new connection to the fake redis server, target_server, in
+  // response.
+  EXPECT_TRUE(fake_upstreams_[1]->waitForRawConnection(fake_upstream_connection_2));
+
+  // The server, fake_upstreams_[1], should receive an "asking" command before the original request.
+  std::string asking_request = makeBulkStringArray({"asking"});
+  EXPECT_TRUE(fake_upstream_connection_2->waitForData(asking_request.size() + request.size(),
+                                                      &proxy_to_server));
+  EXPECT_EQ(asking_request + request, proxy_to_server);
+  // Close the upstream connection before responding to the "asking" command.
+  EXPECT_TRUE(fake_upstream_connection_2->close());
+
+  // The fake Redis client should receive an upstream failure error from the proxy.
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().UpstreamFailure << "\r\n";
+  redis_client->waitForData(error_response.str());
+  EXPECT_EQ(error_response.str(), redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection_1->close());
+  redis_client->close();
+}
+
+// This test verifies that a ASK redirection error as a response to an "asking" command is ignored.
+// This is a negative test scenario that should never happen since a Redis server will reply to an
+// "asking" command with either a "cluster support not enabled" error or "OK".
+
+TEST_P(RedisProxyWithRedirectionIntegrationTest, IgnoreRedirectionForAsking) {
+  initialize();
+  std::string request = makeBulkStringArray({"get", "foo"});
+  std::stringstream redirection_error, asking_response;
+  redirection_error << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[1]) << "\r\n";
+  asking_response << "-ASK 1111 " << redisAddressAndPortNoThrow(fake_upstreams_[0]) << "\r\n";
+  simpleRedirection(fake_upstreams_[1], request, redirection_error.str(), "$3\r\nbar\r\n",
+                    asking_response.str());
+}
+
+// This test verifies that batching works properly. If batching is enabled, when multiple
+// clients make a request to a Redis server within a certain time window, they will be batched
+// together. The below example, two clients send "GET foo", and Redis receives those two as
+// a single concatenated request.
+
+TEST_P(RedisProxyWithBatchingIntegrationTest, SimpleBatching) {
+  initialize();
+
+  const std::string& request = makeBulkStringArray({"get", "foo"});
+  const std::string& response = "$3\r\nbar\r\n";
+
+  std::string proxy_to_server;
+  IntegrationTcpClientPtr redis_client_1 = makeTcpConnection(lookupPort("redis_proxy"));
+  IntegrationTcpClientPtr redis_client_2 = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client_1->write(request));
+  ASSERT_TRUE(redis_client_2->write(request));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  EXPECT_TRUE(fake_upstream_connection->waitForData(request.size() * 2, &proxy_to_server));
+  // The original request should be the same as the data received by the server.
+  EXPECT_EQ(request + request, proxy_to_server);
+
+  EXPECT_TRUE(fake_upstream_connection->write(response + response));
+  redis_client_1->waitForData(response);
+  redis_client_2->waitForData(response);
+  // The original response should be received by the fake Redis client.
+  EXPECT_EQ(response, redis_client_1->data());
+  EXPECT_EQ(response, redis_client_2->data());
+
+  redis_client_1->close();
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client_2->close();
+  EXPECT_TRUE(fake_upstream_connection->close());
+}
+
+// This test verifies that it's possible to route keys to 3 different upstream pools.
+
+TEST_P(RedisProxyWithRoutesIntegrationTest, SimpleRequestAndResponseRoutedByPrefix) {
+  initialize();
+
+  // roundtrip to cluster_0 (catch_all route)
+  simpleRoundtripToUpstream(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}),
+                            "$3\r\nbar\r\n");
+
+  // roundtrip to cluster_1 (prefix "foo:" route)
+  simpleRoundtripToUpstream(fake_upstreams_[2], makeBulkStringArray({"get", "foo:123"}),
+                            "$3\r\nbar\r\n");
+
+  // roundtrip to cluster_2 (prefix "baz:" route)
+  simpleRoundtripToUpstream(fake_upstreams_[4], makeBulkStringArray({"get", "baz:123"}),
+                            "$3\r\nbar\r\n");
+}
+
+// This test verifies that a client connection cannot issue a command to an upstream
+// server until it supplies a valid Redis AUTH command when downstream_auth_password
+// is set for the redis_proxy filter. It also verifies the errors sent by the proxy
+// when no password or the wrong password is received.
+
+TEST_P(RedisProxyWithDownstreamAuthIntegrationTest,
+       DEPRECATED_FEATURE_TEST(ErrorsUntilCorrectPasswordSent)) {
   initialize();
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
-  // std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
-FakeRawConnectionPtr fake;
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
+  proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "wrongpassword"}), "-ERR invalid password\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "somepassword"}), "+OK\r\n", redis_client);
+
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_connection, "", "");
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMultipleDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSent1) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
+  proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "wrongpassword"}), "-ERR invalid password\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "somepassword"}), "+OK\r\n", redis_client);
+
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_connection, "", "");
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMultipleDownstreamAuthIntegrationTest, ErrorsUntilCorrectPasswordSent2) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
+  proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "wrongpassword"}), "-ERR invalid password\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  proxyResponseStep(makeBulkStringArray({"auth", "someotherpassword"}), "+OK\r\n", redis_client);
+
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_connection, "", "");
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// This test verifies that upstream server connections are transparently authenticated if an
+// auth_password is specified for each cluster.
+
+TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentication) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
+
   // roundtrip to cluster_0 (catch_all route)
-  roundtripToUpstreamStepAwsIam(
-      fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n", redis_client,
-      fake, "cluster_0_username",
-      "testcache/"
-      "?Action=connect&User=cluster_0_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
-      "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
-      "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-      "b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host");
-  // roundtripToUpstreamStepAwsIam(
-  //     fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n", redis_client,
-  //     fake_upstream_connection[0], "cluster_0_username",
-  //     "testcache/"
-  //     "?Action=connect&User=cluster_0_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
-  //     "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
-  //     "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-  //     "b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host");
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_connection[0], "", "cluster_0_password");
 
-  // // roundtrip to cluster_1 (prefix "foo:" route)
-  // roundtripToUpstreamStepAwsIam(
-  //     fake_upstreams_[1], makeBulkStringArray({"get", "foo:123"}), "$3\r\nbar\r\n", redis_client,
-  //     fake_upstream_connection[1], "cluster_1_username",
-  //     "testcache/"
-  //     "?Action=connect&User=cluster_1_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
-  //     "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
-  //     "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-  //     "8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host");
+  // roundtrip to cluster_1 (prefix "foo:" route)
+  roundtripToUpstreamStep(fake_upstreams_[1], makeBulkStringArray({"get", "foo:123"}),
+                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection[1], "",
+                          "cluster_1_password");
 
-  // // roundtrip to cluster_2 (prefix "baz:" route)
-  // roundtripToUpstreamStepAwsIam(
-  //     fake_upstreams_[2], makeBulkStringArray({"get", "baz:123"}), "$3\r\nbar\r\n", redis_client,
-  //     fake_upstream_connection[2], "cluster_2_username",
-  //     "testcache/"
-  //     "?Action=connect&User=cluster_2_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
-  //     "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
-  //     "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
-  //     "0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host");
+  // roundtrip to cluster_2 (prefix "baz:" route)
+  roundtripToUpstreamStep(fake_upstreams_[2], makeBulkStringArray({"get", "baz:123"}),
+                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection[2], "",
+                          "cluster_2_password");
 
-  // EXPECT_TRUE(fake_upstream_connection[0]->close());
-  // EXPECT_TRUE(fake_upstream_connection[1]->close());
-  // EXPECT_TRUE(fake_upstream_connection[2]->close());
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  EXPECT_TRUE(fake_upstream_connection[1]->close());
+  EXPECT_TRUE(fake_upstream_connection[2]->close());
+  redis_client->close();
+}
+
+
+TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAuthentication) {
+    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
+  TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
+  TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
+simTime().setSystemTime(std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::milliseconds(1514862245000)));
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
+
+  // roundtrip to cluster_0 (catch_all route)
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_connection[0], "cluster_0_username", 
+                          "testcache/?Action=connect&User=cluster_0_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=900&X-Amz-Security-Token=token&X-Amz-Signature=b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host");
+
+  // roundtrip to cluster_1 (prefix "foo:" route)
+  roundtripToUpstreamStep(fake_upstreams_[1], makeBulkStringArray({"get", "foo:123"}),
+                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection[1], "cluster_1_username",
+                          "testcache/?Action=connect&User=cluster_1_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=900&X-Amz-Security-Token=token&X-Amz-Signature=8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host");
+
+  // roundtrip to cluster_2 (prefix "baz:" route)
+  roundtripToUpstreamStep(fake_upstreams_[2], makeBulkStringArray({"get", "baz:123"}),
+                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection[2], "cluster_2_username",
+                          "testcache/?Action=connect&User=cluster_2_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=900&X-Amz-Security-Token=token&X-Amz-Signature=0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host");
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  EXPECT_TRUE(fake_upstream_connection[1]->close());
+  EXPECT_TRUE(fake_upstream_connection[2]->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
+  const std::string& request = makeBulkStringArray({"get", "toto"});
+  const std::string& response = "$3\r\nbar\r\n";
+  // roundtrip to cluster_0 (catch_all route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(request));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
+
+  // mirror to cluster_1 and cluster_2
+  expectUpstreamRequestResponse(fake_upstreams_[2], request, "$4\r\nbar1\r\n",
+                                fake_upstream_connection[1]);
+  expectUpstreamRequestResponse(fake_upstreams_[4], request, "$4\r\nbar2\r\n",
+                                fake_upstream_connection[2]);
+
+  redis_client->waitForData(response);
+  // The original response from the cluster_0 should be received by the fake Redis client and the
+  // response from mirrored requests are ignored.
+  EXPECT_EQ(response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  EXPECT_TRUE(fake_upstream_connection[1]->close());
+  EXPECT_TRUE(fake_upstream_connection[2]->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredTransaction) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
+
+  std::string request = makeBulkStringArray({"MULTI"}) +
+                        makeBulkStringArray({"set", "foo", "bar"}) +
+                        makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
+  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+
+  // roundtrip to cluster_0 (catch_all route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(request));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
+
+  // mirror to cluster_1 and cluster_2
+  expectUpstreamRequestResponse(fake_upstreams_[2], request, "$4\r\nbar1\r\n",
+                                fake_upstream_connection[1]);
+  expectUpstreamRequestResponse(fake_upstreams_[4], request, "$4\r\nbar2\r\n",
+                                fake_upstream_connection[2]);
+
+  redis_client->waitForData(response);
+  // The original response from the cluster_0 should be received by the fake Redis client and the
+  // response from mirrored requests are ignored.
+  EXPECT_EQ(response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  EXPECT_TRUE(fake_upstream_connection[1]->close());
+  EXPECT_TRUE(fake_upstream_connection[2]->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredWriteOnlyRequest) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
+  const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
+  const std::string& set_response = ":1\r\n";
+
+  // roundtrip to cluster_0 (write_only route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(set_request));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], set_request, set_response,
+                                fake_upstream_connection[0]);
+
+  // mirror to cluster_1
+  expectUpstreamRequestResponse(fake_upstreams_[2], set_request, ":2\r\n",
+                                fake_upstream_connection[1]);
+
+  // The original response from the cluster_1 should be received by the fake Redis client
+  redis_client->waitForData(set_response);
+  EXPECT_EQ(set_response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  EXPECT_TRUE(fake_upstream_connection[1]->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, ExcludeReadCommands) {
+  initialize();
+
+  FakeRawConnectionPtr cluster_0_connection;
+  const std::string& get_request = makeBulkStringArray({"get", "write_only:toto"});
+  const std::string& get_response = "$3\r\nbar\r\n";
+
+  // roundtrip to cluster_0 (write_only route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(get_request));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], get_request, get_response,
+                                cluster_0_connection);
+
+  // command is not mirrored to cluster 1
+  FakeRawConnectionPtr cluster_1_connection;
+  EXPECT_FALSE(fake_upstreams_[2]->waitForRawConnection(cluster_1_connection,
+                                                        std::chrono::milliseconds(500)));
+
+  redis_client->waitForData(get_response);
+  EXPECT_EQ(get_response, redis_client->data());
+
+  EXPECT_TRUE(cluster_0_connection->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithMirrorsIntegrationTest, EnabledViaRuntimeFraction) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 2> fake_upstream_connection;
+  // When random_value is < 50, the percentage:* will be mirrored, random() default is 0
+  const std::string& request = makeBulkStringArray({"get", "percentage:toto"});
+  const std::string& response = "$3\r\nbar\r\n";
+  // roundtrip to cluster_0 (catch_all route)
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(request));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], request, response, fake_upstream_connection[0]);
+
+  // mirror to cluster_1
+  expectUpstreamRequestResponse(fake_upstreams_[2], request, "$4\r\nbar1\r\n",
+                                fake_upstream_connection[1]);
+
+  redis_client->waitForData(response);
+  // The original response from the cluster_0 should be received by the fake Redis client and the
+  // response from mirrored requests are ignored.
+  EXPECT_EQ(response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  EXPECT_TRUE(fake_upstream_connection[1]->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithFaultInjectionIntegrationTest, ErrorFault) {
+  std::string fault_response =
+      fmt::format("-{}\r\n", Extensions::NetworkFilters::Common::Redis::FaultMessages::get().Error);
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"get", "foo"}), fault_response);
+
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error")->value());
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.get.error_fault")->value());
+}
+
+TEST_P(RedisProxyWithFaultInjectionIntegrationTest, DelayFault) {
+  const std::string& set_request = makeBulkStringArray({"set", "write_only:toto", "bar"});
+  const std::string& set_response = ":1\r\n";
+  initialize();
+  simpleRequestAndResponse(set_request, set_response);
+
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.success")->value());
+  EXPECT_EQ(1, test_server_->counter("redis.redis_stats.command.set.delay_fault")->value());
+}
+
+// This test sends a MULTI Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond
+// with an OK.
+
+TEST_P(RedisProxyIntegrationTest, SendMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"multi"}), "+OK\r\n");
+}
+
+// This test sends a nested MULTI Redis command from a fake
+// downstream client to the envoy proxy. Envoy will respond with an
+// error.
+
+TEST_P(RedisProxyIntegrationTest, SendNestedMulti) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"multi"}), "-MULTI calls can not be nested\r\n",
+                    redis_client);
+
+  redis_client->close();
+}
+
+// This test sends an EXEC command without a MULTI command
+// preceding it. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, ExecWithoutMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"exec"}), "-EXEC without MULTI\r\n");
+}
+
+// This test sends an DISCARD command without a MULTI command
+// preceding it. The proxy responds with an error.
+
+TEST_P(RedisProxyIntegrationTest, DiscardWithoutMulti) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"discard"}), "-DISCARD without MULTI\r\n");
+}
+
+// This test executes an empty transaction. The proxy responds
+// with an empty array.
+
+TEST_P(RedisProxyIntegrationTest, ExecuteEmptyTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"exec"}), "*0\r\n", redis_client);
+
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, UnwatchNoTransactionNoOp) {
+  initialize();
+  simpleProxyResponse(makeBulkStringArray({"unwatch"}), "+OK\r\n");
+}
+
+TEST_P(RedisProxyIntegrationTest, UnwatchWithTransactionNoOp) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client);
+
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchNoTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchUnrelatedTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyIntegrationTest, WatchUnwatchInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"watch", "foo"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn, "", "");
+
+  // MULTI will create a new connection, for the transaction.
+  FakeRawConnectionPtr fake_upstream_conn2;
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"multi"}), "+OK\r\n", redis_client,
+                          fake_upstream_conn2, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"unwatch"}), "+QUEUED\r\n", redis_client,
+                          fake_upstream_conn2, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  EXPECT_TRUE(fake_upstream_conn2->close());
+  redis_client->close();
+}
+// This test discards an empty transaction. The proxy responds
+// with an OK.
+
+TEST_P(RedisProxyIntegrationTest, DiscardEmptyTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+  proxyResponseStep(makeBulkStringArray({"discard"}), "+OK\r\n", redis_client);
+
+  redis_client->close();
+}
+
+// MultiKey commands are allowed to go through. The underlying server may fail with
+// CROSSSLOT or MOVED errors, and the client must handle it.
+TEST_P(RedisProxyIntegrationTest, MultiKeyCommandInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_conn;
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+
+  ASSERT_TRUE(redis_client->write(makeBulkStringArray({"del", "b"})));
+  expectUpstreamRequestResponse(upstream,
+                                makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"del", "b"}),
+                                "+QUEUED\r\n", fake_upstream_conn, "", "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "a"}),
+                          "-ERR MOVED 15495 0.0.0.0:6379\r\n", redis_client, fake_upstream_conn, "",
+                          "");
+
+  roundtripToUpstreamStep(upstream, makeBulkStringArray({"del", "b", "a"}),
+                          "-ERR CROSSSLOT Keys in request don't hash to the same slot\r\n",
+                          redis_client, fake_upstream_conn, "", "");
+
+  EXPECT_TRUE(fake_upstream_conn->close());
+  redis_client->close();
+}
+
+// This test verifies that a multi command is sent before the first
+// simple command of the transaction.
+
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, SendMultiBeforeCommandInTransaction) {
+  initialize();
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+
+  proxyResponseStep(makeBulkStringArray({"multi"}), "+OK\r\n", redis_client);
+
+  std::string request = makeBulkStringArray({"set", "foo", "bar"});
+  ASSERT_TRUE(redis_client->write(request));
+
+  // The upstream will receive a MULTI command before the SET command.
+  FakeUpstreamPtr& upstream = fake_upstreams_[0];
+  FakeRawConnectionPtr fake_upstream_connection;
+  std::string auth_username = "";
+  std::string auth_password = "";
+  std::string upstream_request =
+      makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"});
+  std::string upstream_response = "";
+  expectUpstreamRequestResponse(upstream, upstream_request, upstream_response,
+                                fake_upstream_connection, auth_username, auth_password);
+
+  EXPECT_TRUE(fake_upstream_connection->close());
+  redis_client->close();
+}
+
+// This test verifies that a transaction can be pipelined.
+TEST_P(RedisProxyWithCommandStatsIntegrationTest, PipelinedTransactionTest) {
+  initialize();
+
+  std::array<FakeRawConnectionPtr, 1> fake_upstream_connection;
+  std::string transaction_commands =
+      makeBulkStringArray({"MULTI"}) + makeBulkStringArray({"set", "foo", "bar"}) +
+      makeBulkStringArray({"get", "foo"}) + makeBulkStringArray({"exec"});
+  const std::string& response = "+OK\r\n+QUEUED\r\n+QUEUED\r\n*2\r\n+OK\r\n$3\r\nbar\r\n";
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  ASSERT_TRUE(redis_client->write(transaction_commands));
+
+  expectUpstreamRequestResponse(fake_upstreams_[0], transaction_commands, response,
+                                fake_upstream_connection[0]);
+
+  redis_client->waitForData(response);
+  EXPECT_EQ(response, redis_client->data());
+
+  EXPECT_TRUE(fake_upstream_connection[0]->close());
+  redis_client->close();
+}
+
+// TODO: Add full transaction test.
+
+TEST_P(RedisProxyWithExternalAuthIntegrationTest, ErrorsUntilCorrectPasswordSentExternal) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_redis_connection;
+  FakeHttpConnectionPtr fake_upstream_external_auth;
+
+  // Trying to get a key without authenticating should return NOAUTH error.
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  // Sending an AUTH command without a password should return an error.
+  std::stringstream error_response;
+  error_response << "-" << RedisCmdSplitter::Response::get().InvalidRequest << "\r\n";
+  proxyResponseStep(makeBulkStringArray({"auth"}), error_response.str(), redis_client);
+
+  // Sending an AUTH command with the wrong password should return an error.
+  proxyRequestStep(makeBulkStringArray({"auth", "wrongpassword"}), redis_client);
+  FakeStreamPtr auth_request1;
+  expectExternalAuthRequest(fake_upstream_external_auth, auth_request1, "wrongpassword");
+  sendExternalAuthResponse(auth_request1, false, 0);
+  proxyResponseOnlyStep("-ERR Unauthorized\r\n", redis_client);
+
+  // Sending a command after unsuccessful auth should return NOAUTH error.
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  // Sending an AUTH command with the correct password should return OK.
+  proxyRequestStep(makeBulkStringArray({"auth", "somepassword"}), redis_client);
+  FakeStreamPtr auth_request2;
+  expectExternalAuthRequest(fake_upstream_external_auth, auth_request2, "somepassword", true);
+  auto expiration_time = timeSystem().systemTime() + std::chrono::hours(1);
+  sendExternalAuthResponse(
+      auth_request2, true,
+      duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
+  proxyResponseOnlyStep("+OK\r\n", redis_client);
+
+  // Further requests should be successful.
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "foo"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_redis_connection, "", "");
+
+  // Expiration passes
+  timeSystem().advanceTimeWait(std::chrono::hours(2));
+
+  // Sending a command after expiration should return NOAUTH error.
+  proxyResponseStep(makeBulkStringArray({"get", "foo"}), "-NOAUTH Authentication required.\r\n",
+                    redis_client);
+
+  EXPECT_TRUE(fake_upstream_redis_connection->close());
+  EXPECT_TRUE(fake_upstream_external_auth->close());
+  redis_client->close();
+}
+
+TEST_P(RedisProxyWithExternalAuthIntegrationTest, ExternalAuthRespectsPipelining) {
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeHttpConnectionPtr fake_upstream_external_auth;
+
+  // Send an AUTH command followed immediately by a PING command should return OK and PONG.
+  proxyRequestStep(makeBulkStringArray({"AUTH", "somepassword"}), redis_client);
+  FakeStreamPtr auth_request;
+  expectExternalAuthRequest(fake_upstream_external_auth, auth_request, "somepassword");
+  auto expiration_time = timeSystem().systemTime() + std::chrono::hours(1);
+  // PING is sent before the response to the AUTH command is received.
+  proxyRequestStep(makeBulkStringArray({"PING"}), redis_client);
+  sendExternalAuthResponse(
+      auth_request, true,
+      duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch()).count());
+  proxyResponseOnlyStep("+OK\r\n+PONG\r\n", redis_client);
+
+  EXPECT_TRUE(fake_upstream_external_auth->close());
   redis_client->close();
 }
 

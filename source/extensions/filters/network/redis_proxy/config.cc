@@ -78,11 +78,10 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     aws_iam_authenticator_ =
         Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
             server_context, proto_config.settings().aws_iam());
-  if(!aws_iam_authenticator_.has_value())
-  {
+    if (!aws_iam_authenticator_.has_value()) {
       ENVOY_LOG_MISC(debug, "Redis proxy AWS IAM Authentication could not be enabled");
+    }
   }
-}
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {

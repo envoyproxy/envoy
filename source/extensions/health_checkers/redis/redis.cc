@@ -26,8 +26,7 @@ RedisHealthChecker::RedisHealthChecker(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(cluster.info(), api)),
       auth_password_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(cluster.info(), api)),
-      context_(context),
-      redis_config_(redis_config)
+      context_(context), redis_config_(redis_config)
 
 {
   if (!key_.empty()) {
@@ -77,10 +76,10 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    client_ = parent_.client_factory_.create(
-        host_, parent_.dispatcher_, redis_config_, redis_command_stats_,
-        parent_.cluster_.info()->statsScope(), parent_.auth_username_, parent_.auth_password_,
-        false);
+    client_ =
+        parent_.client_factory_.create(host_, parent_.dispatcher_, redis_config_,
+                                       redis_command_stats_, parent_.cluster_.info()->statsScope(),
+                                       parent_.auth_username_, parent_.auth_password_, false);
     client_->addConnectionCallbacks(*this);
   }
 

@@ -86,10 +86,9 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
       .WillOnce(testing::DoAll(testing::SaveArg<0>(&capture), testing::Return(true)));
   // We should get a write from the auth command
   EXPECT_CALL(*mock_connection, write(_, _)).Times(0);
-  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client = factory.create(
-      host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username", "password",
-      false,
-      context_);
+  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client =
+      factory.create(host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username",
+                     "password", false, context_);
 
   Common::Redis::RespValue request1;
   Client::MockClientCallbacks callbacks;
@@ -130,9 +129,9 @@ TEST_F(AwsIamAuthenticatorTest, UsernameNotConfigured) {
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
   EXPECT_CALL(*mock_authenticator, addCallbackIfCredentialsPending(_)).Times(0);
 
-  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client = factory.create(
-      host, dispatcher, config, redis_command_stats, *stats.rootScope(), "", "password", false,
-      context_);
+  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client =
+      factory.create(host, dispatcher, config, redis_command_stats, *stats.rootScope(), "",
+                     "password", false, context_);
 
   client->close();
 }

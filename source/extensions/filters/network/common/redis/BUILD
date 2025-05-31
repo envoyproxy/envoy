@@ -30,11 +30,11 @@ envoy_cc_library(
     deps = [
         ":utility_lib",
         "//source/extensions/common/aws:credential_provider_chains_lib",
+        "//source/extensions/common/aws:region_provider_impl_lib",
         "//source/extensions/common/aws:signer_interface",
         "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
-        "//source/extensions/common/aws:region_provider_impl_lib"
     ],
 )
 

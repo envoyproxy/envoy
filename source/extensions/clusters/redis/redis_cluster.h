@@ -267,7 +267,10 @@ private:
     void finishClusterHostnameResolution(ClusterSlotsSharedPtr slots);
     void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
 
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig() const override { return absl::nullopt;};
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+    awsIamConfig() const override {
+      return absl::nullopt;
+    };
 
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;

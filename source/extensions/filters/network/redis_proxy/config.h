@@ -86,7 +86,7 @@ private:
 
   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
-      Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr auth_;
+  Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr auth_;
 };
 
 } // namespace RedisProxy

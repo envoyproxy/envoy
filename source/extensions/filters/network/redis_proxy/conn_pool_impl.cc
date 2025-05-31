@@ -62,15 +62,14 @@ void InstanceImpl::init() {
   // That may be shorter than the tls callback if the listener is torn down shortly after it is
   // created. We use a weak pointer to make sure this object outlives the tls callbacks.
   std::weak_ptr<InstanceImpl> this_weak_ptr = this->shared_from_this();
-  tls_->set(
-      [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        if (auto this_shared_ptr = this_weak_ptr.lock()) {
-          return std::make_shared<ThreadLocalPool>(
-              this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_,
-              this_shared_ptr->dns_cache_);
-        }
-        return nullptr;
-      });
+  tls_->set([this_weak_ptr](
+                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    if (auto this_shared_ptr = this_weak_ptr.lock()) {
+      return std::make_shared<ThreadLocalPool>(
+          this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->dns_cache_);
+    }
+    return nullptr;
+  });
 }
 
 uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().shardSize(); }
@@ -105,8 +104,7 @@ InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache
-    )
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),

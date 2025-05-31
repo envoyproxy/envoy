@@ -189,8 +189,8 @@ public:
   virtual bool connectionRateLimitEnabled() const PURE;
   virtual uint32_t connectionRateLimitPerSec() const PURE;
 
-   virtual absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig() const PURE;
-
+  virtual absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+  awsIamConfig() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<const Config>;
@@ -213,11 +213,11 @@ public:
    * @param is_transaction_client true if this client was created to relay a transaction.
    * @return ClientPtr a new connection pool client.
    */
-  virtual ClientPtr
-  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-         const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
-         Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
-         bool is_transaction_client) PURE;
+  virtual ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                           const ConfigSharedPtr& config,
+                           const RedisCommandStatsSharedPtr& redis_command_stats,
+                           Stats::Scope& scope, const std::string& auth_username,
+                           const std::string& auth_password, bool is_transaction_client) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

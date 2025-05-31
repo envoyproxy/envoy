@@ -42,8 +42,7 @@ public:
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
       Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-      Server::Configuration::ServerFactoryContext& context
-          );
+      Server::Configuration::ServerFactoryContext& context);
 
   static const NetworkFilters::Common::Redis::RespValue& pingHealthCheckRequest() {
     static HealthCheckRequest* request = new HealthCheckRequest();
@@ -66,12 +65,12 @@ private:
   RedisHealthCheckerStats generateRedisStats(Stats::Scope& scope);
 
   struct RedisConfig : public Extensions::NetworkFilters::Common::Redis::Client::Config {
-    RedisConfig(std::chrono::milliseconds timeout, const envoy::extensions::health_checkers::redis::v3::Redis& config) : parent_timeout_(timeout) {
-        if (config.has_aws_iam())
-  {
-    aws_iam_config_ = config.aws_iam();
-  }
-
+    RedisConfig(std::chrono::milliseconds timeout,
+                const envoy::extensions::health_checkers::redis::v3::Redis& config)
+        : parent_timeout_(timeout) {
+      if (config.has_aws_iam()) {
+        aws_iam_config_ = config.aws_iam();
+      }
     }
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
@@ -100,7 +99,10 @@ private:
     bool enableCommandStats() const override { return false; }
     bool connectionRateLimitEnabled() const override { return false; }
     uint32_t connectionRateLimitPerSec() const override { return 0; }
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig() const override { return aws_iam_config_;};
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+    awsIamConfig() const override {
+      return aws_iam_config_;
+    };
 
     const std::chrono::milliseconds parent_timeout_;
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
@@ -130,7 +132,8 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     RedisHealthChecker& parent_;
-    std::shared_ptr<RedisConfig> redis_config_{std::make_shared<RedisConfig>(parent_.timeout_, parent_.redis_config_)};
+    std::shared_ptr<RedisConfig> redis_config_{
+        std::make_shared<RedisConfig>(parent_.timeout_, parent_.redis_config_)};
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
     Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;

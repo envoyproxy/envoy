@@ -1,9 +1,10 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 
-#include "client.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 #include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
+
+#include "client.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,11 +18,9 @@ namespace {
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 
 // Custom authentication callback handler for AWS IAM authentication
-class AuthCallbackHandler : public DoNothingPoolCallbacks
-{
-  void onResponse(Common::Redis::RespValuePtr&& resp) override
-  {
-    ENVOY_LOG_MISC(debug, "AWS IAM Authentication Response: {}",resp->toString());
+class AuthCallbackHandler : public DoNothingPoolCallbacks {
+  void onResponse(Common::Redis::RespValuePtr&& resp) override {
+    ENVOY_LOG_MISC(debug, "AWS IAM Authentication Response: {}", resp->toString());
   }
 };
 
@@ -71,31 +70,32 @@ ConfigImpl::ConfigImpl(
     connection_rate_limit_enabled_ = false;
     connection_rate_limit_per_sec_ = 100;
   }
-  if (config.has_aws_iam())
-  {
+  if (config.has_aws_iam()) {
     aws_iam_config_ = config.aws_iam();
   }
 }
 
-ClientPtr ClientImpl::create(
-    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-    DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
-    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    bool is_transaction_client, const std::string& auth_username, const std::string& auth_password) {
+ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                             EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                             const ConfigSharedPtr& config,
+                             const RedisCommandStatsSharedPtr& redis_command_stats,
+                             Stats::Scope& scope, bool is_transaction_client,
+                             const std::string& auth_username, const std::string& auth_password) {
 
-  auto client = std::make_unique<ClientImpl>(
-      host, dispatcher, std::move(encoder), decoder_factory, config, redis_command_stats, scope,
-      is_transaction_client, auth_username, auth_password);
+  auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
+                                             config, redis_command_stats, scope,
+                                             is_transaction_client, auth_username, auth_password);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
   client->connection_->noDelay(true);
 
-  if (config->awsIamConfig().has_value() && AwsIamAuthenticator::AwsIamAuthenticatorFactory::getInstance().has_value()) {
+  if (config->awsIamConfig().has_value() &&
+      AwsIamAuthenticator::AwsIamAuthenticatorFactory::getInstance().has_value()) {
     if (auth_username.empty()) {
       ENVOY_LOG(error, "Redis proxy has AWS IAM Authentication enabled, but auth_username is not "
-                      "set in the cluster configuration. IAM Authentication will be disabled.");
+                       "set in the cluster configuration. IAM Authentication will be disabled.");
     } else {
       client->sendAwsIamAuth(auth_username);
     }
@@ -107,31 +107,33 @@ ClientPtr ClientImpl::create(
 void ClientImpl::sendAwsIamAuth(const std::string& auth_username) {
   queueRequests(true);
   auto add_auth = [this, auth_username]() {
-    const auto auth_password = AwsIamAuthenticator::AwsIamAuthenticatorFactory::getInstance().value()->getAuthToken(auth_username);
+    const auto auth_password =
+        AwsIamAuthenticator::AwsIamAuthenticatorFactory::getInstance().value()->getAuthToken(
+            auth_username);
     Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
         auth_username, auth_password);
     makeRequestImmediate(auth_request, auth_callbacks);
     queueRequests(false);
   };
 
-  if (AwsIamAuthenticator::AwsIamAuthenticatorFactory::getInstance().value()->addCallbackIfCredentialsPending(
-          [add_auth]() { add_auth(); }) == false) {
+  if (AwsIamAuthenticator::AwsIamAuthenticatorFactory::getInstance()
+          .value()
+          ->addCallbackIfCredentialsPending([add_auth]() { add_auth(); }) == false) {
     add_auth();
   }
 }
 
-ClientImpl::ClientImpl(
-    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-    DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
-    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    bool is_transaction_client, const std::string&, const std::string&)
+ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+                       EncoderPtr&& encoder, DecoderFactory& decoder_factory,
+                       const ConfigSharedPtr& config,
+                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+                       bool is_transaction_client, const std::string&, const std::string&)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope), is_transaction_client_(is_transaction_client)
-      {
+      scope_(scope), is_transaction_client_(is_transaction_client) {
 
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
   traffic_stats.upstream_cx_total_.inc();
@@ -175,8 +177,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   pending_requests_.emplace_back(*this, callbacks, command);
   encoder_->encode(request, encoder_buffer_);
 
-  if(!queue_enabled_)
-  {
+  if (!queue_enabled_) {
     // If buffer is full, flush. If the buffer was empty before the request, start the timer.
     // if (!queue_enabled_ && encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
     if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
@@ -385,15 +386,15 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
-ClientPtr ClientFactoryImpl::create(
-    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
-    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    const std::string& auth_username, const std::string& auth_password, bool is_transaction_client) {
+ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
+                                    Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
+                                    const RedisCommandStatsSharedPtr& redis_command_stats,
+                                    Stats::Scope& scope, const std::string& auth_username,
+                                    const std::string& auth_password, bool is_transaction_client) {
 
-  ClientPtr client =
-      ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
-                         redis_command_stats, scope, is_transaction_client, auth_username,
-                         auth_password);
+  ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
+                                        decoder_factory_, config, redis_command_stats, scope,
+                                        is_transaction_client, auth_username, auth_password);
 
   if (!config->awsIamConfig().has_value()) {
     client->initialize(auth_username, auth_password);
