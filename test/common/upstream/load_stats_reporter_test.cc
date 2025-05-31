@@ -300,49 +300,54 @@ void addStatExpectation(envoy::config::endpoint::v3::UpstreamLocalityStats* stat
 // endpoint-level granularity load metrics when the feature is enabled. It sets
 // up a cluster with a host, simulates load metrics, and ensures that the
 // generated load report includes the expected endpoint-level statistics.
-TEST_F(LoadStatsReporterTest, EndpointLevelGranularityLoadReport) {
+TEST_F(LoadStatsReporterTest, EndpointLevelLoadStatsReporting) {
   // Enable endpoint granularity
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   createLoadStatsReporter();
-  time_system_.setMonotonicTime(std::chrono::microseconds(0));
+  time_system_.setMonotonicTime(std::chrono::microseconds(100));
 
-  // Set up cluster and host
   NiceMock<MockClusterMockPrioritySet> cluster;
   MockHostSet& host_set = *cluster.prioritySet().getMockHostSet(0);
-  envoy::config::core::v3::Locality locality;
-  locality.set_region("us-central");
+  ::envoy::config::core::v3::Locality locality;
+  locality.set_region("test_region");
+
   HostSharedPtr host = makeTestHost("host", locality);
   host_set.hosts_per_locality_ = makeHostsPerLocality({{host}});
-  addStats(host, 2.5);
+  addStats(host, 10.0);
 
-  cluster.info_->eds_service_name_ = "svc";
-  MockClusterManager::ClusterInfoMaps cluster_info{{{"test_cluster", cluster}}, {}, {}};
-  ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_info));
+  cluster.info_->eds_service_name_ = "eds_service_for_foo";
 
-  // Deliver response with endpoint granularity enabled
-  deliverLoadStatsResponse({"test_cluster"}, true);
-
-  // Advance time and expect endpoint stats in report
-  time_system_.setMonotonicTime(std::chrono::microseconds(1000000));
+  ON_CALL(cm_, getActiveCluster("foo"))
+      .WillByDefault(Return(OptRef<const Upstream::Cluster>(cluster)));
+  deliverLoadStatsResponse({"foo"}, true);
+  time_system_.setMonotonicTime(std::chrono::microseconds(101));
   {
     envoy::config::endpoint::v3::ClusterStats expected_cluster_stats;
-    expected_cluster_stats.set_cluster_name("test_cluster");
-    expected_cluster_stats.set_cluster_service_name("svc");
-    expected_cluster_stats.mutable_load_report_interval()->set_seconds(1);
 
-    auto* locality_stats = expected_cluster_stats.add_upstream_locality_stats();
-    locality_stats->mutable_locality()->set_region("us-central");
-    locality_stats->set_total_successful_requests(1);
-    locality_stats->set_total_issued_requests(1);
-    addStatExpectation(locality_stats, "metric_a", 1, 2.5);
+    expected_cluster_stats.set_cluster_name("foo");
+    expected_cluster_stats.set_cluster_service_name("eds_service_for_foo");
+    expected_cluster_stats.mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(1));
 
-    auto* endpoint_stats = locality_stats->add_upstream_endpoint_stats();
+    auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
+    expected_locality_stats->mutable_locality()->MergeFrom(locality);
+    expected_locality_stats->set_priority(0);
+    expected_locality_stats->set_total_successful_requests(1);
+    expected_locality_stats->set_total_issued_requests(1);
+    addStatExpectation(expected_locality_stats, "metric_a", 1, 10.0);
+
+    auto* endpoint_stats = expected_locality_stats->add_upstream_endpoint_stats();
     endpoint_stats->mutable_address()->mutable_socket_address()->set_address("127.0.0.1");
     endpoint_stats->mutable_address()->mutable_socket_address()->set_port_value(80);
-    addEndpointStatExpectation(endpoint_stats, "metric_a", 1, 2.5);
+    endpoint_stats->set_total_successful_requests(1);
+    endpoint_stats->set_total_issued_requests(1);
+    addEndpointStatExpectation(endpoint_stats, "metric_a", 1, 10.0);
 
-    expectSendMessage({expected_cluster_stats});
+    std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
+        expected_cluster_stats};
+
+    expectSendMessage(expected_cluster_stats_vector);
   }
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000), _));
   response_timer_cb_();

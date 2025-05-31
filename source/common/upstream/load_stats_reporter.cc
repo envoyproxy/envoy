@@ -3,6 +3,7 @@
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -85,6 +86,16 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
         LoadMetricStats::StatMap load_metrics;
+
+        // Store per-host stats for endpoint granularity reporting
+        struct EndpointStats {
+          uint64_t rq_success;
+          uint64_t rq_error;
+          uint64_t rq_active;
+          uint64_t rq_issued;
+        };
+        absl::flat_hash_map<const Host*, EndpointStats> endpoint_stats_map;
+
         for (const HostSharedPtr& host : hosts) {
           uint64_t host_rq_success = host->stats().rq_success_.latch();
           uint64_t host_rq_error = host->stats().rq_error_.latch();
@@ -106,7 +117,11 @@ void LoadStatsReporter::sendLoadStatsRequest() {
               }
             }
           }
+          // Store endpoint stats for this host
+          endpoint_stats_map[host.get()] = {host_rq_success, host_rq_error, host_rq_active,
+                                            host_rq_issued};
         }
+
         bool should_send_locality_stats = rq_success + rq_error + rq_active != 0;
         if (Runtime::runtimeFeatureEnabled(
                 "envoy.reloadable_features.report_load_with_rq_issued")) {
@@ -127,31 +142,29 @@ void LoadStatsReporter::sendLoadStatsRequest() {
                 metric.second.num_requests_with_metric);
             load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
           }
-          // check if endpoint granularity should be reported
+          // Check if endpoint granularity should be reported.
           if (message_->report_endpoint_granularity()) {
             for (const HostSharedPtr& host : hosts) {
-              ENVOY_LOG(info, "Load report endpoint {}:{} count {}", host->address()->asString(),
+              ENVOY_LOG(trace, "Load report endpoint {}:{} count {}", host->address()->asString(),
                         host->address()->ip()->port(), hosts.size());
-              // add upstream endpoint stats to locality stats
+              // Add upstream endpoint stats to locality stats.
               auto* const upstream_endpoint_stats = locality_stats->add_upstream_endpoint_stats();
-              // add address and socket address port
-              auto* const address = upstream_endpoint_stats->mutable_address();
-              auto* const socket_address = address->mutable_socket_address();
-              socket_address->set_address(host->address()->ip()->addressAsString());
-              socket_address->set_port_value(host->address()->ip()->port());
+              // Add address to upstream endpoint stats.
+              Network::Utility::addressToProtobufAddress(
+                  *host->address(), *upstream_endpoint_stats->mutable_address());
 
-              // add endpoint stats (successful requests, requests in progress, error requests, and
-              // issued requests)
-              upstream_endpoint_stats->set_total_successful_requests(
-                  host->stats().rq_success_.latch());
-              upstream_endpoint_stats->set_total_requests_in_progress(
-                  host->stats().rq_active_.value());
-              upstream_endpoint_stats->set_total_error_requests(host->stats().rq_error_.latch());
-              upstream_endpoint_stats->set_total_issued_requests(host->stats().rq_total_.latch());
+              // Add endpoint stats (successful requests, requests in progress, error requests, and
+              // issued requests).
+              const auto& stats = endpoint_stats_map[host.get()];
+              upstream_endpoint_stats->set_total_successful_requests(stats.rq_success);
+              upstream_endpoint_stats->set_total_requests_in_progress(stats.rq_active);
+              upstream_endpoint_stats->set_total_error_requests(stats.rq_error);
+              upstream_endpoint_stats->set_total_issued_requests(stats.rq_issued);
 
-              // add load metric stats
+              // Add load metric stats.
               for (const auto& metric : load_metrics) {
-                auto* const endpoint_metric_stats = upstream_endpoint_stats->add_load_metric_stats();
+                auto* const endpoint_metric_stats =
+                    upstream_endpoint_stats->add_load_metric_stats();
                 endpoint_metric_stats->set_metric_name(metric.first);
                 endpoint_metric_stats->set_num_requests_finished_with_metric(
                     metric.second.num_requests_with_metric);
