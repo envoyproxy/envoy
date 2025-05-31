@@ -759,9 +759,9 @@ public:
 //                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
 //                          TestUtility::ipTestParamsToString);
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 // INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
 //                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),

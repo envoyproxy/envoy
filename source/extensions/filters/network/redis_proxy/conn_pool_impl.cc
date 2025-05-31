@@ -50,12 +50,13 @@ InstanceImpl::InstanceImpl(
     Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
       stats_scope_(std::move(stats_scope)), redis_command_stats_(redis_command_stats),
       redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache) {}
+      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache), aws_iam_authenticator_(aws_iam_authenticator) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
@@ -104,14 +105,15 @@ InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator
+)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
-      dns_cache_(dns_cache),
-      drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
-      client_factory_(parent->client_factory_), config_(parent->config_),
-      stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
-      redis_cluster_stats_(parent->redis_cluster_stats_),
-      refresh_manager_(parent->refresh_manager_) {
+      dns_cache_(dns_cache), drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
+      client_factory_(parent->client_factory_),
+      config_(parent->config_), stats_scope_(parent->stats_scope_),
+      redis_command_stats_(parent->redis_command_stats_), redis_cluster_stats_(parent->redis_cluster_stats_),
+      refresh_manager_(parent->refresh_manager_),
+      aws_iam_authenticator_(aws_iam_authenticator) {
 
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
@@ -278,7 +280,7 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
       client->host_ = host;
       client->redis_client_ =
           client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
-                                 auth_username_, auth_password_, false);
+                                 auth_username_, auth_password_, false, aws_iam_authenticator_);
 
       client->redis_client_->addConnectionCallbacks(*client);
     }
@@ -441,7 +443,7 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& h
   if (transaction.active_ && !transaction.connection_established_) {
     transaction.clients_[client_idx] =
         client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_, true);
+                               auth_username_, auth_password_, true, aws_iam_authenticator_);
     if (transaction.connection_cb_) {
       transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }

@@ -65,7 +65,8 @@ public:
       Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
-      const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache);
+      const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator);
   uint16_t shardSize() override;
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
@@ -152,7 +153,8 @@ private:
                            public Logger::Loggable<Logger::Id::redis> {
     ThreadLocalPool(std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
                     std::string cluster_name,
-                    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache);
+                    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache, 
+                  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
     uint16_t shardSize();
@@ -212,6 +214,7 @@ private:
     Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
     RedisClusterStats redis_cluster_stats_;
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator_;
   };
 
   const std::string cluster_name_;
@@ -225,6 +228,7 @@ private:
   RedisClusterStats redis_cluster_stats_;
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
+  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator_;
 };
 
 } // namespace ConnPool

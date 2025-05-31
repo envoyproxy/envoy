@@ -19,33 +19,13 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::authent
 
 SINGLETON_MANAGER_REGISTRATION(aws_iam_authenticator);
 
-AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(absl::string_view cache_name,
-                                                 absl::string_view region,
-                                                 Envoy::Extensions::Common::Aws::SignerPtr signer)
-    : signer_(std::move(signer)), cache_name_(std::string(cache_name)), region_(region) {
-
-      
+AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Envoy::Extensions::Common::Aws::SignerPtr signer)
+    : signer_(std::move(signer)) {
     }
-
-void AwsIamAuthenticatorImpl::shutDown() { ENVOY_LOG_MISC(debug, "***************** calling shutdon");signer_.reset(); }
 
 absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
     Server::Configuration::ServerFactoryContext& context,
     envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config) {
-
-//   // Make sure we clean up the signer early
-//   shutdown_handle_ = context.lifecycleNotifier().registerCallback(
-//       Server::ServerLifecycleNotifier::Stage::ShutdownExit, []() {
-//         if (authenticator_handle_.has_value()) {
-//           authenticator_handle_.value()->shutDown();
-//         }
-//       });
-
-//       auto authenticator = std::make_shared<AwsIamAuthenticatorImpl>(
-//     aws_iam_config.cache_name(), region, std::move(signer));
-
-
-// return authenticator;
 
   absl::StatusOr<Extensions::Common::Aws::CredentialsProviderChainSharedPtr>
       credentials_provider_chain;
@@ -90,10 +70,10 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
     return absl::nullopt;
   }
 
-  authenticator_handle_ = context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
-      SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
-      [&aws_iam_config, region, &credentials_provider_chain,
-       &context]() -> std::shared_ptr<Singleton::Instance> {
+  // authenticator_handle_ = context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
+  //     SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
+  //     [&aws_iam_config, region, &credentials_provider_chain,
+  //      &context]() -> std::shared_ptr<Singleton::Instance> {
         auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
             aws_iam_config.service_name().empty() ? DEFAULT_SERVICE_NAME
                                                   : aws_iam_config.service_name(),
@@ -101,20 +81,11 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
             Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
             PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60));
 
-        return std::make_shared<AwsIamAuthenticatorImpl>(aws_iam_config.cache_name(), region,
-                                                         std::move(signer));
-      },
-      false);
+        return std::make_shared<AwsIamAuthenticatorImpl>(std::move(signer));
+  //     },
+  //     false);
 
-    authenticator_handle_.value()->shutdown_handle_ = context.lifecycleNotifier().registerCallback(
-    Server::ServerLifecycleNotifier::Stage::ShutdownExit,
-    [authenticator_weak = std::weak_ptr<AwsIamAuthenticatorImpl>(authenticator_handle_.value())]() {
-      if (auto authenticator = authenticator_weak.lock()) {
-        authenticator->shutDown();
-      }
-    });
-
-  return authenticator_handle_;
+  // return authenticator_handle_;
 
   // aws_cluster_manager_ =
   //     context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
@@ -129,18 +100,18 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
   // std::move(signer) );
 }
 
-std::string AwsIamAuthenticatorImpl::getAuthToken(std::string auth_user) {
+std::string AwsIamAuthenticatorImpl::getAuthToken(absl::string_view auth_user, absl::string_view cache_name) {
   ENVOY_LOG(debug, "Generating new AWS IAM authentication token");
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  message.headers().setHost(cache_name_);
+  message.headers().setHost(cache_name);
   message.headers().setPath(fmt::format("/?Action=connect&User={}",
                                         Envoy::Http::Utility::PercentEncoding::encode(auth_user)));
 
   auto status = signer_->sign(message, true, region_);
 
-  auth_token_ = cache_name_ + std::string(message.headers().getPathValue());
+  auth_token_ = std::string(cache_name) + std::string(message.headers().getPathValue());
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
 
@@ -153,7 +124,7 @@ std::string AwsIamAuthenticatorImpl::getAuthToken(std::string auth_user) {
   }
   auto sanitised_query_string =
       query_params.replaceQueryString(Http::HeaderString(message.headers().getPathValue()));
-  ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", cache_name_,
+  ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", cache_name,
             sanitised_query_string);
   return auth_token_;
 }

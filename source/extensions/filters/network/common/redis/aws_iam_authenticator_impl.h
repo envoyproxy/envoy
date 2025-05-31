@@ -19,38 +19,31 @@ static constexpr uint16_t AwsIamDefaultExpiration = 60;
 constexpr char DEFAULT_SERVICE_NAME[] = "elasticache";
 } // namespace
 
-class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws>,
-                                public Singleton::Instance {
+class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
 public:
-  ~AwsIamAuthenticatorBase() override = default;
-  virtual std::string getAuthToken(std::string auth_user) PURE;
+  virtual ~AwsIamAuthenticatorBase() = default;
+  virtual std::string getAuthToken(absl::string_view auth_user, absl::string_view cache_name) PURE;
   virtual bool
   addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb) PURE;
-  virtual void shutDown() PURE;
 
 };
 
 class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
 public:
-  AwsIamAuthenticatorImpl(absl::string_view cache_name, absl::string_view region,
-                          Envoy::Extensions::Common::Aws::SignerPtr signer);
+  AwsIamAuthenticatorImpl(Envoy::Extensions::Common::Aws::SignerPtr signer);
   ~AwsIamAuthenticatorImpl() override {
-    shutdown_handle_.reset();
+    signer_.reset();
   }
-
+  
   bool addCallbackIfCredentialsPending(
       Extensions::Common::Aws::CredentialsPendingCallback&& cb) override {
     return signer_->addCallbackIfCredentialsPending(std::move(cb));
   };
 
-  std::string getAuthToken(std::string auth_user) override;
-  void shutDown() override;
-  Server::ServerLifecycleNotifier::HandlePtr shutdown_handle_;
+  std::string getAuthToken(absl::string_view auth_user, absl::string_view cache_name) override;
 
 private:
   Envoy::Extensions::Common::Aws::SignerPtr signer_;
-  const std::string auth_user_;
-  std::string cache_name_;
   std::string auth_token_;
   std::string region_;
 
@@ -63,11 +56,7 @@ public:
   static absl::optional<AwsIamAuthenticatorSharedPtr> initAwsIamAuthenticator(
       Server::Configuration::ServerFactoryContext& context,
       envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config);
-  static absl::optional<AwsIamAuthenticatorSharedPtr> getInstance() {
-    return authenticator_handle_;
-  }
 
-  static absl::optional<AwsIamAuthenticatorSharedPtr> authenticator_handle_;
 };
 
 } // namespace AwsIamAuthenticator

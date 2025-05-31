@@ -33,7 +33,7 @@ message RedisProxy {
       "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
 
   // Redis connection pool settings.
-  // [#next-free-field: 12]
+  // [#next-free-field: 11]
   message ConnPoolSettings {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
@@ -134,8 +134,6 @@ message RedisProxy {
     // storm to busy redis server. This config is a protection to rate limit reconnection rate.
     // If not set, there will be no rate limiting on the reconnection.
     ConnectionRateLimit connection_rate_limit = 10;
-
-    AwsIam aws_iam = 11;
   }
 
   message PrefixRoutes {
@@ -392,6 +390,8 @@ message RedisProtocolOptions {
   // If `aws_iam` is set, this field will be used as the authenticating user for redis IAM authentication.
   // See `Create a new IAM-enabled user` under `Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_ for more details.
   config.core.v3.DataSource auth_username = 2 [(udpa.annotations.sensitive) = true];
+
+  AwsIam aws_iam = 3;
 }
 
 // [#next-free-field: 6]

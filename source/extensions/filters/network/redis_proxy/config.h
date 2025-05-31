@@ -42,6 +42,15 @@ public:
     return EMPTY_STRING;
   }
 
+  static absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig(const Upstream::ClusterInfoConstSharedPtr info) {
+    auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
+        NetworkFilterNames::get().RedisProxy);
+    if (options && options->proto_config_.has_aws_iam()) {
+      return options->proto_config_.aws_iam();
+    }
+    return absl::nullopt;
+  }
+
   std::string authPassword(Api::Api& api) const {
     return THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password_, true, api), std::string);
   }
