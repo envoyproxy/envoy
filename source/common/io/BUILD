@@ -11,27 +11,33 @@ envoy_package()
 envoy_cc_library(
     name = "io_uring_impl_lib",
     srcs = select({
-        "//bazel:linux": ["io_uring_impl.cc"],
+        "//bazel:liburing_enabled": ["io_uring_impl.cc"],
         "//conditions:default": [],
     }),
-    hdrs = [
-        "io_uring_impl.h",
-    ],
+    hdrs = select({
+        "//bazel:liburing_enabled": ["io_uring_impl.h"],
+        "//conditions:default": [],
+    }),
     tags = ["nocompdb"],
     deps = [
-        "//bazel/foreign_cc:liburing_linux",
         "//envoy/common/io:io_uring_interface",
         "//envoy/thread_local:thread_local_interface",
-    ],
+    ] + select({
+        "//bazel:liburing_enabled": ["//bazel/foreign_cc:liburing_linux"],
+        "//conditions:default": [],
+    }),
 )
 
 envoy_cc_library(
     name = "io_uring_worker_lib",
     srcs = select({
-        "//bazel:linux": ["io_uring_worker_impl.cc"],
+        "//bazel:liburing_enabled": ["io_uring_worker_impl.cc"],
         "//conditions:default": [],
     }),
-    hdrs = ["io_uring_worker_impl.h"],
+    hdrs = select({
+        "//bazel:liburing_enabled": ["io_uring_worker_impl.h"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":io_uring_impl_lib",
         "//envoy/common/io:io_uring_interface",
@@ -43,8 +49,14 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "io_uring_worker_factory_impl_lib",
-    srcs = ["io_uring_worker_factory_impl.cc"],
-    hdrs = ["io_uring_worker_factory_impl.h"],
+    srcs = select({
+        "//bazel:liburing_enabled": ["io_uring_worker_factory_impl.cc"],
+        "//conditions:default": [],
+    }),
+    hdrs = select({
+        "//bazel:liburing_enabled": ["io_uring_worker_factory_impl.h"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":io_uring_worker_lib",
         "//envoy/common/io:io_uring_interface",

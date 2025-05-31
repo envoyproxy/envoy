@@ -11,7 +11,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/win32_socket_handle_impl.h"
 
-#if defined(__linux__) && !defined(__ANDROID_API__)
+#if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
 #include "source/common/io/io_uring_worker_factory_impl.h"
 #include "source/common/io/io_uring_impl.h"
 #include "source/common/network/io_uring_socket_handle_impl.h"
@@ -40,7 +40,7 @@ IoHandlePtr SocketInterfaceImpl::makePlatformSpecificSocket(
   if constexpr (Event::PlatformDefaultTriggerType == Event::FileTriggerType::EmulatedEdge) {
     return std::make_unique<Win32SocketHandleImpl>(socket_fd, socket_v6only, domain);
   }
-#if defined(__linux__) && !defined(__ANDROID_API__)
+#if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
   // Only create IoUringSocketHandleImpl when the IoUringWorkerFactory has been created and it has
   // been registered in the TLS, initialized. There are cases that test may create threads before
   // IoUringWorkerFactory has been added to the TLS and got initialized.
@@ -167,7 +167,7 @@ bool SocketInterfaceImpl::ipFamilySupported(int domain) {
 Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
     [[maybe_unused]] const Protobuf::Message& config,
     [[maybe_unused]] Server::Configuration::ServerFactoryContext& context) {
-#if defined(__linux__) && !defined(__ANDROID_API__)
+#if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::network::socket_interface::v3::DefaultSocketInterface&>(
       config, context.messageValidationVisitor());
