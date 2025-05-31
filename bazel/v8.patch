@@ -38,12 +38,13 @@ index e957c0f..0327669 100644
                  "-std=c++17",
              ],
              "@v8//bazel/config:is_gcc": [
-@@ -131,6 +132,8 @@ def _default_args():
+@@ -131,6 +132,9 @@ def _default_args():
                  "-Wno-redundant-move",
                  "-Wno-return-type",
                  "-Wno-stringop-overflow",
 +                "-Wno-nonnull",
 +                "-Wno-pessimizing-move",
++                "-Wno-dangling-pointer",
                  # Use GNU dialect, because GCC doesn't allow using
                  # ##__VA_ARGS__ when in standards-conforming mode.
                  "-std=gnu++17",

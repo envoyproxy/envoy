@@ -393,15 +393,12 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
       connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
     }
   }
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
-    Http::HttpServerPropertiesCacheManager& cache_manager =
-        server_->httpServerPropertiesCacheManager();
+  Http::HttpServerPropertiesCacheManager& cache_manager =
+      server_->httpServerPropertiesCacheManager();
 
-    Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
-        [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
-    cache_manager.forEachThreadLocalCache(clear_brokenness);
-  }
+  Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+      [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+  cache_manager.forEachThreadLocalCache(clear_brokenness);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
     Http::HttpServerPropertiesCacheManager& cache_manager =
         server_->httpServerPropertiesCacheManager();
@@ -411,7 +408,12 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
     cache_manager.forEachThreadLocalCache(reset_status);
   }
   if (!disable_dns_refresh_on_network_change_) {
-    connectivity_manager_->refreshDns(configuration, true);
+    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
+  } else if (Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.drain_pools_on_network_change")) {
+    ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
+    connectivity_manager_->clusterManager().drainConnections(
+        [](const Upstream::Host&) { return true; });
   }
 }
 
