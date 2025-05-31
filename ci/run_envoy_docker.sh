@@ -2,6 +2,10 @@
 
 set -e
 
+# HACK: REMOVE
+
+sudo rm -rf /opt/hostedtoolcache
+
 CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 # shellcheck source=ci/envoy_build_sha.sh
@@ -31,7 +35,7 @@ if is_windows; then
   SOURCE_DIR_MOUNT_DEST=C:/source
   START_COMMAND=("bash" "-c" "cd /c/source && export HOME=/c/build && $*")
 else
-  [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build-ubuntu"
+  [[ -z "${IMAGE_NAME}" ]] && IMAGE_NAME="envoyproxy/envoy-build"
   # We run as root and later drop permissions. This is required to setup the USER
   # in useradd below, which is need for correct Python execution in the Docker
   # environment.
@@ -39,7 +43,8 @@ else
   DOCKER_USER_ARGS=()
   DOCKER_GROUP_ARGS=()
   DEFAULT_ENVOY_DOCKER_BUILD_DIR=/tmp/envoy-docker-build
-  USER_UID="$(id -u)"
+  BUILD_UID="$(id -u)"
+  export BUILD_UID
   USER_GID="$(id -g)"
   if [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
       ENVOY_DOCKER_OPTIONS+=(-v /var/run/docker.sock:/var/run/docker.sock)
@@ -57,12 +62,7 @@ else
   START_COMMAND=(
       "/bin/bash"
       "-lc"
-      "groupadd ${DOCKER_GROUP_ARGS[*]} -f envoygroup \
-          && useradd -o --uid ${USER_UID} ${DOCKER_USER_ARGS[*]} --no-create-home --home-dir /build envoybuild \
-          && usermod -a -G pcap envoybuild \
-          && chown envoybuild:envoygroup /build \
-          && chown envoybuild /proc/self/fd/2 \
-          && sudo -EHs -u envoybuild bash -c 'cd ${ENVOY_DOCKER_SOURCE_DIR} && $*'")
+      "$*")
 fi
 
 if [[ -n "$ENVOY_DOCKER_PLATFORM" ]]; then
@@ -88,7 +88,7 @@ mkdir -p "${ENVOY_DOCKER_BUILD_DIR}"
 [[ -f .git ]] && [[ ! -d .git ]] && ENVOY_DOCKER_OPTIONS+=(-v "$(git rev-parse --git-common-dir):$(git rev-parse --git-common-dir)")
 [[ -n "${SSH_AUTH_SOCK}" ]] && ENVOY_DOCKER_OPTIONS+=(-v "${SSH_AUTH_SOCK}:${SSH_AUTH_SOCK}" -e SSH_AUTH_SOCK)
 
-export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:${IMAGE_ID}"
+export ENVOY_BUILD_IMAGE="${IMAGE_NAME}:ci-${IMAGE_ID}"
 
 VOLUMES=(
     -v "${ENVOY_DOCKER_BUILD_DIR}":"${BUILD_DIR_MOUNT_DEST}"
@@ -120,10 +120,11 @@ if [[ -n "${ENVOY_DOCKER_PULL}" ]]; then
 fi
 
 # Since we specify an explicit hash, docker-run will pull from the remote repo if missing.
-docker run --rm \
+docker run \
        "${ENVOY_DOCKER_OPTIONS[@]}" \
        "${VOLUMES[@]}" \
        -e BUILD_DIR \
+       -e BUILD_UID \
        -e HTTP_PROXY \
        -e HTTPS_PROXY \
        -e NO_PROXY \
@@ -170,4 +171,4 @@ docker run --rm \
        -e SYSTEM_STAGEDISPLAYNAME \
        -e SYSTEM_JOBDISPLAYNAME \
        "${ENVOY_BUILD_IMAGE}" \
-       "${START_COMMAND[@]}"
+       bash
