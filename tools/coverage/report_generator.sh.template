@@ -1,0 +1,148 @@
+#!/bin/bash
+set -eo pipefail
+
+WORKSPACE_PATH="@@WORKSPACE_PATH@@"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --reports_file=*)
+            REPORTS_FILE="${1#*=}"
+            ;;
+        --output_file=*)
+            OUTPUT_FILE="${1#*=}"
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+find_file() {
+    # kinda wierd to use PYTHON_RUNFILES but that is what is available in the
+    # bazel generator customization
+    find "${PYTHON_RUNFILES}" -type f -o -type l -name "${1}" -path "*/tools/coverage/**/*" | head -1
+}
+
+GRCOV="$(find_file grcov_bin)"
+GRCOV_CONFIG="$(find_file grcov_config.json)"
+COVERAGE_CONFIG="$(find_file "*coverage_config.json")"
+JQ_BIN="$(find_file jq)"
+ZSTD_BIN="$(find_file zstd)"
+TEMPLATES_DIR="$(dirname "$(find_file base.html)")"
+JQ_FILTER="$(find_file "filter.jq")"
+INFO_FILES=()
+OUTPUT_DIR="output"
+
+# This is a little hacky
+cwd="$(basename "$PWD")"
+if [[ "$cwd" == "envoy_mobile" ]]; then
+    WORKSPACE_PATH="${WORKSPACE_PATH}/mobile"
+fi
+if [[ -z "$WORKSPACE_PATH" || ! -e "$WORKSPACE_PATH" ]]; then
+    echo "WARNING: WORKSPACE not set or not found, unable to process coverage" >&2
+    exit 1
+fi
+if [[ -z "$JQ_BIN" || ! -x "$JQ_BIN" ]]; then
+    echo "WARNING: jq not found, unable to process coverage" >&2
+    exit 1
+fi
+if [[ -z "$JQ_FILTER" || ! -e "$JQ_FILTER" ]]; then
+    echo "WARNING: JQ filter not set or not found, unable to process coverage" >&2
+    exit 1
+fi
+if [[ -z "$ZSTD_BIN" || ! -x "$ZSTD_BIN" ]]; then
+    echo "WARNING: zstd not found, unable to process coverage" >&2
+    exit 1
+fi
+if [[ -z "$GRCOV" || ! -x "$GRCOV" ]]; then
+    echo "WARNING: grcov not found, unable to process coverage" >&2
+    exit 1
+fi
+if [[ -z "$GRCOV_CONFIG" || ! -e "$GRCOV_CONFIG" ]]; then
+    echo "WARNING: GRCOV_CONFIG not found, unable to process coverage" >&2
+    exit 1
+fi
+if [[ -z "$COVERAGE_CONFIG" || ! -e "$COVERAGE_CONFIG" ]]; then
+    echo "WARNING: COVERAGE_CONFIG not found, unable to process coverage" >&2
+    exit 1
+fi
+if [[ -z "$REPORTS_FILE" || ! -e "$REPORTS_FILE" ]]; then
+    echo "WARNING: REPORTS_FILE not found, unable to process coverage" >&2
+    exit 1
+fi
+if [[ -z "$OUTPUT_FILE" ]]; then
+    echo "WARNING: OUTPUT_FILE not found, unable to process coverage" >&2
+    exit 1
+fi
+
+
+create_config() {
+    # shellcheck disable=SC2016
+    $JQ_BIN --arg tpl_dir "$TEMPLATES_DIR" \
+      '.templates["base.html"] = ($tpl_dir + "/base.html")
+       | .templates["index.html"] = ($tpl_dir + "/index.html")
+       | .templates["macros.html"] = ($tpl_dir + "/macros.html")' \
+      "$GRCOV_CONFIG" > grcov_config_updated.json
+}
+
+run_grcov() {
+    rm -rf "${OUTPUT_DIR}"
+    mkdir -p "${OUTPUT_DIR}"
+    $GRCOV \
+        "${INFO_FILES[@]}" \
+        --precision 1 \
+        -s "${WORKSPACE_PATH}" \
+        -t html,covdir \
+        --output-config-file grcov_config_updated.json \
+        -o "${OUTPUT_DIR}"
+}
+
+create_report() {
+    local source_directories=""
+    if [[ -n "$COVERAGE_CONFIG" && -f "$COVERAGE_CONFIG" ]]; then
+        if $JQ_BIN -e '.directories' "$COVERAGE_CONFIG" >/dev/null 2>&1; then
+            source_directories=$(find "${WORKSPACE_PATH}/source" -name "*.cc" -type f -printf '%h\n' | sed "s|^${WORKSPACE_PATH}/||" | sort -u)
+        fi
+    fi
+    $JQ_BIN \
+        --slurpfile config "$COVERAGE_CONFIG" \
+        --arg source_directories "$source_directories" \
+        -f "$JQ_FILTER" \
+        "${OUTPUT_DIR}/covdir" > "${OUTPUT_DIR}/coverage.json"
+}
+
+find_coverage_files() {
+    while IFS= read -r dat_file; do
+        if [[ ! -f "$dat_file" ]]; then
+            continue
+        fi
+        dat_file_abs=$(realpath "$dat_file")
+        dat_dir=$(dirname "$dat_file_abs")
+        dat_basename=$(basename "$dat_file_abs")
+        info_basename="${dat_basename%.dat}.info"
+        pushd "$dat_dir" > /dev/null
+        ln -sf "$dat_basename" "$info_basename"
+        popd > /dev/null
+        info_link="${dat_dir}/${info_basename}"
+        INFO_FILES+=("$info_link")
+    done < "$REPORTS_FILE"
+}
+
+create_output() {
+    rm -rf "${OUTPUT_DIR}/html/badges"
+    rm -rf "${OUTPUT_DIR}/html/coverage.json"
+    tar -cf - -C "${OUTPUT_DIR}" . | $ZSTD_BIN -o output.tar.zst
+    mv output.tar.zst "$OUTPUT_FILE"
+}
+
+generate_report() {
+    create_config
+    find_coverage_files
+    run_grcov
+    create_report
+    create_output
+}
+
+generate_report

@@ -1,3 +1,4 @@
+load("@aspect_bazel_lib//lib:yq.bzl", "yq")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
@@ -8,6 +9,22 @@ load(
 licenses(["notice"])  # Apache 2
 
 envoy_package()
+
+yq(
+    name = "coverage_config",
+    srcs = [":coverage.yaml"],
+    outs = ["coverage_config.json"],
+    args = ["-o=json"],
+    visibility = ["//visibility:public"],
+)
+
+yq(
+    name = "fuzz_coverage_config",
+    srcs = [":fuzz_coverage.yaml"],
+    outs = ["fuzz_coverage_config.json"],
+    args = ["-o=json"],
+    visibility = ["//visibility:public"],
+)
 
 # TODO(htuch): remove when we have a solution for https://github.com/bazelbuild/bazel/issues/3510
 envoy_cc_test_library(

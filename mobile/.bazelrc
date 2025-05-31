@@ -212,6 +212,7 @@ build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --repo_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --build_tests_only
+build:mobile-ci-linux-coverage --@envoy//tools/coverage:config=@envoy_mobile//test:coverage_config
 
 #############################################################################
 # mobile-remote-ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
