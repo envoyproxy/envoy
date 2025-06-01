@@ -327,6 +327,11 @@ static_resources:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
           auth_username: {{ inline_string: cluster_0_username }}
+          aws_iam:
+            region: us-east-1
+            service_name: elasticache
+            cache_name: testcache
+            expiration_time: 900s            
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -344,6 +349,11 @@ static_resources:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
           auth_username: {{ inline_string: cluster_1_username }}
+          aws_iam:
+            region: us-east-1
+            service_name: elasticache
+            cache_name: testcache
+            expiration_time: 900s            
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -359,6 +369,11 @@ static_resources:
         envoy.filters.network.redis_proxy:
           "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
           auth_username: {{ inline_string: cluster_2_username }}
+          aws_iam:
+            region: us-east-1
+            service_name: elasticache
+            cache_name: testcache
+            expiration_time: 900s            
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2
@@ -383,11 +398,6 @@ static_resources:
           stat_prefix: redis_stats
           settings:
             op_timeout: 5s
-            aws_iam:
-              region: us-east-1
-              service_name: elasticache
-              cache_name: testcache
-              expiration_time: 900s            
           prefix_routes:
             catch_all_route:
               cluster: cluster_0

@@ -19,12 +19,16 @@ Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthCh
 
   auto redis_config = getRedisHealthCheckConfig(config, context.messageValidationVisitor());
 
+              aws_iam_authenticator_ =
+        NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
+            context.serverFactoryContext(), redis_config.aws_iam());
+
   return std::make_shared<RedisHealthChecker>(
       context.cluster(), config,
       getRedisHealthCheckConfig(config, context.messageValidationVisitor()),
       context.mainThreadDispatcher(), context.runtime(), context.eventLogger(), context.api(),
       NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,
-      context.serverFactoryContext());
+      aws_iam_authenticator_);
 };
 
 /**

@@ -93,9 +93,6 @@ private:
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
 
-  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-      aws_iam_authenticator_;
-  Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr auth_;
 };
 
 } // namespace RedisProxy

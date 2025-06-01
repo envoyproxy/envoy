@@ -77,34 +77,35 @@ ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatche
                              const ConfigSharedPtr& config,
                              const RedisCommandStatsSharedPtr& redis_command_stats,
                              Stats::Scope& scope, bool is_transaction_client,
-                             const std::string& auth_username, const std::string& auth_password,   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator) {
+                             const std::string& auth_username, const std::string& auth_password, absl::optional<std::string> cache_name,
+                              absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator) {
 
   auto client = std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory,
                                              config, redis_command_stats, scope,
-                                             is_transaction_client, auth_username, auth_password, aws_iam_authenticator);
+                                             is_transaction_client, auth_username, auth_password, cache_name, aws_iam_authenticator);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
   client->connection_->noDelay(true);
 
-  if (aws_iam_authenticator.has_value()) {
+  if (aws_iam_authenticator.has_value() && cache_name.has_value()) {
     if (auth_username.empty()) {
       ENVOY_LOG(error, "Redis proxy has AWS IAM Authentication enabled, but auth_username is not "
                        "set in the cluster configuration. IAM Authentication will be disabled.");
     } else {
-      client->sendAwsIamAuth(auth_username);
+      client->sendAwsIamAuth(auth_username, cache_name.value());
     }
   }
 
   return client;
 }
 
-void ClientImpl::sendAwsIamAuth(const std::string& auth_username) {
+void ClientImpl::sendAwsIamAuth(const std::string& auth_username, const std::string& cache_name) {
   queueRequests(true);
-  auto add_auth = [this, auth_username]() {
+  auto add_auth = [this, auth_username, &cache_name]() {
     const auto auth_password = aws_iam_authenticator_.value()->getAuthToken(
-            auth_username);
+            auth_username, cache_name);
     Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
         auth_username, auth_password);
     makeRequestImmediate(auth_request, auth_callbacks);
@@ -122,13 +123,14 @@ ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dis
                        EncoderPtr&& encoder, DecoderFactory& decoder_factory,
                        const ConfigSharedPtr& config,
                        const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-                       bool is_transaction_client, const std::string&, const std::string&,   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator)
+                       bool is_transaction_client, const std::string&, const std::string&, absl::optional<std::string>,   
+                       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope), is_transaction_client_(is_transaction_client) {
+      scope_(scope), is_transaction_client_(is_transaction_client), aws_iam_authenticator_(aws_iam_authenticator) {
 
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
   traffic_stats.upstream_cx_total_.inc();
@@ -385,11 +387,11 @@ ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
                                     Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
                                     const RedisCommandStatsSharedPtr& redis_command_stats,
                                     Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password, bool is_transaction_client,   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator) {
+                                    const std::string& auth_password, bool is_transaction_client, absl::optional<std::string> cache_name, absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator) {
 
   ClientPtr client = ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()},
                                         decoder_factory_, config, redis_command_stats, scope,
-                                        is_transaction_client, auth_username, auth_password, aws_iam_authenticator);
+                                        is_transaction_client, auth_username, auth_password, cache_name, aws_iam_authenticator);
 
   if (!config->awsIamConfig().has_value()) {
     client->initialize(auth_username, auth_password);

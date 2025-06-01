@@ -107,7 +107,7 @@ public:
    */
   virtual void initialize(const std::string& auth_username, const std::string& auth_password) PURE;
 
-  virtual void sendAwsIamAuth(const std::string& auth_username) PURE;
+  virtual void sendAwsIamAuth(const std::string& auth_username, const std::string& cache_name) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;
@@ -188,7 +188,7 @@ public:
 
   virtual bool connectionRateLimitEnabled() const PURE;
   virtual uint32_t connectionRateLimitPerSec() const PURE;
-
+  virtual absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig() const PURE;
 };
 
 using ConfigSharedPtr = std::shared_ptr<const Config>;
@@ -215,7 +215,8 @@ public:
                            const ConfigSharedPtr& config,
                            const RedisCommandStatsSharedPtr& redis_command_stats,
                            Stats::Scope& scope, const std::string& auth_username,
-                           const std::string& auth_password, bool is_transaction_client,  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator) PURE;
+                           const std::string& auth_password, bool is_transaction_client, absl::optional<std::string> cache_name,
+                             absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator) PURE;
 };
 
 // A MULTI command sent when starting a transaction.

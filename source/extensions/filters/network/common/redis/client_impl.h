@@ -57,7 +57,7 @@ public:
   ReadPolicy readPolicy() const override { return read_policy_; }
   bool connectionRateLimitEnabled() const override { return connection_rate_limit_enabled_; }
   uint32_t connectionRateLimitPerSec() const override { return connection_rate_limit_per_sec_; }
-
+  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig() const override { return aws_iam_config_; }
 private:
   const std::chrono::milliseconds op_timeout_;
   const bool enable_hashtagging_;
@@ -69,6 +69,7 @@ private:
   ReadPolicy read_policy_;
   bool connection_rate_limit_enabled_;
   uint32_t connection_rate_limit_per_sec_;
+  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
 };
 
 class ClientImpl : public Client,
@@ -81,13 +82,15 @@ public:
                           const ConfigSharedPtr& config,
                           const RedisCommandStatsSharedPtr& redis_command_stats,
                           Stats::Scope& scope, bool is_transaction_client,
-                          const std::string& auth_username, const std::string& auth_password,  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator);
+                          const std::string& auth_username, const std::string& auth_password,  absl::optional<std::string> cache_name,
+                           absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator);
 
   ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
              DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
              const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
              bool is_transaction_client, const std::string& auth_username,
-             const std::string& auth_password,   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator);
+             const std::string& auth_password, absl::optional<std::string> cache_name, 
+             absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator);
   ~ClientImpl() override;
 
   // Client
@@ -99,7 +102,7 @@ public:
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
-  void sendAwsIamAuth(const std::string& auth_username) override;
+  void sendAwsIamAuth(const std::string& auth_username, const std::string& cache_name) override;
 
   /*
    * Enable or disable request queueing for the client.
@@ -187,7 +190,7 @@ public:
                    const ConfigSharedPtr& config,
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
-                   bool is_transaction_client,  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator) override;
+                   bool is_transaction_client, absl::optional<std::string> cache_name, absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> aws_iam_authenticator) override;
 
   static ClientFactoryImpl instance_;
 

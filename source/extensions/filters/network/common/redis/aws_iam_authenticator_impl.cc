@@ -15,10 +15,6 @@ namespace Common {
 namespace Redis {
 namespace AwsIamAuthenticator {
 
-absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::authenticator_handle_;
-
-SINGLETON_MANAGER_REGISTRATION(aws_iam_authenticator);
-
 AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Envoy::Extensions::Common::Aws::SignerPtr signer)
     : signer_(std::move(signer)) {
     }
