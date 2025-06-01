@@ -3,6 +3,7 @@
 #include "envoy/matcher/matcher.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Matcher {
@@ -10,19 +11,29 @@ namespace Matcher {
 /**
  * The result of a field match.
  */
-struct FieldMatchResult {
-  // Encodes whether we were able to perform the match.
-  MatchState match_state_;
+class FieldMatchResult {
+private:
+  // The match could not be completed, e.g. due to the required data
+  // not being available.
+  struct InsufficientData {};
+  // The match comparison was completed, and there was no match.
+  struct NoMatch {};
+  // The match comparison was completed, and there was a match.
+  struct Matched {};
+  using ResultType = absl::variant<InsufficientData, NoMatch, Matched>;
+  ResultType result_;
+  explicit FieldMatchResult(ResultType r) : result_(r) {}
 
-  // The result, if matching was completed.
-  absl::optional<bool> result_;
-
-  // The unwrapped result. Should only be called if match_state_ == MatchComplete.
-  bool result() const {
-    ASSERT(match_state_ == MatchState::MatchComplete);
-    ASSERT(result_.has_value());
-    return *result_;
+public:
+  inline bool operator==(const FieldMatchResult& other) const {
+    return result_.index() == other.result_.index();
   }
+  static FieldMatchResult insufficientData() { return FieldMatchResult{InsufficientData{}}; }
+  static FieldMatchResult matched() { return FieldMatchResult{Matched{}}; }
+  static FieldMatchResult noMatch() { return FieldMatchResult{NoMatch{}}; }
+  bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
+  bool isMatched() const { return absl::holds_alternative<Matched>(result_); }
+  bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
 };
 
 /**
@@ -34,8 +45,6 @@ public:
 
   /**
    * Attempts to match against the provided data.
-   * @returns absl::optional<bool> if matching was possible, the result of the match. Otherwise
-   * absl::nullopt if the data is not available.
    */
   virtual FieldMatchResult match(const DataType& data) PURE;
 };
@@ -54,20 +63,20 @@ public:
 
   FieldMatchResult match(const DataType& data) override {
     for (const auto& matcher : matchers_) {
-      const auto result = matcher->match(data);
+      const FieldMatchResult result = matcher->match(data);
 
       // If we are unable to decide on a match at this point, propagate this up to defer
       // the match result until we have the requisite data.
-      if (result.match_state_ == MatchState::UnableToMatch) {
+      if (result.isInsufficientData()) {
         return result;
       }
 
-      if (!result.result()) {
+      if (result.isNoMatch()) {
         return result;
       }
     }
 
-    return {MatchState::MatchComplete, true};
+    return FieldMatchResult::matched();
   }
 
 private:
@@ -89,25 +98,25 @@ public:
   FieldMatchResult match(const DataType& data) override {
     bool unable_to_match_some_matchers = false;
     for (const auto& matcher : matchers_) {
-      const auto result = matcher->match(data);
+      const FieldMatchResult result = matcher->match(data);
 
-      if (result.match_state_ == MatchState::UnableToMatch) {
+      if (result.isInsufficientData()) {
         unable_to_match_some_matchers = true;
         continue;
       }
 
-      if (result.result()) {
-        return {MatchState::MatchComplete, true};
+      if (result.isMatched()) {
+        return result;
       }
     }
 
     // If we didn't find a successful match but not all matchers could be evaluated,
-    // return UnableToMatch to defer the match result.
+    // return InsufficientData to defer the match result.
     if (unable_to_match_some_matchers) {
-      return {MatchState::UnableToMatch, absl::nullopt};
+      return FieldMatchResult::insufficientData();
     }
 
-    return {MatchState::MatchComplete, false};
+    return FieldMatchResult::noMatch();
   }
 
 private:
@@ -122,12 +131,11 @@ public:
   explicit NotFieldMatcher(FieldMatcherPtr<DataType> matcher) : matcher_(std::move(matcher)) {}
 
   FieldMatchResult match(const DataType& data) override {
-    const auto result = matcher_->match(data);
-    if (result.match_state_ == MatchState::UnableToMatch) {
+    const FieldMatchResult result = matcher_->match(data);
+    if (result.isInsufficientData()) {
       return result;
     }
-
-    return {MatchState::MatchComplete, !result.result()};
+    return result.isMatched() ? FieldMatchResult::noMatch() : FieldMatchResult::matched();
   }
 
 private:
@@ -136,10 +144,10 @@ private:
 
 /**
  * Implementation of a FieldMatcher that extracts an input value from the provided data and attempts
- * to match using an InputMatcher. absl::nullopt is returned whenever the data is not available or
- * if we failed to match and there is more data available.
- * A consequence of this is that if a match result is desired, care should be taken so that matching
- * is done with all the data available at some point.
+ * to match using an InputMatcher. InsufficientData is returned whenever the data is not available
+ * or if we failed to match and there may be more data available later. A consequence of this is
+ * that if a match result is desired, care should be taken so that matching is done with all the
+ * data available at some point.
  */
 template <class DataType>
 class SingleFieldMatcher : public FieldMatcher<DataType>, Logger::Loggable<Logger::Id::matcher> {
@@ -164,19 +172,18 @@ public:
 
     ENVOY_LOG(trace, "Attempting to match {}", input);
     if (input.data_availability_ == DataInputGetResult::DataAvailability::NotAvailable) {
-      return {MatchState::UnableToMatch, absl::nullopt};
+      return FieldMatchResult::insufficientData();
     }
 
     bool current_match = input_matcher_->match(input.data_);
     if (!current_match && input.data_availability_ ==
                               DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
       ENVOY_LOG(trace, "No match yet; delaying result as more data might be available.");
-      return {MatchState::UnableToMatch, absl::nullopt};
+      return FieldMatchResult::insufficientData();
     }
 
     ENVOY_LOG(trace, "Match result: {}", current_match);
-
-    return {MatchState::MatchComplete, current_match};
+    return current_match ? FieldMatchResult::matched() : FieldMatchResult::noMatch();
   }
 
 private:

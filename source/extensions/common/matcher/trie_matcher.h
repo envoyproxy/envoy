@@ -19,7 +19,7 @@ namespace Matcher {
 using ::Envoy::Matcher::DataInputFactoryCb;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::DataInputPtr;
-using ::Envoy::Matcher::MatchState;
+using ::Envoy::Matcher::MatchResult;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::OnMatch;
 using ::Envoy::Matcher::OnMatchFactory;
@@ -71,19 +71,18 @@ public:
     }
   }
 
-  typename MatchTree<DataType>::MatchResult
-  match(const DataType& data, SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
+  MatchResult match(const DataType& data, SkippedMatchCb skipped_match_cb = nullptr) override {
     const auto input = data_input_->get(data);
     if (input.data_availability_ != DataInputGetResult::DataAvailability::AllDataAvailable) {
-      return {MatchState::UnableToMatch, absl::nullopt};
+      return MatchResult::insufficientData();
     }
     if (absl::holds_alternative<absl::monostate>(input.data_)) {
-      return {MatchState::MatchComplete, on_no_match_};
+      return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
     const Network::Address::InstanceConstSharedPtr addr =
         Network::Utility::parseInternetAddressNoThrow(absl::get<std::string>(input.data_));
     if (!addr) {
-      return {MatchState::MatchComplete, on_no_match_};
+      return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
     auto values = trie_->getData(addr);
     // The candidates returned by the LC trie are not in any specific order, so we
@@ -95,11 +94,10 @@ public:
         continue;
       }
       // handleRecursionAndSkips should only return match-failure, no-match, or an action cb.
-      typename MatchTree<DataType>::MatchResult processed_match =
+      MatchResult processed_match =
           MatchTree<DataType>::handleRecursionAndSkips(*node.on_match_, data, skipped_match_cb);
 
-      if (processed_match.match_state_ != MatchState::MatchComplete ||
-          processed_match.on_match_.has_value()) {
+      if (processed_match.isMatch() || processed_match.isInsufficientData()) {
         return processed_match;
       }
       // No-match isn't definitive, so continue checking nodes.
