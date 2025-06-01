@@ -12,10 +12,13 @@ envoy_cc_test(
     name = "factory_test",
     srcs = ["factory_test.cc"],
     data = [
+        "//test/extensions/dynamic_modules/test_data/c:http_filter_per_route_config_new_fail",
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_destroy",
         "//test/extensions/dynamic_modules/test_data/c:no_http_config_new",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_destroy",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_new",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_per_route_config_destroy",
+        "//test/extensions/dynamic_modules/test_data/c:no_http_filter_per_route_config_new",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_body",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_headers",
         "//test/extensions/dynamic_modules/test_data/c:no_http_filter_request_trailers",
@@ -78,5 +81,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/dynamic_modules:factory_registration",
         "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_modules/v3:pkg_cc_proto",
     ],
 )
