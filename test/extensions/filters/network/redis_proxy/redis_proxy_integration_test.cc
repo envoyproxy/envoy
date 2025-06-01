@@ -308,7 +308,8 @@ static_resources:
 )EOF",
                                                                       Platform::null_device_path);
 
-                                                                      const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM = fmt::format(R"EOF(
+const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM =
+    fmt::format(R"EOF(
 admin:
   access_log:
   - name: envoy.access_loggers.file
@@ -407,7 +408,7 @@ static_resources:
             - prefix: "baz:"
               cluster: cluster_2
 )EOF",
-                                                                      Platform::null_device_path);
+                Platform::null_device_path);
 
 // This is a configuration with fault injection enabled.
 const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
@@ -609,9 +610,12 @@ public:
   RedisProxyWithBatchingIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_BATCHING, 2) {}
 };
 
-class RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest : public Event::TestUsingSimulatedTime, public RedisProxyIntegrationTest {
+class RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest
+    : public Event::TestUsingSimulatedTime,
+      public RedisProxyIntegrationTest {
 public:
-  RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM, 3) {}
+  RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM, 3) {}
 };
 
 class RedisProxyWithRoutesIntegrationTest : public RedisProxyIntegrationTest {
@@ -737,57 +741,57 @@ public:
   }
 };
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
-
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
-
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionAndDNSIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
-
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithBatchingIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
-
-                         INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithDownstreamAuthIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRedirectionAndDNSIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMultipleDownstreamAuthIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithBatchingIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithDownstreamAuthIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMultipleDownstreamAuthIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithCommandStatsIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithCommandStatsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithFaultInjectionIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithFaultInjectionIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
-// INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithExternalAuthIntegrationTest,
-//                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-//                          TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithExternalAuthIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 void RedisProxyIntegrationTest::initialize() {
   setUpstreamCount(num_upstreams_);
@@ -833,6 +837,8 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
                                    : makeBulkStringArray({"auth", auth_username, auth_password});
     EXPECT_TRUE(fake_upstream_connection->waitForData(auth_command.size() + request.size(),
                                                       &proxy_to_server));
+    // EXPECT_TRUE(fake_upstream_connection->waitForData(450,
+    //                                                   &proxy_to_server));
     // The original request should be the same as the data received by the server.
     EXPECT_EQ(auth_command + request, proxy_to_server);
     // Send back an OK for the auth command.
@@ -1421,6 +1427,8 @@ TEST_P(RedisProxyWithMultipleDownstreamAuthIntegrationTest, ErrorsUntilCorrectPa
 // auth_password is specified for each cluster.
 
 TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentication) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
   initialize();
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
@@ -1446,34 +1454,48 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentic
   redis_client->close();
 }
 
-
 TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAuthentication) {
-    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
   TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
   TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "token", 1);
-simTime().setSystemTime(std::chrono::duration_cast<std::chrono::microseconds>(
-        std::chrono::milliseconds(1514862245000)));
+  simTime().setSystemTime(std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::milliseconds(1514862245000)));
   initialize();
 
   IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
   std::array<FakeRawConnectionPtr, 3> fake_upstream_connection;
 
   // roundtrip to cluster_0 (catch_all route)
-  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n",
-                          redis_client, fake_upstream_connection[0], "cluster_0_username", 
-                          "testcache/?Action=connect&User=cluster_0_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=900&X-Amz-Security-Token=token&X-Amz-Signature=b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host");
+  roundtripToUpstreamStep(
+      fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n", redis_client,
+      fake_upstream_connection[0], "cluster_0_username",
+      "testcache/"
+      "?Action=connect&User=cluster_0_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
+      "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
+      "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
+      "b31882a92ff7ef159e6d19bf422a1019d28e88fbfc04c4c94a215134f0b69c2e&X-Amz-SignedHeaders=host");
 
   // roundtrip to cluster_1 (prefix "foo:" route)
-  roundtripToUpstreamStep(fake_upstreams_[1], makeBulkStringArray({"get", "foo:123"}),
-                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection[1], "cluster_1_username",
-                          "testcache/?Action=connect&User=cluster_1_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=900&X-Amz-Security-Token=token&X-Amz-Signature=8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host");
+  roundtripToUpstreamStep(
+      fake_upstreams_[1], makeBulkStringArray({"get", "foo:123"}), "$3\r\nbar\r\n", redis_client,
+      fake_upstream_connection[1], "cluster_1_username",
+      "testcache/"
+      "?Action=connect&User=cluster_1_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
+      "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
+      "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
+      "8dd2faa4d1ba56ae8e45c24b7cd20d4d7b41acf15e48c199fad7484c4bacf8ef&X-Amz-SignedHeaders=host");
 
   // roundtrip to cluster_2 (prefix "baz:" route)
-  roundtripToUpstreamStep(fake_upstreams_[2], makeBulkStringArray({"get", "baz:123"}),
-                          "$3\r\nbar\r\n", redis_client, fake_upstream_connection[2], "cluster_2_username",
-                          "testcache/?Action=connect&User=cluster_2_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=900&X-Amz-Security-Token=token&X-Amz-Signature=0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host");
+  roundtripToUpstreamStep(
+      fake_upstreams_[2], makeBulkStringArray({"get", "baz:123"}), "$3\r\nbar\r\n", redis_client,
+      fake_upstream_connection[2], "cluster_2_username",
+      "testcache/"
+      "?Action=connect&User=cluster_2_username&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential="
+      "akid%2F20180102%2Fus-east-1%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-"
+      "Expires=900&X-Amz-Security-Token=token&X-Amz-Signature="
+      "0b2d4d6304834c7104fc39c29b7a9e93dbdc400fb72a422b3f0a72ef2366c5f8&X-Amz-SignedHeaders=host");
 
   EXPECT_TRUE(fake_upstream_connection[0]->close());
   EXPECT_TRUE(fake_upstream_connection[1]->close());

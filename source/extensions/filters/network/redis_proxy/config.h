@@ -42,7 +42,8 @@ public:
     return EMPTY_STRING;
   }
 
-  static absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> awsIamConfig(const Upstream::ClusterInfoConstSharedPtr info) {
+  static absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+  awsIamConfig(const Upstream::ClusterInfoConstSharedPtr info) {
     auto options = info->extensionProtocolOptionsTyped<ProtocolOptionsConfigImpl>(
         NetworkFilterNames::get().RedisProxy);
     if (options && options->proto_config_.has_aws_iam()) {
@@ -92,7 +93,6 @@ private:
       Server::Configuration::ProtocolOptionsFactoryContext&) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
-
 };
 
 } // namespace RedisProxy

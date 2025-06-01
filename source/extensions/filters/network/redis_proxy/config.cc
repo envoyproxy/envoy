@@ -85,19 +85,26 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
-  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-      aws_iam_authenticator;
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator;
 
-      absl::optional<std::string> cache_name;
-      // Create the AWS IAM authenticator if required
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config = ProtocolOptionsConfigImpl::awsIamConfig(server_context.clusterManager().getThreadLocalCluster(cluster)->info());
-      if(aws_iam_config.has_value())
-      {
-            aws_iam_authenticator =
-        Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
-            server_context, aws_iam_config.value());
-            cache_name = aws_iam_config->cache_name();
+    absl::optional<std::string> cache_name;
+    // Create the AWS IAM authenticator if required
+    auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster);
+    if (cluster_optref.has_value()) {
+
+      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config =
+          ProtocolOptionsConfigImpl::awsIamConfig(cluster_optref.value().get().info());
+      // absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
+      // =
+      // ProtocolOptionsConfigImpl::awsIamConfig(server_context.clusterManager().getThreadLocalCluster(cluster)->info());
+      if (aws_iam_config.has_value()) {
+        aws_iam_authenticator =
+            Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
+                server_context, aws_iam_config.value());
+        cache_name = aws_iam_config->cache_name();
       }
+    }
 
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));

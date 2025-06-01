@@ -25,16 +25,13 @@ public:
   virtual std::string getAuthToken(absl::string_view auth_user, absl::string_view cache_name) PURE;
   virtual bool
   addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb) PURE;
-
 };
 
 class AwsIamAuthenticatorImpl : public AwsIamAuthenticatorBase {
 public:
   AwsIamAuthenticatorImpl(Envoy::Extensions::Common::Aws::SignerPtr signer);
-  ~AwsIamAuthenticatorImpl() override {
-    signer_.reset();
-  }
-  
+  ~AwsIamAuthenticatorImpl() override { signer_.reset(); }
+
   bool addCallbackIfCredentialsPending(
       Extensions::Common::Aws::CredentialsPendingCallback&& cb) override {
     return signer_->addCallbackIfCredentialsPending(std::move(cb));
@@ -46,7 +43,6 @@ private:
   Envoy::Extensions::Common::Aws::SignerPtr signer_;
   std::string auth_token_;
   std::string region_;
-
 };
 
 using AwsIamAuthenticatorSharedPtr = std::shared_ptr<AwsIamAuthenticatorImpl>;
@@ -56,7 +52,6 @@ public:
   static absl::optional<AwsIamAuthenticatorSharedPtr> initAwsIamAuthenticator(
       Server::Configuration::ServerFactoryContext& context,
       envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config);
-
 };
 
 } // namespace AwsIamAuthenticator

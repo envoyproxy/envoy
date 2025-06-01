@@ -16,8 +16,7 @@ namespace Redis {
 namespace AwsIamAuthenticator {
 
 AwsIamAuthenticatorImpl::AwsIamAuthenticatorImpl(Envoy::Extensions::Common::Aws::SignerPtr signer)
-    : signer_(std::move(signer)) {
-    }
+    : signer_(std::move(signer)) {}
 
 absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
     Server::Configuration::ServerFactoryContext& context,
@@ -70,14 +69,13 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
   //     SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
   //     [&aws_iam_config, region, &credentials_provider_chain,
   //      &context]() -> std::shared_ptr<Singleton::Instance> {
-        auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
-            aws_iam_config.service_name().empty() ? DEFAULT_SERVICE_NAME
-                                                  : aws_iam_config.service_name(),
-            region, credentials_provider_chain.value(), context,
-            Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
-            PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60));
+  auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
+      aws_iam_config.service_name().empty() ? DEFAULT_SERVICE_NAME : aws_iam_config.service_name(),
+      region, credentials_provider_chain.value(), context,
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{}, true,
+      PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60));
 
-        return std::make_shared<AwsIamAuthenticatorImpl>(std::move(signer));
+  return std::make_shared<AwsIamAuthenticatorImpl>(std::move(signer));
   //     },
   //     false);
 
@@ -96,7 +94,8 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
   // std::move(signer) );
 }
 
-std::string AwsIamAuthenticatorImpl::getAuthToken(absl::string_view auth_user, absl::string_view cache_name) {
+std::string AwsIamAuthenticatorImpl::getAuthToken(absl::string_view auth_user,
+                                                  absl::string_view cache_name) {
   ENVOY_LOG(debug, "Generating new AWS IAM authentication token");
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
