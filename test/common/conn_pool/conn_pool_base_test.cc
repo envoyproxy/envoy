@@ -98,7 +98,8 @@ class ConnPoolImplBaseTest : public testing::Test {
 public:
   ConnPoolImplBaseTest()
       : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_) {
+        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_,
+              overload_manager_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -128,6 +129,7 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   Upstream::HostSharedPtr host_{
       Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_.timeSource())};
   TestConnPoolImplBase pool_;
@@ -140,7 +142,8 @@ public:
   ConnPoolImplDispatcherBaseTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        pool_(host_, Upstream::ResourcePriority::Default, *dispatcher_, nullptr, nullptr, state_) {
+        pool_(host_, Upstream::ResourcePriority::Default, *dispatcher_, nullptr, nullptr, state_,
+              overload_manager_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -683,6 +686,32 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
 
   // Clean up.
   closeStream();
+}
+
+// Test that when load shed point is triggered, new connections are not created.
+TEST_F(ConnPoolImplBaseTest, LoadShedPointTriggered) {
+  setUp();
+
+  auto load_shed_point = std::make_unique<NiceMock<Server::MockLoadShedPoint>>();
+  EXPECT_CALL(*load_shed_point, shouldShedLoad()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*overload_manager_, getLoadShedPoint(_))
+      .WillRepeatedly(Return(load_shed_point.get()));
+
+  Envoy::ConnectionPool::MockCallbacks callbacks;
+  auto* handle = pool_->newStreamImpl(attach_context_, false);
+
+  EXPECT_EQ(0, pool_->instantiateActiveClient_calls_);
+  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_overflow_.value());
+  EXPECT_NE(nullptr, handle);
+}
+
+// Test that when load shed point is not configured, connections are created normally.
+TEST_F(ConnPoolImplBaseTest, LoadShedPointNotConfigured) {
+  setUp();
+
+  EXPECT_CALL(*overload_manager_, getLoadShedPoint(_)).WillRepeatedly(Return(nullptr));
+
+  createConnection();
 }
 
 } // namespace ConnectionPool

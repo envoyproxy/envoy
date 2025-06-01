@@ -296,7 +296,8 @@ ConnectivityGrid::ConnectivityGrid(
     HttpServerPropertiesCacheSharedPtr alternate_protocols,
     ConnectivityOptions connectivity_options, Quic::QuicStatNames& quic_stat_names,
     Stats::Scope& scope, Http::PersistentQuicInfo& quic_info,
-    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry)
+    OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
+    Server::OverloadManager& overload_manager)
     : dispatcher_(dispatcher), random_generator_(random_generator), host_(host), options_(options),
       transport_socket_options_(transport_socket_options), state_(state),
       next_attempt_duration_(std::chrono::milliseconds(kDefaultTimeoutMs)),
@@ -305,7 +306,7 @@ ConnectivityGrid::ConnectivityGrid(
       // TODO(RyanTheOptimist): Figure out how scheme gets plumbed in here.
       origin_("https", getTargetHostname(transport_socket_options, host_),
               host_->address()->ip()->port()),
-      quic_info_(quic_info), priority_(priority),
+      quic_info_(quic_info), priority_(priority), overload_manager_(overload_manager),
       network_observer_registry_(network_observer_registry) {
   // ProdClusterManagerFactory::allocateConnPool verifies the protocols are HTTP/1, HTTP/2 and
   // HTTP/3.
@@ -378,15 +379,15 @@ ConnectionPool::Instance* ConnectivityGrid::getOrCreateHttp2Pool() {
 ConnectionPool::InstancePtr ConnectivityGrid::createHttp2Pool() {
   return std::make_unique<HttpConnPoolImplMixed>(dispatcher_, random_generator_, host_, priority_,
                                                  options_, transport_socket_options_, state_,
-                                                 origin_, alternate_protocols_);
+                                                 origin_, alternate_protocols_, overload_manager_);
 }
 
 ConnectionPool::InstancePtr ConnectivityGrid::createHttp3Pool(bool attempt_alternate_address) {
-  return Http3::allocateConnPool(dispatcher_, random_generator_, host_, priority_, options_,
-                                 transport_socket_options_, state_, quic_stat_names_,
-                                 *alternate_protocols_, scope_,
-                                 makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this),
-                                 quic_info_, network_observer_registry_, attempt_alternate_address);
+  return Http3::allocateConnPool(
+      dispatcher_, random_generator_, host_, priority_, options_, transport_socket_options_, state_,
+      quic_stat_names_, *alternate_protocols_, scope_,
+      makeOptRefFromPtr<Http3::PoolConnectResultCallback>(this), quic_info_,
+      network_observer_registry_, overload_manager_, attempt_alternate_address);
 }
 
 void ConnectivityGrid::setupPool(ConnectionPool::Instance& pool) {
