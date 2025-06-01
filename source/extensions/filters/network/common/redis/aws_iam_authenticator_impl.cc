@@ -22,6 +22,7 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
     Server::Configuration::ServerFactoryContext& context,
     envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config) {
 
+  // TODO: @nbaws remove this boilerplate credential provider init code
   absl::StatusOr<Extensions::Common::Aws::CredentialsProviderChainSharedPtr>
       credentials_provider_chain;
 
@@ -65,6 +66,7 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
     return absl::nullopt;
   }
 
+  // ElastiCache IAM authentication uses SigV4 query string signing
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       aws_iam_config.service_name().empty() ? DEFAULT_SERVICE_NAME : aws_iam_config.service_name(),
       region, credentials_provider_chain.value(), context,

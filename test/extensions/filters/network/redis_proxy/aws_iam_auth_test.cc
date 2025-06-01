@@ -6,6 +6,7 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/redis_command_stats.h"
 
+#include "test/extensions/common/aws/mocks.h"
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/mocks/server/server_factory_context.h"
@@ -78,14 +79,15 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(stats.symbolTable());
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientFactoryImpl factory;
-  auto mock_authenticator = std::make_shared<AwsIamAuthenticator::MockAwsIamAuthenticator>();
+  auto signer = std::make_unique<Extensions::Common::Aws::MockSigner>();
+
+  auto mock_authenticator =
+      std::make_shared<AwsIamAuthenticator::MockAwsIamAuthenticator>(std::move(signer));
   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> authenticator =
-      absl::make_optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>(
-              mock_authenticator);
+      mock_authenticator;
 
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
-  EXPECT_CALL(*mock_authenticator, getAuthToken("username", _))
-      .WillOnce(Return("auth_token"));
+  EXPECT_CALL(*mock_authenticator, getAuthToken("username", _)).WillOnce(Return("auth_token"));
   EXPECT_CALL(*mock_authenticator,
               addCallbackIfCredentialsPending(
                   An<Envoy::Extensions::Common::Aws::CredentialsPendingCallback&&>()))
@@ -130,11 +132,11 @@ TEST_F(AwsIamAuthenticatorTest, UsernameNotConfigured) {
 
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientFactoryImpl factory;
-  auto mock_authenticator = std::make_shared<AwsIamAuthenticator::MockAwsIamAuthenticator>();
+  auto signer = std::make_unique<Extensions::Common::Aws::MockSigner>();
+  auto mock_authenticator =
+      std::make_shared<AwsIamAuthenticator::MockAwsIamAuthenticator>(std::move(signer));
   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> authenticator =
-      absl::make_optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>(
-          std::dynamic_pointer_cast<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorImpl>(
-              mock_authenticator));
+      mock_authenticator;
   aws_iam_config_.set_region("region");
   aws_iam_config_.set_cache_name("cachename");
   aws_iam_config_.set_service_name("elasticache");

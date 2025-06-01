@@ -770,10 +770,12 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
   aws_iam_config.set_region("region");
   aws_iam_config.set_cache_name("cachename");
   aws_iam_config.set_service_name("elasticache");
-  const envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config_const = aws_iam_config;
+  const envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config_const =
+      aws_iam_config;
 
   auto mock_authenticator = std::make_shared<AwsIamAuthenticator::MockAwsIamAuthenticator>();
-  EXPECT_CALL(*mock_authenticator, getAuthToken("testusername", aws_iam_config_const)).WillOnce(Return("auth_token"));
+  EXPECT_CALL(*mock_authenticator, getAuthToken("testusername", aws_iam_config_const))
+      .WillOnce(Return("auth_token"));
   EXPECT_CALL(*mock_authenticator,
               addCallbackIfCredentialsPending(
                   An<Envoy::Extensions::Common::Aws::CredentialsPendingCallback&&>()))
