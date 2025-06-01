@@ -48,7 +48,7 @@ TEST_F(AwsIamAuthenticatorTest, NormalAuthentication) {
   auto aws_iam_authenticator =
       AwsIamAuthenticatorFactory::initAwsIamAuthenticator(context_, aws_iam_config);
 
-  auto token = aws_iam_authenticator.value()->getAuthToken("test");
+  auto token = aws_iam_authenticator.value()->getAuthToken("test", aws_iam_config);
   EXPECT_EQ(
       token,
       "cachename/"
@@ -70,7 +70,10 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   Upstream::MockHost::MockCreateConnectionData conn_info;
   auto mock_connection = new NiceMock<Network::MockClientConnection>();
   conn_info.connection_ = mock_connection;
-
+  envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config;
+  aws_iam_config.set_region("ap-southeast-2");
+  aws_iam_config.set_service_name("elasticache");
+  aws_iam_config.set_cache_name("cachename");
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
 
   redis_command_stats =
@@ -78,8 +81,12 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientFactoryImpl factory;
   auto mock_authenticator = std::make_shared<Envoy::Extensions::NetworkFilters::RedisProxy::Common::
                                                  AwsIamAuthenticator::MockAwsIamAuthenticator>();
+absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> authenticator = 
+    absl::make_optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>(
+        std::dynamic_pointer_cast<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorImpl>(mock_authenticator));
+
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
-  EXPECT_CALL(*mock_authenticator, getAuthToken("username")).WillOnce(Return("auth_token"));
+  EXPECT_CALL(*mock_authenticator, getAuthToken("username", aws_iam_config)).WillOnce(Return("auth_token"));
   EXPECT_CALL(*mock_authenticator,
               addCallbackIfCredentialsPending(
                   An<Envoy::Extensions::Common::Aws::CredentialsPendingCallback&&>()))
@@ -88,7 +95,7 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   EXPECT_CALL(*mock_connection, write(_, _)).Times(0);
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client =
       factory.create(host, dispatcher, config, redis_command_stats, *stats.rootScope(), "username",
-                     "password", false, context_);
+                     "password", false, aws_iam_config, authenticator);
 
   Common::Redis::RespValue request1;
   Client::MockClientCallbacks callbacks;
@@ -126,12 +133,20 @@ TEST_F(AwsIamAuthenticatorTest, UsernameNotConfigured) {
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientFactoryImpl factory;
   auto mock_authenticator = std::make_shared<Envoy::Extensions::NetworkFilters::RedisProxy::Common::
                                                  AwsIamAuthenticator::MockAwsIamAuthenticator>();
+                                                 absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> authenticator = 
+    absl::make_optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>(
+        std::dynamic_pointer_cast<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorImpl>(mock_authenticator));
+  envoy::extensions::filters::network::redis_proxy::v3::AwsIam aws_iam_config;
+  aws_iam_config.set_region("ap-southeast-2");
+  aws_iam_config.set_service_name("elasticache");
+  aws_iam_config.set_cache_name("cachename");
+
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
   EXPECT_CALL(*mock_authenticator, addCallbackIfCredentialsPending(_)).Times(0);
 
   Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client =
       factory.create(host, dispatcher, config, redis_command_stats, *stats.rootScope(), "",
-                     "password", false, context_);
+                     "password", false, aws_iam_config, authenticator);
 
   client->close();
 }

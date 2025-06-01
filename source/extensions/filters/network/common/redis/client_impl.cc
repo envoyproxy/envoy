@@ -124,7 +124,7 @@ ClientImpl::ClientImpl(
     Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    bool is_transaction_client, const std::string&, const std::string&, absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>,
+    bool is_transaction_client, const std::string&, const std::string&, absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
@@ -132,7 +132,7 @@ ClientImpl::ClientImpl(
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope), is_transaction_client_(is_transaction_client),
+      scope_(scope), is_transaction_client_(is_transaction_client), aws_iam_config_(aws_iam_config),
       aws_iam_authenticator_(aws_iam_authenticator) {
 
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
