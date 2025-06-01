@@ -8,11 +8,14 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/utility.h"
 
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.validate.h"
+#include "contrib/postgres_proxy/filters/network/source/config.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_integration_test.pb.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_integration_test.pb.validate.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_test_utils.h"
@@ -27,12 +30,19 @@ namespace PostgresProxy {
 class PostgresBaseIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public BaseIntegrationTest {
 public:
-  // Tuple to store upstream and downstream startTLS configuration.
+  // Tuple to store downstream startTLS configuration.
   // The first string contains string to enable/disable SSL.
   // The second string contains transport socket configuration.
-  using SSLConfig = std::tuple<const absl::string_view, const absl::string_view>;
+  // The third string contains require downstream SSL config
+  using SSLConfig =
+      std::tuple<const absl::string_view, const absl::string_view, const absl::string_view>;
 
-  std::string postgresConfig(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config,
+  // Tuple to store upstream startTLS configuration.
+  // The first string contains string to enable/disable SSL.
+  // The second string contains transport socket configuration.
+  using UpstreamSSLConfig = std::tuple<const absl::string_view, const absl::string_view>;
+
+  std::string postgresConfig(SSLConfig downstream_ssl_config, UpstreamSSLConfig upstream_ssl_config,
                              std::string additional_filters) {
     std::string main_config = fmt::format(
         fmt::runtime(TestEnvironment::readFileToStringForTest(TestEnvironment::runfilesPath(
@@ -43,13 +53,15 @@ public:
         Network::Test::getAnyAddressString(GetParam()),
         std::get<0>(downstream_ssl_config),  // downstream SSL termination
         std::get<0>(upstream_ssl_config),    // upstream_SSL option
+        std::get<2>(downstream_ssl_config),  // require downstream SSL
         additional_filters,                  // additional filters to insert after postgres
         std::get<1>(downstream_ssl_config)); // downstream SSL transport socket
 
     return main_config;
   }
 
-  PostgresBaseIntegrationTest(SSLConfig downstream_ssl_config, SSLConfig upstream_ssl_config,
+  PostgresBaseIntegrationTest(SSLConfig downstream_ssl_config,
+                              UpstreamSSLConfig upstream_ssl_config,
                               std::string additional_filters = "")
       : BaseIntegrationTest(GetParam(), postgresConfig(downstream_ssl_config, upstream_ssl_config,
                                                        additional_filters)) {
@@ -59,8 +71,9 @@ public:
   void SetUp() override { BaseIntegrationTest::initialize(); }
 
   static constexpr absl::string_view empty_config_string_{""};
-  static constexpr SSLConfig NoUpstreamSSL{empty_config_string_, empty_config_string_};
-  static constexpr SSLConfig NoDownstreamSSL{empty_config_string_, empty_config_string_};
+  static constexpr UpstreamSSLConfig NoUpstreamSSL{empty_config_string_, empty_config_string_};
+  static constexpr SSLConfig NoDownstreamSSL{empty_config_string_, empty_config_string_,
+                                             empty_config_string_};
   FakeRawConnectionPtr fake_upstream_connection_;
 };
 
@@ -138,7 +151,8 @@ public:
                   filename: {}
    )EOF",
                     TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
-                    TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"))),
+                    TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")),
+                "downstream_ssl: REQUIRE"),
             NoUpstreamSSL) {}
 };
 
@@ -172,6 +186,27 @@ TEST_P(DownstreamSSLPostgresIntegrationTest, TerminateSSL) {
   test_server_->waitForCounterEq("postgres.postgres_stats.sessions_terminated_ssl", 1);
 }
 
+// Test verifies that Postgres filter replies with error code upon
+// receiving non-ssl request when require downstream ssl is enabled
+TEST_P(DownstreamSSLPostgresIntegrationTest, RequireSSL) {
+  Buffer::OwnedImpl data;
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  // Send the non SSL message.
+  createInitialPostgresRequest(data);
+  ASSERT_TRUE(tcp_client->write(data.toString()));
+  data.drain(data.length());
+
+  // Message will be processed by Postgres filter which
+  // is configured to send back an error response and close connection
+  tcp_client->waitForData("E", true);
+  tcp_client->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
@@ -179,7 +214,9 @@ class DownstreamSSLWrongConfigPostgresIntegrationTest : public PostgresBaseInteg
 public:
   DownstreamSSLWrongConfigPostgresIntegrationTest()
       // Enable SSL termination but do not configure downstream transport socket.
-      : PostgresBaseIntegrationTest(std::make_tuple("terminate_ssl: true", ""), NoUpstreamSSL) {}
+      : PostgresBaseIntegrationTest(
+            std::make_tuple("terminate_ssl: false", "", "downstream_ssl: REQUIRE"), NoUpstreamSSL) {
+  }
 };
 
 // Test verifies that Postgres filter closes connection when it is configured to
@@ -216,6 +253,33 @@ TEST_P(DownstreamSSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTr
 INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLWrongConfigPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
+class DownstreamSSLConflictConfigPostgresIntegrationTest : public PostgresBaseIntegrationTest {
+public:
+  DownstreamSSLConflictConfigPostgresIntegrationTest()
+      : PostgresBaseIntegrationTest(NoDownstreamSSL, NoUpstreamSSL) {}
+};
+
+// Test verifies throwing EnvoyException when terminate_ssl: true
+// and downstream_ssl: DISABLE explicitly set at the same time.
+TEST_P(DownstreamSSLConflictConfigPostgresIntegrationTest, ConflictSSLConfig) {
+  const auto yaml_string = R"EOF(
+  stat_prefix: postgres_stats
+  terminate_ssl: true
+  downstream_ssl: DISABLE
+  )EOF";
+  envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  PostgresProxy::PostgresConfigFactory factory;
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProtoTyped(proto_config, context), Envoy::EnvoyException,
+      "terminate_ssl cannot be set to true at the same time when downstream_ssl "
+      "is set to DISABLE");
+}
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLConflictConfigPostgresIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
 // Upstream SSL integration tests.
 // Tests do not use the real postgres server and concentrate only on initial exchange.
 // The initial packet
@@ -224,7 +288,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLWrongConfigPostgresIntegration
 
 class UpstreamSSLBaseIntegrationTest : public PostgresBaseIntegrationTest {
 public:
-  UpstreamSSLBaseIntegrationTest(SSLConfig upstream_ssl_config,
+  UpstreamSSLBaseIntegrationTest(UpstreamSSLConfig upstream_ssl_config,
                                  SSLConfig downstream_ssl_config = NoDownstreamSSL)
       // Disable downstream SSL and attach synchronization filter.
       : PostgresBaseIntegrationTest(downstream_ssl_config, upstream_ssl_config, R"EOF(
@@ -518,8 +582,8 @@ public:
                   filename: {}
    )EOF",
                     TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
-                    TestEnvironment::runfilesPath(
-                        "test/config/integration/certs/serverkey.pem")))) {}
+                    TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem")),
+                "downstream_ssl: REQUIRE")) {}
 
   // Method changes IntegrationTcpClient's transport socket to TLS.
   // Sending any traffic to newly attached TLS transport socket will trigger
