@@ -158,6 +158,8 @@ public:
    * limit.
    */
   virtual bool ignoreGlobalConnLimit() const PURE;
+
+  virtual absl::flat_hash_set<std::string> allowRouteString() const PURE;
 };
 
 /**
