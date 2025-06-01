@@ -3,7 +3,6 @@
 # Mangle protoxform and protoprint artifacts.
 
 import argparse
-from collections import defaultdict
 import os
 import pathlib
 import re
@@ -231,7 +230,7 @@ def find_pkgs(package_version_status, api_root):
     return set([os.path.dirname(p)[len(api_root) + 1:] for p in api_protos])
 
 
-def format_api(mode, outfile, xformed, printed, build_file):
+def format_api(mode, outfile, printed, build_file):
 
     with tempfile.TemporaryDirectory() as tmp:
         dst_dir = pathlib.Path(tmp)
@@ -242,10 +241,10 @@ def format_api(mode, outfile, xformed, printed, build_file):
 
         for label in data["proto_targets"]:
             _label = label[len('@@envoy_api//'):].replace(':', '/')
-                source = printed_dir.joinpath(f"{_label}.proto")
-                target = dst_dir.joinpath(_label)
-                target.parent.mkdir(exist_ok=True, parents=True)
-                shutil.copy(source, target)
+            source = printed_dir.joinpath(f"{_label}.proto")
+            target = dst_dir.joinpath(_label)
+            target.parent.mkdir(exist_ok=True, parents=True)
+            shutil.copy(source, target)
 
         sync_build_files(mode, dst_dir)
 
@@ -274,6 +273,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     format_api(
-        args.mode, str(pathlib.Path(args.outfile).absolute()),
-        str(pathlib.Path(args.xformed).absolute()), args.protoprinted,
+        args.mode, str(pathlib.Path(args.outfile).absolute()), args.protoprinted,
         pathlib.Path(args.build_file))
