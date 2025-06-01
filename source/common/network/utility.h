@@ -9,7 +9,13 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/statusor.h"
+
+#if defined(__linux__)
+#include "source/common/api/os_sys_calls_impl_linux.h"
+#endif
 
 #include "absl/strings/string_view.h"
 
@@ -144,10 +150,12 @@ public:
    * @param ip_address string to be parsed as an internet address.
    * @param port optional port to include in Instance created from ip_address, 0 by default.
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @param network_namespace network namespace containing the address.
    * @return pointer to the Instance, or nullptr if unable to parse the address.
    */
   static Address::InstanceConstSharedPtr
-  parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port = 0, bool v6only = true);
+  parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port = 0, bool v6only = true,
+                              absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Parse an internet host address (IPv4 or IPv6) AND port, and create an Instance from it. Throws
@@ -164,10 +172,12 @@ public:
    *        - "1.2.3.4:80"
    *        - "[1234:5678::9]:443"
    * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+   * @param network_namespace network namespace containing the address.
    * @return pointer to the Instance, or a nullptr in case of a malformed IP address.
    */
   static Address::InstanceConstSharedPtr
-  parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only = true);
+  parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only = true,
+                                     absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Get the local address of the first interface address that is of type
@@ -353,6 +363,60 @@ public:
                                                UdpPacketProcessor& udp_packet_processor,
                                                TimeSource& time_source, bool allow_gro,
                                                bool allow_mmsg, uint32_t& packets_dropped);
+
+#if defined(__linux__)
+  /**
+   * Changes the calling thread's network namespace to the one referenced by the file at `netns`,
+   * calls the function `f`, and returns its result after switching back to the original network
+   * namespace.
+   *
+   * @param f the function to execute in the specified network namespace.
+   * @param netns filepath referencing the network namespace in which `f` is executed.
+   * @return the result of 'f' wrapped in absl::StatusOr to any indicate syscall failures.
+   */
+  template <typename Func>
+  static auto execInNetworkNamespace(Func&& f, const char* netns)
+      -> absl::StatusOr<typename std::invoke_result_t<Func>> {
+    Api::OsSysCalls& posix = Api::OsSysCallsSingleton().get();
+
+    // Open the original netns fd, so that we can return to it.
+    constexpr auto curr_netns_file = "/proc/self/ns/net";
+    auto og_netns_fd_result = posix.open(curr_netns_file, O_RDONLY);
+    int og_netns_fd = og_netns_fd_result.return_value_;
+    if (og_netns_fd_result.errno_ != 0) {
+      return absl::InternalError(fmt::format("failed to open netns file {}: {}", curr_netns_file,
+                                             errorDetails(og_netns_fd_result.errno_)));
+    }
+    Cleanup cleanup_og_fd([&og_netns_fd, &posix]() { posix.close(og_netns_fd); });
+
+    // Open the fd for the network namespace we want the socket in.
+    auto netns_fd_result = posix.open(netns, O_RDONLY);
+    const int netns_fd = netns_fd_result.return_value_;
+    if (netns_fd <= 0) {
+      return absl::InternalError(fmt::format("failed to open netns file {}: {}", netns,
+                                             errorDetails(netns_fd_result.errno_)));
+    }
+    Cleanup cleanup_netns_fd([&posix, &netns_fd]() { posix.close(netns_fd); });
+
+    // Change the network namespace of this thread.
+    auto setns_result = Api::LinuxOsSysCallsSingleton().get().setns(netns_fd, CLONE_NEWNET);
+    if (setns_result.return_value_ != 0) {
+      return absl::InternalError(fmt::format("failed to set netns to {} (fd={}): {}", netns,
+                                             netns_fd, errorDetails(errno)));
+    }
+
+    // Calling function from the specified network namespace.
+    auto result = std::forward<Func>(f)();
+
+    // Restore the original network namespace before returning the function result.
+    setns_result = Api::LinuxOsSysCallsSingleton().get().setns(og_netns_fd, CLONE_NEWNET);
+    RELEASE_ASSERT(
+        setns_result.return_value_ == 0,
+        fmt::format("failed to restore original netns (fd={}): {}", netns_fd, errorDetails(errno)));
+
+    return result;
+  }
+#endif
 
 private:
   /**

@@ -36,6 +36,7 @@ envoy_cc_library(
         "//envoy/server:transport_socket_config_interface",
         "//envoy/server:worker_interface",
         "//source/common/access_log:access_log_lib",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:basic_resource_lib",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",

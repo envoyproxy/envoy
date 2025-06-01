@@ -14,6 +14,7 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
@@ -279,6 +280,36 @@ Network::ListenerFilterMatcherSharedPtr ProdListenerComponentFactory::createList
 }
 
 absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocket(
+    Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+
+#if defined(__linux__)
+  auto netns = address->networkNamespace();
+  if (netns.has_value()) {
+    auto fn = [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
+      return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                        worker_index);
+    };
+
+    auto result = Network::Utility::execInNetworkNamespace(fn, netns.value().c_str());
+
+    // We have a nested absl::StatusOr type, so if there were no issues with changing the namespace,
+    // we want to return the inner absl::StatusOr.
+    if (result->ok()) {
+      return result->value();
+    }
+
+    // The result was not ok, so we want to return the outer status.
+    return result.status();
+  }
+#endif
+
+  return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                    worker_index);
+}
+
+absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocketInternal(
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
     const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
