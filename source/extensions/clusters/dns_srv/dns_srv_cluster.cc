@@ -70,12 +70,12 @@ void DnsSrvCluster::startResolve() {
 
         if (status == Network::DnsResolver::ResolutionStatus::Completed) {
           for (const auto& dns : response) {
-            ENVOY_LOG(debug, "SRV: host: {}, port: {}, weight: {}, prio: {}", dns.srv().host_,
+            ENVOY_LOG(debug, "SRV: host: {}, port: {}, weight: {}, prio: {}", dns.srv().target_,
                       dns.srv().port_, dns.srv().weight_, dns.srv().priority_);
 
             active_resolve_list_->addTarget(ResolveTargetPtr(
                 new ResolveTarget(*active_resolve_list_, dns_resolver_, dns_lookup_family_,
-                                  dns.srv().host_, dns.srv().port_)));
+                                  dns.srv().target_, dns.srv().port_)));
           }
 
           active_resolve_list_->noMoreTargets();
