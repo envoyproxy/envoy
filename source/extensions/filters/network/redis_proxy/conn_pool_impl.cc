@@ -51,7 +51,7 @@ InstanceImpl::InstanceImpl(
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config, 
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
@@ -110,7 +110,7 @@ InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config, 
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),

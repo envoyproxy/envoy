@@ -76,22 +76,25 @@ class ClientImpl : public Client,
                    public Network::ConnectionCallbacks,
                    public Logger::Loggable<Logger::Id::redis> {
 public:
-  static ClientPtr
-  create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-         DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
-         const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-         bool is_transaction_client, const std::string& auth_username,
-         const std::string& auth_password, absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-         absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-             aws_iam_authenticator);
+  static ClientPtr create(
+      Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+      DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
+      const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+      bool is_transaction_client, const std::string& auth_username,
+      const std::string& auth_password,
+      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+          aws_iam_authenticator);
 
-  ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
-             DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
-             const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-             bool is_transaction_client, const std::string& auth_username,
-             const std::string& auth_password, absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-             absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-                 aws_iam_authenticator);
+  ClientImpl(
+      Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+      DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
+      const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+      bool is_transaction_client, const std::string& auth_username,
+      const std::string& auth_password,
+      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+          aws_iam_authenticator);
   ~ClientImpl() override;
 
   // Client
@@ -103,7 +106,9 @@ public:
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
-  void sendAwsIamAuth(const std::string& auth_username, const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) override;
+  void sendAwsIamAuth(
+      const std::string& auth_username,
+      const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) override;
 
   /*
    * Enable or disable request queueing for the client.
@@ -181,13 +186,14 @@ private:
 class ClientFactoryImpl : public ClientFactory, public Logger::Loggable<Logger::Id::redis> {
 public:
   // RedisProxy::ConnPool::ClientFactoryImpl
-  ClientPtr create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                   const ConfigSharedPtr& config,
-                   const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-                   const std::string& auth_username, const std::string& auth_password,
-                   bool is_transaction_client, absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
-                   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
-                       aws_iam_authenticator) override;
+  ClientPtr create(
+      Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
+      const ConfigSharedPtr& config, const RedisCommandStatsSharedPtr& redis_command_stats,
+      Stats::Scope& scope, const std::string& auth_username, const std::string& auth_password,
+      bool is_transaction_client,
+      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+          aws_iam_authenticator) override;
 
   static ClientFactoryImpl instance_;
 

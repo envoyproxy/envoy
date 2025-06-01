@@ -74,8 +74,9 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
   return std::make_shared<AwsIamAuthenticatorImpl>(std::move(signer));
 }
 
-std::string AwsIamAuthenticatorImpl::getAuthToken(absl::string_view auth_user,
-                                                  const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) {
+std::string AwsIamAuthenticatorImpl::getAuthToken(
+    absl::string_view auth_user,
+    const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) {
   ENVOY_LOG(debug, "Generating new AWS IAM authentication token");
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
@@ -84,9 +85,12 @@ std::string AwsIamAuthenticatorImpl::getAuthToken(absl::string_view auth_user,
   message.headers().setPath(fmt::format("/?Action=connect&User={}",
                                         Envoy::Http::Utility::PercentEncoding::encode(auth_user)));
 
-  auto status = signer_->sign(message, true, !aws_iam_config.region().empty()?aws_iam_config.region():region_);
+  // If the region exists in the aws_iam configuration, then override our signing with that
+  auto status = signer_->sign(message, true,
+                              !aws_iam_config.region().empty() ? aws_iam_config.region() : region_);
 
-  auth_token_ = std::string(aws_iam_config.cache_name()) + std::string(message.headers().getPathValue());
+  auth_token_ =
+      std::string(aws_iam_config.cache_name()) + std::string(message.headers().getPathValue());
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
 

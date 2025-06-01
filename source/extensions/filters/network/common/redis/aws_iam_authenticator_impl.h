@@ -22,7 +22,9 @@ constexpr char DEFAULT_SERVICE_NAME[] = "elasticache";
 class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
 public:
   virtual ~AwsIamAuthenticatorBase() = default;
-  virtual std::string getAuthToken(absl::string_view auth_user, const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) PURE;
+  virtual std::string getAuthToken(
+      absl::string_view auth_user,
+      const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) PURE;
   virtual bool
   addCallbackIfCredentialsPending(Extensions::Common::Aws::CredentialsPendingCallback&& cb) PURE;
 };
@@ -37,7 +39,9 @@ public:
     return signer_->addCallbackIfCredentialsPending(std::move(cb));
   };
 
-  std::string getAuthToken(absl::string_view auth_user, const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) override;
+  std::string getAuthToken(
+      absl::string_view auth_user,
+      const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) override;
 
 private:
   Envoy::Extensions::Common::Aws::SignerPtr signer_;

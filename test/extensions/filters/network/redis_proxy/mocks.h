@@ -184,22 +184,6 @@ public:
 };
 
 } // namespace ExternalAuth
-
-namespace Common {
-namespace AwsIamAuthenticator {
-
-class MockAwsIamAuthenticator : public Envoy::Extensions::NetworkFilters::Common::Redis::
-                                    AwsIamAuthenticator::AwsIamAuthenticatorBase {
-public:
-  ~MockAwsIamAuthenticator() override = default;
-  MOCK_METHOD(std::string, getAuthToken, (absl::string_view auth_user, const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config));
-  MOCK_METHOD(bool, addCallbackIfCredentialsPending,
-              (Extensions::Common::Aws::CredentialsPendingCallback && cb));
-};
-
-} // namespace AwsIamAuthenticator
-} // namespace Common
-
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions
