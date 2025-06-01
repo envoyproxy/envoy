@@ -66,7 +66,7 @@ public:
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
       const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-      absl::optional<std::string> cache_name,
+      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config, 
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator);
   uint16_t shardSize() override;
@@ -156,7 +156,7 @@ private:
     ThreadLocalPool(std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
                     std::string cluster_name,
                     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
-                    absl::optional<std::string> cache_name,
+                        absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config, 
                     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
                         aws_iam_authenticator);
     ~ThreadLocalPool() override;
@@ -220,7 +220,7 @@ private:
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator_;
-    absl::optional<std::string> cache_name_;
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_; 
   };
 
   const std::string cluster_name_;
@@ -236,7 +236,7 @@ private:
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
-  absl::optional<std::string> cache_name_;
+  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
 };
 
 } // namespace ConnPool

@@ -65,10 +65,6 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
     return absl::nullopt;
   }
 
-  // authenticator_handle_ = context.singletonManager().getTyped<AwsIamAuthenticatorImpl>(
-  //     SINGLETON_MANAGER_REGISTERED_NAME(aws_iam_authenticator),
-  //     [&aws_iam_config, region, &credentials_provider_chain,
-  //      &context]() -> std::shared_ptr<Singleton::Instance> {
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       aws_iam_config.service_name().empty() ? DEFAULT_SERVICE_NAME : aws_iam_config.service_name(),
       region, credentials_provider_chain.value(), context,
@@ -76,37 +72,21 @@ absl::optional<AwsIamAuthenticatorSharedPtr> AwsIamAuthenticatorFactory::initAws
       PROTOBUF_GET_SECONDS_OR_DEFAULT(aws_iam_config, expiration_time, 60));
 
   return std::make_shared<AwsIamAuthenticatorImpl>(std::move(signer));
-  //     },
-  //     false);
-
-  // return authenticator_handle_;
-
-  // aws_cluster_manager_ =
-  //     context.singletonManager().getTyped<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(
-  //         SINGLETON_MANAGER_REGISTERED_NAME(aws_cluster_manager),
-  //         [&context] {
-  //           return
-  //           std::make_shared<Envoy::Extensions::Common::Aws::AwsClusterManagerImpl>(context);
-  //         },
-  //         true);
-
-  // return std::make_shared<AwsIamAuthenticatorImpl>( aws_iam_config.cache_name(),  region,
-  // std::move(signer) );
 }
 
 std::string AwsIamAuthenticatorImpl::getAuthToken(absl::string_view auth_user,
-                                                  absl::string_view cache_name) {
+                                                  const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) {
   ENVOY_LOG(debug, "Generating new AWS IAM authentication token");
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  message.headers().setHost(cache_name);
+  message.headers().setHost(aws_iam_config.cache_name());
   message.headers().setPath(fmt::format("/?Action=connect&User={}",
                                         Envoy::Http::Utility::PercentEncoding::encode(auth_user)));
 
-  auto status = signer_->sign(message, true, region_);
+  auto status = signer_->sign(message, true, !aws_iam_config.region().empty()?aws_iam_config.region():region_);
 
-  auth_token_ = std::string(cache_name) + std::string(message.headers().getPathValue());
+  auth_token_ = std::string(aws_iam_config.cache_name()) + std::string(message.headers().getPathValue());
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(message.headers().getPathValue());
 
@@ -119,7 +99,7 @@ std::string AwsIamAuthenticatorImpl::getAuthToken(absl::string_view auth_user,
   }
   auto sanitised_query_string =
       query_params.replaceQueryString(Http::HeaderString(message.headers().getPathValue()));
-  ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", cache_name,
+  ENVOY_LOG(debug, "Generated authentication token (sanitised): {}{}", aws_iam_config.cache_name(),
             sanitised_query_string);
   return auth_token_;
 }

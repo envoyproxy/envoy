@@ -90,19 +90,15 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
     absl::optional<std::string> cache_name;
     // Create the AWS IAM authenticator if required
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
     auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster);
     if (cluster_optref.has_value()) {
 
-      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config =
-          ProtocolOptionsConfigImpl::awsIamConfig(cluster_optref.value().get().info());
-      // absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config
-      // =
-      // ProtocolOptionsConfigImpl::awsIamConfig(server_context.clusterManager().getThreadLocalCluster(cluster)->info());
+      aws_iam_config = ProtocolOptionsConfigImpl::awsIamConfig(cluster_optref.value().get().info());
       if (aws_iam_config.has_value()) {
         aws_iam_authenticator =
             Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
                 server_context, aws_iam_config.value());
-        cache_name = aws_iam_config->cache_name();
       }
     }
 
@@ -112,7 +108,7 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
         cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
-        refresh_manager, filter_config->dns_cache_, cache_name, aws_iam_authenticator);
+        refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }

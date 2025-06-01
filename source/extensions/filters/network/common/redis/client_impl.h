@@ -81,7 +81,7 @@ public:
          DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
          const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
          bool is_transaction_client, const std::string& auth_username,
-         const std::string& auth_password, absl::optional<std::string> cache_name,
+         const std::string& auth_password, absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
          absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
              aws_iam_authenticator);
 
@@ -89,7 +89,7 @@ public:
              DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
              const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
              bool is_transaction_client, const std::string& auth_username,
-             const std::string& auth_password, absl::optional<std::string> cache_name,
+             const std::string& auth_password, absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
              absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
                  aws_iam_authenticator);
   ~ClientImpl() override;
@@ -103,7 +103,7 @@ public:
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_username, const std::string& auth_password) override;
-  void sendAwsIamAuth(const std::string& auth_username, const std::string& cache_name) override;
+  void sendAwsIamAuth(const std::string& auth_username, const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) override;
 
   /*
    * Enable or disable request queueing for the client.
@@ -113,14 +113,6 @@ public:
    */
 
   void queueRequests(bool enable_queue) { queue_enabled_ = enable_queue; }
-  /*
-   * Send AWS IAM authentication credentials. Will set the client to queue requests if we are still
-   * waiting on AWS credentials to be returned from a credentials provider.
-   * @param The shared pointer to an already initialized AWS IAM authenticator.
-   */
-
-  void
-  sendIamAuthentication(AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr aws_iam_authenticator);
 
   PoolRequest* makeRequestImmediate(const RespValue& request, ClientCallbacks& callbacks);
 
@@ -181,6 +173,7 @@ private:
   Stats::Scope& scope_;
   bool is_transaction_client_;
   bool queue_enabled_{false};
+  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
 };
@@ -192,7 +185,7 @@ public:
                    const ConfigSharedPtr& config,
                    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
                    const std::string& auth_username, const std::string& auth_password,
-                   bool is_transaction_client, absl::optional<std::string> cache_name,
+                   bool is_transaction_client, absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
                    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
                        aws_iam_authenticator) override;
 
