@@ -10,8 +10,27 @@ export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
 
 CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
+# Parse run command for NUM_CPUS arg
+filtered_args=()
+skip_next=false
+for arg in "$@"; do
+    if [[ "$skip_next" == true ]]; then
+        NUM_CPUS="$arg"
+        skip_next=false
+    elif [[ "$arg" == "-j" ]]; then
+        skip_next=true
+    else
+        filtered_args+=("$arg")
+    fi
+done
+
+# Set filtered_args as the arguments to be processed later
+set -- "${filtered_args[@]}"
+
 # shellcheck source=ci/build_setup.sh
 . "${CURRENT_SCRIPT_DIR}"/build_setup.sh
+
+NUM_CPUS=$((NUM_CPUS - 1))
 
 echo "building using ${NUM_CPUS} CPUs"
 echo "building for ${ENVOY_BUILD_ARCH}"
@@ -46,6 +65,7 @@ setup_clang_toolchain() {
     fi
     CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
     BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+    BAZEL_BUILD_OPTIONS+=("--jobs=${NUM_CPUS}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
     echo "clang toolchain with ${ENVOY_STDLIB} configured: ${CONFIG}"
