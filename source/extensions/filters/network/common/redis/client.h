@@ -210,6 +210,8 @@ public:
    * @param scope supplies the stats scope.
    * @param auth password for upstream host.
    * @param is_transaction_client true if this client was created to relay a transaction.
+   * @param aws_iam_config supplies the AWS IAM configuration from protobuf
+   * @param aws_iam_authenticator supplies the AWS IAM authenticator created during config
    * @return ClientPtr a new connection pool client.
    */
   virtual ClientPtr create(

@@ -102,7 +102,7 @@ private:
     bool connectionRateLimitEnabled() const override { return false; }
     uint32_t connectionRateLimitPerSec() const override { return 0; }
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
-    awsIamConfig() const override {
+    awsIamConfig() const {
       return aws_iam_config_;
     };
 

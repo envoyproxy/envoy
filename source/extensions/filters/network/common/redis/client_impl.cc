@@ -76,14 +76,14 @@ ClientPtr ClientImpl::create(
     Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    bool is_transaction_client, const std::string& auth_username, const std::string& auth_password,
+    bool is_transaction_client, const std::string& auth_username,
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator) {
 
   auto client = std::make_unique<ClientImpl>(
       host, dispatcher, std::move(encoder), decoder_factory, config, redis_command_stats, scope,
-      is_transaction_client, auth_username, auth_password, aws_iam_config, aws_iam_authenticator);
+      is_transaction_client, aws_iam_config, aws_iam_authenticator);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
@@ -125,7 +125,7 @@ ClientImpl::ClientImpl(
     Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
     DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
     const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-    bool is_transaction_client, const std::string&, const std::string&,
+    bool is_transaction_client,
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator)
@@ -179,6 +179,7 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   pending_requests_.emplace_back(*this, callbacks, command);
   encoder_->encode(request, encoder_buffer_);
 
+  // If we have enabled queuing (to pause AUTH while credentials are being used), don't flush our buffers
   if (!queue_enabled_) {
     // If buffer is full, flush. If the buffer was empty before the request, start the timer.
     // if (!queue_enabled_ && encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
@@ -399,7 +400,7 @@ ClientPtr ClientFactoryImpl::create(
   ClientPtr client =
       ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
                          redis_command_stats, scope, is_transaction_client, auth_username,
-                         auth_password, aws_iam_config, aws_iam_authenticator);
+                         aws_iam_config, aws_iam_authenticator);
 
   if (!aws_iam_authenticator.has_value()) {
     client->initialize(auth_username, auth_password);

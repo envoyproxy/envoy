@@ -78,14 +78,14 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    absl::optional<std::string> cache_name;
-    if (!redis_config_->aws_iam_config_->cache_name().empty()) {
-      cache_name = redis_config_->aws_iam_config_->cache_name();
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
+    if (redis_config_->awsIamConfig().has_value()) {
+      aws_iam_config = redis_config_->awsIamConfig();
     }
     client_ = parent_.client_factory_.create(
         host_, parent_.dispatcher_, redis_config_, redis_command_stats_,
         parent_.cluster_.info()->statsScope(), parent_.auth_username_, parent_.auth_password_,
-        false, cache_name, parent_.aws_iam_authenticator_);
+        false, aws_iam_config, parent_.aws_iam_authenticator_);
     client_->addConnectionCallbacks(*this);
   }
 

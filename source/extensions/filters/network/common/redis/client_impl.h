@@ -81,7 +81,6 @@ public:
       DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
       bool is_transaction_client, const std::string& auth_username,
-      const std::string& auth_password,
       absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator);
@@ -90,8 +89,7 @@ public:
       Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
       DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-      bool is_transaction_client, const std::string& auth_username,
-      const std::string& auth_password,
+      bool is_transaction_client,
       absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
       absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator);
