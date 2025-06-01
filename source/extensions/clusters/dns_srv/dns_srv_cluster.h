@@ -24,7 +24,21 @@ class DnsSrvClusterFactory;
 class DnsSrvClusterTest;
 
 /**
- * TODO: add description
+ * Cluster implementation for DNS SRV records.
+ * An SRV record specifies hostname(s) for a service, each hostname additionally contains:
+ * - weight
+ * - priority
+ * - port number
+ *
+ * For each hostname, we will resolve a list of IP addresses (A/AAAA records) and populate the
+ * cluster endpoints.
+ *
+ * Current limitations:
+ * - Only c-ares DNS resolver is supported.
+ * - Only one SRV record is supported per cluster.
+ * - All resolved IP addresses will be addedd to cluster (acting like Strict DNS cluster).
+ * - Weight and priority are ignored.
+ * - Both initial SRV record and subsequent A/AAAA records resolved via the same DNS resolver.
  */
 class DnsSrvCluster : public BaseDynamicClusterImpl {
 public:
@@ -52,6 +66,7 @@ private:
                   const uint32_t dns_port);
     ~ResolveTarget();
     void startResolve();
+    void addResolvedTarget(Network::Address::InstanceConstSharedPtr address);
 
     ResolveList& parent_; // TODO: probably don't need this
     Network::DnsResolverSharedPtr dns_resolver_;
@@ -60,6 +75,7 @@ private:
     const uint32_t dns_port_;
     std::list<Network::Address::InstanceConstSharedPtr> resolved_targets_;
     Network::DnsResolver::ResolutionStatus resolve_status_;
+    std::string resolve_status_details_;
     Network::ActiveDnsQuery* active_dns_query_{nullptr};
   };
   using ResolveTargetPtr = std::unique_ptr<ResolveTarget>;
@@ -71,9 +87,12 @@ private:
     ResolveList(DnsSrvCluster& parent);
     void addTarget(ResolveTargetPtr new_target);
     void noMoreTargets();
-    void targetResolved(ResolveTarget* target);
+    void targetResolved(ResolveTarget* target, std::chrono::seconds dns_ttl);
     void maybeAllResolved();
     const std::list<ResolveTargetPtr>& getResolvedTargets() const;
+    void addResolvedTarget(ResolveTargetPtr new_target,
+                           Network::Address::InstanceConstSharedPtr resolved_address);
+    std::chrono::seconds dnsTtlRefreshRate() const;
 
   private:
     DnsSrvCluster& parent_;
@@ -81,6 +100,11 @@ private:
     bool no_more_targets_{false};
     std::list<ResolveTargetPtr> active_targets_;
     std::list<ResolveTargetPtr> resolved_targets_;
+    // Ideally, we should collect the list of targets and resolve each of them separately,
+    // respecting their TTLs. However, this is not implemented yet, so we will just use the same TTL
+    // (min) for all targets. Once this refresh rate passed, we will re-resolve the SRV and then all
+    // of the targets.
+    std::chrono::seconds dns_ttl_refresh_rate_;
   };
   using ResolveListPtr = std::unique_ptr<ResolveList>;
 

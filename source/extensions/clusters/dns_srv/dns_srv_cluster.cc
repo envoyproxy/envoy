@@ -27,7 +27,7 @@ DnsSrvCluster::DnsSrvCluster(
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      respect_dns_ttl_(cluster.respect_dns_ttl()), // TODO: use me
+      respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
       local_info_(context.serverFactoryContext().localInfo()), dns_srv_cluster_(dns_srv_cluster) {
@@ -70,12 +70,24 @@ void DnsSrvCluster::startResolve() {
 
         if (status == Network::DnsResolver::ResolutionStatus::Completed) {
           for (const auto& dns : response) {
+
             ENVOY_LOG(debug, "SRV: host: {}, port: {}, weight: {}, prio: {}", dns.srv().target_,
                       dns.srv().port_, dns.srv().weight_, dns.srv().priority_);
 
-            active_resolve_list_->addTarget(ResolveTargetPtr(
-                new ResolveTarget(*active_resolve_list_, dns_resolver_, dns_lookup_family_,
-                                  dns.srv().target_, dns.srv().port_)));
+            if (auto address = Envoy::Network::Utility::parseInternetAddressNoThrow(
+                    dns.srv().target_, 0, false);
+                address != nullptr) {
+              // SRV record target is an IP address, not a hostname.
+              ResolveTargetPtr target = ResolveTargetPtr(
+                  new ResolveTarget(*active_resolve_list_, dns_resolver_, dns_lookup_family_,
+                                    dns.srv().target_, dns.srv().port_));
+
+              active_resolve_list_->addResolvedTarget(std::move(target), address);
+            } else {
+              active_resolve_list_->addTarget(ResolveTargetPtr(
+                  new ResolveTarget(*active_resolve_list_, dns_resolver_, dns_lookup_family_,
+                                    dns.srv().target_, dns.srv().port_)));
+            }
           }
 
           active_resolve_list_->noMoreTargets();
@@ -108,20 +120,20 @@ void DnsSrvCluster::allTargetsResolved() {
     // SRV query returns a number of instances (hostnames), but each hostname
     // may potentially be resolved in a number of IP addresses
     if (target->resolve_status_ != Network::DnsResolver::ResolutionStatus::Completed) {
-      ENVOY_LOG(debug, "IP resolution for target: '{}' has failed", target->srv_record_hostname_);
+      ENVOY_LOG(debug, "IP resolution for target: '{}' has failed: {}",
+                target->srv_record_hostname_, target->resolve_status_details_);
       continue;
     }
 
     some_targets_resolved = true;
 
     for (auto& address : target->resolved_targets_) {
-
       if (all_new_hosts.count(address->asString()) > 0) {
         continue;
       }
 
       ENVOY_LOG(debug, "Endpoints size: {}", load_assignment_.endpoints().size());
-      // load_assignment_.endpoints()[0].lb_endpoints()
+
       auto host_or_status = HostImpl::create(
           info_, target->srv_record_hostname_, address,
           // TODO(zyfjeff): Created through metadata shared pool
@@ -134,8 +146,10 @@ void DnsSrvCluster::allTargetsResolved() {
 
       if (!host_or_status.ok()) {
         // TODO: update counter?
-        // TODO: log address
-        ENVOY_LOG(debug, "Failed to create host record for: '{}'", target->srv_record_hostname_);
+        host_or_status.status().message();
+        ENVOY_LOG(debug, "Failed to create host record for: '{}': code={}, message='{}'",
+                  target->srv_record_hostname_, host_or_status.status().raw_code(),
+                  host_or_status.status().message());
         continue;
       }
 
@@ -180,22 +194,40 @@ void DnsSrvCluster::allTargetsResolved() {
 
   onPreInitComplete();
 
+  std::chrono::milliseconds final_refresh_rate_ms = dns_refresh_rate_ms_;
+  if (respect_dns_ttl_) {
+    std::chrono::seconds dns_ttl = active_resolve_list_->dnsTtlRefreshRate();
+    if (dns_ttl != std::chrono::seconds::max() && dns_ttl.count() > 0) {
+      final_refresh_rate_ms = std::chrono::duration_cast<std::chrono::milliseconds>(dns_ttl);
+    }
+  }
+
   active_resolve_list_.reset();
-  // TODO: consider TTL returned by the DNS
-  resolve_timer_->enableTimer(dns_refresh_rate_ms_);
+
+  resolve_timer_->enableTimer(final_refresh_rate_ms);
 }
 
 /////////////  DnsSrvCluster::ResolveList::ResolveList  //////////////////
-DnsSrvCluster::ResolveList::ResolveList(DnsSrvCluster& parent) : parent_(parent) {}
+DnsSrvCluster::ResolveList::ResolveList(DnsSrvCluster& parent)
+    : parent_(parent), dns_ttl_refresh_rate_(std::chrono::seconds::max()) {}
 
 void DnsSrvCluster::ResolveList::addTarget(ResolveTargetPtr new_target) {
-  // new_target->startResolve();
+  auto target_ptr = new_target.get();
   active_targets_.emplace_back(std::move(new_target));
-  active_targets_.back()->startResolve();
+  target_ptr->startResolve();
+}
+
+// In case when SRV record target is an IP address, not a hostname
+void DnsSrvCluster::ResolveList::addResolvedTarget(
+    ResolveTargetPtr new_target, Network::Address::InstanceConstSharedPtr resolved_address) {
+  auto target_ptr = new_target.get();
+  resolved_targets_.emplace_back(std::move(new_target));
+  target_ptr->addResolvedTarget(resolved_address);
 }
 
 // callback, A/AAAA record resolved for one of the SRV record
-void DnsSrvCluster::ResolveList::targetResolved(ResolveTarget* target) {
+void DnsSrvCluster::ResolveList::targetResolved(ResolveTarget* target,
+                                                std::chrono::seconds dns_ttl) {
   auto p = std::find_if(
       active_targets_.begin(), active_targets_.end(),
       [target](const auto& container_value) { return container_value.get() == target; });
@@ -204,6 +236,8 @@ void DnsSrvCluster::ResolveList::targetResolved(ResolveTarget* target) {
 
   resolved_targets_.push_back(std::move(*p));
   active_targets_.erase(p);
+
+  dns_ttl_refresh_rate_ = std::min(dns_ttl_refresh_rate_, dns_ttl);
 
   maybeAllResolved();
 }
@@ -223,6 +257,10 @@ void DnsSrvCluster::ResolveList::maybeAllResolved() {
 const std::list<DnsSrvCluster::ResolveTargetPtr>&
 DnsSrvCluster::ResolveList::getResolvedTargets() const {
   return resolved_targets_;
+}
+
+std::chrono::seconds DnsSrvCluster::ResolveList::dnsTtlRefreshRate() const {
+  return dns_ttl_refresh_rate_;
 }
 
 /////////////  DnsSrvCluster::ResolveList::ResolveTarget  //////////////////
@@ -250,6 +288,7 @@ void DnsSrvCluster::ResolveTarget::startResolve() {
 
         active_dns_query_ = nullptr;
 
+        std::chrono::seconds dns_ttl = std::chrono::seconds::max();
         if (status == Network::DnsResolver::ResolutionStatus::Completed) {
           for (const auto& resp : response) {
             const auto& addrinfo = resp.addrInfo();
@@ -260,12 +299,20 @@ void DnsSrvCluster::ResolveTarget::startResolve() {
             auto address = Network::Utility::getAddressWithPort(*(addrinfo.address_), dns_port_);
 
             resolved_targets_.push_back(address);
+            dns_ttl = std::min(dns_ttl, addrinfo.ttl_);
           }
         }
 
         resolve_status_ = status;
-        parent_.targetResolved(this);
+        resolve_status_details_ = details;
+        parent_.targetResolved(this, dns_ttl);
       });
+}
+
+void DnsSrvCluster::ResolveTarget::addResolvedTarget(
+    Network::Address::InstanceConstSharedPtr address) {
+  resolved_targets_.push_back(std::move(address));
+  parent_.targetResolved(this, std::chrono::seconds::max());
 }
 
 /////////////  DnsSrvClusterFactory  //////////////////
@@ -285,8 +332,6 @@ DnsSrvClusterFactory::createClusterWithConfig(
                     "'envoy.network.dns_resolver.cares'. Current value: '{}'",
                     cluster.typed_dns_resolver_config().name()));
   }
-
-  // TODO: Validate the name of the record
 
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::make_pair(std::shared_ptr<DnsSrvCluster>(new DnsSrvCluster(
