@@ -87,7 +87,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_issued = 0;
         LoadMetricStats::StatMap load_metrics;
 
-        // Store per-host stats for endpoint granularity reporting
+        // Store per-host stats for endpoint granularity reporting.
         struct EndpointStats {
           uint64_t rq_success;
           uint64_t rq_error;
@@ -117,7 +117,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
               }
             }
           }
-          // Store endpoint stats for this host
+          // Store endpoint stats for this host.
           endpoint_stats_map[host.get()] = {host_rq_success, host_rq_error, host_rq_active,
                                             host_rq_issued};
         }
