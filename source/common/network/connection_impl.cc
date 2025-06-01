@@ -921,6 +921,13 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
+bool ConnectionImpl::setSocketOption(Network::Socket::Option::Details option) {
+  auto sockopt = std::make_shared<SocketOptionImpl>(option.name_, option.value_);
+  socket_->addOption(sockopt);
+  sockopt->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING);
+  return true;
+}
+
 absl::string_view ConnectionImpl::transportFailureReason() const {
   if (!failure_reason_.empty()) {
     return failure_reason_;
