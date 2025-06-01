@@ -32,11 +32,6 @@ const std::string& DelegatingRouteEntry::clusterName() const {
   return base_route_->routeEntry()->clusterName();
 }
 
-const std::string
-DelegatingRouteEntry::getRequestHostValue(const Http::RequestHeaderMap& headers) const {
-  return base_route_->routeEntry()->getRequestHostValue(headers);
-}
-
 Http::Code DelegatingRouteEntry::clusterNotFoundResponseCode() const {
   return base_route_->routeEntry()->clusterNotFoundResponseCode();
 }

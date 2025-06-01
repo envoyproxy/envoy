@@ -7,6 +7,15 @@ behavior_changes:
     As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
     grpc_credentials/aws_iam extension is being deleted. Any configuration referencing this extension
     will fail to load.
+- area: prefix_match_map
+  change: |
+    :ref:`prefix_match_map <envoy_v3_api_field_config.common.matcher.v3.Matcher.MatcherTree.prefix_match_map>`
+    now continues to search for a match with shorter prefix if a longer match
+    does not find an action. This brings it in line with the behavior of ``matcher_list``.
+    This change can temporarily be reverted by setting the runtime guard
+    ``envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss`` to false.
+    If the old behavior is desired more permanently, this can be achieved in config by setting
+    an ``on_no_match`` action that responds with 404 for each subtree.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -112,6 +121,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
+    used to record the original host header value before it is mutated by the router filter.
 - area: stateful_session
   change: |
     Supports envelope stateful session extension to keep the exist session header value
