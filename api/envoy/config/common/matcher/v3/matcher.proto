@@ -41,6 +41,17 @@ message Matcher {
       // Protocol-specific action to take.
       core.v3.TypedExtensionConfig action = 2;
     }
+
+    // If true, the action will be taken but the caller will behave as if no
+    // match was found. This applies both to actions directly encoded in the
+    // action field and to actions returned from a nested matcher tree in the
+    // matcher field. A subsequent matcher on_no_match action will be used
+    // instead.
+    //
+    // This field is not supported in all contexts in which the matcher API is
+    // used. If this field is set in a context in which it's not supported,
+    // the resource will be rejected.
+    bool keep_matching = 3;
   }
 
   // A linear list of field matchers.

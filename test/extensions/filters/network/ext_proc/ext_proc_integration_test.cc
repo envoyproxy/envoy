@@ -662,20 +662,53 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleDataChunks) {
   EXPECT_EQ(request1.read_data().end_of_stream(), false);
 
   sendReadGrpcMessage("chunk1_processed", false, true);
-  ASSERT_TRUE(fake_upstream_connection->waitForData(16));
+  size_t total_upstream_data = 16; // Already received "chunk1_processed"
+  ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data)); // "chunk1_processed"
 
   ASSERT_TRUE(tcp_client->write("chunk2", true));
 
-  // Second chunk should also be sent to ext_proc
   ProcessingRequest request2;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request2));
   EXPECT_EQ(request2.has_read_data(), true);
-  EXPECT_EQ(request2.read_data().data(), "chunk2");
-  EXPECT_EQ(request2.read_data().end_of_stream(), true);
 
-  // Respond to second chunk
-  sendReadGrpcMessage("chunk2_processed", true);
-  ASSERT_TRUE(fake_upstream_connection->waitForData(16));
+  // Handle potential TCP fragmentation
+  if (!request2.read_data().end_of_stream()) {
+    // We got partial data without end_of_stream
+    std::string partial_response = request2.read_data().data() + "_processed";
+    sendReadGrpcMessage(partial_response, false);
+
+    // Wait for upstream to receive the partial data
+    total_upstream_data += partial_response.length();
+    ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+
+    // Wait for the final message with end_of_stream
+    ProcessingRequest request3;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request3));
+    EXPECT_EQ(request3.has_read_data(), true);
+    EXPECT_EQ(request3.read_data().end_of_stream(), true);
+
+    // Respond to the final message
+    std::string final_response = request3.read_data().data() + "_processed";
+    sendReadGrpcMessage(final_response, true);
+
+    // Wait for the final data if non-empty
+    if (!request3.read_data().data().empty()) {
+      total_upstream_data += final_response.length();
+      ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+    }
+  } else {
+    // We got the complete chunk2 with end_of_stream in one message
+    EXPECT_EQ(request2.read_data().data(), "chunk2");
+    EXPECT_EQ(request2.read_data().end_of_stream(), true);
+
+    sendReadGrpcMessage("chunk2_processed", true);
+
+    total_upstream_data += 16; // "chunk2_processed"
+    ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+  }
+
+  // Wait for half-close to ensure end_of_stream was properly propagated
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();

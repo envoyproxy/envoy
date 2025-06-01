@@ -187,8 +187,7 @@ private:
   std::vector<std::string> quic_suffixes_;
   int num_timeouts_to_trigger_port_migration_ = 0;
 #if defined(__APPLE__)
-  // TODO(abeyad): once stable, consider setting the default to true.
-  bool respect_system_proxy_settings_ = false;
+  bool respect_system_proxy_settings_ = true;
   int proxy_settings_refresh_interval_secs_ = 10;
   int ios_network_service_type_ = 0;
 #endif

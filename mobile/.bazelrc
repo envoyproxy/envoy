@@ -20,12 +20,11 @@ build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules
 build --features=swift.debug_prefix_map
 build --host_force_python=PY3
-build --macos_minimum_os=13.3
-build --ios_minimum_os=16.3
-build --ios_simulator_version=17.4
+build --macos_minimum_os=13.4
+# Use MINIMUM_IOS_VERSION in config.bzl instead
+# build --ios_minimum_os=16.3
 build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
-build --xcode_version=15.3
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
@@ -42,7 +41,7 @@ build --swiftcopt=-wmo
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
 # Temporarily set to C++17 because Android NDK does not fully support C++20 yet.
-build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
+build:android --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 # Unset per_object_debug_info. Causes failures on Android Linux release builds.
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.

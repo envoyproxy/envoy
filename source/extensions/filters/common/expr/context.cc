@@ -480,6 +480,18 @@ const XDSLookupValues& XDSLookupValues::get() {
              }
              return {};
            }},
+          {UpstreamHostLocalityMetadata,
+           [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_ == nullptr) {
+               return {};
+             }
+             const auto upstream_info = wrapper.info_->upstreamInfo();
+             if (upstream_info && upstream_info->upstreamHost()) {
+               return CelProtoWrapper::CreateMessage(
+                   upstream_info->upstreamHost()->localityMetadata().get(), &wrapper.arena_);
+             }
+             return {};
+           }},
           {FilterChainName,
            [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
              if (wrapper.info_ == nullptr) {
