@@ -332,7 +332,7 @@ static_resources:
             region: us-east-1
             service_name: elasticache
             cache_name: testcache
-            expiration_time: 900s            
+            expiration_time: 900s
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_0
@@ -354,7 +354,7 @@ static_resources:
             region: us-east-1
             service_name: elasticache
             cache_name: testcache
-            expiration_time: 900s            
+            expiration_time: 900s
       load_assignment:
         cluster_name: cluster_1
         endpoints:
@@ -374,7 +374,7 @@ static_resources:
             region: us-east-1
             service_name: elasticache
             cache_name: testcache
-            expiration_time: 900s            
+            expiration_time: 900s
       lb_policy: RANDOM
       load_assignment:
         cluster_name: cluster_2
