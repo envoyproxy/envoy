@@ -118,8 +118,9 @@ public:
 
 namespace AwsIamAuthenticator {
 class MockAwsIamAuthenticator : public Envoy::Extensions::NetworkFilters::Common::Redis::
-                                    AwsIamAuthenticator::AwsIamAuthenticatorBase {
+                                    AwsIamAuthenticator::AwsIamAuthenticatorImpl {
 public:
+ 
   ~MockAwsIamAuthenticator() override = default;
   MOCK_METHOD(std::string, getAuthToken,
               (absl::string_view auth_user,

@@ -81,8 +81,7 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   auto mock_authenticator = std::make_shared<AwsIamAuthenticator::MockAwsIamAuthenticator>();
   absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> authenticator =
       absl::make_optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>(
-          std::dynamic_pointer_cast<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorImpl>(
-              mock_authenticator));
+              mock_authenticator);
 
   EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
   EXPECT_CALL(*mock_authenticator, getAuthToken("username", _))
