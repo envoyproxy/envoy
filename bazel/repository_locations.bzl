@@ -117,8 +117,8 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
         use_category = ["build", "controlplane", "dataplane_core"],
         implied_untracked_deps = [
-            "toolshed_tsan_libs",
-            "toolshed_msan_libs",
+            "tsan_libs",
+            "msan_libs",
         ],
         release_date = "2025-06-01",
         cpe = "N/A",
