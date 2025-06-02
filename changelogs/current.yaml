@@ -135,6 +135,14 @@ new_features:
   change: |
     Added Override Host Load Balancing policy. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
+- area: load_balancing
+  change: |
+    Added :ref:`hash policy support
+    <envoy_v3_api_msg_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig.hash_policy>`
+    to the ring hash and maglev load balancing policies. If the hash policy in the load balancer is
+    configured, the
+    :ref:`route level hash policy <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
+    will be ignored.
 - area: lua
   change: |
     Added support for accessing filter context.
@@ -182,4 +190,5 @@ new_features:
     If configured, the OAuth2 filter will redirect users to this endpoint when they access the
     :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`. This allows users to
     be logged out of the Authorization server.
+
 deprecated:
