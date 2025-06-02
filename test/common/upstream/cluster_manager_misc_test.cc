@@ -722,7 +722,7 @@ TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterOpts) {
   expectSetsockopts(names_vals);
 }
 
-TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterManangerOpts) {
+TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterManagerOpts) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
