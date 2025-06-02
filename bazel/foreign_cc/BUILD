@@ -446,7 +446,7 @@ cc_library(
     name = "libcxx_msan_wrapper",
     visibility = ["//visibility:public"],
     deps = select({
-        "//bazel:msan_build": ["@toolshed_msan_libs//:msan_libs"],
+        "//bazel:msan_build": ["@msan_libs"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
@@ -456,7 +456,7 @@ cc_library(
     name = "libcxx_tsan_wrapper",
     visibility = ["//visibility:public"],
     deps = select({
-        "//bazel:tsan_build": ["@toolshed_tsan_libs//:tsan_libs"],
+        "//bazel:tsan_build": ["@tsan_libs"],
         "//conditions:default": [],
     }),
     alwayslink = 1,
