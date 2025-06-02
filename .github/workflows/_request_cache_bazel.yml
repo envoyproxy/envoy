@@ -89,11 +89,12 @@ jobs:
           cd /source
           git clone "$GITHUB_WORKSPACE" .
 
-          echo "Fetching: ${{ inputs.targets }}"
+          targets=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
+          echo "Fetching: ${targets}"
           # ironically the repository_cache is just about the only thing you dont want to cache
           bazel --output_user_root=/build/bazel_root \
                 --output_base=/build/bazel_root/base \
-                aquery "deps(${{ inputs.targets }})" \
+                aquery "deps(${targets})" \
                 --config=ci \
                 --repository_cache=/tmp/cache \
                 ${{ inputs.bazel-extra }} \

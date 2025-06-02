@@ -662,20 +662,53 @@ TEST_P(NetworkExtProcFilterIntegrationTest, MultipleDataChunks) {
   EXPECT_EQ(request1.read_data().end_of_stream(), false);
 
   sendReadGrpcMessage("chunk1_processed", false, true);
-  ASSERT_TRUE(fake_upstream_connection->waitForData(16));
+  size_t total_upstream_data = 16; // Already received "chunk1_processed"
+  ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data)); // "chunk1_processed"
 
   ASSERT_TRUE(tcp_client->write("chunk2", true));
 
-  // Second chunk should also be sent to ext_proc
   ProcessingRequest request2;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request2));
   EXPECT_EQ(request2.has_read_data(), true);
-  EXPECT_EQ(request2.read_data().data(), "chunk2");
-  EXPECT_EQ(request2.read_data().end_of_stream(), true);
 
-  // Respond to second chunk
-  sendReadGrpcMessage("chunk2_processed", true);
-  ASSERT_TRUE(fake_upstream_connection->waitForData(16));
+  // Handle potential TCP fragmentation
+  if (!request2.read_data().end_of_stream()) {
+    // We got partial data without end_of_stream
+    std::string partial_response = request2.read_data().data() + "_processed";
+    sendReadGrpcMessage(partial_response, false);
+
+    // Wait for upstream to receive the partial data
+    total_upstream_data += partial_response.length();
+    ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+
+    // Wait for the final message with end_of_stream
+    ProcessingRequest request3;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request3));
+    EXPECT_EQ(request3.has_read_data(), true);
+    EXPECT_EQ(request3.read_data().end_of_stream(), true);
+
+    // Respond to the final message
+    std::string final_response = request3.read_data().data() + "_processed";
+    sendReadGrpcMessage(final_response, true);
+
+    // Wait for the final data if non-empty
+    if (!request3.read_data().data().empty()) {
+      total_upstream_data += final_response.length();
+      ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+    }
+  } else {
+    // We got the complete chunk2 with end_of_stream in one message
+    EXPECT_EQ(request2.read_data().data(), "chunk2");
+    EXPECT_EQ(request2.read_data().end_of_stream(), true);
+
+    sendReadGrpcMessage("chunk2_processed", true);
+
+    total_upstream_data += 16; // "chunk2_processed"
+    ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+  }
+
+  // Wait for half-close to ensure end_of_stream was properly propagated
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
@@ -918,6 +951,68 @@ TEST_P(NetworkExtProcFilterIntegrationTest, BothTypedAndUntypedMetadataForwardin
 
   ASSERT_TRUE(fake_upstream_connection->close());
   tcp_client->close();
+}
+
+// Test connection status CLOSE handling in responses
+TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusCloseHandling) {
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ProcessingRequest request;
+  waitForFirstGrpcMessage(request);
+
+  // Create a response with CLOSE status
+  ProcessingResponse response;
+  response.set_connection_status(ProcessingResponse::CLOSE);
+  auto* read_data = response.mutable_read_data();
+  read_data->set_data("modified_data");
+  read_data->set_end_of_stream(false);
+
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(response);
+
+  // Verify counters
+  verifyCounters({{"connections_closed", 1}});
+
+  // Connection should be closed
+  ASSERT_FALSE(tcp_client->write("", true));
+  tcp_client->waitForDisconnect();
+}
+
+// Test connection status CLOSE_RST handling in responses
+TEST_P(NetworkExtProcFilterIntegrationTest, ConnectionStatusRSTHandling) {
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("network_ext_proc_filter"));
+  ASSERT_TRUE(tcp_client->write("client_data", false));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+
+  ProcessingRequest request;
+  ASSERT_TRUE(grpc_upstream_->waitForHttpConnection(*dispatcher_, processor_connection_));
+  ASSERT_TRUE(processor_connection_->waitForNewStream(*dispatcher_, processor_stream_));
+  ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, request));
+
+  // Create a response with CLOSE_RST status
+  ProcessingResponse response;
+  response.set_connection_status(ProcessingResponse::CLOSE_RST);
+  auto* read_data = response.mutable_read_data();
+  read_data->set_data("modified_data");
+  read_data->set_end_of_stream(false);
+
+  processor_stream_->startGrpcStream();
+  processor_stream_->sendGrpcMessage(response);
+
+  // Verify counters - should now have 1 close in total and 1 reset
+  verifyCounters({{"connections_closed", 1}, {"connections_reset", 1}});
+
+  // Connection should be closed
+  ASSERT_FALSE(tcp_client->write("", true));
+  tcp_client->waitForDisconnect();
 }
 
 } // namespace ExtProc

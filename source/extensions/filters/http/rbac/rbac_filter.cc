@@ -103,8 +103,9 @@ DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(enforcedEngineResultField, rules_stat_pr
                                         rulesStatPrefix, EnforcedEngineResultField)
 
 const Filters::Common::RBAC::RoleBasedAccessControlEngine*
-RoleBasedAccessControlFilterConfig::engine(const Http::StreamFilterCallbacks* callbacks,
-                                           Filters::Common::RBAC::EnforcementMode mode) const {
+RoleBasedAccessControlFilterConfig::engine(
+    const Http::StreamFilterCallbacks* callbacks,
+    const Filters::Common::RBAC::EnforcementMode mode) const {
   const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<
       RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);
 
@@ -144,8 +145,8 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
 }
 
 // Evaluates the shadow engine policy and updates metrics accordingly
-bool RoleBasedAccessControlFilter::evaluateShadowEngine(Http::RequestHeaderMap& headers,
-                                                        ProtobufWkt::Struct& metrics) {
+bool RoleBasedAccessControlFilter::evaluateShadowEngine(const Http::RequestHeaderMap& headers,
+                                                        ProtobufWkt::Struct& metrics) const {
   const auto shadow_engine =
       config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Shadow);
   if (shadow_engine == nullptr) {
@@ -154,7 +155,7 @@ bool RoleBasedAccessControlFilter::evaluateShadowEngine(Http::RequestHeaderMap& 
 
   auto& fields = *metrics.mutable_fields();
   std::string effective_policy_id;
-  std::string shadow_response_code =
+  absl::string_view shadow_response_code =
       Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
 
   const bool per_rule_stats_enabled = config_->perRuleStatsEnabled(callbacks_);
@@ -205,11 +206,12 @@ RoleBasedAccessControlFilter::evaluateEnforcedEngine(Http::RequestHeaderMap& hea
   const bool allowed = engine->handleAction(*callbacks_->connection(), headers,
                                             callbacks_->streamInfo(), &effective_policy_id);
 
-  const std::string log_policy_id = effective_policy_id.empty() ? "none" : effective_policy_id;
-
+  absl::string_view log_policy_id = effective_policy_id;
   if (!effective_policy_id.empty()) {
     *fields[config_->enforcedEffectivePolicyIdField(callbacks_)].mutable_string_value() =
         effective_policy_id;
+  } else {
+    log_policy_id = "none";
   }
 
   if (allowed) {
@@ -267,20 +269,22 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
   const bool shadow_engine_evaluated = evaluateShadowEngine(headers, metrics);
 
   // Evaluate enforced engine if it exists
-  Http::FilterHeadersStatus status = evaluateEnforcedEngine(headers, metrics);
+  const Http::FilterHeadersStatus status = evaluateEnforcedEngine(headers, metrics);
 
-  // If we evaluated either engine, set the dynamic metadata
-  if (shadow_engine_evaluated || status == Http::FilterHeadersStatus::StopIteration) {
+  // Set dynamic metadata if either engine was evaluated
+  const bool enforced_engine_evaluated =
+      status == Http::FilterHeadersStatus::StopIteration ||
+      config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced) != nullptr;
+
+  if (shadow_engine_evaluated || enforced_engine_evaluated) {
     callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
+  }
+
+  if (status == Http::FilterHeadersStatus::StopIteration) {
     return status;
   }
 
-  // Special case: shadow engine evaluated but no enforced engine
-  if (shadow_engine_evaluated) {
-    callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.rbac", metrics);
-  }
-
-  ENVOY_LOG(debug, "no engine, allowed by default");
+  ENVOY_LOG(debug, "allowed by default or by policy");
   return Http::FilterHeadersStatus::Continue;
 }
 
