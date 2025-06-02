@@ -422,11 +422,8 @@ Filter::StreamOpenState Filter::openStream() {
     ExternalProcessorStreamPtr stream_object =
         grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
-    if (processing_complete_) {
-      // Stream failed while starting and either onGrpcError or onGrpcClose was already called
-      // Asserts that `stream_object` is nullptr since it is not valid to be used any further
-      // beyond this point.
-      ASSERT(stream_object == nullptr);
+    if (processing_complete_ || stream_object == nullptr) {
+      // Stream failed while starting and either onGrpcError or onGrpcClose was already called.
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
@@ -737,12 +734,16 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     } else {
       ENVOY_STREAM_LOG(trace, "Header processing still in progress -- holding body data",
                        *decoder_callbacks_);
-      // We don't know what to do with the body until the response comes back.
-      // We must buffer it in case we need it when that happens. Watermark will be raised when the
-      // buffered data reaches the buffer's watermark limit. When end_stream is true, we need to
-      // StopIterationAndWatermark as well to stop the ActiveStream from returning error when the
-      // last chunk added to stream buffer exceeds the buffer limit.
       state.setPaused(true);
+      // Buffer the body when waiting for header response.
+      // For BUFFERED mode, return StopIterationAndBuffer so when buffered data reaches
+      // the per-connection-limit, Envoy will a send a 413: payload-too-large local reply.
+      // For non-BUFFERED mode, return StopIterationAndWatermark so watermark can be raised
+      // when the buffered data reaches the per-connection-limit. The watermark will be cleared
+      // during the header response handling at which Envoy will send the buffered data out.
+      if (state.bodyMode() == ProcessingMode::BUFFERED) {
+        return FilterDataStatus::StopIterationAndBuffer;
+      }
       return FilterDataStatus::StopIterationAndWatermark;
     }
   }
@@ -774,8 +775,8 @@ void Filter::encodeProtocolConfig(ProcessingRequest& req) {
   ENVOY_STREAM_LOG(debug, "Trying to encode filter protocol configurations", *decoder_callbacks_);
   if (!protocol_config_encoded_ && !config_->observabilityMode()) {
     auto* protocol_config = req.mutable_protocol_config();
-    protocol_config->set_request_body_mode(config_->processingMode().request_body_mode());
-    protocol_config->set_response_body_mode(config_->processingMode().response_body_mode());
+    protocol_config->set_request_body_mode(decoding_state_.bodyMode());
+    protocol_config->set_response_body_mode(encoding_state_.bodyMode());
     protocol_config->set_send_body_without_waiting_for_header_response(
         config_->sendBodyWithoutWaitingForHeaderResponse());
     protocol_config_encoded_ = true;

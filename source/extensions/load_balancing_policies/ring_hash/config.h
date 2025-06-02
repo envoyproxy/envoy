@@ -33,14 +33,14 @@ public:
              const Protobuf::Message& config) override {
     ASSERT(dynamic_cast<const RingHashLbProto*>(&config) != nullptr);
     const RingHashLbProto& typed_config = dynamic_cast<const RingHashLbProto&>(config);
-    // TODO(wbocode): to merge the legacy and typed config and related constructors into one.
     return Upstream::LoadBalancerConfigPtr{new Upstream::TypedRingHashLbConfig(typed_config)};
   }
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadLegacy(Server::Configuration::ServerFactoryContext&,
              const Upstream::ClusterProto& cluster) override {
-    return Upstream::LoadBalancerConfigPtr{new Upstream::LegacyRingHashLbConfig(cluster)};
+    return Upstream::LoadBalancerConfigPtr{new Upstream::TypedRingHashLbConfig(
+        cluster.common_lb_config(), cluster.ring_hash_lb_config())};
   }
 };
 

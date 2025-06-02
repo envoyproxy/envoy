@@ -10,8 +10,8 @@ Each credentials provider inherits from `CredentialsProvider`.
 
 A credential provider chain (`Envoy::Extensions::Common::Aws::CredentialsProviderChain`) is a simple ordered list of credential providers. Convenience methods
 for creating standard credential providers are provided, the most common being the default credential provider chain
-(`Envoy::Extensions::Common::Aws::DefaultCredentialsProviderChain`)
-By creating the `DefaultCredentialsProviderChain` you receive a list of credential providers in the following order, which align to the precedence in which credentials will be retrieved. Once an earlier credentials provider returns credentials via `getCredentials()`, no further providers will be checked.
+(`Extensions::Common::Aws::CommonCredentialsProviderChain::defaultCredentialsProviderChain`)
+By creating the `defaultCredentialsProviderChain` you receive a list of credential providers in the following order, which align to the precedence in which credentials will be retrieved. Once an earlier credentials provider returns credentials via `getCredentials()`, no further providers will be checked.
 
 - `EnvironmentCredentialsProvider`
 - `CredentialsFileCredentialsProvider`

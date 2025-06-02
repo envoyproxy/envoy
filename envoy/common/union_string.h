@@ -6,6 +6,7 @@
 #include "source/common/common/utility.h"
 
 #include "absl/container/inlined_vector.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/variant.h"
 
@@ -60,7 +61,12 @@ public:
    */
   UnionStringBase() : buffer_(std::in_place_type<InlinedStringVector>) {
     ASSERT((getInVec(buffer_).capacity()) >= MaxIntegerLength);
-    ASSERT(valid());
+    assertValid();
+  }
+
+  inline void assertValid() const {
+    ASSERT(valid(), absl::StrCat(typeid(Validator).name(), " failed to validate string \"",
+                                 getStringView(), "\""));
   }
 
   /**
@@ -68,7 +74,7 @@ public:
    * @param ref_value MUST point to data that will live beyond the lifetime of any request/response
    *        using the string (since a codec may optimize for zero copy).
    */
-  explicit UnionStringBase(absl::string_view ref_value) : buffer_(ref_value) { ASSERT(valid()); }
+  explicit UnionStringBase(absl::string_view ref_value) : buffer_(ref_value) { assertValid(); }
 
   UnionStringBase(UnionStringBase&& move_value) noexcept : buffer_(std::move(move_value.buffer_)) {
     move_value.clear();
@@ -84,7 +90,9 @@ public:
     // Make sure the requested memory allocation is below uint32_t::max
     const uint64_t new_capacity = static_cast<uint64_t>(data_size) + size();
     validateCapacity(new_capacity);
-    ASSERT(valid(absl::string_view(data, data_size)));
+    ASSERT(valid(absl::string_view(data, data_size)),
+           absl::StrCat(typeid(Validator).name(), " failed to validate string \"",
+                        absl::string_view(data, data_size), "\""));
 
     switch (type()) {
     case Type::Reference: {
@@ -171,7 +179,7 @@ public:
 
     getInVec(buffer_).reserve(size);
     getInVec(buffer_).assign(data, data + size);
-    ASSERT(valid());
+    assertValid();
   }
 
   /**
@@ -207,7 +215,7 @@ public:
    */
   void setReference(absl::string_view ref_value) {
     buffer_ = ref_value;
-    ASSERT(valid());
+    assertValid();
   }
 
   /**

@@ -62,8 +62,8 @@ TEST(QuicLbTest, InvalidConfig) {
   envoy::extensions::transport_sockets::tls::v3::Secret encryption_parameters;
   encryption_parameters.set_name(kSecretName);
   encryption_parameters.mutable_generic_secret();
-  auto status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-                    .addStaticSecret(encryption_parameters);
+  auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryption_parameters);
   EXPECT_TRUE(status.ok());
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(), "Missing 'encryption_key'");
@@ -73,9 +73,9 @@ TEST(QuicLbTest, InvalidConfig) {
   envoy::config::core::v3::DataSource key;
   key.set_inline_string("bad");
   secrets["encryption_key"] = key;
-  factory_context.transport_socket_factory_context_.server_context_.resetSecretManager();
-  status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-               .addStaticSecret(encryption_parameters);
+  factory_context.server_factory_context_.resetSecretManager();
+  status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryption_parameters);
   EXPECT_TRUE(status.ok());
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(),
@@ -84,9 +84,9 @@ TEST(QuicLbTest, InvalidConfig) {
   // Missing version.
   key.set_inline_string("0123456789abcdef");
   secrets["encryption_key"] = key;
-  factory_context.transport_socket_factory_context_.server_context_.resetSecretManager();
-  status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-               .addStaticSecret(encryption_parameters);
+  factory_context.server_factory_context_.resetSecretManager();
+  status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryption_parameters);
   EXPECT_TRUE(status.ok());
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(), "Missing 'configuration_version'");
@@ -97,9 +97,9 @@ TEST(QuicLbTest, InvalidConfig) {
   version_bytes.resize(2);
   version.set_inline_bytes(version_bytes);
   secrets["configuration_version"] = version;
-  factory_context.transport_socket_factory_context_.server_context_.resetSecretManager();
-  status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-               .addStaticSecret(encryption_parameters);
+  factory_context.server_factory_context_.resetSecretManager();
+  status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryption_parameters);
   EXPECT_TRUE(status.ok());
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(),
@@ -110,9 +110,9 @@ TEST(QuicLbTest, InvalidConfig) {
   version_bytes.data()[0] = 7;
   version.set_inline_bytes(version_bytes);
   secrets["configuration_version"] = version;
-  factory_context.transport_socket_factory_context_.server_context_.resetSecretManager();
-  status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-               .addStaticSecret(encryption_parameters);
+  factory_context.server_factory_context_.resetSecretManager();
+  status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryption_parameters);
   EXPECT_TRUE(status.ok());
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_EQ(factory_or_status.status().message(),
@@ -122,9 +122,9 @@ TEST(QuicLbTest, InvalidConfig) {
   version_bytes.data()[0] = 6;
   version.set_inline_bytes(version_bytes);
   secrets["configuration_version"] = version;
-  factory_context.transport_socket_factory_context_.server_context_.resetSecretManager();
-  status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-               .addStaticSecret(encryption_parameters);
+  factory_context.server_factory_context_.resetSecretManager();
+  status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryption_parameters);
   EXPECT_TRUE(status.ok());
   factory_or_status = Factory::create(cfg, factory_context);
   EXPECT_TRUE(factory_or_status.ok());
@@ -171,8 +171,8 @@ TEST(QuicLbTest, Unencrypted) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  auto status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-                    .addStaticSecret(encryptionParamaters(0));
+  auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
   auto generator = createTypedIdGenerator(*factory_or_status.value());
@@ -198,8 +198,8 @@ TEST(QuicLbTest, TooLong) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  auto status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-                    .addStaticSecret(encryptionParamaters(0));
+  auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
   auto generator = createTypedIdGenerator(*factory_or_status.value());
@@ -217,8 +217,8 @@ TEST(QuicLbTest, WorkerSelector) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  auto status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-                    .addStaticSecret(encryptionParamaters(0));
+  auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
   constexpr uint32_t concurrency = 8;
@@ -291,8 +291,7 @@ TEST(QuicLbTest, EmptySecretCallback) {
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   auto secret_mgr_unique = std::make_unique<Secret::MockSecretManager>();
   Secret::MockSecretManager* secret_manager = secret_mgr_unique.get();
-  factory_context.transport_socket_factory_context_.server_context_.secret_manager_ =
-      std::move(secret_mgr_unique);
+  factory_context.server_factory_context_.secret_manager_ = std::move(secret_mgr_unique);
   auto secret_provider = std::make_shared<Secret::MockGenericSecretConfigProvider>();
 
   EXPECT_CALL(*secret_manager, findOrCreateGenericSecretProvider(_, _, _, _))

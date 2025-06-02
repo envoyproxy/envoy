@@ -18,7 +18,6 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
-        "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",

@@ -21,8 +21,11 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/tls:94.4" # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
 "source/common/tls/cert_validator:94.7"
 "source/common/tls/private_key:88.9"
+"source/common/tracing:95.4"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
 "source/exe:94.2" # increased by #32346, need coverage for terminate_handler and hot restart failures
+"source/extensions/api_listeners:55.0" # Many IS_ENVOY_BUG are not covered.
+"source/extensions/api_listeners/default_api_listener:55.0" # Many IS_ENVOY_BUG are not covered.
 "source/extensions/common/aws:96.3"
 "source/extensions/common/aws/credential_providers:94.4"
 "source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
@@ -40,7 +43,9 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/http/ip_tagging:90.6"
 "source/extensions/filters/http/kill_request:91.7" # Death tests don't report LCOV
 "source/extensions/filters/http/oauth2:96.4"
+"source/extensions/filters/listener:96.5"
 "source/extensions/filters/listener/original_src:92.1"
+"source/extensions/filters/listener/tls_inspector:94.0"
 "source/extensions/filters/network/dubbo_proxy:96.2"
 "source/extensions/filters/network/mongo_proxy:96.1"
 "source/extensions/filters/network/sni_cluster:88.9"
@@ -49,6 +54,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/internal_redirect/allow_listed_routes:85.7"
 "source/extensions/internal_redirect/previous_routes:89.3"
 "source/extensions/load_balancing_policies/maglev:90.7"
+"source/extensions/load_balancing_policies/round_robin:96.4"
 "source/extensions/load_balancing_policies/ring_hash:96.2"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"

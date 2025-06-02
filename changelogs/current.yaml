@@ -7,6 +7,15 @@ behavior_changes:
     As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
     grpc_credentials/aws_iam extension is being deleted. Any configuration referencing this extension
     will fail to load.
+- area: prefix_match_map
+  change: |
+    :ref:`prefix_match_map <envoy_v3_api_field_config.common.matcher.v3.Matcher.MatcherTree.prefix_match_map>`
+    now continues to search for a match with shorter prefix if a longer match
+    does not find an action. This brings it in line with the behavior of ``matcher_list``.
+    This change can temporarily be reverted by setting the runtime guard
+    ``envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss`` to false.
+    If the old behavior is desired more permanently, this can be achieved in config by setting
+    an ``on_no_match`` action that responds with 404 for each subtree.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -36,6 +45,18 @@ minor_behavior_changes:
   change: |
     Allow getaddrinfo to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
     <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
+- area: grpc-json-transcoding
+  change: |
+    Add SSE style message framing for streamed responses in :ref:`gRPC JSON transcoder filter <config_http_filters_grpc_json_transcoder>`.
+- area: http
+  change: |
+   :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
+   :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
+   will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
+- area: aws
+  change: |
+    :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
+    providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -86,6 +107,9 @@ removed_config_or_runtime:
 - area: runtime
   change: |
     Removed runtime guard ``envoy_reloadable_features_boolean_to_string_fix`` and legacy code paths.
+- area: logging
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.logging_with_fast_json_formatter`` and legacy code paths.
 - area: sni
   change: |
     Removed runtime guard ``envoy.reloadable_features.use_route_host_mutation_for_auto_sni_san`` and legacy code paths.
@@ -100,6 +124,16 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
+    used to record the original host header value before it is mutated by the router filter.
+- area: stateful_session
+  change: |
+    Supports envelope stateful session extension to keep the exist session header value
+    from upstream server. See :ref:`mode
+    <envoy_v3_api_msg_extensions.http.stateful_session.envelope.v3.EnvelopeSessionState>`
+    for more details.
 - area: load_balancing
   change: |
     Added Override Host Load Balancing policy. See
@@ -116,10 +150,39 @@ new_features:
 - area: ext_authz
   change: |
     Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
+- area: http
+  change: |
+    Add :ref:`response trailers mutations
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.response_trailers_mutations>` and
+    :ref:`quest trailers mutations
+    <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.request_trailers_mutations>`
+    to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
+    for adding/removing trailers from the request and the response.
 - area: url_template
   change: |
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
-
+- area: rbac filter
+  change: |
+    allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
+- area: rbac filter
+  change: |
+    allow listed ``FilterStateInput`` to be used with the xDS matcher in the Network RBAC filter.
+- area: tls_inspector filter
+  change: |
+    added :ref:`enable_ja4_fingerprinting
+    <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.enable_ja4_fingerprinting>` to create
+    a JA4 fingerprint hash from the Client Hello message.
+- area: local_ratelimit
+  change: |
+    ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
+- area: oauth2
+  change: |
+    Added :ref:`end_session_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.end_session_endpoint>`
+    to the oauth2 filter to support OIDC RP initiated logout. This field is only used when
+    ``openid`` is in the :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_scopes>` field.
+    If configured, the OAuth2 filter will redirect users to this endpoint when they access the
+    :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`. This allows users to
+    be logged out of the Authorization server.
 deprecated:
