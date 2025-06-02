@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.load_balancing_policies.common.v3;
 
 import "envoy/config/core/v3/base.proto";
-import "envoy/type/v3/hash_policy.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -142,7 +142,5 @@ message ConsistentHashingLbConfig {
   // set, then
   // :ref:`route level hash policy <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
   // will be ignored.
-  //
-  // [#not-implemented-hide:]
-  repeated type.v3.HashPolicy hash_policy = 3;
+  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 3;
 }

@@ -92,13 +92,12 @@ private:
   }
 
   std::string makeSetCookie(const std::string& address) const {
-    return Envoy::Http::Utility::makeSetCookieValue(name_, address, path_, ttl_, true, attributes_);
+    return Envoy::Http::Utility::makeSetCookieValue(name_, address, path_, ttl_, true, {});
   }
 
   const std::string name_;
-  const std::chrono::seconds ttl_;
+  const uint64_t ttl_;
   const std::string path_;
-  const Envoy::Http::CookieAttributeRefVector attributes_;
   TimeSource& time_source_;
 
   std::function<bool(absl::string_view)> path_matcher_;
