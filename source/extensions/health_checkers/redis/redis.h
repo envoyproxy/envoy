@@ -42,8 +42,10 @@ public:
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
       Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
-      absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
-                         AwsIamAuthenticatorSharedPtr>
+      const absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+          aws_iam_config,
+      const absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+                               AwsIamAuthenticatorSharedPtr>
           aws_iam_authenticator);
 
   static const NetworkFilters::Common::Redis::RespValue& pingHealthCheckRequest() {
@@ -67,13 +69,7 @@ private:
   RedisHealthCheckerStats generateRedisStats(Stats::Scope& scope);
 
   struct RedisConfig : public Extensions::NetworkFilters::Common::Redis::Client::Config {
-    RedisConfig(std::chrono::milliseconds timeout,
-                const envoy::extensions::health_checkers::redis::v3::Redis& config)
-        : parent_timeout_(timeout) {
-      if (config.has_aws_iam()) {
-        aws_iam_config_ = config.aws_iam();
-      }
-    }
+    RedisConfig(std::chrono::milliseconds timeout) : parent_timeout_(timeout) {}
 
     // Extensions::NetworkFilters::Common::Redis::Client::Config
     bool disableOutlierEvents() const override { return true; }
@@ -101,10 +97,6 @@ private:
     bool enableCommandStats() const override { return false; }
     bool connectionRateLimitEnabled() const override { return false; }
     uint32_t connectionRateLimitPerSec() const override { return 0; }
-    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
-    awsIamConfig() const {
-      return aws_iam_config_;
-    };
 
     const std::chrono::milliseconds parent_timeout_;
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
@@ -134,8 +126,7 @@ private:
     void onBelowWriteBufferLowWatermark() override {}
 
     RedisHealthChecker& parent_;
-    std::shared_ptr<RedisConfig> redis_config_{
-        std::make_shared<RedisConfig>(parent_.timeout_, parent_.redis_config_)};
+    std::shared_ptr<RedisConfig> redis_config_{std::make_shared<RedisConfig>(parent_.timeout_)};
     Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client_;
     Extensions::NetworkFilters::Common::Redis::Client::PoolRequest* current_request_{};
     Extensions::NetworkFilters::Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
@@ -163,9 +154,12 @@ private:
   RedisHealthCheckerStats redis_stats_;
   const std::string auth_username_;
   const std::string auth_password_;
-  absl::optional<
+  const absl::optional<
       Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
       aws_iam_authenticator_;
+  const absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+      aws_iam_config_;
+
   const envoy::extensions::health_checkers::redis::v3::Redis& redis_config_;
 };
 

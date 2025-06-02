@@ -80,8 +80,8 @@ public:
         Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 config_, redis_command_stats_, *stats_.rootScope(), false,
-                                 "pass", absl::nullopt, absl::nullopt);
+                                 config_, redis_command_stats_, *stats_.rootScope(), false, "pass",
+                                 absl::nullopt, absl::nullopt);
     EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());

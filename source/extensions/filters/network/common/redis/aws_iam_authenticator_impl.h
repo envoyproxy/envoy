@@ -19,15 +19,17 @@ static constexpr uint16_t AwsIamDefaultExpiration = 60;
 constexpr char DEFAULT_SERVICE_NAME[] = "elasticache";
 } // namespace
 
-// An implementation of AWS IAM Authentication for elasticache
+// An implementation of AWS IAM Authentication for ElastiCache
 class AwsIamAuthenticatorBase : public Logger::Loggable<Logger::Id::aws> {
 public:
   virtual ~AwsIamAuthenticatorBase() = default;
 
   /**
-   * Get the current authentication token, which is dependent on the configured auth_user and cache name
+   * Get the current authentication token, which is dependent on the configured auth_user and cache
+   * name
    * @param auth_user The configured auth_user
-   * @param aws_iam_config supplies the AWS IAM configuration from protobuf to retrieve configured cache name
+   * @param aws_iam_config supplies the AWS IAM configuration from protobuf to retrieve configured
+   * cache name
    * @return The auth token used as password to AUTH command
    */
   virtual std::string getAuthToken(
@@ -35,7 +37,8 @@ public:
       const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) PURE;
 
   /**
-   * If credentials are pending from an async credential provider, provide a callback for when they are available
+   * If credentials are pending from an async credential provider, provide a callback for when they
+   * are available
    * @param cb The callback
    */
 

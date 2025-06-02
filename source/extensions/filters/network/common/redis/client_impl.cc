@@ -179,7 +179,8 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   pending_requests_.emplace_back(*this, callbacks, command);
   encoder_->encode(request, encoder_buffer_);
 
-  // If we have enabled queuing (to pause AUTH while credentials are being used), don't flush our buffers
+  // If we have enabled queuing (to pause AUTH while credentials are being used), don't flush our
+  // buffers
   if (!queue_enabled_) {
     // If buffer is full, flush. If the buffer was empty before the request, start the timer.
     // if (!queue_enabled_ && encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
