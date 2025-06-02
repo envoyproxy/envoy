@@ -90,7 +90,7 @@ public:
         ttl_(cookie.has_ttl() ? absl::optional<uint64_t>(cookie.ttl().seconds()) : absl::nullopt) {
     attributes_.reserve(cookie.attributes().size());
     for (const auto& attribute : cookie.attributes()) {
-      attributes_.emplace_back(attribute.name(), attribute.value());
+      attributes_.push_back(CookieAttribute{attribute.name(), attribute.value()});
     }
   }
 
