@@ -150,7 +150,7 @@ AWS IAM Authentication
 
 The redis proxy filter supports authentication with AWS IAM credentials, to ElastiCache and MemoryDB instances. To configure AWS IAM Authentication,
 additional fields are provided in the cluster redis settings.
-If `region` is not specified, the region will be deduced using the region provider chain as described in  :ref:`regions<_config_http_filters_aws_request_signing_region>`.
+If `region` is not specified, the region will be deduced using the region provider chain as described in  :ref:`config_http_filters_aws_request_signing_region`.
 `cache_name` is required and is set to the name of your cache. Both `auth_usernam` and `cache_name` are used when calculating the IAM authentication token.
 `auth_password` is not used in AWS IAM configuration and the password value is automatically calculated by envoy.
 In your upstream cluster, the `auth_username` field must be configured with the user that has been added to your cache, as per
