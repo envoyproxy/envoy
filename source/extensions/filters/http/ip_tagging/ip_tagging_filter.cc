@@ -202,7 +202,6 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       ip_tag_header_action_(config.has_ip_tag_header()
                                 ? config.ip_tag_header().action()
                                 : HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE),
-      ip_tags_path_(config.ip_tags_datasource().filename()),
       ip_tags_registry_(singleton_manager.getTyped<IpTagsRegistrySingleton>(
           SINGLETON_MANAGER_REGISTERED_NAME(ip_tags_registry),
           [] { return std::make_shared<IpTagsRegistrySingleton>(); })),
@@ -213,25 +212,32 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   // to be implemented.
   // TODO(ccaraman): Remove size check once file system support is implemented.
   // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
-  if (config.ip_tags().empty() && !config.has_ip_tags_datasource()) {
+  if (config.ip_tags().empty() && !config.has_ip_tags_file_provider()) {
     creation_status = absl::InvalidArgumentError(
-        "HTTP IP Tagging Filter requires either ip_tags or ip_tags_datasource to be specified.");
+        "HTTP IP Tagging Filter requires either ip_tags or ip_tags_file_provider to be specified.");
   }
 
-  if (!config.ip_tags().empty() && config.has_ip_tags_datasource()) {
-    creation_status =
-        absl::InvalidArgumentError("Only one of ip_tags or ip_tags_datasource can be configured.");
+  if (!config.ip_tags().empty() && config.has_ip_tags_file_provider()) {
+    creation_status = absl::InvalidArgumentError(
+        "Only one of ip_tags or ip_tags_file_provider can be configured.");
   }
 
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (!config.ip_tags().empty()) {
     trie_ = tags_loader_.parseIpTagsAsProto(config.ip_tags(), creation_status);
   } else {
-    auto ip_tags_refresh_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(config, ip_tags_refresh_rate, 0);
+    if (!config.ip_tags_file_provider().has_ip_tags_datasource()) {
+      creation_status = absl::InvalidArgumentError(
+          "ip_tags_file_provider requires a valid ip_tags_datasource to be configured.");
+      return;
+    }
+    auto ip_tags_refresh_interval_ms =
+        PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
     provider_ = ip_tags_registry_->get(
-        config.ip_tags_datasource(), tags_loader_, ip_tags_refresh_interval_ms,
-        [this]() { incIpTagsReloadSuccess(); }, [this]() { incIpTagsReloadError(); }, api, tls,
-        dispatcher, ip_tags_registry_, creation_status);
+        config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
+        ip_tags_refresh_interval_ms, [this]() { incIpTagsReloadSuccess(); },
+        [this]() { incIpTagsReloadError(); }, api, tls, dispatcher, ip_tags_registry_,
+        creation_status);
     RETURN_ONLY_IF_NOT_OK_REF(creation_status);
     if (provider_ && provider_->ipTags()) {
       trie_ = provider_->ipTags();

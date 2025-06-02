@@ -30,10 +30,11 @@ const std::string FileBasedIpTaggingConfig = R"EOF(
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
     request_type: both
-    ip_tags_datasource:
-      filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.yaml"
-      watched_directory:
-        path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data"
+    ip_tags_file_provider:
+      ip_tags_datasource:
+        filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.yaml"
+        watched_directory:
+          path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data"
 )EOF";
 
 // Make sure that Envoy starts up with an ip tagging filter.
