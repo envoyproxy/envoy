@@ -142,6 +142,7 @@ class MockLinuxOsSysCalls : public LinuxOsSysCallsImpl {
 public:
   // Api::LinuxOsSysCalls
   MOCK_METHOD(SysCallIntResult, sched_getaffinity, (pid_t pid, size_t cpusetsize, cpu_set_t* mask));
+  MOCK_METHOD(SysCallIntResult, setns, (int fd, int nstype), (const));
 };
 #endif
 
