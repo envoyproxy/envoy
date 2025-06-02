@@ -403,7 +403,8 @@ message AwsIam {
   // The name of the cache, used when generating the authentication token.
   string cache_name = 2 [(validate.rules).string = {min_len: 1}];
 
-  // The optional service name to be used in AWS IAM authentication. If not provided, the service name will be set to `elasticache`
+  // The optional service name to be used in AWS IAM authentication. If not provided, the service name will be set to ``elasticache``. For Amazon MemoryDB
+  // the service name should be set to ``memorydb``.
   string service_name = 3;
 
   // The optional AWS region that your cache is located in. If not provided, the region will be deduced using the region provider chain
