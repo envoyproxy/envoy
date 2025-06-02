@@ -408,7 +408,7 @@ message AwsIam {
   string service_name = 3;
 
   // The optional AWS region that your cache is located in. If not provided, the region will be deduced using the region provider chain
-  // as described in  :ref:`regions<_config_http_filters_aws_request_signing_region>`
+  // as described in :ref:`config_http_filters_aws_request_signing_region`.
   string region = 4;
 
   // Number of seconds before the IAM authentication token will expire. If not set, defaults to 60s (1 minute). Maximum of 900s (15 minutes)
