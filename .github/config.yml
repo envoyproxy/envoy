@@ -241,8 +241,9 @@ run:
     - bazel/repository_locations.bzl
     - mobile/.bazelrc
     - mobile/**/*
-    - tools/code_format/check_format.py
     - test/run_envoy_bazel_coverage.sh
+    - tools/code_format/check_format.py
+    - tools/coverage/**/*
   mobile-format:
     paths:
     - .bazelrc
