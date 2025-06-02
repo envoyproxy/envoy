@@ -22,7 +22,7 @@ described in the paper `IP-address lookup using
 LC-tries <https://www.csc.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/text.pdf>`_ by S. Nilsson and
 G. Karlsson.
 
-Ip tags can either be parsed from :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` api field or
+IP tags can either be provided directly using the :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` api field or
 can be loaded from file if :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` api field is configured.
 Both :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` and file with *filename* from :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
 use :ref:`IPTag <envoy_v3_api_msg_data.ip_tagging.v3.IPTag>` proto format for defining individual ip tags.
