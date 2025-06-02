@@ -930,41 +930,46 @@ public:
         });
   }
 
-  ActiveDnsQuery*
-  resolveSrvWithExpectations(const std::string& address, const DnsLookupFamily lookup_family,
-                             const DnsResolver::ResolutionStatus expected_status,
-                             const std::list<std::string>& expected_results,
-                             const std::list<std::string>& expected_absent_results,
-                             const absl::optional<std::chrono::seconds> expected_ttl) {
-    return resolver_->resolveSrv(
-        address, lookup_family,
-        [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
-                  std::list<DnsResponse>&& results) -> void {
-          EXPECT_EQ(expected_status, status);
+  ActiveDnsQuery* resolveSrvWithExpectations(const std::string& address,
+                                             const DnsResolver::ResolutionStatus expected_status,
+                                             const std::list<std::string>& expected_results) {
+    return resolver_->resolveSrv(address,
+                                 [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                   EXPECT_EQ(expected_status, status);
 
-          std::list<std::string> srv_as_string_list; // = getAddressAsStringList(results);
-          // std::list<std::string> address;
+                                   std::list<std::string> srv_as_string_list;
 
-          for_each(results.begin(), results.end(), [&](DnsResponse resp) {
-            srv_as_string_list.emplace_back(resp.srv().asString());
-          });
+                                   for_each(results.begin(), results.end(), [&](DnsResponse resp) {
+                                     srv_as_string_list.emplace_back(resp.srv().asString());
+                                   });
 
-          EXPECT_THAT(srv_as_string_list, UnorderedElementsAreArray(expected_results));
+                                   EXPECT_THAT(srv_as_string_list,
+                                               UnorderedElementsAreArray(expected_results));
 
-          for (const auto& expected_absent_result : expected_absent_results) {
-            EXPECT_THAT(srv_as_string_list, Not(Contains(expected_absent_result)));
-          }
+                                   dispatcher_->exit();
+                                 });
+  }
 
-          if (expected_ttl) {
-            // TODO: uncoment me
-            // std::list<Address::InstanceConstSharedPtr> address_list = getAddressList(results);
-            // for (const auto& address : results) {
-            //   EXPECT_EQ(address.addrInfo().ttl_.count(), expected_ttl.value().count());
-            // }
-          }
+  ActiveDnsQuery* resolveSrvWithNoRecords(const std::string& address,
+                                          const DnsResolver::ResolutionStatus expected_status,
+                                          const std::list<std::string>& expected_results) {
+    return resolver_->resolveSrv(address,
+                                 [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                   EXPECT_EQ(expected_status, status);
 
-          dispatcher_->exit();
-        });
+                                   std::list<std::string> srv_as_string_list;
+
+                                   for_each(results.begin(), results.end(), [&](DnsResponse resp) {
+                                     srv_as_string_list.emplace_back(resp.srv().asString());
+                                   });
+
+                                   EXPECT_THAT(srv_as_string_list,
+                                               UnorderedElementsAreArray(expected_results));
+
+                                   dispatcher_->exit();
+                                 });
   }
 
   ActiveDnsQuery* resolveWithNoRecordsExpectation(const std::string& address,
@@ -1928,14 +1933,13 @@ TEST_P(DnsImplTest, DnsSrv) {
   server_->addSrvRecord("_unique_name._tcp.example.com",
                         {SrvResponse{/*priority_*/ 0, /*weight_*/ 0, /*port_*/ 9090,
                                      /*target_*/ "unique-svc.local"}});
-  EXPECT_NE(nullptr,
-            resolveSrvWithExpectations("_unique_name._tcp.example.com", DnsLookupFamily::Auto,
-                                       DnsResolver::ResolutionStatus::Completed,
-                                       {"0 0 9090 unique-svc.local"}, {}, absl::nullopt));
+  EXPECT_NE(nullptr, resolveSrvWithExpectations("_unique_name._tcp.example.com",
+                                                DnsResolver::ResolutionStatus::Completed,
+                                                {"0 0 9090 unique-svc.local"}));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  //   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
-  //              0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
   //   EXPECT_NE(nullptr, resolveSrvWithExpectations("_unique_name._tcp.example.com",
   //   DnsLookupFamily::V4Only,

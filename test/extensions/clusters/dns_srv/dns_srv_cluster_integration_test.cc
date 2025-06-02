@@ -96,9 +96,9 @@ TEST_P(DnsSrvClusterIntegrationTest, BasicDnsSrvClusterTest) {
             return nullptr;
           }));
 
-  EXPECT_CALL(*dns_resolver, resolveSrv(_, _, _))
+  EXPECT_CALL(*dns_resolver, resolveSrv(_, _))
       .WillRepeatedly(
-          Invoke([this](const std::string& dns_name, Network::DnsLookupFamily,
+          Invoke([this](const std::string& dns_name,
                         Network::DnsResolver::ResolveCb dns_callback) -> Network::ActiveDnsQuery* {
             uint16_t port = 0;
             for (const auto& p : fake_upstreams_) {

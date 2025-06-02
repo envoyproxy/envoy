@@ -247,7 +247,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
 
 ActiveDnsQuery*
 GetAddrInfoDnsResolver::resolveSrv(const std::string& dns_name ABSL_ATTRIBUTE_UNUSED,
-                                   DnsLookupFamily dns_lookup_family ABSL_ATTRIBUTE_UNUSED,
                                    ResolveCb callback ABSL_ATTRIBUTE_UNUSED) {
   // TODO: implement me
   return nullptr;

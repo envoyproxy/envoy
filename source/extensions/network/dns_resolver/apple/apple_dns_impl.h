@@ -83,8 +83,7 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
-  ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                             ResolveCb callback) override;
+  ActiveDnsQuery* resolveSrv(const std::string& dns_name, ResolveCb callback) override;
   void resetNetworking() override {
     // In the Apple DNS resolver each query is independent and handled by the OS so there is nothing
     // to do here.

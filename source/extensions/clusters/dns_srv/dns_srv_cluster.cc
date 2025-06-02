@@ -60,7 +60,7 @@ void DnsSrvCluster::startResolve() {
   active_resolve_list_.reset(new ResolveList(*this));
 
   active_dns_query_ = dns_resolver_->resolveSrv(
-      dns_srv_cluster_.srv_name(), dns_lookup_family_,
+      dns_srv_cluster_.srv_name(),
       [this](Network::DnsResolver::ResolutionStatus status, absl::string_view details,
              std::list<Network::DnsResponse>&& response) -> void {
         active_dns_query_ = nullptr;

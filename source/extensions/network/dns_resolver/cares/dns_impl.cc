@@ -468,11 +468,10 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   }
 }
 
-ActiveDnsQuery* DnsResolverImpl::resolveSrv(const std::string& dns_name,
-                                            DnsLookupFamily dns_lookup_family, ResolveCb callback) {
+ActiveDnsQuery* DnsResolverImpl::resolveSrv(const std::string& dns_name, ResolveCb callback) {
 
-  std::unique_ptr<PendingSrvResolution> pending_srv_res(new PendingSrvResolution(
-      callback, dispatcher_, channel_, dns_name, dns_lookup_family, *this));
+  std::unique_ptr<PendingSrvResolution> pending_srv_res(
+      new PendingSrvResolution(callback, dispatcher_, channel_, dns_name, *this));
 
   pending_srv_res->startResolution();
   if (pending_srv_res->completed_) {
@@ -628,20 +627,22 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 }
 
 void DnsResolverImpl::PendingSrvResolution::startResolution() {
+  parent_.stats_.pending_resolutions_.inc();
   ares_query(
       channel_, dns_name_.c_str(), ns_c_in, ns_t_srv,
       [](void* arg, int status, int timeouts, unsigned char* abuf, int alen) {
-        static_cast<PendingSrvResolution*>(arg)->onAresSrvStartCallback(status, timeouts, abuf,
-                                                                        alen);
+        static_cast<PendingSrvResolution*>(arg)->onAresSrvCallback(status, timeouts, abuf, alen);
       },
       this);
 }
 
-void DnsResolverImpl::PendingSrvResolution::onAresSrvStartCallback(int status, int timeouts,
-                                                                   unsigned char* buf, int len) {
+void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(int status, int timeouts,
+                                                              unsigned char* buf, int len) {
 
-  ENVOY_LOG(debug, "onAresSrvStartCallback: status={}, timeouts={}, buf len={}", status, timeouts,
-            len);
+  ENVOY_LOG(debug, "onAresSrvCallback: status={}, timeouts={}, buf len={}", status, timeouts, len);
+
+  parent_.stats_.resolve_total_.inc();
+  parent_.stats_.pending_resolutions_.dec();
 
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);

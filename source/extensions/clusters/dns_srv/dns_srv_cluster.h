@@ -68,7 +68,7 @@ private:
     void startResolve();
     void addResolvedTarget(Network::Address::InstanceConstSharedPtr address);
 
-    ResolveList& parent_; // TODO: probably don't need this
+    ResolveList& parent_;
     Network::DnsResolverSharedPtr dns_resolver_;
     Network::DnsLookupFamily dns_lookup_family_;
     const std::string srv_record_hostname_; // ResolveTarget needs to store its own copy

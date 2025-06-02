@@ -61,8 +61,7 @@ public:
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
   // Network::DnsResolver
-  ActiveDnsQuery* resolveSrv(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                             ResolveCb callback) override;
+  ActiveDnsQuery* resolveSrv(const std::string& dns_name, ResolveCb callback) override;
   void resetNetworking() override { reinitializeChannel(); }
 
 private:
@@ -126,10 +125,8 @@ private:
                         ares_channel channel, const std::string& dns_name*/
   struct PendingSrvResolution : public PendingResolution {
     PendingSrvResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
-                         const std::string& dns_name, DnsLookupFamily dns_lookup_family,
-                         DnsResolverImpl& parent)
-        : PendingResolution(parent, callback, dispatcher, channel, dns_name),
-          dns_lookup_family_(dns_lookup_family), resolver_(parent) {}
+                         const std::string& dns_name, DnsResolverImpl& parent)
+        : PendingResolution(parent, callback, dispatcher, channel, dns_name), resolver_(parent) {}
 
     /**
      * c-ares ares_query() query callback for initiation.
@@ -138,7 +135,7 @@ private:
      * @param buf the result buffer.
      * @param len the result buffer length.
      */
-    void onAresSrvStartCallback(int status, int timeouts, unsigned char* buf, int len);
+    void onAresSrvCallback(int status, int timeouts, unsigned char* buf, int len);
 
     /**
      * c-ares ares_query() query callback for completion.
@@ -149,8 +146,6 @@ private:
     // wrapper function of call to ares_query().
     void startResolution();
 
-    // The DnsLookupFamily for the SRV record.
-    const DnsLookupFamily dns_lookup_family_;
     // The resolver instance.
     DnsResolverImpl& resolver_;
   };
