@@ -90,7 +90,10 @@ protected:
   std::unique_ptr<ProtoApiScrubberFilter> filter_;
 };
 
-TEST_F(ProtoApiScrubberFilterTest, RequestNotGrpc) {
+// Following tests validate that the filter is not executed for requests with invalid headers.
+using ProtoApiScrubberInvalidRequestHeaderTests = ProtoApiScrubberFilterTest;
+
+TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, RequestNotGrpc) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -101,7 +104,7 @@ TEST_F(ProtoApiScrubberFilterTest, RequestNotGrpc) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 }
 
-TEST_F(ProtoApiScrubberFilterTest, PathNotExist) {
+TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"}, {"content-type", "application/grpc"}};
@@ -110,10 +113,35 @@ TEST_F(ProtoApiScrubberFilterTest, PathNotExist) {
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
 }
 
-// Following tests validate that the request passes through the filter without any modification.
-using ProtoApiScrubberFilterPassThroughTest = ProtoApiScrubberFilterTest;
+// Following tests validate that the filter rejects the request for various failure scenarios.
+using ProtoApiScrubberRequestRejectedTests = ProtoApiScrubberFilterTest;
 
-TEST_F(ProtoApiScrubberFilterPassThroughTest, UnarySingleBuffer) {
+TEST_F(ProtoApiScrubberRequestRejectedTests, BufferLimitedExceeded) {
+  setUp();
+  ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+
+  EXPECT_CALL(mock_decoder_callbacks_,
+              sendLocalReply(
+                  Http::Code::BadRequest, "Rejected because internal buffer limits are exceeded.",
+                  Eq(nullptr), Eq(Envoy::Grpc::Status::FailedPrecondition),
+                  "proto_api_scrubber_FAILED_PRECONDITION{REQUEST_BUFFER_CONVERSION_FAIL}"));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer,
+            filter_->decodeData(*request_data, true));
+}
+
+// Following tests validate that the request passes through the filter without any modification.
+using ProtoApiScrubberPassThroughTest = ProtoApiScrubberFilterTest;
+
+TEST_F(ProtoApiScrubberPassThroughTest, UnarySingleBuffer) {
   setUp();
 
   Envoy::Http::TestRequestHeaderMapImpl req_headers =
@@ -130,7 +158,7 @@ TEST_F(ProtoApiScrubberFilterPassThroughTest, UnarySingleBuffer) {
   checkSerializedData<CreateApiKeyRequest>(*request_data, {request});
 }
 
-TEST_F(ProtoApiScrubberFilterPassThroughTest, UnaryMultipeBuffers) {
+TEST_F(ProtoApiScrubberPassThroughTest, UnaryMultipeBuffers) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
@@ -162,7 +190,7 @@ TEST_F(ProtoApiScrubberFilterPassThroughTest, UnaryMultipeBuffers) {
   checkSerializedData<CreateApiKeyRequest>(request_data_parts[2], {request});
 }
 
-TEST_F(ProtoApiScrubberFilterPassThroughTest, StreamingMultipleMessageSingleBuffer) {
+TEST_F(ProtoApiScrubberPassThroughTest, StreamingMultipleMessageSingleBuffer) {
   setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},

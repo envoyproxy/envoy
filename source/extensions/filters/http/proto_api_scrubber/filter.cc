@@ -9,6 +9,7 @@
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter_utility.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/stream_message.h"
 
+#include "absl/log/check.h"
 #include "proto_field_extraction/message_data/cord_message_data.h"
 
 namespace Envoy {
@@ -75,24 +76,26 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
   ENVOY_STREAM_LOG(trace, "Accumulated {} messages. Starting scrubbing on each of them one by one.",
                    *decoder_callbacks_, messages->size());
   for (size_t msg_idx = 0; msg_idx < messages->size(); ++msg_idx) {
-    std::unique_ptr<StreamMessage> message_data = std::move(messages->at(msg_idx));
+    std::unique_ptr<StreamMessage> stream_message = std::move(messages->at(msg_idx));
 
     // MessageConverter uses an empty StreamMessage to denote the end.
-    if (message_data->message() == nullptr) {
-      RELEASE_ASSERT(end_stream,
-                     "expect end_stream=true as when the MessageConverter signals an stream end");
-      RELEASE_ASSERT(message_data->isFinalMessage(),
-                     "expect message_data->isFinalMessage()=true when the MessageConverter signals "
-                     "an stream end");
-      // This is the last one in the vector.
-      RELEASE_ASSERT(msg_idx == messages->size() - 1,
-                     "expect message_data is the last element in the vector when the "
-                     "MessageConverter signals an stream end");
+    if (stream_message->message() == nullptr) {
+      // Expect end_stream=true when the MessageConverter signals an stream end.
+      DCHECK(end_stream);
+
+      // Expect message_data->isFinalMessage()=true when the MessageConverter signals an stream end.
+      DCHECK(stream_message->isFinalMessage());
+
+      // Expect message_data is the last element in the vector when the MessageConverter signals an
+      // stream end.
+      DCHECK(msg_idx == messages->size() - 1);
+
       // Skip the empty message
       continue;
     }
 
-    auto buf_convert_status = request_msg_converter_->convertBackToBuffer(std::move(message_data));
+    auto buf_convert_status =
+        request_msg_converter_->convertBackToBuffer(std::move(stream_message));
     RELEASE_ASSERT(buf_convert_status.ok(), "failed to convert message back to envoy buffer");
 
     data.move(*buf_convert_status.value());
