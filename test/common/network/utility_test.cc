@@ -1,3 +1,5 @@
+#include <fcntl.h>
+
 #ifndef WIN32
 #include <net/if.h>
 
@@ -30,6 +32,7 @@
 
 using testing::DoAll;
 using testing::Eq;
+using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -744,6 +747,90 @@ TEST(PacketLoss, LossTest) {
                           &packets_read);
   EXPECT_EQ(2, packets_dropped);
   EXPECT_EQ(0, packets_read);
+}
+#endif
+
+#if defined(__linux__)
+class ExecInNetnsTest : public testing::Test {
+public:
+  void SetUp() override {}
+
+protected:
+  std::string getCurrentNetns() const { return current_netns_; }
+
+  int next_fd_{1};
+  absl::flat_hash_map<int, const char*> fake_fd_map_;
+  std::string current_netns_;
+};
+
+TEST_F(ExecInNetnsTest, Basic) {
+  // Make the tests use mock syscalls.
+  testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_syscalls;
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
+
+  EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly(Invoke([this](int fd) -> Api::SysCallIntResult {
+    EXPECT_TRUE(fake_fd_map_.contains(fd));
+    fake_fd_map_.erase(fd);
+    return {0, 0};
+  }));
+
+  EXPECT_CALL(linux_os_syscalls, setns(_, Eq(CLONE_NEWNET)))
+      .WillRepeatedly(([this](int fd, int) -> Api::SysCallIntResult {
+        EXPECT_TRUE(fake_fd_map_.contains(fd));
+        current_netns_ = fake_fd_map_[fd];
+        return {0, 0};
+      }));
+
+  // Every time open() is called, we want to make up some fd and associate it with the "path" that
+  // was provided.
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillRepeatedly(Invoke([this](const char* pathname, int) -> Api::SysCallIntResult {
+        int fd = this->next_fd_++;
+        fake_fd_map_[fd] = pathname;
+        return {fd, 0};
+      }));
+
+  // We expect no calls to "setns" at this point, so the string should be empty.
+  EXPECT_EQ(getCurrentNetns(), "");
+
+  // Now check basic functionality to ensure the function is called from a "different netns".
+  std::function<std::string()> func = [&]() -> std::string { return getCurrentNetns(); };
+  auto result = Utility::execInNetworkNamespace(func, "ns1");
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value(), "ns1");
+
+  // Make sure the netns reverted back to the netns the execInNetworkNamespace function was called
+  // from. When the netns was noted before making the jump, it used the fd of "/proc/self/ns/net"
+  // and that is what would show up for the test.
+  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+
+  // Try another netns.
+  result = Utility::execInNetworkNamespace(func, "ns2");
+  EXPECT_TRUE(result.ok());
+  EXPECT_EQ(result.value(), "ns2");
+
+  // Make sure the netns reverted back.
+  EXPECT_EQ(getCurrentNetns(), "/proc/self/ns/net");
+}
+
+TEST_F(ExecInNetnsTest, OpenFail) {
+  // Make the tests use mock syscalls.
+  testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_syscalls;
+  testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_syscalls);
+
+  // Open will always fail.
+  EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+      .WillRepeatedly(Invoke([](const char*, int) -> Api::SysCallIntResult { return {-1, -1}; }));
+
+  // No other syscalls are expected.
+
+  // Expecting failure.
+  auto result = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
+  EXPECT_FALSE(result.ok());
 }
 #endif
 
