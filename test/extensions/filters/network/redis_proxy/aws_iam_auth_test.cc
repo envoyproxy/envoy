@@ -58,6 +58,35 @@ TEST_F(AwsIamAuthenticatorTest, NormalAuthentication) {
       "3bf9d8841acb6db28373efcab8b9ccf1076a7a9ab39faf489002fa0555a1f89c&X-Amz-SignedHeaders=host");
 }
 
+TEST_F(AwsIamAuthenticatorTest, HasCredentialFileProvider) {
+  aws_iam_config_.set_region("region");
+  aws_iam_config_.set_cache_name("cachename");
+  aws_iam_config_.set_service_name("elasticache");
+  aws_iam_config_.mutable_credential_provider()->mutable_credentials_file_provider();
+  const auto& aws_iam_config = aws_iam_config_;
+  auto aws_iam_authenticator =
+      AwsIamAuthenticatorFactory::initAwsIamAuthenticator(context_, aws_iam_config);
+
+  auto token = aws_iam_authenticator.value()->getAuthToken("test", aws_iam_config);
+  EXPECT_EQ(
+      token,
+      "cachename/"
+      "?Action=connect&User=test&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=akid%2F20180102%"
+      "2Fregion%2Felasticache%2Faws4_request&X-Amz-Date=20180102T030405Z&X-Amz-Expires=60&X-Amz-"
+      "Security-Token=token&X-Amz-Signature="
+      "3bf9d8841acb6db28373efcab8b9ccf1076a7a9ab39faf489002fa0555a1f89c&X-Amz-SignedHeaders=host");
+}
+
+TEST_F(AwsIamAuthenticatorTest, HasCustomChainButNoProviders) {
+  aws_iam_config_.set_cache_name("cachename");
+  aws_iam_config_.set_service_name("elasticache");
+  aws_iam_config_.mutable_credential_provider()->set_custom_credential_provider_chain("true");
+  const auto& aws_iam_config = aws_iam_config_;
+  auto aws_iam_authenticator =
+      AwsIamAuthenticatorFactory::initAwsIamAuthenticator(context_, aws_iam_config);
+  EXPECT_FALSE(aws_iam_authenticator.has_value());
+}
+
 // Verify filter correctly pauses requests when credentials are pending.
 TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats;
