@@ -42,6 +42,9 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     pip_dev_dependencies()
     pip_fuzzing_dependencies()
     rules_pkg_dependencies()
+    emscripten_deps(emscripten_version = "4.0.6")
+    register_emscripten_toolchains()
+
     rust_repository_set(
         name = "rust_linux_s390x",
         exec_triple = "s390x-unknown-linux-gnu",
@@ -66,8 +69,6 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
         oss_fuzz = True,
         honggfuzz = False,
     )
-    emscripten_deps(emscripten_version = "3.1.67")
-    register_emscripten_toolchains()
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
     parser_deps()
