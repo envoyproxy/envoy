@@ -63,11 +63,6 @@ public:
   virtual uint32_t numEjections() PURE;
 
   /**
-   * Add an HTTP response code for a host.
-   */
-  virtual void putHttpResponseCode(uint64_t code) PURE;
-
-  /**
    * Add a non-HTTP result for a host.
    * Some non-HTTP codes like TIMEOUT may require special mapping to HTTP code
    * and such code may be passed as optional parameter.

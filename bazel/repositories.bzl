@@ -192,7 +192,6 @@ def envoy_dependencies(skip_targets = []):
     _io_hyperscan()
     _io_vectorscan()
     _io_opentelemetry_api_cpp()
-    _llvm_source()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
     _net_zlib()
@@ -215,16 +214,16 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_examples")
+    external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
+
     external_http_archive(
         "aspect_bazel_lib",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
     )
 
     _com_github_fdio_vpp_vcl()
@@ -236,7 +235,6 @@ def envoy_dependencies(skip_targets = []):
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-
     _com_github_wamr()
     _com_github_wasmtime()
 
@@ -392,12 +390,6 @@ def _com_github_qat_zstd():
 def _com_github_lz4_lz4():
     external_http_archive(
         name = "com_github_lz4_lz4",
-        build_file_content = BUILD_ALL_CONTENT,
-    )
-
-def _llvm_source():
-    external_http_archive(
-        name = "llvm_source",
         build_file_content = BUILD_ALL_CONTENT,
     )
 

@@ -591,13 +591,20 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // Increment the attempt count from 0 to 1 at the first upstream request.
+  attempt_count_++;
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
+
+  // Finalize the request headers before the host selection.
+  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+                                       !config_->suppress_envoy_headers_);
+
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
-
   if (upstream_http_protocol_options && (upstream_http_protocol_options->auto_sni() ||
                                          upstream_http_protocol_options->auto_san_validation())) {
     // Default the header to Host/Authority header.
-    std::string header_value = route_entry_->getRequestHostValue(headers);
+    absl::string_view header_value = headers.getHostValue();
 
     // Check whether `override_auto_sni_header` is specified.
     if (const auto& override_header = upstream_http_protocol_options->override_auto_sni_header();
@@ -609,7 +616,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
                          *callbacks_, override_header);
       }
       if (!override_header_value.empty() && !override_header_value[0]->value().empty()) {
-        header_value = std::string(override_header_value[0]->value().getStringView());
+        header_value = override_header_value[0]->value().getStringView();
       }
     }
 
@@ -658,15 +665,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_start_ms",
       callbacks_->dispatcher().timeSource().monotonicTime());
-
-  // Increment the attempt count from 0 to 1 at the first upstream request.
-  attempt_count_++;
-  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
-  if (include_attempt_count_in_request_) {
-    headers.setEnvoyAttemptCount(attempt_count_);
-  }
-
-  callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   auto host_selection_response = cluster->chooseHost(this);
   if (!host_selection_response.cancelable ||
@@ -771,8 +769,11 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
 
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
-                                       !config_->suppress_envoy_headers_);
+  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
+  if (include_attempt_count_in_request_) {
+    headers.setEnvoyAttemptCount(attempt_count_);
+  }
+
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
       host->transportSocketFactory().sslCtx() != nullptr,
@@ -1634,11 +1635,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   maybeProcessOrcaLoadReport(*headers, upstream_request);
 
-  if (grpc_status.has_value()) {
-    upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(grpc_to_http_status);
-  } else {
-    upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(response_code);
-  }
+  const uint64_t put_result_code = grpc_status.has_value() ? grpc_to_http_status : response_code;
+  upstream_request.upstreamHost()->outlierDetector().putResult(
+      put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
+                             : Upstream::Outlier::Result::ExtOriginRequestSuccess,
+      put_result_code);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(

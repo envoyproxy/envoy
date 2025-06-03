@@ -6325,7 +6325,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerWithDynamicFilterConfi
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     enable_reuse_port: false
@@ -6359,7 +6359,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     additional_addresses:
@@ -6405,7 +6405,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithMultiAddressesOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     additional_addresses:
@@ -6468,7 +6468,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithMultiAddressesEmptyOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     additional_addresses:
@@ -6516,7 +6516,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithSocketOptOnAdditionalAddressOnly) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     additional_addresses:

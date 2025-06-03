@@ -50,9 +50,7 @@ jobs:
       command: ../test/run_envoy_bazel_coverage.sh
       request: ${{ needs.load.outputs.request }}
       source: |
-        export COVERAGE_THRESHOLD=76
         export BAZEL_BUILD_OPTION_LIST=--config=mobile-remote-ci-linux-coverage
-        export GENHTML_ARGS="--erase-functions=__cxx_global_var_init --ignore-errors \"category,corrupt,inconsistent\""
       steps-post: |
         - name: Package coverage
           shell: bash
