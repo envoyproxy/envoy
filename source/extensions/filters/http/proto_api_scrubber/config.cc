@@ -19,10 +19,19 @@ FilterFactoryCreator::FilterFactoryCreator() : FactoryBase(kFilterName) {}
 Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
         proto_config,
-    const std::string&, Envoy::Server::Configuration::FactoryContext&) {
-  auto filter_config = std::make_shared<FilterConfig>(proto_config);
+    const std::string&, Envoy::Server::Configuration::FactoryContext& context) {
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config =
+      ProtoApiScrubberFilterConfig::create(proto_config, context);
+  if (!filter_config.ok()) {
+    std::string error_msg = filter_config.status().ToString();
+
+    // Allowlist exception as there's no other exception-free way to propagate this error to Envoy.
+    // NOLINTNEXTLINE(envoy-build-forbidden-exception)
+    throw Envoy::ProtoValidationException(error_msg);
+  }
+
   return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<Filter>(*filter_config));
+    callbacks.addStreamFilter(std::make_shared<ProtoApiScrubberFilter>(**filter_config));
   };
 }
 
