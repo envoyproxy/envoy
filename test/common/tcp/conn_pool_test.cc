@@ -271,7 +271,7 @@ public:
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime());
     conn_pool_ =
         std::make_unique<ConnPoolImpl>(dispatcher_, host_, Upstream::ResourcePriority::Default,
-                                       nullptr, nullptr, state_, absl::nullopt);
+                                       nullptr, nullptr, state_, absl::nullopt, overload_manager_);
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   }
   ~TcpConnPoolImplDestructorTest() override = default;
@@ -316,6 +316,7 @@ public:
   Network::MockClientConnection* connection_;
   std::unique_ptr<Tcp::ConnectionPool::Instance> conn_pool_;
   std::unique_ptr<ConnPoolCallbacks> callbacks_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 /**
