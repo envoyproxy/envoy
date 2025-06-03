@@ -73,7 +73,7 @@ public:
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) {
               return nullptr; // Not used: createCodecClient overloaded.
             },
-            std::vector<Protocol>{Protocol::Http11}, absl::nullopt, nullptr, overload_manager),
+            std::vector<Protocol>{Protocol::Http11}, overload_manager, absl::nullopt, nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_cb_(upstream_ready_cb) {}
 
@@ -162,10 +162,10 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   Event::MockSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 /**
@@ -1129,10 +1129,10 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   MockDestructSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 // Regression test for use after free when dispatcher executes onUpstreamReady after connection pool
