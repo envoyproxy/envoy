@@ -2,11 +2,11 @@ agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
   repo: envoyproxy/envoy-build-ubuntu
-  sha: 4f82300bc27a125b22b88a3b682a3f3b51d006d5fb4ad73de48f5e2bca9e78cb
-  mobile-sha: 6582f79bc6af4720f027cc66717ca13ba3eb99751b239f43ee4cbba7dcd1190b
+  sha: b10346fe2eee41733dbab0e02322c47a538bf3938d093a5daebad9699860b814
+  mobile-sha: 1a4da70e73be0de3ae2f3342aaf9a58b7b426ae9e6007f51fec36f57be7315db
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: a41f69c56ba636856576949a22cc2ec450c48a7a37487554d8a31827e0d54c03
-  tag: 637e381b3d59e52d30b186b50f2b26f924d52067
+  gcr-sha: 95d7afdea0f0f8881e88fa5e581db4f50907d0745ac8d90e00357ac1a316abe5
+  tag: f4a881a1205e8e6db1a57162faf3df7aed88eae8
 
 config:
   envoy:
