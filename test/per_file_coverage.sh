@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+<<<<<<< HEAD
 # directory:coverage_percent
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
@@ -78,66 +79,10 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/config_subscription/rest:94.8"
 "source/extensions/matching/input_matchers/cel_matcher:91.3" #Death tests don't report LCOV
 )
+=======
+set -e
+>>>>>>> upstream/main
 
-[[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
-COVERAGE_DIR="${SRCDIR}"/generated/coverage
-COVERAGE_DATA="${COVERAGE_DIR}/coverage.dat"
 
-FAILED=0
-DEFAULT_COVERAGE_THRESHOLD=96.6
-DIRECTORY_THRESHOLD=$DEFAULT_COVERAGE_THRESHOLD
-
-# Unfortunately we have a bunch of preexisting directory with low coverage.
-# Set their low bar as their current coverage level.
-get_coverage_target() {
-  DIRECTORY_THRESHOLD=$DEFAULT_COVERAGE_THRESHOLD
-  for FILE_PERCENT in "${KNOWN_LOW_COVERAGE[@]}"
-  do
-    if [[ $FILE_PERCENT =~ $1: ]]; then
-      DIRECTORY_THRESHOLD="${FILE_PERCENT//*:/}"
-      return
-    fi
-  done
-}
-
-# Make sure that for each directory with code, coverage doesn't dip
-# below the default coverage threshold.
-SOURCES=$(find source/* -type d)
-HIGH_COVERAGE_STRING=""
-while read -r DIRECTORY
-do
-  get_coverage_target "$DIRECTORY"
-  COVERAGE_VALUE=$(lcov -e "$COVERAGE_DATA"  "${DIRECTORY}/*" -o /dev/null | grep line |  cut -d ' ' -f 4 | tr -d '\n')
-  COVERAGE_VALUE=${COVERAGE_VALUE%?}
-  # If the coverage number is 'n' (no data found) there is 0% coverage. This is
-  # probably a directory without source code, so we skip checks.
-  #
-  # We could insist that we validate that 0% coverage directories are in a
-  # documented list, but instead of adding busy-work for folks adding
-  # non-source-containing directories, we trust reviewers to notice if there's
-  # absolutely no tests for a full directory.
-  if [[ $COVERAGE_VALUE =~ "n" ]]; then
-    continue;
-  fi;
-  COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${DIRECTORY_THRESHOLD}" | bc)
-  if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
-    echo "ERROR: Code coverage for ${DIRECTORY} is lower than limit of ${DIRECTORY_THRESHOLD} (${COVERAGE_VALUE})" >&2
-    FAILED=1
-  fi
-  COVERAGE_HIGH=$(echo "${COVERAGE_VALUE}>${DIRECTORY_THRESHOLD}" | bc)
-  if [[ (${DIRECTORY_THRESHOLD} != "${DEFAULT_COVERAGE_THRESHOLD}") && "${COVERAGE_HIGH}" -eq 1 ]]; then
-    HIGH_COVERAGE_STRING+="\"${DIRECTORY}:${COVERAGE_VALUE} (${DIRECTORY_THRESHOLD})\"\n"
-  fi
-  if [[ -n ${VERBOSE} && ${COVERAGE_VALUE} > ${DIRECTORY_THRESHOLD} ]]; then
-    if [[ ${DIRECTORY_THRESHOLD} < $DEFAULT_COVERAGE_THRESHOLD ]]; then
-      echo "Code coverage for ${DIRECTORY} is now ${COVERAGE_VALUE} (previously ${DIRECTORY_THRESHOLD})"
-    fi
-  fi
-
-done <<< "$SOURCES"
-
-if [[ ${FAILED} != 1 && -n "${HIGH_COVERAGE_STRING}" ]]; then
-  echo -e "WARNING: Coverage in the following directories may be adjusted up:\n ${HIGH_COVERAGE_STRING}" >&2
-fi
-
-exit $FAILED
+echo "NOTE: this file has moved and will self-destruct" >&2
+echo "Configure coverage in coverage.yaml" >&2

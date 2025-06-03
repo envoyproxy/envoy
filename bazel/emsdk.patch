@@ -1,8 +1,45 @@
+diff --git a/bazel/BUILD b/bazel/BUILD
+index cb3135c..4d6d92c 100644
+--- a/bazel/BUILD
++++ b/bazel/BUILD
+@@ -78,6 +78,18 @@ alias(
+     }),
+ )
+ 
++alias(
++    name = "dwp_files",
++    actual = select({
++        ":linux": "@emscripten_bin_linux//:dwp_files",
++        ":linux_arm64": "@emscripten_bin_linux_arm64//:dwp_files",
++        ":macos": "@emscripten_bin_mac//:dwp_files",
++        ":macos_arm64": "@emscripten_bin_mac_arm64//:dwp_files",
++        ":windows": "@emscripten_bin_win//:dwp_files",
++        "//conditions:default": ":empty",
++    }),
++)
++
+ platform(
+     name = "platform_wasm",
+     constraint_values = [
 diff --git a/bazel/emscripten_deps.bzl b/bazel/emscripten_deps.bzl
-index 9d020bd..a364f21 100644
+index 9d020bd..f466edb 100644
 --- a/bazel/emscripten_deps.bzl
 +++ b/bazel/emscripten_deps.bzl
-@@ -173,38 +173,3 @@ def emscripten_deps(emscripten_version = "latest"):
+@@ -96,6 +96,13 @@ filegroup(
+         ],
+     ),
+ )
++
++filegroup(
++    name = "dwp_files",
++    srcs = [
++        "bin/llvm-dwp{bin_extension}",
++    ],
++)
+ """
+ 
+ def emscripten_deps(emscripten_version = "latest"):
+@@ -173,38 +180,3 @@ def emscripten_deps(emscripten_version = "latest"):
              build_file_content = BUILD_FILE_CONTENT_TEMPLATE.format(bin_extension = ".exe"),
              type = "zip",
          )
@@ -41,3 +78,358 @@ index 9d020bd..a364f21 100644
 -            data = ["@emscripten_bin_win//:emscripten/package.json"],
 -            npm_package_lock = "@emscripten_bin_win//:emscripten/package-lock.json",
 -        )
+diff --git a/bazel/emscripten_toolchain/BUILD.bazel b/bazel/emscripten_toolchain/BUILD.bazel
+index a989450..4cfa098 100644
+--- a/bazel/emscripten_toolchain/BUILD.bazel
++++ b/bazel/emscripten_toolchain/BUILD.bazel
+@@ -43,12 +43,25 @@ filegroup(
+     ],
+ )
+ 
++filegroup(
++    name = "dwp_files",
++    srcs = [
++        "emdwp-emscripten_bin_linux_arm64.sh",
++        "emdwp-emscripten_bin_linux.sh",
++        "emdwp-emscripten_bin_mac_arm64.sh",
++        "emdwp-emscripten_bin_mac.sh",
++        "emdwp-emscripten_bin_win.bat",
++        "@emsdk//:dwp_files",
++    ],
++)
++
+ filegroup(
+     name = "all_files",
+     srcs = [
+         ":ar_files",
+         ":compiler_files",
+         ":linker_files",
++        ":dwp_files",
+     ],
+ )
+ 
+@@ -75,7 +88,7 @@ cc_toolchain(
+     ar_files = ":ar_files",
+     as_files = ":empty",
+     compiler_files = ":compiler_files",
+-    dwp_files = ":empty",
++    dwp_files = ":dwp_files",
+     linker_files = ":linker_files",
+     objcopy_files = ":empty",
+     strip_files = ":empty",
+diff --git a/bazel/emscripten_toolchain/dwp.bat b/bazel/emscripten_toolchain/dwp.bat
+new file mode 100644
+index 0000000..85ed4b5
+--- /dev/null
++++ b/bazel/emscripten_toolchain/dwp.bat
+@@ -0,0 +1,4 @@
++@echo off
++REM Dummy dwp script for emscripten toolchain
++REM Since wasm doesn't support split debug info, this is a no-op
++exit /b 0
+diff --git a/bazel/emscripten_toolchain/dwp.sh b/bazel/emscripten_toolchain/dwp.sh
+new file mode 100644
+index 0000000..50a1d80
+--- /dev/null
++++ b/bazel/emscripten_toolchain/dwp.sh
+@@ -0,0 +1,8 @@
++#!/bin/bash
++
++# Dummy dwp script for emscripten toolchain
++# Since wasm doesn't support split debug info, this is a no-op
++# Just echo the command for debugging and exit successfully
++
++echo "DWP called with args: $@" >&2
++exit 0
+diff --git a/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux.sh b/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux.sh
+new file mode 100755
+index 0000000..513feee
+--- /dev/null
++++ b/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux.sh
+@@ -0,0 +1,10 @@
++#!/bin/bash
++#
++#  This script differs in form from emcc.{py,bat}/…, because bazel are limited/bugged in the way of executing dwp tool.
++#  Bazel dwp action configuration does not pass environment variables, so we cannot use them in this script.
++#  For more info, see PR discussion and bazel issue:
++#  - https://github.com/emscripten-core/emsdk/pull/1531#discussion_r1962090650
++#  - https://github.com/bazelbuild/bazel/issues/25336
++#
++
++exec external/emscripten_bin_linux/bin/llvm-dwp "$@"
+diff --git a/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux_arm64.sh b/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux_arm64.sh
+new file mode 100755
+index 0000000..f6f3383
+--- /dev/null
++++ b/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux_arm64.sh
+@@ -0,0 +1,10 @@
++#!/bin/bash
++#
++#  This script differs in form from emcc.{py,bat}/…, because bazel are limited/bugged in the way of executing dwp tool.
++#  Bazel dwp action configuration does not pass environment variables, so we cannot use them in this script.
++#  For more info, see PR discussion and bazel issue:
++#  - https://github.com/emscripten-core/emsdk/pull/1531#discussion_r1962090650
++#  - https://github.com/bazelbuild/bazel/issues/25336
++#
++
++exec external/emscripten_bin_linux_arm64/bin/llvm-dwp "$@"
+diff --git a/bazel/emscripten_toolchain/emdwp-emscripten_bin_mac.sh b/bazel/emscripten_toolchain/emdwp-emscripten_bin_mac.sh
+new file mode 100755
+index 0000000..0f97690
+--- /dev/null
++++ b/bazel/emscripten_toolchain/emdwp-emscripten_bin_mac.sh
+@@ -0,0 +1,10 @@
++#!/bin/bash
++#
++#  This script differs in form from emcc.{py,bat}/…, because bazel are limited/bugged in the way of executing dwp tool.
++#  Bazel dwp action configuration does not pass environment variables, so we cannot use them in this script.
++#  For more info, see PR discussion and bazel issue:
++#  - https://github.com/emscripten-core/emsdk/pull/1531#discussion_r1962090650
++#  - https://github.com/bazelbuild/bazel/issues/25336
++#
++
++exec external/emscripten_bin_mac/bin/llvm-dwp "$@"
+diff --git a/bazel/emscripten_toolchain/emdwp-emscripten_bin_mac_arm64.sh b/bazel/emscripten_toolchain/emdwp-emscripten_bin_mac_arm64.sh
+new file mode 100755
+index 0000000..4ae033c
+--- /dev/null
++++ b/bazel/emscripten_toolchain/emdwp-emscripten_bin_mac_arm64.sh
+@@ -0,0 +1,10 @@
++#!/bin/bash
++#
++#  This script differs in form from emcc.{py,bat}/…, because bazel are limited/bugged in the way of executing dwp tool.
++#  Bazel dwp action configuration does not pass environment variables, so we cannot use them in this script.
++#  For more info, see PR discussion and bazel issue:
++#  - https://github.com/emscripten-core/emsdk/pull/1531#discussion_r1962090650
++#  - https://github.com/bazelbuild/bazel/issues/25336
++#
++
++exec external/emscripten_bin_mac_arm64/bin/llvm-dwp "$@"
+diff --git a/bazel/emscripten_toolchain/emdwp-emscripten_bin_win.bat b/bazel/emscripten_toolchain/emdwp-emscripten_bin_win.bat
+new file mode 100644
+index 0000000..3cb1f2e
+--- /dev/null
++++ b/bazel/emscripten_toolchain/emdwp-emscripten_bin_win.bat
+@@ -0,0 +1,10 @@
++::
++::  This script differs in form from emcc.{py,bat}/…, because bazel are limited/bugged in the way of executing dwp tool.
++::  Bazel dwp action configuration does not pass environment variables, so we cannot use them in this script.
++::  For more info, see PR discussion and bazel issue:
++::  - https://github.com/emscripten-core/emsdk/pull/1531#discussion_r1962090650
++::  - https://github.com/bazelbuild/bazel/issues/25336
++::
++@ECHO OFF
++
++call external\emscripten_bin_win\bin\llvm-dwp %*
+diff --git a/bazel/emscripten_toolchain/toolchain.bzl b/bazel/emscripten_toolchain/toolchain.bzl
+index c8cec07..a89ad1e 100644
+--- a/bazel/emscripten_toolchain/toolchain.bzl
++++ b/bazel/emscripten_toolchain/toolchain.bzl
+@@ -72,12 +72,14 @@ def _impl(ctx):
+ 
+     emscripten_dir = ctx.attr.emscripten_binaries.label.workspace_root
+     nodejs_path = ctx.file.nodejs_bin.path
++    emscripten_name = ctx.attr.emscripten_binaries.label.workspace_name
+ 
+     builtin_sysroot = emscripten_dir + "/emscripten/cache/sysroot"
+ 
+     emcc_script = "emcc.%s" % ctx.attr.script_extension
+     emcc_link_script = "emcc_link.%s" % ctx.attr.script_extension
+     emar_script = "emar.%s" % ctx.attr.script_extension
++    emdwp_script = "emdwp-%s.%s" % (emscripten_name, ctx.attr.script_extension)
+ 
+     ################################################################
+     # Tools
+@@ -99,6 +101,7 @@ def _impl(ctx):
+         tool_path(name = "nm", path = "NOT_USED"),
+         tool_path(name = "objdump", path = "/bin/false"),
+         tool_path(name = "strip", path = "NOT_USED"),
++        tool_path(name = "dwp", path = emdwp_script),
+     ]
+ 
+     ################################################################
+@@ -460,6 +463,49 @@ def _impl(ctx):
+         feature(
+             name = "wasm_standalone",
+         ),
++        # Support for debug fission. In short, debugging fission should:
++        #   * reduce linking time, RAM usage and disk usage
++        #   * speed up incremental builds
++        #   * speed up debugger work (reduce startup and breakpoint time)
++        # (to use this, follow the --fission=yes flag)
++        # https://developer.chrome.com/blog/faster-wasm-debugging
++        # https://bazel.build/docs/user-manual#fission
++        feature(
++            name = "per_object_debug_info",
++            flag_sets = [
++                flag_set(
++                    actions = [
++                        ACTION_NAMES.c_compile,
++                        ACTION_NAMES.cpp_compile,
++                        ACTION_NAMES.cpp_module_codegen,
++                        ACTION_NAMES.assemble,
++                        ACTION_NAMES.preprocess_assemble,
++                    ],
++                    flag_groups = [
++                        flag_group(
++                            flags = ["-g", "-gsplit-dwarf", "-gdwarf-5", "-gpubnames"],
++                            expand_if_available = "per_object_debug_info_file",
++                        ),
++                    ],
++                ),
++            ],
++            enabled = True,
++        ),
++        feature(
++            name = "fission_support",
++            flag_sets = [
++                flag_set(
++                    actions = all_link_actions,
++                    flag_groups = [
++                        flag_group(
++                            flags = ["-sWASM_BIGINT"], # WASM_BIGINT required to support dwarf-5
++                            expand_if_available = "is_using_fission",
++                        ),
++                    ],
++                ),
++            ],
++            enabled = True,
++        )
+     ]
+ 
+     crosstool_default_flag_sets = [
+diff --git a/bazel/emscripten_toolchain/wasm_binary.py b/bazel/emscripten_toolchain/wasm_binary.py
+index d7d6142..0da7f55 100644
+--- a/bazel/emscripten_toolchain/wasm_binary.py
++++ b/bazel/emscripten_toolchain/wasm_binary.py
+@@ -14,6 +14,7 @@ WebAssembly binary into a larger web application.
+ import argparse
+ import os
+ import tarfile
++import shutil
+ 
+ 
+ def ensure(f):
+@@ -26,11 +27,20 @@ def main():
+   parser = argparse.ArgumentParser()
+   parser.add_argument('--archive', help='The archive to extract from.')
+   parser.add_argument('--outputs', help='Comma separated list of files that should be extracted from the archive. Only the extname has to match a file in the archive.')
++  parser.add_argument('--dwp_file', help='Optional dwp input file, generated when fission flags set.')
+   parser.add_argument('--allow_empty_outputs', help='If an output listed in --outputs does not exist, create it anyways.', action='store_true')
+   args = parser.parse_args()
+ 
+   args.archive = os.path.normpath(args.archive)
+   args.outputs = args.outputs.split(",")
++  args.dwp_file = os.path.normpath(args.dwp_file) if args.dwp_file else None
++
++  if args.dwp_file:
++    for idx, output in enumerate(args.outputs):
++      if output.endswith(".dwp"):  # also update extension 'binary.dwp' to 'binary.wasm.dwp'
++        shutil.copy2(args.dwp_file, output)
++        args.outputs.pop(idx)
++        break
+ 
+   tar = tarfile.open(args.archive)
+ 
+diff --git a/bazel/emscripten_toolchain/wasm_cc_binary.bzl b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
+index 6ea4f12..5cfd86d 100644
+--- a/bazel/emscripten_toolchain/wasm_cc_binary.bzl
++++ b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
+@@ -69,6 +69,7 @@ _ALLOW_OUTPUT_EXTNAMES = [
+     ".fetch.js",
+     ".js.symbols",
+     ".wasm.debug.wasm",
++    ".wasm.dwp",
+     ".html",
+     ".aw.js",
+ ]
+@@ -107,10 +108,12 @@ _WASM_BINARY_COMMON_ATTRS = {
+ }
+ 
+ def _wasm_cc_binary_impl(ctx):
+-    args = ctx.actions.args()
++    print("IN BINARY RULE")
+     cc_target = ctx.attr.cc_target[0]
++    dwp_file = cc_target[DebugPackageInfo].dwp_file if DebugPackageInfo in cc_target else None
++    outputs = ctx.outputs.outputs
+ 
+-    for output in ctx.outputs.outputs:
++    for output in outputs:
+         valid_extname = False
+         for allowed_extname in _ALLOW_OUTPUT_EXTNAMES:
+             if output.path.endswith(allowed_extname):
+@@ -119,28 +122,36 @@ def _wasm_cc_binary_impl(ctx):
+         if not valid_extname:
+             fail("Invalid output '{}'. Allowed extnames: {}".format(output.basename, ", ".join(_ALLOW_OUTPUT_EXTNAMES)))
+ 
++    inputs = ctx.files.cc_target
++    args = ctx.actions.args()
+     args.add_all("--archive", ctx.files.cc_target)
+-    args.add_joined("--outputs", ctx.outputs.outputs, join_with = ",")
++    args.add_joined("--outputs", outputs, join_with = ",")
++
++    if dwp_file:
++        args.add("--dwp_file", dwp_file)
++        inputs = inputs + [dwp_file]
+ 
+     ctx.actions.run(
+-        inputs = ctx.files.cc_target,
+-        outputs = ctx.outputs.outputs,
++        inputs = inputs,
++        outputs = outputs,
+         arguments = [args],
+         executable = ctx.executable._wasm_binary_extractor,
+     )
+ 
+     return [
+         DefaultInfo(
+-            files = depset(ctx.outputs.outputs),
++            files = depset(outputs),
+             # This is needed since rules like web_test usually have a data
+             # dependency on this target.
+-            data_runfiles = ctx.runfiles(transitive_files = depset(ctx.outputs.outputs)),
++            data_runfiles = ctx.runfiles(transitive_files = depset(outputs)),
+         ),
+         OutputGroupInfo(_wasm_tar = cc_target.files),
+     ]
+ 
+ def _wasm_cc_binary_legacy_impl(ctx):
++    print("IN LEGACY BINARY RULE")
+     cc_target = ctx.attr.cc_target[0]
++    dwp_file = cc_target[DebugPackageInfo].dwp_file if DebugPackageInfo in cc_target else None
+     outputs = [
+         ctx.outputs.loader,
+         ctx.outputs.wasm,
+@@ -151,17 +162,23 @@ def _wasm_cc_binary_legacy_impl(ctx):
+         ctx.outputs.data,
+         ctx.outputs.symbols,
+         ctx.outputs.dwarf,
++        ctx.outputs.dwp,
+         ctx.outputs.html,
+         ctx.outputs.audio_worklet,
+     ]
+ 
++    inputs = ctx.files.cc_target
+     args = ctx.actions.args()
+     args.add("--allow_empty_outputs")
+     args.add_all("--archive", ctx.files.cc_target)
+     args.add_joined("--outputs", outputs, join_with = ",")
+ 
++    if dwp_file:
++        args.add("--dwp_file", dwp_file)
++        inputs = inputs + [dwp_file]
++
+     ctx.actions.run(
+-        inputs = ctx.files.cc_target,
++        inputs = inputs,
+         outputs = outputs,
+         arguments = [args],
+         executable = ctx.executable._wasm_binary_extractor,
+@@ -202,6 +219,7 @@ def _wasm_binary_legacy_outputs(name, cc_target):
+         "data": "{}/{}.data".format(name, basename),
+         "symbols": "{}/{}.js.symbols".format(name, basename),
+         "dwarf": "{}/{}.wasm.debug.wasm".format(name, basename),
++        "dwp": "{}/{}.wasm.dwp".format(name, basename),
+         "html": "{}/{}.html".format(name, basename),
+         "audio_worklet": "{}/{}.aw.js".format(name, basename)
+     }
