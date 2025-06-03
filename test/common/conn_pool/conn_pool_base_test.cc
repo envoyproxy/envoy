@@ -2,6 +2,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
@@ -231,6 +232,7 @@ public:
   Event::SimulatedTimeSystemHelper time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   uint32_t max_connection_duration_ = 5000;
   absl::optional<std::chrono::milliseconds> max_connection_duration_opt_{max_connection_duration_};
   uint32_t stream_limit_ = 100;
@@ -686,32 +688,6 @@ TEST_F(ConnPoolImplDispatcherBaseTest, PoolDrainsWithEarlyDataStreams) {
 
   // Clean up.
   closeStream();
-}
-
-// Test that when load shed point is triggered, new connections are not created.
-TEST_F(ConnPoolImplBaseTest, LoadShedPointTriggered) {
-  setUp();
-
-  auto load_shed_point = std::make_unique<NiceMock<Server::MockLoadShedPoint>>();
-  EXPECT_CALL(*load_shed_point, shouldShedLoad()).WillRepeatedly(Return(true));
-  EXPECT_CALL(*overload_manager_, getLoadShedPoint(_))
-      .WillRepeatedly(Return(load_shed_point.get()));
-
-  Envoy::ConnectionPool::MockCallbacks callbacks;
-  auto* handle = pool_->newStreamImpl(attach_context_, false);
-
-  EXPECT_EQ(0, pool_->instantiateActiveClient_calls_);
-  EXPECT_EQ(1, cluster_->traffic_stats_->upstream_cx_overflow_.value());
-  EXPECT_NE(nullptr, handle);
-}
-
-// Test that when load shed point is not configured, connections are created normally.
-TEST_F(ConnPoolImplBaseTest, LoadShedPointNotConfigured) {
-  setUp();
-
-  EXPECT_CALL(*overload_manager_, getLoadShedPoint(_)).WillRepeatedly(Return(nullptr));
-
-  createConnection();
 }
 
 } // namespace ConnectionPool

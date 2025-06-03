@@ -182,7 +182,7 @@ protected:
     ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                         Network::ConnectionSocket::OptionsSharedPtr options,
                         Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-                        ConnPoolBase& parent, Server::MockOverloadManager& overload_manager)
+                        ConnPoolBase& parent, Server::OverloadManager& overload_manager)
         : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
                        transport_socket_options, state_, absl::nullopt, overload_manager),
           parent_(parent) {}

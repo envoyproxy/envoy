@@ -62,7 +62,7 @@ public:
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       Random::RandomGenerator& random_generator,
                       Event::MockSchedulableCallback* upstream_ready_cb,
-                      Server::MockOverloadManager& overload_manager)
+                      Server::OverloadManager& overload_manager)
       : FixedHttpConnPoolImpl(
             Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource()),
             Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr, random_generator,

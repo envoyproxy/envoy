@@ -32,7 +32,7 @@ public:
                       Random::RandomGenerator& random, Upstream::ClusterInfoConstSharedPtr cluster,
                       HttpServerPropertiesCache::Origin origin,
                       HttpServerPropertiesCacheSharedPtr cache,
-                      Server::MockOverloadManager& overload_manager)
+                      Server::OverloadManager& overload_manager)
       : HttpConnPoolImplMixed(dispatcher, random,
                               Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
                               Upstream::ResourcePriority::Default, nullptr, nullptr, state, origin,
