@@ -191,7 +191,6 @@ ConnPoolImplBase::tryCreateNewConnection(float global_preconnect_ratio) {
   // Drop new connection attempts if the load shed point indicates overload.
   if (create_new_connection_load_shed_) {
     if (create_new_connection_load_shed_->shouldShedLoad()) {
-      ENVOY_LOG(debug, "pool load shedding active, not creating new connection");
       return ConnectionResult::LoadShed;
     }
   }
@@ -378,7 +377,6 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStreamImpl(AttachContext& cont
                   ConnectionPool::PoolFailureReason::LocalConnectionFailure, context);
     return nullptr;
   } else if (result == ConnectionResult::LoadShed) {
-    ENVOY_LOG(debug, "result == ConnectionResult:LoadShed");
     pending->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
     onPoolFailure(nullptr, absl::string_view(), ConnectionPool::PoolFailureReason::Overflow,
                   context);
