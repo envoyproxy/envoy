@@ -42,28 +42,27 @@ public:
    * @param dispatcher The dispatcher for the thread used by a datasource provider.
    * @param tls The thread local slot allocator used by a datasource provider.
    * @param creation_status This status will be populated with error if loading fails.
-   * @return Valid LcTrieSharedPtr if loading succeeded or nullptr otherwise.
+   * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
    */
-  LcTrieSharedPtr loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                           Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-                           absl::Status& creation_status);
+  absl::StatusOr<LcTrieSharedPtr>
+  loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
+           Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls);
 
   /**
    * Performs periodic refresh of file based ip tags via datasource.
    * @param refresh_status This status will be populated with error if refresh fails.
-   * @return Valid LcTrieSharedPtr if loading succeeded or nullptr otherwise.
+   * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise..
    */
-  LcTrieSharedPtr refreshTags(absl::Status& refresh_status);
+  absl::StatusOr<LcTrieSharedPtr> refreshTags();
 
   /**
    * Parses ip tags in a proto format into a trie structure.
    * @param ip_tags Collection of ip tags in proto format.
    * @param creation_status This status will be populated with error if parsing fails.
-   * @return Valid LcTrieSharedPtr if parsing succeeded or nullptr otherwise.
+   * @return Valid LcTrieSharedPtr if parsing succeeded or error status otherwise.
    */
-  LcTrieSharedPtr
-  parseIpTagsAsProto(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags,
-                     absl::Status& creation_status);
+  absl::StatusOr<LcTrieSharedPtr>
+  parseIpTagsAsProto(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags);
 
 private:
   Api::Api& api_;

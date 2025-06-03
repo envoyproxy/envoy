@@ -33,7 +33,11 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
       ip_tags_datasource.has_watched_directory()) {
     needs_refresh_ = true;
   }
-  tags_ = tags_loader_.loadTags(ip_tags_datasource, dispatcher, tls, creation_status);
+  auto tags_or_error = tags_loader_.loadTags(ip_tags_datasource, dispatcher, tls);
+  creation_status = tags_or_error.status();
+  if (tags_or_error.status().ok()) {
+    tags_ = tags_or_error.value();
+  }
 }
 
 IpTagsProvider::~IpTagsProvider() { ENVOY_LOG(debug, "Shutting down ip tags provider"); };
@@ -43,14 +47,14 @@ LcTrieSharedPtr IpTagsProvider::ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
     const auto current_time = time_source_.monotonicTime();
     if (std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_reloaded_time_) >
         ip_tags_refresh_interval_ms_) {
-      absl::Status refresh_status = absl::OkStatus();
-      auto new_tags = tags_loader_.refreshTags(refresh_status);
-      if (new_tags) {
+      auto new_tags_or_error = tags_loader_.refreshTags();
+      if (new_tags_or_error.status().ok()) {
         absl::MutexLock lock(&ip_tags_mutex_);
-        tags_ = new_tags;
+        tags_ = new_tags_or_error.value();
         reload_success_cb_();
       } else {
-        ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}", refresh_status.message());
+        ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
+                  new_tags_or_error.status().message());
         reload_error_cb_();
       }
       last_reloaded_time_ = current_time;
@@ -92,33 +96,30 @@ IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& va
                            Stats::StatNameSetPtr& stat_name_set)
     : api_(api), validation_visitor_(validation_visitor), stat_name_set_(stat_name_set) {}
 
-LcTrieSharedPtr
+absl::StatusOr<LcTrieSharedPtr>
 IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                       Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-                       absl::Status& creation_status) {
+                       Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls) {
   if (!ip_tags_datasource.filename().empty()) {
     if (!absl::EndsWith(ip_tags_datasource.filename(), MessageUtil::FileExtensions::get().Yaml) &&
         !absl::EndsWith(ip_tags_datasource.filename(), MessageUtil::FileExtensions::get().Json)) {
-      creation_status =
-          absl::InvalidArgumentError("Unsupported file format, unable to parse ip tags from file " +
-                                     ip_tags_datasource.filename());
-      return nullptr;
+      return absl::InvalidArgumentError(
+          "Unsupported file format, unable to parse ip tags from file " +
+          ip_tags_datasource.filename());
     }
     auto provider_or_error = Config::DataSource::DataSourceProvider::create(
         ip_tags_datasource, dispatcher, tls, api_, false, 0);
-    if (!provider_or_error.ok()) {
-      creation_status = absl::InvalidArgumentError(
+    if (!provider_or_error.status().ok()) {
+      return absl::InvalidArgumentError(
           fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
-      return nullptr;
     }
     data_source_provider_ = std::move(provider_or_error.value());
     ip_tags_path_ = ip_tags_datasource.filename();
-    return refreshTags(creation_status);
+    return refreshTags();
   }
-  return nullptr;
+  return absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
 }
 
-LcTrieSharedPtr IpTagsLoader::refreshTags(absl::Status& refresh_status) {
+absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   if (data_source_provider_) {
     IpTagFileProto ip_tags_proto;
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
@@ -127,28 +128,25 @@ LcTrieSharedPtr IpTagsLoader::refreshTags(absl::Status& refresh_status) {
                                   validation_visitor_);
       }
       END_TRY catch (EnvoyException& ex) {
-        refresh_status = absl::InvalidArgumentError(
+        return absl::InvalidArgumentError(
             fmt::format("failed to parse ip tags file as yaml: {}", ex.what()));
-        return nullptr;
       }
     } else if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Json)) {
       bool has_unknown_field;
-      refresh_status = MessageUtil::loadFromJsonNoThrow(data_source_provider_->data(),
-                                                        ip_tags_proto, has_unknown_field);
-      if (!refresh_status.ok()) {
-        return nullptr;
+      auto load_status = MessageUtil::loadFromJsonNoThrow(data_source_provider_->data(),
+                                                          ip_tags_proto, has_unknown_field);
+      if (!load_status.ok()) {
+        return load_status;
       }
     }
-    return parseIpTagsAsProto(ip_tags_proto.ip_tags(), refresh_status);
+    return parseIpTagsAsProto(ip_tags_proto.ip_tags());
   } else {
-    refresh_status = absl::InvalidArgumentError("Unable to load tags from empty datasource");
-    return nullptr;
+    return absl::InvalidArgumentError("Unable to load tags from empty datasource");
   }
 }
 
-LcTrieSharedPtr IpTagsLoader::parseIpTagsAsProto(
-    const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags,
-    absl::Status& creation_status) {
+absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
+    const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags) {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(ip_tags.size());
   for (const auto& ip_tag : ip_tags) {
@@ -160,10 +158,9 @@ LcTrieSharedPtr IpTagsLoader::parseIpTagsAsProto(
       if (cidr_or_error.status().ok()) {
         cidr_set.emplace_back(std::move(cidr_or_error.value()));
       } else {
-        creation_status = absl::InvalidArgumentError(
+        return absl::InvalidArgumentError(
             fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
                         entry.address_prefix(), entry.prefix_len().value()));
-        return nullptr;
       }
     }
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
@@ -224,7 +221,13 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (!config.ip_tags().empty()) {
-    trie_ = tags_loader_.parseIpTagsAsProto(config.ip_tags(), creation_status);
+    auto trie_or_error = tags_loader_.parseIpTagsAsProto(config.ip_tags());
+    if (trie_or_error.status().ok()) {
+      trie_ = trie_or_error.value();
+    } else {
+      creation_status = trie_or_error.status();
+      return;
+    }
   } else {
     if (!config.ip_tags_file_provider().has_ip_tags_datasource()) {
       creation_status = absl::InvalidArgumentError(
