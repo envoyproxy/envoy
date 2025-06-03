@@ -34,8 +34,8 @@ public:
   const std::string HttpDownstreamFilterCheck =
       "envoy.load_shed_points.http_downstream_filter_check";
 
-  // Envoy will reject creating new connections in the connection pool when
-  // under pressure (typically memory pressure). If a new connection is
+  // Envoy will stop creating new connections in the connection pool when
+  // it is under pressure (typically memory pressure). If a new connection is
   // rejected by this load shed point and there is no available capacity
   // to serve the downstream request, the downstream request will fail.
   const std::string ConnectionPoolNewConnection =
