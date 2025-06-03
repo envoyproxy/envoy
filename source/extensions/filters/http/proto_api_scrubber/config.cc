@@ -23,11 +23,9 @@ Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoT
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config =
       ProtoApiScrubberFilterConfig::create(proto_config, context);
   if (!filter_config.ok()) {
-    std::string error_msg = filter_config.status().ToString();
-
     // Allowlist exception as there's no other exception-free way to propagate this error to Envoy.
     // NOLINTNEXTLINE(envoy-build-forbidden-exception)
-    throw Envoy::ProtoValidationException(error_msg);
+    throw Envoy::ProtoValidationException(filter_config.status().ToString());
   }
 
   return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
