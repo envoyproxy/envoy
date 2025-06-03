@@ -271,90 +271,106 @@ template <class T> OnMatch<T> stringOnMatch(absl::string_view value, bool keep_m
   return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr, keep_matching};
 }
 
-// Verifies the match tree completes the matching with an not match result.
-void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
-  EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
-  EXPECT_FALSE(result.on_match_.has_value());
+inline void PrintTo(const Action& action, std::ostream* os) {
+  if (action.typeUrl() == "google.protobuf.StringValue") {
+    *os << "{string_value=\"" << action.getTyped<StringAction>().string_ << "\"}";
+    return;
+  }
+  *os << "{type=" << action.typeUrl() << "}";
 }
 
-void verifyOnMatch(const OnMatch<TestData>& on_match, absl::string_view expected_value) {
-  EXPECT_NE(on_match.action_cb_, nullptr);
-  EXPECT_EQ(on_match.action_cb_().get()->getTyped<StringAction>(), *stringValue(expected_value))
-      << " Actual: " << on_match.action_cb_().get()->getTyped<StringAction>().string_
-      << ". Expected: " << expected_value;
+inline void PrintTo(const ActionFactoryCb& action_cb, std::ostream* os) {
+  if (action_cb == nullptr) {
+    *os << "nullptr";
+    return;
+  }
+  ActionPtr action = action_cb();
+  PrintTo(*action, os);
 }
 
-// Verifies the match tree completes the matching with the expected value.
-void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
-                          absl::string_view expected_value) {
-  EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
-  EXPECT_TRUE(result.on_match_.has_value());
-
-  EXPECT_EQ(nullptr, result.on_match_->matcher_);
-  verifyOnMatch(*result.on_match_, expected_value);
+inline void PrintTo(const MatchState state, std::ostream* os) {
+  switch (state) {
+  case MatchState::UnableToMatch:
+    *os << "UnableToMatch";
+    break;
+  case MatchState::MatchComplete:
+    *os << "MatchComplete";
+    break;
+  }
 }
 
-// Verifies the match tree fails to match since the data are not enough.
-void verifyNotEnoughDataForMatch(const MatchTree<TestData>::MatchResult& result) {
-  EXPECT_EQ(MatchState::UnableToMatch, result.match_state_);
-  EXPECT_FALSE(result.on_match_.has_value());
+inline void PrintTo(const MatchTree<TestData>& matcher, std::ostream* os) {
+  *os << "{type=" << typeid(matcher).name() << "}";
 }
 
-MATCHER_P(IsStringAction, m, "") {
-  // Accepts an ActionFactoryCb argument.
+inline void PrintTo(const OnMatch<TestData>& on_match, std::ostream* os) {
+  if (on_match.action_cb_) {
+    *os << "{action_cb_=";
+    PrintTo(on_match.action_cb_, os);
+    *os << "}";
+  } else if (on_match.matcher_) {
+    *os << "{matcher_=";
+    PrintTo(*on_match.matcher_, os);
+    *os << "}";
+  } else {
+    *os << "{invalid, no value set}";
+  }
+}
+
+inline void PrintTo(const MatchTree<TestData>::MatchResult& result, std::ostream* os) {
+  *os << "{match_state_=";
+  PrintTo(result.match_state_, os);
+  *os << ", on_match_=";
+  if (result.on_match_.has_value()) {
+    PrintTo(result.on_match_.value(), os);
+  } else {
+    *os << "nullopt";
+  }
+  *os << "}";
+}
+
+MATCHER(HasNotEnoughData, "") {
+  // Takes a MatchTree<TestData>::MatchResult& and validates that it
+  // is in the UnableToMatch state.
+  return arg.match_state_ == MatchState::UnableToMatch && !arg.on_match_.has_value();
+}
+
+MATCHER_P(IsStringAction, matcher, "") {
+  // Takes an ActionFactoryCb argument, and compares its StringAction's string against matcher.
   if (arg == nullptr) {
-    *result_listener << "action callback is nullptr";
     return false;
   }
   ActionPtr action = arg();
-  StringAction string_action = action->getTyped<StringAction>();
-  return ::testing::ExplainMatchResult(m, string_action.string_, result_listener);
+  if (action->typeUrl() != "google.protobuf.StringValue") {
+    return false;
+  }
+  return ::testing::ExplainMatchResult(testing::Matcher<std::string>(matcher),
+                                       action->template getTyped<StringAction>().string_,
+                                       result_listener);
 }
 
-MATCHER_P(HasStringAction, m, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
+MATCHER_P(HasStringAction, matcher, "") {
+  // Takes a MatchTree<TestData>::MatchResult& and validates that it
+  // is a StringAction with contents matching matcher.
+  if (arg.match_state_ != MatchState::MatchComplete || !arg.on_match_.has_value() ||
+      arg.on_match_->matcher_ != nullptr) {
     return false;
   }
-  if (arg.on_match_ == absl::nullopt) {
-    *result_listener << "on_match_ is nullopt";
-    return false;
-  }
-  return ExplainMatchResult(IsStringAction(m), arg.on_match_->action_cb_, result_listener);
+  return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.on_match_->action_cb_,
+                                       result_listener);
 }
 
 MATCHER(HasNoMatch, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.on_match_ != absl::nullopt) {
-    *result_listener << "on_match_ was not nullopt";
-    return false;
-  }
-  return true;
+  // Takes a MatchTree<TestData>::MatchResult& and validates that it
+  // is MatchComplete with no on_match_.
+  return arg.match_state_ == MatchState::MatchComplete && !arg.on_match_.has_value();
 }
 
 MATCHER(HasSubMatcher, "") {
-  // Accepts a MatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.on_match_ == absl::nullopt) {
-    *result_listener << "on_match_ is nullopt";
-    return false;
-  }
-  if (arg.on_match_->matcher_ == nullptr) {
-    *result_listener << "on_match_->matcher_ is nullptr, expected it to not be.";
-    if (arg.on_match_->action_cb_ != nullptr) {
-      *result_listener << "\non_match_->action_cb_ is not nullptr.";
-    }
-    return false;
-  }
-  return true;
+  // Takes a MatchTree<TestData>::MatchResult& and validates that it
+  // has a matcher_ value in on_match_.
+  return arg.match_state_ == MatchState::MatchComplete && arg.on_match_.has_value() &&
+         arg.on_match_->matcher_ != nullptr;
 }
 
 MATCHER_P(HasResult, m, "") {

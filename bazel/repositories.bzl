@@ -236,7 +236,6 @@ def envoy_dependencies(skip_targets = []):
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-
     _com_github_wamr()
     _com_github_wasmtime()
 

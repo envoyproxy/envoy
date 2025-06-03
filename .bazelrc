@@ -261,6 +261,8 @@ build:coverage --define=no_debug_info=1
 build:coverage --linkopt=-Wl,-s,--no-relax
 build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 build:coverage --define=dynamic_link_tests=false
+# Use custom report generator that also generates HTML
+build:coverage --coverage_report_generator=@envoy//tools/coverage:report_generator
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
@@ -272,6 +274,8 @@ build:fuzz-coverage --test_tag_filters=-nocoverage
 # fuzz dependencies anyways. On the other hand, disabling WASM reduces the build time and
 # resources required to build and run the tests.
 build:fuzz-coverage --define=wasm=disabled
+build:fuzz-coverage --config=fuzz-coverage-config
+build:fuzz-coverage-config --//tools/coverage:config=//test:fuzz_coverage_config
 
 build:cache-local --remote_cache=grpc://localhost:9092
 

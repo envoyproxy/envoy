@@ -30,6 +30,7 @@ envoy_cc_library(
     deps = [
         ":map_matcher_lib",
         "//source/common/common:trie_lookup_table_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
