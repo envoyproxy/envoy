@@ -134,6 +134,10 @@ public:
   absl::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap>,
                                     OptRef<const StreamInfo::StreamInfo> info,
                                     HashPolicy::AddCookieCallback) const override {
+    if (!info.has_value()) {
+      return absl::nullopt;
+    }
+
     const auto& conn = info->downstreamAddressProvider();
     const auto& downstream_addr = conn.remoteAddress();
 
