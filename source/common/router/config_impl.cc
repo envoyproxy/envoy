@@ -964,35 +964,33 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-const std::string
-RouteEntryImplBase::getRequestHostValue(const Http::RequestHeaderMap& headers) const {
+void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
+                                            bool keep_old_host) const {
+  absl::string_view hostname;
+  std::string buffer;
+
   if (!host_rewrite_.empty()) {
-    return host_rewrite_;
-  }
-
-  if (auto_host_rewrite_header_) {
-    const auto& header = headers.get(*auto_host_rewrite_header_);
-    if (!header.empty()) {
-      const absl::string_view header_value = header[0]->value().getStringView();
-      if (!header_value.empty()) {
-        return std::string(header_value);
-      }
+    hostname = host_rewrite_;
+  } else if (auto_host_rewrite_header_) {
+    if (const auto header = headers.get(*auto_host_rewrite_header_); !header.empty()) {
+      hostname = header[0]->value().getStringView();
     }
-  }
-
-  if (host_rewrite_path_regex_) {
+  } else if (host_rewrite_path_regex_) {
     absl::string_view path = headers.getPathValue();
-    return host_rewrite_path_regex_->replaceAll(Http::PathUtil::removeQueryAndFragment(path),
-                                                host_rewrite_path_regex_substitution_);
+    buffer = host_rewrite_path_regex_->replaceAll(Http::PathUtil::removeQueryAndFragment(path),
+                                                  host_rewrite_path_regex_substitution_);
+    hostname = buffer;
   }
 
-  // Fallback to original host value
-  return std::string(headers.getHostValue());
+  if (hostname.empty()) {
+    return;
+  }
+  Http::Utility::updateAuthority(headers, hostname, append_xfh_, keep_old_host);
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
-                                                bool insert_envoy_original_path) const {
+                                                bool keep_original_host_or_path) const {
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
@@ -1010,16 +1008,13 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  auto final_host_value = getRequestHostValue(headers);
-  if (final_host_value != headers.getHostValue()) {
-    Http::Utility::updateAuthority(headers, final_host_value, append_xfh_);
-  }
+  finalizeHostHeader(headers, keep_original_host_or_path);
 
   // Handle path rewrite
   absl::optional<std::string> container;
   if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr ||
       path_rewriter_ != nullptr) {
-    rewritePathHeader(headers, insert_envoy_original_path);
+    rewritePathHeader(headers, keep_original_host_or_path);
   }
 }
 

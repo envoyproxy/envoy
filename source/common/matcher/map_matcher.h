@@ -32,9 +32,13 @@ public:
       return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
 
-    const absl::optional<OnMatch<DataType>> result = doMatch(absl::get<std::string>(input.data_));
+    const typename MatchTree<DataType>::MatchResult result =
+        doMatch(data, absl::get<std::string>(input.data_), skipped_match_cb);
+    if (result.match_state_ != MatchState::MatchComplete) {
+      return result;
+    }
     // No match.
-    if (!result.has_value()) {
+    if (!result.on_match_.has_value()) {
       // Match failed.
       if (input.data_availability_ ==
           DataInputGetResult::DataAvailability::MoreDataMightBeAvailable) {
@@ -46,7 +50,7 @@ public:
 
     // Handle recursion and keep_matching.
     auto processed_result =
-        MatchTree<DataType>::handleRecursionAndSkips(result, data, skipped_match_cb);
+        MatchTree<DataType>::handleRecursionAndSkips(result.on_match_, data, skipped_match_cb);
     // Matched or failed nested matching.
     if (processed_result.match_state_ != MatchState::MatchComplete ||
         processed_result.on_match_.has_value()) {
@@ -74,7 +78,9 @@ public:
   // The inner match method. Attempts to match against the resulting data string. If the match
   // result was determined, the OnMatch will be returned. If a match result was determined to be no
   // match, {} will be returned.
-  virtual absl::optional<OnMatch<DataType>> doMatch(const std::string& data) PURE;
+  virtual typename MatchTree<DataType>::MatchResult
+  doMatch(const DataType& data, absl::string_view key,
+          SkippedMatchCb<DataType> skipped_match_cb) PURE;
 };
 
 } // namespace Matcher

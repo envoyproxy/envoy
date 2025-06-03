@@ -325,7 +325,11 @@ void ConnectionManagerUtility::cleanInternalHeaders(
     request_headers.removeEnvoyDecoratorOperation();
     request_headers.removeEnvoyDownstreamServiceCluster();
     request_headers.removeEnvoyDownstreamServiceNode();
+
+    // TODO(wbpcode): Envoy may should always remove these headers from client because
+    // these headers are hop by hop headers and should not be sent to upstream.
     request_headers.removeEnvoyOriginalPath();
+    request_headers.removeEnvoyOriginalHost();
   }
 
   // Headers to be stripped from edge *and* intermediate-hop external requests.
