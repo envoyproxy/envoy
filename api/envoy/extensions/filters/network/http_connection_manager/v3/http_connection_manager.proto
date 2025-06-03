@@ -668,7 +668,7 @@ message HttpConnectionManager {
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
   uint32 xff_num_trusted_hops = 19;
 
-  // Configuration for Original IP Detection extensions.
+  // Configuration for original IP detection extensions.
   //
   // When these extensions are configured, Envoy will invoke them with the incoming request headers and
   // details about the downstream connection, including the directly connected address. Each extension uses
