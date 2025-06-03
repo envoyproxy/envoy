@@ -50,7 +50,7 @@ absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
 CertificateValidationContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
     bool auto_sni_san_match, Api::Api& api) {
-  auto ca_or_error = Config::DataSource::read(context.trusted_ca(), true, api);
+  auto ca_or_error = Config::DataSource::read(context.trusted_ca(), !context.has_trusted_ca(), api);
   RETURN_IF_NOT_OK_REF(ca_or_error.status());
   auto list_or_error = Config::DataSource::read(context.crl(), true, api);
   RETURN_IF_NOT_OK_REF(list_or_error.status());
