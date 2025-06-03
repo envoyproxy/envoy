@@ -155,7 +155,6 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   return absl::OkStatus();
 }
 
-
 absl::Status FilterChainManagerImpl::verifyNoDuplicateMatchers(
     const xds::type::matcher::v3::Matcher* filter_chain_matcher,
     absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch, std::string, MessageUtil,
