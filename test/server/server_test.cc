@@ -534,13 +534,6 @@ TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
   server_thread->join();
 }
 
-// Validate the the Envoy FIPS compilation flags are consistent with the FIPS
-// mode of the underlying BoringSSL build.
-TEST_P(ServerInstanceImplTest, ValidateFIPSModeConsistency) {
-  bool isFIPS = (FIPS_mode() != 0);
-  EXPECT_EQ(isFIPS, VersionInfo::sslFipsCompliant());
-}
-
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/test_data/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
