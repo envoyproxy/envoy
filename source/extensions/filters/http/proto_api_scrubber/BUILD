@@ -15,7 +15,10 @@ envoy_cc_extension(
     hdrs = ["filter_config.h"],
     deps = [
         "//source/common/common:minimal_logger_lib",
-        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/common/http:utility_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/matcher:matcher_lib",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/proto_api_scrubber/v3:pkg_cc_proto",
     ],
 )

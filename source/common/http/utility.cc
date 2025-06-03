@@ -444,20 +444,21 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 }
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
-                              const bool append_xfh) {
-  const auto host = headers.getHostValue();
+                              bool append_xfh, bool keep_old) {
+  if (const absl::string_view host = headers.getHostValue(); !host.empty()) {
+    // Insert the x-envoy-original-host header if required.
+    if (keep_old) {
+      headers.setEnvoyOriginalHost(host);
+    }
 
-  // Only append to x-forwarded-host if the value was not the last value appended.
-  const auto xfh = headers.getForwardedHostValue();
-
-  if (append_xfh && !host.empty()) {
-    if (!xfh.empty()) {
-      const auto xfh_split = StringUtil::splitToken(xfh, ",");
-      if (!xfh_split.empty() && xfh_split.back() != host) {
+    // Append the x-forwarded-host header if required. Only append to x-forwarded-host
+    // if the value was not the last value appended.
+    if (append_xfh) {
+      const absl::InlinedVector<absl::string_view, 4> xfh_split =
+          absl::StrSplit(headers.getForwardedHostValue(), ',', absl::SkipWhitespace());
+      if (xfh_split.empty() || xfh_split.back() != host) {
         headers.appendForwardedHost(host, ",");
       }
-    } else {
-      headers.appendForwardedHost(host, ",");
     }
   }
 

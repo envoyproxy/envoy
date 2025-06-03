@@ -203,7 +203,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   }
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(200));
+              putResult(_, absl::optional<uint64_t>(200)));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
