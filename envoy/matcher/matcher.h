@@ -127,9 +127,10 @@ public:
 };
 
 // The result of a match. There are three possible results:
-// - The match could not be completed due to lack of data (InsufficientData)
-// - The match was completed, no match found (NoMatch)
-// - The match was completed, match found (onMatch() will return the OnMatch).
+// - The match could not be completed due to lack of data (isInsufficientData() will return true.)
+// - The match was completed, no match found (isNoMatch() will return true.)
+// - The match was completed, match found (isMatch() will return true, action() will return the
+//   ActionFactoryCb.)
 struct MatchResult {
 private:
   struct InsufficientData {};
