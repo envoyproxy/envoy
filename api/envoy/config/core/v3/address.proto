@@ -99,7 +99,7 @@ message SocketAddress {
   bool ipv4_compat = 6;
 
   // Filepath that specifies the Linux network namespace this socket will be created in (see ``man 7
-  // network_namespaces``).  If this field is set, Envoy will create the socket in the specified
+  // network_namespaces``). If this field is set, Envoy will create the socket in the specified
   // network namespace.
   //
   // .. note::
