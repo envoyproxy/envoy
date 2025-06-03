@@ -17,8 +17,8 @@ namespace ProtoApiScrubber {
 
 ProtoApiScrubberFilter::ProtoApiScrubberFilter(ProtoApiScrubberFilterConfig&) {}
 
-Envoy::Http::FilterHeadersStatus ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
-                                                       bool) {
+Envoy::Http::FilterHeadersStatus
+ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(debug, "Called method {} with headers={}", *decoder_callbacks_, __func__,
                    headers);
   return Envoy::Http::FilterHeadersStatus::Continue;
