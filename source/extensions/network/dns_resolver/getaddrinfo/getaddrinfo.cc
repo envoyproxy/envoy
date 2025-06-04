@@ -173,7 +173,9 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
       addrinfo hints;
       memset(&hints, 0, sizeof(hints));
-      hints.ai_flags = AI_ADDRCONFIG;
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_no_ai_flags")) {
+        hints.ai_flags = AI_ADDRCONFIG;
+      }
       hints.ai_family = AF_UNSPEC;
       // If we don't specify a socket type, every address will appear twice, once
       // for SOCK_STREAM and one for SOCK_DGRAM. Since we do not return the family
