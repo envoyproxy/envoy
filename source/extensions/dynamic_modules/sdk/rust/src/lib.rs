@@ -12,6 +12,7 @@ use mockall::*;
 #[path = "./lib_test.rs"]
 mod mod_test;
 
+use std::any::Any;
 use std::sync::OnceLock;
 
 /// This module contains the generated bindings for the envoy dynamic modules ABI.
@@ -57,6 +58,21 @@ pub mod abi {
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
+  ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
+    #[no_mangle]
+    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
+        .get_or_init(|| $new_http_filter_config_fn);
+      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
+        .get_or_init(|| $new_http_filter_per_route_config_fn);
+      if ($f()) {
+        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+          as *const ::std::os::raw::c_char
+      } else {
+        ::std::ptr::null()
+      }
+    }
+  };
   ($f:ident, $new_http_filter_config_fn:expr) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
@@ -99,6 +115,22 @@ pub type NewHttpFilterConfigFunction<EC, EHF> = fn(
 /// `declare_init_functions` macro, and is not intended to be set directly.
 pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
   NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
+> = OnceLock::new();
+
+/// The function signature for the new HTTP filter per-route configuration function.
+///
+/// This is called when a new HTTP filter per-route configuration is created. It must return an
+/// object representing the filter's per-route configuration. Returning `None` will cause the HTTP
+/// filter configuration to be rejected.
+/// This config can be later retried by the filter via
+/// [`EnvoyHttpFilter::get_most_specific_route_config`] method.
+pub type NewHttpFilterPerRouteConfigFunction =
+  fn(name: &str, config: &[u8]) -> Option<Box<dyn Any>>;
+
+/// The global init function for HTTP filter per-route configurations. This is set via the
+/// `declare_init_functions` macro, and is not intended to be set directly.
+pub static NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION: OnceLock<
+  NewHttpFilterPerRouteConfigFunction,
 > = OnceLock::new();
 
 /// The trait that represents the configuration for an Envoy Http filter configuration.
@@ -576,6 +608,13 @@ pub trait EnvoyHttpFilter {
     _body: Option<&'a [u8]>,
     _timeout_milliseconds: u64,
   ) -> abi::envoy_dynamic_module_type_http_callout_init_result;
+
+  /// Get the most specific route configuration for the current route.
+  ///
+  /// Returns None if no per-route configuration is present on this route. Otherwise,
+  /// returns the most specific per-route configuration (i.e. the one most up along the config
+  /// hierarchy) created by the filter.
+  fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1085,6 +1124,16 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       )
     }
   }
+
+  fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>> {
+    unsafe {
+      let filter_config_ptr =
+        abi::envoy_dynamic_module_callback_get_most_specific_route_config(self.raw_ptr)
+          as *mut std::sync::Arc<dyn Any>;
+
+      filter_config_ptr.as_ref().cloned()
+    }
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -1273,8 +1322,8 @@ macro_rules! wrap_into_c_void_ptr {
 // Implementation note: this cannot be a function as we need to cast as *mut *mut dyn T which is
 // not feasible via usual function type params.
 macro_rules! drop_wrapped_c_void_ptr {
-  ($ptr:expr, $trait_:ident < $($args:ident),* >) => {{
-    let config = $ptr as *mut *mut dyn $trait_< $($args),* >;
+  ($ptr:expr, $trait_:ident $(< $($args:ident),* >)?) => {{
+    let config = $ptr as *mut *mut dyn $trait_$(< $($args),* >)?;
 
     // Drop the Box<*mut $t>, and then the Box<$t>, which also
     // drops the underlying object.
@@ -1304,6 +1353,57 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
 ) {
   drop_wrapped_c_void_ptr!(config_ptr,
     HttpFilterConfig<EnvoyHttpFilterConfigImpl,EnvoyHttpFilterImpl>);
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_new(
+  name_ptr: *const u8,
+  name_size: usize,
+  config_ptr: *const u8,
+  config_size: usize,
+) -> abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
+  // This assumes that the name is a valid UTF-8 string. Should we relax? At the moment,
+  // it is a String at protobuf level.
+  let name = if !name_ptr.is_null() {
+    std::str::from_utf8(std::slice::from_raw_parts(name_ptr, name_size)).unwrap_or_default()
+  } else {
+    ""
+  };
+  let config = if !config_ptr.is_null() {
+    std::slice::from_raw_parts(config_ptr, config_size)
+  } else {
+    b""
+  };
+
+  envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
+    name,
+    config,
+    NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
+      .get()
+      .expect("NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION must be set"),
+  )
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_per_route_config_destroy(
+  config_ptr: abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr,
+) {
+  let ptr = config_ptr as *mut std::sync::Arc<dyn Any>;
+  std::mem::drop(Box::from_raw(ptr));
+}
+
+fn envoy_dynamic_module_on_http_filter_per_route_config_new_impl(
+  name: &str,
+  config: &[u8],
+  new_fn: &NewHttpFilterPerRouteConfigFunction,
+) -> abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr {
+  if let Some(config) = new_fn(name, config) {
+    let arc: std::sync::Arc<dyn Any> = std::sync::Arc::from(config);
+    let ptr = Box::into_raw(Box::new(arc));
+    ptr as abi::envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
+  } else {
+    std::ptr::null()
+  }
 }
 
 #[no_mangle]
