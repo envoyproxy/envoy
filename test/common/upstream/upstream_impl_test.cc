@@ -2729,11 +2729,8 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
 
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
-  cluster->prioritySet()
-      .hostSetsPerPriority()[0]
-      ->hosts()[0]
-      ->outlierDetector()
-      .putHttpResponseCode(503);
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->outlierDetector().putResult(
+      Outlier::Result::ExtOriginRequestFailed, absl::optional<uint64_t>(503));
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);

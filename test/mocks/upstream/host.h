@@ -27,7 +27,6 @@ public:
   ~MockDetectorHostMonitor() override;
 
   MOCK_METHOD(uint32_t, numEjections, ());
-  MOCK_METHOD(void, putHttpResponseCode, (uint64_t code));
   MOCK_METHOD(void, putResult, (Result result, absl::optional<uint64_t> code));
   MOCK_METHOD(void, putResponseTime, (std::chrono::milliseconds time));
   MOCK_METHOD(const absl::optional<MonotonicTime>&, lastEjectionTime, ());

@@ -260,15 +260,22 @@ build:coverage --define=no_debug_info=1
 # `--no-relax` is required for coverage to not err with `relocation R_X86_64_REX_GOTPCRELX`
 build:coverage --linkopt=-Wl,-s,--no-relax
 build:coverage --test_env=ENVOY_IP_TEST_VERSIONS=v4only
+build:coverage --define=dynamic_link_tests=false
+# Use custom report generator that also generates HTML
+build:coverage --coverage_report_generator=@envoy//tools/coverage:report_generator
 
 build:test-coverage --test_arg="-l trace"
 build:test-coverage --test_arg="--log-path /dev/null"
 build:test-coverage --test_tag_filters=-nocoverage,-fuzz_target
-build:test-coverage --define=dynamic_link_tests=false
 build:fuzz-coverage --config=plain-fuzzer
 build:fuzz-coverage --run_under=@envoy//bazel/coverage:fuzz_coverage_wrapper.sh
 build:fuzz-coverage --test_tag_filters=-nocoverage
-build:fuzz-coverage --define=dynamic_link_tests=true
+# Existing fuzz tests don't need a full WASM runtime and in generally we don't really want to
+# fuzz dependencies anyways. On the other hand, disabling WASM reduces the build time and
+# resources required to build and run the tests.
+build:fuzz-coverage --define=wasm=disabled
+build:fuzz-coverage --config=fuzz-coverage-config
+build:fuzz-coverage-config --//tools/coverage:config=//test:fuzz_coverage_config
 
 build:cache-local --remote_cache=grpc://localhost:9092
 
@@ -312,12 +319,8 @@ build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
-build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
-build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
 build:rbe-toolchain-msan --config=clang-msan
 
-build:rbe-toolchain-tsan --linkopt=-L/opt/libcxx_tsan/lib
-build:rbe-toolchain-tsan --linkopt=-Wl,-rpath,/opt/libcxx_tsan/lib
 build:rbe-toolchain-tsan --config=clang-tsan
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
@@ -395,7 +398,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:a2aa71100aa4f39e2f9006f83f2167d66a6239ab@sha256:e483bc180b91b577f1d95b6a37a28263ad88990acc21b2017b8eacfab637a6a6
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:f4a881a1205e8e6db1a57162faf3df7aed88eae8@sha256:b10346fe2eee41733dbab0e02322c47a538bf3938d093a5daebad9699860b814
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -566,7 +569,7 @@ common:bes-envoy-engflow --bes_timeout=3600s
 common:bes-envoy-engflow --bes_upload_mode=fully_async
 common:bes-envoy-engflow --nolegacy_important_outputs
 common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:116a6a4f7b2e7a43e07156a988b1aaf310d1d1b5c9339e076374bb4684e616dc
+common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:95d7afdea0f0f8881e88fa5e581db4f50907d0745ac8d90e00357ac1a316abe5
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
 
