@@ -55,7 +55,7 @@ absl::Status verifyProcessingModeConfig(
        envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED) ||
       (processing_mode.response_body_mode() ==
        envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED)) {
-    if (config.failure_mode_allow() == true) {
+    if (config.failure_mode_allow()) {
       return absl::InvalidArgumentError(
           "If the ext_proc filter has either the request_body_mode or the response_body_mode set "
           "to FULL_DUPLEX_STREAMED, then the failure_mode_allow has to be left as false");
