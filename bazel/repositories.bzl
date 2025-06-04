@@ -221,10 +221,9 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
+
     external_http_archive(
         "aspect_bazel_lib",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
     )
 
     _com_github_fdio_vpp_vcl()
@@ -236,7 +235,6 @@ def envoy_dependencies(skip_targets = []):
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-
     _com_github_wamr()
     _com_github_wasmtime()
 
@@ -535,8 +533,6 @@ def _io_vectorscan():
 def _io_opentelemetry_api_cpp():
     external_http_archive(
         name = "io_opentelemetry_cpp",
-        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_datadog_dd_trace_cpp():

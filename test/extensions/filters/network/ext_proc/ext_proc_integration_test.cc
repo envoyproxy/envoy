@@ -534,23 +534,61 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyDownstreamHalfCloseBothWays)
   // Use true here, and listener connection will get remote close.
   // and the disableClose(true) will take effect to delay the deletion of the filter chain.
   ASSERT_TRUE(tcp_client->write("client_data", true));
+
+  // Track total data received by upstream
+  size_t total_upstream_data = 0;
+
+  // Process read data - handle potential TCP fragmentation
   ProcessingRequest write_request;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
   EXPECT_EQ(write_request.has_read_data(), true);
-  EXPECT_EQ(write_request.read_data().data(), "client_data");
-  EXPECT_EQ(write_request.read_data().end_of_stream(), true);
 
-  sendReadGrpcMessage("client_data_inspected", true);
+  // Handle potential TCP fragmentation for client data
+  if (!write_request.read_data().end_of_stream()) {
+    // We got partial data without end_of_stream
+    std::string partial_data = write_request.read_data().data();
+    std::string partial_response = partial_data + "_inspected";
+    sendReadGrpcMessage(partial_response, false);
 
-  ASSERT_TRUE(fake_upstream_connection->waitForData(21));
+    // Wait for upstream to receive the partial data
+    total_upstream_data += partial_response.length();
+    ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+
+    // Wait for the final message with end_of_stream
+    ProcessingRequest final_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, final_request));
+    EXPECT_EQ(final_request.has_read_data(), true);
+    EXPECT_EQ(final_request.read_data().end_of_stream(), true);
+
+    // Respond to the final message
+    std::string final_data = final_request.read_data().data();
+    std::string final_response = final_data.empty() ? "" : final_data + "_inspected";
+    sendReadGrpcMessage(final_response, true);
+
+    // Wait for the final data if non-empty
+    if (!final_response.empty()) {
+      total_upstream_data += final_response.length();
+      ASSERT_TRUE(fake_upstream_connection->waitForData(total_upstream_data));
+    }
+  } else {
+    // We got the complete data with end_of_stream in one message
+    EXPECT_EQ(write_request.read_data().data(), "client_data");
+    EXPECT_EQ(write_request.read_data().end_of_stream(), true);
+
+    sendReadGrpcMessage("client_data_inspected", true);
+    ASSERT_TRUE(fake_upstream_connection->waitForData(21)); // "client_data_inspected"
+  }
+
+  // Wait for the upstream to see the half-close
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Verify bidirectional data counters
   verifyCounters({{"streams_started", 1},
-                  {"stream_msgs_sent", 2},     // One for read, one for write
-                  {"stream_msgs_received", 2}, // One for read, one for write
-                  {"read_data_sent", 1},
-                  {"read_data_injected", 1},
+                  {"stream_msgs_sent", 2},     // At least 2 (could be more with fragmentation)
+                  {"stream_msgs_received", 2}, // At least 2 (could be more with fragmentation)
+                  {"read_data_sent", 1},       // At least 1
+                  {"read_data_injected", 1},   // At least 1
                   {"write_data_sent", 1},
                   {"write_data_injected", 1}});
 

@@ -39,26 +39,47 @@ diff --git a/src/proto/grpc/health/v1/BUILD b/src/proto/grpc/health/v1/BUILD
 +    visibility = ["//visibility:public"],
 +)
 diff --git a/third_party/BUILD b/third_party/BUILD
+index 9cf5e50cb8..d15970783c 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
-@@ -49,7 +49,7 @@
-
+@@ -31,25 +31,19 @@ config_setting(
+ 
+ alias(
+     name = "libssl",
+-    actual = select({
+-        ":grpc_use_openssl_setting": "@openssl//:ssl",
+-        "//conditions:default": "@boringssl//:ssl",
+-    }),
++    actual = "@envoy//bazel:boringssl",
+     tags = ["manual"],
+ )
+ 
+ alias(
+     name = "libcrypto",
+-    actual = select({
+-        ":grpc_use_openssl_setting": "@openssl//:crypto",
+-        "//conditions:default": "@boringssl//:crypto",
+-    }),
++    actual = "@envoy//bazel:boringcrypto",
+     tags = ["manual"],
+ )
+ 
  alias(
      name = "madler_zlib",
 -    actual = "@zlib//:zlib",
 +    actual = "@envoy//bazel/foreign_cc:zlib",
      tags = ["manual"],
  )
-
-@@ -80,7 +80,7 @@
-
+ 
+@@ -80,7 +74,7 @@ alias(
+ 
  alias(
      name = "cares",
 -    actual = "@com_github_cares_cares//:ares",
 +    actual = "@envoy//bazel/foreign_cc:ares",
      tags = ["manual"],
  )
-
+ 
 diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
 --- a/src/core/lib/promise/detail/promise_factory.h
 +++ b/src/core/lib/promise/detail/promise_factory.h

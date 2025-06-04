@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -25,8 +26,7 @@ public:
       TransportSocketOptionsConstSharedPtr transport_socket_options,
       const Upstream::HostDescriptionConstSharedPtr& host,
       const ConnectionSocket::OptionsSharedPtr options,
-      const absl::optional<
-          envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
           happy_eyeballs_config);
   bool hasNextConnection() override;
   ClientConnectionPtr createNextConnection(const uint64_t id) override;
@@ -41,8 +41,7 @@ public:
   sortAddresses(const std::vector<Address::InstanceConstSharedPtr>& address_list);
   static std::vector<Address::InstanceConstSharedPtr> sortAddressesWithConfig(
       const std::vector<Address::InstanceConstSharedPtr>& address_list,
-      const absl::optional<
-          envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
           happy_eyeballs_config);
 
 private:
@@ -87,8 +86,7 @@ public:
       TransportSocketOptionsConstSharedPtr transport_socket_options,
       const Upstream::HostDescriptionConstSharedPtr& host,
       const ConnectionSocket::OptionsSharedPtr options,
-      const absl::optional<
-          envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+      OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
           happy_eyeballs_config)
       : MultiConnectionBaseImpl(dispatcher,
                                 std::make_unique<Network::HappyEyeballsConnectionProvider>(

@@ -17,6 +17,11 @@ public:
   virtual ~LinuxOsSysCalls() = default;
 
   /**
+   * @see man 2 setns
+   */
+  virtual SysCallIntResult setns(int fd, int nstype) const PURE;
+
+  /**
    * @see sched_getaffinity (man 2 sched_getaffinity)
    */
   virtual SysCallIntResult sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t* mask) PURE;
