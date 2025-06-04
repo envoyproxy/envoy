@@ -123,9 +123,6 @@ protected:
 
   // Router::RouteEntry
   const std::string& clusterName() const override { return cluster_name_; }
-  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override {
-    return std::string(headers.getHostValue());
-  }
   const Router::RouteStatsContextOptRef routeStatsContext() const override {
     return Router::RouteStatsContextOptRef();
   }

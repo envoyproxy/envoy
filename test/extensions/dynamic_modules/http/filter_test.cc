@@ -519,6 +519,75 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
   callbacks_captured->onFailure(req, Http::AsyncClient::FailureReason::Reset);
 }
 
+// This test verifies that handling of per-route config is correct in terms of lifetimes.
+TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
+  const std::string filter_name = "per_route_config";
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  const std::string filter_config = "listener config";
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto dynamic_module_for_route =
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module_for_route.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->initializeInModuleFilter();
+
+  // Now simulate a per-route config that is very short lived, and verify that the filter doesn't
+  // segfaults if it uses it after after it discarded.
+  {
+    // do all per-route config in an inner scope to make sure the is destroyed before the filter
+    // response headers is called.
+    const std::string route_filter_config_str = "router config";
+    auto route_filter_config_or_status =
+        Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
+            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()));
+    EXPECT_TRUE(route_filter_config_or_status.ok());
+    auto route_filter_config = std::move(route_filter_config_or_status.value());
+
+    const Router::RouteSpecificFilterConfig* router_config_ptr = route_filter_config.get();
+
+    EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+        .WillOnce(testing::Return(router_config_ptr));
+
+    TestRequestHeaderMapImpl headers{{}};
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(headers, true));
+    route_filter_config.reset();
+  }
+
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, true));
+
+  // Assert response header is what we expect
+  EXPECT_EQ(response_headers.get(Http::LowerCaseString("x-per-route-config-response"))[0]
+                ->value()
+                .getStringView(),
+            "router config");
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions
