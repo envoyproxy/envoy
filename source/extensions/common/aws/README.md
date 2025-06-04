@@ -13,8 +13,6 @@ for creating standard credential providers are provided, the most common being t
 (`Extensions::Common::Aws::CommonCredentialsProviderChain::defaultCredentialsProviderChain`)
 By creating the `defaultCredentialsProviderChain` you receive a list of credential providers in the following order, which align to the precedence in which credentials will be retrieved. Once an earlier credentials provider returns credentials via `getCredentials()`, no further providers will be checked.
 
-- `IAMRolesAnywhereCredentialsProvider`
-- `AssumeRoleCredentialsProvider`
 - `EnvironmentCredentialsProvider`
 - `CredentialsFileCredentialsProvider`
 - `WebIdentityCredentialsProvider`
