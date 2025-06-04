@@ -62,11 +62,11 @@ public:
   Http::HttpServerPropertiesCacheSharedPtr cache_;
   MockHttpServerPropertiesCache& mock_cache_;
   HttpServerPropertiesCache::Origin origin_{"https", "hostname.com", 443};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockSchedulableCallback>* mock_upstream_ready_cb_;
-  NiceMock<Server::MockOverloadManager> overload_manager_;
 
   void testAlpnHandshake(absl::optional<Protocol> protocol);
   TestScopedRuntime scoped_runtime;
