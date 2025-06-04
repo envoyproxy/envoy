@@ -924,8 +924,7 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 bool ConnectionImpl::setSocketOption(Network::Socket::Option::Details option) {
   auto sockopt = std::make_shared<SocketOptionImpl>(option.name_, option.value_);
   socket_->addOption(sockopt);
-  sockopt->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING);
-  return true;
+  return sockopt->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING);
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {
