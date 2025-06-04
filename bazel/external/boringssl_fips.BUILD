@@ -1,10 +1,14 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 licenses(["notice"])  # Apache 2
 
 # BoringSSL build as described in the Security Policy for BoringCrypto module "update stream":
 # https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md#update-stream
 
 FIPS_GO_VERSION = "go1.24.2"
+
 FIPS_NINJA_VERSION = "1.10.2"
+
 FIPS_CMAKE_VERSION = "cmake version 3.22.1"
 
 # marker for dir
@@ -36,7 +40,10 @@ cc_library(
 
 genrule(
     name = "ninja_bin",
-    srcs = ["@fips_ninja//:all", "@fips_ninja//:configure.py"],
+    srcs = [
+        "@fips_ninja//:all",
+        "@fips_ninja//:configure.py",
+    ],
     outs = ["ninja"],
     cmd = """
     SRC_DIR=$$(dirname $(location @fips_ninja//:configure.py))
@@ -52,19 +59,19 @@ genrule(
     cd $$SRC_DIR
     OUTPUT=$$(mktemp)
     if ! $${PYTHON_BIN} ./configure.py --bootstrap --with-python=$${PYTHON_BIN} > $$OUTPUT 2>&1; then
-        echo "Build failed:"
-        cat $$OUTPUT
+        echo "Build failed:" >&2
+        cat $$OUTPUT >&2
         exit 1
     fi
     cp ninja $$OUT_FILE
     """,
-    tools = [
-        "@bazel_tools//tools/cpp:current_cc_toolchain",
-        "@rules_python//python:current_py_toolchain",
-    ],
     toolchains = [
         "@rules_python//python:current_py_toolchain",
         "@bazel_tools//tools/cpp:current_cc_toolchain",
+    ],
+    tools = [
+        "@bazel_tools//tools/cpp:current_cc_toolchain",
+        "@rules_python//python:current_py_toolchain",
     ],
 )
 
@@ -108,17 +115,15 @@ export EXPECTED_CMAKE_VERSION="%s"
 # We might need to make this configurable if it causes issues outside of CI
 export NINJA_CORES=$$(nproc)
 
-OUTPUT=$$(mktemp)
-
 CRYPTO_OUT="$$(realpath $(location crypto/libcrypto.a))"
 SSL_OUT="$$(realpath $(location ssl/libssl.a))"
-
 export CRYPTO_OUT
 export SSL_OUT
 
+OUTPUT=$$(mktemp)
 if ! $(location @envoy//bazel/external:boringssl_fips.genrule_cmd) > $$OUTPUT 2>&1; then
     echo "Build failed:"
-    cat $$OUTPUT
+    cat $$OUTPUT >&2
     exit 1
 fi
 """
@@ -146,10 +151,19 @@ genrule(
             FIPS_CMAKE_VERSION,
         ),
     }),
+    exec_properties = select({
+        "@envoy//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "@envoy//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+    }),
+    toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
     tools = [
+        ":ninja_bin",
         "@bazel_tools//tools/cpp:current_cc_toolchain",
         "@envoy//bazel/external:boringssl_fips.genrule_cmd",
-        ":ninja_bin",
     ] + select({
         "@platforms//cpu:x86_64": [
             "@fips_cmake_linux_x86_64//:all",
@@ -163,14 +177,5 @@ genrule(
             "@fips_go_linux_arm64//:all",
             "@fips_go_linux_arm64//:bin/go",
         ],
-    }),
-    toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
-    exec_properties = select({
-        "@envoy//bazel:engflow_rbe_x86_64": {
-            "Pool": "linux_x64_large",
-        },
-        "@envoy//bazel:engflow_rbe_aarch64": {
-            "Pool": "linux_arm64_small",
-        },
     }),
 )

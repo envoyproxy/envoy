@@ -262,7 +262,6 @@ def _boringssl_fips():
         patch_args = ["-p1"],
     )
 
-    # Dependencies for fips - VERSIONS SHOULD NOT BE CHANGED
     NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
     external_http_archive(
         name = "fips_ninja",
