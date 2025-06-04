@@ -98,10 +98,10 @@ int main(int argc, char** argv) {
 
     // Send request
     auto headers = Envoy::Http::Utility::createRequestHeaderMapPtr();
-    headers->addCopy(":method", "GET");
-    headers->addCopy(":scheme", "https");
-    headers->addCopy(":authority", url.hostAndPort());
-    headers->addCopy(":path", url.pathAndQueryParams());
+    headers->addCopy(Envoy::Http::LowerCaseString(":method"), "GET");
+    headers->addCopy(Envoy::Http::LowerCaseString(":scheme"), "https");
+    headers->addCopy(Envoy::Http::LowerCaseString(":authority"), url.hostAndPort());
+    headers->addCopy(Envoy::Http::LowerCaseString(":path"), url.pathAndQueryParams());
     stream->sendHeaders(std::move(headers), true);
 
     // Wait for it to be done.
