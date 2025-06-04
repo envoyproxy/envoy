@@ -35,7 +35,8 @@ namespace ExtProc {
   COUNTER(connections_closed)                                                                      \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(stream_open_failures)                                                                    \
-  COUNTER(connections_reset)
+  COUNTER(connections_reset)                                                                       \
+  COUNTER(message_timeouts)
 
 struct NetworkExtProcStats {
   ALL_NETWORK_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -196,6 +197,10 @@ private:
   void closeConnection(const std::string& reason, Network::ConnectionCloseType close_type);
   void handleConnectionStatus(const ProcessingResponse& response);
 
+  // Called by MessageTimeoutManager
+  void handleMessageTimeout(bool is_read);
+  std::chrono::milliseconds getMessageTimeout() const;
+
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{nullptr};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};
 
@@ -203,11 +208,15 @@ private:
   const NetworkExtProcStats& stats_;
   ExternalProcessorClientPtr client_;
   ExternalProcessorStreamPtr stream_;
+  std::unique_ptr<MessageTimeoutManager> timeout_manager_;
   const Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
   DownstreamCallbacks downstream_callbacks_;
 
   bool processing_complete_{false};
+
+  bool read_pending_{false};
+  bool write_pending_{false};
 
   // Delay close counters
   uint32_t disable_count_write_{0};
