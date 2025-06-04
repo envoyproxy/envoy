@@ -166,7 +166,7 @@ public:
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
-  bool usePost() const override { return use_post_; }
+  bool usePost() const override { return !post_path_.empty(); }
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
 
@@ -182,7 +182,6 @@ public:
   }
 
 private:
-  const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
   const bool propagate_response_headers_;
