@@ -71,7 +71,7 @@ public:
         allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                          transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                         quic_info_, {observers_}, happy_eyeballs_, overload_manager_);
+                         quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -132,10 +132,11 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   new Event::MockSchedulableCallback(&dispatcher_);
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::TransportSocketOptionsConstSharedPtr transport_options;
-  ConnectionPool::InstancePtr pool = allocateConnPool(
-      dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options, transport_options,
-      state_, quic_stat_names_, {}, *store_.rootScope(),
-      makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_, {observers_});
+  ConnectionPool::InstancePtr pool =
+      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+                       {observers_}, overload_manager_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
 }
@@ -159,10 +160,11 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   new Event::MockSchedulableCallback(&dispatcher_);
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::TransportSocketOptionsConstSharedPtr transport_options;
-  ConnectionPool::InstancePtr pool = allocateConnPool(
-      dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options, transport_options,
-      state_, quic_stat_names_, {}, *store_.rootScope(),
-      makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_, {observers_});
+  ConnectionPool::InstancePtr pool =
+      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+                       {observers_}, overload_manager_);
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
