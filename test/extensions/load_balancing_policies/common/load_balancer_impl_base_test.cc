@@ -100,7 +100,9 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   // on the number of hosts regardless of their health.
   EXPECT_EQ(50, lb_.percentageLoad(0));
   EXPECT_EQ(50, lb_.percentageLoad(1));
+  EXPECT_CALL(priority_set_, recordPriorityStatsPerRequest(0));
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context, 0).first);
+  EXPECT_EQ(host_set_.priority(), 0);
 
   // Modify number of hosts in failover, but leave them in the unhealthy state
   // primary and secondary are in panic mode, so load distribution is
@@ -108,6 +110,7 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   updateHostSet(failover_host_set_, 2, 0);
   EXPECT_EQ(34, lb_.percentageLoad(0));
   EXPECT_EQ(66, lb_.percentageLoad(1));
+  EXPECT_CALL(priority_set_, recordPriorityStatsPerRequest(0));
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context, 0).first);
 
   // Update the priority set with a new priority level P=2 and ensure the host
@@ -118,7 +121,9 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
   priority_load.healthy_priority_load_ = HealthyLoad({0u, 0u, 100});
+  EXPECT_CALL(priority_set_, recordPriorityStatsPerRequest(2));
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context, 0).first);
+  EXPECT_EQ(tertiary_host_set_.priority(), 2);
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
@@ -127,14 +132,18 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(2));
   priority_load.healthy_priority_load_ = HealthyLoad({100u, 0u, 0u});
+  EXPECT_CALL(priority_set_, recordPriorityStatsPerRequest(0));
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context, 0).first);
+  EXPECT_EQ(host_set_.priority(), 0);
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(100, lb_.percentageLoad(2));
   priority_load.healthy_priority_load_ = HealthyLoad({0u, 0u, 100});
+  EXPECT_CALL(priority_set_, recordPriorityStatsPerRequest(2));
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context, 0).first);
+  EXPECT_EQ(tertiary_host_set_.priority(), 2);
 }
 
 // Tests host selection with a randomized number of healthy, degraded and unhealthy hosts.

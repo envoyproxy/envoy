@@ -56,6 +56,7 @@
 #include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
+#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -887,9 +888,17 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
             return runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
           }));
       host_sets_.push_back(std::move(host_set));
+      per_priority_stats_.push_back(PerPriorityStats{ALL_CLUSTER_LB_PER_PRIORITY_STATS(
+          POOL_COUNTER_PREFIX(stats_scope_, fmt::format("priority_{}.", priority)))});
     }
   }
   return *host_sets_[priority];
+}
+
+void PrioritySetImpl::recordPriorityStatsPerRequest(uint32_t priority) const {
+  ASSERT(priority < per_priority_stats_.size());
+  auto stat = per_priority_stats_[priority];
+  stat.lb_priority_selected_.inc();
 }
 
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
@@ -1598,6 +1607,7 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       random_(cluster_context.serverFactoryContext().api().randomGenerator()),
       time_source_(cluster_context.serverFactoryContext().timeSource()),
+      priority_set_(cluster_context.serverFactoryContext().scope()),
       local_cluster_(cluster_context.clusterManager().localClusterName().value_or("") ==
                      cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(

@@ -63,6 +63,7 @@
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
+#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 #include "source/extensions/upstreams/http/config.h"
 #include "source/extensions/upstreams/tcp/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -543,6 +544,10 @@ private:
   std::vector<HostVector> hosts_per_locality_;
 };
 
+struct PerPriorityStats {
+  ALL_CLUSTER_LB_PER_PRIORITY_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 /**
  * A class for management of the set of hosts for a given priority level.
  */
@@ -705,7 +710,7 @@ using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
  */
 class PrioritySetImpl : public PrioritySet {
 public:
-  PrioritySetImpl() : batch_update_(false) {}
+  PrioritySetImpl(Stats::Scope& stats_scope) : batch_update_(false), stats_scope_(stats_scope) {}
   // From PrioritySet
   ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const override {
@@ -737,6 +742,8 @@ public:
     return const_cross_priority_host_map_;
   }
 
+  void recordPriorityStatsPerRequest(uint32_t priority) const override;
+
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
   virtual HostSetImplPtr createHostSet(uint32_t priority,
@@ -758,6 +765,9 @@ protected:
   // It will expand as host sets are added but currently does not shrink to
   // avoid any potential lifetime issues.
   std::vector<std::unique_ptr<HostSet>> host_sets_;
+  // Similar to host_sets_, this vector will expand as host sets are added
+  // but does not shrink.
+  std::vector<PerPriorityStats> per_priority_stats_;
 
   // Read only all host map for fast host searching. This will never be null.
   mutable HostMapConstSharedPtr const_cross_priority_host_map_{std::make_shared<HostMap>()};
@@ -771,6 +781,7 @@ private:
   mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
   bool batch_update_ : 1;
+  Stats::Scope& stats_scope_;
 
   // Helper class to maintain state as we perform multiple host updates. Keeps track of all hosts
   // that have been added/removed throughout the batch update, and ensures that we properly manage
@@ -804,6 +815,8 @@ private:
  */
 class MainPrioritySetImpl : public PrioritySetImpl, public Logger::Loggable<Logger::Id::upstream> {
 public:
+  explicit MainPrioritySetImpl(Stats::Scope& stats_scope) : PrioritySetImpl(stats_scope) {}
+
   // PrioritySet
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,

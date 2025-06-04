@@ -75,7 +75,6 @@ public:
   void setDropCategory(absl::string_view) override {}
 
 protected:
-  PrioritySetImpl priority_set_;
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
@@ -107,6 +106,9 @@ private:
   updateHosts(const Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::LocalityLbEndpoints>&
                   locality_endpoints,
               bool update_socket_matches);
+
+protected:
+  PrioritySetImpl priority_set_;
 };
 
 using HdsClusterPtr = std::shared_ptr<HdsCluster>;

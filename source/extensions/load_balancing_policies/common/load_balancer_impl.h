@@ -141,7 +141,7 @@ public:
   // availability level was chosen.
   static std::pair<uint32_t, HostAvailability>
   choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
-                 const DegradedLoad& degraded_per_priority_load);
+                 const DegradedLoad& degraded_per_priority_load, const PrioritySet& priority_set);
 
   // Pool selection not implemented.
   absl::optional<Upstream::SelectedPoolAndConnection>

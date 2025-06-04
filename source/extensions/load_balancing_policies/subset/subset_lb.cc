@@ -711,7 +711,7 @@ void SubsetLoadBalancer::purgeEmptySubsets(LbSubsetMap& subsets) {
 SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalancer& subset_lb,
                                                            bool locality_weight_aware,
                                                            bool scale_locality_weight)
-    : original_priority_set_(subset_lb.original_priority_set_),
+    : PrioritySetImpl(subset_lb.scope_), original_priority_set_(subset_lb.original_priority_set_),
       original_local_priority_set_(subset_lb.original_local_priority_set_),
       locality_weight_aware_(locality_weight_aware), scale_locality_weight_(scale_locality_weight) {
   // Create at least one host set.

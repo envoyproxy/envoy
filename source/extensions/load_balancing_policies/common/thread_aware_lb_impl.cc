@@ -164,7 +164,8 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   const uint64_t h = hash ? hash.value() : random_.random();
 
   const uint32_t priority =
-      LoadBalancerBase::choosePriority(h, *healthy_per_priority_load_, *degraded_per_priority_load_)
+      LoadBalancerBase::choosePriority(h, *healthy_per_priority_load_, *degraded_per_priority_load_,
+                                       priority_set_)
           .first;
   const auto& per_priority_state = (*per_priority_state_)[priority];
   if (per_priority_state->global_panic_) {
@@ -185,8 +186,9 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   return host;
 }
 
-LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams) {
-  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
+LoadBalancerPtr
+ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams params) {
+  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_, params.priority_set);
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.

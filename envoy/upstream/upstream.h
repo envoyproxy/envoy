@@ -547,6 +547,11 @@ public:
   virtual const std::vector<HostSetPtr>& hostSetsPerPriority() const PURE;
 
   /**
+   * Record statistics per priority.
+   */
+  virtual void recordPriorityStatsPerRequest(uint32_t priority) const PURE;
+
+  /**
    * @return HostMapConstSharedPtr read only cross priority host map that indexed by host address
    * string.
    */
@@ -683,6 +688,11 @@ public:
   COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(lb_zone_routing_sampled)                                                                 \
   GAUGE(lb_subsets_active, Accumulate)
+
+/**
+ * All cluster load balancing priority related stats.
+ */
+#define ALL_CLUSTER_LB_PER_PRIORITY_STATS(COUNTER) COUNTER(lb_priority_selected)
 
 /**
  * All cluster stats. @see stats_macros.h
