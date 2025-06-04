@@ -56,7 +56,8 @@ public:
         typed_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().typed().begin(),
             config.metadata_options().forwarding_namespaces().typed().end()),
-        stats_(generateStats(config.stat_prefix(), scope)) {};
+        stats_(generateStats(config.stat_prefix(), scope)),
+        message_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs)) {};
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -76,7 +77,13 @@ public:
 
   const NetworkExtProcStats& stats() const { return stats_; }
 
+  const uint32_t messageTimeout() {
+    return message_timeout_;
+  }
+
 private:
+  static constexpr uint64_t DefaultMessageTimeoutMs = 500;
+
   NetworkExtProcStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat("network_ext_proc.", prefix);
     return {ALL_NETWORK_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -88,11 +95,40 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   NetworkExtProcStats stats_;
+  const uint32_t message_timeout_;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
+
+/**
+ * Manages timeouts for read and write operations independently.
+ * Each direction (read/write) can have its own active timer.
+ */
+class MessageTimeoutManager : public Logger::Loggable<Logger::Id::ext_proc> {
+public:
+  MessageTimeoutManager(NetworkExtProcFilter& filter, Event::Dispatcher& dispatcher);
+  ~MessageTimeoutManager() = default;
+
+  // Start timeout for a specific direction
+  void startTimer(bool is_read);
+  
+  // Stop timeout for a specific direction
+  void stopTimer(bool is_read);
+  
+  // Stop all active timers
+  void stopAllTimers();
+
+private:
+  void onTimeout(bool is_read);
+
+  NetworkExtProcFilter& filter_;
+  Event::TimerPtr read_timer_;
+  Event::TimerPtr write_timer_;
+  bool read_timer_active_{false};
+  bool write_timer_active_{false};
+};
 
 class NetworkExtProcFilter : public Envoy::Network::Filter,
                              ExternalProcessorCallbacks,
