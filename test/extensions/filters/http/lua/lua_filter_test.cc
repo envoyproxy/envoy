@@ -2303,7 +2303,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionDynamicMetadata) {
 TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadata) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("envoy.filters.listener.proxy_protocol")
+      local typed_meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
       if typed_meta then
         request_handle:logTrace("Has typed metadata: true")
         -- The typed metadata is structured with field keys
@@ -2362,7 +2362,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadata) {
 TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataComplex) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("envoy.filters.listener.proxy_protocol")
+      local typed_meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
       if typed_meta then
         request_handle:logTrace("Has typed metadata: true")
 
@@ -2446,7 +2446,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataComplex) {
 TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataNotFound) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("unknown.filter")
+      local typed_meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("unknown.filter")
       if typed_meta then
         request_handle:logTrace("Has typed metadata: true")
       else
@@ -2473,7 +2473,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataNotFound) {
 TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataInvalidType) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("envoy.test.metadata")
+      local typed_meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.test.metadata")
       if typed_meta["value"] == nil then
         request_handle:logTrace("metadata value is nil")
       else
@@ -2506,7 +2506,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataInvalidType) {
 TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataUnpackFailure) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      local typed_meta = request_handle:connectionStreamInfo():typedMetadata("envoy.filters.listener.proxy_protocol")
+      local typed_meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
       if typed_meta["typed_metadata"] ~= nil then
         request_handle:logTrace("key: " .. typed_meta["typed_metadata"]["tlv_ea"])
       end

@@ -1080,6 +1080,15 @@ This method ensures type-safe access to metadata but returns nil in the followin
 4. Map keys must be strings or integers
 5. Some protocol buffer features (like Any messages) may not be fully supported
 
+``dynamicMetadata()``
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  connectionStreamInfo:dynamicMetadata()
+
+Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
+
 Dynamic metadata object API
 ---------------------------
 

@@ -1609,7 +1609,7 @@ typed_config:
       inline_string: |
         function envoy_on_request(request_handle)
           -- Test valid metadata
-          local meta = request_handle:connectionStreamInfo():typedMetadata("envoy.test.typed_metadata")
+          local meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.test.typed_metadata")
           if meta and meta.typed_metadata then
             -- Check basic key-value pair
             request_handle:headers():add("typed_metadata_key", meta.typed_metadata.test_key)
@@ -1636,7 +1636,7 @@ typed_config:
           end
 
           -- Test missing metadata
-          local missing = request_handle:connectionStreamInfo():typedMetadata("missing.metadata")
+          local missing = request_handle:connectionStreamInfo():dynamicTypedMetadata("missing.metadata")
           if missing == nil then
             request_handle:headers():add("missing_metadata", "is_nil")
           end
@@ -1724,7 +1724,7 @@ typed_config:
       inline_string: |
         function envoy_on_request(request_handle)
           -- Access Proxy Protocol typed metadata
-          local meta = request_handle:connectionStreamInfo():typedMetadata("envoy.filters.listener.proxy_protocol")
+          local meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
           if meta and meta.typed_metadata then
             -- Add ALPN values
             if meta.typed_metadata.PP2_TYPE_ALPN then

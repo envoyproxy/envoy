@@ -48,17 +48,18 @@ public:
   /**
    * Push a Lua table onto the stack that contains the converted protobuf message
    * @param state the Lua state
-   * @param message the protobuf reflectable message to convert
+   * @param message the protobuf message to convert
    *
    * This function creates a new Lua table containing the fields of the protobuf message
    * and pushes it onto the Lua stack. The caller is responsible for managing the stack.
    */
-  static void pushLuaTableFromMessage(lua_State* state, const Protobuf::ReflectableMessage& message);
+  static void pushLuaTableFromMessage(lua_State* state,
+                                      const Protobuf::ReflectableMessage& message);
 
   /**
    * Push a Lua value onto the stack that represents the value of a field
    * @param state the Lua state
-   * @param message the protobuf reflectable message containing the field
+   * @param message the protobuf message containing the field
    * @param field the field descriptor
    *
    * This function inspects the field type and extracts the appropriate value,
@@ -70,7 +71,7 @@ public:
   /**
    * Push a Lua table onto the stack that represents a protobuf map field
    * @param state the Lua state
-   * @param message the protobuf reflectable message containing the map field
+   * @param message the protobuf message containing the map field
    * @param field the map field descriptor
    *
    * This function converts a protobuf map field into a Lua table and
@@ -83,7 +84,7 @@ public:
   /**
    * Push a Lua array onto the stack that represents a repeated field
    * @param state the Lua state
-   * @param message the protobuf reflectable message containing the repeated field
+   * @param message the protobuf message containing the repeated field
    * @param field the repeated field descriptor
    *
    * This function converts a protobuf repeated field into a Lua array and

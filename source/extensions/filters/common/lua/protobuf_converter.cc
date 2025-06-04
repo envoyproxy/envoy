@@ -11,7 +11,7 @@ namespace Lua {
 namespace {
 
 // Helper function to push string to Lua stack
-void pushLuaString(lua_State* state, const std::string& str) {
+inline void pushLuaString(lua_State* state, const std::string& str) {
   lua_pushlstring(state, str.data(), str.size());
 }
 
@@ -21,16 +21,22 @@ void pushLuaNumericValue(lua_State* state, const Protobuf::ReflectableMessage& m
                          const Protobuf::Reflection* reflection) {
   switch (field->cpp_type()) {
   case Protobuf::FieldDescriptor::CPPTYPE_INT32:
+    lua_pushnumber(state, reflection->GetInt32(*message, field));
+    break;
   case Protobuf::FieldDescriptor::CPPTYPE_INT64:
-    lua_pushnumber(state, reflection->GetInt64(message.message(), field));
+    lua_pushnumber(state, reflection->GetInt64(*message, field));
     break;
   case Protobuf::FieldDescriptor::CPPTYPE_UINT32:
+    lua_pushnumber(state, reflection->GetUInt32(*message, field));
+    break;
   case Protobuf::FieldDescriptor::CPPTYPE_UINT64:
-    lua_pushnumber(state, reflection->GetUInt64(message.message(), field));
+    lua_pushnumber(state, reflection->GetUInt64(*message, field));
     break;
   case Protobuf::FieldDescriptor::CPPTYPE_DOUBLE:
+    lua_pushnumber(state, reflection->GetDouble(*message, field));
+    break;
   case Protobuf::FieldDescriptor::CPPTYPE_FLOAT:
-    lua_pushnumber(state, reflection->GetDouble(message.message(), field));
+    lua_pushnumber(state, reflection->GetFloat(*message, field));
     break;
   default:
     // This should not happen, as we've already filtered for numeric types before calling
@@ -39,40 +45,7 @@ void pushLuaNumericValue(lua_State* state, const Protobuf::ReflectableMessage& m
   }
 }
 
-// Helper function to push repeated numeric value based on protobuf field type
-void pushLuaRepeatedNumericValue(lua_State* state, const Protobuf::ReflectableMessage& message,
-                                 const Protobuf::FieldDescriptor* field,
-                                 const Protobuf::Reflection* reflection, uint32_t index) {
-  switch (field->cpp_type()) {
-  case Protobuf::FieldDescriptor::CPPTYPE_INT32:
-  case Protobuf::FieldDescriptor::CPPTYPE_INT64:
-    lua_pushnumber(state, reflection->GetRepeatedInt64(message.message(), field, index));
-    break;
-  case Protobuf::FieldDescriptor::CPPTYPE_UINT32:
-  case Protobuf::FieldDescriptor::CPPTYPE_UINT64:
-    lua_pushnumber(state, reflection->GetRepeatedUInt64(message.message(), field, index));
-    break;
-  case Protobuf::FieldDescriptor::CPPTYPE_DOUBLE:
-    lua_pushnumber(state, reflection->GetRepeatedDouble(message.message(), field, index));
-    break;
-  case Protobuf::FieldDescriptor::CPPTYPE_FLOAT:
-    lua_pushnumber(state, reflection->GetRepeatedFloat(message.message(), field, index));
-    break;
-  case Protobuf::FieldDescriptor::CPPTYPE_ENUM:
-    lua_pushnumber(state, reflection->GetRepeatedEnumValue(message.message(), field, index));
-    break;
-  default:
-    lua_pushnil(state);
-    break;
-  }
-}
-
 } // namespace
-
-Protobuf::ReflectableMessage
-ProtobufConverterUtils::createReflectableMessage(const Protobuf::Message& message) {
-  return Protobuf::ReflectableMessage{message};
-}
 
 void ProtobufConverterUtils::pushLuaTableFromMessage(lua_State* state,
                                                      const Protobuf::Message& message) {
@@ -80,10 +53,10 @@ void ProtobufConverterUtils::pushLuaTableFromMessage(lua_State* state,
   pushLuaTableFromMessage(state, reflectable);
 }
 
-void ProtobufConverterUtils::pushLuaTableFromMessage(lua_State* state,
-                                                     const Protobuf::ReflectableMessage& reflectable) {
-  const auto* descriptor = reflectable.message().GetDescriptor();
-  const auto* reflection = reflectable.message().GetReflection();
+void ProtobufConverterUtils::pushLuaTableFromMessage(
+    lua_State* state, const Protobuf::ReflectableMessage& reflectable) {
+  const auto* descriptor = reflectable->GetDescriptor();
+  const auto* reflection = reflectable->GetReflection();
 
   // Create a table for the message
   lua_createtable(state, 0, descriptor->field_count());
@@ -94,10 +67,10 @@ void ProtobufConverterUtils::pushLuaTableFromMessage(lua_State* state,
 
     // Skip fields that aren't set
     if (field->is_repeated()) {
-      if (reflection->FieldSize(reflectable.message(), field) == 0) {
+      if (reflection->FieldSize(*reflectable, field) == 0) {
         continue;
       }
-    } else if (!reflection->HasField(reflectable.message(), field)) {
+    } else if (!reflection->HasField(*reflectable, field)) {
       continue;
     }
 
@@ -111,7 +84,13 @@ void ProtobufConverterUtils::pushLuaTableFromMessage(lua_State* state,
 void ProtobufConverterUtils::pushLuaValueFromField(lua_State* state,
                                                    const Protobuf::ReflectableMessage& message,
                                                    const Protobuf::FieldDescriptor* field) {
-  const Protobuf::Reflection* reflection = message.message().GetReflection();
+  const Protobuf::Reflection* reflection = message->GetReflection();
+
+  // Check for map fields first, before checking for repeated fields
+  if (field->is_map()) {
+    pushLuaTableFromMapField(state, message, field);
+    return;
+  }
 
   if (field->is_repeated()) {
     pushLuaArrayFromRepeatedField(state, message, field);
@@ -129,26 +108,23 @@ void ProtobufConverterUtils::pushLuaValueFromField(lua_State* state,
     break;
 
   case Protobuf::FieldDescriptor::CPPTYPE_BOOL:
-    lua_pushboolean(state, reflection->GetBool(message.message(), field));
+    lua_pushboolean(state, reflection->GetBool(*message, field));
     break;
 
   case Protobuf::FieldDescriptor::CPPTYPE_STRING: {
-    std::string value;
-    reflection->GetString(message.message(), field, &value);
+    const std::string& value = reflection->GetString(*message, field);
     pushLuaString(state, value);
     break;
   }
 
-  case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE:
-    if (field->is_map()) {
-      pushLuaTableFromMapField(state, message, field);
-    } else {
-      pushLuaTableFromMessage(state, reflection->GetMessage(message.message(), field));
-    }
+  case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
+    const auto& msg = reflection->GetMessage(*message, field);
+    pushLuaTableFromMessage(state, msg);
     break;
+  }
 
   case Protobuf::FieldDescriptor::CPPTYPE_ENUM:
-    lua_pushnumber(state, reflection->GetEnumValue(message.message(), field));
+    lua_pushnumber(state, reflection->GetEnumValue(*message, field));
     break;
 
   default:
@@ -160,18 +136,19 @@ void ProtobufConverterUtils::pushLuaValueFromField(lua_State* state,
 void ProtobufConverterUtils::pushLuaTableFromMapField(lua_State* state,
                                                       const Protobuf::ReflectableMessage& message,
                                                       const Protobuf::FieldDescriptor* field) {
-  const Protobuf::Reflection* reflection = message.message().GetReflection();
+  const Protobuf::Reflection* reflection = message->GetReflection();
+  const int size = reflection->FieldSize(*message, field);
 
-  lua_createtable(state, 0, reflection->FieldSize(message.message(), field));
+  lua_createtable(state, 0, size);
 
-  for (int i = 0; i < reflection->FieldSize(message.message(), field); ++i) {
+  for (int i = 0; i < size; ++i) {
     // Get the map entry message
-    const auto& entry_message = reflection->GetRepeatedMessage(message.message(), field, i);
+    const auto& entry_message = reflection->GetRepeatedMessage(*message, field, i);
     auto entry = Envoy::createReflectableMessage(entry_message);
-    const auto* entry_descriptor = entry.message().GetDescriptor();
-    const auto* entry_reflection = entry.message().GetReflection();
+    const auto* entry_descriptor = entry->GetDescriptor();
+    const auto* entry_reflection = entry->GetReflection();
 
-    // Get key and value field descriptors
+    // Get key and value field descriptors using the standard protobuf map field names
     const auto* key_field =
         entry_descriptor->FindFieldByName(std::string(ProtobufMap::KEY_FIELD_NAME));
     const auto* value_field =
@@ -184,24 +161,27 @@ void ProtobufConverterUtils::pushLuaTableFromMapField(lua_State* state,
     // Push the key
     switch (key_field->cpp_type()) {
     case Protobuf::FieldDescriptor::CPPTYPE_STRING: {
-      std::string key;
-      entry_reflection->GetString(entry.message(), key_field, &key);
+      const std::string& key = entry_reflection->GetString(*entry, key_field);
       pushLuaString(state, key);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_INT32:
+      lua_pushnumber(state, entry_reflection->GetInt32(*entry, key_field));
+      break;
     case Protobuf::FieldDescriptor::CPPTYPE_INT64:
-      lua_pushnumber(state, entry_reflection->GetInt64(entry.message(), key_field));
+      lua_pushnumber(state, entry_reflection->GetInt64(*entry, key_field));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_UINT32:
+      lua_pushnumber(state, entry_reflection->GetUInt32(*entry, key_field));
+      break;
     case Protobuf::FieldDescriptor::CPPTYPE_UINT64:
-      lua_pushnumber(state, entry_reflection->GetUInt64(entry.message(), key_field));
+      lua_pushnumber(state, entry_reflection->GetUInt64(*entry, key_field));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_BOOL:
-      lua_pushboolean(state, entry_reflection->GetBool(entry.message(), key_field));
+      lua_pushboolean(state, entry_reflection->GetBool(*entry, key_field));
       break;
     default:
-      lua_pushnumber(state, i); // Fallback to index if key type isn't supported
+      lua_pushnumber(state, i + 1); // Fallback to 1-based index if key type isn't supported
       break;
     }
 
@@ -214,54 +194,52 @@ void ProtobufConverterUtils::pushLuaTableFromMapField(lua_State* state,
 void ProtobufConverterUtils::pushLuaArrayFromRepeatedField(
     lua_State* state, const Protobuf::ReflectableMessage& message,
     const Protobuf::FieldDescriptor* field) {
-  const Protobuf::Reflection* reflection = message.message().GetReflection();
-  const uint32_t size = reflection->FieldSize(message.message(), field);
+  const Protobuf::Reflection* reflection = message->GetReflection();
+  const int size = reflection->FieldSize(*message, field);
 
   lua_createtable(state, size, 0);
 
-  for (uint32_t i = 0; i < size; i++) {
+  for (int i = 0; i < size; ++i) {
     // Lua arrays are 1-based
     lua_pushnumber(state, i + 1);
 
     switch (field->cpp_type()) {
     case Protobuf::FieldDescriptor::CPPTYPE_INT32:
-      lua_pushnumber(state, reflection->GetRepeatedInt32(message.message(), field, i));
+      lua_pushnumber(state, reflection->GetRepeatedInt32(*message, field, i));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_INT64:
-      lua_pushnumber(state, reflection->GetRepeatedInt64(message.message(), field, i));
+      lua_pushnumber(state, reflection->GetRepeatedInt64(*message, field, i));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_UINT32:
-      lua_pushnumber(state, reflection->GetRepeatedUInt32(message.message(), field, i));
+      lua_pushnumber(state, reflection->GetRepeatedUInt32(*message, field, i));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_UINT64:
-      lua_pushnumber(state, reflection->GetRepeatedUInt64(message.message(), field, i));
+      lua_pushnumber(state, reflection->GetRepeatedUInt64(*message, field, i));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_DOUBLE:
-      lua_pushnumber(state, reflection->GetRepeatedDouble(message.message(), field, i));
+      lua_pushnumber(state, reflection->GetRepeatedDouble(*message, field, i));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_FLOAT:
-      lua_pushnumber(state, reflection->GetRepeatedFloat(message.message(), field, i));
+      lua_pushnumber(state, reflection->GetRepeatedFloat(*message, field, i));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_BOOL:
-      lua_pushboolean(state, reflection->GetRepeatedBool(message.message(), field, i));
+      lua_pushboolean(state, reflection->GetRepeatedBool(*message, field, i));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_STRING: {
-      std::string value;
-      value = reflection->GetRepeatedString(message.message(), field, i);
+      const std::string& value = reflection->GetRepeatedString(*message, field, i);
       pushLuaString(state, value);
       break;
     }
     case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE:
-      pushLuaTableFromMessage(state, reflection->GetRepeatedMessage(message.message(), field, i));
+      pushLuaTableFromMessage(state, reflection->GetRepeatedMessage(*message, field, i));
       break;
     case Protobuf::FieldDescriptor::CPPTYPE_ENUM:
-      lua_pushnumber(state, reflection->GetRepeatedEnumValue(message.message(), field, i));
+      lua_pushnumber(state, reflection->GetRepeatedEnumValue(*message, field, i));
       break;
     default:
       lua_pushnil(state);
       break;
     }
-
     lua_rawset(state, -3);
   }
 }

@@ -42,5 +42,7 @@ envoy_cc_library(
     deps = [
         "//bazel/foreign_cc:luajit",
         "//source/common/protobuf",
+        "//source/common/protobuf:create_reflectable_message_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )

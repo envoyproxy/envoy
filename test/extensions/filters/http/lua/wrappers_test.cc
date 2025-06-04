@@ -762,7 +762,7 @@ protected:
 TEST_F(LuaConnectionStreamInfoWrapperTest, GetTypedMetadata) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)
-      local meta = object:typedMetadata("envoy.test.typed_metadata")
+      local meta = object:dynamicTypedMetadata("envoy.test.typed_metadata")
       if meta and meta.typed_metadata then
         testPrint(meta.typed_metadata.test_key)
       end
@@ -796,7 +796,7 @@ TEST_F(LuaConnectionStreamInfoWrapperTest, GetTypedMetadata) {
 TEST_F(LuaConnectionStreamInfoWrapperTest, IterateTypedMetadata) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)
-      local meta = object:typedMetadata("envoy.test.typed_metadata")
+      local meta = object:dynamicTypedMetadata("envoy.test.typed_metadata")
       if meta and meta.typed_metadata then
         for k,v in pairs(meta.typed_metadata) do
           testPrint(string.format("%s=%s", k, v))
