@@ -119,6 +119,8 @@ StatusOr<sockaddr_in> parseV4Address(const std::string& ip_address, uint16_t por
 
 StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t port) {
   // Parse IPv6 with optional scope using getaddrinfo().
+  // While inet_pton() would be faster and simpler, it does not support IPv6
+  // addresses that specify a scope, e.g. `::%eth0` to listen on only one interface.
   struct addrinfo hints;
   memset(&hints, 0, sizeof(hints));
   struct addrinfo* res = nullptr;
