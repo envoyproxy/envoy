@@ -921,10 +921,22 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
-bool ConnectionImpl::setSocketOption(Network::Socket::Option::Details option) {
-  auto sockopt = std::make_shared<SocketOptionImpl>(option.name_, option.value_);
+bool ConnectionImpl::setSocketOption(Network::SocketOptionName name, absl::string_view value) {
+  const std::vector<uint8_t, Memory::AlignedAllocator<uint8_t, alignof(void*)>> val_ptr(
+      value.begin(), value.end());
+
+  Api::SysCallIntResult result =
+      SocketOptionImpl::setSocketOption(*socket_, name, val_ptr.data(), val_ptr.size());
+  if (result.return_value_ != 0) {
+    ENVOY_LOG(warn, "Setting option on socket failed, errno: {}, message: {}", result.errno_,
+              errorDetails(result.errno_));
+    return false;
+  }
+
+  auto sockopt = std::make_shared<SocketOptionImpl>(name, value);
   socket_->addOption(sockopt);
-  return sockopt->setOption(*socket_, envoy::config::core::v3::SocketOption::STATE_LISTENING);
+
+  return true;
 }
 
 absl::string_view ConnectionImpl::transportFailureReason() const {

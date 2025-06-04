@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <string>
 
 #include "envoy/common/platform.h"
@@ -2584,12 +2586,15 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
 TEST_P(ConnectionImplTest, SetSocketOptionTest) {
   setUpBasicConnection();
 
-  Envoy::Network::Socket::Option::Details option_details;
-  option_details.name_ = ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_KEEPALIVE);
-  option_details.value_ = 1;
-  EXPECT_TRUE(client_connection_->setSocketOption(option_details));
+  Envoy::Network::SocketOptionName sockopt_name =
+      ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_KEEPIDLE);
 
-  SocketOptionImpl expected_opt(option_details.name_, option_details.value_);
+  int val = 1;
+  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
+
+  EXPECT_TRUE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
+
+  SocketOptionImpl expected_opt(sockopt_name, sockopt_val);
   std::vector<uint8_t> expected_key;
   expected_opt.hashKey(expected_key);
 
@@ -2607,6 +2612,26 @@ TEST_P(ConnectionImplTest, SetSocketOptionTest) {
   }
 
   EXPECT_TRUE(opt_found);
+
+  disconnect(false);
+}
+
+TEST_P(ConnectionImplTest, SetSocketOptionFailedTest) {
+  setUpBasicConnection();
+  Envoy::Network::SocketOptionName sockopt_name =
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_DEBUG);
+
+  int val = 1;
+  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
+
+  EXPECT_TRUE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
+
+  SocketOptionImpl expected_opt(sockopt_name, sockopt_val);
+  std::vector<uint8_t> expected_key;
+  expected_opt.hashKey(expected_key);
+
+  EXPECT_TRUE(client_connection_->socketOptions());
+  auto options = client_connection_->socketOptions();
 
   disconnect(false);
 }

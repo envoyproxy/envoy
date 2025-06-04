@@ -54,7 +54,9 @@ public:
   // Set up socket and start handshake.
   void connect() override;
 
-  bool setSocketOption(const Network::Socket::Option::Details) override { return false; }
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::string_view) override {
+    return false;
+  }
 
   // quic::QuicSession
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,

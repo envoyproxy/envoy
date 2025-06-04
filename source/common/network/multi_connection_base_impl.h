@@ -101,7 +101,7 @@ public:
 
   // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() const override;
-  bool setSocketOption(const Network::Socket::Option::Details option) override;
+  bool setSocketOption(Network::SocketOptionName name, absl::string_view value) override;
   std::string nextProtocol() const override;
   // Note, this might change before connect finishes.
   ConnectionInfoSetter& connectionInfoSetter() override;

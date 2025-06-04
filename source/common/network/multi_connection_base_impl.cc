@@ -106,10 +106,11 @@ bool MultiConnectionBaseImpl::isHalfCloseEnabled() const {
   return connections_[0]->isHalfCloseEnabled();
 }
 
-bool MultiConnectionBaseImpl::setSocketOption(const Network::Socket::Option::Details option) {
+bool MultiConnectionBaseImpl::setSocketOption(Network::SocketOptionName name,
+                                              absl::string_view value) {
   bool success = true;
   for (auto& connection : connections_) {
-    if (!connection->setSocketOption(option)) {
+    if (!connection->setSocketOption(name, value)) {
       success = false;
     }
   }

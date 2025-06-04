@@ -352,8 +352,7 @@ public:
    * @param option The socket option to set.
    * @return boolean telling if the socket option was set successfully.
    */
-  virtual bool setSocketOption(const Network::Socket::Option::Details option) PURE;
-
+  virtual bool setSocketOption(Network::SocketOptionName name, absl::string_view value) PURE;
   /**
    * The StreamInfo object associated with this connection. This is typically
    * used for logging purposes. Individual filters may add specific information
