@@ -58,7 +58,7 @@ public:
             config.metadata_options().forwarding_namespaces().typed().begin(),
             config.metadata_options().forwarding_namespaces().typed().end()),
         stats_(generateStats(config.stat_prefix(), scope)),
-        message_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs)) {};
+        message_timeout_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -78,9 +78,7 @@ public:
 
   const NetworkExtProcStats& stats() const { return stats_; }
 
-  const uint32_t messageTimeout() {
-    return message_timeout_;
-  }
+  const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
 private:
   static constexpr uint64_t DefaultMessageTimeoutMs = 500;
@@ -96,12 +94,14 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   NetworkExtProcStats stats_;
-  const uint32_t message_timeout_;
+  const std::chrono::milliseconds message_timeout_;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
+
+class NetworkExtProcFilter;
 
 /**
  * Manages timeouts for read and write operations independently.
@@ -172,6 +172,10 @@ public:
   void onComplete(ProcessingResponse&) override {};
   void onError() override {};
 
+  // Called by MessageTimeoutManager
+  void handleMessageTimeout(bool is_read);
+  const std::chrono::milliseconds& getMessageTimeout();
+
 private:
   struct DownstreamCallbacks : public Envoy::Network::ConnectionCallbacks {
     DownstreamCallbacks(NetworkExtProcFilter& parent) : parent_(parent) {}
@@ -196,10 +200,6 @@ private:
   Envoy::Network::FilterStatus handleStreamError();
   void closeConnection(const std::string& reason, Network::ConnectionCloseType close_type);
   void handleConnectionStatus(const ProcessingResponse& response);
-
-  // Called by MessageTimeoutManager
-  void handleMessageTimeout(bool is_read);
-  std::chrono::milliseconds getMessageTimeout() const;
 
   Envoy::Network::ReadFilterCallbacks* read_callbacks_{nullptr};
   Envoy::Network::WriteFilterCallbacks* write_callbacks_{nullptr};

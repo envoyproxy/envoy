@@ -6,8 +6,8 @@ namespace NetworkFilters {
 namespace ExtProc {
 
 // MessageTimeoutManager implementation
-MessageTimeoutManager::MessageTimeoutManager(NetworkExtProcFilter& filter, 
-                                           Event::Dispatcher& dispatcher)
+MessageTimeoutManager::MessageTimeoutManager(NetworkExtProcFilter& filter,
+                                             Event::Dispatcher& dispatcher)
     : filter_(filter),
       read_timer_(dispatcher.createTimer([this]() -> void { onTimeout(true); })),
       write_timer_(dispatcher.createTimer([this]() -> void { onTimeout(false); })) {}
@@ -71,7 +71,7 @@ void NetworkExtProcFilter::initializeReadFilterCallbacks(Network::ReadFilterCall
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
 
   if (!timeout_manager_) {
-    timeout_manager_ = std::make_unique<MessageTimeoutManager>(*this, callbacks.dispatcher());
+    timeout_manager_ = std::make_unique<MessageTimeoutManager>(*this, read_callbacks_->connection().dispatcher());
   }
 }
 
@@ -246,9 +246,8 @@ void NetworkExtProcFilter::handleMessageTimeout(bool is_read) {
   }
 }
 
-// Implement getMessageTimeout
-std::chrono::milliseconds NetworkExtProcFilter::getMessageTimeout() const {
-  return std::chrono::milliseconds(config_->messageTimeout());
+const std::chrono::milliseconds& NetworkExtProcFilter::getMessageTimeout() {
+  return config_->messageTimeout();
 }
 
 void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, bool is_read) {
