@@ -167,7 +167,11 @@ message ExternalProcessor {
     (xds.annotations.v3.field_status).work_in_progress = true
   ];
 
-  // By default, if the gRPC stream cannot be established, or if it is closed
+  // If the ``BodySendMode`` in the
+  // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
+  // is set to ``FULL_DUPLEX_STREAMED``, ``failure_mode_allow`` can not be set to true.
+  //
+  // Otherwise, by default, if the gRPC stream cannot be established, or if it is closed
   // prematurely with an error, the filter will fail. Specifically, if the
   // response headers have not yet been delivered, then it will return a 500
   // error downstream. If they have been delivered, then instead the HTTP stream to the
