@@ -193,7 +193,6 @@ function bazel_envoy_api_build() {
     ENVOY_STDLIB="libstdc++"
     setup_clang_toolchain
     export CLANG_TOOLCHAIN_SETUP=1
-    export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
     echo "Run protoxform test"
     bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
         --//tools/api_proto_plugin:default_type_db_target=//tools/testdata/protoxform:fix_protos \

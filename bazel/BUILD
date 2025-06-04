@@ -1073,3 +1073,19 @@ config_setting(
         ":enable_liburing": "True",
     },
 )
+
+bool_flag(
+    name = "enable_qat",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "qat_enabled",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        ":enable_qat": "True",
+    },
+)

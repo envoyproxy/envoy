@@ -11,6 +11,9 @@
 # TODO: Adding just to test android
 startup --host_jvm_args=-Xmx3g
 
+# DEBUG: REMOVE
+# common --toolchain_resolution_debug=.*
+
 common --noenable_bzlmod
 
 fetch --color=yes
@@ -32,11 +35,10 @@ build --incompatible_merge_fixed_and_default_shell_env
 # A workaround for slow ICU download.
 build --http_timeout_scaling=6.0
 
-# Pass CC, CXX and LLVM_CONFIG variables from the environment.
+# Pass CC, CXX variables from the environment.
 # We assume they have stable values, so this won't cause action cache misses.
 build --action_env=CC --host_action_env=CC
 build --action_env=CXX --host_action_env=CXX
-build --action_env=LLVM_CONFIG --host_action_env=LLVM_CONFIG
 # Do not pass through PATH however.
 # It tends to have machine-specific values, such as dynamically created temp folders.
 # This would make it impossible to share remote action cache hits among machines.
@@ -90,7 +92,8 @@ build:clang --action_env=BAZEL_COMPILER=clang
 build:clang --linkopt=-fuse-ld=lld
 build:clang --action_env=CC=clang --host_action_env=CC=clang
 build:clang --action_env=CXX=clang++ --host_action_env=CXX=clang++
-build:clang --incompatible_enable_cc_toolchain_resolution=false
+build:clang --repo_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
+build:clang --incompatible_enable_cc_toolchain_resolution=true
 
 # Flags for Clang + PCH
 build:clang-pch --spawn_strategy=local
@@ -165,6 +168,7 @@ build:macos --copt=-Wno-deprecated-declarations
 build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
+build:macos --incompatible_enable_cc_toolchain_resolution=false
 
 # macOS ASAN/UBSAN
 build:macos-asan --config=asan
@@ -219,8 +223,10 @@ build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
+build:clang-libc++ --config=clang
 build:clang-libc++ --config=libc++
 build:clang-libc++ --action_env=ARFLAGS=r
+
 build:arm64-clang-libc++ --config=clang-libc++
 
 build:libc++20 --config=libc++
@@ -279,36 +285,20 @@ build:fuzz-coverage-config --//tools/coverage:config=//test:fuzz_coverage_config
 
 build:cache-local --remote_cache=grpc://localhost:9092
 
-# Remote execution: https://docs.bazel.build/versions/master/remote-execution.html
-build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
-build:rbe-toolchain --incompatible_enable_cc_toolchain_resolution=false
-
 build:rbe-toolchain-clang --config=rbe-toolchain
-build:rbe-toolchain-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
-build:rbe-toolchain-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
-build:rbe-toolchain-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
-build:rbe-toolchain-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain
-build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++
+build:rbe-toolchain-clang --config=clang
 
-build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
-build:rbe-toolchain-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
-build:rbe-toolchain-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
-build:rbe-toolchain-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
-build:rbe-toolchain-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain
-build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
-build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
-build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
+build:rbe-toolchain-clang-libc++ --config=libc++
+build:rbe-toolchain-clang-libc++ --config=clang
+build:rbe-toolchain-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_x64_platform
+build:rbe-toolchain-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_x64_platform
+build:rbe-toolchain-clang-libc++ --extra_toolchains=@llvm_toolchain//:cc-toolchain-x86_64-linux
 
-build:rbe-toolchain-arm64-clang-libc++ --config=rbe-toolchain
-build:rbe-toolchain-arm64-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
-build:rbe-toolchain-arm64-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
-build:rbe-toolchain-arm64-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
-build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain-arm64
-build:rbe-toolchain-arm64-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
-build:rbe-toolchain-arm64-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:rbe-toolchain-arm64-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
-build:rbe-toolchain-arm64-clang-libc++ --define force_libcpp=enabled
+build:rbe-toolchain-arm64-clang-libc++ --config=libc++
+build:rbe-toolchain-arm64-clang-libc++ --config=clang
+build:rbe-toolchain-arm64-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_platform
+build:rbe-toolchain-arm64-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_platform
+build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@llvm_toolchain//:cc-toolchain-aarch64-linux
 
 build:rbe-toolchain-asan --config=clang-asan
 build:rbe-toolchain-asan --linkopt -fuse-ld=lld
@@ -320,10 +310,8 @@ build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
 build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
 build:rbe-toolchain-msan --config=clang-msan
-
 build:rbe-toolchain-tsan --config=clang-tsan
 
-build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 build:rbe-toolchain-gcc --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
 build:rbe-toolchain-gcc --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/gcc/cc:toolchain
@@ -398,7 +386,7 @@ build:compile-time-options --@envoy//source/extensions/filters/http/kill_request
 
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/main/toolchains/rbe_toolchains_config.bzl#L8
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:637e381b3d59e52d30b186b50f2b26f924d52067@sha256:4f82300bc27a125b22b88a3b682a3f3b51d006d5fb4ad73de48f5e2bca9e78cb
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu:0e6c302f99465aa73bb43e4971014aceb661d711@sha256:5396fc18c2ebfa2a5bb05a9ef28b60585a0ca9a5a07eddec95c7b5aa81da6319
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -569,7 +557,7 @@ common:bes-envoy-engflow --bes_timeout=3600s
 common:bes-envoy-engflow --bes_upload_mode=fully_async
 common:bes-envoy-engflow --nolegacy_important_outputs
 common:rbe-envoy-engflow --remote_executor=grpcs://mordenite.cluster.engflow.com
-common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:a41f69c56ba636856576949a22cc2ec450c48a7a37487554d8a31827e0d54c03
+common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker://gcr.io/envoy-ci/envoy-build@sha256:92a34e0d3e878d596c8330722d8195bd61d905b0f5ba502363fe3845f1c6d479
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
 

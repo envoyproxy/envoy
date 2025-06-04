@@ -2,25 +2,6 @@
 
 set -e -o pipefail
 
-LLVM_VERSION=${LLVM_VERSION:-"18.1.8"}
-CLANG_VERSION=$(clang --version | grep version | sed -e 's/\ *clang version \([0-9.]*\).*/\1/')
-LLVM_COV_VERSION=$(llvm-cov --version | grep version | sed -e 's/\ *LLVM version \([0-9.]*\).*/\1/')
-LLVM_PROFDATA_VERSION=$(llvm-profdata show --version | grep version | sed -e 's/\ *LLVM version \(.*\)/\1/')
-
-if [[ -z "$ENVOY_RBE" && "${CLANG_VERSION}" != "${LLVM_VERSION}" ]]; then
-    echo "ERROR: clang version ${CLANG_VERSION} does not match expected ${LLVM_VERSION}" >&2
-    exit 1
-fi
-
-if [[ -z "$ENVOY_RBE" && "${LLVM_COV_VERSION}" != "${LLVM_VERSION}" ]]; then
-    echo "ERROR: llvm-cov version ${LLVM_COV_VERSION} does not match expected ${LLVM_VERSION}" >&2
-    exit 1
-fi
-
-if [[ -z "$ENVOY_RBE" && "${LLVM_PROFDATA_VERSION}" != "${LLVM_VERSION}" ]]; then
-    echo "ERROR: llvm-profdata version ${LLVM_PROFDATA_VERSION} does not match expected ${LLVM_VERSION}" >&2
-    exit 1
-fi
 
 # This is a little hacky
 IS_MOBILE="${IS_MOBILE:-}"

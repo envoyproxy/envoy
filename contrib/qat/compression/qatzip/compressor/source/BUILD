@@ -60,7 +60,7 @@ envoy_cc_contrib_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     defines = select({
-        "//bazel:linux_x86_64": [
+        "//bazel:qat_enabled": [
         ],
         "//conditions:default": [
             "QAT_DISABLED=1",
@@ -72,7 +72,7 @@ envoy_cc_contrib_extension(
         "//source/common/http:headers_lib",
         "@envoy_api//contrib/envoy/extensions/compression/qatzip/compressor/v3alpha:pkg_cc_proto",
     ] + select({
-        "//bazel:linux_x86_64": [
+        "//bazel:qat_enabled": [
             ":compressor_lib",
         ],
         "//conditions:default": [

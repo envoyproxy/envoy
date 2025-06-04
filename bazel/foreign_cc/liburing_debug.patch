@@ -1,0 +1,20 @@
+diff --git a/configure b/configure
+index c2351a2..5cd3676 100755
+--- a/configure
++++ b/configure
+@@ -567,6 +567,7 @@ print_config "CXX" "$cxx"
+ # Reset MAKEFLAGS
+ MAKEFLAGS=
+ MAKE_PRINT_VARS="include Makefile.common\nprint-%%: ; @echo \$(\$*)\n"
++
+ VERSION_MAJOR=$(printf "$MAKE_PRINT_VARS" | make -s --no-print-directory -f - print-VERSION_MAJOR)
+ VERSION_MINOR=$(printf "$MAKE_PRINT_VARS" | make -s --no-print-directory -f - print-VERSION_MINOR)
+ io_uring_version_h="src/include/liburing/io_uring_version.h"
+@@ -617,6 +618,7 @@ cat >> $compat_h << EOF
+ 
+ EOF
+ fi
++open_how=no
+ if test "$open_how" != "yes"; then
+ cat >> $compat_h << EOF
+ #include <inttypes.h>

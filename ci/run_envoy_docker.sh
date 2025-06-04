@@ -2,6 +2,10 @@
 
 set -e
 
+# HACK: REMOVE
+
+sudo rm -rf /opt/hostedtoolcache
+
 CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 
 # shellcheck source=ci/envoy_build_sha.sh
