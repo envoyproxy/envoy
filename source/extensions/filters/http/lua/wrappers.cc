@@ -8,8 +8,6 @@
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
-#include "google/protobuf/dynamic_message.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -226,43 +224,35 @@ int ConnectionStreamInfoWrapper::luaConnectionDynamicTypedMetadata(lua_State* st
   }
   const absl::string_view type_name = absl::string_view(type_url).substr(pos + 1);
 
-  // Try to unpack the Any message into a dynamic message
-  try {
-    // Get the descriptor pool to find the message type
-    const auto* descriptor =
-        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(std::string(type_name));
+  // Get the descriptor pool to find the message type
+  const auto* descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(std::string(type_name));
 
-    if (descriptor == nullptr) {
-      ENVOY_LOG(debug, "Cannot find descriptor for type: {}", type_name);
-      lua_pushnil(state);
-      return 1;
-    }
-
-    // Create a dynamic message and unpack the Any into it
-    Protobuf::DynamicMessageFactory factory;
-    const Protobuf::Message* prototype = factory.GetPrototype(descriptor);
-    if (prototype == nullptr) {
-      ENVOY_LOG(debug, "Cannot create prototype for type: {}", type_name);
-      lua_pushnil(state);
-      return 1;
-    }
-
-    std::unique_ptr<Protobuf::Message> dynamic_message(prototype->New());
-    if (!any_message.UnpackTo(dynamic_message.get())) {
-      ENVOY_LOG(debug, "Failed to unpack Any message for filter: {}", filter_name);
-      lua_pushnil(state);
-      return 1;
-    }
-
-    // Convert the unpacked message to Lua table
-    Filters::Common::Lua::ProtobufConverterUtils::pushLuaTableFromMessage(state, *dynamic_message);
-    return 1;
-
-  } catch (const std::exception& e) {
-    ENVOY_LOG(debug, "Error unpacking typed metadata for filter {}: {}", filter_name, e.what());
+  if (descriptor == nullptr) {
+    ENVOY_LOG(debug, "Cannot find descriptor for type: {}", type_name);
     lua_pushnil(state);
     return 1;
   }
+
+  // Create a dynamic message and unpack the Any into it
+  Protobuf::DynamicMessageFactory factory;
+  const Protobuf::Message* prototype = factory.GetPrototype(descriptor);
+  if (prototype == nullptr) {
+    ENVOY_LOG(debug, "Cannot create prototype for type: {}", type_name);
+    lua_pushnil(state);
+    return 1;
+  }
+
+  std::unique_ptr<Protobuf::Message> dynamic_message(prototype->New());
+  if (!any_message.UnpackTo(dynamic_message.get())) {
+    ENVOY_LOG(debug, "Failed to unpack Any message for filter: {}", filter_name);
+    lua_pushnil(state);
+    return 1;
+  }
+
+  // Convert the unpacked message to Lua table
+  Filters::Common::Lua::ProtobufConverterUtils::pushLuaTableFromMessage(state, *dynamic_message);
+  return 1;
 }
 
 int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
