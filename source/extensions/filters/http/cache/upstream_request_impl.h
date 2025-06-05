@@ -59,9 +59,6 @@ private:
   using CallbackTypes =
       absl::variant<absl::monostate, GetHeadersCallback, GetBodyCallback, GetTrailersCallback>;
 
-  // True if no callback is waiting to be called.
-  bool callbackEmpty() const { return absl::holds_alternative<absl::monostate>(callback_); }
-
   // Returns the current callback and clears the member variable so it's safe to
   // assert that it's empty.
   CallbackTypes consumeCallback() { return std::exchange(callback_, absl::monostate{}); }

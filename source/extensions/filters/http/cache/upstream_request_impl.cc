@@ -41,7 +41,7 @@ void UpstreamRequestImpl::onBelowLowWatermark() {
 
 void UpstreamRequestImpl::getHeaders(GetHeadersCallback&& cb) {
   ASSERT(dispatcher_.isThreadSafe());
-  ASSERT(callbackEmpty());
+  ASSERT(absl::holds_alternative<absl::monostate>(callback_));
   if (!stream_ && !end_stream_after_headers_ && !end_stream_after_body_ && !trailers_) {
     return cb(nullptr, EndStream::Reset);
   }
@@ -67,7 +67,7 @@ void UpstreamRequestImpl::maybeDeliverHeaders() {
 
 void UpstreamRequestImpl::getBody(AdjustedByteRange range, GetBodyCallback&& cb) {
   ASSERT(dispatcher_.isThreadSafe());
-  ASSERT(callbackEmpty());
+  ASSERT(absl::holds_alternative<absl::monostate>(callback_));
   ASSERT(range.begin() == stream_pos_, "UpstreamRequest does not support out of order reads");
   ASSERT(!end_stream_after_headers_);
   if (!stream_ && !end_stream_after_body_ && !trailers_) {
@@ -121,7 +121,7 @@ void UpstreamRequestImpl::maybeDeliverBody() {
 
 void UpstreamRequestImpl::getTrailers(GetTrailersCallback&& cb) {
   ASSERT(dispatcher_.isThreadSafe());
-  ASSERT(callbackEmpty());
+  ASSERT(absl::holds_alternative<absl::monostate>(callback_));
   ASSERT(!end_stream_after_headers_ && !end_stream_after_body_);
   if (!stream_ && !trailers_) {
     return cb(nullptr, EndStream::Reset);
