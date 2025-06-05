@@ -76,8 +76,6 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (),
-              (const, override));
   MOCK_METHOD(Secret::SecretManager&, secretManager, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   Http::Context& httpContext() override { return http_context_; }
@@ -141,30 +139,18 @@ public:
   MockGenericFactoryContext();
   ~MockGenericFactoryContext() override;
 
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (const));
-  MOCK_METHOD(Stats::Scope&, scope, ());
-  MOCK_METHOD(Init::Manager&, initManager, ());
-
-  NiceMock<MockServerFactoryContext> server_factory_context_;
-  testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
-  testing::NiceMock<Init::MockManager> init_manager_;
-};
-
-class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
-public:
-  MockTransportSocketFactoryContext();
-  ~MockTransportSocketFactoryContext() override;
-
   MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
+  MOCK_METHOD(Stats::Scope&, scope, ());
   MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 
-  testing::NiceMock<MockServerFactoryContext> server_context_;
+  NiceMock<MockServerFactoryContext> server_context_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
   testing::NiceMock<Init::MockManager> init_manager_;
 };
+
+using MockTransportSocketFactoryContext = MockGenericFactoryContext;
 
 // Stateless mock ServerFactoryContext for cases where it needs to be used concurrently in different
 // threads. Global state in the MockServerFactoryContext causes thread safety issues in this case.
@@ -191,8 +177,6 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (),
-              (const, override));
   MOCK_METHOD(Http::Context&, httpContext, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Router::Context&, routerContext, ());

@@ -2,7 +2,7 @@
 
 #include "envoy/config/listener/v3/listener.pb.h"
 
-#include "source/server/api_listener_impl.h"
+#include "source/extensions/api_listeners/default_api_listener/api_listener_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -17,6 +17,9 @@
 
 namespace Envoy {
 namespace Server {
+
+using Extensions::ApiListeners::DefaultApiListener::HttpApiListener;
+using Extensions::ApiListeners::DefaultApiListener::HttpApiListenerFactory;
 
 class ApiListenerTest : public testing::Test {
 protected:
@@ -53,7 +56,8 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
 
   ASSERT_EQ("test_api_listener", http_api_listener->name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
@@ -88,7 +92,8 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
 
   ASSERT_EQ("test_api_listener", http_api_listener->name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
@@ -124,8 +129,9 @@ api_listener:
       ->mutable_path_config_source()
       ->set_path("eds path");
   expected_any_proto.PackFrom(expected_cluster_proto);
+  HttpApiListenerFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      HttpApiListener::create(config, server_, config.name()).IgnoreError(), EnvoyException,
+      factory.create(config, server_, config.name()).IgnoreError(), EnvoyException,
       fmt::format("Unable to unpack as "
                   "envoy.extensions.filters.network.http_connection_manager.v3."
                   "HttpConnectionManager: {}",
@@ -159,7 +165,8 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
 
   ASSERT_EQ("test_api_listener", http_api_listener->name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());

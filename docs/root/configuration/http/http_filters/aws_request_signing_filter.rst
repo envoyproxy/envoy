@@ -36,7 +36,7 @@ can be specified as ``AWS_SIGV4`` or ``AWS_SIGV4A``. If the signing algorithm is
 If ``AWS_SIGV4`` is unspecified, or explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
 is used to define the region to which the sigv4 calculation is addressed to.
 If ``AWS_SIGV4A`` is explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
-is used as a region set. A region set is a single region, or comma seperated list of regions. Regions in a region set can also include wildcards,
+is used as a region set. A region set is a single region, or comma separated list of regions. Regions in a region set can also include wildcards,
 such as ``us-east-*`` or even ``*``. By using ``AWS_SIGV4A`` and wildcarded regions it is possible to simplify the overall envoy configuration for
 multi-region implementations.
 

@@ -2638,11 +2638,9 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
 
   EXPECT_EQ("envoy.load_balancing_policies.round_robin",
             cluster->info()->loadBalancerFactory().name());
-  auto slow_start_config =
-      dynamic_cast<const Extensions::LoadBalancingPolices::RoundRobin::LegacyRoundRobinLbConfig*>(
-          cluster->info()->loadBalancerConfig().ptr())
-          ->lbConfig()
-          ->slow_start_config();
+  auto slow_start_config = dynamic_cast<const Upstream::TypedRoundRobinLbConfig*>(
+                               cluster->info()->loadBalancerConfig().ptr())
+                               ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
@@ -2685,10 +2683,9 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
             cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<
-          const Extensions::LoadBalancingPolices::LeastRequest::LegacyLeastRequestLbConfig*>(
+          const Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig*>(
           cluster->info()->loadBalancerConfig().ptr())
-          ->lbConfig()
-          ->slow_start_config();
+          ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
@@ -2734,11 +2731,8 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
 
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
-  cluster->prioritySet()
-      .hostSetsPerPriority()[0]
-      ->hosts()[0]
-      ->outlierDetector()
-      .putHttpResponseCode(503);
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->outlierDetector().putResult(
+      Outlier::Result::ExtOriginRequestFailed, absl::optional<uint64_t>(503));
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);

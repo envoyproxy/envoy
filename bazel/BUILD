@@ -535,6 +535,14 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "boringssl_fips_not_ppc",
+    match_all = [
+        ":boringssl_fips",
+        ":not_ppc",
+    ],
+)
+
 config_setting(
     name = "zlib_ng",
     constraint_values = [
@@ -581,7 +589,7 @@ alias(
     name = "boringssl",
     actual = select({
         "//bazel:boringssl_fips_ppc": "@aws_lc//:ssl",
-        "//bazel:boringssl_fips_x86": "@boringssl_fips//:ssl",
+        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
     }),
 )
@@ -590,7 +598,7 @@ alias(
     name = "boringcrypto",
     actual = select({
         "//bazel:boringssl_fips_ppc": "@aws_lc//:crypto",
-        "//bazel:boringssl_fips_x86": "@boringssl_fips//:crypto",
+        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:crypto",
         "//conditions:default": "@boringssl//:crypto",
     }),
 )
@@ -861,6 +869,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "not_ppc",
+    match_any = [
+        ":not_x86_ppc",
+        ":x86",
+    ],
+)
+
+selects.config_setting_group(
     name = "not_x86",
     match_any = [
         ":darwin_arm64",
@@ -1041,4 +1057,19 @@ cc_library(
         ): ["@com_github_google_tcmalloc//tcmalloc"],
         "//conditions:default": ["//bazel/foreign_cc:gperftools"],
     }),
+)
+
+bool_flag(
+    name = "enable_liburing",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "liburing_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        ":enable_liburing": "True",
+    },
 )

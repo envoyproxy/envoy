@@ -146,6 +146,11 @@ public:
                                           const Options& options,
                                           ProtobufMessage::ValidationVisitor& validation_visitor,
                                           Api::Api& api);
+
+  /**
+   * Raises soft file limit to the hard limit.
+   */
+  static void raiseFileLimits();
 };
 
 /**
@@ -188,9 +193,6 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return server_.messageValidationContext();
   }
-  TransportSocketFactoryContext& getTransportSocketFactoryContext() const override {
-    return server_.transportSocketFactoryContext();
-  };
   Envoy::Runtime::Loader& runtime() override { return server_.runtime(); }
   Stats::Scope& scope() override { return *server_scope_; }
   Stats::Scope& serverScope() override { return *server_scope_; }
@@ -220,14 +222,7 @@ public:
   Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    // Server has two message validation visitors, one for static and
-    // other for dynamic configuration. Choose the dynamic validation
-    // visitor if server's init manager indicates that the server is
-    // in the Initialized state, as this state is engaged right after
-    // the static configuration (e.g., bootstrap) has been completed.
-    return initManager().state() == Init::Manager::State::Initialized
-               ? server_.messageValidationContext().dynamicValidationVisitor()
-               : server_.messageValidationContext().staticValidationVisitor();
+    return server_.messageValidationVisitor();
   }
 
 private:
@@ -321,6 +316,14 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Server has two message validation visitors, one for static and
+    // other for dynamic configuration. Choose the dynamic validation
+    // visitor if server main dispatch loop started, as if all configuration
+    // after main dispatch loop started should be dynamic.
+    return main_dispatch_loop_started_.load() ? validation_context_.dynamicValidationVisitor()
+                                              : validation_context_.staticValidationVisitor();
+  }
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
@@ -375,6 +378,7 @@ private:
   bool shutdown_{false};
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
+  std::atomic<bool> main_dispatch_loop_started_{false};
   TimeSource& time_source_;
   // Delete local_info_ as late as possible as some members below may reference it during their
   // destruction.

@@ -168,7 +168,6 @@ def envoy_dependencies(skip_targets = []):
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
-    _com_github_intel_ipp_crypto_crypto_mb_fips()
     _com_github_intel_qatlib()
     _com_github_intel_qatzip()
     _com_github_qat_zstd()
@@ -185,7 +184,6 @@ def envoy_dependencies(skip_targets = []):
     _com_google_absl()
     _com_google_googletest()
     _com_google_protobuf()
-    _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
     _com_googlesource_chromium_base_trace_event_common()
@@ -210,23 +208,22 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("proxy_wasm_rust_sdk")
     _com_google_cel_cpp()
     _com_github_google_perfetto()
-    _utf8_range()
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
     external_http_archive("bazel_features")
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_examples")
+    external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
 
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
+
     external_http_archive(
         "aspect_bazel_lib",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
     )
 
     _com_github_fdio_vpp_vcl()
@@ -238,7 +235,6 @@ def envoy_dependencies(skip_targets = []):
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-
     _com_github_wamr()
     _com_github_wasmtime()
 
@@ -371,19 +367,6 @@ def _com_github_intel_ipp_crypto_crypto_mb():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _com_github_intel_ipp_crypto_crypto_mb_fips():
-    # Temporary fix for building ipp-crypto when boringssl-fips is used.
-    # Build will fail if bn2lebinpad patch is applied. Remove this archive
-    # when upstream dependency fixes this issue.
-    external_http_archive(
-        name = "com_github_intel_ipp_crypto_crypto_mb_fips",
-        patches = ["@envoy//bazel/foreign_cc:ipp-crypto-bn2lebinpad.patch"],
-        patch_args = ["-p1"],
-        build_file_content = BUILD_ALL_CONTENT,
-        # Use existing ipp-crypto repository location name to avoid redefinition.
-        location_name = "com_github_intel_ipp_crypto_crypto_mb",
-    )
-
 def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
@@ -457,8 +440,6 @@ def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
         name = "com_github_zlib_ng_zlib_ng",
         build_file_content = BUILD_ALL_CONTENT,
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:zlib_ng.patch"],
     )
 
 # Boost in general is not approved for Envoy use, and the header-only
@@ -550,7 +531,9 @@ def _io_vectorscan():
     )
 
 def _io_opentelemetry_api_cpp():
-    external_http_archive(name = "io_opentelemetry_cpp")
+    external_http_archive(
+        name = "io_opentelemetry_cpp",
+    )
 
 def _com_github_datadog_dd_trace_cpp():
     external_http_archive("com_github_datadog_dd_trace_cpp")
@@ -586,6 +569,10 @@ def _com_google_googletest():
         "com_google_googletest",
         patches = ["@envoy//bazel:googletest.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+            "@re2": "@com_googlesource_code_re2",
+        },
     )
 
 # TODO(jmarantz): replace the use of bind and external_deps with just
@@ -597,6 +584,7 @@ def _com_google_absl():
         name = "com_google_absl",
         patches = ["@envoy//bazel:abseil.patch"],
         patch_args = ["-p1"],
+        repo_mapping = {"@googletest": "@com_google_googletest"},
     )
 
     # keep these until jwt_verify_lib is updated.
@@ -692,29 +680,6 @@ def _com_google_protobuf():
         actual = "@com_google_protobuf//upb:reflection",
     )
 
-def _com_github_curl():
-    # The usage by AWS extensions common utilities is deprecated and will be removed by Q3 2024 after
-    # the deprecation period of 2 releases. Please DO NOT USE curl dependency for any new or existing extensions.
-    # See https://github.com/envoyproxy/envoy/issues/11816 & https://github.com/envoyproxy/envoy/pull/30731.
-    external_http_archive(
-        name = "com_github_curl",
-        build_file_content = BUILD_ALL_CONTENT + """
-cc_library(name = "curl", visibility = ["//visibility:public"], deps = ["@envoy//bazel/foreign_cc:curl"])
-""",
-        # Patch curl 7.74.0 and later due to CMake's problematic implementation of policy `CMP0091`
-        # and introduction of libidn2 dependency which is inconsistently available and must
-        # not be a dynamic dependency on linux.
-        # Upstream patches submitted: https://github.com/curl/curl/pull/6050 & 6362
-        # TODO(https://github.com/envoyproxy/envoy/issues/11816): This patch is obsoleted
-        # by elimination of the curl dependency.
-        patches = ["@envoy//bazel/foreign_cc:curl.patch"],
-        patch_args = ["-p1"],
-    )
-    native.bind(
-        name = "curl",
-        actual = "@envoy//bazel/foreign_cc:curl",
-    )
-
 def _v8():
     external_http_archive(
         name = "v8",
@@ -769,8 +734,7 @@ def _com_github_grpc_grpc():
         name = "com_github_grpc_grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
-        # Needed until grpc updates its naming (v1.62.0)
-        repo_mapping = {"@com_github_cncf_udpa": "@com_github_cncf_xds"},
+        repo_mapping = {"@openssl": "@boringssl"},
     )
     external_http_archive("build_bazel_rules_apple")
 
@@ -787,6 +751,7 @@ def _com_github_grpc_grpc():
         name = "libcrypto",
         actual = "//external:crypto",
     )
+
     native.bind(
         name = "cares",
         actual = "@envoy//bazel/foreign_cc:ares",
@@ -970,9 +935,6 @@ def _com_github_fdio_vpp_vcl():
         build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
     )
-
-def _utf8_range():
-    external_http_archive("utf8_range")
 
 def _rules_ruby():
     external_http_archive("rules_ruby")

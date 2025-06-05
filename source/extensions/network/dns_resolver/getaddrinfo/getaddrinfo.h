@@ -33,9 +33,7 @@ public:
   GetAddrInfoDnsResolver(
       const envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig&
           config,
-      Event::Dispatcher& dispatcher, Api::Api& api)
-      : config_(config), dispatcher_(dispatcher),
-        resolver_thread_(api.threadFactory().createThread([this] { resolveThreadRoutine(); })) {}
+      Event::Dispatcher& dispatcher, Api::Api& api);
 
   ~GetAddrInfoDnsResolver() override;
 
@@ -48,7 +46,8 @@ protected:
   class PendingQuery : public ActiveDnsQuery {
   public:
     PendingQuery(const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback)
-        : dns_name_(dns_name), dns_lookup_family_(dns_lookup_family), callback_(callback) {}
+        : dns_name_(dns_name), dns_lookup_family_(dns_lookup_family),
+          callback_(std::move(callback)) {}
 
     void cancel(CancelReason) override {
       ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
@@ -108,12 +107,13 @@ protected:
 
   envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig config_;
   Event::Dispatcher& dispatcher_;
+  Api::Api& api_;
   absl::Mutex mutex_;
   std::list<PendingQueryInfo> pending_queries_ ABSL_GUARDED_BY(mutex_);
   bool shutting_down_ ABSL_GUARDED_BY(mutex_){};
-  // The resolver thread must be initialized last so that the above members are already fully
+  // The resolvers thread must be initialized last so that the above members are already fully
   // initialized.
-  const Thread::ThreadPtr resolver_thread_;
+  std::vector<Thread::ThreadPtr> resolver_threads_;
 };
 
 // getaddrinfo DNS resolver factory
