@@ -124,7 +124,7 @@ ActiveDnsQuery* AppleDnsResolverImpl::resolve(const std::string& dns_name,
 
 ActiveDnsQuery* AppleDnsResolverImpl::resolveSrv(const std::string& dns_name ABSL_ATTRIBUTE_UNUSED,
                                                  ResolveCb callback ABSL_ATTRIBUTE_UNUSED) {
-  // TODO: implement me
+  ENVOT_LOG(error, "Apple DNS resolver does not support SRV records (not implemented)");
   return nullptr;
 }
 
