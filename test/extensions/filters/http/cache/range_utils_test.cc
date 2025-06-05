@@ -255,6 +255,8 @@ INSTANTIATE_TEST_SUITE_P(
                     "bytes=1-2,3-4-5",
                     "bytes=1-2,bytes=3-4",
                     "bytes=1-2,3-4,a",
+                    // negative length
+                    "bytes=2-1",
                     // too many byte ranges (test sets the limit as 5)
                     "bytes=0-1,1-2,2-3,3-4,4-5,5-6",
                     // UINT64_MAX-UINT64_MAX+1
