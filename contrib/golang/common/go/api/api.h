@@ -122,7 +122,8 @@ CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_l
 CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len,
                                             uint64_t* value_data, int* value_len);
 
-CAPIStatus envoyGoFilterHttpSetUpstreamOverrideHost(void* s, void* host_data, int host_len, bool strict);
+CAPIStatus envoyGoFilterHttpSetUpstreamOverrideHost(void* s, void* host_data, int host_len,
+                                                    bool strict);
 
 /* These APIs have nothing to do with request */
 void envoyGoFilterLog(uint32_t level, void* message_data, int message_len);
