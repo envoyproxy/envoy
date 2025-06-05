@@ -86,6 +86,28 @@ public:
 
 REGISTER_FACTORY(StrictDNSFactory, ClusterFactory);
 
+envoy::config::endpoint::v3::ClusterLoadAssignment
+DnsClusterImpl::extractAndProcessLoadAssignment(const envoy::config::cluster::v3::Cluster& cluster,
+                                                bool all_addresses_in_single_endpoint) {
+  // In Logical DNS we convert the priority set by the configuration back to zero.
+  // This helps ensure that we don't blow up later when using zone aware routing,
+  // as it only supports load assignments with priority 0.
+  //
+  // Since Logical DNS is limited to exactly one host declared per load_assignment
+  // (enforced in DnsClusterImpl::DnsClusterImpl), we can safely just rewrite the priority
+  // to zero.
+  if (all_addresses_in_single_endpoint) {
+    envoy::config::endpoint::v3::ClusterLoadAssignment converted;
+    converted.MergeFrom(cluster.load_assignment());
+    for (auto& endpoint : *converted.mutable_endpoints()) {
+      endpoint.set_priority(0);
+    }
+    return converted;
+  }
+
+  return cluster.load_assignment();
+}
+
 /**
  * DnsClusterImpl: implementation for both logical and strict DNS.
  */
@@ -108,7 +130,8 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
                                Network::DnsResolverSharedPtr dns_resolver,
                                absl::Status& creation_status)
     : BaseDynamicClusterImpl(cluster, context, creation_status),
-      load_assignment_(cluster.load_assignment()),
+      load_assignment_(
+          extractAndProcessLoadAssignment(cluster, dns_cluster.all_addresses_in_single_endpoint())),
       local_info_(context.serverFactoryContext().localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(dns_cluster, dns_refresh_rate, 5000))),
@@ -124,21 +147,33 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
 
-  if (all_addresses_in_single_endpoint_) {
+  if (all_addresses_in_single_endpoint_) { // Logical DNS
+    // For Logical DNS, we make sure we have just a single endpoint.
     if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
-      creation_status = absl::InvalidArgumentError(
-          "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+      if (cluster.has_load_assignment()) {
+        creation_status =
+            absl::InvalidArgumentError("Logical DNS clusters must have a single "
+                                       "locality_lb_endpoint and a single lb_endpoint");
+      } else {
+        creation_status =
+            absl::InvalidArgumentError("Logical DNS clusters must have at least a single host");
+      }
       return;
+    }
+  } else { // Strict DNS
+    for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
+      // Strict DNS clusters must ensure that the priority for all localities
+      // are set to zero when using zone-aware routing. Zone-aware routing only
+      // works for localities with priority zero (the highest).
+      const auto validation = validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
+      if (!validation.ok()) {
+        creation_status = validation;
+        return;
+      }
     }
   }
 
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-    const auto validation = validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
-    if (!all_addresses_in_single_endpoint_ && !validation.ok()) {
-      creation_status = validation;
-      return;
-    }
-
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
       if (!socket_address.resolver_name().empty()) {
@@ -216,10 +251,13 @@ DnsClusterImpl::ResolveTarget::~ResolveTarget() {
 bool DnsClusterImpl::ResolveTarget::isSuccessfulResponse(
     const std::list<Network::DnsResponse>& response,
     const Network::DnsResolver::ResolutionStatus& status) {
-  return status == Network::DnsResolver::ResolutionStatus::Completed &&
-         (!parent_.all_addresses_in_single_endpoint_ || /* strict DNS accepts empty responses */
-          (parent_.all_addresses_in_single_endpoint_ &&
-           !response.empty())); /* logical DNS doesn't */
+  if (parent_.all_addresses_in_single_endpoint_) {
+    // Logical DNS doesn't accept empty responses.
+    return status == Network::DnsResolver::ResolutionStatus::Completed && !response.empty();
+  } else {
+    // For Strict DNS, an empty response just means no available hosts.
+    return status == Network::DnsResolver::ResolutionStatus::Completed;
+  }
 }
 
 StatusOr<DnsClusterImpl::ResolveTarget::NewHosts>
@@ -277,6 +315,55 @@ DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
   return result;
 }
 
+void DnsClusterImpl::ResolveTarget::updateLogicalDnsHosts(
+    const std::list<Network::DnsResponse>& response, const NewHosts& new_hosts) {
+  Network::Address::InstanceConstSharedPtr primary_address =
+      Network::Utility::getAddressWithPort(*(response.front().addrInfo().address_), port_);
+  auto all_addresses = DnsUtils::generateAddressList(response, port_);
+  if (!logic_dns_cached_address_ ||
+      (*primary_address != *logic_dns_cached_address_ ||
+       DnsUtils::listChanged(logic_dns_cached_address_list_, all_addresses))) {
+    logic_dns_cached_address_ = primary_address;
+    logic_dns_cached_address_list_ = std::move(all_addresses);
+    ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+    const auto previous_hosts = hosts_;
+    if (!hosts_.empty()) {
+      hosts_[0] = new_hosts.hosts[0];
+    } else {
+      hosts_.push_back(new_hosts.hosts[0]);
+    }
+    // For logical DNS, we remove the unique logical host, and add the new one.
+    parent_.updateAllHosts(new_hosts.hosts, previous_hosts, locality_lb_endpoints_.priority());
+  }
+  // Note that we don't increment the update_no_rebuild_ counter when
+  // there's no change in the host for logical DNS. This keeps compatibility
+  // with the previous split implementation of logical and strict DNS.
+}
+
+void DnsClusterImpl::ResolveTarget::updateStrictDnsHosts(const NewHosts& new_hosts) {
+  HostVector hosts_added;
+  HostVector hosts_removed;
+  if (parent_.updateDynamicHostList(new_hosts.hosts, hosts_, hosts_added, hosts_removed, all_hosts_,
+                                    new_hosts.host_addresses)) {
+    ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+    ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
+      return host->priority() == locality_lb_endpoints_.priority();
+    }));
+
+    // Update host map for current resolve target.
+    for (const auto& host : hosts_removed) {
+      all_hosts_.erase(host->address()->asString());
+    }
+    for (const auto& host : hosts_added) {
+      all_hosts_.insert({host->address()->asString(), host});
+    }
+
+    parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoints_.priority());
+  } else {
+    parent_.info_->configUpdateStats().update_no_rebuild_.inc();
+  }
+}
+
 void DnsClusterImpl::ResolveTarget::startResolve() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
   parent_.info_->configUpdateStats().update_attempt_.inc();
@@ -295,7 +382,7 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
 
           StatusOr<NewHosts> new_hosts_or_error;
 
-          if (parent_.all_addresses_in_single_endpoint_ && !response.empty()) {
+          if (parent_.all_addresses_in_single_endpoint_) {
             new_hosts_or_error = createLogicalDnsHosts(response);
           } else {
             new_hosts_or_error = createStrictDnsHosts(response);
@@ -310,26 +397,10 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
 
           const auto& new_hosts = new_hosts_or_error.value();
 
-          HostVector hosts_added;
-          HostVector hosts_removed;
-          if (parent_.updateDynamicHostList(new_hosts.hosts, hosts_, hosts_added, hosts_removed,
-                                            all_hosts_, new_hosts.host_addresses)) {
-            ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
-            ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
-              return host->priority() == locality_lb_endpoints_.priority();
-            }));
-
-            // Update host map for current resolve target.
-            for (const auto& host : hosts_removed) {
-              all_hosts_.erase(host->address()->asString());
-            }
-            for (const auto& host : hosts_added) {
-              all_hosts_.insert({host->address()->asString(), host});
-            }
-
-            parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoints_.priority());
+          if (parent_.all_addresses_in_single_endpoint_) {
+            updateLogicalDnsHosts(response, new_hosts);
           } else {
-            parent_.info_->configUpdateStats().update_no_rebuild_.inc();
+            updateStrictDnsHosts(new_hosts);
           }
 
           // reset failure backoff strategy because there was a success.

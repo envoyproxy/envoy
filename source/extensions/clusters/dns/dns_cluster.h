@@ -64,6 +64,9 @@ private:
     };
     StatusOr<NewHosts> createLogicalDnsHosts(const std::list<Network::DnsResponse>& response);
     StatusOr<NewHosts> createStrictDnsHosts(const std::list<Network::DnsResponse>& response);
+    void updateLogicalDnsHosts(const std::list<Network::DnsResponse>& response,
+                               const NewHosts& new_hosts);
+    void updateStrictDnsHosts(const NewHosts& new_hosts);
 
     DnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
@@ -82,6 +85,15 @@ private:
     // 2) Cross-priority global host map may not be able to search for the expected host based on
     // the address.
     HostMap all_hosts_;
+
+    // These attributes are only used for logical DNS resolution. We use them to keep track of the
+    // previous responses, so we can check and update the hosts only when the DNS response changes.
+    // We cache those values here to avoid fetching them from the logical hosts, as that requires
+    // synchronization mechanisms.
+    Network::Address::InstanceConstSharedPtr logic_dns_cached_address_;
+    ;
+    std::vector<Network::Address::InstanceConstSharedPtr> logic_dns_cached_address_list_;
+    ;
   };
 
   using ResolveTargetPtr = std::unique_ptr<ResolveTarget>;
@@ -91,6 +103,10 @@ private:
 
   // ClusterImplBase
   void startPreInit() override;
+
+  static envoy::config::endpoint::v3::ClusterLoadAssignment
+  extractAndProcessLoadAssignment(const envoy::config::cluster::v3::Cluster& cluster,
+                                  bool all_addresses_in_single_endpoint);
 
   // Keep load assignment as a member to make sure its data referenced in
   // resolve_targets_ outlives them.
