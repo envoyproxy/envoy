@@ -1190,7 +1190,13 @@ TEST_P(LoadShedPointIntegrationTest, ConnectionPoolLoadShedWithExistingConnectio
             value: 0.90
     )EOF"));
 
+  updateResource(0.80);
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ(response1->headers().getStatusValue(), "200");
 
   updateResource(0.95);
   test_server_->waitForGaugeEq(
