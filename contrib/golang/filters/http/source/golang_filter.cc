@@ -1498,13 +1498,14 @@ CAPIStatus Filter::getSecret(const absl::string_view name, uint64_t* value_data,
   }
 }
 
-CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_view host, bool strict) {
+CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_view host,
+                                           bool strict) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
-  
+
   if (!state.isProcessingInGo()) {
     ENVOY_LOG(debug, "golang filter is not processing Go");
     return CAPIStatus::CAPINotInGo;

@@ -864,7 +864,9 @@ typed_config:
     cleanup();
   }
 
-  void testUpstreamOverrideHost(const std::string expected_status_code, const std::string expected_upstream_host, std::string path, bool strict, bool bad_host, bool invalid_host) {
+  void testUpstreamOverrideHost(const std::string expected_status_code,
+                                const std::string expected_upstream_host, std::string path,
+                                bool strict, bool bad_host, bool invalid_host) {
     initializeBasicFilter(BASIC);
 
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -874,7 +876,7 @@ typed_config:
     auto encoder_decoder = codec_client_->startRequest(request_headers);
     Http::RequestEncoder& request_encoder = encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    
+
     if (!bad_host) {
       codec_client_->sendData(request_encoder, "helloworld", true);
       if (!(invalid_host && strict)) {
@@ -886,14 +888,14 @@ typed_config:
 
     ASSERT_TRUE(response->waitForEndStream());
 
-
     EXPECT_EQ(expected_status_code, response->headers().getStatusValue());
     if (expected_upstream_host != "") {
-      EXPECT_TRUE(absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"), expected_upstream_host));
+      EXPECT_TRUE(absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"),
+                                    expected_upstream_host));
     }
 
     cleanup();
-}
+  }
 
   const std::string ECHO{"echo"};
   const std::string BASIC{"basic"};
@@ -1801,30 +1803,29 @@ TEST_P(GolangIntegrationTest, MissingSecretGoRoutine) {
   testSecrets("missing_secret", "", "404", "/async");
 }
 
-// Set a valid IP address 
+// Set a valid IP address
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost) {
-  const std::string host = GetParam() == Network::Address::IpVersion::v4 
-                         ? "127.0.0.1" 
-                         : "[::1]";
+  const std::string host = GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
   testUpstreamOverrideHost("200", host, "/test?upstreamOverrideHost=" + host, false, false, false);
 }
 
-// Set a non-IP address, 
+// Set a non-IP address,
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_BadHost) {
   testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost", false, true, false);
 }
 
 // Set a invalid IP address
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost) {
-  const std::string host = GetParam() == Network::Address::IpVersion::v4 
-                        ? "127.0.0.1" 
-                        : "[::1]";
-  testUpstreamOverrideHost("200", host, "/test?upstreamOverrideHost=200.0.0.1:8080", false, false, true);
+  const std::string host = GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  testUpstreamOverrideHost("200", host, "/test?upstreamOverrideHost=200.0.0.1:8080", false, false,
+                           true);
 }
 
 // Set a invalid IP address with strict mode
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
-  testUpstreamOverrideHost("503", "", "/test?upstreamOverrideHost=200.0.0.1:8080&upstreamOverrideHostStrict=true", true, false, true);
+  testUpstreamOverrideHost(
+      "503", "", "/test?upstreamOverrideHost=200.0.0.1:8080&upstreamOverrideHostStrict=true", true,
+      false, true);
 }
 
 } // namespace Envoy
