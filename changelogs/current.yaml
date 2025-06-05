@@ -81,7 +81,8 @@ bug_fixes:
 - area: tls
   change: |
     Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
-    chain. This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file`` to ``false``.
+    chain. This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file``
+    to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
