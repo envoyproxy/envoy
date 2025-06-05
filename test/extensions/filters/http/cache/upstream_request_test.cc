@@ -18,6 +18,9 @@ using testing::MockFunction;
 using testing::Pointee;
 
 class UpstreamRequestTest : public ::testing::Test {
+protected:
+  // Arbitrary buffer limit for testing.
+  virtual int bufferLimit() const { return 1024; }
   void SetUp() override {
     EXPECT_CALL(async_client_, start(_, _))
         .WillOnce([this](Http::AsyncClient::StreamCallbacks& callbacks,
@@ -27,7 +30,7 @@ class UpstreamRequestTest : public ::testing::Test {
         });
     EXPECT_CALL(http_stream_, sendHeaders(HeaderMapEqualRef(&request_headers_), true));
     Http::AsyncClient::StreamOptions options;
-    options.setBufferLimit(1024);
+    options.setBufferLimit(bufferLimit());
     EXPECT_CALL(dispatcher_, isThreadSafe())
         .Times(testing::AnyNumber())
         .WillRepeatedly(testing::Return(true));
@@ -231,6 +234,65 @@ TEST_F(UpstreamRequestTest, TrailersRequestedThenArrivedDeliversTrailers) {
   http_callbacks_->onTrailers(
       std::make_unique<Http::TestResponseTrailerMapImpl>(response_trailers_));
   http_callbacks_->onComplete();
+}
+
+TEST_F(UpstreamRequestTest, TrailersArrivedWhileExpectingMoreBodyDeliversNullBodyThenTrailers) {
+  MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
+  MockFunction<void(Http::ResponseTrailerMapPtr, EndStream)> trailer_cb;
+  EXPECT_CALL(body_cb, Call(IsNull(), EndStream::More));
+  upstream_request_->getBody(AdjustedByteRange{0, 5}, body_cb.AsStdFunction());
+  http_callbacks_->onTrailers(
+      std::make_unique<Http::TestResponseTrailerMapImpl>(response_trailers_));
+  testing::Mock::VerifyAndClearExpectations(&body_cb);
+  EXPECT_CALL(trailer_cb, Call(HeaderMapEqualIgnoreOrder(&response_trailers_), EndStream::End));
+  upstream_request_->getTrailers(trailer_cb.AsStdFunction());
+  http_callbacks_->onComplete();
+}
+
+TEST_F(UpstreamRequestTest, DestroyedWhileBodyBufferedCorrectsStats) {
+  Buffer::OwnedImpl data{"hello"};
+  EXPECT_CALL(stats_provider_->mock_stats_, addUpstreamBufferedBytes(data.length()));
+  EXPECT_CALL(http_stream_, reset());
+  EXPECT_CALL(stats_provider_->mock_stats_, subUpstreamBufferedBytes(data.length()));
+  http_callbacks_->onData(data, true);
+  upstream_request_.reset();
+}
+
+class UpstreamRequestWithRangeHeaderTest : public UpstreamRequestTest {
+protected:
+  void SetUp() override {
+    request_headers_.addCopy("range", "bytes=3-4");
+    UpstreamRequestTest::SetUp();
+  }
+};
+
+TEST_F(UpstreamRequestWithRangeHeaderTest, RangeHeaderSkipsToExpectedStreamPos) {
+  Buffer::OwnedImpl data{"lo"};
+  MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
+  upstream_request_->getBody(AdjustedByteRange{3, 5}, body_cb.AsStdFunction());
+  EXPECT_CALL(body_cb, Call(Pointee(BufferStringEqual("lo")), EndStream::End));
+  http_callbacks_->onData(data, true);
+  http_callbacks_->onComplete();
+}
+
+class UpstreamRequestWithSmallBuffersTest : public UpstreamRequestTest {
+protected:
+  int bufferLimit() const override { return 3; }
+};
+
+TEST_F(UpstreamRequestWithSmallBuffersTest, WatermarksPauseTheUpstream) {
+  Buffer::OwnedImpl data{"hello"};
+  MockFunction<void(Buffer::InstancePtr, EndStream)> body_cb;
+  // TODO(ravenblack): validate that onAboveHighWatermark actions
+  // are performed during onData, once it's possible to pause flow
+  // from upstream.
+  http_callbacks_->onData(data, true);
+  http_callbacks_->onComplete();
+  // TODO(ravenblack): validate that onBelowHighWatermark actions
+  // are performed during onData, once it's possible to pause flow
+  // from upstream.
+  EXPECT_CALL(body_cb, Call(Pointee(BufferStringEqual("hello")), EndStream::End));
+  upstream_request_->getBody(AdjustedByteRange{0, 5}, body_cb.AsStdFunction());
 }
 
 } // namespace
