@@ -61,6 +61,8 @@ type HttpCAPI interface {
 	HttpFinalize(r unsafe.Pointer, reason int)
 	HttpGetStringSecret(c unsafe.Pointer, key string) (string, bool)
 
+	HttpSetUpstreamOverrideHost(s unsafe.Pointer, host string, strict bool) error
+
 	/* These APIs are related to config, use the pointer of config. */
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32
 	HttpIncrementMetric(c unsafe.Pointer, metricId uint32, offset int64)

@@ -210,6 +210,15 @@ type FilterProcessCallbacks interface {
 
 type DecoderFilterCallbacks interface {
 	FilterProcessCallbacks
+	// Sets an upstream address override for the request. When the overridden host exists in the host list of the routed cluster
+	// and can be selected directly, the load balancer bypasses its algorithm and routes traffic directly to the specified host.
+	//
+	// The strict flag determines whether the HTTP request must strictly use the overridden destination.
+	// When the destination is unavailable/not-found, if strict is set to true, Envoy responds with a 503 Service Unavailable error;
+	// if strict is set to false, Envoy will fall back to its load balancing mechanism.
+	//
+	// Notice: host must be a valid IP address(with port).
+	SetUpstreamOverrideHost(host string, strict bool) error
 }
 
 type EncoderFilterCallbacks interface {
