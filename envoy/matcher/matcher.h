@@ -132,14 +132,6 @@ public:
 // - The match was completed, match found (isMatch() will return true, action() will return the
 //   ActionFactoryCb.)
 struct MatchResult {
-private:
-  struct InsufficientData {};
-  struct NoMatch {};
-  using Result = absl::variant<ActionFactoryCb, NoMatch, InsufficientData>;
-  Result result_;
-  MatchResult(NoMatch) : result_(NoMatch{}) {}
-  MatchResult(InsufficientData) : result_(InsufficientData{}) {}
-
 public:
   MatchResult(ActionFactoryCb cb) : result_(std::move(cb)) {}
   static MatchResult noMatch() { return MatchResult(NoMatch{}); }
@@ -150,6 +142,14 @@ public:
   bool isMatch() const { return absl::holds_alternative<ActionFactoryCb>(result_); }
   ActionFactoryCb actionFactory() const { return absl::get<ActionFactoryCb>(result_); }
   ActionPtr action() const { return actionFactory()(); }
+
+private:
+  struct InsufficientData {};
+  struct NoMatch {};
+  using Result = absl::variant<ActionFactoryCb, NoMatch, InsufficientData>;
+  Result result_;
+  MatchResult(NoMatch) : result_(NoMatch{}) {}
+  MatchResult(InsufficientData) : result_(InsufficientData{}) {}
 };
 
 // Callback to execute against skipped matches' actions.
