@@ -1064,12 +1064,31 @@ public:
   }
   std::string get_(const std::string& key) const { return get_(LowerCaseString(key)); }
   std::string get_(const LowerCaseString& key) const {
-    // TODO(mattklein123): Possibly allow getting additional headers beyond the first.
     auto headers = get(key);
     if (headers.empty()) {
       return EMPTY_STRING;
     } else {
       return std::string(headers[0]->value().getStringView());
+    }
+  }
+  std::vector<std::string> getAll(const LowerCaseString& key) const {
+    auto headerMap = get(key);
+    if (headerMap.empty()) {
+      return std::vector<std::string>{};
+    } else {
+      std::vector<std::string> headers{};
+      for (auto& header : headerMap) {
+        headers.push_back(std::string(header->value().getStringView()));
+      }
+      return headers;
+    }
+  }
+  std::string getNth(const LowerCaseString& key, size_t n) const {
+    auto headerResult = get(key);
+    if (headerResult.size() < n) {
+      return EMPTY_STRING;
+    } else {
+      return std::string(headerResult[n]->value().getStringView());
     }
   }
   bool has(const std::string& key) const { return !get(LowerCaseString(key)).empty(); }
