@@ -105,7 +105,7 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
   }
 
   // If no match tree is set, interpret as a skip.
-  if (!has_match_tree_) {
+  if (match_tree_ == nullptr) {
     skip_filter_ = true;
     match_tree_evaluated_ = true;
     return;
