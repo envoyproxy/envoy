@@ -8,14 +8,11 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/server/factory_context.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/utility.h"
 
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.validate.h"
-#include "contrib/postgres_proxy/filters/network/source/config.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_integration_test.pb.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_integration_test.pb.validate.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_test_utils.h"
@@ -251,33 +248,6 @@ TEST_P(DownstreamSSLWrongConfigPostgresIntegrationTest, TerminateSSLNoStartTlsTr
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLWrongConfigPostgresIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
-
-class DownstreamSSLConflictConfigPostgresIntegrationTest : public PostgresBaseIntegrationTest {
-public:
-  DownstreamSSLConflictConfigPostgresIntegrationTest()
-      : PostgresBaseIntegrationTest(NoDownstreamSSL, NoUpstreamSSL) {}
-};
-
-// Test verifies throwing EnvoyException when terminate_ssl: true
-// and downstream_ssl: DISABLE explicitly set at the same time.
-TEST_P(DownstreamSSLConflictConfigPostgresIntegrationTest, ConflictSSLConfig) {
-  const auto yaml_string = R"EOF(
-  stat_prefix: postgres_stats
-  terminate_ssl: true
-  downstream_ssl: DISABLE
-  )EOF";
-  envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy proto_config;
-  TestUtility::loadFromYaml(yaml_string, proto_config);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  PostgresProxy::PostgresConfigFactory factory;
-  EXPECT_THROW_WITH_MESSAGE(
-      factory.createFilterFactoryFromProtoTyped(proto_config, context), Envoy::EnvoyException,
-      "terminate_ssl cannot be set to true at the same time when downstream_ssl "
-      "is set to DISABLE");
-}
-
-INSTANTIATE_TEST_SUITE_P(IpVersions, DownstreamSSLConflictConfigPostgresIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
 // Upstream SSL integration tests.

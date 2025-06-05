@@ -21,6 +21,7 @@ class PostgresConfigFactory
 public:
   PostgresConfigFactory() : FactoryBase{NetworkFilterNames::get().PostgresProxy} {}
 
+private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy&
           proto_config,
