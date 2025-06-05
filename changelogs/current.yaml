@@ -74,6 +74,10 @@ bug_fixes:
   change: |
     Fixes a bug where the lifetime of the HttpConnectionManager's ActiveStream can be out of sync
     with the lifetime of the codec stream.
+- area: config_validation
+  change: |
+    Fixed an bug where the config validation server will crash when the configuration contains
+    ``%CEL%`` or ``%METADATA%`` substitution formatter.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
