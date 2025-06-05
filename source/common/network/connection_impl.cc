@@ -933,6 +933,7 @@ bool ConnectionImpl::setSocketOption(Network::SocketOptionName name, absl::strin
     return false;
   }
 
+  // Only add a sockopt if it's added successfully.
   auto sockopt = std::make_shared<SocketOptionImpl>(name, value);
   socket_->addOption(sockopt);
 

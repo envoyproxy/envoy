@@ -2598,9 +2598,7 @@ TEST_P(ConnectionImplTest, SetSocketOptionTest) {
   std::vector<uint8_t> expected_key;
   expected_opt.hashKey(expected_key);
 
-  EXPECT_TRUE(client_connection_->socketOptions());
   auto options = client_connection_->socketOptions();
-
   bool opt_found = false;
   for (const std::shared_ptr<const Socket::Option>& opt : *options) {
     std::vector<uint8_t> key;
@@ -2619,19 +2617,11 @@ TEST_P(ConnectionImplTest, SetSocketOptionTest) {
 TEST_P(ConnectionImplTest, SetSocketOptionFailedTest) {
   setUpBasicConnection();
   Envoy::Network::SocketOptionName sockopt_name =
-      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_DEBUG);
+      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_KEEPALIVE);
 
   int val = 1;
-  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
-
-  EXPECT_TRUE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
-
-  SocketOptionImpl expected_opt(sockopt_name, sockopt_val);
-  std::vector<uint8_t> expected_key;
-  expected_opt.hashKey(expected_key);
-
-  EXPECT_TRUE(client_connection_->socketOptions());
-  auto options = client_connection_->socketOptions();
+  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val) - 1};
+  EXPECT_FALSE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
 
   disconnect(false);
 }
