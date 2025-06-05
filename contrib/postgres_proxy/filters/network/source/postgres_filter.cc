@@ -72,7 +72,7 @@ DecoderPtr PostgresFilter::createDecoder(DecoderCallbacks* callbacks) {
   return std::make_unique<DecoderImpl>(callbacks);
 }
 
-EncoderPtr PostgresFilter::createEncoder() { return std::make_unique<EncoderImpl>(); }
+EncoderPtr PostgresFilter::createEncoder() { return std::make_unique<Encoder>(); }
 
 void PostgresFilter::incMessagesBackend() {
   config_->stats_.messages_.inc();

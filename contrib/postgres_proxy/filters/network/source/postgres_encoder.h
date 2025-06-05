@@ -12,9 +12,9 @@ namespace NetworkFilters {
 namespace PostgresProxy {
 
 // Postgres response encoder.
-class Encoder {
+class Encoder : Logger::Loggable<Logger::Id::filter> {
 public:
-  virtual ~Encoder() = default;
+  Encoder() = default;
 
   /**
    * Build a PostgreSQL error response buffer.
@@ -29,20 +29,11 @@ public:
    * https://www.postgresql.org/docs/current/errcodes-appendix.html
    * @return Buffer containing the response message
    */
-  virtual Envoy::Buffer::OwnedImpl buildErrorResponse(absl::string_view severity,
-                                                      absl::string_view message,
-                                                      absl::string_view code) PURE;
-};
-
-using EncoderPtr = std::unique_ptr<Encoder>;
-
-class EncoderImpl : public Encoder, Logger::Loggable<Logger::Id::filter> {
-public:
-  EncoderImpl() {}
-
   Envoy::Buffer::OwnedImpl buildErrorResponse(absl::string_view severity, absl::string_view message,
                                               absl::string_view code);
 };
+
+using EncoderPtr = std::unique_ptr<Encoder>;
 
 } // namespace PostgresProxy
 } // namespace NetworkFilters

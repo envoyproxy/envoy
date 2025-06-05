@@ -5,9 +5,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-Envoy::Buffer::OwnedImpl EncoderImpl::buildErrorResponse(absl::string_view severity,
-                                                         absl::string_view message,
-                                                         absl::string_view code) {
+Envoy::Buffer::OwnedImpl Encoder::buildErrorResponse(absl::string_view severity,
+                                                     absl::string_view message,
+                                                     absl::string_view code) {
   Buffer::OwnedImpl response;
   response.add("E");
   // Length of message contents in bytes, including self.

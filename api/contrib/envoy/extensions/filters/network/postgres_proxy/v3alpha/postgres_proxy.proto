@@ -35,9 +35,10 @@ message PostgresProxy {
     // accept the request for SSL connection, the session is terminated.
     REQUIRE = 1;
 
-    // If used in downstream ssl, the Postgres proxy filter will terminate SSL for encrypted traffic.
-    // It will pass unencrypted packets to upstream server.
-    // It is not supported in upstream SSL.
+    // If used in downstream ssl, the Postgres proxy filter will accept downstream
+    // client's encryption settings. If the client wants to use clear-text,
+    // Envoy will not enforce SSL encryption.
+    // If the client wants to use encryption, Envoy will terminate SSL.
     ALLOW = 2;
   }
 

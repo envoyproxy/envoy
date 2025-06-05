@@ -9,15 +9,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace PostgresProxy {
 
-class EncoderImplTest : public ::testing::Test {
+class EncoderTest : public ::testing::Test {
 public:
-  EncoderImplTest() { encoder_ = std::make_unique<EncoderImpl>(); }
+  EncoderTest() { encoder_ = std::make_unique<Encoder>(); }
 
 protected:
-  std::unique_ptr<EncoderImpl> encoder_;
+  std::unique_ptr<Encoder> encoder_;
 };
 
-TEST_F(EncoderImplTest, BuildErrorResponseProducesCorrectFormat) {
+TEST_F(EncoderTest, BuildErrorResponseProducesCorrectFormat) {
   const std::string severity = "FATAL";
   const std::string message = "some error";
   const std::string code = "01007";
