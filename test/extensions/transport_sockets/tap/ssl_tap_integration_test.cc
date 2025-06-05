@@ -86,13 +86,11 @@ public:
 
     // stats for both streaming and buffered trace
     if (pegging_counter_) {
-      socket_tap_config->set_pegging_counter(true);
       socket_tap_config->set_stats_prefix("tranTapPrefix");
     }
 
     // Only for buffered trace
     if (sending_tapped_msg_on_configured_size_) {
-      socket_tap_config->set_sending_tapped_msg_on_configured_size(true);
       socket_tap_config->mutable_min_buffered_bytes()->set_value(min_buffered_bytes_);
     }
     tap_config.mutable_transport_socket()->MergeFrom(inner_transport);

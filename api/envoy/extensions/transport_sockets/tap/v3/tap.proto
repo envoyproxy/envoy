@@ -38,28 +38,18 @@ message Tap {
 }
 
 // Additional configurations for the transport socket tap
-// [#next-free-field: 6]
 message SocketTapConfig {
   // Indicates to whether output the connection information per event
   // This is only applicable if the streamed trace is enabled
   bool set_connection_per_event = 1;
 
-  // Indicates whether pegging the tap counter is required.
-  bool pegging_counter = 2;
-
   // The contents of the transport tap's statistics prefix.
-  string stats_prefix = 3;
-
-  // Indicates whether sending the tapped messages for the buffer trace
-  // which is conditioned on the configured min_buffered_bytes bytes value.
-  // This is only applicable if the buffer trace is enabled.
-  bool sending_tapped_msg_on_configured_size = 4;
+  string stats_prefix = 2;
 
   // For buffer tracing, tapped messages are sent only on connection closure by default.
   // This is suitable for HTTP/1 but not for HTTP/2.
   // Tapped messages are sent based on the min_buffered_bytes threshold
-  // when sending_tapped_msg_on_configured_size is true.
-  // If the min_buffered_bytes is unspecified, the default is 9 bytes (min HTTP/2 frame size).
+  // If the min_buffered_bytes is specified, the min value is 9 bytes (min HTTP/2 frame size).
   // This is only applicable if the buffer trace is enabled.
-  google.protobuf.UInt32Value min_buffered_bytes = 5;
+  google.protobuf.UInt32Value min_buffered_bytes = 3;
 }

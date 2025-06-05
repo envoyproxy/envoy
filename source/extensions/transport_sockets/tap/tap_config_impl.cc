@@ -19,13 +19,7 @@ PerSocketTapperImpl::PerSocketTapperImpl(
     : config_(std::move(config)),
       sink_handle_(config_->createPerTapSinkHandleManager(connection.id())),
       connection_(connection), statuses_(config_->createMatchStatusVector()),
-      should_output_conn_info_per_event_(tap_config.set_connection_per_event()),
-      should_peg_counter_(tap_config.pegging_counter()),
-      should_sending_tapped_msg_on_configured_size_(
-          tap_config.sending_tapped_msg_on_configured_size()),
-      min_sending_buffered_bytes_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(tap_config, min_buffered_bytes, DefaultMinBufferedBytes)),
-      stats_(stats) {
+      should_output_conn_info_per_event_(tap_config.set_connection_per_event()), stats_(stats) {
   config_->rootMatcher().onNewStream(statuses_);
   if (config_->streaming() && config_->rootMatcher().matchStatus(statuses_).matches_) {
     // TODO(mattklein123): For IP client connections, local address will not be populated until
@@ -34,6 +28,11 @@ PerSocketTapperImpl::PerSocketTapperImpl(
     TapCommon::TraceWrapperPtr trace = makeTraceSegment();
     fillConnectionInfo(*trace->mutable_socket_streamed_trace_segment()->mutable_connection());
     sink_handle_->submitTrace(std::move(trace));
+  }
+  if (PROTOBUF_GET_OPTIONAL_WRAPPED(tap_config, min_buffered_bytes) != absl::nullopt) {
+    min_sending_buffered_bytes_ =
+        std::max(tap_config.min_buffered_bytes().value(), DefaultMinBufferedBytes);
+    should_sending_tapped_msg_on_configured_size_ = true;
   }
 }
 
@@ -48,9 +47,6 @@ void PerSocketTapperImpl::fillConnectionInfo(envoy::data::tap::v3::Connection& c
 }
 
 void PerSocketTapperImpl::pegCloseSubmitCounter(const bool isStreaming) {
-  if (!should_peg_counter_) {
-    return;
-  }
   if (isStreaming) {
     stats_.streamed_close_submit_.inc();
   } else {
@@ -98,9 +94,6 @@ void PerSocketTapperImpl::initStreamingEvent(envoy::data::tap::v3::SocketEvent& 
 }
 
 void PerSocketTapperImpl::pegReadWriteSubmitCounter(const bool isStreaming, const bool isRead) {
-  if (!should_peg_counter_) {
-    return;
-  }
   if (isStreaming) {
     if (isRead) {
       stats_.streamed_read_submit_.inc();

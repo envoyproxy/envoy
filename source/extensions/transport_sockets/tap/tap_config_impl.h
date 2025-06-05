@@ -58,10 +58,9 @@ private:
   uint32_t rx_bytes_buffered_{};
   uint32_t tx_bytes_buffered_{};
   const bool should_output_conn_info_per_event_{false};
-  const bool should_peg_counter_{false};
-  const bool should_sending_tapped_msg_on_configured_size_{false};
-  const uint32_t min_sending_buffered_bytes_{};
-  uint32_t current_buffered_rx_tx_bytes_{};
+  bool should_sending_tapped_msg_on_configured_size_{false};
+  uint32_t min_sending_buffered_bytes_{0};
+  uint32_t current_buffered_rx_tx_bytes_{0};
   const TransportTapStats stats_;
 };
 

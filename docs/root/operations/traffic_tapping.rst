@@ -86,8 +86,6 @@ Statistics
 The tap filter emits statistics within the ``transport.tap.<stat_prefix>`` namespace.
 To customize the prefix used in these statistics, configure the :ref:`stats_prefix
 <envoy_v3_api_field_extensions.transport_sockets.tap.v3.SocketTapConfig.stats_prefix>` field accordingly.
-As an optional enhancement, the emission of tap statistics is governed by the :ref:`pegging_counter
-<envoy_v3_api_field_extensions.transport_sockets.tap.v3.SocketTapConfig.pegging_counter>` flag.
 
 .. csv-table::
   :header: Name, Type, Description

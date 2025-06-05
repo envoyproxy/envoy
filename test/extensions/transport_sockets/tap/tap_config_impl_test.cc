@@ -82,13 +82,11 @@ public:
     TransportTapStats stats{
         ALL_TRANSPORT_TAP_STATS(POOL_COUNTER_PREFIX(*stats_store_.rootScope(), final_prefix))};
     if (pegging_counter_) {
-      tap_config_.set_pegging_counter(true);
       tap_config_.set_stats_prefix("tranTapPrefix");
     }
 
     // Only for buffered trace
     if (sending_tapped_msg_on_configured_size_) {
-      tap_config_.set_sending_tapped_msg_on_configured_size(true);
       tap_config_.mutable_min_buffered_bytes()->set_value(default_min_buffered_bytes_);
     }
 
