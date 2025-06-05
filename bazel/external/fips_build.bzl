@@ -2,6 +2,8 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 
 # Set up all the paths, flags, and deps, and then call the boringssl build
 BUILD_COMMAND = """
+set -eo pipefail
+
 # c++
 export CC=$(CC)
 # bazel doesnt expose CXX so we have to construct it (or use foreign_cc)
@@ -54,6 +56,8 @@ fi
 """
 
 NINJA_BUILD_COMMAND = """
+set -eo pipefail
+
 SRC_DIR=$$(dirname $(location @fips_ninja//:configure.py))
 OUT_FILE=$$(realpath $@)
 PYTHON_BIN=$$(realpath $(PYTHON3))
