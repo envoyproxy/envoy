@@ -1081,3 +1081,15 @@ config_setting(
         ":enable_liburing": "True",
     },
 )
+
+bool_flag(
+    name = "libc++",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "libc++_enabled",
+    flag_values = {
+        ":libc++": "True",
+    },
+)

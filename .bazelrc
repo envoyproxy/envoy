@@ -219,6 +219,7 @@ build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
+build:libc++ --//bazel:libc++=true
 build:clang-libc++ --config=libc++
 build:clang-libc++ --action_env=ARFLAGS=r
 build:arm64-clang-libc++ --config=clang-libc++
