@@ -222,6 +222,8 @@ private:
   void performUpstreamRequest() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   void onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
                          bool range_header_was_stripped) ABSL_LOCKS_EXCLUDED(mu_);
+  void onUncacheable(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
+                     bool range_header_was_stripped) ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   // For the unlikely case that cache config was modified while operations were in flight,
   // requests still in the lookup state are transformed to pass-through.
   // Requests for headers/body/trailers should be able to continue as the cache

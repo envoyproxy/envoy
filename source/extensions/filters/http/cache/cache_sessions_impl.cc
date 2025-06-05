@@ -734,6 +734,44 @@ void CacheSession::processSuccessfulValidation(Http::ResponseHeaderMapPtr header
   lookup_subscribers_.clear();
 }
 
+void CacheSession::onUncacheable(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
+                                 bool range_header_was_stripped) {
+  // If it turned out to be not cacheable, mark it as such, pass the already
+  // open connection to the first request, and give any other requests in flight
+  // a pass-through to upstream.
+  // If the upstream request stripped off a range header from the downstream
+  // request in order to populate the cache, we'll have to drop that upstream
+  // request and just issue a new request for every downstream.
+  mu_.AssertHeld();
+  state_ = State::NotCacheable;
+  bool use_existing_stream = !range_header_was_stripped;
+  if (!use_existing_stream) {
+    // Reset the upstream request if the request wanted a range and
+    // the upstream request didn't want a range.
+    upstream_request_ = nullptr;
+  }
+  for (LookupSubscriber& sub : lookup_subscribers_) {
+    sub.context_->setContentLength(content_length_header_);
+    if (use_existing_stream) {
+      ActiveLookupResultPtr result = std::make_unique<ActiveLookupResult>();
+      result->status_ = CacheEntryStatus::Uncacheable;
+      result->http_source_ = std::make_unique<UpstreamRequestWithHeadersPrepopulated>(
+          std::move(upstream_request_), std::move(headers), end_stream);
+      sub.dispatcher().post([result = std::move(result), cb = std::move(sub.callback_)]() mutable {
+        cb(std::move(result));
+      });
+      use_existing_stream = false;
+    } else {
+      postUpstreamPassThrough(std::move(sub), CacheEntryStatus::Uncacheable);
+    }
+  }
+  if (auto cache_sessions = cache_sessions_.lock()) {
+    cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
+  }
+  lookup_subscribers_.clear();
+  return;
+}
+
 void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStream end_stream,
                                      bool range_header_was_stripped) {
   absl::MutexLock lock(&mu_);
@@ -772,35 +810,17 @@ void CacheSession::onUpstreamHeaders(Http::ResponseHeaderMapPtr headers, EndStre
   } else {
     ASSERT(state_ == State::Pending, "should only get upstreamHeaders for Validating or Pending");
   }
-  // If it turned out to be not cacheable, mark it as such, pass the already
-  // open connection to the first request, and give any other requests in flight
-  // a pass-through to upstream. (If the original request stripped off a range
-  // header to populate the cache, we'll just drop that upstream request and
-  // issue a new requests for each downstream.)
   absl::string_view cl = headers->getContentLengthValue();
   if (!cl.empty()) {
     absl::SimpleAtoi(cl, &content_length_header_) || (content_length_header_ = 0);
   }
   if (!lookup_subscribers_.front().context_->lookup().isCacheableResponse(*headers)) {
-    state_ = State::NotCacheable;
-    for (LookupSubscriber& sub : lookup_subscribers_) {
-      sub.context_->setContentLength(content_length_header_);
-      if (!range_header_was_stripped && &sub == &lookup_subscribers_.front()) {
-        ActiveLookupResultPtr result = std::make_unique<ActiveLookupResult>();
-        result->status_ = CacheEntryStatus::Uncacheable;
-        result->http_source_ = std::make_unique<UpstreamRequestWithHeadersPrepopulated>(
-            std::move(upstream_request_), std::move(headers), end_stream);
-        sub.dispatcher().post([result = std::move(result),
-                               cb = std::move(sub.callback_)]() mutable { cb(std::move(result)); });
-      } else {
-        postUpstreamPassThrough(std::move(sub), CacheEntryStatus::Uncacheable);
-      }
-    }
-    if (auto cache_sessions = cache_sessions_.lock()) {
-      cache_sessions->stats().subCacheSessionsSubscribers(lookup_subscribers_.size());
-    }
-    lookup_subscribers_.clear();
-    return;
+    return onUncacheable(std::move(headers), end_stream, range_header_was_stripped);
+  }
+  if (VaryHeaderUtils::hasVary(*headers)) {
+    // TODO(ravenblack): implement Vary header support.
+    ENVOY_LOG(debug, "Vary header found in upstream response, treating as not cacheable");
+    return onUncacheable(std::move(headers), end_stream, range_header_was_stripped);
   }
   auto cache_sessions = cache_sessions_.lock();
   if (!cache_sessions) {
