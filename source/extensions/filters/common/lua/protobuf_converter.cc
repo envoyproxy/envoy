@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/lua/protobuf_converter.h"
 
+#include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -39,9 +40,7 @@ void pushLuaNumericValue(lua_State* state, const Protobuf::ReflectableMessage& m
     lua_pushnumber(state, reflection->GetFloat(*message, field));
     break;
   default:
-    // This should not happen, as we've already filtered for numeric types before calling
-    lua_pushnil(state);
-    break;
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 
@@ -128,8 +127,7 @@ void ProtobufConverterUtils::pushLuaValueFromField(lua_State* state,
     break;
 
   default:
-    lua_pushnil(state);
-    break;
+    PANIC_DUE_TO_CORRUPT_ENUM;
   }
 }
 
@@ -237,8 +235,7 @@ void ProtobufConverterUtils::pushLuaArrayFromRepeatedField(
       lua_pushnumber(state, reflection->GetRepeatedEnumValue(*message, field, i));
       break;
     default:
-      lua_pushnil(state);
-      break;
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
     lua_rawset(state, -3);
   }
