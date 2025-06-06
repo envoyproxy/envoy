@@ -5,7 +5,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
 
-// MessageTimeoutManager implementation
 MessageTimeoutManager::MessageTimeoutManager(NetworkExtProcFilter& filter,
                                              Event::Dispatcher& dispatcher)
     : filter_(filter), read_timer_(dispatcher.createTimer([this]() -> void { onTimeout(true); })),
@@ -212,13 +211,9 @@ void NetworkExtProcFilter::handleMessageTimeout(bool is_read) {
   ENVOY_CONN_LOG(warn, "{} message timeout occurred", read_callbacks_->connection(),
                  is_read ? "Read" : "Write");
 
-  // Increment timeout counter
   stats_.message_timeouts_.inc();
-
-  // Mark processing as complete
   processing_complete_ = true;
 
-  // Clear all pending flags
   read_pending_ = false;
   write_pending_ = false;
 
@@ -230,7 +225,6 @@ void NetworkExtProcFilter::handleMessageTimeout(bool is_read) {
     updateCloseCallbackStatus(false, false);
   }
 
-  // Close the stream and stop all timers
   closeStream();
 
   // Handle timeout based on failure mode
