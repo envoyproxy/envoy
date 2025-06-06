@@ -173,7 +173,7 @@ new_features:
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
 - area: socket
   change: |
-    Added ``network_namespace_filepath`` to ``SocketAddress``. Currently only used by listeners.
+    Added ``network_namespace_filepath`` to ``SocketAddress``.
 - area: rbac filter
   change: |
     allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
