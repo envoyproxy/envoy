@@ -126,7 +126,7 @@ protected:
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }
-      bool setSocketOption(Network::SocketOptionName, absl::string_view) override {
+      bool setSocketOption(Network::SocketOptionName, absl::Span<uint8_t>) override {
         IS_ENVOY_BUG("Unexpected function call");
         return false;
       }

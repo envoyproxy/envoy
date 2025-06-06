@@ -54,7 +54,7 @@ public:
   // Set up socket and start handshake.
   void connect() override;
 
-  bool setSocketOption(Envoy::Network::SocketOptionName, absl::string_view) override {
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
     return false;
   }
 

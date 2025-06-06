@@ -1191,7 +1191,7 @@ TEST_F(MultiConnectionBaseImplTest, SetSocketOptionTest) {
   Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
 
   int val = 1;
-  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
 
   EXPECT_TRUE(impl_->setSocketOption(sockopt_name, sockopt_val));
 }
@@ -1203,8 +1203,9 @@ TEST_F(MultiConnectionBaseImplTest, SetSocketOptionFailedTest) {
   EXPECT_CALL(*createdConnections()[0], setSocketOption(_, _)).WillOnce(Return(false));
 
   Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
+
   int val = 1;
-  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
 
   EXPECT_FALSE(impl_->setSocketOption(sockopt_name, sockopt_val));
 }

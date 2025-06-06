@@ -921,12 +921,9 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
-bool ConnectionImpl::setSocketOption(Network::SocketOptionName name, absl::string_view value) {
-  const std::vector<uint8_t, Memory::AlignedAllocator<uint8_t, alignof(void*)>> val_ptr(
-      value.begin(), value.end());
-
+bool ConnectionImpl::setSocketOption(Network::SocketOptionName name, absl::Span<uint8_t> value) {
   Api::SysCallIntResult result =
-      SocketOptionImpl::setSocketOption(*socket_, name, val_ptr.data(), val_ptr.size());
+      SocketOptionImpl::setSocketOption(*socket_, name, value.data(), value.size());
   if (result.return_value_ != 0) {
     ENVOY_LOG(warn, "Setting option on socket failed, errno: {}, message: {}", result.errno_,
               errorDetails(result.errno_));
@@ -934,7 +931,8 @@ bool ConnectionImpl::setSocketOption(Network::SocketOptionName name, absl::strin
   }
 
   // Only add a sockopt if it's added successfully.
-  auto sockopt = std::make_shared<SocketOptionImpl>(name, value);
+  auto sockopt = std::make_shared<SocketOptionImpl>(
+      name, absl::string_view(reinterpret_cast<const char*>(value.data()), value.size()));
   socket_->addOption(sockopt);
 
   return true;

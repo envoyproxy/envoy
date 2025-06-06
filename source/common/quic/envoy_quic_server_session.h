@@ -99,7 +99,7 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
-  bool setSocketOption(Envoy::Network::SocketOptionName, absl::string_view) override {
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
     return false;
   }
 

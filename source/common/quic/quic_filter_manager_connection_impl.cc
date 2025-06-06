@@ -62,7 +62,7 @@ bool QuicFilterManagerConnectionImpl::isHalfCloseEnabled() const {
 }
 
 bool QuicFilterManagerConnectionImpl::setSocketOption(Envoy::Network::SocketOptionName,
-                                                      absl::string_view) {
+                                                      absl::Span<uint8_t>) {
   return false;
 }
 

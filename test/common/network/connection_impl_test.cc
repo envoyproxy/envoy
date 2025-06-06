@@ -2594,11 +2594,11 @@ TEST_P(ConnectionImplTest, SetSocketOptionTest) {
     Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
 
     int val = 1;
-    absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
-
+    absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
     EXPECT_TRUE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
 
-    SocketOptionImpl expected_opt(sockopt_name, sockopt_val);
+    absl::string_view sockopt_str{reinterpret_cast<char*>(&val), sizeof(val)};
+    SocketOptionImpl expected_opt(sockopt_name, sockopt_str);
     std::vector<uint8_t> expected_key;
     expected_opt.hashKey(expected_key);
 
@@ -2630,8 +2630,7 @@ TEST_P(ConnectionImplTest, SetSocketOptionFailedTest) {
     Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
 
     int val = 1;
-    absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
-
+    absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
     EXPECT_FALSE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
   }
 
