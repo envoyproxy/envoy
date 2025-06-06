@@ -10,6 +10,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/stream_info/mocks.h"
+#include "envoy/network/socket.h"
 
 using testing::Return;
 using testing::ReturnRef;
@@ -1180,6 +1181,32 @@ TEST_F(MultiConnectionBaseImplTest, LastRoundTripTime) {
   absl::optional<std::chrono::milliseconds> rtt = std::chrono::milliseconds(5);
   EXPECT_CALL(*createdConnections()[0], lastRoundTripTime()).WillOnce(Return(rtt));
   EXPECT_EQ(rtt, impl_->lastRoundTripTime());
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetSocketOptionTest) {
+  setupMultiConnectionImpl(2);
+  connectFirstAttempt();
+  EXPECT_CALL(*createdConnections()[0], setSocketOption(_, _)).WillOnce(Return(true));
+
+  Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
+
+  int val = 1;
+  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
+
+  EXPECT_TRUE(impl_->setSocketOption(sockopt_name, sockopt_val));
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetSocketOptionFailedTest) {
+  setupMultiConnectionImpl(2);
+  connectFirstAttempt();
+
+  EXPECT_CALL(*createdConnections()[0], setSocketOption(_, _)).WillOnce(Return(false));
+
+  Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
+  int val = 1;
+  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
+
+  EXPECT_FALSE(impl_->setSocketOption(sockopt_name, sockopt_val));
 }
 
 } // namespace Network

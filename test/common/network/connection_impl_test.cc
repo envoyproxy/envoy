@@ -2586,42 +2586,54 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
 TEST_P(ConnectionImplTest, SetSocketOptionTest) {
   setUpBasicConnection();
 
-  Envoy::Network::SocketOptionName sockopt_name =
-      ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_TCP, TCP_KEEPIDLE);
+  {
+    Api::MockOsSysCalls os_sys_calls_;
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, 1, 2, _, sizeof(int))).WillOnce(Return(0));
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
 
-  int val = 1;
-  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
+    Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
 
-  EXPECT_TRUE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
+    int val = 1;
+    absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
 
-  SocketOptionImpl expected_opt(sockopt_name, sockopt_val);
-  std::vector<uint8_t> expected_key;
-  expected_opt.hashKey(expected_key);
+    EXPECT_TRUE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
 
-  auto options = client_connection_->socketOptions();
-  bool opt_found = false;
-  for (const std::shared_ptr<const Socket::Option>& opt : *options) {
-    std::vector<uint8_t> key;
-    opt->hashKey(key);
-    EXPECT_EQ(key, expected_key);
-    if (key == expected_key) {
-      opt_found = true;
+    SocketOptionImpl expected_opt(sockopt_name, sockopt_val);
+    std::vector<uint8_t> expected_key;
+    expected_opt.hashKey(expected_key);
+
+    auto options = client_connection_->socketOptions();
+    bool opt_found = false;
+    for (const std::shared_ptr<const Socket::Option>& opt : *options) {
+      std::vector<uint8_t> key;
+      opt->hashKey(key);
+      EXPECT_EQ(key, expected_key);
+      if (key == expected_key) {
+        opt_found = true;
+      }
     }
-  }
 
-  EXPECT_TRUE(opt_found);
+    EXPECT_TRUE(opt_found);
+  }
 
   disconnect(false);
 }
 
 TEST_P(ConnectionImplTest, SetSocketOptionFailedTest) {
   setUpBasicConnection();
-  Envoy::Network::SocketOptionName sockopt_name =
-      ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_KEEPALIVE);
 
-  int val = 1;
-  absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val) - 1};
-  EXPECT_FALSE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
+  {
+    Api::MockOsSysCalls os_sys_calls_;
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, 1, 2, _, sizeof(int))).WillOnce(Return(1));
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+
+    Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
+
+    int val = 1;
+    absl::string_view sockopt_val{reinterpret_cast<char*>(&val), sizeof(val)};
+
+    EXPECT_FALSE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
+  }
 
   disconnect(false);
 }
