@@ -34,3 +34,15 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
+
+envoy_cc_library(
+    name = "protobuf_converter_lib",
+    srcs = ["protobuf_converter.cc"],
+    hdrs = ["protobuf_converter.h"],
+    deps = [
+        "//bazel/foreign_cc:luajit",
+        "//source/common/protobuf",
+        "//source/common/protobuf:create_reflectable_message_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)

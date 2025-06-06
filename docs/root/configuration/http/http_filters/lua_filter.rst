@@ -987,6 +987,99 @@ Connection stream info object API
 
 .. include:: ../../../_include/lua_common.rst
 
+``dynamicTypedMetadata()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  connectionStreamInfo:dynamicTypedMetadata(filterName)
+
+Returns dynamic metadata for a given filter name. Dynamic metadata provides type-safe access to metadata values that are stored as protocol buffer messages. This is particularly useful when working with filters that store structured data.
+
+*filterName* is a string that supplies the filter name, e.g. *envoy.lb*. Returns a Lua table containing the unpacked protocol buffer message. Returns nil if no dynamic metadata exists for the given filter name or if the metadata cannot be unpacked.
+
+**Type Conversion Details:**
+The following rules apply when converting protocol buffer messages into Lua tables:
+
+- Repeated fields are converted to Lua arrays (1-based indexing).
+- Map fields become Lua tables with string keys.
+- Enums are represented as their numeric values.
+- Byte fields are translated to Lua strings.
+- Nested messages are converted to nested tables.
+- Optional fields that are not set are returned as nil.
+
+**Error Handling:**
+This method ensures type-safe access to metadata but returns nil in the following scenarios:
+
+- If the specified filter name does not exist. For example, trying to access
+  ``dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")`` when the proxy protocol filter isn't configured.
+- If the metadata exists but cannot be unpacked. It could happen if the filter state exists but is stored as a different
+  type than ``ProtobufWkt::Struct``.
+- If the protocol buffer message is malformed. It could happen when the data in the filter state is corrupted or
+  partially written.
+
+**Common Use Cases:**
+
+1. Accessing Proxy Protocol Metadata:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Access proxy protocol typed metadata
+    local typed_meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
+
+    -- Check if metadata exists
+    if typed_meta then
+      -- Access specific TLV values
+      local tlv_type_authority = typed_meta.typed_metadata.tlv_type_authority  -- Authority identifier from proxy protocol TLV
+      local tlv_value = typed_meta.typed_metadata.tlv_value                    -- Value from the proxy protocol TLV data
+
+      request_handle:logInfo(string.format("TLV Authority: %s, Value: %s", tlv_type_authority or "none", tlv_value or "none"))
+    else
+      request_handle:logInfo("No proxy protocol metadata available")
+    end
+  end
+
+2. Working with Custom Filter Metadata:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local metadata = request_handle:connectionStreamInfo():dynamicTypedMetadata("custom.filter")
+
+    -- Check if metadata exists before accessing
+    if metadata then
+      -- Safely access potentially nested fields
+      if metadata.config then
+        -- Access nested configuration
+        if metadata.config.rules then
+          for _, rule in ipairs(metadata.config.rules) do
+            if rule.name and rule.value then
+              request_handle:logInfo(string.format("Rule: %s = %s", rule.name, rule.value))
+            end
+          end
+        end
+
+        -- Access map fields
+        if metadata.config.properties then
+          for key, value in pairs(metadata.config.properties) do
+            request_handle:logInfo(string.format("Property: %s = %s", key, value))
+          end
+        end
+      end
+    else
+      request_handle:logInfo("No metadata available for custom.filter")
+    end
+  end
+
+**Limitations:**
+
+1. Dynamic metadata is read-only and cannot be modified through this API
+2. Raw protobuf message structure cannot be accessed directly
+3. Extension types or unknown fields cannot be accessed through this API
+4. Map keys must be strings or integers
+5. Some protocol buffer features (like Any messages) may not be fully supported
+
 ``dynamicMetadata()``
 ^^^^^^^^^^^^^^^^^^^^^
 
