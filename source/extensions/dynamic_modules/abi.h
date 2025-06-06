@@ -129,8 +129,8 @@ typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
  * DynamicModuleHttpFilterScheduler class in Envoy.
  *
  * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
- * lifetime of the pointer. Notably, it must be explicitly committed and destroyed by the module
- * when scheduling the HTTP filter event. The creation of this pointer is done by
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the HTTP filter event is done. The creation of this pointer is done by
  * envoy_dynamic_module_callback_http_filter_scheduler_new and the scheduling and destruction is
  * done by envoy_dynamic_module_callback_http_filter_scheduler_delete. Since its lifecycle is
  * owned/managed by the module, this has _module_ptr suffix.

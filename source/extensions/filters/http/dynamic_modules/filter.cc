@@ -134,7 +134,6 @@ void DynamicModuleHttpFilter::sendLocalReply(
     const absl::optional<Grpc::Status::GrpcStatus> grpc_status, absl::string_view details) {
   decoder_callbacks_->sendLocalReply(code, body, modify_headers, grpc_status, details);
   sent_local_reply_ = true;
-  printf("bbbbbbbbbbbbb");
 }
 
 void DynamicModuleHttpFilter::encodeComplete() {};
