@@ -83,8 +83,8 @@ matcher_tree:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   auto match_tree = factory_.create(matcher);
 
-  MaybeMatchResult result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(result, HasResult(IsStringAction("expected!")));
+  MatchResult result = evaluateMatch(*match_tree(), TestData());
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestPrefixMatcher) {
@@ -130,8 +130,8 @@ matcher_tree:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   auto match_tree = factory_.create(matcher);
 
-  const MaybeMatchResult result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(result, HasResult(IsStringAction("expected!")));
+  MatchResult result = evaluateMatch(*match_tree(), TestData());
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestPrefixMatcherWithRetryInnerMissPerformsOuterOnNoMatch) {
@@ -532,8 +532,8 @@ on_no_match:
 
   auto match_tree = factory_.create(matcher);
 
-  MaybeMatchResult result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(result, HasResult(IsStringAction("expected!")));
+  MatchResult result = evaluateMatch(*match_tree(), TestData());
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, CustomGenericInput) {
@@ -564,8 +564,8 @@ matcher_list:
   auto common_input_factory = TestCommonProtocolInputFactory("generic", "foo");
   auto match_tree = factory_.create(matcher);
 
-  MaybeMatchResult result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(result, HasResult(IsStringAction("expected!")));
+  MatchResult result = evaluateMatch(*match_tree(), TestData());
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, CustomMatcher) {
@@ -607,8 +607,8 @@ matcher_list:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.BoolValue"));
   auto match_tree = factory_.create(matcher);
 
-  MaybeMatchResult result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(result, HasResult(IsStringAction("expected!")));
+  MatchResult result = evaluateMatch(*match_tree(), TestData());
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestAndMatcher) {
@@ -664,8 +664,8 @@ matcher_tree:
       .Times(2);
   auto match_tree = factory_.create(matcher);
 
-  MaybeMatchResult result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(result, HasResult(IsStringAction("expected!")));
+  MatchResult result = evaluateMatch(*match_tree(), TestData());
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestOrMatcher) {
@@ -721,8 +721,8 @@ matcher_tree:
       .Times(2);
   auto match_tree = factory_.create(matcher);
 
-  MaybeMatchResult result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(result, HasResult(IsStringAction("expected!")));
+  MatchResult result = evaluateMatch(*match_tree(), TestData());
+  EXPECT_THAT(result, HasStringAction("expected!"));
 }
 
 TEST_F(MatcherTest, TestNotMatcher) {
@@ -758,8 +758,8 @@ matcher_list:
               performDataInputValidation(_, "type.googleapis.com/google.protobuf.StringValue"));
   auto match_tree = factory_.create(matcher);
 
-  MaybeMatchResult result = evaluateMatch(*match_tree(), TestData());
-  EXPECT_THAT(result, HasNoMatchResult());
+  MatchResult result = evaluateMatch(*match_tree(), TestData());
+  EXPECT_THAT(result, HasNoMatch());
 }
 
 TEST_F(MatcherTest, TestRecursiveMatcher) {
@@ -818,8 +818,8 @@ TEST_F(MatcherTest, RecursiveMatcherNoMatch) {
   matcher.addMatcher(createSingleMatcher(absl::nullopt, [](auto) { return false; }),
                      stringOnMatch<TestData>("match"));
 
-  const auto recursive_result = evaluateMatch(matcher, TestData());
-  EXPECT_THAT(recursive_result, HasNoMatchResult());
+  MatchResult recursive_result = evaluateMatch(matcher, TestData());
+  EXPECT_THAT(recursive_result, HasNoMatch());
 }
 
 TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
@@ -830,8 +830,8 @@ TEST_F(MatcherTest, RecursiveMatcherCannotMatch) {
                          DataInputGetResult::DataAvailability::NotAvailable),
                      stringOnMatch<TestData>("match"));
 
-  const auto recursive_result = evaluateMatch(matcher, TestData());
-  EXPECT_THAT(recursive_result, HasFailureResult());
+  MatchResult recursive_result = evaluateMatch(matcher, TestData());
+  EXPECT_THAT(recursive_result, HasInsufficientData());
 }
 
 // Parameterized to test both xDS and Envoy Matcher APIs for new features.
@@ -908,11 +908,11 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingSupportInEvaluation) {
   std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
 
   std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
   const auto result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
-  EXPECT_THAT(result, HasResult(IsStringAction("on-no-match")));
+  EXPECT_THAT(result, HasStringAction("on-no-match"));
   EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("keep-matching")));
 }
 
@@ -1021,11 +1021,11 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithRecursiveMatcher) {
   // Expect the nested matchers with keep_matching to be skipped and also the top-level
   // keep_matching setting to skip the result of the first sub-matcher.
   std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
-  MaybeMatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
-  EXPECT_THAT(result, HasResult(IsStringAction(("nested-match-2"))));
+  MatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
+  EXPECT_THAT(result, HasStringAction(("nested-match-2")));
   EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("nested-keep-matching-1"),
                                            IsStringAction("on-no-match-nested-1"),
                                            IsStringAction("nested-keep-matching-2")));
@@ -1057,11 +1057,11 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
   std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
 
   std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
-  MaybeMatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
-  EXPECT_THAT(result, HasNoMatchResult());
+  MatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
+  EXPECT_THAT(result, HasNoMatch());
   EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("keep matching")));
 }
 
@@ -1135,11 +1135,11 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithFailingNestedMatcher) {
 
   // Expect re-entry to fail due to the nested matcher.
   std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
-  MaybeMatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
-  EXPECT_THAT(result, HasFailureResult());
+  MatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
+  EXPECT_THAT(result, HasInsufficientData());
   EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("match")));
 }
 

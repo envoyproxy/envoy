@@ -569,12 +569,12 @@ const Network::FilterChain*
 FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
                                                     const StreamInfo::StreamInfo& info) const {
   Network::Matching::MatchingDataImpl data(socket, info.filterState(), info.dynamicMetadata());
-  const auto& match_result = Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
-  ASSERT(match_result.match_state_ == Matcher::MatchState::MatchComplete,
-         "Matching must complete for network streams.");
-  if (match_result.result_) {
-    const auto result = match_result.result_();
-    return result->getTyped<Configuration::FilterChainBaseAction>().get(filter_chains_by_name_,
+  const Matcher::MatchResult match_result =
+      Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
+  ASSERT(match_result.isComplete(), "Matching must complete for network streams.");
+  if (match_result.isMatch()) {
+    const Matcher::ActionPtr action = match_result.action();
+    return action->getTyped<Configuration::FilterChainBaseAction>().get(filter_chains_by_name_,
                                                                         info);
   }
   return default_filter_chain_.get();
