@@ -2,6 +2,7 @@
 
 #include "envoy/stream_info/filter_state.h"
 
+#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -16,15 +17,25 @@ class OverrideHostFilterState : public StreamInfo::FilterState::Object {
 public:
   static constexpr absl::string_view kFilterStateKey =
       "envoy.extensions.load_balancing_policies.override_host.filter_state";
-  OverrideHostFilterState() = default;
 
-  uint64_t fallbackHostIndex() const { return fallback_host_index_; }
-  void setFallbackHostIndex(uint64_t fallback_host_index) {
-    fallback_host_index_ = fallback_host_index;
+  OverrideHostFilterState(std::vector<std::string>&& host_list)
+      : host_list_(std::move(host_list)) {}
+  bool empty() const { return host_list_.empty(); }
+
+  /**
+   * @return consume next valid host from the list of selected hosts.
+   * Empty string view is returned if there are no more hosts.
+   */
+  absl::string_view consumeNextHost() {
+    if (host_index_ >= host_list_.size()) {
+      return {};
+    }
+    return host_list_[host_index_++];
   }
 
 private:
-  uint64_t fallback_host_index_ = 1;
+  const std::vector<std::string> host_list_;
+  uint64_t host_index_ = 0;
 };
 
 } // namespace OverrideHost

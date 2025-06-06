@@ -32,14 +32,17 @@ protected:
                   absl::optional<OnMatch<DataType>> on_no_match, absl::Status& creation_status)
       : MapMatcher<DataType>(std::move(data_input), std::move(on_no_match), creation_status) {}
 
-  typename MatchTree<DataType>::MatchResult doMatch(const DataType&, absl::string_view key,
-                                                    SkippedMatchCb<DataType>) override {
+  MatchResult doMatch(const DataType& data, absl::string_view key,
+                      SkippedMatchCb skipped_match_cb) override {
     const auto itr = children_.find(key);
     if (itr != children_.end()) {
-      return {MatchState::MatchComplete, itr->second};
+      MatchResult result =
+          MatchTree<DataType>::handleRecursionAndSkips(itr->second, data, skipped_match_cb);
+      if (!result.isNoMatch()) {
+        return result;
+      }
     }
-
-    return {MatchState::MatchComplete, absl::nullopt};
+    return this->doNoMatch(data, skipped_match_cb);
   }
 
 private:
