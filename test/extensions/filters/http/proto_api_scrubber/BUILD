@@ -32,3 +32,20 @@ envoy_cc_test(
         "@com_github_cncf_xds//xds/type/matcher/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "filter_test",
+    srcs = ["filter_test.cc"],
+    data = ["//test/proto:apikeys_proto_descriptor"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/filters/http/proto_api_scrubber:filter",
+        "//test/extensions/filters/http/grpc_field_extraction/message_converter:message_converter_test_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/proto:apikeys_proto_cc_proto",
+        "//test/proto:bookstore_proto_cc_proto",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
