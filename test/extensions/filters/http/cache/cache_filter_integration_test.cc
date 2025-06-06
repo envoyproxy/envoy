@@ -36,8 +36,11 @@ public:
   }
 
   void TearDown() override {
+    std::cerr << "XXXXX TearDown" << std::endl;
     cleanupUpstreamAndDownstream();
+    std::cerr << "XXXXX MidTearDown" << std::endl;
     HttpProtocolIntegrationTest::TearDown();
+    std::cerr << "XXXXX /TearDown" << std::endl;
   }
 
   void initializeFilter(const std::string& config) {
@@ -497,7 +500,7 @@ TEST_P(CacheIntegrationTest, TemporarilyUncacheableEventuallyCaches) {
   }
   // Send third request, and get cacheable 200 response from upstream, it should be cached this
   // time.
-
+  std::cerr << "XXXXX Part 3" << std::endl;
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers,
@@ -506,8 +509,11 @@ TEST_P(CacheIntegrationTest, TemporarilyUncacheableEventuallyCaches) {
     EXPECT_THAT(response_decoder->body(), Eq(response_body));
     EXPECT_THAT(response_decoder->trailers(), Pointee(IsSupersetOfHeaders(response_trailers)));
     // Advance time to force a log flush.
+    std::cerr << "XXXXX advanceTimeWait" << std::endl;
     simTime().advanceTimeWait(Seconds(1));
+    std::cerr << "XXXXX waitForAccessLog" << std::endl;
     EXPECT_THAT(waitForAccessLog(access_log_name_, 2), HasSubstr("cache.insert_via_upstream"));
+    std::cerr << "XXXXX /waitForAccessLog" << std::endl;
   }
 }
 
@@ -613,6 +619,7 @@ TEST_P(CacheIntegrationTest, GetRequestWithResponseTrailers) {
   const Http::TestResponseTrailerMapImpl response_trailers{{"response1", "trailer1"},
                                                            {"response2", "trailer2"}};
   // Send GET request, receive a response from upstream, cache it
+  std::cerr << "XXXXX A" << std::endl;
   {
     IntegrationStreamDecoderPtr response_decoder = sendHeaderOnlyRequestAwaitResponse(
         request_headers, simulateUpstreamResponse(response_headers, makeOptRef(response_body),
@@ -621,11 +628,15 @@ TEST_P(CacheIntegrationTest, GetRequestWithResponseTrailers) {
     EXPECT_EQ(response_decoder->headers().get(Http::CustomHeaders::get().Age).size(), 0);
     EXPECT_EQ(response_decoder->body(), response_body);
     EXPECT_THAT(response_decoder->trailers(), Pointee(IsSupersetOfHeaders(response_trailers)));
+    std::cerr << "XXXXX B" << std::endl;
     EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("via_upstream"));
+    std::cerr << "XXXXX C" << std::endl;
   }
+  std::cerr << "XXXXX D" << std::endl;
 
   // Advance time, to verify the original date header is preserved.
   simTime().advanceTimeWait(Seconds(10));
+  std::cerr << "XXXXX E" << std::endl;
   // Send second request, and get response from cache.
   {
     IntegrationStreamDecoderPtr response_decoder =
@@ -635,10 +646,14 @@ TEST_P(CacheIntegrationTest, GetRequestWithResponseTrailers) {
                 HeaderHasValueRef(Http::CustomHeaders::get().Age, "10"));
     EXPECT_EQ(response_decoder->body(), response_body);
     EXPECT_THAT(response_decoder->trailers(), Pointee(IsSupersetOfHeaders(response_trailers)));
+    std::cerr << "XXXXX F" << std::endl;
     simTime().advanceTimeWait(Seconds(1));
+    std::cerr << "XXXXX G" << std::endl;
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
                 HasSubstr("RFCF cache.response_from_cache_filter"));
+    std::cerr << "XXXXX H" << std::endl;
   }
+  std::cerr << "XXXXX I" << std::endl;
 }
 
 TEST_P(CacheIntegrationTest, ServeHeadRequest) {
