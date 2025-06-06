@@ -25,8 +25,6 @@ public:
       const std::shared_ptr<const CacheFilterStatsProvider> stats_provider_,
       bool ignore_request_cache_control_header);
 
-  const RequestCacheControl& requestCacheControl() const { return request_cache_control_; }
-
   // Caches may modify the key according to local needs, though care must be
   // taken to ensure that meaningfully distinct responses have distinct keys.
   const Key& key() const { return key_; }
