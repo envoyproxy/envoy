@@ -32,6 +32,8 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       cluster_name: String::from_utf8(config.to_owned()).unwrap(),
     })),
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
+    "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
+    "fake_external_cache" => Some(Box::new(FakeExternalCachingFilterConfig {})),
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -510,5 +512,143 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
       vec![("some_header", b"some_value")],
       Some(b"local_response_body"),
     );
+  }
+}
+
+struct HttpFilterSchedulerConfig {}
+
+impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+  for HttpFilterSchedulerConfig
+{
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(HttpFilterScheduler {
+      event_ids: vec![],
+      thread_handles: vec![],
+    })
+  }
+}
+
+/// This spawns a thread for each request and response header callback and stops iteration at these
+/// event hooks.
+struct HttpFilterScheduler {
+  event_ids: Vec<u64>,
+  thread_handles: Vec<std::thread::JoinHandle<()>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpFilterScheduler {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    let scheduler = envoy_filter.new_scheduler();
+    let thread = std::thread::spawn(move || {
+      scheduler.commit(0);
+      scheduler.commit(1);
+    });
+    self.thread_handles.push(thread);
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let scheduler = envoy_filter.new_scheduler();
+    let thread = std::thread::spawn(move || {
+      scheduler.commit(2);
+      scheduler.commit(3);
+    });
+    self.thread_handles.push(thread);
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+    self.event_ids.push(event_id);
+    if event_id == 1 {
+      envoy_filter.continue_decoding()
+    } else if event_id == 3 {
+      envoy_filter.continue_encoding()
+    }
+  }
+}
+
+impl Drop for HttpFilterScheduler {
+  fn drop(&mut self) {
+    assert_eq!(self.event_ids, vec![0, 1, 2, 3]);
+    assert_eq!(self.thread_handles.len(), 2);
+    for thread in self.thread_handles.drain(..) {
+      thread.join().expect("Failed to join thread");
+    }
+  }
+}
+
+
+/// This implements a fake external caching filter that simulates an asynchronous cache lookup.
+struct FakeExternalCachingFilterConfig {}
+
+impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+  for FakeExternalCachingFilterConfig
+{
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(FakeExternalCachingFilter { rx: None })
+  }
+}
+
+struct FakeExternalCachingFilter {
+  rx: Option<std::sync::mpsc::Receiver<String>>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Get the cache key from the request header, which is owned by the Envoy filter.
+    let cache_key_header_value = envoy_filter.get_request_header_value("cacahe-key").unwrap();
+    // Construct the cache key String from the Envoy buffer so that it can be sent to the different
+    // thread.
+    let mut cache_key = String::new();
+    cache_key.push_str(std::str::from_utf8(cache_key_header_value.as_slice()).unwrap());
+    // We need to send the found cached response body back to the worker thread,
+    // so we use a channel to communicate between the filter and the worker thread safely.
+    //
+    // Alternatively, you can use Arc<Mutex<>> or similar constructs.
+    let (cx, rx) = std::sync::mpsc::channel();
+    self.rx = Some(rx);
+    // In real world scenarios, rather than spawning a thread per request,
+    // you would typically use a thread pool or an async runtime to handle
+    // the asynchronous I/O or computation.
+    let scheduler = envoy_filter.new_scheduler();
+    _ = std::thread::spawn(move || {
+      // Simulate some processing to check if the cache key exists.
+      let cache_hit = if cache_key == "existing" {
+        // Do some processing to get the cached response body in real world.
+        let cached_body = "cached_response_body".to_string();
+        // If the cache key exists, we send it back to the Envoy filter.
+        cx.send(cached_body).unwrap();
+        1
+      } else {
+        0
+      };
+      // We use the event_id pased to the commit method to indicate if the cache key was found.
+      scheduler.commit(cache_hit);
+    });
+    // Return StopIteration to indicate that we will continue the processing
+    // once the scheduled event is completed.
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+    // We use event_id to determine if the cache key was found.
+    if event_id == 0 {
+      // This means the cache key was not found, so we continue decoding.
+      envoy_filter.continue_decoding();
+    } else {
+      let result = self.rx.take().unwrap().recv().unwrap();
+      envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()));
+    }
   }
 }

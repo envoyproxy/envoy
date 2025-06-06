@@ -104,6 +104,10 @@ newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
       "envoy_dynamic_module_on_http_filter_http_callout_done");
   RETURN_IF_NOT_OK_REF(on_http_callout_done.status());
 
+  auto on_scheduled = dynamic_module->getFunctionPointer<OnHttpFilterScheduled>(
+      "envoy_dynamic_module_on_http_filter_scheduled");
+  RETURN_IF_NOT_OK_REF(on_scheduled.status());
+
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(filter_name, filter_config,
                                                                 std::move(dynamic_module), context);
 
@@ -126,6 +130,7 @@ newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
   config->on_http_filter_stream_complete_ = on_filter_stream_complete.value();
   config->on_http_filter_destroy_ = on_filter_destroy.value();
   config->on_http_filter_http_callout_done_ = on_http_callout_done.value();
+  config->on_http_filter_scheduled_ = on_scheduled.value();
   return config;
 }
 
