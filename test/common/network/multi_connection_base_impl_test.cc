@@ -1,6 +1,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "envoy/network/socket.h"
+
 #include "source/common/network/address_impl.h"
 #include "source/common/network/multi_connection_base_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
@@ -10,7 +12,6 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/stream_info/mocks.h"
-#include "envoy/network/socket.h"
 
 using testing::Return;
 using testing::ReturnRef;
