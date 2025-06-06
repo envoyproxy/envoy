@@ -20,10 +20,10 @@ namespace ProtoApiScrubber {
 
 inline constexpr const char kFilterName[] = "envoy.filters.http.proto_api_scrubber";
 
-class Filter : public Envoy::Http::PassThroughFilter,
-               Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
+class ProtoApiScrubberFilter : public Envoy::Http::PassThroughFilter,
+                               Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
-  explicit Filter(FilterConfig&);
+  explicit ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig&);
 
   Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
                                                  bool end_stream) override;
