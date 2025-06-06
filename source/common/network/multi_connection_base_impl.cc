@@ -106,6 +106,17 @@ bool MultiConnectionBaseImpl::isHalfCloseEnabled() const {
   return connections_[0]->isHalfCloseEnabled();
 }
 
+bool MultiConnectionBaseImpl::setSocketOption(Network::SocketOptionName name,
+                                              absl::Span<uint8_t> value) {
+  bool success = true;
+  for (auto& connection : connections_) {
+    if (!connection->setSocketOption(name, value)) {
+      success = false;
+    }
+  }
+  return success;
+}
+
 std::string MultiConnectionBaseImpl::nextProtocol() const {
   return connections_[0]->nextProtocol();
 }
