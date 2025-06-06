@@ -713,6 +713,7 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
 #else
   UNREFERENCED_PARAMETER(name);
   UNREFERENCED_PARAMETER(cluster);
+  UNREFERENCED_PARAMETER(header_mutations);
   PANIC("YAML support compiled out");
 #endif
 }
