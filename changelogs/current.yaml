@@ -129,6 +129,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for scan and info.
 - area: http
   change: |
     added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
