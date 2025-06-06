@@ -251,9 +251,10 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
     if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TIMEOUT_FACTOR)) {
       return true;
     }
-
+    std::cerr << "XXXXX periodicDispatch" << std::endl;
     // Run the client dispatcher since we may need to process window updates, etc.
     client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
+    std::cerr << "XXXXX /periodicDispatch" << std::endl;
   }
   return false;
 }
@@ -306,6 +307,7 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
+  std::cerr << "XXXXX waitForEndStream" << std::endl;
   absl::MutexLock lock(&lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
@@ -313,6 +315,7 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
           timeout)) {
     return AssertionFailure() << "Timed out waiting for end of stream.";
   }
+  std::cerr << "XXXXX /waitForEndStream" << std::endl;
   return AssertionSuccess();
 }
 
