@@ -58,7 +58,8 @@ public:
             config.metadata_options().forwarding_namespaces().typed().begin(),
             config.metadata_options().forwarding_namespaces().typed().end()),
         stats_(generateStats(config.stat_prefix(), scope)),
-        message_timeout_(std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
+        message_timeout_(std::chrono::milliseconds(
+            PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -114,10 +115,10 @@ public:
 
   // Start timeout for a specific direction
   void startTimer(bool is_read);
-  
+
   // Stop timeout for a specific direction
   void stopTimer(bool is_read);
-  
+
   // Stop all active timers
   void stopAllTimers();
 

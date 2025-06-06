@@ -8,8 +8,7 @@ namespace ExtProc {
 // MessageTimeoutManager implementation
 MessageTimeoutManager::MessageTimeoutManager(NetworkExtProcFilter& filter,
                                              Event::Dispatcher& dispatcher)
-    : filter_(filter),
-      read_timer_(dispatcher.createTimer([this]() -> void { onTimeout(true); })),
+    : filter_(filter), read_timer_(dispatcher.createTimer([this]() -> void { onTimeout(true); })),
       write_timer_(dispatcher.createTimer([this]() -> void { onTimeout(false); })) {}
 
 void MessageTimeoutManager::startTimer(bool is_read) {
@@ -43,19 +42,19 @@ void MessageTimeoutManager::stopTimer(bool is_read) {
 }
 
 void MessageTimeoutManager::stopAllTimers() {
-  stopTimer(true);   // Stop read timer
-  stopTimer(false);  // Stop write timer
+  stopTimer(true);  // Stop read timer
+  stopTimer(false); // Stop write timer
 }
 
 void MessageTimeoutManager::onTimeout(bool is_read) {
   ENVOY_LOG(warn, "{} message timeout occurred", is_read ? "Read" : "Write");
-  
+
   if (is_read) {
     read_timer_active_ = false;
   } else {
     write_timer_active_ = false;
   }
-  
+
   filter_.handleMessageTimeout(is_read);
 }
 
@@ -71,7 +70,8 @@ void NetworkExtProcFilter::initializeReadFilterCallbacks(Network::ReadFilterCall
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
 
   if (!timeout_manager_) {
-    timeout_manager_ = std::make_unique<MessageTimeoutManager>(*this, read_callbacks_->connection().dispatcher());
+    timeout_manager_ =
+        std::make_unique<MessageTimeoutManager>(*this, read_callbacks_->connection().dispatcher());
   }
 }
 
@@ -379,7 +379,7 @@ void NetworkExtProcFilter::closeStream() {
   // Clear pending flags
   read_pending_ = false;
   write_pending_ = false;
-  
+
   if (stream_ == nullptr) {
     return;
   }

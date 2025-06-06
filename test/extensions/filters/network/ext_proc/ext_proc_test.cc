@@ -887,8 +887,7 @@ TEST_F(NetworkExtProcFilterTest, MessageTimeoutWithFailureModeDisallow) {
 
   EXPECT_CALL(*stream_ptr, send(_, false));
   EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce([&](ExternalProcessorCallbacks&, 
-                    const Grpc::GrpcServiceConfigWithHashKey&,
+      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
                     Http::AsyncClient::StreamOptions&,
                     Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
         return std::move(stream);
@@ -906,7 +905,8 @@ TEST_F(NetworkExtProcFilterTest, MessageTimeoutWithFailureModeDisallow) {
   // Simulate timeout by calling handleMessageTimeout directly
   EXPECT_CALL(read_callbacks_, disableClose(false)).Times(2);
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
 
   filter_->handleMessageTimeout(true);
 
@@ -996,7 +996,8 @@ TEST_F(NetworkExtProcFilterTest, WriteMessageTimeout) {
   // Simulate timeout
   EXPECT_CALL(write_callbacks_, disableClose(false)).Times(2);
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
 
   filter_->handleMessageTimeout(false);
 
@@ -1043,7 +1044,8 @@ TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
   EXPECT_CALL(read_callbacks_, disableClose(false)).Times(2);
   EXPECT_CALL(write_callbacks_, disableClose(false)).Times(2);
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
+  EXPECT_CALL(connection_,
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
 
   filter_->handleMessageTimeout(true); // Timeout on read, but should clean up both
 
