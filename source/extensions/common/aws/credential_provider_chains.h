@@ -48,6 +48,12 @@ public:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
 
+  virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+          iam_roles_anywhere_config) const PURE;
+
 protected:
   std::string stsClusterName(absl::string_view region) {
     return absl::StrCat(STS_TOKEN_CLUSTER, "-", region);
@@ -138,6 +144,12 @@ private:
       AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config) override;
+
+  CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+          iam_roles_anywhere_config) const override;
 
   AwsClusterManagerPtr aws_cluster_manager_;
 };

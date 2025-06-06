@@ -28,6 +28,7 @@
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::Eq;
 using testing::InvokeWithoutArgs;
+using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -134,7 +135,8 @@ public:
                        << "\n";
     }
     if (!expected_message_.bodyAsString().empty()) {
-      if (const std::string body = expected_message_.bodyAsString(); !body.empty()) {
+      const std::string body = expected_message_.bodyAsString();
+      if (body != message.bodyAsString() && !body.empty()) {
         equal = 0;
         *result_listener << "\n"
                          << TestUtility::addLeftAndRightPadding("Expected message body:") << "\n"
@@ -172,7 +174,8 @@ public:
   ~IamRolesAnywhereCredentialsProviderTest() override = default;
 
   void setupProvider(std::string cert, std::string pkey, std::string chain = "",
-                     std::string session = "session", uint16_t duration = 3600) {
+                     std::string session = "session", uint16_t duration = 3600,
+                     bool override_cluster = false) {
     ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
 
     auto cert_env = std::string("CERT");
@@ -219,9 +222,10 @@ public:
     iam_roles_anywhere_config_.set_profile_arn("arn:profile-arn");
     iam_roles_anywhere_config_.set_trust_anchor_arn("arn:trust-anchor-arn");
     mock_manager_ = std::make_shared<MockAwsClusterManager>();
+    absl::StatusOr<std::string> return_val = absl::InvalidArgumentError("error");
     EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
-        .WillRepeatedly(Return("rolesanywhere.ap-southeast-2.amazonaws.com:443"));
-
+        .WillRepeatedly(Return(
+            override_cluster ? return_val : "rolesanywhere.ap-southeast-2.amazonaws.com:443"));
     const auto refresh_state = MetadataFetcher::MetadataReceiver::RefreshState::FirstRefresh;
     const auto initialization_timer = std::chrono::seconds(2);
 
@@ -235,7 +239,6 @@ public:
         std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
             absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
             roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
-
     provider_ = std::make_shared<IAMRolesAnywhereCredentialsProvider>(
         context_, mock_manager_, "rolesanywhere.ap-southeast-2.amazonaws.com",
         [this](Upstream::ClusterManager&, absl::string_view) {
@@ -479,6 +482,36 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigning) {
   timer_->invokeCallback();
 
   auto creds = provider_->getCredentials();
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, BrokenClusterManager) {
+
+  // This is what we expect to see requested by the signer
+  auto headers =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_nochain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+
+  expectDocument(201, "", message);
+
+  time_system_.setSystemTime(std::chrono::milliseconds(1514862245000));
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem, "", "session", 3600,
+                "testcluster.xxx");
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  auto creds = provider_->getCredentials();
+  EXPECT_EQ(creds.hasCredentials(), false);
+  delete (raw_metadata_fetcher_);
 }
 
 TEST_F(IamRolesAnywhereCredentialsProviderTest, StandardRSASigningCustomSessionName) {
@@ -1008,31 +1041,6 @@ TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi4xx) {
   EXPECT_FALSE(creds.sessionToken().has_value());
 }
 
-TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi5xx) {
-
-  // Setup timer.
-  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
-  Http::RequestMessageImpl message(std::move(headers));
-  expectDocument(503, "", message);
-
-  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
-                server_root_chain_rsa_pem);
-  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
-
-  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
-
-  // Kick off a refresh
-  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
-  provider_friend.onClusterAddOrUpdate();
-  timer_->invokeCallback();
-
-  auto creds = provider_->getCredentials();
-  EXPECT_FALSE(creds.accessKeyId().has_value());
-  EXPECT_FALSE(creds.secretAccessKey().has_value());
-  EXPECT_FALSE(creds.sessionToken().has_value());
-}
-
 TEST_F(IamRolesAnywhereCredentialsProviderTest, TestCancel) {
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
@@ -1060,6 +1068,31 @@ not json
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
   delete (raw_metadata_fetcher_);
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderTest, SessionsApi5xx) {
+
+  // Setup timer.
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  auto headers = Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{rsa_headers_chain_}};
+  Http::RequestMessageImpl message(std::move(headers));
+  expectDocument(503, "", message);
+
+  setupProvider(server_root_cert_rsa_pem, server_root_private_key_rsa_pem,
+                server_root_chain_rsa_pem);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(std::chrono::seconds(2)), nullptr));
+
+  // Kick off a refresh
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  auto creds = provider_->getCredentials();
+  EXPECT_FALSE(creds.accessKeyId().has_value());
+  EXPECT_FALSE(creds.secretAccessKey().has_value());
+  EXPECT_FALSE(creds.sessionToken().has_value());
 }
 
 class IamRolesAnywhereCredentialsProviderBadCredentialsTest : public testing::Test {
@@ -1157,6 +1190,191 @@ TEST_F(IamRolesAnywhereCredentialsProviderBadCredentialsTest, InvalidPrivateKeyG
   EXPECT_FALSE(creds.secretAccessKey().has_value());
   EXPECT_FALSE(creds.sessionToken().has_value());
   provider_.reset();
+}
+
+class IamRolesAnywhereCredentialsProviderBasicTests : public testing::Test {
+public:
+  IamRolesAnywhereCredentialsProviderBasicTests() = default;
+  ~IamRolesAnywhereCredentialsProviderBasicTests() override = default;
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+};
+
+TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignEmptyPayload) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
+
+  X509Credentials creds =
+      X509Credentials("cert", X509Credentials::PublicKeySignatureAlgorithm::RSA, "serial", "chain",
+                      "pem", context_.timeSystem().systemTime());
+
+  EXPECT_CALL(*mock_credentials_provider, getCredentials()).WillRepeatedly(Return(creds));
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          mock_credentials_provider, context_.mainThreadDispatcher().timeSource());
+
+  Http::TestRequestHeaderMapImpl headers{};
+  absl::Status status;
+  headers.setMethod("GET");
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signEmptyPayload(headers, "ap-southeast-2");
+  // Will fail because credentials are invalid
+  EXPECT_FALSE(status.ok());
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, SignUnsignedPayload) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
+  X509Credentials creds =
+      X509Credentials("cert", X509Credentials::PublicKeySignatureAlgorithm::RSA, "serial", "chain",
+                      "pem", context_.timeSystem().systemTime());
+
+  EXPECT_CALL(*mock_credentials_provider, getCredentials()).WillRepeatedly(Return(creds));
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          mock_credentials_provider, context_.mainThreadDispatcher().timeSource());
+
+  Http::TestRequestHeaderMapImpl headers{};
+  absl::Status status;
+  headers.setMethod("GET");
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signUnsignedPayload(headers, "ap-southeast-2");
+  // Will fail because credentials are invalid
+  EXPECT_FALSE(status.ok());
+  mock_credentials_provider.reset();
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoMethod) {
+  auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
+
+  X509Credentials creds =
+      X509Credentials("cert", X509Credentials::PublicKeySignatureAlgorithm::RSA, "serial", "chain",
+                      "pem", context_.timeSystem().systemTime());
+
+  EXPECT_CALL(*mock_credentials_provider, getCredentials()).WillRepeatedly(Return(creds));
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          mock_credentials_provider, context_.mainThreadDispatcher().timeSource());
+
+  Http::TestRequestHeaderMapImpl headers{};
+  absl::Status status;
+  // No Method
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signUnsignedPayload(headers, "ap-southeast-2");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "Message is missing :method header");
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoPath) {
+  auto mock_credentials_provider = std::make_shared<MockX509CredentialsProvider>();
+
+  X509Credentials creds =
+      X509Credentials("cert", X509Credentials::PublicKeySignatureAlgorithm::RSA, "serial", "chain",
+                      "pem", context_.timeSystem().systemTime());
+
+  EXPECT_CALL(*mock_credentials_provider, getCredentials()).WillRepeatedly(Return(creds));
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          mock_credentials_provider, context_.mainThreadDispatcher().timeSource());
+
+  Http::TestRequestHeaderMapImpl headers{};
+  absl::Status status;
+  // No Path
+  headers.setMethod("GET");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signUnsignedPayload(headers, "ap-southeast-2");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), "Message is missing :path header");
+}
+
+TEST_F(IamRolesAnywhereCredentialsProviderBasicTests, NoCredentials) {
+  auto roles_anywhere_certificate_provider = std::make_shared<MockX509CredentialsProvider>();
+
+  // Blank credentials set here
+  EXPECT_CALL(*roles_anywhere_certificate_provider, getCredentials())
+      .WillRepeatedly(Return(X509Credentials()));
+
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
+
+  Http::TestRequestHeaderMapImpl headers{};
+  absl::Status status;
+  headers.setMethod("GET");
+  headers.setPath("/");
+  headers.addCopy(Http::LowerCaseString("host"), "www.example.com");
+  status = roles_anywhere_signer->signEmptyPayload(headers, "ap-southeast-2");
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(),
+            "Unable to sign IAM Roles Anywhere payload - no x509 credentials found");
+}
+
+class ControlledCredentialsProvider : public CredentialsProvider {
+public:
+  ControlledCredentialsProvider(CredentialSubscriberCallbacks* cb) : cb_(cb) {}
+
+  Credentials getCredentials() override {
+    Thread::LockGuard guard(mu_);
+    return credentials_;
+  }
+
+  bool credentialsPending() override {
+    Thread::LockGuard guard(mu_);
+    return pending_;
+  }
+
+  std::string providerName() override { return "Controlled Credentials Provider"; }
+
+  void refresh(const Credentials& credentials) {
+    {
+      Thread::LockGuard guard(mu_);
+      credentials_ = credentials;
+      pending_ = false;
+    }
+    if (cb_) {
+      cb_->onCredentialUpdate();
+    }
+  }
+
+private:
+  CredentialSubscriberCallbacks* cb_;
+  Thread::MutexBasicLockable mu_;
+  Credentials credentials_ ABSL_GUARDED_BY(mu_);
+  bool pending_ ABSL_GUARDED_BY(mu_) = true;
+};
+
+TEST_F(IamRolesAnywhereCredentialsProviderBasicTests,
+       SignerCallbacksCalledWhenCredentialsReturned) {
+  MockFunction<void()> signer_callback;
+  EXPECT_CALL(signer_callback, Call());
+
+  auto roles_anywhere_certificate_provider = std::make_shared<MockX509CredentialsProvider>();
+
+  // Blank credentials set here
+  EXPECT_CALL(*roles_anywhere_certificate_provider, getCredentials())
+      .WillRepeatedly(Return(X509Credentials()));
+
+  auto roles_anywhere_signer =
+      std::make_unique<Extensions::Common::Aws::IAMRolesAnywhereSigV4Signer>(
+          absl::string_view(ROLESANYWHERE_SERVICE), absl::string_view("ap-southeast-2"),
+          roles_anywhere_certificate_provider, context_.mainThreadDispatcher().timeSource());
+
+  CredentialsProviderChain chain;
+
+  auto provider = std::make_shared<ControlledCredentialsProvider>(&chain);
+  chain.add(provider);
+  ASSERT_TRUE(chain.addCallbackIfChainCredentialsPending(signer_callback.AsStdFunction()));
+  provider->refresh(Credentials());
 }
 
 } // namespace Aws
