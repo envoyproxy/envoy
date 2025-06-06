@@ -1093,6 +1093,11 @@ TEST(UtilityTest, ValidateTerminalFilterFailsWithMissingUpstreamTerminalFilter) 
                        "UpstreamCodec filter."));
 }
 
+TEST(UtilityTest, ValidateEmptyFactoryNameError) {
+  EXPECT_THROW_WITH_MESSAGE(Utility::getAndCheckFactoryByName<MockTypedFactory>("", true),
+                            EnvoyException,
+                            "Provided name for static registration lookup was empty.");
+}
 } // namespace
 } // namespace Config
 } // namespace Envoy
