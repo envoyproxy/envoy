@@ -441,9 +441,9 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
   MULTI_CATCH(
       const EnvoyException& e,
       {
-        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+        ENVOY_LOG(critical, "error `{}` initializing config '{} {} {}'", e.what(),
                   options_.configProto().DebugString(), options_.configYaml(),
-                  options_.configPath(), e.what());
+                  options_.configPath());
         terminate();
         throw;
       },
