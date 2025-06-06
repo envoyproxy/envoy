@@ -96,6 +96,23 @@ public:
   }
 
   /**
+   * This is called when an event is scheduled via DynamicModuleHttpFilterScheduler::commit.
+   */
+  void onScheduled(uint64_t event_id);
+
+  /**
+   * This can be used to continue the decoding of the HTTP request after the processing has been
+   * stopped at the normal HTTP event hooks such as decodeHeaders or encodeHeaders.
+   */
+  void continueDecoding();
+
+  /**
+   * This can be used to continue the encoding of the HTTP response after the processing has been
+   * stopped at the normal HTTP event hooks such as encodeHeaders or encodeData.
+   */
+  void continueEncoding();
+
+  /**
    * Sends an HTTP callout to the specified cluster with the given message.
    */
   envoy_dynamic_module_type_http_callout_init_result
@@ -115,6 +132,10 @@ private:
    * no-op.
    */
   void destroy();
+
+  // True if the filter is in the continue state. This is to avoid prohibited calls to
+  // continueDecoding() or continueEncoding() multiple times.
+  bool in_continue_ = false;
 
   // This helps to avoid reentering the module when sending a local reply. For example, if
   // sendLocalReply() is called, encodeHeaders and encodeData will be called again inline on top of
@@ -155,6 +176,33 @@ private:
 };
 
 using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter>;
+
+/**
+ * This class is used to schedule a HTTP filter event hook from a different thread
+ * than the one it was assigned to. This is created via
+ * envoy_dynamic_module_callback_http_filter_scheduler_new and deleted via
+ * envoy_dynamic_module_callback_http_filter_scheduler_delete.
+ *
+ * More precisely, this is used to post the onScheduled() method of the
+ * DynamicModuleHttpFilter to the worker thread that the filter is assigned to
+ * when the scheduler is destroyed.
+ */
+class DynamicModuleHttpFilterScheduler {
+public:
+  DynamicModuleHttpFilterScheduler(DynamicModuleHttpFilterSharedPtr filter,
+                                   Event::Dispatcher& dispatcher)
+      : filter_(std::move(filter)), dispatcher_(dispatcher) {}
+
+  void commit(uint64_t event_id) {
+    dispatcher_.post([filter = filter_, event_id]() { filter->onScheduled(event_id); });
+  }
+
+private:
+  // The filter that this scheduler is associated with.
+  DynamicModuleHttpFilterSharedPtr filter_;
+  // The dispatcher is used to post the event to the worker thread that filter_ is assigned to.
+  Event::Dispatcher& dispatcher_;
+};
 
 } // namespace HttpFilters
 } // namespace DynamicModules
