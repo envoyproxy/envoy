@@ -212,6 +212,12 @@ The following core load shed points are supported:
       the router if Envoy is under resource pressure, typically memory. This change
       makes load shed check availabe in HTTP decoder filters.
 
+  * - envoy.load_shed_points.connection_pool_new_connection
+    - Envoy will stop creating new connections in the connection pool when
+      it is under pressure (typically memory pressure). If a new connection is
+      rejected by this load shed point and there is no available capacity
+      to serve the downstream request, the downstream request will fail.
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts

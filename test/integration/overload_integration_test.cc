@@ -1159,6 +1159,57 @@ TEST_P(LoadShedPointIntegrationTest, HttpDownstreamFilterLoadShed) {
   EXPECT_EQ(response_that_is_proxied->headers().getStatusValue(), "200");
 }
 
+TEST_P(LoadShedPointIntegrationTest, ConnectionPoolNewConnectionLoadShed) {
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.connection_pool_new_connection"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.connection_pool_new_connection.scale_percent", 100);
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "503");
+  codec_client_->close();
+}
+
+TEST_P(LoadShedPointIntegrationTest, ConnectionPoolLoadShedWithExistingConnections) {
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.connection_pool_new_connection"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  updateResource(0.80);
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response1->waitForEndStream());
+  EXPECT_EQ(response1->headers().getStatusValue(), "200");
+
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.connection_pool_new_connection.scale_percent", 100);
+
+  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_EQ(response2->headers().getStatusValue(), "200");
+  codec_client_->close();
+}
+
 TEST_P(LoadShedPointIntegrationTest, HttpConnManagerDoesNotShedLoadWhenBypassed) {
   // QUIC uses UDP, not TCP.
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
