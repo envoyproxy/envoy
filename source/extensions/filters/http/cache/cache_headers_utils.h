@@ -11,6 +11,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/http/cache/key.pb.h"
 
 #include "absl/container/btree_set.h"
 #include "absl/strings/str_join.h"
@@ -107,6 +108,18 @@ SystemTime httpTime(const Http::HeaderEntry* header_entry);
 Seconds calculateAge(const Http::ResponseHeaderMap& response_headers, SystemTime response_time,
                      SystemTime now);
 
+// Create a resource key from headers and cluster name.
+Key makeKey(const Http::RequestHeaderMap& request_headers, absl::string_view cluster_name);
+
+// Adds required conditional headers for cache validation to the request headers
+// according to the previous response headers.
+void injectValidationHeaders(Http::RequestHeaderMap& request_headers,
+                             const Http::ResponseHeaderMap& old_response_headers);
+
+// Checks if a cached entry should be updated with a 304 response.
+bool shouldUpdateCachedEntry(const Http::ResponseHeaderMap& new_headers,
+                             const Http::ResponseHeaderMap& old_headers);
+
 /**
  * Read a leading positive decimal integer value and advance "*str" past the
  * digits read. If overflow occurs, or no digits exist, return
@@ -123,6 +136,14 @@ void getAllMatchingHeaderNames(const Http::HeaderMap& headers,
 // https://tools.ietf.org/html/rfc7230#section-7.
 std::vector<absl::string_view> parseCommaDelimitedHeader(const Http::HeaderMap::GetResult& entry);
 } // namespace CacheHeadersUtils
+
+// Helper abstraction for a container that contains a VaryAllowList.
+class CacheableResponseChecker {
+public:
+  // Calls CacheabilityUtils::isCacheableResponse with the contained VaryAllowList.
+  virtual bool isCacheableResponse(const Http::ResponseHeaderMap& headers) const PURE;
+  virtual ~CacheableResponseChecker() = default;
+};
 
 class VaryAllowList {
 public:
