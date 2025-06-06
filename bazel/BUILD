@@ -786,6 +786,14 @@ selects.config_setting_group(
 )
 
 selects.config_setting_group(
+    name = "engflow_rbe_aarch64",
+    match_all = [
+        ":engflow_rbe",
+        ":linux_aarch64",
+    ],
+)
+
+selects.config_setting_group(
     name = "apple",
     match_any = [
         ":darwin",
@@ -1057,4 +1065,31 @@ cc_library(
         ): ["@com_github_google_tcmalloc//tcmalloc"],
         "//conditions:default": ["//bazel/foreign_cc:gperftools"],
     }),
+)
+
+bool_flag(
+    name = "enable_liburing",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "liburing_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        ":enable_liburing": "True",
+    },
+)
+
+bool_flag(
+    name = "libc++",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "libc++_enabled",
+    flag_values = {
+        ":libc++": "True",
+    },
 )

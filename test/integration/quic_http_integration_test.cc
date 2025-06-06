@@ -218,45 +218,6 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
   codec_client_->close();
 }
 
-// Envoy Mobile does not have listeners, so the above test is not applicable.
-// This test ensures that a mobile client can connect when early data is disabled on the QUICHE
-// layer.
-TEST_P(QuicHttpIntegrationTest, ClientEarlyDataDisabled) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_disable_client_early_data",
-                                    "true");
-  // Make sure all connections use the same PersistentQuicInfoImpl.
-  concurrency_ = 1;
-  initialize();
-  // Start the first connection.
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
-            codec_client_->connection()->requestedServerName());
-  // Send a complete request on the first connection.
-  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response1->waitForEndStream());
-  // Close the first connection.
-  codec_client_->close();
-
-  // Start a second connection.
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Send a complete request on the second connection.
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response2->waitForEndStream());
-  // Ensure the 2nd connection is using resumption ticket but doesn't accept early data.
-  EnvoyQuicClientSession* quic_session =
-      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
-  EXPECT_TRUE(quic_session->IsResumption());
-  EXPECT_FALSE(quic_session->EarlyDataAccepted());
-  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().EarlyData).empty());
-
-  // Close the second connection.
-  codec_client_->close();
-}
-
 // Not only test multiple quic connections, but disconnect and reconnect to
 // trigger resumption.
 TEST_P(QuicHttpIntegrationTest, MultipleUpstreamQuicConnections) {

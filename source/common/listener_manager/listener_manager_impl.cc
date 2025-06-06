@@ -31,7 +31,6 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
-#include "source/server/api_listener_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
@@ -73,7 +72,7 @@ envoy::admin::v3::ListenersConfigDump::DynamicListener* getOrCreateDynamicListen
 void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
-  state.mutable_listener()->PackFrom(listener.config());
+  listener.dumpListenerConfig(*state.mutable_listener());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 } // namespace
@@ -415,12 +414,12 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   absl::flat_hash_map<std::string, DynamicListener*> listener_map;
 
   for (const auto& listener : active_listeners_) {
-    if (!name_matcher.match(listener->config().name())) {
+    if (!name_matcher.match(listener->configName())) {
       continue;
     }
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
-      static_listener.mutable_listener()->PackFrom(listener->config());
+      listener->dumpListenerConfig(*static_listener.mutable_listener());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
       continue;
@@ -442,7 +441,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   }
 
   for (const auto& listener : warming_listeners_) {
-    if (!name_matcher.match(listener->config().name())) {
+    if (!name_matcher.match(listener->configName())) {
       continue;
     }
     DynamicListener* dynamic_listener =
@@ -452,7 +451,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   }
 
   for (const auto& draining_listener : draining_listeners_) {
-    if (!name_matcher.match(draining_listener.listener_->config().name())) {
+    if (!name_matcher.match(draining_listener.listener_->configName())) {
       continue;
     }
     const auto& listener = draining_listener.listener_;
@@ -504,7 +503,14 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
           name));
     }
     if (!api_listener_ && !added_via_api) {
-      auto listener_or_error = HttpApiListener::create(config, server_, config.name());
+      auto* api_listener_factory =
+          Registry::FactoryRegistry<Server::ApiListenerFactory>::getFactory(
+              "envoy.http_api_listener");
+      if (api_listener_factory == nullptr) {
+        return absl::InvalidArgumentError(fmt::format(
+            "error adding listener named '{}': missing the API listener extension", name));
+      }
+      auto listener_or_error = api_listener_factory->create(config, server_, config.name());
       RETURN_IF_NOT_OK_REF(listener_or_error.status());
       api_listener_ = std::move(listener_or_error.value());
       return true;
@@ -578,7 +584,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // removed.
   if (existing_warming_listener != warming_listeners_.end() &&
       existing_active_listener != active_listeners_.end() &&
-      (*existing_active_listener)->blockUpdate(hash)) {
+      (*existing_active_listener)->blockLdsUpdate(hash)) {
     warming_listeners_.erase(existing_warming_listener);
     updateWarmingActiveGauges();
     stats_.listener_modified_.inc();
@@ -588,9 +594,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
-       (*existing_warming_listener)->blockUpdate(hash)) ||
+       (*existing_warming_listener)->blockLdsUpdate(hash)) ||
       (existing_active_listener != active_listeners_.end() &&
-       (*existing_active_listener)->blockUpdate(hash))) {
+       (*existing_active_listener)->blockLdsUpdate(hash))) {
     ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
   }

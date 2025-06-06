@@ -1072,6 +1072,7 @@ oneof
 oneway
 oob
 opcode
+openid
 openssl
 opentracing
 optimizations
@@ -1208,6 +1209,7 @@ redis
 redispatch
 redistributions
 reentrant
+reentrants
 refactor
 refactored
 refcount
@@ -1307,6 +1309,7 @@ sigactions
 sigaltstack
 siginfo
 signalstack
+signout
 sigv
 sigv4
 sigv4a

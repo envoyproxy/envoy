@@ -343,10 +343,12 @@ void IAMRolesAnywhereX509CredentialsProvider::refresh() {
   }
 }
 
+// getCacheDuration will return a duration between 3566 and 3595 seconds, IE close to 1 hour with
+// jitter.
 std::chrono::seconds IAMRolesAnywhereX509CredentialsProvider::getCacheDuration() {
-  return std::chrono::seconds(
-      REFRESH_INTERVAL -
-      REFRESH_GRACE_PERIOD /*TODO: Add jitter from context.api().randomGenerator()*/);
+  const auto jitter =
+      std::chrono::seconds(context_.api().randomGenerator().random() % MAX_CACHE_JITTER.count());
+  return std::chrono::seconds(REFRESH_INTERVAL - REFRESH_GRACE_PERIOD - jitter);
 }
 
 } // namespace Aws

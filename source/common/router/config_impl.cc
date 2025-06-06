@@ -964,35 +964,33 @@ bool RouteEntryImplBase::matchRoute(const Http::RequestHeaderMap& headers,
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
-const std::string
-RouteEntryImplBase::getRequestHostValue(const Http::RequestHeaderMap& headers) const {
+void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
+                                            bool keep_old_host) const {
+  absl::string_view hostname;
+  std::string buffer;
+
   if (!host_rewrite_.empty()) {
-    return host_rewrite_;
-  }
-
-  if (auto_host_rewrite_header_) {
-    const auto& header = headers.get(*auto_host_rewrite_header_);
-    if (!header.empty()) {
-      const absl::string_view header_value = header[0]->value().getStringView();
-      if (!header_value.empty()) {
-        return std::string(header_value);
-      }
+    hostname = host_rewrite_;
+  } else if (auto_host_rewrite_header_) {
+    if (const auto header = headers.get(*auto_host_rewrite_header_); !header.empty()) {
+      hostname = header[0]->value().getStringView();
     }
-  }
-
-  if (host_rewrite_path_regex_) {
+  } else if (host_rewrite_path_regex_) {
     absl::string_view path = headers.getPathValue();
-    return host_rewrite_path_regex_->replaceAll(Http::PathUtil::removeQueryAndFragment(path),
-                                                host_rewrite_path_regex_substitution_);
+    buffer = host_rewrite_path_regex_->replaceAll(Http::PathUtil::removeQueryAndFragment(path),
+                                                  host_rewrite_path_regex_substitution_);
+    hostname = buffer;
   }
 
-  // Fallback to original host value
-  return std::string(headers.getHostValue());
+  if (hostname.empty()) {
+    return;
+  }
+  Http::Utility::updateAuthority(headers, hostname, append_xfh_, keep_old_host);
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                                 const StreamInfo::StreamInfo& stream_info,
-                                                bool insert_envoy_original_path) const {
+                                                bool keep_original_host_or_path) const {
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
@@ -1010,16 +1008,13 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
     }
   }
 
-  auto final_host_value = getRequestHostValue(headers);
-  if (final_host_value != headers.getHostValue()) {
-    Http::Utility::updateAuthority(headers, final_host_value, append_xfh_);
-  }
+  finalizeHostHeader(headers, keep_original_host_or_path);
 
   // Handle path rewrite
   absl::optional<std::string> container;
   if (!getPathRewrite(headers, container).empty() || regex_rewrite_ != nullptr ||
       path_rewriter_ != nullptr) {
-    rewritePathHeader(headers, insert_envoy_original_path);
+    rewritePathHeader(headers, keep_original_host_or_path);
   }
 }
 
@@ -1310,7 +1305,7 @@ RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
 }
 
 absl::StatusOr<PathRewriterSharedPtr>
-RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
+RouteEntryImplBase::buildPathRewriter(const envoy::config::route::v3::Route& route,
                                       ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.route().has_path_rewrite_policy()) {
     return nullptr;
@@ -1329,7 +1324,7 @@ RouteEntryImplBase::buildPathRewriter(envoy::config::route::v3::Route route,
 }
 
 absl::StatusOr<PathMatcherSharedPtr>
-RouteEntryImplBase::buildPathMatcher(envoy::config::route::v3::Route route,
+RouteEntryImplBase::buildPathMatcher(const envoy::config::route::v3::Route& route,
                                      ProtobufMessage::ValidationVisitor& validator) const {
   if (!route.match().has_path_match_policy()) {
     return nullptr;
@@ -2140,10 +2135,11 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
-    auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
+    Matcher::MatchResult match_result =
+        Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
-    if (match.result_) {
-      const auto result = match.result_();
+    if (match_result.isMatch()) {
+      const Matcher::ActionPtr result = match_result.action();
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
         const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
 
@@ -2156,7 +2152,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       PANIC("Action in router matcher should be Route or RouteList");
     }
 
-    ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
+    ENVOY_LOG(debug, "failed to match incoming request: {}",
+              match_result.isNoMatch() ? "no match" : "insufficient data");
 
     return nullptr;
   }
