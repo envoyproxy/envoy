@@ -410,6 +410,107 @@ static_resources:
 )EOF",
                 Platform::null_device_path);
 
+const std::string CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM_NO_AUTH_USERNAME =
+    fmt::format(R"EOF(
+admin:
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    - name: cluster_0
+      type: STATIC
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+          aws_iam:
+            region: us-east-1
+            service_name: elasticache
+            cache_name: testcache
+            expiration_time: 900s
+      lb_policy: RANDOM
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+    - name: cluster_1
+      type: STATIC
+      lb_policy: RANDOM
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+          auth_username: {{ inline_string: cluster_1_username }}
+          aws_iam:
+            region: us-east-1
+            service_name: elasticache
+            cache_name: testcache
+            expiration_time: 900s
+      load_assignment:
+        cluster_name: cluster_1
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+    - name: cluster_2
+      type: STATIC
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+          auth_username: {{ inline_string: cluster_2_username }}
+          aws_iam:
+            region: us-east-1
+            service_name: elasticache
+            cache_name: testcache
+            expiration_time: 900s
+      lb_policy: RANDOM
+      load_assignment:
+        cluster_name: cluster_2
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: redis
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: redis_stats
+          settings:
+            op_timeout: 5s
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
+            routes:
+            - prefix: "foo:"
+              cluster: cluster_1
+            - prefix: "baz:"
+              cluster: cluster_2
+)EOF",
+                Platform::null_device_path);
+
 // This is a configuration with fault injection enabled.
 const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
           faults:
@@ -618,6 +719,15 @@ public:
       : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM, 3) {}
 };
 
+class RedisProxyWithRoutesAndAuthPasswordsAwsIamNoAuthUsernameIntegrationTest
+    : public Event::TestUsingSimulatedTime,
+      public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithRoutesAndAuthPasswordsAwsIamNoAuthUsernameIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS_AWS_IAM_NO_AUTH_USERNAME,
+                                  3) {}
+};
+
 class RedisProxyWithRoutesIntegrationTest : public RedisProxyIntegrationTest {
 public:
   RedisProxyWithRoutesIntegrationTest() : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES, 6) {}
@@ -758,6 +868,11 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithBatchingIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+INSTANTIATE_TEST_SUITE_P(IpVersions,
+                         RedisProxyWithRoutesAndAuthPasswordsAwsIamNoAuthUsernameIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
@@ -1427,7 +1542,6 @@ TEST_P(RedisProxyWithMultipleDownstreamAuthIntegrationTest, ErrorsUntilCorrectPa
 // auth_password is specified for each cluster.
 
 TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentication) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   initialize();
 
@@ -1455,7 +1569,6 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsIntegrationTest, TransparentAuthentic
 }
 
 TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAuthentication) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "akid", 1);
   TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "secret", 1);
@@ -1500,6 +1613,24 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamIntegrationTest, TransparentAut
   EXPECT_TRUE(fake_upstream_connection[0]->close());
   EXPECT_TRUE(fake_upstream_connection[1]->close());
   EXPECT_TRUE(fake_upstream_connection[2]->close());
+  redis_client->close();
+}
+
+// Test that we don't attempt IAM Auth if no auth username is set, even if iam auth configuration is
+// set
+TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamNoAuthUsernameIntegrationTest,
+       TransparentAuthentication) {
+
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  FakeRawConnectionPtr fake_upstream_connection;
+
+  // roundtrip to cluster_0 (catch_all route)
+  roundtripToUpstreamStep(fake_upstreams_[0], makeBulkStringArray({"get", "toto"}), "$3\r\nbar\r\n",
+                          redis_client, fake_upstream_connection, "", "");
+
+  EXPECT_TRUE(fake_upstream_connection->close());
   redis_client->close();
 }
 

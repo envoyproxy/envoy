@@ -92,7 +92,7 @@ ClientPtr ClientImpl::create(
 
   // The presence of a valid auth_username is checked during filter initialization
   if (aws_iam_authenticator.has_value() && aws_iam_config.has_value()) {
-      client->sendAwsIamAuth(auth_username, aws_iam_config.value());
+    client->sendAwsIamAuth(auth_username, aws_iam_config.value());
   }
 
   return client;

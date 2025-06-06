@@ -147,40 +147,6 @@ TEST_F(AwsIamAuthenticatorTest, CredentialPendingAuthentication) {
   client->close();
 }
 
-// Verify that we cleanly handle the case of no username being configured at cluster level
-TEST_F(AwsIamAuthenticatorTest, UsernameNotConfigured) {
-  Common::Redis::RedisCommandStatsSharedPtr redis_command_stats;
-  NiceMock<Stats::MockIsolatedStatsStore> stats;
-  std::shared_ptr<Upstream::MockHost> host{new NiceMock<Upstream::MockHost>()};
-  Event::MockDispatcher dispatcher;
-  auto config = std::make_shared<Client::ConfigImpl>(Client::createConnPoolSettings());
-
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-  auto mock_connection = new NiceMock<Network::MockClientConnection>();
-  conn_info.connection_ = mock_connection;
-
-  EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
-  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientFactoryImpl factory;
-  auto signer = std::make_unique<Extensions::Common::Aws::MockSigner>();
-  auto mock_authenticator =
-      std::make_shared<AwsIamAuthenticator::MockAwsIamAuthenticator>(std::move(signer));
-  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr> authenticator =
-      mock_authenticator;
-  aws_iam_config_.set_region("region");
-  aws_iam_config_.set_cache_name("cachename");
-  aws_iam_config_.set_service_name("elasticache");
-  const auto& aws_iam_config = aws_iam_config_;
-
-  EXPECT_CALL(dispatcher, createTimer_(_)).Times(2);
-  EXPECT_CALL(*mock_authenticator, addCallbackIfCredentialsPending(_)).Times(0);
-
-  Envoy::Extensions::NetworkFilters::Common::Redis::Client::ClientPtr client =
-      factory.create(host, dispatcher, config, redis_command_stats, *stats.rootScope(), "",
-                     "password", false, aws_iam_config, authenticator);
-
-  client->close();
-}
-
 } // namespace AwsIamAuthenticator
 } // namespace Redis
 } // namespace Common
