@@ -101,9 +101,10 @@ message SocketAddress {
   // Filepath that specifies the Linux network namespace this socket will be created in (see ``man 7
   // network_namespaces``).  If this field is set, Envoy will create the socket in the specified
   // network namespace, which associates the socket with that net namespace.
+  //
   // .. note::
-  //    Currently only used for Listener sockets and upstream bind configs. This field is unused if
-  //    set for endpoint addresses.
+  //    Currently, the field is only valid for Listener sockets and upstream bind configs. It
+  //    results in a validation error if set for endpoint addresses.
   //
   // .. note::
   //    Setting this parameter requires Envoy to run with the ``CAP_NET_ADMIN`` capability.

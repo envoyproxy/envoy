@@ -2252,9 +2252,6 @@ TEST_F(HostImplTest, NetnsInvalid) {
   config.set_port_value(8000);
   auto dest_addr =
       Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:9999", true, "/netns/filepath");
-  std::cout << "@tallen " << dest_addr->asString() << std::endl;
-  std::cout << "@tallen has netns value: " << std::boolalpha
-            << dest_addr->networkNamespace().has_value() << std::endl;
   EXPECT_EQ(
       HostDescriptionImpl::create(info, "", dest_addr, nullptr, nullptr,
                                   envoy::config::core::v3::Locality().default_instance(), config, 1,
@@ -2351,6 +2348,50 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
   EXPECT_TRUE(cluster->prioritySet().hostSetsPerPriority()[0]->weightedPriorityHealth());
   EXPECT_EQ(100, cluster->prioritySet().hostSetsPerPriority()[0]->overprovisioningFactor());
   EXPECT_FALSE(cluster->info()->addedViaApi());
+}
+
+TEST_F(StaticClusterImplTest, UpstreamBindConfigWithNetns) {
+  const std::string yaml_base = R"EOF(
+    name: staticcluster_with_ns_bind
+    connect_timeout: 0.25s
+    type: STATIC
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 10.0.0.1
+                    port_value: 443
+    upstream_bind_config:
+      source_address:
+        address: 1.2.3.4
+        port_value: 5678
+        network_namespace_filepath: "/var/run/netns/test_ns"
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml_base);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
+      false);
+
+#if defined(__linux__)
+  constexpr bool is_linux = true;
+#else
+  constexpr bool is_linux = false;
+#endif
+
+  if (is_linux) {
+    // On Linux, this configuration should be valid.
+    std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
+    EXPECT_NE(nullptr, cluster);
+  } else {
+    // On non-Linux, this should fail validation.
+    EXPECT_THAT_THROWS_MESSAGE(
+        createCluster(cluster_config, factory_context), EnvoyException,
+        testing::HasSubstr("network namespace filepaths, but the OS is not Linux"));
+  }
 }
 
 TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostname) {
