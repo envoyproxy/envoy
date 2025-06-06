@@ -41,6 +41,13 @@ message FilterConfig {
   // ``envoy.stream.upstream_address`` (See
   // :repo:`upstream_address.h<source/common/stream_info/upstream_address.h>`).
   bool save_upstream_address = 2;
+
+  // When this flag is set, the filter will check for the "envoy.upstream.dynamic_host" and/or
+  // "envoy.upstream.dynamic_port" filter state values before falling back to using the HTTP Host
+  // header for DNS resolution.
+  // This provides consistency with other dynamic forward proxy implementations (SNI and UDP)
+  // which also check for this filter state value first. Defaults to ``false``.
+  bool allow_dynamic_host_from_filter_state = 4;
 }
 
 // Per route Configuration for the dynamic forward proxy HTTP filter.

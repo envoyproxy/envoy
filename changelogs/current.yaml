@@ -196,4 +196,11 @@ new_features:
     If configured, the OAuth2 filter will redirect users to this endpoint when they access the
     :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`. This allows users to
     be logged out of the Authorization server.
+- area: dfp
+  change: |
+    Added a new flag
+    :ref:`allow_dynamic_host_from_filter_state
+    <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
+    to allow HTTP DFP filter to use the filter state values for host and port lookups.
+
 deprecated:
