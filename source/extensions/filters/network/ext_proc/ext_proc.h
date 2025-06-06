@@ -35,7 +35,8 @@ namespace ExtProc {
   COUNTER(connections_closed)                                                                      \
   COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(stream_open_failures)                                                                    \
-  COUNTER(connections_reset)
+  COUNTER(connections_reset)                                                                       \
+  COUNTER(message_timeouts)
 
 struct NetworkExtProcStats {
   ALL_NETWORK_EXT_PROC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
@@ -56,7 +57,9 @@ public:
         typed_forwarding_namespaces_(
             config.metadata_options().forwarding_namespaces().typed().begin(),
             config.metadata_options().forwarding_namespaces().typed().end()),
-        stats_(generateStats(config.stat_prefix(), scope)) {};
+        stats_(generateStats(config.stat_prefix(), scope)),
+        message_timeout_(std::chrono::milliseconds(
+            PROTOBUF_GET_MS_OR_DEFAULT(config, message_timeout, DefaultMessageTimeoutMs))) {};
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
@@ -76,7 +79,11 @@ public:
 
   const NetworkExtProcStats& stats() const { return stats_; }
 
+  const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
+
 private:
+  static constexpr uint64_t DefaultMessageTimeoutMs = 200;
+
   NetworkExtProcStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat("network_ext_proc.", prefix);
     return {ALL_NETWORK_EXT_PROC_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
@@ -88,11 +95,42 @@ private:
   const std::vector<std::string> untyped_forwarding_namespaces_;
   const std::vector<std::string> typed_forwarding_namespaces_;
   NetworkExtProcStats stats_;
+  const std::chrono::milliseconds message_timeout_;
 };
 
 using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 using ProcessingRequest = envoy::service::network_ext_proc::v3::ProcessingRequest;
 using ProcessingResponse = envoy::service::network_ext_proc::v3::ProcessingResponse;
+
+class NetworkExtProcFilter;
+
+/**
+ * Manages timeouts for read and write operations independently.
+ * Each direction (read/write) can have its own active timer.
+ */
+class MessageTimeoutManager : public Logger::Loggable<Logger::Id::ext_proc> {
+public:
+  MessageTimeoutManager(NetworkExtProcFilter& filter, Event::Dispatcher& dispatcher);
+  ~MessageTimeoutManager() = default;
+
+  // Start timeout for a specific direction
+  void startTimer(bool is_read);
+
+  // Stop timeout for a specific direction
+  void stopTimer(bool is_read);
+
+  // Stop all active timers
+  void stopAllTimers();
+
+private:
+  void onTimeout(bool is_read);
+
+  NetworkExtProcFilter& filter_;
+  Event::TimerPtr read_timer_;
+  Event::TimerPtr write_timer_;
+  bool read_timer_active_{false};
+  bool write_timer_active_{false};
+};
 
 class NetworkExtProcFilter : public Envoy::Network::Filter,
                              ExternalProcessorCallbacks,
@@ -135,6 +173,10 @@ public:
   void onComplete(ProcessingResponse&) override {};
   void onError() override {};
 
+  // Called by MessageTimeoutManager
+  void handleMessageTimeout(bool is_read);
+  const std::chrono::milliseconds& getMessageTimeout();
+
 private:
   struct DownstreamCallbacks : public Envoy::Network::ConnectionCallbacks {
     DownstreamCallbacks(NetworkExtProcFilter& parent) : parent_(parent) {}
@@ -167,11 +209,15 @@ private:
   const NetworkExtProcStats& stats_;
   ExternalProcessorClientPtr client_;
   ExternalProcessorStreamPtr stream_;
+  std::unique_ptr<MessageTimeoutManager> timeout_manager_;
   const Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Http::StreamFilterSidestreamWatermarkCallbacks watermark_callbacks_{};
   DownstreamCallbacks downstream_callbacks_;
 
   bool processing_complete_{false};
+
+  bool read_pending_{false};
+  bool write_pending_{false};
 
   // Delay close counters
   uint32_t disable_count_write_{0};
