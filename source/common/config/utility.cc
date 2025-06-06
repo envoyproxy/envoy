@@ -79,7 +79,10 @@ checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_co
                           int max_grpc_services) {
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC ||
-       api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+       api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC ||
+       api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC ||
+       api_config_source.api_type() ==
+           envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
 
   if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
     return absl::InvalidArgumentError(
@@ -90,12 +93,12 @@ checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_co
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
       return absl::InvalidArgumentError(
-          fmt::format("{}::(DELTA_)GRPC must not have a cluster name specified: {}",
+          fmt::format("{}::(AGGREGATED_)(DELTA_)GRPC must not have a cluster name specified: {}",
                       api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services_size() > max_grpc_services) {
       return absl::InvalidArgumentError(fmt::format(
-          "{}::(DELTA_)GRPC must have no more than {} gRPC services specified: {}",
+          "{}::(AGGREGATED_)(DELTA_)GRPC must have no more than {} gRPC services specified: {}",
           api_config_source.GetTypeName(), max_grpc_services, api_config_source.DebugString()));
     }
   } else {
@@ -223,19 +226,40 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
   return rate_limit_settings;
 }
 
+namespace {
+// Returns true iff the api_type is AGGREGATED_GRPC or AGGREGATED_DELTA_GRPC.
+bool isApiTypeAggregated(const envoy::config::core::v3::ApiConfigSource::ApiType api_type) {
+  return (api_type == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC) ||
+         (api_type == envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+}
+
+// Returns true iff the api_type is GRPC or DELTA_GRPC.
+bool isApiTypeNonAggregated(const envoy::config::core::v3::ApiConfigSource::ApiType api_type) {
+  return (api_type == envoy::config::core::v3::ApiConfigSource::GRPC) ||
+         (api_type == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+}
+} // namespace
+
 absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
-    bool skip_cluster_check, int grpc_service_idx) {
+    bool skip_cluster_check, int grpc_service_idx, bool xdstp_config_source) {
   RETURN_IF_NOT_OK(checkApiConfigSourceNames(
       api_config_source,
       Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support") ? 2 : 1));
 
-  if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
-      api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    return absl::InvalidArgumentError(fmt::format("{} type must be gRPC: {}",
-                                                  api_config_source.GetTypeName(),
-                                                  api_config_source.DebugString()));
+  if (xdstp_config_source) {
+    if (!isApiTypeAggregated(api_config_source.api_type())) {
+      return absl::InvalidArgumentError(fmt::format("{} type must be of aggregated gRPC: {}",
+                                                    api_config_source.GetTypeName(),
+                                                    api_config_source.DebugString()));
+    }
+  } else {
+    if (!isApiTypeNonAggregated(api_config_source.api_type())) {
+      return absl::InvalidArgumentError(fmt::format("{} type must be of non-aggregated gRPC: {}",
+                                                    api_config_source.GetTypeName(),
+                                                    api_config_source.DebugString()));
+    }
   }
 
   if (grpc_service_idx >= api_config_source.grpc_services_size()) {
