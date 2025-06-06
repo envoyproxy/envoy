@@ -176,19 +176,19 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_name = "Aspect Bazel helpers",
         project_desc = "Base Starlark libraries and basic Bazel rules which are useful for constructing rulesets and BUILD files",
         project_url = "https://github.com/aspect-build/bazel-lib",
-        version = "2.17.1",
-        sha256 = "1338d2b844051eadc23c0134910516b329e7f72d9db16bd858db86c958fd452e",
+        version = "2.16.0",
+        sha256 = "092f841dd9ea8e736ea834f304877a25190a762d0f0a6c8edac9f94aac8bbf16",
         strip_prefix = "bazel-lib-{version}",
         urls = ["https://github.com/aspect-build/bazel-lib/archive/v{version}.tar.gz"],
         use_category = ["build", "test_only"],
-        release_date = "2025-05-29",
+        release_date = "2025-05-06",
         cpe = "N/A",
         license = "Apache-2.0",
         license_url = "https://github.com/aspect-build/bazel-lib/blob/v{version}/LICENSE",
     ),
     com_google_absl = dict(
         project_name = "Abseil",
-        project_desc = "Open source collection of C++ libraries drawn from the most fundamental pieces of Google's internal codebase",
+        project_desc = "Open source collection of C++ libraries drawn from the most fundamental pieces of Google’s internal codebase",
         project_url = "https://abseil.io/",
         version = "20250512.0",
         sha256 = "7262daa7c1711406248c10f41026d685e88223bc92817d16fb93c19adb57f669",
@@ -1175,7 +1175,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     v8 = dict(
         project_name = "V8",
-        project_desc = "Google's open source high-performance JavaScript and WebAssembly engine, written in C++",
+        project_desc = "Google’s open source high-performance JavaScript and WebAssembly engine, written in C++",
         project_url = "https://v8.dev",
         # NOTE: Update together with com_googlesource_chromium_base_trace_event_common.
         # Patch contains workaround for https://github.com/bazelbuild/rules_python/issues/1221
@@ -1206,7 +1206,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
     ),
     com_github_google_quiche = dict(
         project_name = "QUICHE",
-        project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google's implementation of QUIC and related protocols",
+        project_desc = "QUICHE (QUIC, HTTP/2, Etc) is Google‘s implementation of QUIC and related protocols",
         project_url = "https://github.com/google/quiche",
         version = "e3f34245b3f0ca5d12ad3ecddd3d1774567b5a9a",
         sha256 = "da5bf9878c289af1099bd25de2798b4eb2ee36bba498fc4f381c530b43ee3389",
