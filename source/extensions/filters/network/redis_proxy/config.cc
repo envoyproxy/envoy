@@ -86,9 +86,16 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
       // this connection pool.
       aws_iam_config = ProtocolOptionsConfigImpl::awsIamConfig(cluster_optref.value().get().info());
       if (aws_iam_config.has_value()) {
-        aws_iam_authenticator =
-            Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
-                server_context, aws_iam_config.value());
+        if (!ProtocolOptionsConfigImpl::authUsername(cluster_optref.value().get().info(),context.serverFactoryContext().api()).empty())
+        {
+          aws_iam_authenticator =
+              Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::initAwsIamAuthenticator(
+                  server_context, aws_iam_config.value());
+        }
+        else
+        {
+          ENVOY_LOG_MISC(warn, "No auth_username found for cluster {}, AWS IAM Authentication will be disabled for this cluster", cluster);
+        }
       }
     }
 

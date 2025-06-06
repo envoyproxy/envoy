@@ -90,13 +90,9 @@ ClientPtr ClientImpl::create(
   client->connection_->connect();
   client->connection_->noDelay(true);
 
+  // The presence of a valid auth_username is checked during filter initialization
   if (aws_iam_authenticator.has_value() && aws_iam_config.has_value()) {
-    if (auth_username.empty()) {
-      ENVOY_LOG(error, "Redis proxy has AWS IAM Authentication enabled, but auth_username is not "
-                       "set in the cluster configuration. IAM Authentication will be disabled.");
-    } else {
       client->sendAwsIamAuth(auth_username, aws_iam_config.value());
-    }
   }
 
   return client;
@@ -183,7 +179,6 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   // buffers
   if (!queue_enabled_) {
     // If buffer is full, flush. If the buffer was empty before the request, start the timer.
-    // if (!queue_enabled_ && encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
     if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
       flushBufferAndResetTimer();
     } else if (empty_buffer) {
