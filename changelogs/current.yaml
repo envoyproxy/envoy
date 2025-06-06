@@ -196,4 +196,8 @@ new_features:
     If configured, the OAuth2 filter will redirect users to this endpoint when they access the
     :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`. This allows users to
     be logged out of the Authorization server.
+- area: redis
+  change: |
+    ``redis_proxy`` filter now supports AWS IAM Authentication.
+
 deprecated:
