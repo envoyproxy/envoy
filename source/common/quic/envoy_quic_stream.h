@@ -143,6 +143,31 @@ public:
     return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
   }
 
+  void startHeaderBlock() override {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.do_not_validate_http3_pseudo_headers")) {
+      return;
+    }
+    header_validator_.StartHeaderBlock();
+  }
+
+  bool finishHeaderBlock(bool is_trailing_headers) override {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.restart_features.do_not_validate_http3_pseudo_headers")) {
+      return true;
+    }
+    if (is_trailing_headers) {
+      return header_validator_.FinishHeaderBlock(
+          quic_session_.perspective() == quic::Perspective::IS_CLIENT
+          ? http2::adapter::HeaderType::RESPONSE_TRAILER
+          : http2::adapter::HeaderType::REQUEST_TRAILER);
+    }
+    return header_validator_.FinishHeaderBlock(
+        quic_session_.perspective() == quic::Perspective::IS_CLIENT
+        ? http2::adapter::HeaderType::RESPONSE
+        : http2::adapter::HeaderType::REQUEST);
+  }
+
   absl::string_view responseDetails() override { return details_; }
 
   const StreamInfo::BytesMeterSharedPtr& bytesMeter() override { return bytes_meter_; }
@@ -189,6 +214,10 @@ protected:
   bool mustRejectMetadata(size_t bytes) {
     received_metadata_bytes_ += bytes;
     return received_metadata_bytes_ > 1 << 20;
+  }
+
+  http2::adapter::HeaderValidator& header_validator() {
+    return header_validator_;
   }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
