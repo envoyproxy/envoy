@@ -362,13 +362,11 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->streamInfo().downstreamAddressProvider().remoteAddress().get(),
-            *downstream_headers_,
-            [this](const std::string& key, const std::string& path, std::chrono::seconds max_age,
-                   Http::CookieAttributeRefVector attributes) {
+            *downstream_headers_, callbacks_->streamInfo(),
+            [this](absl::string_view key, absl::string_view path, uint64_t max_age,
+                   absl::Span<const Http::CookieAttribute> attributes) -> std::string {
               return addDownstreamSetCookie(key, path, max_age, attributes);
-            },
-            callbacks_->streamInfo().filterState());
+            });
       }
     }
     return {};
@@ -462,9 +460,9 @@ public:
    * @param  path the path of the cookie, or ""
    * @return std::string the value of the new cookie
    */
-  std::string addDownstreamSetCookie(const std::string& key, const std::string& path,
-                                     std::chrono::seconds max_age,
-                                     Http::CookieAttributeRefVector attributes) {
+  std::string addDownstreamSetCookie(absl::string_view key, absl::string_view path,
+                                     uint64_t max_age,
+                                     absl::Span<const Http::CookieAttribute> attributes) {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
     // Since the downstream port is part of the hashed value, multiple HTTP1

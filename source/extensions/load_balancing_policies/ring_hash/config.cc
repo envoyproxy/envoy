@@ -21,7 +21,7 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
       priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
       PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
                                                      healthy_panic_threshold, 100, 50),
-      typed_lb_config->lb_config_);
+      typed_lb_config->lb_config_, typed_lb_config->hash_policy_);
 }
 
 /**

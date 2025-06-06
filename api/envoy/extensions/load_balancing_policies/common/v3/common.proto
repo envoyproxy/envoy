@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.load_balancing_policies.common.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -136,4 +137,10 @@ message ConsistentHashingLbConfig {
   // This is an O(N) algorithm, unlike other load balancers. Using a lower ``hash_balance_factor`` results in more hosts
   // being probed, so use a higher value if you require better performance.
   google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
+
+  //  Specifies a list of hash policies to use for ring hash load balancing. If ``hash_policy`` is
+  // set, then
+  // :ref:`route level hash policy <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
+  // will be ignored.
+  repeated config.route.v3.RouteAction.HashPolicy hash_policy = 3;
 }
