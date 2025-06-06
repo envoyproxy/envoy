@@ -441,9 +441,9 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
   MULTI_CATCH(
       const EnvoyException& e,
       {
-        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+        ENVOY_LOG(critical, "error `{}` initializing config '{} {} {}'", e.what(),
                   options_.configProto().DebugString(), options_.configYaml(),
-                  options_.configPath(), e.what());
+                  options_.configPath());
         terminate();
         throw;
       },
@@ -880,7 +880,7 @@ void InstanceBase::onRuntimeReady() {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0, false);
       THROW_IF_NOT_OK_REF(factory_or_error.status());
       hds_delegate_ = maybeCreateHdsDelegate(
           serverFactoryContext(), *stats_store_.rootScope(),
