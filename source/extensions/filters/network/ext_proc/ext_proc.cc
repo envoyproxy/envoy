@@ -208,7 +208,6 @@ NetworkExtProcFilter::StreamOpenState NetworkExtProcFilter::openStream() {
   return StreamOpenState::Ok;
 }
 
-// Implement handleMessageTimeout
 void NetworkExtProcFilter::handleMessageTimeout(bool is_read) {
   ENVOY_CONN_LOG(warn, "{} message timeout occurred", read_callbacks_->connection(),
                  is_read ? "Read" : "Write");

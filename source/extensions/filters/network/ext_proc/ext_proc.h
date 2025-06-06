@@ -81,7 +81,7 @@ public:
   const std::chrono::milliseconds& messageTimeout() const { return message_timeout_; }
 
 private:
-  static constexpr uint64_t DefaultMessageTimeoutMs = 500;
+  static constexpr uint64_t DefaultMessageTimeoutMs = 200;
 
   NetworkExtProcStats generateStats(const std::string& prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat("network_ext_proc.", prefix);
