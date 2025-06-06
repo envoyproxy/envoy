@@ -239,18 +239,10 @@ public:
       return access_log_flush_interval_;
     }
     TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
-      if (tunneling_config_helper_) {
-        return {*tunneling_config_helper_};
-      } else {
-        return {};
-      }
+      return makeOptRefFromPtr<const TunnelingConfigHelper>(tunneling_config_helper_.get());
     }
     OnDemandConfigOptConstRef onDemandConfig() {
-      if (on_demand_config_) {
-        return {*on_demand_config_};
-      } else {
-        return {};
-      }
+      return makeOptRefFromPtr<const OnDemandConfig>(on_demand_config_.get());
     }
     const BackOffStrategyPtr& backoffStrategy() const { return backoff_strategy_; };
     const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
