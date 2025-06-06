@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/lua/protobuf_converter.h"
 
+#include "test/common/protobuf/deterministic_hash_test.pb.h"
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
@@ -673,6 +674,467 @@ TEST_F(LuaProtobufConverterTest, MapFields) {
 
   // Clean up
   lua_pop(lua_state_, 3);
+}
+
+// Add comprehensive native protobuf message tests
+TEST_F(LuaProtobufConverterTest, NativeProtobufSingleFieldsAllTypes) {
+  deterministichashtest::SingleFields message;
+
+  // Set all field types
+  message.set_b(true);
+  message.set_string("test_string");
+  message.set_int32(-123);
+  message.set_uint32(456);
+  message.set_int64(-789012345);
+  message.set_uint64(987654321);
+  message.set_bytes("binary_data");
+  message.set_db(3.14159);
+  message.set_f(2.718f);
+  message.set_e(deterministichashtest::FOO);
+
+  ProtobufConverterUtils::pushLuaTableFromMessage(lua_state_, message);
+
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+
+  // Test bool field
+  lua_getfield(lua_state_, -1, "b");
+  EXPECT_TRUE(lua_toboolean(lua_state_, -1));
+  lua_pop(lua_state_, 1);
+
+  // Test string field
+  lua_getfield(lua_state_, -1, "string");
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "test_string");
+  lua_pop(lua_state_, 1);
+
+  // Test int32 field
+  lua_getfield(lua_state_, -1, "int32");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), -123);
+  lua_pop(lua_state_, 1);
+
+  // Test uint32 field
+  lua_getfield(lua_state_, -1, "uint32");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 456);
+  lua_pop(lua_state_, 1);
+
+  // Test int64 field
+  lua_getfield(lua_state_, -1, "int64");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), -789012345);
+  lua_pop(lua_state_, 1);
+
+  // Test uint64 field
+  lua_getfield(lua_state_, -1, "uint64");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 987654321);
+  lua_pop(lua_state_, 1);
+
+  // Test bytes field
+  lua_getfield(lua_state_, -1, "bytes");
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "binary_data");
+  lua_pop(lua_state_, 1);
+
+  // Test double field
+  lua_getfield(lua_state_, -1, "db");
+  EXPECT_NEAR(lua_tonumber(lua_state_, -1), 3.14159, 0.00001);
+  lua_pop(lua_state_, 1);
+
+  // Test float field
+  lua_getfield(lua_state_, -1, "f");
+  EXPECT_NEAR(lua_tonumber(lua_state_, -1), 2.718, 0.001);
+  lua_pop(lua_state_, 1);
+
+  // Test enum field
+  lua_getfield(lua_state_, -1, "e");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), deterministichashtest::FOO);
+  lua_pop(lua_state_, 1);
+
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, NativeProtobufRepeatedFieldsAllTypes) {
+  deterministichashtest::RepeatedFields message;
+
+  // Add repeated bool values
+  message.add_bools(true);
+  message.add_bools(false);
+
+  // Add repeated string values
+  message.add_strings("first");
+  message.add_strings("second");
+
+  // Add repeated int32 values
+  message.add_int32s(-100);
+  message.add_int32s(200);
+
+  // Add repeated uint32 values
+  message.add_uint32s(300);
+  message.add_uint32s(400);
+
+  // Add repeated int64 values
+  message.add_int64s(-500000000);
+  message.add_int64s(600000000);
+
+  // Add repeated uint64 values
+  message.add_uint64s(700000000);
+  message.add_uint64s(800000000);
+
+  // Add repeated bytes values
+  message.add_byteses("bytes1");
+  message.add_byteses("bytes2");
+
+  // Add repeated double values
+  message.add_doubles(1.23);
+  message.add_doubles(4.56);
+
+  // Add repeated float values
+  message.add_floats(7.89f);
+  message.add_floats(10.11f);
+
+  // Add repeated enum values
+  message.add_enums(deterministichashtest::BAR);
+  message.add_enums(deterministichashtest::ZERO);
+
+  // Add repeated message values
+  auto* sub_msg1 = message.add_messages();
+  sub_msg1->set_index(111);
+  auto* sub_msg2 = message.add_messages();
+  sub_msg2->set_index(222);
+
+  ProtobufConverterUtils::pushLuaTableFromMessage(lua_state_, message);
+
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+
+  // Test repeated bools
+  lua_getfield(lua_state_, -1, "bools");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_TRUE(lua_toboolean(lua_state_, -1));
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_FALSE(lua_toboolean(lua_state_, -1));
+  lua_pop(lua_state_, 2);
+
+  // Test repeated strings
+  lua_getfield(lua_state_, -1, "strings");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "first");
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "second");
+  lua_pop(lua_state_, 2);
+
+  // Test repeated int32s
+  lua_getfield(lua_state_, -1, "int32s");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), -100);
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 200);
+  lua_pop(lua_state_, 2);
+
+  // Test repeated uint32s
+  lua_getfield(lua_state_, -1, "uint32s");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 300);
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 400);
+  lua_pop(lua_state_, 2);
+
+  // Test repeated int64s
+  lua_getfield(lua_state_, -1, "int64s");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), -500000000);
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 600000000);
+  lua_pop(lua_state_, 2);
+
+  // Test repeated uint64s
+  lua_getfield(lua_state_, -1, "uint64s");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 700000000);
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 800000000);
+  lua_pop(lua_state_, 2);
+
+  // Test repeated bytes
+  lua_getfield(lua_state_, -1, "byteses");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "bytes1");
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "bytes2");
+  lua_pop(lua_state_, 2);
+
+  // Test repeated doubles
+  lua_getfield(lua_state_, -1, "doubles");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_NEAR(lua_tonumber(lua_state_, -1), 1.23, 0.001);
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_NEAR(lua_tonumber(lua_state_, -1), 4.56, 0.001);
+  lua_pop(lua_state_, 2);
+
+  // Test repeated floats
+  lua_getfield(lua_state_, -1, "floats");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_NEAR(lua_tonumber(lua_state_, -1), 7.89, 0.001);
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_NEAR(lua_tonumber(lua_state_, -1), 10.11, 0.001);
+  lua_pop(lua_state_, 2);
+
+  // Test repeated enums
+  lua_getfield(lua_state_, -1, "enums");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), deterministichashtest::BAR);
+  lua_pop(lua_state_, 1);
+  lua_rawgeti(lua_state_, -1, 2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), deterministichashtest::ZERO);
+  lua_pop(lua_state_, 2);
+
+  // Test repeated messages
+  lua_getfield(lua_state_, -1, "messages");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_rawgeti(lua_state_, -1, 1);
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "index");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 111);
+  lua_pop(lua_state_, 2);
+  lua_rawgeti(lua_state_, -1, 2);
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "index");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 222);
+  lua_pop(lua_state_, 3);
+
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, NativeProtobufMapFieldsAllKeyTypes) {
+  deterministichashtest::Maps message;
+
+  // Test map<bool, string>
+  (*message.mutable_bool_string())[true] = "true_value";
+  (*message.mutable_bool_string())[false] = "false_value";
+
+  // Test map<string, bool>
+  (*message.mutable_string_bool())["key1"] = true;
+  (*message.mutable_string_bool())["key2"] = false;
+
+  // Test map<int32, uint32>
+  (*message.mutable_int32_uint32())[-100] = 200;
+  (*message.mutable_int32_uint32())[300] = 400;
+
+  // Test map<uint32, int32>
+  (*message.mutable_uint32_int32())[500] = -600;
+  (*message.mutable_uint32_int32())[700] = 800;
+
+  // Test map<int64, uint64>
+  (*message.mutable_int64_uint64())[-900000000] = 1000000000;
+  (*message.mutable_int64_uint64())[1100000000] = 1200000000;
+
+  // Test map<uint64, string>
+  (*message.mutable_uint64_int64())[1300000000] = "large_value";
+  (*message.mutable_uint64_int64())[1400000000] = "another_large_value";
+
+  ProtobufConverterUtils::pushLuaTableFromMessage(lua_state_, message);
+
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+
+  // Test bool key map
+  lua_getfield(lua_state_, -1, "bool_string");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_pushboolean(lua_state_, true);
+  lua_gettable(lua_state_, -2);
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "true_value");
+  lua_pop(lua_state_, 1);
+  lua_pushboolean(lua_state_, false);
+  lua_gettable(lua_state_, -2);
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "false_value");
+  lua_pop(lua_state_, 2);
+
+  // Test string key map
+  lua_getfield(lua_state_, -1, "string_bool");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "key1");
+  EXPECT_TRUE(lua_toboolean(lua_state_, -1));
+  lua_pop(lua_state_, 1);
+  lua_getfield(lua_state_, -1, "key2");
+  EXPECT_FALSE(lua_toboolean(lua_state_, -1));
+  lua_pop(lua_state_, 2);
+
+  // Test int32 key map
+  lua_getfield(lua_state_, -1, "int32_uint32");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_pushnumber(lua_state_, -100);
+  lua_gettable(lua_state_, -2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 200);
+  lua_pop(lua_state_, 1);
+  lua_pushnumber(lua_state_, 300);
+  lua_gettable(lua_state_, -2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 400);
+  lua_pop(lua_state_, 2);
+
+  // Test uint32 key map
+  lua_getfield(lua_state_, -1, "uint32_int32");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_pushnumber(lua_state_, 500);
+  lua_gettable(lua_state_, -2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), -600);
+  lua_pop(lua_state_, 1);
+  lua_pushnumber(lua_state_, 700);
+  lua_gettable(lua_state_, -2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 800);
+  lua_pop(lua_state_, 2);
+
+  // Test int64 key map
+  lua_getfield(lua_state_, -1, "int64_uint64");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_pushnumber(lua_state_, -900000000);
+  lua_gettable(lua_state_, -2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 1000000000);
+  lua_pop(lua_state_, 1);
+  lua_pushnumber(lua_state_, 1100000000);
+  lua_gettable(lua_state_, -2);
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 1200000000);
+  lua_pop(lua_state_, 2);
+
+  // Test uint64 key map
+  lua_getfield(lua_state_, -1, "uint64_int64");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_pushnumber(lua_state_, 1300000000);
+  lua_gettable(lua_state_, -2);
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "large_value");
+  lua_pop(lua_state_, 1);
+  lua_pushnumber(lua_state_, 1400000000);
+  lua_gettable(lua_state_, -2);
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "another_large_value");
+  lua_pop(lua_state_, 2);
+
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, EmptyFieldsAndMissingFields) {
+  deterministichashtest::SingleFields message;
+  // Only set some fields, leave others unset to test missing field logic
+  message.set_string("only_set_string");
+  message.set_int32(42);
+
+  ProtobufConverterUtils::pushLuaTableFromMessage(lua_state_, message);
+
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+
+  // Check that set fields exist
+  lua_getfield(lua_state_, -1, "string");
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "only_set_string");
+  lua_pop(lua_state_, 1);
+
+  lua_getfield(lua_state_, -1, "int32");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 42);
+  lua_pop(lua_state_, 1);
+
+  // Check that unset fields are not present (should be nil)
+  lua_getfield(lua_state_, -1, "b");
+  EXPECT_TRUE(lua_isnil(lua_state_, -1));
+  lua_pop(lua_state_, 1);
+
+  lua_getfield(lua_state_, -1, "uint64");
+  EXPECT_TRUE(lua_isnil(lua_state_, -1));
+  lua_pop(lua_state_, 1);
+
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, EmptyRepeatedFields) {
+  deterministichashtest::RepeatedFields message;
+  // Don't add any repeated field values to test empty repeated field logic
+
+  ProtobufConverterUtils::pushLuaTableFromMessage(lua_state_, message);
+
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+
+  // Count the number of fields in the table - should be 0 for empty repeated fields
+  lua_pushnil(lua_state_);
+  int field_count = 0;
+  while (lua_next(lua_state_, -2) != 0) {
+    field_count++;
+    lua_pop(lua_state_, 1);
+  }
+  EXPECT_EQ(field_count, 0);
+
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, EmptyMapFields) {
+  deterministichashtest::Maps message;
+  // Don't add any map values to test empty map field logic
+
+  ProtobufConverterUtils::pushLuaTableFromMessage(lua_state_, message);
+
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+
+  // Count the number of fields in the table - should be 0 for empty maps
+  lua_pushnil(lua_state_);
+  int field_count = 0;
+  while (lua_next(lua_state_, -2) != 0) {
+    field_count++;
+    lua_pop(lua_state_, 1);
+  }
+  EXPECT_EQ(field_count, 0);
+
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, NestedMessageWithRecursion) {
+  deterministichashtest::Recursion message;
+  message.set_index(1);
+
+  // Create a nested child
+  auto* child = message.mutable_child();
+  child->set_index(2);
+
+  // Create a grandchild
+  auto* grandchild = child->mutable_child();
+  grandchild->set_index(3);
+
+  ProtobufConverterUtils::pushLuaTableFromMessage(lua_state_, message);
+
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+
+  // Check root level
+  lua_getfield(lua_state_, -1, "index");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 1);
+  lua_pop(lua_state_, 1);
+
+  // Check child level
+  lua_getfield(lua_state_, -1, "child");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "index");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 2);
+  lua_pop(lua_state_, 1);
+
+  // Check grandchild level
+  lua_getfield(lua_state_, -1, "child");
+  ASSERT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "index");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 3);
+  lua_pop(lua_state_, 1);
+
+  // Grandchild should not have a child (unset field)
+  lua_getfield(lua_state_, -1, "child");
+  EXPECT_TRUE(lua_isnil(lua_state_, -1));
+  lua_pop(lua_state_, 3);
+
+  lua_pop(lua_state_, 1);
 }
 
 } // namespace

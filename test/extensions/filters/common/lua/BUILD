@@ -45,6 +45,7 @@ envoy_cc_test(
         ":lua_wrappers_lib",
         "//source/extensions/filters/common/lua:protobuf_converter_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
+        "//test/common/protobuf:deterministic_hash_test_proto_cc_proto",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
     ],
