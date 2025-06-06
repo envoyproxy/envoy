@@ -164,12 +164,33 @@ static std::string dateNow() {
   return formatter.fromTime(now);
 }
 
+static std::string dateNowPlus60s() {
+  static const DateFormatter formatter{"%a, %d %b %Y %H:%M:%S GMT"};
+  SystemTime t = Event::SimulatedTimeSystem().systemTime();
+  t += std::chrono::seconds(60);
+  return formatter.fromTime(t);
+}
+
 Http::ResponseHeaderMapPtr cacheableResponseHeaders(absl::optional<uint64_t> content_length = 0) {
   auto h = std::make_unique<Http::TestResponseHeaderMapImpl>();
   h->setStatus("200");
   h->addCopy(":scheme", "http");
   h->addCopy(":method", "GET");
   h->addCopy("cache-control", "max-age=86400");
+  h->addCopy("date", dateNow());
+  if (content_length.has_value()) {
+    h->addCopy("content-length", absl::StrCat(content_length.value()));
+  }
+  return h;
+}
+
+Http::ResponseHeaderMapPtr
+cacheableResponseHeadersByExpire(absl::optional<uint64_t> content_length = 0) {
+  auto h = std::make_unique<Http::TestResponseHeaderMapImpl>();
+  h->setStatus("200");
+  h->addCopy(":scheme", "http");
+  h->addCopy(":method", "GET");
+  h->addCopy("expires", dateNowPlus60s());
   h->addCopy("date", dateNow());
   if (content_length.has_value()) {
     h->addCopy("content-length", absl::StrCat(content_length.value()));
@@ -563,7 +584,7 @@ TEST_F(CacheSessionsTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAga
   EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _)).Times(2);
   ActiveLookupResultPtr result1, result2, result3;
-  auto response_headers = cacheableResponseHeaders();
+  auto response_headers = cacheableResponseHeadersByExpire();
   cache_sessions_->lookup(testLookupRequest("/a"),
                           [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
   cache_sessions_->lookup(testLookupRequest("/a"),
