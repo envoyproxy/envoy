@@ -1,0 +1,13 @@
+{
+  "ip_tags": [
+    {
+      "ip_tag_name": "ipv6_request",
+      "ip_list": [
+        {
+          "address_prefix": "2001:abcd:ef01:2345:6789:abcd:ef01:234",
+          "prefix_len": 64
+        }
+      ]
+    }
+  ]
+}

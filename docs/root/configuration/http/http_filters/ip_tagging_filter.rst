@@ -22,6 +22,12 @@ described in the paper `IP-address lookup using
 LC-tries <https://www.csc.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/text.pdf>`_ by S. Nilsson and
 G. Karlsson.
 
+IP tags can either be provided directly using the :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` api field or
+can be loaded from file if :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` api field is configured.
+Both :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` and file with *filename* from :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
+use :ref:`IPTag <envoy_v3_api_msg_data.ip_tagging.v3.IPTag>` proto format for defining individual ip tags.
+Ip tags will be dynamically reloaded if *watched_directory* is configured for :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
+and :ref:`ip_tags_refresh_rate <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_refresh_rate>` is set to value greater than zero.
 
 Configuration
 -------------
@@ -41,6 +47,8 @@ the owning HTTP connection manager.
         <tag_name>.hit, Counter, Total number of requests that have the ``<tag_name>`` applied to it
         no_hit, Counter, Total number of requests with no applicable IP tags
         total, Counter, Total number of requests the IP Tagging Filter operated on
+        reload_success, Counter, Total number of successful reloads of ip tags file
+        reload_error, Counter, Total number of failed reloads of ip tags file
 
 Runtime
 -------

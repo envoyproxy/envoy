@@ -129,6 +129,7 @@ proto_library(
         "//envoy/data/cluster/v3:pkg",
         "//envoy/data/core/v3:pkg",
         "//envoy/data/dns/v3:pkg",
+        "//envoy/data/ip_tagging/v3:pkg",
         "//envoy/data/tap/v3:pkg",
         "//envoy/extensions/access_loggers/file/v3:pkg",
         "//envoy/extensions/access_loggers/filters/cel/v3:pkg",
