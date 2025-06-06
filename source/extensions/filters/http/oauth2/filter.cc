@@ -767,7 +767,7 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
 // the request upstream.
 void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) {
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
-  if(cookies.empty()){
+  if (cookies.empty()) {
     return;
   }
 
@@ -792,7 +792,8 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
                              decryptToken(encrypted_refresh_token, config_->hmacSecret()));
   }
 
-  if (!encrypted_access_token.empty()||!encrypted_id_token.empty()||!encrypted_refresh_token.empty()){
+  if (!encrypted_access_token.empty() || !encrypted_id_token.empty() ||
+      !encrypted_refresh_token.empty()) {
     std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
     headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
   }

@@ -1616,15 +1616,18 @@ TEST_F(OAuth2Test, OAuthTestUpdatePathAfterSuccess) {
 
   EXPECT_EQ(request_headers.getHostValue(), "traffic.example.com");
   EXPECT_EQ(request_headers.getMethodValue(), Http::Headers::get().MethodValues.Get);
-  EXPECT_EQ(request_headers.getPathValue(), "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
-           "&state=" + TEST_ENCODED_STATE);
+  EXPECT_EQ(request_headers.getPathValue(),
+            "/_oauth?code=abcdefxyz123&scope=" + TEST_ENCODED_AUTH_SCOPES +
+                "&state=" + TEST_ENCODED_STATE);
   auto auth_header = request_headers.get(Http::CustomHeaders::get().Authorization);
   EXPECT_EQ(auth_header[0]->value().getStringView(), "Bearer access_code");
 
   auto cookies = Http::Utility::parseCookies(request_headers);
   EXPECT_EQ(cookies["OauthExpires"], "123");
   EXPECT_EQ(cookies["BearerToken"], "access_code");
-  EXPECT_EQ(cookies["OauthHMAC"], "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMjRlNjMxZTJmNTZkYzRmZTM0ZQ====");
+  EXPECT_EQ(
+      cookies["OauthHMAC"],
+      "ZTRlMzU5N2Q4ZDIwZWE5ZTU5NTg3YTU3YTcxZTU0NDFkMzY1ZTc1NjMyODYyMjRlNjMxZTJmNTZkYzRmZTM0ZQ====");
   EXPECT_EQ(cookies["OauthNonce"], TEST_CSRF_TOKEN);
 }
 
