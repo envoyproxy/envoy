@@ -182,10 +182,6 @@ using DynamicModuleHttpFilterSharedPtr = std::shared_ptr<DynamicModuleHttpFilter
  * than the one it was assigned to. This is created via
  * envoy_dynamic_module_callback_http_filter_scheduler_new and deleted via
  * envoy_dynamic_module_callback_http_filter_scheduler_delete.
- *
- * More precisely, this is used to post the onScheduled() method of the
- * DynamicModuleHttpFilter to the worker thread that the filter is assigned to
- * when the scheduler is destroyed.
  */
 class DynamicModuleHttpFilterScheduler {
 public:
