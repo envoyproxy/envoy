@@ -31,6 +31,8 @@ class CacheIntegrationTest : public Event::TestUsingSimulatedTime,
 public:
   void SetUp() override {
     useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
+    std::cerr << "XXXXX SetUp at " << formatter_.fromTime(std::chrono::system_clock::now())
+              << std::endl;
     // Set system time to cause Envoy's cached formatted time to match time on this thread.
     simTime().setSystemTime(std::chrono::hours(1));
   }
@@ -41,6 +43,8 @@ public:
     std::cerr << "XXXXX MidTearDown" << std::endl;
     HttpProtocolIntegrationTest::TearDown();
     std::cerr << "XXXXX /TearDown" << std::endl;
+    std::cerr << "XXXXX TearDown ends at " << formatter_.fromTime(std::chrono::system_clock::now())
+              << std::endl;
   }
 
   void initializeFilter(const std::string& config) {
