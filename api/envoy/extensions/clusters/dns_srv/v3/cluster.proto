@@ -9,8 +9,10 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clu
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Cluster Configuration Via SRV record]
+// This clustrer adds support for `DNS SRV <https://en.wikipedia.org/wiki/SRV_record>` discovery clusters.
 //
-//
+// This cluster type is used to discover endpoints via DNS SRV records. The cluster will resolve the
+// SRV name specified in the configuration, and will use the resolved endpoints as cluster endpoints.
 //
 // Example:
 //
