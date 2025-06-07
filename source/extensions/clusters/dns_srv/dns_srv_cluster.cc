@@ -146,7 +146,8 @@ void DnsSrvCluster::allTargetsResolved() {
 
       if (!host_or_status.ok()) {
         // TODO: update counter?
-        host_or_status.status().message();
+        info_->configUpdateStats().update_failure_.inc();
+
         ENVOY_LOG(debug, "Failed to create host record for: '{}': code={}, message='{}'",
                   target->srv_record_hostname_, host_or_status.status().raw_code(),
                   host_or_status.status().message());

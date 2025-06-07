@@ -126,7 +126,8 @@ private:
   struct PendingSrvResolution : public PendingResolution {
     PendingSrvResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
                          const std::string& dns_name, DnsResolverImpl& parent)
-        : PendingResolution(parent, callback, dispatcher, channel, dns_name), resolver_(parent) {}
+        : PendingResolution(parent, callback, dispatcher, channel,
+                            dns_name) /*, resolver_(parent)*/ {}
 
     /**
      * c-ares ares_query() query callback for initiation.
@@ -146,8 +147,11 @@ private:
     // wrapper function of call to ares_query().
     void startResolution();
 
+  private:
+    bool isResponseWithNoRecords(int status);
+
     // The resolver instance.
-    DnsResolverImpl& resolver_;
+    // DnsResolverImpl& resolver_;
   };
 
   class AddrInfoPendingResolution final : public PendingResolution {

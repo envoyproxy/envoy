@@ -951,22 +951,15 @@ public:
                                  });
   }
 
-  ActiveDnsQuery* resolveSrvWithNoRecords(const std::string& address,
-                                          const DnsResolver::ResolutionStatus expected_status,
-                                          const std::list<std::string>& expected_results) {
+  ActiveDnsQuery*
+  resolveSrvWithNoRecordsExpectation(const std::string& address,
+                                     const DnsResolver::ResolutionStatus expected_status) {
     return resolver_->resolveSrv(address,
                                  [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
                                            std::list<DnsResponse>&& results) -> void {
                                    EXPECT_EQ(expected_status, status);
 
-                                   std::list<std::string> srv_as_string_list;
-
-                                   for_each(results.begin(), results.end(), [&](DnsResponse resp) {
-                                     srv_as_string_list.emplace_back(resp.srv().asString());
-                                   });
-
-                                   EXPECT_THAT(srv_as_string_list,
-                                               UnorderedElementsAreArray(expected_results));
+                                   EXPECT_EQ(0, results.size());
 
                                    dispatcher_->exit();
                                  });
@@ -1941,19 +1934,11 @@ TEST_P(DnsImplTest, DnsSrv) {
   checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 
-  //   EXPECT_NE(nullptr, resolveSrvWithExpectations("_unique_name._tcp.example.com",
-  //   DnsLookupFamily::V4Only,
-  //                                              DnsResolver::ResolutionStatus::Completed,
-  //                                              {"1.2.3.4"},
-  //                                              {}, absl::nullopt));
-  //   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  //   checkStats(3 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
-  //              0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
-
-  // EXPECT_NE(nullptr, resolveWithNoRecordsExpectation("_unique_name._tcp.example.com",
-  // DnsLookupFamily::V6Only)); dispatcher_->run(Event::Dispatcher::RunType::Block); checkStats(4
-  // /*resolve_total*/, 0 /*pending_resolutions*/, 2 /*not_found*/,
-  //            0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+  EXPECT_NE(nullptr, resolveSrvWithNoRecordsExpectation("_non_existing._tcp.example.com",
+                                                        DnsResolver::ResolutionStatus::Completed));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
 class DnsImplFilterUnroutableFamiliesTest : public DnsImplTest {

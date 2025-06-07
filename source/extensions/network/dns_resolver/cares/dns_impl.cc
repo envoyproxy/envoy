@@ -644,6 +644,13 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(int status, int ti
   parent_.stats_.resolve_total_.inc();
   parent_.stats_.pending_resolutions_.dec();
 
+  if (status != ARES_SUCCESS) {
+    parent_.chargeGetAddrInfoErrorStats(status, timeouts);
+    ENVOY_LOG_EVENT(debug, "cares_srv_resolution_failure",
+                    "dns resolution for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
+                    status, ares_strerror(status));
+  }
+
   if (status == ARES_EDESTRUCTION) {
     ASSERT(owned_);
     delete this;
@@ -677,6 +684,11 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(int status, int ti
         fmt::format("srv resolve: ares_parse_srv_reply = {}", ares_strerror(parse_srv_status));
 
     ares_free_data(srv_reply);
+  } else if (isResponseWithNoRecords(status)) {
+    // Treat `ARES_ENODATA` or `ARES_ENOTFOUND` here as success to populate back the
+    // "empty records" response.
+    pending_response_.status_ = ResolutionStatus::Completed;
+    pending_response_.details_ = absl::StrCat("cares_norecords:", ares_strerror(status));
   } else {
     // resolve failed
     pending_response_.status_ = ResolutionStatus::Failure;
@@ -695,6 +707,10 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvFinishCallback(
     std::list<DnsResponse>&& srv_records) {
   pending_response_.address_list_.swap(srv_records);
   finishResolve();
+}
+
+bool DnsResolverImpl::PendingSrvResolution::isResponseWithNoRecords(int status) {
+  return status == ARES_ENODATA || status == ARES_ENOTFOUND;
 }
 
 // c-ares DNS resolver factory
