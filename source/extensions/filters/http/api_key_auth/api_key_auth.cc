@@ -173,8 +173,7 @@ Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap
     if (!header_name.get().empty()) {
       const std::string& client = credential->second;
       // Add the authenticated client to the request headers.
-      headers.setCopy(header_name, client);
-      ENVOY_LOG(debug, "Inserted client ID {} into header {}", client, header_name.get());
+      headers.setReferenceKey(header_name, client);
     }
 
     // If hide credentials is true, remove the API key from the request.
