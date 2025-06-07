@@ -12,6 +12,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
@@ -1193,6 +1194,8 @@ void Utility::transformUpgradeRequestFromH2toH1(RequestHeaderMap& headers) {
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Get);
   headers.setUpgrade(headers.getProtocolValue());
   headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
+  headers.setSecWebSocketKey(Utility::generateSecWebSocketKey());
+  headers.setReferenceSecWebSocketVersion("13");
   headers.removeProtocol();
 }
 
@@ -1639,6 +1642,17 @@ bool Utility::isValidRefererValue(absl::string_view value) {
   }
 
   return true;
+}
+
+std::string Utility::generateSecWebSocketKey() {
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  std::uniform_int_distribution<uint8_t> dis(0, 255);
+  std::array<uint8_t, 16> random_bytes;
+  for (auto& byte : random_bytes) {
+    byte = dis(gen);
+  }
+  return Base64::encode(reinterpret_cast<const char*>(random_bytes.data()), random_bytes.size());
 }
 
 } // namespace Http

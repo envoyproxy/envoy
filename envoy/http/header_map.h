@@ -253,6 +253,8 @@ private:
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(ProxyStatus)                                                                         \
   HEADER_FUNC(RequestId)                                                                           \
+  HEADER_FUNC(SecWebSocketKey)                                                                     \
+  HEADER_FUNC(SecWebSocketVersion)                                                                 \
   HEADER_FUNC(TransferEncoding)                                                                    \
   HEADER_FUNC(Upgrade)                                                                             \
   HEADER_FUNC(Via)
