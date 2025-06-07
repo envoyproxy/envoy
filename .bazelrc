@@ -36,9 +36,9 @@ build --incompatible_merge_fixed_and_default_shell_env
 build --http_timeout_scaling=6.0
 
 # bazel defaults to gcc/libstdc++ - so ensure it can work with no flags
-build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build --action_env=BAZEL_LINKOPTS=-lm
-build --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
+build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
+build:linux --action_env=BAZEL_LINKOPTS=-lm
+build:linux --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 
 # Pass CC, CXX and LLVM_CONFIG variables from the environment.
 # We assume they have stable values, so this won't cause action cache misses.
