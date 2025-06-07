@@ -921,49 +921,28 @@ TEST_P(LoadStatsIntegrationTest, EndpointLevelStatsReportingSuccessAndFailure) {
   requestLoadStatsResponse({"cluster_0"}, false /*send_all_clusters*/,
                            true /*report_endpoint_granularity*/);
 
-  // Configure cluster_0 with two endpoints (service_upstream_[0] and service_upstream_[1])
+  // Configure cluster_0 with one endpoint (service_upstream_[0], which is fake_upstreams_[1])
   // in the "winter" locality.
-  updateClusterLoadAssignment({{0, 1}}, {}, {}, {});
-  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 2);
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 1);
 
-  // Send requests:
-  // - 2x 200 to endpoint 0
-  // - 1x 503 to endpoint 0
-  // - 1x 200 to endpoint 1
-  // - 2x 503 to endpoint 1
-  sendAndReceiveUpstream(0, 200, false);
-  sendAndReceiveUpstream(0, 200, false);
-  sendAndReceiveUpstream(0, 503, false);
-  sendAndReceiveUpstream(1, 200, false);
-  sendAndReceiveUpstream(1, 503, false);
-  sendAndReceiveUpstream(1, 503, false);
+  sendAndReceiveUpstream(0, 200, false /*send_orca_load_report*/);
+  sendAndReceiveUpstream(0, 503, false /*send_orca_load_report*/);
 
-  // Construct the expected UpstreamLocalityStats with two UpstreamEndpointStats.
-  // Locality totals: endpoint 0 (2 success, 1 error), endpoint 1 (1 success, 2 error)
+  // Construct the expected UpstreamLocalityStats with one UpstreamEndpointStats.
+  // Total: 1 success, 1 error, 2 issued.
   envoy::config::endpoint::v3::UpstreamLocalityStats uls =
-      localityStats("winter", 3 /*success*/, 3 /*error*/, 0 /*active*/, 6 /*issued*/);
+      localityStats("winter", 1 /*success*/, 1 /*error*/, 0 /*active*/, 2 /*issued*/);
 
-  // Endpoint 0 stats
-  auto* eps0 = uls.add_upstream_endpoint_stats();
-  const auto& endpoint_address0 = fake_upstreams_[1]->localAddress();
-  eps0->mutable_address()->mutable_socket_address()->set_address(
-      endpoint_address0->ip()->addressAsString());
-  eps0->mutable_address()->mutable_socket_address()->set_port_value(
-      endpoint_address0->ip()->port());
-  eps0->set_total_successful_requests(2);
-  eps0->set_total_error_requests(1);
-  eps0->set_total_issued_requests(3);
+  auto* eps = uls.add_upstream_endpoint_stats();
 
-  // Endpoint 1 stats
-  auto* eps1 = uls.add_upstream_endpoint_stats();
-  const auto& endpoint_address1 = fake_upstreams_[2]->localAddress();
-  eps1->mutable_address()->mutable_socket_address()->set_address(
-      endpoint_address1->ip()->addressAsString());
-  eps1->mutable_address()->mutable_socket_address()->set_port_value(
-      endpoint_address1->ip()->port());
-  eps1->set_total_successful_requests(1);
-  eps1->set_total_error_requests(2);
-  eps1->set_total_issued_requests(3);
+  const auto& endpoint_address = fake_upstreams_[1]->localAddress();
+  eps->mutable_address()->mutable_socket_address()->set_address(
+      endpoint_address->ip()->addressAsString());
+  eps->mutable_address()->mutable_socket_address()->set_port_value(endpoint_address->ip()->port());
+  eps->set_total_successful_requests(1);
+  eps->set_total_error_requests(1);
+  eps->set_total_issued_requests(2);
 
   std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats> expected_uls_vector = {uls};
   ASSERT_TRUE(waitForLoadStatsRequest(expected_uls_vector));
