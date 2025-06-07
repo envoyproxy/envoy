@@ -87,11 +87,11 @@ private:
 /**
  * Configuration for forwarding client identity upstream and optionally hiding the API key.
  */
-class ForwardingInfo {
+class Forwarding {
 public:
-  ForwardingInfo(const ForwardingProto& proto_config);
+  Forwarding(const ForwardingProto& proto_config);
 
-  const Http::LowerCaseString& getHeaderName() const { return header_name_; }
+  const Http::LowerCaseString& headerName() const { return header_name_; }
   bool hideCredentials() const { return hide_credentials_; }
 
 private:
@@ -140,14 +140,14 @@ public:
   /**
    * To get the optional reference of the client forwarding configuration.
    */
-  OptRef<const ForwardingInfo> forwarding() const {
-    return forwarding_.has_value() ? makeOptRef(*forwarding_) : OptRef<const ForwardingInfo>{};
+  OptRef<const Forwarding> forwarding() const {
+    return forwarding_.has_value() ? makeOptRef(*forwarding_) : OptRef<const Forwarding>{};
   }
 
 private:
   const KeySources key_sources_;
   Credentials credentials_;
-  absl::optional<ForwardingInfo> forwarding_;
+  absl::optional<Forwarding> forwarding_;
 };
 
 class RouteConfig : public Router::RouteSpecificFilterConfig {
@@ -179,7 +179,7 @@ public:
    * To get the optional reference of the forwarding configuration. If this returns a valid
    * reference, then it will will override the default configuration.
    */
-  OptRef<const ForwardingInfo> forwarding() const { return override_config_.forwarding(); }
+  OptRef<const Forwarding> forwarding() const { return override_config_.forwarding(); }
 
 private:
   const ApiKeyAuthConfig override_config_;
@@ -210,7 +210,7 @@ public:
   /**
    * To get the optional reference of the forwarding configuration.
    */
-  OptRef<const ForwardingInfo> forwarding() const { return default_config_.forwarding(); }
+  OptRef<const Forwarding> forwarding() const { return default_config_.forwarding(); }
 
   /**
    * To get the stats of the filter.

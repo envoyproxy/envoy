@@ -486,7 +486,7 @@ TEST_F(FilterTest, KnownApiKeyButNotAllowed) {
   }
 }
 
-TEST_F(FilterTest, HeaderApiKeyWithForwardingInfo) {
+TEST_F(FilterTest, HeaderApiKeyWithForwarding) {
   const std::string config_yaml = R"EOF(
   credentials:
   - key: key1
@@ -514,7 +514,7 @@ TEST_F(FilterTest, HeaderApiKeyWithForwardingInfo) {
   EXPECT_EQ(request_headers.get_("authorization"), "Bearer key1");
 }
 
-TEST_F(FilterTest, QueryApiKeyWithForwardingInfo) {
+TEST_F(FilterTest, QueryApiKeyWithForwarding) {
   const std::string config_yaml = R"EOF(
   credentials:
   - key: key1
@@ -540,7 +540,7 @@ TEST_F(FilterTest, QueryApiKeyWithForwardingInfo) {
   EXPECT_EQ(path, "/path?api_key=key1");
 }
 
-TEST_F(FilterTest, CookieApiKeyWithForwardingInfo) {
+TEST_F(FilterTest, CookieApiKeyWithForwarding) {
   const std::string config_yaml = R"EOF(
   credentials:
   - key: key1
@@ -588,7 +588,7 @@ TEST_F(FilterTest, HideCredentialsHeader) {
   EXPECT_FALSE(request_headers.has("authorization"));
 }
 
-TEST_F(FilterTest, HideCredentialsHeaderWithForwardingInfo) {
+TEST_F(FilterTest, HideCredentialsHeaderWithForwarding) {
   const std::string config_yaml = R"EOF(
   credentials:
   - key: key1
@@ -613,7 +613,7 @@ TEST_F(FilterTest, HideCredentialsHeaderWithForwardingInfo) {
   EXPECT_FALSE(request_headers.has("authorization"));
 }
 
-TEST_F(FilterTest, HideCredentialsQueryWithForwardingInfo) {
+TEST_F(FilterTest, HideCredentialsQueryWithForwarding) {
   const std::string config_yaml = R"EOF(
   credentials:
   - key: key1
@@ -652,7 +652,7 @@ TEST_F(FilterTest, HideCredentialsQueryWithForwardingInfo) {
   }
 }
 
-TEST_F(FilterTest, HideCredentialsCookieWithForwardingInfo) {
+TEST_F(FilterTest, HideCredentialsCookieWithForwarding) {
   const std::string config_yaml = R"EOF(
   credentials:
   - key: key1
@@ -689,7 +689,7 @@ TEST_F(FilterTest, HideCredentialsCookieWithForwardingInfo) {
   }
 }
 
-TEST_F(FilterTest, HideCredentialsMultipleKeySourcesWithForwardingInfo) {
+TEST_F(FilterTest, HideCredentialsMultipleKeySourcesWithForwarding) {
   const std::string config_yaml = R"EOF(
   credentials:
   - key: key1
@@ -722,7 +722,7 @@ TEST_F(FilterTest, HideCredentialsMultipleKeySourcesWithForwardingInfo) {
   EXPECT_FALSE(request_headers.has("cookie"));
 }
 
-TEST_F(FilterTest, RouteConfigOverrideForwardingInfo) {
+TEST_F(FilterTest, RouteConfigOverrideForwarding) {
   const std::string config_yaml = R"EOF(
   credentials:
   - key: key1

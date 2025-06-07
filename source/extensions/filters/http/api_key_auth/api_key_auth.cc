@@ -101,7 +101,7 @@ void KeySources::Source::removeKey(Http::RequestHeaderMap& headers) const {
   }
 }
 
-ForwardingInfo::ForwardingInfo(const ForwardingProto& proto_config) {
+Forwarding::Forwarding(const ForwardingProto& proto_config) {
   header_name_ = Http::LowerCaseString(proto_config.header());
   hide_credentials_ = proto_config.hide_credentials();
 }
@@ -119,7 +119,7 @@ Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap
 
   OptRef<const Credentials> credentials = config_->credentials();
   OptRef<const KeySources> key_sources = config_->keySources();
-  OptRef<const ForwardingInfo> forwarding = config_->forwarding();
+  OptRef<const Forwarding> forwarding = config_->forwarding();
 
   // If there is an override config, then try to override the API key map, key source and
   // forwarding info.
@@ -132,7 +132,7 @@ Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap
         route_key_sources.has_value()) {
       key_sources = route_key_sources;
     }
-    if (OptRef<const ForwardingInfo> route_forwarding = route_config->forwarding();
+    if (OptRef<const Forwarding> route_forwarding = route_config->forwarding();
         route_forwarding.has_value()) {
       forwarding = route_forwarding;
     }
@@ -168,7 +168,7 @@ Http::FilterHeadersStatus ApiKeyAuthFilter::decodeHeaders(Http::RequestHeaderMap
   }
 
   if (forwarding.has_value()) {
-    const Http::LowerCaseString& header_name = forwarding->getHeaderName();
+    const Http::LowerCaseString& header_name = forwarding->headerName();
 
     if (!header_name.get().empty()) {
       const std::string& client = credential->second;
