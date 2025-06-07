@@ -402,6 +402,17 @@ CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t v
       });
 }
 
+CAPIStatus envoyGoFilterHttpSetUpstreamOverrideHost(void* s, void* host_data, int host_len,
+                                                    bool strict) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s,
+      [host_data, host_len, strict](std::shared_ptr<Filter>& filter,
+                                    ProcessorState& state) -> CAPIStatus {
+        auto host_str = stringViewFromGoPointer(host_data, host_len);
+        return filter->setUpstreamOverrideHost(state, host_str, strict);
+      });
+}
+
 #ifdef __cplusplus
 }
 #endif
