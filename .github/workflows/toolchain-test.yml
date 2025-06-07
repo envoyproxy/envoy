@@ -1,0 +1,42 @@
+name: Toolchain Default Behavior Test
+
+permissions:
+  contents: read
+on:
+  pull_request:
+    paths:
+    - '.bazelrc'
+    - 'bazel/BUILD'
+    - 'bazel/**/*.bzl'
+    - '.github/workflows/toolchain-test.yml'
+    - 'ci/matrix/**'
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  toolchain-test:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: "GCC-13 Only"
+          service: "gcc"
+        - name: "LLVM Only"
+          service: "llvm"
+        - name: "Both GCC & LLVM"
+          service: "all"
+        - name: "No Compilers"
+          service: "none"
+    name: "Test: ${{ matrix.name }}"
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+      with:
+        fetch-depth: 0  # Full history for proper git operations
+    - name: Run matrix test
+      run: |
+        cd ci/matrix
+        export UID
+        docker compose run --rm --build ${{ matrix.service }}

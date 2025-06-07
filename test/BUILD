@@ -1,4 +1,5 @@
 load("@aspect_bazel_lib//lib:yq.bzl", "yq")
+load("@rules_cc//cc:defs.bzl", "cc_binary")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
@@ -115,4 +116,9 @@ envoy_pch_library(
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
+)
+
+cc_binary(
+    name = "toolchain",
+    srcs = ["detect_toolchain.cc"],
 )
