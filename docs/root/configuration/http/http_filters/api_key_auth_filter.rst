@@ -26,6 +26,23 @@ An example configuration of the filter may look like the following:
     :linenos:
     :caption: :download:`api-key-auth-filter.yaml <_include/api-key-auth-filter.yaml>`
 
+.. note::
+
+  This filter supports forwarding client information upstream via a configurable request header.
+  Additionally, it can also be configured to strip the API key from the request before forwarding.
+  These two options can be enabled separately or together, depending on the desired behavior.
+  For more information, check out :ref:`forwarding configuration
+  <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Forwarding>`.
+
+  A sample configuration is as follows:
+
+  .. literalinclude:: _include/api-key-auth-filter.yaml
+      :language: yaml
+      :lines: 57-69
+      :emphasize-lines: 11-13
+      :linenos:
+      :caption: :download:`api-key-auth-filter.yaml <_include/api-key-auth-filter.yaml>`
+
 Per-Route Configuration
 -----------------------
 

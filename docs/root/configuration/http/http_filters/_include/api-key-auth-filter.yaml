@@ -64,6 +64,9 @@ static_resources:
                 client: another_client
               key_sources:
               - header: Authorization
+              forwarding:
+                header: x-client-id
+                hide_credentials: false
           - name: envoy.filters.http.router
             typed_config:
               '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
