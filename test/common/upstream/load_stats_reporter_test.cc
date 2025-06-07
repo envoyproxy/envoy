@@ -312,9 +312,12 @@ TEST_F(LoadStatsReporterTest, EndpointLevelLoadStatsReporting) {
   ::envoy::config::core::v3::Locality locality;
   locality.set_region("test_region");
 
-  HostSharedPtr host = makeTestHost("host", locality);
-  host_set.hosts_per_locality_ = makeHostsPerLocality({{host}});
-  addStats(host, 10.0);
+  // Create two hosts with different metric values
+  HostSharedPtr host1 = makeTestHost("host1", locality);
+  HostSharedPtr host2 = makeTestHost("host2", locality);
+  host_set.hosts_per_locality_ = makeHostsPerLocality({{host1, host2}});
+  addStats(host1, 10.0); // metric_a = 10.0
+  addStats(host2, 20.0); // metric_a = 20.0
 
   cluster.info_->eds_service_name_ = "eds_service_for_foo";
 
@@ -333,16 +336,26 @@ TEST_F(LoadStatsReporterTest, EndpointLevelLoadStatsReporting) {
     auto* expected_locality_stats = expected_cluster_stats.add_upstream_locality_stats();
     expected_locality_stats->mutable_locality()->MergeFrom(locality);
     expected_locality_stats->set_priority(0);
-    expected_locality_stats->set_total_successful_requests(1);
-    expected_locality_stats->set_total_issued_requests(1);
-    addStatExpectation(expected_locality_stats, "metric_a", 1, 10.0);
+    expected_locality_stats->set_total_successful_requests(2);
+    expected_locality_stats->set_total_issued_requests(2);
+    // Locality metric is the sum
+    addStatExpectation(expected_locality_stats, "metric_a", 2, 30.0);
 
-    auto* endpoint_stats = expected_locality_stats->add_upstream_endpoint_stats();
-    endpoint_stats->mutable_address()->mutable_socket_address()->set_address("127.0.0.1");
-    endpoint_stats->mutable_address()->mutable_socket_address()->set_port_value(80);
-    endpoint_stats->set_total_successful_requests(1);
-    endpoint_stats->set_total_issued_requests(1);
-    addEndpointStatExpectation(endpoint_stats, "metric_a", 1, 10.0);
+    // Endpoint 1
+    auto* endpoint_stats1 = expected_locality_stats->add_upstream_endpoint_stats();
+    endpoint_stats1->mutable_address()->mutable_socket_address()->set_address("127.0.0.1");
+    endpoint_stats1->mutable_address()->mutable_socket_address()->set_port_value(80);
+    endpoint_stats1->set_total_successful_requests(1);
+    endpoint_stats1->set_total_issued_requests(1);
+    addEndpointStatExpectation(endpoint_stats1, "metric_a", 1, 10.0);
+
+    // Endpoint 2
+    auto* endpoint_stats2 = expected_locality_stats->add_upstream_endpoint_stats();
+    endpoint_stats2->mutable_address()->mutable_socket_address()->set_address("127.0.0.1");
+    endpoint_stats2->mutable_address()->mutable_socket_address()->set_port_value(80);
+    endpoint_stats2->set_total_successful_requests(1);
+    endpoint_stats2->set_total_issued_requests(1);
+    addEndpointStatExpectation(endpoint_stats2, "metric_a", 1, 20.0);
 
     std::vector<envoy::config::endpoint::v3::ClusterStats> expected_cluster_stats_vector = {
         expected_cluster_stats};

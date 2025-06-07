@@ -95,6 +95,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           uint64_t rq_issued;
         };
         absl::flat_hash_map<const Host*, EndpointStats> endpoint_stats_map;
+        absl::flat_hash_map<const Host*, std::unique_ptr<LoadMetricStats::StatMap>>
+            endpoint_metric_stats_map;
 
         for (const HostSharedPtr& host : hosts) {
           uint64_t host_rq_success = host->stats().rq_success_.latch();
@@ -109,6 +111,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
             const std::unique_ptr<LoadMetricStats::StatMap> latched_stats =
                 host->loadMetricStats().latch();
             if (latched_stats != nullptr) {
+              endpoint_metric_stats_map[host.get()] =
+                  std::make_unique<LoadMetricStats::StatMap>(*latched_stats);
               for (const auto& metric : *latched_stats) {
                 const std::string& name = metric.first;
                 LoadMetricStats::Stat& stat = load_metrics[name];
@@ -162,13 +166,15 @@ void LoadStatsReporter::sendLoadStatsRequest() {
               upstream_endpoint_stats->set_total_issued_requests(stats.rq_issued);
 
               // Add load metric stats.
-              for (const auto& metric : load_metrics) {
-                auto* const endpoint_metric_stats =
-                    upstream_endpoint_stats->add_load_metric_stats();
-                endpoint_metric_stats->set_metric_name(metric.first);
-                endpoint_metric_stats->set_num_requests_finished_with_metric(
-                    metric.second.num_requests_with_metric);
-                endpoint_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+              const auto it = endpoint_metric_stats_map.find(host.get());
+              if (it != endpoint_metric_stats_map.end() && it->second != nullptr) {
+                for (const auto& metric : *(it->second)) {
+                  auto* endpoint_metric_stats = upstream_endpoint_stats->add_load_metric_stats();
+                  endpoint_metric_stats->set_metric_name(metric.first);
+                  endpoint_metric_stats->set_num_requests_finished_with_metric(
+                      metric.second.num_requests_with_metric);
+                  endpoint_metric_stats->set_total_metric_value(metric.second.total_metric_value);
+                }
               }
             }
           }
