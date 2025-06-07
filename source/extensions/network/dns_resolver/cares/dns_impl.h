@@ -60,6 +60,8 @@ public:
   // Network::DnsResolver
   ActiveDnsQuery* resolve(const std::string& dns_name, DnsLookupFamily dns_lookup_family,
                           ResolveCb callback) override;
+  // Network::DnsResolver
+  ActiveDnsQuery* resolveSrv(const std::string& dns_name, ResolveCb callback) override;
   void resetNetworking() override { reinitializeChannel(); }
 
 private:
@@ -116,6 +118,40 @@ private:
     // or `ARES_ENODATA` or `ARES_ENOTFOUND`reply. In the dual_resolution case __any__ ARES_SUCCESS
     // reply will result in a ResolutionStatus::Completed callback.
     PendingResponse pending_response_{ResolutionStatus::Failure, {}};
+  };
+
+  /*
+  DnsResolverImpl& parent, ResolveCb callback, Event::Dispatcher& dispatcher,
+                        ares_channel channel, const std::string& dns_name*/
+  struct PendingSrvResolution : public PendingResolution {
+    PendingSrvResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
+                         const std::string& dns_name, DnsResolverImpl& parent)
+        : PendingResolution(parent, callback, dispatcher, channel,
+                            dns_name) /*, resolver_(parent)*/ {}
+
+    /**
+     * c-ares ares_query() query callback for initiation.
+     * @param status the status of the call to ares_query().
+     * @param timeouts the number of times the request timed out.
+     * @param buf the result buffer.
+     * @param len the result buffer length.
+     */
+    void onAresSrvCallback(int status, int timeouts, unsigned char* buf, int len);
+
+    /**
+     * c-ares ares_query() query callback for completion.
+     * @param srv_records a list of SRV records.
+     */
+    void onAresSrvFinishCallback(std::list<DnsResponse>&& srv_records);
+
+    // wrapper function of call to ares_query().
+    void startResolution();
+
+  private:
+    bool isResponseWithNoRecords(int status);
+
+    // The resolver instance.
+    // DnsResolverImpl& resolver_;
   };
 
   class AddrInfoPendingResolution final : public PendingResolution {

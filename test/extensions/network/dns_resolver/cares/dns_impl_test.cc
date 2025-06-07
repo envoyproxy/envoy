@@ -67,15 +67,19 @@ using HostMap = absl::node_hash_map<std::string, IpList>;
 // Map from hostname to CNAME
 using CNameMap = absl::node_hash_map<std::string, std::string>;
 
+using SrvList = std::list<SrvResponse>;
+using SrvMap = absl::node_hash_map<std::string, SrvList>;
+
 class TestDnsServerQuery {
 public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
-                     const CNameMap& cnames, const std::chrono::seconds& record_ttl,
-                     const std::chrono::seconds& cname_ttl_, bool refused, bool error_on_a,
-                     bool error_on_aaaa, bool no_response)
+                     const CNameMap& cnames, const SrvMap& hosts_srv,
+                     const std::chrono::seconds& record_ttl, const std::chrono::seconds& cname_ttl_,
+                     bool refused, bool error_on_a, bool error_on_aaaa, bool no_response)
       : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
-        cnames_(cnames), record_ttl_(record_ttl), cname_ttl_(cname_ttl_), refused_(refused),
-        error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa), no_response_(no_response) {
+        cnames_(cnames), hosts_srv_(hosts_srv), record_ttl_(record_ttl), cname_ttl_(cname_ttl_),
+        refused_(refused), error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa),
+        no_response_(no_response) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -159,11 +163,24 @@ private:
 
         ares_free_string(name);
 
-        ASSERT_TRUE(q_type == T_A || q_type == T_AAAA);
+        ASSERT_TRUE(q_type == T_A || q_type == T_AAAA || q_type == T_SRV);
         if (q_type == T_A || q_type == T_AAAA) {
           const auto addrs = getAddrs(q_type, lookup_name);
           auto buf = createAddrResolutionBuffer(q_type, addrs, request, name_len, encoded_cname,
                                                 encoded_name);
+          if (!parent_.no_response_) {
+            parent_.connection_->write(buf, false);
+          }
+
+          // Reset query state, time for the next one.
+          buffer_.drain(size_);
+          size_ = 0;
+        } else if (q_type == T_SRV) {
+          SrvList srvs;
+          if (auto p = parent_.hosts_srv_.find(lookup_name); p != parent_.hosts_srv_.end()) {
+            srvs = p->second;
+          }
+          auto buf = createSrvResolutionBuffer(q_type, srvs, request, name_len, encoded_name);
           if (!parent_.no_response_) {
             parent_.connection_->write(buf, false);
           }
@@ -206,12 +223,14 @@ private:
         if (it != parent_.hosts_aaaa_.end()) {
           ips = it->second;
         }
+      } else {
+        throw std::runtime_error(fmt::format("Unknown record type: {}", q_type));
       }
       return ips;
     }
 
     size_t getAnswersLen(int q_type, const std::list<std::string>& addrs, int query_name_len,
-                         const std::string& cname) {
+                         const std::string& cname, const SrvList& srvs) {
       size_t len = 0;
 
       if (!cname.empty()) {
@@ -223,9 +242,19 @@ private:
         len += addrs.size() * (query_name_len + RRFIXEDSZ + sizeof(in_addr));
       } else if (q_type == T_AAAA) {
         len += addrs.size() * (query_name_len + RRFIXEDSZ + sizeof(in6_addr));
+      } else if (q_type == T_SRV) {
+        for (const auto& srv : srvs) {
+          len += query_name_len + RRFIXEDSZ + srvRecordLen(srv);
+        }
       }
 
       return len;
+    }
+
+    size_t srvRecordLen(const SrvResponse& srv) {
+      const auto encoded_target_name = TestDnsServerQuery::encodeDnsName(srv.target_);
+      return 3 * 2 // prio, weigth, port
+             + encoded_target_name.size() + 1 /* terminal zero-byte */;
     }
 
     void writeHeaderAndQuestion(Buffer::OwnedImpl& buf, const int q_type, uint16_t answer_count,
@@ -289,6 +318,32 @@ private:
       }
     }
 
+    void writeSrvRecord(Buffer::OwnedImpl& buf, const std::string& encoded_name,
+                        const SrvResponse& srv) {
+      unsigned char response_rr_fixed[RRFIXEDSZ];
+
+      DNS_RR_SET_TYPE(response_rr_fixed, T_SRV);
+      DNS_RR_SET_LEN(response_rr_fixed, srvRecordLen(srv));
+
+      DNS_RR_SET_CLASS(response_rr_fixed, C_IN);
+      DNS_RR_SET_TTL(response_rr_fixed, parent_.record_ttl_.count());
+
+      buf.add(encoded_name.c_str(), encoded_name.size() + 1);
+      buf.add(response_rr_fixed, RRFIXEDSZ);
+
+      uint16_t priority = htons(srv.priority_);
+      buf.add(&priority, sizeof priority);
+
+      uint16_t weight = htons(srv.weight_);
+      buf.add(&weight, sizeof weight);
+
+      uint16_t port_buf = htons(srv.port_);
+      buf.add(&port_buf, sizeof port_buf);
+
+      const auto encoded_target_name = TestDnsServerQuery::encodeDnsName(srv.target_);
+      buf.add(encoded_target_name.c_str(), encoded_target_name.size() + 1);
+    }
+
     void writeCnameRecord(Buffer::OwnedImpl& buf, const std::string& cname,
                           const std::string& encoded_name) {
       unsigned char cname_rr_fixed[RRFIXEDSZ];
@@ -307,7 +362,7 @@ private:
                                                  const std::string& encoded_name) {
       Buffer::OwnedImpl write_buffer;
       const size_t qfield_size = name_len + QFIXEDSZ;
-      const size_t answer_byte_len = getAnswersLen(q_type, ips, name_len, encoded_cname);
+      const size_t answer_byte_len = getAnswersLen(q_type, ips, name_len, encoded_cname, {});
       int answer_count = ips.size();
       answer_count += !encoded_cname.empty() ? 1 : 0;
 
@@ -325,6 +380,26 @@ private:
 
       return write_buffer;
     }
+
+    Buffer::OwnedImpl createSrvResolutionBuffer(const int q_type, const SrvList srvs,
+                                                unsigned char* request, long name_len,
+                                                const std::string& encoded_name) {
+      Buffer::OwnedImpl write_buffer;
+      const size_t qfield_size = name_len + QFIXEDSZ;
+      const size_t answer_byte_len = getAnswersLen(q_type, {}, name_len, "", srvs);
+      int answer_count = srvs.size();
+
+      ASSERT(q_type == T_SRV);
+      // Write response header
+      writeHeaderAndQuestion(write_buffer, q_type, answer_count, answer_byte_len, qfield_size,
+                             request);
+
+      for (const auto& srv : srvs) {
+        writeSrvRecord(write_buffer, encoded_name, srv);
+      }
+
+      return write_buffer;
+    }
   };
 
 private:
@@ -332,6 +407,7 @@ private:
   const HostMap& hosts_a_;
   const HostMap& hosts_aaaa_;
   const CNameMap& cnames_;
+  const SrvMap& hosts_srv_;
   const std::chrono::seconds& record_ttl_;
   const std::chrono::seconds& cname_ttl_;
   const bool refused_;
@@ -352,8 +428,8 @@ public:
     Network::ConnectionPtr new_connection = dispatcher_.createServerConnection(
         std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
     TestDnsServerQuery* query = new TestDnsServerQuery(
-        std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_, record_ttl_, cname_ttl_,
-        refused_, error_on_a_, error_on_aaaa_, no_response_);
+        std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_, hosts_srv_, record_ttl_,
+        cname_ttl_, refused_, error_on_a_, error_on_aaaa_, no_response_);
     queries_.emplace_back(query);
   }
 
@@ -365,7 +441,13 @@ public:
       hosts_a_[hostname] = ip;
     } else if (type == RecordType::AAAA) {
       hosts_aaaa_[hostname] = ip;
+    } else {
+      throw std::runtime_error(fmt::format("Unknown type: {}", static_cast<int>(type)));
     }
+  }
+
+  void addSrvRecord(const std::string& hostname, const SrvList& srv_records) {
+    hosts_srv_[hostname] = srv_records;
   }
 
   void addCName(const std::string& hostname, const std::string& cname) {
@@ -383,6 +465,7 @@ private:
 
   HostMap hosts_a_;
   HostMap hosts_aaaa_;
+  SrvMap hosts_srv_;
   CNameMap cnames_;
   std::chrono::seconds record_ttl_;
   std::chrono::seconds cname_ttl_;
@@ -846,6 +929,41 @@ public:
 
           dispatcher_->exit();
         });
+  }
+
+  ActiveDnsQuery* resolveSrvWithExpectations(const std::string& address,
+                                             const DnsResolver::ResolutionStatus expected_status,
+                                             const std::list<std::string>& expected_results) {
+    return resolver_->resolveSrv(address,
+                                 [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                   EXPECT_EQ(expected_status, status);
+
+                                   std::list<std::string> srv_as_string_list;
+
+                                   for_each(results.begin(), results.end(), [&](DnsResponse resp) {
+                                     srv_as_string_list.emplace_back(resp.srv().asString());
+                                   });
+
+                                   EXPECT_THAT(srv_as_string_list,
+                                               UnorderedElementsAreArray(expected_results));
+
+                                   dispatcher_->exit();
+                                 });
+  }
+
+  ActiveDnsQuery*
+  resolveSrvWithNoRecordsExpectation(const std::string& address,
+                                     const DnsResolver::ResolutionStatus expected_status) {
+    return resolver_->resolveSrv(address,
+                                 [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                                           std::list<DnsResponse>&& results) -> void {
+                                   EXPECT_EQ(expected_status, status);
+
+                                   EXPECT_EQ(0, results.size());
+
+                                   dispatcher_->exit();
+                                 });
   }
 
   ActiveDnsQuery* resolveWithNoRecordsExpectation(const std::string& address,
@@ -1803,6 +1921,25 @@ TEST_P(DnsImplTest, ErrorWithAcceptNodataEnabled) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(7 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
              7 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+}
+
+TEST_P(DnsImplTest, DnsSrv) {
+  server_->addSrvRecord("_unique_name._tcp.example.com",
+                        {SrvResponse{/*priority_*/ 0, /*weight_*/ 0, /*port_*/ 9090,
+                                     /*target_*/ "unique-svc.local"}});
+  EXPECT_NE(nullptr, resolveSrvWithExpectations("_unique_name._tcp.example.com",
+                                                DnsResolver::ResolutionStatus::Completed,
+                                                {"0 0 9090 unique-svc.local"}));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+
+  EXPECT_NE(nullptr, resolveSrvWithNoRecordsExpectation("_non_existing._tcp.example.com",
+                                                        DnsResolver::ResolutionStatus::Completed));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
+             0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
 class DnsImplFilterUnroutableFamiliesTest : public DnsImplTest {
