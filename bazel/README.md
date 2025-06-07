@@ -105,19 +105,26 @@ for how to update or override dependencies.
     bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
     ```
 
-    This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang as default, run the following:
+    This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang with libc++ as default, run the following:
     ```console
-    echo "build --config=clang" >> user.bazelrc
+    echo "build --config=clang-libc++" >> user.bazelrc
     ```
 
-    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
+    Note: `libc++` is the recommended standard library for Envoy development.
 
     #### Config Flag Choices
-    Different [config](https://bazel.build/run/bazelrc/#config) flags specify the compiler libraries:
+    Different [config](https://bazel.build/run/bazelrc/#config) flags specify the compiler and standard library:
 
-    - `--config=libc++` means using `clang` + `libc++`
-    - `--config=clang` means using `clang` + `libstdc++`
-    - no config flag means using `gcc` + `libstdc++`
+    - `--config=clang-libc++` means using `clang` + `libc++` (LLVM standard library) - **Recommended**
+    - `--config=gcc` means using `gcc` + `libstdc++` (GNU standard library)
+    - `--config=clang` means using `clang` with system default standard library
+    - no config flag means using system default compiler with `libc++` (default)
+
+    Note: `clang` + `libstdc++` combination is possible but not tested or supported.
+
+    You can also use the base configs separately:
+    - `--config=libc++` provides just the libc++ standard library flags (default)
+    - `--config=libstdc++` provides just the libstdc++ standard library flags
 
 
     ### macOS
@@ -340,13 +347,13 @@ set different options. See below to configure test IP versions.
 
 To link Envoy against libc++, follow the [quick start](#quick-start-bazel-build-for-developers) to setup Clang+LLVM and run:
 ```
-bazel build --config=libc++ envoy
+bazel build --config=clang-libc++ envoy
 ```
 
 Or use our configuration with Remote Execution or Docker sandbox, pass `--config=remote-clang-libc++` or
 `--config=docker-clang-libc++` respectively.
 
-If you want to make libc++ as default, add a line `build --config=libc++` to the `user.bazelrc` file in Envoy source root.
+If you want to make libc++ as default, add a line `build --config=clang-libc++` to the `user.bazelrc` file in Envoy source root.
 
 ## Using a compiler toolchain in a non-standard location
 
@@ -442,7 +449,7 @@ bazel test //test/... --test_env=HEAPCHECK=minimal
 ```
 
 If you see a leak detected, by default the reported offsets will require `addr2line` interpretation.
-You can run under `--config=clang-asan` to have this automatically applied.
+You can run under `--config=asan` to have this automatically applied.
 
 Bazel will by default cache successful test results. To force it to rerun tests:
 
@@ -585,10 +592,9 @@ bazel build envoy --config=sizeopt
 
 ## Sanitizers
 
-To build and run tests with the gcc compiler's [address sanitizer
-(ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and
-[undefined behavior
-(UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:
+**Note: Sanitizer testing requires the Clang toolchain.**
+
+To build and run tests with [address sanitizer (ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and [undefined behavior (UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:
 
 ```
 bazel test -c dbg --config=asan //test/...
@@ -597,12 +603,6 @@ bazel test -c dbg --config=asan //test/...
 The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above. If the
 stack trace is not symbolized, try setting the ASAN_SYMBOLIZER_PATH environment variable to point to the
 llvm-symbolizer binary (or make sure the llvm-symbolizer is in your $PATH).
-
-If you have clang-5.0 or newer, additional checks are provided with:
-
-```
-bazel test -c dbg --config=clang-asan //test/...
-```
 
 [Thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) tests rely on
 a TSAN-instrumented version of libc++ and can be run under the docker sandbox:

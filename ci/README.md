@@ -152,8 +152,8 @@ export BAZEL_BUILD_EXTRA_OPTIONS=--config=my-remote-cache
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
 * `api` &mdash; build and run API tests under `-c fastbuild` with clang.
-* `asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
-* `asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=clang-asan` with clang.
+* `asan` &mdash; build and run tests under `-c dbg --config=asan` with clang.
+* `asan <test>` &mdash; build and run a specified test or test dir under `-c dbg --config=asan` with clang.
 * `debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `debug <test>` &mdash; build Envoy static binary and run a specified test or test dir under `-c dbg`.
 * `debug.server_only` &mdash; build Envoy static binary under `-c dbg`.

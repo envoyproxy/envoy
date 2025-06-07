@@ -296,14 +296,9 @@ case $CI_TARGET in
 
     asan)
         setup_clang_toolchain
-        if [[ -n "$ENVOY_RBE" ]]; then
-            ASAN_CONFIG="--config=rbe-toolchain-asan"
-        else
-            ASAN_CONFIG="--config=clang-asan"
-        fi
         BAZEL_BUILD_OPTIONS+=(
             -c dbg
-            "${ASAN_CONFIG}"
+            "--config=asan"
             "--build_tests_only"
             "--remote_download_minimal")
         echo "bazel ASAN/UBSAN debug build with tests"
@@ -652,7 +647,7 @@ case $CI_TARGET in
 
     gcc)
         if [[ -n "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
-            echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
+            echo "Envoy only tests gcc with libstdc++, not ${ENVOY_STDLIB}."
             exit 1
         fi
         if [[ -n "${ENVOY_RBE}" ]]; then
@@ -678,9 +673,9 @@ case $CI_TARGET in
 
     msan)
         setup_clang_toolchain
-        # rbe-toolchain-msan must comes as first to win library link order.
+        # msan must comes as first to win library link order.
         BAZEL_BUILD_OPTIONS=(
-            "--config=rbe-toolchain-msan"
+            "--config=msan"
             "${BAZEL_BUILD_OPTIONS[@]}"
             "-c" "dbg"
             "--build_tests_only"
@@ -831,7 +826,7 @@ case $CI_TARGET in
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
-             --config=rbe-toolchain-tsan \
+             --config=tsan \
              -c dbg \
              --build_tests_only \
              --remote_download_minimal \
