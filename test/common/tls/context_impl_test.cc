@@ -1256,6 +1256,20 @@ TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineByteWhenRuntimeDisabl
   EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
+TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHash) {
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        verify_certificate_hash: "df6ff72fe9116521268f6f2dd4966f51df479883fe7037b39f75916ac3049d1a"
+  )EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
+}
+
 TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledByDefault) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(
