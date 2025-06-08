@@ -451,18 +451,17 @@ void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope) {
   // an index to it. Assumes the order in the ca_certs_ vector doesn't change.
   int idx = 0;
   for (bssl::UniquePtr<X509>& cert : spiffe_data_->ca_certs_) {
-    const absl::optional<uint64_t> expiration_unix_time_in_seconds =
-        Utility::getExpirationUnixTime(cert.get());
-    if (expiration_unix_time_in_seconds.has_value()) {
-      // Add underscore between cert name and index to avoid collisions
-      std::string cert_name = absl::StrCat(cert_name_, "_", idx);
+    // Add underscore between cert name and index to avoid collisions
+    std::string cert_name = absl::StrCat(cert_name_, "_", idx);
 
-      Stats::Gauge*& expiration_gauge = expiration_gauges_map_[cert_name];
-      if (expiration_gauge == nullptr) {
-        expiration_gauge = &createCertificateExpirationGauge(scope, cert_name);
-      }
-      expiration_gauge->set(expiration_unix_time_in_seconds.value());
+    Stats::Gauge*& expiration_gauge = expiration_gauges_map_[cert_name];
+    if (expiration_gauge == nullptr) {
+      expiration_gauge = &createCertificateExpirationGauge(scope, cert_name);
     }
+
+    const uint64_t expiration_unix_time_in_seconds = Utility::getExpirationUnixTime(cert.get());
+    expiration_gauge->set(expiration_unix_time_in_seconds);
+
     idx++;
   }
 }

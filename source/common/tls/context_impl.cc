@@ -584,11 +584,9 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
 void ContextImpl::updateCertStats() {
   // Update TLS certs' expiration time.
   for (Ssl::TlsContext& ctx : tls_contexts_) {
-    absl::optional<uint64_t> expiration_unix_time_in_seconds =
-        Utility::getExpirationUnixTime(ctx.cert_chain_.get());
-    if (expiration_unix_time_in_seconds.has_value()) {
-      ctx.setExpirationOnCertStats(
-          std::chrono::duration<uint64_t>(expiration_unix_time_in_seconds.value()));
+    if (ctx.cert_chain_.get() != nullptr) {
+      uint64_t expiration_unix_time_in_seconds = Utility::getExpirationUnixTime(ctx.cert_chain_.get());
+      ctx.setExpirationOnCertStats(std::chrono::duration<uint64_t>(expiration_unix_time_in_seconds));
     }
   }
 }

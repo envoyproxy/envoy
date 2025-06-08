@@ -599,17 +599,12 @@ void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
     return;
   }
 
-  absl::optional<uint64_t> expiration_unix_time_in_seconds =
-      Utility::getExpirationUnixTime(ca_cert_.get());
   if (!expiration_gauge_) {
     expiration_gauge_ = &createCertificateExpirationGauge(scope, config_->caCertName());
   }
-  if (expiration_unix_time_in_seconds.has_value()) {
-    expiration_gauge_->set(expiration_unix_time_in_seconds.value());
-  } else {
-    // For certificates with no expiration time, set to max uint64_t (effectively "never expires")
-    expiration_gauge_->set(std::numeric_limits<uint64_t>::max());
-  }
+
+  const uint64_t expiration_unix_time_in_seconds = Utility::getExpirationUnixTime(ca_cert_.get());
+  expiration_gauge_->set(expiration_unix_time_in_seconds);
 }
 
 absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
