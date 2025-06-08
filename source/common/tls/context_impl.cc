@@ -109,8 +109,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
     // No need to store cert name for default tls context as there are no TLS certificates.
     if (!tls_certificates.empty()) {
-      ctx.cert_name_ = tls_certificates[i].get().certificateName();
-      ctx.createCertExpirationGauge(scope, ctx.cert_name_);
+      ctx.createCertExpirationGauge(scope, tls_certificates[i].get().certificateName());
     }
 
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);

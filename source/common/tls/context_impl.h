@@ -48,7 +48,6 @@ struct TlsContext {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<X509> cert_chain_;
   std::string cert_chain_file_path_;
-  std::string cert_name_;
   std::unique_ptr<OcspResponseWrapper> ocsp_response_;
   // We initialize the curve name variable to EC_CURVE_INVALID_NID which is used as a sentinel value
   // for "not an ECDSA context".
