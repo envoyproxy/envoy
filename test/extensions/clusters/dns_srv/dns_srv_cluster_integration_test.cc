@@ -110,7 +110,8 @@ TEST_P(DnsSrvClusterIntegrationTest, BasicDnsSrvClusterTest) {
                                 "SRV record request, resolving {} as localhost:{}", dns_name, port);
 
             std::list<Network::DnsResponse> ret;
-            ret.emplace_back(Network::DnsResponse("localhost", port, 1, 1));
+            ret.emplace_back(
+                Network::DnsResponse(1, 1, port, "localhost", std::chrono::seconds(60)));
 
             dns_callback(Network::DnsResolver::ResolutionStatus::Completed,
                          "test resolve srv: success", std::move(ret));

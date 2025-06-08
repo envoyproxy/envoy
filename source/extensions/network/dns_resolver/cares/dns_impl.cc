@@ -628,18 +628,33 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
 
 void DnsResolverImpl::PendingSrvResolution::startResolution() {
   parent_.stats_.pending_resolutions_.inc();
-  ares_query(
-      channel_, dns_name_.c_str(), ns_c_in, ns_t_srv,
-      [](void* arg, int status, int timeouts, unsigned char* abuf, int alen) {
-        static_cast<PendingSrvResolution*>(arg)->onAresSrvCallback(status, timeouts, abuf, alen);
+
+  ares_status_t dnsrecStatus = ares_query_dnsrec(
+      channel_, dns_name_.c_str(), ARES_CLASS_IN, ARES_REC_TYPE_SRV,
+      [](void* arg, ares_status_t status, size_t timeouts, const ares_dns_record_t* dnsrec) {
+        static_cast<PendingSrvResolution*>(arg)->onAresSrvCallback(status, timeouts, dnsrec);
       },
-      this);
+      this, &ares_query_id_);
+
+  if (dnsrecStatus != ARES_SUCCESS) {
+    parent_.stats_.pending_resolutions_.dec();
+    parent_.stats_.resolve_total_.inc();
+    parent_.chargeGetAddrInfoErrorStats(dnsrecStatus, 0);
+
+    ENVOY_LOG_EVENT(debug, "cares_srv_resolution_failure",
+                    "dns query for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
+                    static_cast<int>(dnsrecStatus), ares_strerror(dnsrecStatus));
+    finishResolve();
+  }
 }
 
-void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(int status, int timeouts,
-                                                              unsigned char* buf, int len) {
+void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(ares_status_t status, size_t timeouts,
+                                                              const ares_dns_record_t* dnsrec) {
 
-  ENVOY_LOG(debug, "onAresSrvCallback: status={}, timeouts={}, buf len={}", status, timeouts, len);
+  unsigned int aresAnswerQueryId = ares_dns_record_get_id(dnsrec);
+  ENVOY_LOG(debug, "onAresSrvCallback: status={}, timeouts={}, query id={}, answer query id={}",
+            static_cast<int>(status), timeouts, ares_query_id_, aresAnswerQueryId);
+  ASSERT(ares_query_id_ == aresAnswerQueryId);
 
   parent_.stats_.resolve_total_.inc();
   parent_.stats_.pending_resolutions_.dec();
@@ -648,7 +663,7 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(int status, int ti
     parent_.chargeGetAddrInfoErrorStats(status, timeouts);
     ENVOY_LOG_EVENT(debug, "cares_srv_resolution_failure",
                     "dns resolution for {} failed with c-ares status {:#06x}: \"{}\"", dns_name_,
-                    status, ares_strerror(status));
+                    static_cast<int>(status), ares_strerror(status));
   }
 
   if (status == ARES_EDESTRUCTION) {
@@ -658,32 +673,30 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(int status, int ti
   }
 
   if (status == ARES_SUCCESS) {
-    struct ares_srv_reply* srv_reply = nullptr;
-    int parse_srv_status = ares_parse_srv_reply(buf, len, &srv_reply);
-    if (parse_srv_status == ARES_SUCCESS) {
-      std::list<DnsResponse> srv_records;
-      for (ares_srv_reply* current_reply = srv_reply; current_reply != nullptr;
-           current_reply = current_reply->next) {
-        auto response = DnsResponse(current_reply->host, current_reply->port,
-                                    current_reply->priority, current_reply->weight);
-
-        srv_records.emplace_back(std::move(response));
+    std::list<DnsResponse> srv_records;
+    for (size_t i = 0; i < ares_dns_record_rr_cnt(dnsrec, ARES_SECTION_ANSWER); i++) {
+      const ares_dns_rr_t* rr = ares_dns_record_rr_get_const(dnsrec, ARES_SECTION_ANSWER, i);
+      if (ares_dns_rr_get_type(rr) != ARES_REC_TYPE_SRV) {
+        continue;
       }
 
-      pending_response_.status_ = ResolutionStatus::Completed;
-      pending_response_.details_ = "srv resolve: cares_success";
+      unsigned int ttl = ares_dns_rr_get_ttl(rr);
 
-      ares_free_data(srv_reply);
-      onAresSrvFinishCallback(std::move(srv_records));
+      uint16_t priority = ares_dns_rr_get_u16(rr, ARES_RR_SRV_PRIORITY);
+      uint16_t weight = ares_dns_rr_get_u16(rr, ARES_RR_SRV_WEIGHT);
+      uint16_t port = ares_dns_rr_get_u16(rr, ARES_RR_SRV_PORT);
+      const char* target = ares_dns_rr_get_str(rr, ARES_RR_SRV_TARGET);
 
-      return;
+      auto response = DnsResponse(priority, weight, port, target, std::chrono::seconds(ttl));
+
+      srv_records.emplace_back(std::move(response));
     }
 
-    pending_response_.status_ = ResolutionStatus::Failure;
-    pending_response_.details_ =
-        fmt::format("srv resolve: ares_parse_srv_reply = {}", ares_strerror(parse_srv_status));
+    pending_response_.status_ = ResolutionStatus::Completed;
+    pending_response_.details_ = "srv resolve: cares_success";
+    onAresSrvFinishCallback(std::move(srv_records));
 
-    ares_free_data(srv_reply);
+    return;
   } else if (isResponseWithNoRecords(status)) {
     // Treat `ARES_ENODATA` or `ARES_ENOTFOUND` here as success to populate back the
     // "empty records" response.

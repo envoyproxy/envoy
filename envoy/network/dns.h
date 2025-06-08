@@ -78,6 +78,8 @@ struct SrvResponse {
   uint16_t port_;
   std::string target_;
 
+  std::chrono::seconds ttl_;
+
   std::string asString() const {
     return fmt::format("{} {} {} {}", priority_, weight_, port_, target_);
   }
@@ -94,8 +96,13 @@ public:
             address,
             std::chrono::seconds(std::min(std::chrono::seconds::rep(INT_MAX),
                                           std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
-  DnsResponse(const std::string& host, uint16_t port, uint16_t priority, uint16_t weight)
-      : response_(SrvResponse{priority, weight, port, host}) {}
+
+  DnsResponse(uint16_t priority, uint16_t weight, uint16_t port, const std::string& target,
+              const std::chrono::seconds ttl)
+      : response_(SrvResponse{
+            priority, weight, port, target,
+            std::chrono::seconds(std::min(std::chrono::seconds::rep(INT_MAX),
+                                          std::max(ttl.count(), std::chrono::seconds::rep(0))))}) {}
 
   const AddrInfoResponse& addrInfo() const { return absl::get<AddrInfoResponse>(response_); }
 

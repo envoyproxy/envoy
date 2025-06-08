@@ -933,22 +933,34 @@ public:
   ActiveDnsQuery* resolveSrvWithExpectations(const std::string& address,
                                              const DnsResolver::ResolutionStatus expected_status,
                                              const std::list<std::string>& expected_results) {
-    return resolver_->resolveSrv(address,
-                                 [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
-                                           std::list<DnsResponse>&& results) -> void {
-                                   EXPECT_EQ(expected_status, status);
+    return resolver_->resolveSrv(
+        address,
+        [=, this](DnsResolver::ResolutionStatus status, absl::string_view,
+                  std::list<DnsResponse>&& results) -> void {
+          ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), debug,
+                              "resolveSrvWithExpectations CB {} == {}",
+                              static_cast<int>(expected_status), static_cast<int>(status));
+          EXPECT_EQ(expected_status, status);
 
-                                   std::list<std::string> srv_as_string_list;
+          std::list<std::string> srv_as_string_list;
+          ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), debug,
+                              "resolveSrvWithExpectations list count: {}", results.size());
 
-                                   for_each(results.begin(), results.end(), [&](DnsResponse resp) {
-                                     srv_as_string_list.emplace_back(resp.srv().asString());
-                                   });
+          for_each(results.begin(), results.end(), [&](DnsResponse resp) {
+            ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), debug, "RECORD");
+            ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::testing), debug, "RECORD: {}",
+                                resp.srv().asString());
+            srv_as_string_list.push_back(resp.srv().asString());
+          });
 
-                                   EXPECT_THAT(srv_as_string_list,
-                                               UnorderedElementsAreArray(expected_results));
+          ENVOY_LOG_TO_LOGGER(
+              Logger::Registry::getLog(Logger::Id::testing), debug,
+              "EXPECT_THAT(srv_as_string_list, UnorderedElementsAreArray(expected_results))");
 
-                                   dispatcher_->exit();
-                                 });
+          EXPECT_THAT(srv_as_string_list, UnorderedElementsAreArray(expected_results));
+
+          dispatcher_->exit();
+        });
   }
 
   ActiveDnsQuery*
@@ -1923,9 +1935,10 @@ TEST_P(DnsImplTest, ErrorWithAcceptNodataEnabled) {
 }
 
 TEST_P(DnsImplTest, DnsSrv) {
-  server_->addSrvRecord("_unique_name._tcp.example.com",
-                        {SrvResponse{/*priority_*/ 0, /*weight_*/ 0, /*port_*/ 9090,
-                                     /*target_*/ "unique-svc.local"}});
+  server_->addSrvRecord(
+      "_unique_name._tcp.example.com",
+      {SrvResponse{/*priority_*/ 0, /*weight_*/ 0, /*port_*/ 9090,
+                   /*target_*/ "unique-svc.local", /* ttl_ */ std::chrono::seconds(8600)}});
   EXPECT_NE(nullptr, resolveSrvWithExpectations("_unique_name._tcp.example.com",
                                                 DnsResolver::ResolutionStatus::Completed,
                                                 {"0 0 9090 unique-svc.local"}));

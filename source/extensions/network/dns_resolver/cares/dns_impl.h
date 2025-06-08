@@ -130,13 +130,13 @@ private:
                             dns_name) /*, resolver_(parent)*/ {}
 
     /**
-     * c-ares ares_query() query callback for initiation.
+     * c-ares ares_query_dnsrec() query callback for initiation.
+     * @param arg argument we passed in ares_query_dnsrec, currently we'll pass `this`.
      * @param status the status of the call to ares_query().
      * @param timeouts the number of times the request timed out.
-     * @param buf the result buffer.
-     * @param len the result buffer length.
+     * @param dnsrec the result buffer.
      */
-    void onAresSrvCallback(int status, int timeouts, unsigned char* buf, int len);
+    void onAresSrvCallback(ares_status_t status, size_t timeouts, const ares_dns_record_t* dnsrec);
 
     /**
      * c-ares ares_query() query callback for completion.
@@ -149,6 +149,10 @@ private:
 
   private:
     bool isResponseWithNoRecords(int status);
+
+    // keeping the type/name accodring to c-ares API
+    // this query ID is filled by ares_query_dnsrec()
+    unsigned short ares_query_id_ = 0;
 
     // The resolver instance.
     // DnsResolverImpl& resolver_;
