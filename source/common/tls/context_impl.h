@@ -55,7 +55,7 @@ struct TlsContext {
   CurveNID ec_group_curve_name_ = EC_CURVE_INVALID_NID;
   bool is_must_staple_{};
   Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider_{};
-  Extensions::TransportSockets::Tls::CertStatsPtr cert_stats_;
+  Stats::Gauge* expiration_gauge_{nullptr};
 
 #ifdef ENVOY_ENABLE_QUIC
   quiche::QuicheReferenceCountedPointer<quic::ProofSource::Chain> quic_cert_;
@@ -74,7 +74,7 @@ struct TlsContext {
                           const std::string& password, bool fips_mode);
   absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
                                bool fips_mode);
-  void createCertStats(Stats::Scope& scope, std::string cert_name);
+  void createCertExpirationGauge(Stats::Scope& scope, const std::string& cert_name);
   void setExpirationOnCertStats(std::chrono::duration<uint64_t> duration);
 };
 } // namespace Ssl

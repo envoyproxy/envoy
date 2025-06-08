@@ -117,7 +117,7 @@ private:
   std::shared_ptr<SpiffeData> spiffe_data_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_{};
   std::unique_ptr<Filesystem::Watcher> file_watcher_;
-  absl::flat_hash_map<std::string, CertStatsPtr> cert_stats_map_;
+  absl::flat_hash_map<std::string, Stats::Gauge*> expiration_gauges_map_;
   Api::Api& api_;
   const std::string cert_name_;
   SslStats& stats_;

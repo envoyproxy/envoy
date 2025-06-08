@@ -456,11 +456,11 @@ void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope) {
       // Add underscore between cert name and index to avoid collisions
       std::string cert_name = absl::StrCat(cert_name_, "_", idx);
 
-      std::unique_ptr<CertStats>& cert_stats = cert_stats_map_[cert_name];
-      if (cert_stats == nullptr) {
-        cert_stats = std::make_unique<CertStats>(generateCertStats(scope, cert_name));
+      Stats::Gauge*& expiration_gauge = expiration_gauges_map_[cert_name];
+      if (expiration_gauge == nullptr) {
+        expiration_gauge = &createCertificateExpirationGauge(scope, cert_name);
       }
-      cert_stats->expiration_unix_time_in_seconds_.set(expiration_unix_time_in_seconds.value());
+      expiration_gauge->set(expiration_unix_time_in_seconds.value());
     }
     idx++;
   }

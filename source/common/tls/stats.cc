@@ -14,9 +14,11 @@ SslStats generateSslStats(Stats::Scope& store) {
                         POOL_HISTOGRAM_PREFIX(store, prefix))};
 }
 
-CertStats generateCertStats(Stats::Scope& scope, std::string cert_name) {
-  std::string prefix_cert_name(absl::StrCat("ssl.certificate.", cert_name, "."));
-  return {ALL_CERT_STATS(POOL_GAUGE_PREFIX(scope, prefix_cert_name))};
+Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name) {
+  const std::string prefix_cert_name(absl::StrCat("ssl.certificate.", cert_name, "."));
+  const std::string stat_name = absl::StrCat(prefix_cert_name, "expiration_unix_time_in_seconds");
+
+  return scope.gaugeFromString(stat_name, Stats::Gauge::ImportMode::NeverImport);
 }
 
 } // namespace Tls
