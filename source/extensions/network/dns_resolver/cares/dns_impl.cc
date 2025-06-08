@@ -667,8 +667,14 @@ void DnsResolverImpl::PendingSrvResolution::onAresSrvCallback(ares_status_t stat
   }
 
   if (status == ARES_EDESTRUCTION) {
+    // In the destruction path we must wait until there are no more pending queries. Resolution is
+    // not truly finished until the last parallel query has been destroyed.
     ASSERT(owned_);
-    delete this;
+
+    ENVOY_LOG_EVENT(debug, "cares_dns_resolution_destroyed", "dns resolution for {} destroyed",
+                    dns_name_);
+
+    finishResolve();
     return;
   }
 

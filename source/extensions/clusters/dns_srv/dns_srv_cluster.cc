@@ -145,7 +145,6 @@ void DnsSrvCluster::allTargetsResolved() {
           lb_endpoint_.health_status(), time_source_);
 
       if (!host_or_status.ok()) {
-        // TODO: update counter?
         info_->configUpdateStats().update_failure_.inc();
 
         ENVOY_LOG(debug, "Failed to create host record for: '{}': code={}, message='{}'",

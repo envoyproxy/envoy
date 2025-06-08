@@ -75,11 +75,12 @@ public:
   TestDnsServerQuery(ConnectionPtr connection, const HostMap& hosts_a, const HostMap& hosts_aaaa,
                      const CNameMap& cnames, const SrvMap& hosts_srv,
                      const std::chrono::seconds& record_ttl, const std::chrono::seconds& cname_ttl_,
-                     bool refused, bool error_on_a, bool error_on_aaaa, bool no_response)
+                     bool refused, bool error_on_a, bool error_on_aaaa, bool error_on_srv_,
+                     bool no_response)
       : connection_(std::move(connection)), hosts_a_(hosts_a), hosts_aaaa_(hosts_aaaa),
         cnames_(cnames), hosts_srv_(hosts_srv), record_ttl_(record_ttl), cname_ttl_(cname_ttl_),
         refused_(refused), error_on_a_(error_on_a), error_on_aaaa_(error_on_aaaa),
-        no_response_(no_response) {
+        error_on_srv_(error_on_srv_), no_response_(no_response) {
     connection_->addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
   }
 
@@ -253,7 +254,7 @@ private:
 
     size_t srvRecordLen(const SrvResponse& srv) {
       const auto encoded_target_name = TestDnsServerQuery::encodeDnsName(srv.target_);
-      return 3 * 2 // priority, weigth, port
+      return 3 * 2 // priority, weight, port
              + encoded_target_name.size() + 1 /* terminal zero-byte */;
     }
 
@@ -273,6 +274,10 @@ private:
         // in a reinitialized channel. See `DnsImplTest::DestroyChannelOnRefused` for details.
         DNS_HEADER_SET_RCODE(response_base, FORMERR);
       } else if (q_type == T_AAAA && parent_.error_on_aaaa_) {
+        // Use `FORMERR` here as a most of the error codes (`SERVFAIL`, `NOTIMP`, `REFUSED`) result
+        // in a reinitialized channel. See `DnsImplTest::DestroyChannelOnRefused` for details.
+        DNS_HEADER_SET_RCODE(response_base, FORMERR);
+      } else if (q_type == T_SRV && parent_.error_on_srv_) {
         // Use `FORMERR` here as a most of the error codes (`SERVFAIL`, `NOTIMP`, `REFUSED`) result
         // in a reinitialized channel. See `DnsImplTest::DestroyChannelOnRefused` for details.
         DNS_HEADER_SET_RCODE(response_base, FORMERR);
@@ -413,6 +418,7 @@ private:
   const bool refused_;
   const bool error_on_a_;
   const bool error_on_aaaa_;
+  const bool error_on_srv_;
   const bool no_response_{false};
 };
 
@@ -429,7 +435,7 @@ public:
         std::move(socket), Network::Test::createRawBufferSocket(), stream_info_);
     TestDnsServerQuery* query = new TestDnsServerQuery(
         std::move(new_connection), hosts_a_, hosts_aaaa_, cnames_, hosts_srv_, record_ttl_,
-        cname_ttl_, refused_, error_on_a_, error_on_aaaa_, no_response_);
+        cname_ttl_, refused_, error_on_a_, error_on_aaaa_, error_on_srv_, no_response_);
     queries_.emplace_back(query);
   }
 
@@ -459,6 +465,7 @@ public:
   void setRefused(bool refused) { refused_ = refused; }
   void setErrorOnQtypeA(bool error) { error_on_a_ = error; }
   void setErrorOnQtypeAAAA(bool error) { error_on_aaaa_ = error; }
+  void setErrorOnQtypeSrv(bool error) { error_on_srv_ = error; }
 
 private:
   Event::Dispatcher& dispatcher_;
@@ -472,6 +479,7 @@ private:
   bool refused_{};
   bool error_on_a_{};
   bool error_on_aaaa_{};
+  bool error_on_srv_{};
   // All queries are tracked so we can do resource reclamation when the test is
   // over.
   std::vector<std::unique_ptr<TestDnsServerQuery>> queries_;
@@ -1952,6 +1960,20 @@ TEST_P(DnsImplTest, DnsSrv) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   checkStats(2 /*resolve_total*/, 0 /*pending_resolutions*/, 1 /*not_found*/,
              0 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
+}
+
+TEST_P(DnsImplTest, DnsSrvError) {
+  server_->setErrorOnQtypeSrv(true);
+  server_->addSrvRecord(
+      "_unique_name._tcp.example.com",
+      {SrvResponse{/*priority_*/ 0, /*weight_*/ 0, /*port_*/ 9090,
+                   /*target_*/ "unique-svc.local", /* ttl_ */ std::chrono::seconds(8600)}});
+  EXPECT_NE(nullptr, resolveSrvWithExpectations("_unique_name._tcp.example.com",
+                                                DnsResolver::ResolutionStatus::Failure, {}));
+
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+  checkStats(1 /*resolve_total*/, 0 /*pending_resolutions*/, 0 /*not_found*/,
+             1 /*get_addr_failure*/, 0 /*timeouts*/, 0 /*reinitializations*/);
 }
 
 class DnsImplFilterUnroutableFamiliesTest : public DnsImplTest {
