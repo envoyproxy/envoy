@@ -838,6 +838,8 @@ public:
     DynamicRouteEntry(const RouteEntryAndRoute* parent, RouteConstSharedPtr owner,
                       const std::string& name)
         : parent_(parent), owner_(std::move(owner)), cluster_name_(name) {}
+    DynamicRouteEntry(RouteEntryAndRouteConstSharedPtr parent, absl::string_view name)
+        : parent_(parent.get()), owner_(parent), cluster_name_(name) {}
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }

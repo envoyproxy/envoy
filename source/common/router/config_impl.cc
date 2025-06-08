@@ -1390,9 +1390,8 @@ RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
     final_cluster_name = std::string(entry[0]->value().getStringView());
   }
 
-  return std::make_shared<DynamicRouteEntry>(route_selector_override
-                                                 ? route_selector_override
-                                                 : static_cast<const RouteEntryAndRoute*>(this),
+  return std::make_shared<DynamicRouteEntry>(route_selector_override ? route_selector_override
+                                                                     : this,
                                              shared_from_this(), final_cluster_name);
 }
 

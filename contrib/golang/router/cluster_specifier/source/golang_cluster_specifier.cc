@@ -47,7 +47,6 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
 RouteConstSharedPtr GolangClusterSpecifierPlugin::route(RouteEntryAndRouteConstSharedPtr parent,
                                                         const Http::RequestHeaderMap& header,
                                                         const StreamInfo::StreamInfo&) const {
-  ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
   int buffer_len = 256;
   std::string buffer;
   std::string cluster;
@@ -78,8 +77,7 @@ RouteConstSharedPtr GolangClusterSpecifierPlugin::route(RouteEntryAndRouteConstS
     }
   }
 
-  return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
-      dynamic_cast<const RouteEntryImplBase*>(parent.get()), parent, cluster);
+  return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(std::move(parent), cluster);
 }
 
 void GolangClusterSpecifierPlugin::log(absl::string_view& msg) const {
