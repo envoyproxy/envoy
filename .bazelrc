@@ -296,20 +296,14 @@ build:rbe-toolchain-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_li
 build:rbe-toolchain-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
 build:rbe-toolchain-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain
-build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
-build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
-build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
+build:rbe-toolchain-clang-libc++ --config=libc++
 
 build:rbe-toolchain-arm64-clang-libc++ --config=rbe-toolchain
 build:rbe-toolchain-arm64-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
 build:rbe-toolchain-arm64-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
 build:rbe-toolchain-arm64-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
 build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain-arm64
-build:rbe-toolchain-arm64-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
-build:rbe-toolchain-arm64-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:rbe-toolchain-arm64-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
-build:rbe-toolchain-arm64-clang-libc++ --define force_libcpp=enabled
+build:rbe-toolchain-arm64-clang-libc++ --config=libc++
 
 build:rbe-toolchain-asan --config=clang-asan
 build:rbe-toolchain-asan --linkopt -fuse-ld=lld
