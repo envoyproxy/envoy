@@ -159,8 +159,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                  SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Stats::Scope& scope)
-    : api_(config->api()), stats_(stats),
-      time_source_(context.timeSource()) {
+    : api_(config->api()), stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
@@ -445,7 +444,8 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
-void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name) {
+void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope,
+                                                    const std::string& cert_name) {
   // TODO(peterl328): Due to current interface, we only receive one cert name.
   // Since we may have multiple certificates here, we will use the provided cert name and append
   // an index to it. Assumes the order in the ca_certs_ vector doesn't change.

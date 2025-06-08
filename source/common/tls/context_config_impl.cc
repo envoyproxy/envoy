@@ -27,10 +27,6 @@ namespace Tls {
 namespace {
 
 std::string generateCertificateHash(const std::string& cert_data) {
-  if (cert_data.empty()) {
-    return "";
-  }
-
   Buffer::OwnedImpl buffer(cert_data);
 
   // Calculate SHA-256 hash of cert data and take first 8 chars
@@ -220,7 +216,7 @@ ContextConfigImpl::ContextConfigImpl(
   SET_AND_RETURN_IF_NOT_OK(list_or_error.status(), creation_status);
   tls_keylog_remote_ = std::move(list_or_error.value());
 
-  if (certificate_validation_context_provider_.provider != nullptr) {
+  if (certificate_validation_context_provider_.provider_ != nullptr) {
     if (default_cvc_) {
       // We need to validate combined certificate validation context.
       // The default certificate validation context and dynamic certificate validation
@@ -230,27 +226,27 @@ ContextConfigImpl::ContextConfigImpl(
       // getCombinedValidationContextConfig() throws exception, validation_context_config_ will not
       // get updated.
       cvc_validation_callback_handle_ =
-          certificate_validation_context_provider_.provider->addValidationCallback(
+          certificate_validation_context_provider_.provider_->addValidationCallback(
               [this](
                   const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
                       dynamic_cvc) {
                 return getCombinedValidationContextConfig(
-                           dynamic_cvc, certificate_validation_context_provider_.certificate_name)
+                           dynamic_cvc, certificate_validation_context_provider_.certificate_name_)
                     .status();
               });
     }
     // Load inlined, static or dynamic secret that's already available.
-    if (certificate_validation_context_provider_.provider->secret() != nullptr) {
+    if (certificate_validation_context_provider_.provider_->secret() != nullptr) {
       if (default_cvc_) {
         auto context_or_error = getCombinedValidationContextConfig(
-            *certificate_validation_context_provider_.provider->secret(),
-            certificate_validation_context_provider_.certificate_name);
+            *certificate_validation_context_provider_.provider_->secret(),
+            certificate_validation_context_provider_.certificate_name_);
         SET_AND_RETURN_IF_NOT_OK(context_or_error.status(), creation_status);
         validation_context_config_ = std::move(*context_or_error);
       } else {
         auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
-            *certificate_validation_context_provider_.provider->secret(), auto_sni_san_match, api_,
-            certificate_validation_context_provider_.certificate_name);
+            *certificate_validation_context_provider_.provider_->secret(), auto_sni_san_match, api_,
+            certificate_validation_context_provider_.certificate_name_);
         SET_AND_RETURN_IF_NOT_OK(config_or_status.status(), creation_status);
         validation_context_config_ = std::move(config_or_status.value());
       }
@@ -259,9 +255,9 @@ ContextConfigImpl::ContextConfigImpl(
   // Load inlined, static or dynamic secrets that are already available.
   if (!tls_certificate_providers_.empty()) {
     for (auto& provider : tls_certificate_providers_) {
-      if (provider.provider->secret() != nullptr) {
+      if (provider.provider_->secret() != nullptr) {
         auto config_or_error = Ssl::TlsCertificateConfigImpl::create(
-            *provider.provider->secret(), factory_context, api_, provider.certificate_name);
+            *provider.provider_->secret(), factory_context, api_, provider.certificate_name_);
         SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
         tls_certificate_configs_.emplace_back(std::move(*config_or_error));
       }
@@ -308,13 +304,13 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> ca
   // ContextConfigImpl::tls_certificate_configs_ with new secret.
   for (const auto& tls_certificate_provider : tls_certificate_providers_) {
     tc_update_callback_handles_.push_back(
-        tls_certificate_provider.provider->addUpdateCallback([this, callback]() {
+        tls_certificate_provider.provider_->addUpdateCallback([this, callback]() {
           tls_certificate_configs_.clear();
           for (const auto& tls_certificate_provider : tls_certificate_providers_) {
-            auto* secret = tls_certificate_provider.provider->secret();
+            auto* secret = tls_certificate_provider.provider_->secret();
             if (secret != nullptr) {
               auto config_or_error = Ssl::TlsCertificateConfigImpl::create(
-                  *secret, factory_context_, api_, tls_certificate_provider.certificate_name);
+                  *secret, factory_context_, api_, tls_certificate_provider.certificate_name_);
               RETURN_IF_NOT_OK(config_or_error.status());
               tls_certificate_configs_.emplace_back(std::move(*config_or_error));
             }
@@ -322,17 +318,17 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> ca
           return callback();
         }));
   }
-  if (certificate_validation_context_provider_.provider) {
+  if (certificate_validation_context_provider_.provider_) {
     if (default_cvc_) {
       // Once certificate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with a combined certificate validation
       // context. The combined certificate validation context is created by merging new secret
       // into default_cvc_.
       cvc_update_callback_handle_ =
-          certificate_validation_context_provider_.provider->addUpdateCallback([this, callback]() {
+          certificate_validation_context_provider_.provider_->addUpdateCallback([this, callback]() {
             auto context_or_error = getCombinedValidationContextConfig(
-                *certificate_validation_context_provider_.provider->secret(),
-                certificate_validation_context_provider_.certificate_name);
+                *certificate_validation_context_provider_.provider_->secret(),
+                certificate_validation_context_provider_.certificate_name_);
             RETURN_IF_NOT_OK(context_or_error.status());
             validation_context_config_ = std::move(*context_or_error);
             return callback();
@@ -341,10 +337,10 @@ void ContextConfigImpl::setSecretUpdateCallback(std::function<absl::Status()> ca
       // Once certificate_validation_context_provider_ receives new secret, this callback updates
       // ContextConfigImpl::validation_context_config_ with new secret.
       cvc_update_callback_handle_ =
-          certificate_validation_context_provider_.provider->addUpdateCallback([this, callback]() {
+          certificate_validation_context_provider_.provider_->addUpdateCallback([this, callback]() {
             auto config_or_status = Envoy::Ssl::CertificateValidationContextConfigImpl::create(
-                *certificate_validation_context_provider_.provider->secret(), auto_sni_san_match_,
-                api_, certificate_validation_context_provider_.certificate_name);
+                *certificate_validation_context_provider_.provider_->secret(), auto_sni_san_match_,
+                api_, certificate_validation_context_provider_.certificate_name_);
             RETURN_IF_NOT_OK(config_or_status.status());
             validation_context_config_ = std::move(config_or_status.value());
             return callback();

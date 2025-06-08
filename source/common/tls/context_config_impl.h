@@ -21,13 +21,13 @@ namespace Tls {
 static const std::string INLINE_STRING = "<inline>";
 
 struct TlsCertificateConfigProviderWithName {
-  const std::string certificate_name;
-  Secret::TlsCertificateConfigProviderSharedPtr provider;
+  const std::string certificate_name_;
+  Secret::TlsCertificateConfigProviderSharedPtr provider_;
 };
 
 struct CertificateValidationContextConfigProviderWithName {
-  const std::string certificate_name;
-  Secret::CertificateValidationContextConfigProviderSharedPtr provider;
+  const std::string certificate_name_;
+  Secret::CertificateValidationContextConfigProviderSharedPtr provider_;
 };
 
 class ContextConfigImpl : public virtual Ssl::ContextConfig {
@@ -69,7 +69,7 @@ public:
         (tls_certificate_providers_.empty() || !tls_certificate_configs_.empty());
     const bool combined_cvc_is_ready =
         (default_cvc_ == nullptr || validation_context_config_ != nullptr);
-    const bool cvc_is_ready = (certificate_validation_context_provider_.provider == nullptr ||
+    const bool cvc_is_ready = (certificate_validation_context_provider_.provider_ == nullptr ||
                                default_cvc_ != nullptr || validation_context_config_ != nullptr);
     return tls_is_ready && combined_cvc_is_ready && cvc_is_ready;
   }
