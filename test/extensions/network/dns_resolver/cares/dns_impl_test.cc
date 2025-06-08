@@ -253,7 +253,7 @@ private:
 
     size_t srvRecordLen(const SrvResponse& srv) {
       const auto encoded_target_name = TestDnsServerQuery::encodeDnsName(srv.target_);
-      return 3 * 2 // prio, weigth, port
+      return 3 * 2 // priority, weigth, port
              + encoded_target_name.size() + 1 /* terminal zero-byte */;
     }
 

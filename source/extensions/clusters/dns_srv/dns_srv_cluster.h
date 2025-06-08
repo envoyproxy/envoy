@@ -36,7 +36,7 @@ class DnsSrvClusterTest;
  * Current limitations:
  * - Only c-ares DNS resolver is supported.
  * - Only one SRV record is supported per cluster.
- * - All resolved IP addresses will be addedd to cluster (acting like Strict DNS cluster).
+ * - All resolved IP addresses will be added to cluster (acting like Strict DNS cluster).
  * - Weight and priority are ignored.
  * - Both initial SRV record and subsequent A/AAAA records resolved via the same DNS resolver.
  */

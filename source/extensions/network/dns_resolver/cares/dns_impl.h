@@ -139,7 +139,7 @@ private:
     void onAresSrvCallback(ares_status_t status, size_t timeouts, const ares_dns_record_t* dnsrec);
 
     /**
-     * c-ares ares_query() query callback for completion.
+     * c-ares ares_query_dnsrec() query callback for completion.
      * @param srv_records a list of SRV records.
      */
     void onAresSrvFinishCallback(std::list<DnsResponse>&& srv_records);
@@ -150,7 +150,7 @@ private:
   private:
     bool isResponseWithNoRecords(int status);
 
-    // keeping the type/name accodring to c-ares API
+    // keeping the type/name according to c-ares API
     // this query ID is filled by ares_query_dnsrec()
     unsigned short ares_query_id_ = 0;
 
