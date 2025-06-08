@@ -15,10 +15,11 @@ SslStats generateSslStats(Stats::Scope& store) {
 }
 
 Stats::Gauge& createCertificateExpirationGauge(Stats::Scope& scope, const std::string& cert_name) {
-  const std::string prefix_cert_name(absl::StrCat("ssl.certificate.", cert_name, "."));
-  const std::string stat_name = absl::StrCat(prefix_cert_name, "expiration_unix_time_in_seconds");
+  const std::string full_stat_name = absl::StrCat("ssl.certificate.", cert_name, ".expiration_unix_time_in_seconds");
 
-  return scope.gaugeFromString(stat_name, Stats::Gauge::ImportMode::NeverImport);
+  return Stats::Utility::gaugeFromElements(scope,
+                                           {Stats::DynamicName(full_stat_name)},
+                                           Stats::Gauge::ImportMode::NeverImport);
 }
 
 } // namespace Tls

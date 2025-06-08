@@ -829,7 +829,8 @@ absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
 }
 
 void TlsContext::createCertExpirationGauge(Stats::Scope& scope, const std::string& cert_name) {
-  expiration_gauge_ = &Extensions::TransportSockets::Tls::createCertificateExpirationGauge(scope, cert_name);
+  expiration_gauge_ =
+      &Extensions::TransportSockets::Tls::createCertificateExpirationGauge(scope, cert_name);
 }
 
 void TlsContext::setExpirationOnCertStats(std::chrono::duration<uint64_t> duration) {
