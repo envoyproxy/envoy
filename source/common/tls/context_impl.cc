@@ -111,7 +111,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     if (!tls_certificates.empty()) {
       ctx.createCertExpirationGauge(scope, tls_certificates[i].get().certificateName());
       if (ctx.cert_chain_.get() != nullptr) {
-        ctx.setExpirationOnCertStats(std::chrono::seconds(Utility::getExpirationUnixTime(ctx.cert_chain_.get())));
+        ctx.setExpirationOnCertStats(
+            std::chrono::seconds(Utility::getExpirationUnixTime(ctx.cert_chain_.get())));
       }
     }
 
