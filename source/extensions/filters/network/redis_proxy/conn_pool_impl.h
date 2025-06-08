@@ -155,7 +155,7 @@ private:
                            public Logger::Loggable<Logger::Id::redis> {
     ThreadLocalPool(
         std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
-        std::string cluster_name,
+        std::string cluster_name, Api::Api& api,
         const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
         absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
         absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
@@ -193,6 +193,7 @@ private:
     std::weak_ptr<InstanceImpl> parent_;
     Event::Dispatcher& dispatcher_;
     const std::string cluster_name_;
+    Api::Api& api_;
     const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
     Upstream::ClusterUpdateCallbacksHandlePtr cluster_update_handle_;
     Upstream::ThreadLocalCluster* cluster_{};

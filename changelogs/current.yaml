@@ -490,5 +490,8 @@ new_features:
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
     configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
     to help avoid stale socket states and provide better load distribution across UDP ports.
+- area: redis
+  change: |
+    Added support for ``redis_proxy`` filter to use separate credentials for each upstream Redis cluster.
 
 deprecated:
