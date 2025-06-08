@@ -35,8 +35,7 @@ namespace Tls {
 class DefaultCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
   DefaultCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                       SslStats& stats, Server::Configuration::CommonFactoryContext& context,
-                       Stats::Scope& scope);
+                       SslStats& stats, Server::Configuration::CommonFactoryContext& context);
 
   ~DefaultCertValidator() override = default;
 
@@ -50,10 +49,12 @@ public:
                     bool is_server, absl::string_view host_name) override;
 
   absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                            bool provides_certificates) override;
+                                            bool provides_certificates,
+                                            Stats::Scope& scope) override;
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
+
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_path_; };
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
@@ -116,7 +117,6 @@ private:
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;
-  Stats::Scope& scope_;
   Stats::Gauge* expiration_gauge_{nullptr};
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;

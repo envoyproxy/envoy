@@ -45,8 +45,8 @@ namespace Tls {
 
 DefaultCertValidator::DefaultCertValidator(
     const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-    Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope)
-    : config_(config), stats_(stats), context_(context), scope_(scope),
+    Server::Configuration::CommonFactoryContext& context)
+    : config_(config), stats_(stats), context_(context),
       auto_sni_san_match_(config_ != nullptr ? config_->autoSniSanMatch() : false) {
   if (config_ != nullptr) {
     allow_untrusted_certificate_ = config_->trustChainVerification() ==
@@ -56,7 +56,8 @@ DefaultCertValidator::DefaultCertValidator(
 };
 
 absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                                                bool provides_certificates) {
+                                                                bool provides_certificates,
+                                                                Stats::Scope& scope) {
 
   int verify_mode = SSL_VERIFY_NONE;
   int verify_mode_validation_context = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
@@ -197,7 +198,7 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
     }
   }
 
-  initializeCertExpirationStats(scope_);
+  initializeCertExpirationStats(scope);
 
   return verify_mode;
 }
@@ -620,8 +621,8 @@ public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context,
-                      Stats::Scope& scope) override {
-    return std::make_unique<DefaultCertValidator>(config, stats, context, scope);
+                      Stats::Scope& /*scope*/) override {
+    return std::make_unique<DefaultCertValidator>(config, stats, context);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.default"; }

@@ -58,7 +58,8 @@ public:
                     absl::string_view host_name) override;
 
   absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                            bool provides_certificates) override;
+                                            bool provides_certificates,
+                                            Stats::Scope& scope) override;
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;

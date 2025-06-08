@@ -171,7 +171,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   auto verify_mode_or_error = cert_validator_->initializeSslContexts(
-      ssl_contexts, config.capabilities().provides_certificates);
+      ssl_contexts, config.capabilities().provides_certificates, scope);
   SET_AND_RETURN_IF_NOT_OK(verify_mode_or_error.status(), creation_status);
   auto verify_mode = verify_mode_or_error.value();
 
