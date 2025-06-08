@@ -239,11 +239,11 @@ TagNameValues::TagNameValues() {
   // grpc.(<stat_prefix>).**
   addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
 
-  // listener.[<address>.]ssl.certificate.(<cert_name>).expiration_unix_time_in_seconds or
-  // cluster.[<cluster_name>.]ssl.certificate.(<cert_name>).expiration_unix_time_in_seconds
+  // listener.[<address>.]ssl.certificate.(<cert_name>).expiration_unix_time_seconds or
+  // cluster.[<cluster_name>.]ssl.certificate.(<cert_name>).expiration_unix_time_seconds
   addRe2(
       TLS_CERTIFICATE,
-      R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.certificate(\.(<TAG_VALUE>)\.expiration_unix_time_in_seconds)$)",
+      R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.certificate(\.(<TAG_VALUE>)\.expiration_unix_time_seconds)$)",
       ".ssl.certificate");
 }
 

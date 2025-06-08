@@ -603,8 +603,8 @@ void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
     expiration_gauge_ = &createCertificateExpirationGauge(scope, config_->caCertName());
   }
 
-  const uint64_t expiration_unix_time_in_seconds = Utility::getExpirationUnixTime(ca_cert_.get());
-  expiration_gauge_->set(expiration_unix_time_in_seconds);
+  const uint64_t expiration_unix_time_seconds = Utility::getExpirationUnixTime(ca_cert_.get());
+  expiration_gauge_->set(expiration_unix_time_seconds);
 }
 
 absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {

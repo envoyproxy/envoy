@@ -459,8 +459,8 @@ void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope) {
       expiration_gauge = &createCertificateExpirationGauge(scope, cert_name);
     }
 
-    const uint64_t expiration_unix_time_in_seconds = Utility::getExpirationUnixTime(cert.get());
-    expiration_gauge->set(expiration_unix_time_in_seconds);
+    const uint64_t expiration_unix_time_seconds = Utility::getExpirationUnixTime(cert.get());
+    expiration_gauge->set(expiration_unix_time_seconds);
 
     idx++;
   }

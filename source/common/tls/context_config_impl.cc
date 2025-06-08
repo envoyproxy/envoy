@@ -45,7 +45,6 @@ std::vector<TlsCertificateConfigProviderWithName> getTlsCertificateConfigProvide
     absl::Status& creation_status) {
   std::vector<TlsCertificateConfigProviderWithName> providers;
   if (!config.tls_certificates().empty()) {
-    uint32_t unnamed_cert_idx = 0;
     for (const auto& tls_certificate : config.tls_certificates()) {
       if (!tls_certificate.has_private_key_provider() && !tls_certificate.has_certificate_chain() &&
           !tls_certificate.has_private_key() && !tls_certificate.has_pkcs12()) {
@@ -57,11 +56,6 @@ std::vector<TlsCertificateConfigProviderWithName> getTlsCertificateConfigProvide
         const std::string hash_id =
             generateCertificateHash(tls_certificate.certificate_chain().inline_bytes());
         absl::StrAppend(&cert_id, hash_id);
-      }
-
-      // Fall back to unnamed_cert_idx if we couldn't generate a hash-based name
-      if (cert_id.empty()) {
-        absl::StrAppend(&cert_id, unnamed_cert_idx++);
       }
 
       providers.push_back(TlsCertificateConfigProviderWithName{

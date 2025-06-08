@@ -585,8 +585,10 @@ void ContextImpl::updateCertStats() {
   // Update TLS certs' expiration time.
   for (Ssl::TlsContext& ctx : tls_contexts_) {
     if (ctx.cert_chain_.get() != nullptr) {
-      uint64_t expiration_unix_time_in_seconds = Utility::getExpirationUnixTime(ctx.cert_chain_.get());
-      ctx.setExpirationOnCertStats(std::chrono::duration<uint64_t>(expiration_unix_time_in_seconds));
+      uint64_t expiration_unix_time_seconds =
+          Utility::getExpirationUnixTime(ctx.cert_chain_.get());
+      ctx.setExpirationOnCertStats(
+          std::chrono::duration<uint64_t>(expiration_unix_time_seconds));
     }
   }
 }
