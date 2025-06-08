@@ -446,23 +446,23 @@ message HttpConnectionManager {
   Tracing tracing = 7;
 
   // Additional settings for HTTP requests handled by the connection manager. These will be
-  // applicable to both HTTP1 and HTTP2 requests.
+  // applicable to both HTTP/1.1 and HTTP/2 requests.
   config.core.v3.HttpProtocolOptions common_http_protocol_options = 35
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
 
-  // If set to true, Envoy will not start a drain timer for downstream HTTP1 connections after
-  // :ref:`common_http_protocol_options.max_connection_duration
-  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` passes.
-  // Instead, Envoy will wait for the next downstream request, add connection:close to the response
-  // headers, then close the connection after the stream ends.
+  // If set to ``true``, Envoy will not initiate an immediate drain timer for downstream HTTP/1 connections
+  // once :ref:`common_http_protocol_options.max_connection_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>` is exceeded.
+  // Instead, Envoy will wait until the next downstream request arrives, add a ``connection: close`` header
+  // to the response, and then gracefully close the connection once the stream has completed.
   //
-  // This behavior is compliant with `RFC 9112 section 9.6 <https://www.rfc-editor.org/rfc/rfc9112#name-tear-down>`_
+  // This behavior adheres to `RFC 9112, Section 9.6 <https://www.rfc-editor.org/rfc/rfc9112#name-tear-down>`_.
   //
-  // If set to false, ``max_connection_duration`` will cause Envoy to enter the normal drain
-  // sequence for HTTP1 with Envoy eventually closing the connection (once there are no active
-  // streams).
+  // If set to ``false``, exceeding ``max_connection_duration`` triggers Envoy's default drain behavior for HTTP/1,
+  // where the connection is eventually closed after all active streams finish.
   //
-  // Has no effect if ``max_connection_duration`` is unset. Defaults to false.
+  // This option has no effect if ``max_connection_duration`` is not configured.
+  // Defaults to ``false``.
   bool http1_safe_max_connection_duration = 58;
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
@@ -595,7 +595,7 @@ message HttpConnectionManager {
   // Delaying Envoy's connection close and giving the peer the opportunity to initiate the close
   // sequence mitigates a race condition that exists when downstream clients do not drain/process
   // data in a connection's receive buffer after a remote close has been detected via a socket
-  // write(). This race leads to such clients failing to process the response code sent by Envoy,
+  // ``write()``. This race leads to such clients failing to process the response code sent by Envoy,
   // which could result in erroneous downstream processing.
   //
   // If the timeout triggers, Envoy will close the connection's socket.
@@ -608,7 +608,7 @@ message HttpConnectionManager {
   //    a reasonable "worst" case processing time for a full iteration of Envoy's event loop>.
   //
   // .. warning::
-  //    A value of 0 will completely disable delayed close processing. When disabled, the downstream
+  //    A value of ``0`` will completely disable delayed close processing. When disabled, the downstream
   //    connection's socket will be closed immediately after the write flush is completed or will
   //    never close if the write flush does not complete.
   //
@@ -668,20 +668,19 @@ message HttpConnectionManager {
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
   uint32 xff_num_trusted_hops = 19;
 
-  // The configuration for the original IP detection extensions.
+  // Configuration for original IP detection extensions.
   //
-  // When configured the extensions will be called along with the request headers
-  // and information about the downstream connection, such as the directly connected address.
-  // Each extension will then use these parameters to decide the request's effective remote address.
-  // If an extension fails to detect the original IP address and isn't configured to reject
-  // the request, the HCM will try the remaining extensions until one succeeds or rejects
-  // the request. If the request isn't rejected nor any extension succeeds, the HCM will
-  // fallback to using the remote address.
+  // When these extensions are configured, Envoy will invoke them with the incoming request headers and
+  // details about the downstream connection, including the directly connected address. Each extension uses
+  // this information to determine the effective remote IP address for the request. If an extension cannot
+  // identify the original IP address and isn't set to reject the request, Envoy will sequentially attempt
+  // the remaining extensions until one successfully determines the IP or explicitly rejects the request.
+  // If all extensions fail without rejection, Envoy defaults to using the directly connected remote address.
   //
   // .. warning::
-  //    Extensions cannot be used in conjunction with :ref:`use_remote_address
+  //    These extensions cannot be configured simultaneously with :ref:`use_remote_address
   //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
-  //    nor :ref:`xff_num_trusted_hops
+  //    or :ref:`xff_num_trusted_hops
   //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`.
   //
   // [#extension-category: envoy.http.original_ip_detection]

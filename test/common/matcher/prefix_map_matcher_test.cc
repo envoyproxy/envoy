@@ -95,7 +95,7 @@ TEST(PrefixMapMatcherTest, DataNotAvailable) {
 
   TestData data;
   const auto result = matcher->match(data);
-  EXPECT_THAT(result, HasNotEnoughData());
+  EXPECT_THAT(result, HasInsufficientData());
 }
 
 TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
@@ -108,7 +108,7 @@ TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  EXPECT_THAT(result, HasNotEnoughData());
+  EXPECT_THAT(result, HasInsufficientData());
 }
 
 TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableMatch) {
@@ -139,7 +139,7 @@ TEST(PrefixMapMatcherTest, MoreDataMightBeAvailableNoMatchThenMatchDoesNotPerfor
 
   TestData data;
   const auto result = matcher->match(data);
-  EXPECT_THAT(result, HasNotEnoughData());
+  EXPECT_THAT(result, HasInsufficientData());
 }
 
 } // namespace Matcher

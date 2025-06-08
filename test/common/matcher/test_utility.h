@@ -261,6 +261,18 @@ createSingleMatcher(absl::optional<absl::string_view> input,
       .value();
 }
 
+void PrintTo(const FieldMatchResult& result, std::ostream* os) {
+  if (result.isInsufficientData()) {
+    *os << "InsufficientData";
+  } else if (result.isNoMatch()) {
+    *os << "NoMatch";
+  } else if (result.isMatched()) {
+    *os << "Matched";
+  } else {
+    *os << "UnknownState";
+  }
+}
+
 // Creates a StringAction from a provided string.
 std::unique_ptr<StringAction> stringValue(absl::string_view value) {
   return std::make_unique<StringAction>(std::string(value));
@@ -288,14 +300,17 @@ inline void PrintTo(const ActionFactoryCb& action_cb, std::ostream* os) {
   PrintTo(*action, os);
 }
 
-inline void PrintTo(const MatchState state, std::ostream* os) {
-  switch (state) {
-  case MatchState::UnableToMatch:
-    *os << "UnableToMatch";
-    break;
-  case MatchState::MatchComplete:
-    *os << "MatchComplete";
-    break;
+inline void PrintTo(const MatchResult& result, std::ostream* os) {
+  if (result.isInsufficientData()) {
+    *os << "InsufficientData";
+  } else if (result.isNoMatch()) {
+    *os << "NoMatch";
+  } else if (result.isMatch()) {
+    *os << "Match{ActionFactoryCb=";
+    PrintTo(result.actionFactory(), os);
+    *os << "}";
+  } else {
+    *os << "UnknownState";
   }
 }
 
@@ -317,22 +332,20 @@ inline void PrintTo(const OnMatch<TestData>& on_match, std::ostream* os) {
   }
 }
 
-inline void PrintTo(const MatchTree<TestData>::MatchResult& result, std::ostream* os) {
-  *os << "{match_state_=";
-  PrintTo(result.match_state_, os);
-  *os << ", on_match_=";
-  if (result.on_match_.has_value()) {
-    PrintTo(result.on_match_.value(), os);
-  } else {
-    *os << "nullopt";
-  }
-  *os << "}";
+MATCHER(HasInsufficientData, "") {
+  // Takes a MatchResult& and validates that it
+  // is in the InsufficientData state.
+  return arg.isInsufficientData();
 }
 
-MATCHER(HasNotEnoughData, "") {
-  // Takes a MatchTree<TestData>::MatchResult& and validates that it
-  // is in the UnableToMatch state.
-  return arg.match_state_ == MatchState::UnableToMatch && !arg.on_match_.has_value();
+MATCHER_P(IsActionWithType, matcher, "") {
+  // Takes an ActionFactoryCb argument, and compares its action type against matcher.
+  if (arg == nullptr) {
+    return false;
+  }
+  ActionPtr action = arg();
+  return ::testing::ExplainMatchResult(testing::Matcher<absl::string_view>(matcher),
+                                       action->typeUrl(), result_listener);
 }
 
 MATCHER_P(IsStringAction, matcher, "") {
@@ -350,66 +363,28 @@ MATCHER_P(IsStringAction, matcher, "") {
 }
 
 MATCHER_P(HasStringAction, matcher, "") {
-  // Takes a MatchTree<TestData>::MatchResult& and validates that it
-  // is a StringAction with contents matching matcher.
-  if (arg.match_state_ != MatchState::MatchComplete || !arg.on_match_.has_value() ||
-      arg.on_match_->matcher_ != nullptr) {
+  // Takes a MatchResult& and validates that it
+  // has a StringAction with contents matching matcher.
+  if (!arg.isMatch()) {
     return false;
   }
-  return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.on_match_->action_cb_,
+  return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.actionFactory(),
+                                       result_listener);
+}
+
+MATCHER_P(HasActionWithType, matcher, "") {
+  // Takes a MatchResult& and validates that it
+  // has an action whose type matches matcher.
+  if (!arg.isMatch()) {
+    return false;
+  }
+  return ::testing::ExplainMatchResult(IsActionWithType(matcher), arg.actionFactory(),
                                        result_listener);
 }
 
 MATCHER(HasNoMatch, "") {
-  // Takes a MatchTree<TestData>::MatchResult& and validates that it
-  // is MatchComplete with no on_match_.
-  return arg.match_state_ == MatchState::MatchComplete && !arg.on_match_.has_value();
-}
-
-MATCHER(HasSubMatcher, "") {
-  // Takes a MatchTree<TestData>::MatchResult& and validates that it
-  // has a matcher_ value in on_match_.
-  return arg.match_state_ == MatchState::MatchComplete && arg.on_match_.has_value() &&
-         arg.on_match_->matcher_ != nullptr;
-}
-
-MATCHER_P(HasResult, m, "") {
-  // Accepts a MaybeMatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.result_ == nullptr) {
-    *result_listener << "result_ is null";
-    return false;
-  }
-  return ExplainMatchResult(m, arg.result_, result_listener);
-}
-
-MATCHER(HasNoMatchResult, "") {
-  // Accepts a MaybeMatchResult argument.
-  if (arg.match_state_ != MatchState::MatchComplete) {
-    *result_listener << "match_state_ is not MatchComplete";
-    return false;
-  }
-  if (arg.result_ != nullptr) {
-    *result_listener << "result_ is not null";
-    return false;
-  }
-  return true;
-}
-
-MATCHER(HasFailureResult, "") {
-  // Accepts a MaybeMatchResult argument.
-  if (arg.match_state_ != MatchState::UnableToMatch) {
-    *result_listener << "match_state_ is not UnableToMatch";
-    return false;
-  }
-  if (arg.result_ != nullptr) {
-    *result_listener << "result_ is not null";
-    return false;
-  }
-  return true;
+  // Takes a MatchResult& and validates that it is NoMatch.
+  return arg.isNoMatch();
 }
 
 } // namespace Matcher

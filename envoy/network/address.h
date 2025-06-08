@@ -254,6 +254,7 @@ public:
   InstanceAccessor(InstanceConstSharedPtr ip) : ip_(std::move(ip)) {}
 
   InstanceConstOptRef getIp() const { return makeOptRefFromPtr<const Instance>(ip_.get()); }
+  InstanceConstSharedPtr getAddress() const { return ip_; }
 
 private:
   InstanceConstSharedPtr ip_;
