@@ -193,7 +193,8 @@ getHeaderParsers(const HeaderParser* global_route_config_header_parser,
 // plugin is set to optional, then this null plugin will be used as a placeholder.
 class NullClusterSpecifierPlugin : public ClusterSpecifierPlugin {
 public:
-  RouteConstSharedPtr route(RouteConstSharedPtr, const Http::RequestHeaderMap&) const override {
+  RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr, const Http::RequestHeaderMap&,
+                            const StreamInfo::StreamInfo&) const override {
     return nullptr;
   }
 };
@@ -241,6 +242,16 @@ createRedirectConfig(const envoy::config::route::v3::Route& route, Regex::Engine
     ASSERT(redirect_config.prefix_rewrite_redirect_.empty());
   }
   return redirect_config;
+}
+
+absl::string_view pickClusterHeader(const Http::LowerCaseString& header_name,
+                                    const Http::HeaderMap& headers) {
+  if (const auto entry = headers.get(header_name); !entry.empty()) {
+    // This is an implicitly untrusted header, so per the API documentation only
+    // the first value is used.
+    return entry[0]->value().getStringView();
+  }
+  return {};
 }
 
 } // namespace
@@ -689,14 +700,12 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     uint64_t total_weight = 0UL;
     const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
 
-    std::vector<WeightedClusterEntrySharedPtr> weighted_clusters;
+    std::vector<WeightedClusterConfigSharedPtr> weighted_clusters;
     weighted_clusters.reserve(route.route().weighted_clusters().clusters().size());
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      auto cluster_entry = THROW_OR_RETURN_VALUE(
-          WeightedClusterEntry::create(this, runtime_key_prefix + "." + cluster.name(),
-                                       factory_context, validator, cluster),
-          std::unique_ptr<WeightedClusterEntry>);
-      weighted_clusters.emplace_back(std::move(cluster_entry));
+      SET_AND_RETURN_IF_NOT_OK(validateWeightedClusterSpecifier(cluster), creation_status);
+      weighted_clusters.emplace_back(std::make_shared<WeightedClusterConfig>(
+          *this, runtime_key_prefix + "." + cluster.name(), factory_context, validator, cluster));
       total_weight += weighted_clusters.back()->clusterWeight(loader_);
       if (total_weight > std::numeric_limits<uint32_t>::max()) {
         creation_status = absl::InvalidArgumentError(
@@ -1378,24 +1387,8 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
-    const Http::LowerCaseString& cluster_header_name, const Http::HeaderMap& headers,
-    const RouteEntryAndRoute* route_selector_override) const {
-  const auto entry = headers.get(cluster_header_name);
-  std::string final_cluster_name;
-  if (!entry.empty()) {
-    // This is an implicitly untrusted header, so per the API documentation only
-    // the first value is used.
-    final_cluster_name = std::string(entry[0]->value().getStringView());
-  }
-
-  return std::make_shared<DynamicRouteEntry>(route_selector_override
-                                                 ? route_selector_override
-                                                 : static_cast<const RouteEntryAndRoute*>(this),
-                                             shared_from_this(), final_cluster_name);
-}
-
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
+                                                     const StreamInfo::StreamInfo& stream_info,
                                                      uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
@@ -1403,13 +1396,13 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
     if (!cluster_name_.empty() || isDirectResponse()) {
       return shared_from_this();
     } else if (!cluster_header_name_.get().empty()) {
-      return pickClusterViaClusterHeader(cluster_header_name_, headers,
-                                         /*route_selector_override=*/nullptr);
+      return std::make_shared<DynamicRouteEntry>(shared_from_this(),
+                                                 pickClusterHeader(cluster_header_name_, headers));
     } else {
       // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
       // cluster specifier plugin.
       ASSERT(cluster_specifier_plugin_ != nullptr);
-      return cluster_specifier_plugin_->route(shared_from_this(), headers);
+      return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info);
     }
   }
   return pickWeightedCluster(headers, random_value);
@@ -1464,8 +1457,7 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     cluster_weights.reserve(weighted_clusters_config_->weighted_clusters_.size());
 
     total_cluster_weight = 0;
-    for (const WeightedClusterEntrySharedPtr& cluster :
-         weighted_clusters_config_->weighted_clusters_) {
+    for (const auto& cluster : weighted_clusters_config_->weighted_clusters_) {
       auto cluster_weight = cluster->clusterWeight(loader_);
       cluster_weights.push_back(cluster_weight);
       if (cluster_weight > std::numeric_limits<uint32_t>::max() - total_cluster_weight) {
@@ -1490,9 +1482,7 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
   // Find the right cluster to route to based on the interval in which
   // the selected value falls. The intervals are determined as
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const WeightedClusterEntrySharedPtr& cluster :
-       weighted_clusters_config_->weighted_clusters_) {
-
+  for (const auto& cluster : weighted_clusters_config_->weighted_clusters_) {
     if (runtime_key_prefix_configured) {
       end = begin + *cluster_weight++;
     } else {
@@ -1500,17 +1490,8 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
     }
 
     if (selected_value >= begin && selected_value < end) {
-      if (!cluster->clusterHeaderName().get().empty() &&
-          !headers.get(cluster->clusterHeaderName()).empty()) {
-        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers,
-                                           static_cast<RouteEntryAndRoute*>(cluster.get()));
-      }
-      // The WeightedClusterEntry does not contain reference to the RouteEntryImplBase to
-      // avoid circular reference. To ensure that the RouteEntryImplBase is not destructed
-      // before the WeightedClusterEntry, additional wrapper is used to hold the reference
-      // to the RouteEntryImplBase.
-      return std::make_shared<DynamicRouteEntry>(cluster.get(), shared_from_this(),
-                                                 cluster->clusterName());
+      return std::make_shared<WeightedClusterEntry>(shared_from_this(),
+                                                    cluster->pickCluster(headers), cluster);
     }
     begin = end;
   }
@@ -1536,8 +1517,7 @@ absl::Status RouteEntryImplBase::validateClusters(
       return absl::InvalidArgumentError(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (weighted_clusters_config_ != nullptr) {
-    for (const WeightedClusterEntrySharedPtr& cluster :
-         weighted_clusters_config_->weighted_clusters_) {
+    for (const auto& cluster : weighted_clusters_config_->weighted_clusters_) {
       if (!cluster->clusterName().empty()) {
         if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
           return absl::InvalidArgumentError(
@@ -1584,28 +1564,16 @@ const Envoy::Config::TypedMetadata& RouteEntryImplBase::typedMetadata() const {
                               : DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
-absl::StatusOr<std::unique_ptr<RouteEntryImplBase::WeightedClusterEntry>>
-RouteEntryImplBase::WeightedClusterEntry::create(
-    const RouteEntryImplBase* parent, const std::string& runtime_key,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator,
-    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
-  RETURN_IF_NOT_OK(validateWeightedClusterSpecifier(cluster));
-  return std::unique_ptr<WeightedClusterEntry>(
-      new WeightedClusterEntry(parent, runtime_key, factory_context, validator, cluster));
-}
-
-RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
-    const RouteEntryImplBase* parent, const std::string& runtime_key,
+RouteEntryImplBase::WeightedClusterConfig::WeightedClusterConfig(
+    const RouteEntryImplBase& parent, const std::string& runtime_key,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator,
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster)
-    : DynamicRouteEntry(parent, nullptr, cluster.name()), runtime_key_(runtime_key),
-      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
+    : runtime_key_(runtime_key), cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
       per_filter_configs_(THROW_OR_RETURN_VALUE(
           PerFilterConfigs::create(cluster.typed_per_filter_config(), factory_context, validator),
           std::unique_ptr<PerFilterConfigs>)),
-      host_rewrite_(cluster.host_rewrite_literal()),
+      host_rewrite_(cluster.host_rewrite_literal()), cluster_name_(cluster.name()),
       cluster_header_name_(cluster.cluster_header()) {
   if (!cluster.request_headers_to_add().empty() || !cluster.request_headers_to_remove().empty()) {
     request_headers_parser_ =
@@ -1624,15 +1592,21 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it != cluster.metadata_match().filter_metadata().end()) {
-      if (parent->metadata_match_criteria_) {
+      if (parent.metadata_match_criteria_) {
         cluster_metadata_match_criteria_ =
-            parent->metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+            parent.metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
       } else {
         cluster_metadata_match_criteria_ =
             std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
       }
     }
   }
+}
+
+absl::string_view
+RouteEntryImplBase::WeightedClusterConfig::pickCluster(const Http::HeaderMap& headers) const {
+  return cluster_header_name_.get().empty() ? absl::string_view(cluster_name_)
+                                            : pickClusterHeader(cluster_header_name_, headers);
 }
 
 Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::requestHeaderTransforms(
@@ -1655,7 +1629,7 @@ RouteSpecificFilterConfigs
 RouteEntryImplBase::WeightedClusterEntry::perFilterConfigs(absl::string_view filter_name) const {
 
   auto result = DynamicRouteEntry::perFilterConfigs(filter_name);
-  const auto* cfg = per_filter_configs_->get(filter_name);
+  const auto* cfg = config_->per_filter_configs_->get(filter_name);
   if (cfg != nullptr) {
     result.push_back(cfg);
   }
@@ -1685,7 +1659,7 @@ UriTemplateMatcherRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                           uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       path_matcher_->match(headers.getPathValue())) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
   return nullptr;
 }
@@ -1716,7 +1690,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
   return nullptr;
 }
@@ -1748,7 +1722,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
 
   return nullptr;
@@ -1787,7 +1761,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     if (path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
-      return clusterEntry(headers, random_value);
+      return clusterEntry(headers, stream_info, random_value);
     }
   }
   return nullptr;
@@ -1817,7 +1791,7 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
   if ((Http::HeaderUtility::isConnect(headers) ||
        Http::HeaderUtility::isConnectUdpRequest(headers)) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
   return nullptr;
 }
@@ -1856,7 +1830,7 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   const size_t matcher_size = matcher().size();
   if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
   return nullptr;
 }

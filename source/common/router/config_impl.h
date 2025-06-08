@@ -835,9 +835,8 @@ public:
 
   class DynamicRouteEntry : public RouteEntryAndRoute {
   public:
-    DynamicRouteEntry(const RouteEntryAndRoute* parent, RouteConstSharedPtr owner,
-                      const std::string& name)
-        : parent_(parent), owner_(std::move(owner)), cluster_name_(name) {}
+    DynamicRouteEntry(RouteEntryAndRouteConstSharedPtr parent, absl::string_view name)
+        : parent_(std::move(parent)), cluster_name_(name) {}
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -960,53 +959,78 @@ public:
     const std::string& routeName() const override { return parent_->routeName(); }
 
   private:
-    const RouteEntryAndRoute* parent_;
-
-    // If a DynamicRouteEntry instance is created and returned to the caller directly, then keep an
-    // copy of the shared pointer to the parent Route (RouteEntryImplBase) to ensure the parent
-    // is not destroyed before this entry.
-    //
-    // This should be nullptr if the DynamicRouteEntry is part of the parent (RouteEntryImplBase) to
-    // avoid possible circular reference. For example, the WeightedClusterEntry (derived from
-    // DynamicRouteEntry) will be member of the RouteEntryImplBase, so the owner_ should be nullptr.
-    const RouteConstSharedPtr owner_;
+    RouteEntryAndRouteConstSharedPtr parent_;
     const std::string cluster_name_;
   };
 
-  /**
-   * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
-   * one or more weighted cluster objects, where each object has a back pointer to the parent
-   * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
-   * parent, with the exception of clusterName, routeEntry, and metadataMatchCriteria.
-   */
-  class WeightedClusterEntry : public DynamicRouteEntry {
+  // Weighted cluster config which will be used to create WeightedClusterEntry.
+  class WeightedClusterConfig {
   public:
-    static absl::StatusOr<std::unique_ptr<WeightedClusterEntry>>
-    create(const RouteEntryImplBase* parent, const std::string& rutime_key,
-           Server::Configuration::ServerFactoryContext& factory_context,
-           ProtobufMessage::ValidationVisitor& validator,
-           const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
+    WeightedClusterConfig(const RouteEntryImplBase& parent, const std::string& rutime_key,
+                          Server::Configuration::ServerFactoryContext& factory_context,
+                          ProtobufMessage::ValidationVisitor& validator,
+                          const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
 
     uint64_t clusterWeight(Runtime::Loader& loader) const {
       return loader.snapshot().getInteger(runtime_key_, cluster_weight_);
     }
 
+    absl::string_view pickCluster(const Http::HeaderMap& headers) const;
+    absl::string_view clusterName() const { return cluster_name_; }
+    const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
+
+    const std::string runtime_key_;
+    const uint64_t cluster_weight_;
+    MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
+    HeaderParserPtr request_headers_parser_;
+    HeaderParserPtr response_headers_parser_;
+    std::unique_ptr<PerFilterConfigs> per_filter_configs_;
+    const std::string host_rewrite_;
+    const std::string cluster_name_;
+    const Http::LowerCaseString cluster_header_name_;
+  };
+
+  using WeightedClusterConfigSharedPtr = std::shared_ptr<WeightedClusterConfig>;
+  // Container for route config elements that pertain to weighted clusters.
+  // We keep them in a separate data structure to avoid memory overhead for the routes that do not
+  // use weighted clusters.
+  struct WeightedClustersConfig {
+    WeightedClustersConfig(std::vector<WeightedClusterConfigSharedPtr>&& weighted_clusters,
+                           uint64_t total_cluster_weight,
+                           const std::string& random_value_header_name,
+                           const std::string& runtime_key_prefix)
+        : weighted_clusters_(std::move(weighted_clusters)),
+          total_cluster_weight_(total_cluster_weight),
+          random_value_header_name_(random_value_header_name),
+          runtime_key_prefix_(runtime_key_prefix) {}
+    const std::vector<WeightedClusterConfigSharedPtr> weighted_clusters_;
+    const uint64_t total_cluster_weight_;
+    const std::string random_value_header_name_;
+    const std::string runtime_key_prefix_;
+  };
+
+  class WeightedClusterEntry : public DynamicRouteEntry {
+  public:
+    WeightedClusterEntry(RouteEntryAndRouteConstSharedPtr parent, absl::string_view cluster_name,
+                         WeightedClusterConfigSharedPtr config)
+        : DynamicRouteEntry(std::move(parent), cluster_name), config_(std::move(config)) {}
+
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
-      if (cluster_metadata_match_criteria_) {
-        return cluster_metadata_match_criteria_.get();
+      if (config_->cluster_metadata_match_criteria_) {
+        return config_->cluster_metadata_match_criteria_.get();
       }
       return DynamicRouteEntry::metadataMatchCriteria();
     }
 
     const HeaderParser& requestHeaderParser() const {
-      if (request_headers_parser_ != nullptr) {
-        return *request_headers_parser_;
+      if (config_->request_headers_parser_ != nullptr) {
+        return *config_->request_headers_parser_;
       }
       return HeaderParser::defaultParser();
     }
     const HeaderParser& responseHeaderParser() const {
-      if (response_headers_parser_ != nullptr) {
-        return *response_headers_parser_;
+      if (config_->response_headers_parser_ != nullptr) {
+        return *config_->response_headers_parser_;
       }
       return HeaderParser::defaultParser();
     }
@@ -1015,8 +1039,8 @@ public:
                                 const StreamInfo::StreamInfo& stream_info,
                                 bool insert_envoy_original_path) const override {
       requestHeaderParser().evaluateHeaders(headers, stream_info);
-      if (!host_rewrite_.empty()) {
-        headers.setHost(host_rewrite_);
+      if (!config_->host_rewrite_.empty()) {
+        headers.setHost(config_->host_rewrite_);
       }
       DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
     }
@@ -1035,7 +1059,7 @@ public:
                                                     bool do_formatting = true) const override;
 
     absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
-      absl::optional<bool> result = per_filter_configs_->disabled(config_name);
+      absl::optional<bool> result = config_->per_filter_configs_->disabled(config_name);
       if (result.has_value()) {
         return result.value();
       }
@@ -1043,46 +1067,13 @@ public:
     }
     const RouteSpecificFilterConfig*
     mostSpecificPerFilterConfig(absl::string_view name) const override {
-      auto* config = per_filter_configs_->get(name);
+      auto* config = config_->per_filter_configs_->get(name);
       return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
     }
     RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
 
-    const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
-
   private:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
-                         Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator,
-                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
-
-    const std::string runtime_key_;
-    const uint64_t cluster_weight_;
-    MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
-    HeaderParserPtr request_headers_parser_;
-    HeaderParserPtr response_headers_parser_;
-    std::unique_ptr<PerFilterConfigs> per_filter_configs_;
-    const std::string host_rewrite_;
-    const Http::LowerCaseString cluster_header_name_;
-  };
-
-  using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
-  // Container for route config elements that pertain to weighted clusters.
-  // We keep them in a separate data structure to avoid memory overhead for the routes that do not
-  // use weighted clusters.
-  struct WeightedClustersConfig {
-    WeightedClustersConfig(const std::vector<WeightedClusterEntrySharedPtr>&& weighted_clusters,
-                           uint64_t total_cluster_weight,
-                           const std::string& random_value_header_name,
-                           const std::string& runtime_key_prefix)
-        : weighted_clusters_(std::move(weighted_clusters)),
-          total_cluster_weight_(total_cluster_weight),
-          random_value_header_name_(random_value_header_name),
-          runtime_key_prefix_(runtime_key_prefix) {}
-    const std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
-    const uint64_t total_cluster_weight_;
-    const std::string random_value_header_name_;
-    const std::string runtime_key_prefix_;
+    WeightedClusterConfigSharedPtr config_;
   };
 
 protected:
@@ -1096,6 +1087,7 @@ protected:
 
   bool case_sensitive() const { return case_sensitive_; }
   RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
                                    uint64_t random_value) const;
 
   /**
@@ -1190,11 +1182,6 @@ private:
   absl::StatusOr<PathRewriterSharedPtr>
   buildPathRewriter(const envoy::config::route::v3::Route& route,
                     ProtobufMessage::ValidationVisitor& validator) const;
-
-  RouteConstSharedPtr
-  pickClusterViaClusterHeader(const Http::LowerCaseString& cluster_header_name,
-                              const Http::HeaderMap& headers,
-                              const RouteEntryAndRoute* route_selector_override) const;
 
   RouteConstSharedPtr pickWeightedCluster(const Http::HeaderMap& headers,
                                           uint64_t random_value) const;

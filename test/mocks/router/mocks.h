@@ -685,7 +685,9 @@ public:
   MockClusterSpecifierPlugin();
 
   MOCK_METHOD(RouteConstSharedPtr, route,
-              (RouteConstSharedPtr parent, const Http::RequestHeaderMap& header), (const));
+              (RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& stream_info),
+              (const));
 };
 
 class MockClusterSpecifierPluginFactoryConfig : public ClusterSpecifierPluginFactoryConfig {
