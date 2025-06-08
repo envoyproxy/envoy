@@ -642,8 +642,8 @@ TEST(DefaultCertValidatorTest, WithVerifyDepth) {
       std::make_unique<TestCertificateValidationContextConfig>(typed_conf, false, san_matchers,
                                                                ca_cert_str, 2);
   auto default_validator =
-      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(
-          test_config.get(), stats, context);
+      std::make_unique<Extensions::TransportSockets::Tls::DefaultCertValidator>(test_config.get(),
+                                                                                stats, context);
 
   STACK_OF(X509)* intermediates = cert_chain.get();
   SSLContextPtr ssl_ctx = SSL_CTX_new(TLS_method());
