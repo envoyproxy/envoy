@@ -7,6 +7,7 @@
 #include "source/common/router/upstream_codec_filter.h"
 #include "source/common/tls/cert_validator/default_validator.h"
 #include "source/common/upstream/default_local_address_selector_factory.h"
+#include "source/extensions/api_listeners/default_api_listener/api_listener_impl.h"
 #include "source/extensions/clusters/dynamic_forward_proxy/cluster.h"
 #include "source/extensions/compression/brotli/decompressor/config.h"
 #include "source/extensions/compression/gzip/decompressor/config.h"
@@ -58,6 +59,8 @@ namespace Envoy {
 
 void ExtensionRegistry::registerFactories() {
   ExtensionRegistryPlatformAdditions::registerFactories();
+
+  Extensions::ApiListeners::DefaultApiListener::forceRegisterHttpApiListenerFactory();
 
   // The uuid extension is required for E-M for server mode. Ideally E-M could skip it.
   Extensions::RequestId::forceRegisterUUIDRequestIDExtensionFactory();

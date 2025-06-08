@@ -188,9 +188,6 @@ function bazel_contrib_binary_build() {
 }
 
 function bazel_envoy_api_build() {
-    # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
-    # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
-    ENVOY_STDLIB="libstdc++"
     setup_clang_toolchain
     export CLANG_TOOLCHAIN_SETUP=1
     export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
@@ -431,10 +428,6 @@ case $CI_TARGET in
             export FUZZ_COVERAGE=true
         fi
         export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
-        ENVOY_GENHTML_ARGS=(
-            --ignore-errors "category,corrupt,inconsistent")
-        GENHTML_ARGS="${ENVOY_GENHTML_ARGS[*]}"
-        export GENHTML_ARGS
         "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage

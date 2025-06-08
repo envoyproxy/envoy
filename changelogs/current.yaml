@@ -7,6 +7,19 @@ behavior_changes:
     As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
     grpc_credentials/aws_iam extension is being deleted. Any configuration referencing this extension
     will fail to load.
+- area: prefix_match_map
+  change: |
+    :ref:`prefix_match_map <envoy_v3_api_field_config.common.matcher.v3.Matcher.MatcherTree.prefix_match_map>`
+    now continues to search for a match with shorter prefix if a longer match
+    does not find an action. This brings it in line with the behavior of ``matcher_list``.
+    This change can temporarily be reverted by setting the runtime guard
+    ``envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss`` to false.
+    If the old behavior is desired more permanently, this can be achieved in config by setting
+    an ``on_no_match`` action that responds with 404 for each subtree.
+- area: server
+  change: |
+    Envoy will automatically raise the soft limit on the file descriptors to the hard limit. This behavior
+    can be reverted using the runtime guard ``envoy_restart_features_raise_file_limits``.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -41,6 +54,10 @@ minor_behavior_changes:
    :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
    :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
    will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
+- area: aws
+  change: |
+    :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
+    providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -61,6 +78,10 @@ bug_fixes:
   change: |
     Fixes a bug where the lifetime of the HttpConnectionManager's ActiveStream can be out of sync
     with the lifetime of the codec stream.
+- area: quic
+  change: |
+    Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a "transfer-encoding" header is incorrectly appended.
+    Protected by runtime guard ``envoy.reloadable_features.quic_signal_headers_only_to_http1_backend``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -108,6 +129,13 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: redis
+  change: |
+    Added support for scan and info.
+- area: http
+  change: |
+    added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
+    used to record the original host header value before it is mutated by the router filter.
 - area: stateful_session
   change: |
     Supports envelope stateful session extension to keep the exist session header value
@@ -143,6 +171,9 @@ new_features:
     Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+- area: socket
+  change: |
+    Added ``network_namespace_filepath`` to ``SocketAddress``. Currently only used by listeners.
 - area: rbac filter
   change: |
     allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
@@ -157,6 +188,14 @@ new_features:
 - area: local_ratelimit
   change: |
     ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
+- area: oauth2
+  change: |
+    Added :ref:`end_session_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.end_session_endpoint>`
+    to the oauth2 filter to support OIDC RP initiated logout. This field is only used when
+    ``openid`` is in the :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_scopes>` field.
+    If configured, the OAuth2 filter will redirect users to this endpoint when they access the
+    :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`. This allows users to
+    be logged out of the Authorization server.
 - area: tls
   change: |
     Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.

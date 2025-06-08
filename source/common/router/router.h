@@ -449,6 +449,9 @@ public:
     }
     return callbacks_->upstreamOverrideHost();
   }
+  void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) override {
+    modify_headers_from_upstream_lb_ = std::move(modifier);
+  }
 
   void onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string&& details) override;
 
@@ -621,7 +624,8 @@ private:
   MonotonicTime downstream_request_complete_time_;
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
-  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
+  std::function<void(Http::ResponseHeaderMap&)> modify_headers_from_upstream_lb_;
+  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_;
   std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
   std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.

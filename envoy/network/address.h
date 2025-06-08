@@ -239,6 +239,11 @@ public:
    * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
+
+  /**
+   * @return filepath of the network namespace for the address.
+   */
+  virtual absl::optional<std::string> networkNamespace() const PURE;
 };
 
 /*
@@ -249,6 +254,7 @@ public:
   InstanceAccessor(InstanceConstSharedPtr ip) : ip_(std::move(ip)) {}
 
   InstanceConstOptRef getIp() const { return makeOptRefFromPtr<const Instance>(ip_.get()); }
+  InstanceConstSharedPtr getAddress() const { return ip_; }
 
 private:
   InstanceConstSharedPtr ip_;
