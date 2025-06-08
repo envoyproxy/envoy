@@ -44,9 +44,9 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
   }
 }
 
-RouteConstSharedPtr
-GolangClusterSpecifierPlugin::route(RouteConstSharedPtr parent,
-                                    const Http::RequestHeaderMap& header) const {
+RouteConstSharedPtr GolangClusterSpecifierPlugin::route(RouteEntryAndRouteConstSharedPtr parent,
+                                                        const Http::RequestHeaderMap& header,
+                                                        const StreamInfo::StreamInfo&) const {
   ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
   int buffer_len = 256;
   std::string buffer;

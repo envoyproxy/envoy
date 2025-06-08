@@ -1096,6 +1096,7 @@ protected:
 
   bool case_sensitive() const { return case_sensitive_; }
   RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
                                    uint64_t random_value) const;
 
   /**

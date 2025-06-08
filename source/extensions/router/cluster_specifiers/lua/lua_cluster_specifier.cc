@@ -121,8 +121,9 @@ std::string LuaClusterSpecifierPlugin::startLua(const Http::HeaderMap& headers) 
 }
 
 Envoy::Router::RouteConstSharedPtr
-LuaClusterSpecifierPlugin::route(Envoy::Router::RouteConstSharedPtr parent,
-                                 const Http::RequestHeaderMap& headers) const {
+LuaClusterSpecifierPlugin::route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
+                                 const Http::RequestHeaderMap& headers,
+                                 const StreamInfo::StreamInfo&) const {
   return std::make_shared<Envoy::Router::RouteEntryImplBase::DynamicRouteEntry>(
       dynamic_cast<const Envoy::Router::RouteEntryImplBase*>(parent.get()), parent,
       startLua(headers));
