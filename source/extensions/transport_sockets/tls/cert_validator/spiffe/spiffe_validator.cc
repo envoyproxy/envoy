@@ -159,7 +159,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
                                  SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context,
                                  Stats::Scope& scope)
-    : api_(config->api()), cert_name_(config->caCertName()), stats_(stats),
+    : api_(config->api()), stats_(stats),
       time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
@@ -201,7 +201,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
       initializeCertificateRefresh(context);
     }
 
-    initializeCertExpirationStats(scope);
+    initializeCertExpirationStats(scope, config->caCertName());
     return;
   }
 
@@ -257,7 +257,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     spiffe_data_->trust_bundle_stores_[domain.name()] = std::move(store);
   }
 
-  initializeCertExpirationStats(scope);
+  initializeCertExpirationStats(scope, config->caCertName());
 }
 
 absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
@@ -445,18 +445,18 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
-void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope) {
+void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name) {
   // TODO(peterl328): Due to current interface, we only receive one cert name.
   // Since we may have multiple certificates here, we will use the provided cert name and append
   // an index to it. Assumes the order in the ca_certs_ vector doesn't change.
   int idx = 0;
   for (bssl::UniquePtr<X509>& cert : spiffe_data_->ca_certs_) {
     // Add underscore between cert name and index to avoid collisions
-    std::string cert_name = absl::StrCat(cert_name_, "_", idx);
+    std::string cert_name_with_idx = absl::StrCat(cert_name, "_", idx);
 
-    Stats::Gauge*& expiration_gauge = expiration_gauges_map_[cert_name];
+    Stats::Gauge*& expiration_gauge = expiration_gauges_map_[cert_name_with_idx];
     if (expiration_gauge == nullptr) {
-      expiration_gauge = &createCertificateExpirationGauge(scope, cert_name);
+      expiration_gauge = &createCertificateExpirationGauge(scope, cert_name_with_idx);
     }
 
     const uint64_t expiration_unix_time_seconds = Utility::getExpirationUnixTime(cert.get());

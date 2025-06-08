@@ -113,7 +113,6 @@ private:
                                  std::string* error_details, uint8_t* out_alert);
 
   void initializeCertExpirationStats(Stats::Scope& scope);
-  const std::string cert_name_;
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;

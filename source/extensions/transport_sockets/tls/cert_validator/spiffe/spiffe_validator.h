@@ -85,7 +85,7 @@ private:
                                             std::string& error_details);
 
   void initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
-  void initializeCertExpirationStats(Stats::Scope& scope);
+  void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);
   absl::StatusOr<std::shared_ptr<SpiffeData>>
   parseTrustBundles(const std::string& trust_bundles_str);
 
@@ -120,7 +120,6 @@ private:
   std::unique_ptr<Filesystem::Watcher> file_watcher_;
   absl::flat_hash_map<std::string, Stats::Gauge*> expiration_gauges_map_;
   Api::Api& api_;
-  const std::string cert_name_;
   SslStats& stats_;
   TimeSource& time_source_;
 };
