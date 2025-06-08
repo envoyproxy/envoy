@@ -586,7 +586,7 @@ void ContextImpl::updateCertStats() {
   for (Ssl::TlsContext& ctx : tls_contexts_) {
     if (ctx.cert_chain_.get() != nullptr) {
       uint64_t expiration_unix_time_seconds = Utility::getExpirationUnixTime(ctx.cert_chain_.get());
-      ctx.setExpirationOnCertStats(std::chrono::duration<uint64_t>(expiration_unix_time_seconds));
+      ctx.setExpirationOnCertStats(std::chrono::seconds(expiration_unix_time_seconds));
     }
   }
 }
@@ -831,7 +831,7 @@ void TlsContext::createCertExpirationGauge(Stats::Scope& scope, const std::strin
       &Extensions::TransportSockets::Tls::createCertificateExpirationGauge(scope, cert_name);
 }
 
-void TlsContext::setExpirationOnCertStats(std::chrono::duration<uint64_t> duration) {
+void TlsContext::setExpirationOnCertStats(std::chrono::seconds duration) {
   expiration_gauge_->set(duration.count());
 }
 

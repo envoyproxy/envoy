@@ -75,7 +75,7 @@ struct TlsContext {
   absl::Status checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey, const std::string& key_path,
                                bool fips_mode);
   void createCertExpirationGauge(Stats::Scope& scope, const std::string& cert_name);
-  void setExpirationOnCertStats(std::chrono::duration<uint64_t> duration);
+  void setExpirationOnCertStats(std::chrono::seconds duration);
 };
 } // namespace Ssl
 
