@@ -151,8 +151,6 @@ protected:
 
   void populateServerNamesMap(Ssl::TlsContext& ctx, const int pkey_id);
 
-  void updateCertStats();
-
   // This is always non-empty, with the first context used for all new SSL
   // objects. For server contexts, once we have ClientHello, we
   // potentially switch to a different CertificateContext based on certificate

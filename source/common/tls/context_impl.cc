@@ -110,6 +110,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     // No need to store cert name for default tls context as there are no TLS certificates.
     if (!tls_certificates.empty()) {
       ctx.createCertExpirationGauge(scope, tls_certificates[i].get().certificateName());
+      if (ctx.cert_chain_.get() != nullptr) {
+        ctx.setExpirationOnCertStats(std::chrono::seconds(Utility::getExpirationUnixTime(ctx.cert_chain_.get())));
+      }
     }
 
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
@@ -384,9 +387,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       return;
     }
   }
-
-  // Update certificate stats after all certificates are loaded
-  updateCertStats();
 }
 
 void ContextImpl::keylogCallback(const SSL* ssl, const char* line) {
@@ -578,16 +578,6 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
     }
   }
   return providers;
-}
-
-void ContextImpl::updateCertStats() {
-  // Update TLS certs' expiration time.
-  for (Ssl::TlsContext& ctx : tls_contexts_) {
-    if (ctx.cert_chain_.get() != nullptr) {
-      uint64_t expiration_unix_time_seconds = Utility::getExpirationUnixTime(ctx.cert_chain_.get());
-      ctx.setExpirationOnCertStats(std::chrono::seconds(expiration_unix_time_seconds));
-    }
-  }
 }
 
 absl::optional<uint32_t> ContextImpl::daysUntilFirstCertExpires() const {
