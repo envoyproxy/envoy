@@ -752,7 +752,7 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   return false;
 }
 
-// Decrpyts the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
+// Decrypt the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
 // the request upstream.
 void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) {
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
@@ -803,7 +803,7 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token,
     // In this case, we return the token as-is to allow the request to proceed.
     // 2. The token is encrypted, but the decryption failed due to the HMAC secret is changed.
     // In this case, we return the original encrypted token, the HMAC validation will fail
-    // and the user wil
+    // and the user will be redirected to the OAuth server for re-authentication.
     return encrypted_token;
   }
   return decrypt_result.plaintext;
