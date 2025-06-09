@@ -82,6 +82,11 @@ bug_fixes:
   change: |
     Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a "transfer-encoding" header is incorrectly appended.
     Protected by runtime guard ``envoy.reloadable_features.quic_signal_headers_only_to_http1_backend``.
+- area: tls
+  change: |
+    Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
+    chain. This fix addresses this issue by rejecting such configuration with empty value. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -202,4 +207,9 @@ new_features:
     to the API Key Auth filter, which allows forwarding the authenticated client identity
     using a custom header, and also offers the option to remove the API key from the request
     before forwarding.
+- area: lua
+  change: |
+    Added a new ``typedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from
+    network filters, such as the Proxy Protocol, etc.
+
 deprecated:
