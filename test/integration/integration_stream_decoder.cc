@@ -12,7 +12,6 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/http/utility.h"
-#include "source/server/backtrace.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -112,7 +111,6 @@ void IntegrationStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& header
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   std::cerr << "ISD decodeData body_data_waiting_length_=" << body_data_waiting_length_
             << ", end_stream=" << end_stream << std::endl;
-  BACKTRACE_LOG();
   saw_end_stream_ = end_stream;
   body_ += data.toString();
 
