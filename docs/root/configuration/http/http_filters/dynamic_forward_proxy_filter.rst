@@ -34,6 +34,14 @@ host when forwarding. See the example below within the configured routes.
   understanding that any address reachable from the proxy is potentially accessible by untrusted
   clients.
 
+.. warning::
+
+  If a custom preceding filter sets the ``envoy.upstream.dynamic_host``` and ``envoy.upstream.dynamic_port``` filter
+  state, the HTTP Dynamic Forward Proxy filter might not function correctly unless the filter state values match the
+  host used for DNS lookups by the filter. The Dynamic Forward Proxy cluster prioritizes cache lookups using the filter
+  state values first, so mismatched hosts between the filter's resolution logic and the cluster's cache lookup can
+  result in request failures.
+
 .. note::
 
   Configuring a :ref:`transport_socket with name envoy.transport_sockets.tls <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket>` on the cluster with

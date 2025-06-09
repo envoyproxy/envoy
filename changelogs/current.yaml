@@ -82,6 +82,11 @@ bug_fixes:
   change: |
     Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a "transfer-encoding" header is incorrectly appended.
     Protected by runtime guard ``envoy.reloadable_features.quic_signal_headers_only_to_http1_backend``.
+- area: tls
+  change: |
+    Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
+    chain. This fix addresses this issue by rejecting such configuration with empty value. This behavior can be reverted by setting
+    the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -196,6 +201,12 @@ new_features:
     If configured, the OAuth2 filter will redirect users to this endpoint when they access the
     :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`. This allows users to
     be logged out of the Authorization server.
+- area: api_key_auth
+  change: |
+    Added :ref:`forwarding configuration <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Forwarding>`.
+    to the API Key Auth filter, which allows forwarding the authenticated client identity
+    using a custom header, and also offers the option to remove the API key from the request
+    before forwarding.
 - area: lua
   change: |
     Added a new ``typedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from

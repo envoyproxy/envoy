@@ -15,29 +15,31 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
-Filter::Filter(FilterConfig&) {}
+ProtoApiScrubberFilter::ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig&) {}
 
-Envoy::Http::FilterHeadersStatus Filter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
-                                                       bool) {
+Envoy::Http::FilterHeadersStatus
+ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(debug, "Called method {} with headers={}", *decoder_callbacks_, __func__,
                    headers);
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
-Envoy::Http::FilterDataStatus Filter::decodeData(Envoy::Buffer::Instance& data, bool end_stream) {
+Envoy::Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Envoy::Buffer::Instance& data,
+                                                                 bool end_stream) {
   ENVOY_STREAM_LOG(debug, "Called ProtoApiScrubber::decodeData: data size={} end_stream={}",
                    *decoder_callbacks_, data.length(), end_stream);
   return Envoy::Http::FilterDataStatus::Continue;
 }
 
-Envoy::Http::FilterHeadersStatus Filter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
-                                                       bool end_stream) {
+Envoy::Http::FilterHeadersStatus
+ProtoApiScrubberFilter::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "Called method {} with headers={}. end_stream={}", *encoder_callbacks_,
                    __func__, headers, end_stream);
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
-Envoy::Http::FilterDataStatus Filter::encodeData(Envoy::Buffer::Instance& data, bool end_stream) {
+Envoy::Http::FilterDataStatus ProtoApiScrubberFilter::encodeData(Envoy::Buffer::Instance& data,
+                                                                 bool end_stream) {
   ENVOY_STREAM_LOG(debug, "Called ProtoApiScrubber::encodeData: data size={} end_stream={}",
                    *encoder_callbacks_, data.length(), end_stream);
   return Envoy::Http::FilterDataStatus::Continue;
