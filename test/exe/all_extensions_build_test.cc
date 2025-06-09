@@ -1,5 +1,7 @@
 #include "envoy/registry/registry.h"
 
+#include "source/common/version/version.h"
+
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -73,6 +75,19 @@ TEST(CheckExtensionsAgainstRegistry, CorrectMetadata) {
       }
     }
   }
+}
+
+// Validate the the Envoy FIPS compilation flags are consistent with the FIPS
+// mode of the underlying BoringSSL build.
+// Note: this must be done on the "complete" build since transitive dependencies may override the
+// choice of the boringssl library.
+TEST(FIPS, ValidateFIPSModeConsistency) {
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_TRUE(VersionInfo::sslFipsCompliant());
+  TestEnvironment::exec({TestEnvironment::runfilesPath("test/exe/fips_check.sh")});
+#else
+  EXPECT_FALSE(VersionInfo::sslFipsCompliant());
+#endif
 }
 
 } // namespace

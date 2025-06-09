@@ -200,6 +200,9 @@ public:
       return wrapped_->overrideHostToSelect();
     }
     void onAsyncHostSelection(Upstream::HostConstSharedPtr&&, std::string&&) override {}
+    void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) override {
+      wrapped_->setHeadersModifier(std::move(modifier));
+    }
 
   private:
     LoadBalancerContext* wrapped_;
