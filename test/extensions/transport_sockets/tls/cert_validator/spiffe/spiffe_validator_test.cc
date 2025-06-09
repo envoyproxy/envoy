@@ -258,8 +258,9 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 
 TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
   initialize();
+  Stats::TestUtil::TestStore store;
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-            validator().initializeSslContexts({}, false, *store_.rootScope()).value());
+            validator().initializeSslContexts({}, false, store.scope()).value());
 }
 
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
