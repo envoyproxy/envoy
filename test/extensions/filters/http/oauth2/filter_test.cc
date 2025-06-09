@@ -1499,10 +1499,11 @@ TEST_F(OAuth2Test, CookieValidatorCanUpdateToken) {
 
 // Verify that we 401 the request if the state query param doesn't contain a valid URL.
 TEST_F(OAuth2Test, OAuthTestInvalidUrlInStateQueryParam) {
-  // {"url":"blah","csrf_token":"${extracted}"}
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+
   static const std::string state_with_invalid_url =
-      "eyJ1cmwiOiJibGFoIiwiY3NyZl90b2tlbiI6IjAwMDAwMDAwMDc1YmNkMTUifQ";
+      "eyJ1cmwiOiJibGFoIiwiY3NyZl90b2tlbiI6IjAwMDAwMDAwMDc1YmNkMTUubmE2a3J1NHgxcEhnb2NTSWVVL21kdEhZ"
+      "bjU4R2gxYnF3ZVM0WFhvaXFWZz0ifQ";
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},

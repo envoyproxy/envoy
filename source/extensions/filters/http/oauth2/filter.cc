@@ -799,10 +799,11 @@ std::string OAuth2Filter::decryptToken(const std::string& encrypted_token,
     ENVOY_LOG(error, "failed to decrypt token: {}, error: {}", encrypted_token,
               decrypt_result.error.value());
     // There are two cases:
-    // 1. The token is a legacy token, so we return the original token.
+    // 1. The token is a legacy unencrypted token.
+    // In this case, we return the token as-is to allow the request to proceed.
     // 2. The token is encrypted, but the decryption failed due to the HMAC secret is changed.
-    // In both cases, the client will be redirected to the OAuth server because Cookie validation
-    // failed.
+    // In this case, we return the original encrypted token, the HMAC validation will fail
+    // and the user wil
     return encrypted_token;
   }
   return decrypt_result.plaintext;
