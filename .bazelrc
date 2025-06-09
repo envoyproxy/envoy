@@ -73,7 +73,7 @@ build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
 build:linux --features=per_object_debug_info
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build:linux --action_env=BAZEL_LINKOPTS=-lm
+build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
