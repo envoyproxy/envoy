@@ -730,7 +730,8 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
       std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>();
   Stats::TestUtil::TestStore store;
   auto ssl_stats = generateSslStats(*store.rootScope());
-  auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats);
+  auto validator =
+      std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
   EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
               testing::ContainsRegex("Failed to create string SAN matcher of type.*"));
@@ -747,7 +748,8 @@ TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
 
   Stats::TestUtil::TestStore store;
   auto ssl_stats = generateSslStats(*store.rootScope());
-  auto validator = std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats);
+  auto validator =
+      std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
   EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
               testing::ContainsRegex("Failed to load trusted CA certificates from.*"));
