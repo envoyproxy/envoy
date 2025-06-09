@@ -32,6 +32,8 @@ std::string formatError(absl::string_view filter_name, absl::string_view error_t
 }
 } // namespace
 
+ProtoApiScrubberFilter::ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig&) {}
+
 Http::FilterHeadersStatus
 ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
   ENVOY_STREAM_LOG(trace, "Called ProtoApiScrubber Filter : {}", *decoder_callbacks_, __func__);

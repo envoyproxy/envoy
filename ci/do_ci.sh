@@ -431,10 +431,6 @@ case $CI_TARGET in
             export FUZZ_COVERAGE=true
         fi
         export BAZEL_GRPC_LOG="${ENVOY_BUILD_DIR}/grpc.log"
-        ENVOY_GENHTML_ARGS=(
-            --ignore-errors "category,corrupt,inconsistent")
-        GENHTML_ARGS="${ENVOY_GENHTML_ARGS[*]}"
-        export GENHTML_ARGS
         "${ENVOY_SRCDIR}/test/run_envoy_bazel_coverage.sh" \
             "${COVERAGE_TEST_TARGETS[@]}"
         collect_build_profile coverage
