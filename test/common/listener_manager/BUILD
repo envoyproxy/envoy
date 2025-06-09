@@ -110,26 +110,31 @@ envoy_cc_test(
 # Stand-alone quic test because of FIPS.
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
-    srcs = ["listener_manager_impl_quic_only_test.cc"],
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": ["listener_manager_impl_quic_only_test.cc"],
+    }),
     rbe_pool = "6gig",
-    tags = ["nofips"],
-    deps = [
-        ":listener_manager_impl_test_lib",
-        "//source/common/formatter:formatter_extension_lib",
-        "//source/extensions/filters/http/router:config",
-        "//source/extensions/filters/network/http_connection_manager:config",
-        "//source/extensions/matching/network/common:inputs_lib",
-        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
-        "//source/extensions/request_id/uuid:config",
-        "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:config",
-        "//test/integration/filters:test_listener_filter_lib",
-        "//test/integration/filters:test_network_filter_lib",
-        "//test/server:utility_lib",
-        "//test/test_common:threadsafe_singleton_injector_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
+    deps = select({
+        "//bazel:disable_http3": [],
+        "//conditions:default": [
+            ":listener_manager_impl_test_lib",
+            "//source/common/formatter:formatter_extension_lib",
+            "//source/extensions/filters/http/router:config",
+            "//source/extensions/filters/network/http_connection_manager:config",
+            "//source/extensions/matching/network/common:inputs_lib",
+            "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
+            "//source/extensions/request_id/uuid:config",
+            "//source/extensions/transport_sockets/raw_buffer:config",
+            "//source/extensions/transport_sockets/tls:config",
+            "//test/integration/filters:test_listener_filter_lib",
+            "//test/integration/filters:test_network_filter_lib",
+            "//test/server:utility_lib",
+            "//test/test_common:threadsafe_singleton_injector_lib",
+            "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+            "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        ],
+    }),
 )
 
 envoy_cc_test(
