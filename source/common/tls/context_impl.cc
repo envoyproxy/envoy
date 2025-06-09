@@ -107,15 +107,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
     ssl_contexts[i] = ctx.ssl_ctx_.get();
 
-    // No need to store cert name for default tls context as there are no TLS certificates.
-    if (!tls_certificates.empty()) {
-      ctx.createCertExpirationGauge(scope, tls_certificates[i].get().certificateName());
-      if (ctx.cert_chain_.get() != nullptr) {
-        ctx.setExpirationOnCertStats(
-            std::chrono::seconds(Utility::getExpirationUnixTime(ctx.cert_chain_.get())));
-      }
-    }
-
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
     RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
 
@@ -221,6 +212,14 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       if (!creation_status.ok()) {
         return;
       }
+
+      // Create and set the certificate expiration gauge.
+      ctx.createCertExpirationGauge(scope, tls_certificate.certificateName());
+      if (ctx.cert_chain_.get() != nullptr) {
+        ctx.setExpirationOnCertStats(
+            std::chrono::seconds(Utility::getExpirationUnixTime(ctx.cert_chain_.get())));
+      }
+
       // The must staple extension means the certificate promises to carry
       // with it an OCSP staple. https://tools.ietf.org/html/rfc7633#section-6
       constexpr absl::string_view tls_feature_ext = "1.3.6.1.5.5.7.1.24";
