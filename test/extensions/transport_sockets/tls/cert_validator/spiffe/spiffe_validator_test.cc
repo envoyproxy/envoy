@@ -259,7 +259,7 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
   initialize();
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-            validator().initializeSslContexts({}, false, nullptr).value());
+            validator().initializeSslContexts({}, false, *store_.rootScope()).value());
 }
 
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
