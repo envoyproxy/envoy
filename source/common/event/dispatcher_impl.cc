@@ -18,7 +18,6 @@
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/utility.h"
-#include "source/common/network/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/event/libevent_scheduler.h"
 #include "source/common/event/scaled_range_timer_manager_impl.h"
@@ -27,6 +26,7 @@
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
