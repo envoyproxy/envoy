@@ -929,7 +929,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
   EXPECT_NE(span.get(), nullptr);
 
   // Check that the max buffer size.
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.max_buffer_size", 1000U))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.max_cache_size", 1000U))
       .Times(1)
       .WillRepeatedly(Return(1));
   // Flush after a single span.
