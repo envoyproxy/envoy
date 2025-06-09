@@ -46,6 +46,9 @@ public:
   waitForEndStream(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  ABSL_MUST_USE_RESULT testing::AssertionResult
+  waitForWithDispatcherRun(const std::function<bool()>& condition, absl::string_view description,
+                           std::chrono::milliseconds timeout);
   void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder
