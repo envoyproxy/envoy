@@ -23,8 +23,8 @@ if OUTPUT_NO_ARGS=$(bazel run --verbose_failures -s //tools/toolchain:detect 2>&
     fi
 fi
 
-echo "Testing --config=clang-libc++"
-if OUTPUT_CLANG=$(bazel run --verbose_failures -s  --config=clang-libc++ //tools/toolchain:detect 2>&1); then
+echo "Testing --config=clang"
+if OUTPUT_CLANG=$(bazel run --verbose_failures -s  --config=clang //tools/toolchain:detect 2>&1); then
     COMPILER=$(echo "$OUTPUT_CLANG" | grep "Compiler:" | awk '{print $2}' | tr -d '\r\n')
     LIBRARY=$(echo "$OUTPUT_CLANG" | grep "Standard Library:" | awk '{print $3}' | tr -d '\r\n')
     if [[ -n "$COMPILER" && -n "$LIBRARY" ]]; then
