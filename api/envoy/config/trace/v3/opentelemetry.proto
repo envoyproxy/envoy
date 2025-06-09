@@ -8,6 +8,7 @@ import "envoy/config/core/v3/http_service.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
+import "google/protobuf/wrappers.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "OpentelemetryProto";
@@ -57,4 +58,9 @@ message OpenTelemetryConfig {
   // See: `OpenTelemetry sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#sampler>`_
   // [#extension-category: envoy.tracers.opentelemetry.samplers]
   core.v3.TypedExtensionConfig sampler = 5;
+
+  // Envoy caches the span in memory when the OpenTelemetry backend service is temporarily unavailable.
+  // This field specifies the maximum number of spans that can be cached. If not specified, the
+  // default is 1024.
+  google.protobuf.UInt32Value max_cache_size = 6;
 }
