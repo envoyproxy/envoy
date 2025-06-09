@@ -44,12 +44,6 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
-  auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
-      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
-
-  request_msg_converter_ = std::make_unique<MessageConverter>(
-      std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
-
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
@@ -57,8 +51,14 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
   ENVOY_STREAM_LOG(debug, "Called ProtoApiScrubber::decodeData: data size={} end_stream={}",
                    *decoder_callbacks_, data.length(), end_stream);
 
+  auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
+    []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
+
+  auto request_msg_converter = std::make_unique<MessageConverter>(
+    std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
+
   // Buffer the data to complete the request message.
-  auto messages = request_msg_converter_->accumulateMessages(data, end_stream);
+  auto messages = request_msg_converter->accumulateMessages(data, end_stream);
   if (const absl::Status& status = messages.status(); !status.ok()) {
     rejectRequest(status.raw_code(), status.message(),
                   formatError(kRcDetailFilterProtoApiScrubber,
@@ -81,21 +81,21 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
     // MessageConverter uses an empty StreamMessage to denote the end.
     if (stream_message->message() == nullptr) {
       // Expect end_stream=true when the MessageConverter signals an stream end.
-      DCHECK(end_stream);
+      ASSERT(end_stream);
 
       // Expect message_data->isFinalMessage()=true when the MessageConverter signals an stream end.
-      DCHECK(stream_message->isFinalMessage());
+      ASSERT(stream_message->isFinalMessage());
 
       // Expect message_data is the last element in the vector when the MessageConverter signals an
       // stream end.
-      DCHECK(msg_idx == messages->size() - 1);
+      ASSERT(msg_idx == messages->size() - 1);
 
       // Skip the empty message
       continue;
     }
 
     auto buf_convert_status =
-        request_msg_converter_->convertBackToBuffer(std::move(stream_message));
+        request_msg_converter->convertBackToBuffer(std::move(stream_message));
     RELEASE_ASSERT(buf_convert_status.ok(), "failed to convert message back to envoy buffer");
 
     data.move(*buf_convert_status.value());

@@ -33,14 +33,6 @@ private:
   // Rejects requests and sends local reply back to the client.
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
-
-  // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and
-  // vice-versa.
-  GrpcFieldExtraction::MessageConverterPtr request_msg_converter_ = nullptr;
-
-  // Response message converter which converts Envoy Buffer data to StreamMessage (for scrubbing)
-  // and vice-versa.
-  GrpcFieldExtraction::MessageConverterPtr response_msg_converter_ = nullptr;
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {
