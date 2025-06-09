@@ -15,7 +15,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
-ProtoApiScrubberFilter::ProtoApiScrubberFilter(ProtoApiScrubberFilterConfig&) {}
+ProtoApiScrubberFilter::ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig&) {}
 
 Envoy::Http::FilterHeadersStatus
 ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {

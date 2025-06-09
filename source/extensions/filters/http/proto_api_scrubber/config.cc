@@ -14,22 +14,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
 
-FilterFactoryCreator::FilterFactoryCreator() : FactoryBase(kFilterName) {}
+FilterFactoryCreator::FilterFactoryCreator() : ExceptionFreeFactoryBase(kFilterName) {}
 
-Envoy::Http::FilterFactoryCb FilterFactoryCreator::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Envoy::Http::FilterFactoryCb>
+FilterFactoryCreator::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
         proto_config,
     const std::string&, Envoy::Server::Configuration::FactoryContext& context) {
-  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config =
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config_or_status =
       ProtoApiScrubberFilterConfig::create(proto_config, context);
-  if (!filter_config.ok()) {
-    // Allowlist exception as there's no other exception-free way to propagate this error to Envoy.
-    // NOLINTNEXTLINE(envoy-build-forbidden-exception)
-    throw Envoy::ProtoValidationException(filter_config.status().ToString());
-  }
+  RETURN_IF_ERROR(filter_config_or_status.status());
 
-  return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<ProtoApiScrubberFilter>(**filter_config));
+  return [filter_config_or_status](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(
+        std::make_shared<ProtoApiScrubberFilter>(*filter_config_or_status.value()));
   };
 }
 
