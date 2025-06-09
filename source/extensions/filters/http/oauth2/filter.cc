@@ -277,7 +277,6 @@ std::string encodeState(const std::string& original_request_url, const std::stri
  */
 std::string encrypt(const std::string& plaintext, const std::string& secret,
                     Random::RandomGenerator& random) {
-  std::cout << "XXXXX encrypt hmac secret" << secret << std::endl;
   // Generate the key from the secret using SHA-256
   std::vector<unsigned char> key(SHA256_DIGEST_LENGTH); // AES-256 requires 256-bit (32 bytes) key
   SHA256(reinterpret_cast<const unsigned char*>(secret.c_str()), secret.size(), key.data());
@@ -343,7 +342,6 @@ struct DecryptResult {
  * Decrypt an AES-256-CBC encrypted string.
  */
 DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
-  std::cout << "XXXXX decrypt hmac secret" << secret << std::endl;
   // Decode the Base64Url-encoded input
   std::string decoded = Base64Url::decode(encrypted);
   std::vector<unsigned char> combined(decoded.begin(), decoded.end());
@@ -535,15 +533,6 @@ bool OAuth2CookieValidator::hmacIsValid() const {
   if (!cookie_domain_.empty()) {
     cookie_domain = cookie_domain_;
   }
-  std::cout << "xxxxx encodeHmacBase64: "
-            << encodeHmacBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
-                                refresh_token_)
-            << std::endl;
-  std::cout << "xxxxxencodeHmacHexBase64: "
-            << encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
-                                   refresh_token_)
-            << std::endl;
-  std::cout << "xxxxxxhamc: " << hmac_ << std::endl;
   return ((encodeHmacBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
                             refresh_token_) == hmac_) ||
           (encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
@@ -763,7 +752,7 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   return false;
 }
 
-// Decrypts the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
+// Decrpyts the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
 // the request upstream.
 void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) {
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
