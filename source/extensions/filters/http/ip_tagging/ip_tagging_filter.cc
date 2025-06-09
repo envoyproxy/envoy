@@ -17,9 +17,10 @@ namespace IpTagging {
 IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                                IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                                IpTagsReloadSuccessCb reload_success_cb,
-                               IpTagsReloadErrorCb reload_error_cb, Event::Dispatcher& dispatcher,
-                               Api::Api& api, ThreadLocal::SlotAllocator& tls,
-                               Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
+                               IpTagsReloadErrorCb reload_error_cb,
+                               Event::Dispatcher& main_dispatcher, Api::Api& api,
+                               ThreadLocal::SlotAllocator& tls, Singleton::InstanceSharedPtr owner,
+                               absl::Status& creation_status)
     : ip_tags_path_(ip_tags_datasource.filename()), tags_loader_(tags_loader),
       time_source_(api.timeSource()),
       ip_tags_refresh_interval_ms_(std::chrono::milliseconds(ip_tags_refresh_interval_ms)),
@@ -33,35 +34,56 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
       ip_tags_datasource.has_watched_directory()) {
     needs_refresh_ = true;
   }
-  auto tags_or_error = tags_loader_.loadTags(ip_tags_datasource, dispatcher, tls);
+  auto tags_or_error = tags_loader_.loadTags(ip_tags_datasource, main_dispatcher, tls);
   creation_status = tags_or_error.status();
   if (tags_or_error.status().ok()) {
     tags_ = tags_or_error.value();
   }
+  ip_tags_reload_dispatcher_ = api.allocateDispatcher("ip_tags_reload_routine");
+  ip_tags_reload_timer_ = ip_tags_reload_dispatcher_->createTimer([this]() -> void {
+    ENVOY_LOG(debug, "Trying to update ip tags in background");
+    auto new_tags_or_error = tags_loader_.refreshTags();
+    if (new_tags_or_error.status().ok()) {
+      updateIpTags(new_tags_or_error.value());
+      reload_success_cb_();
+    } else {
+      ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
+                new_tags_or_error.status().message());
+      reload_error_cb_();
+    }
+    ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
+  });
+
+  ip_tags_reload_thread_ = api.threadFactory().createThread(
+      [this]() -> void {
+        ENVOY_LOG(debug, "Started ip_tags_reload_routine");
+        if (ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0)) {
+          ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
+        }
+        ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+      },
+      Thread::Options{std::string("ip_tags_reload_routine")});
 }
 
-IpTagsProvider::~IpTagsProvider() { ENVOY_LOG(debug, "Shutting down ip tags provider"); };
+IpTagsProvider::~IpTagsProvider() {
+  ENVOY_LOG(debug, "Shutting down ip tags provider");
+  if (ip_tags_reload_dispatcher_) {
+    ip_tags_reload_dispatcher_->exit();
+  }
+  if (ip_tags_reload_thread_) {
+    ip_tags_reload_thread_->join();
+    ip_tags_reload_thread_.reset();
+  }
+};
 
 LcTrieSharedPtr IpTagsProvider::ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
-  if (needs_refresh_) {
-    const auto current_time = time_source_.monotonicTime();
-    if (std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_reloaded_time_) >
-        ip_tags_refresh_interval_ms_) {
-      auto new_tags_or_error = tags_loader_.refreshTags();
-      if (new_tags_or_error.status().ok()) {
-        absl::MutexLock lock(&ip_tags_mutex_);
-        tags_ = new_tags_or_error.value();
-        reload_success_cb_();
-      } else {
-        ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
-                  new_tags_or_error.status().message());
-        reload_error_cb_();
-      }
-      last_reloaded_time_ = current_time;
-    }
-  }
   absl::ReaderMutexLock lock(&ip_tags_mutex_);
   return tags_;
+}
+
+void IpTagsProvider::updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
+  absl::MutexLock lock(&ip_tags_mutex_);
+  tags_ = new_tags;
 }
 
 std::shared_ptr<IpTagsProvider> IpTagsRegistrySingleton::get(
@@ -98,7 +120,7 @@ IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& va
 
 absl::StatusOr<LcTrieSharedPtr>
 IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                       Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls) {
+                       Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls) {
   if (!ip_tags_datasource.filename().empty()) {
     if (!absl::EndsWith(ip_tags_datasource.filename(), MessageUtil::FileExtensions::get().Yaml) &&
         !absl::EndsWith(ip_tags_datasource.filename(), MessageUtil::FileExtensions::get().Json)) {
@@ -107,7 +129,7 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
           ip_tags_datasource.filename());
     }
     auto provider_or_error = Config::DataSource::DataSourceProvider::create(
-        ip_tags_datasource, dispatcher, tls, api_, false, 0);
+        ip_tags_datasource, main_dispatcher, tls, api_, false, 0);
     if (!provider_or_error.status().ok()) {
       return absl::InvalidArgumentError(
           fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
@@ -122,10 +144,11 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   if (data_source_provider_) {
     IpTagFileProto ip_tags_proto;
+    auto new_data = std::move(data_source_provider_->data());
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       TRY_NEEDS_AUDIT {
-        MessageUtil::loadFromYaml(data_source_provider_->data(), ip_tags_proto,
-                                  validation_visitor_);
+        MessageUtil::loadFromYaml(new_data, ip_tags_proto, validation_visitor_,
+                                  true /*is_custom_thread*/);
       }
       END_TRY catch (EnvoyException& ex) {
         return absl::InvalidArgumentError(
@@ -133,8 +156,8 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
       }
     } else if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Json)) {
       bool has_unknown_field;
-      auto load_status = MessageUtil::loadFromJsonNoThrow(data_source_provider_->data(),
-                                                          ip_tags_proto, has_unknown_field);
+      auto load_status =
+          MessageUtil::loadFromJsonNoThrow(new_data, ip_tags_proto, has_unknown_field);
       if (!load_status.ok()) {
         return load_status;
       }
@@ -277,6 +300,9 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
 
   std::vector<std::string> tags =
       config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
+
+  // Used for testing.
+  synchronizer_.syncPoint("_trie_lookup_complete");
   applyTags(headers, tags);
   if (!tags.empty()) {
     // For a large number(ex > 1000) of tags, stats cardinality will be an issue.

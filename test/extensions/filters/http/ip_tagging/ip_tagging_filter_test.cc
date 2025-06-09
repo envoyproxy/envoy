@@ -42,6 +42,13 @@ public:
   }
 };
 
+class IpTaggingFilterPeer {
+public:
+  static Thread::ThreadSynchronizer& synchronizer(std::unique_ptr<IpTaggingFilter>& filter) {
+    return filter->synchronizer_;
+  }
+};
+
 namespace {
 namespace {
 
@@ -877,6 +884,7 @@ ip_tags:
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.ip_tags_reload_success"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
 
@@ -912,7 +920,6 @@ ip_tags:
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter(absl::StrCat(ip_tagging_prefix, "ip_tags_reload_success")));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_updated_request.hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
   request_headers = {{"x-envoy-internal", "true"}};
@@ -923,7 +930,7 @@ ip_tags:
   request_trailers = Http::TestRequestTrailerMapImpl{};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  // Remove the file.
+  // Remove the files.
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_old_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
@@ -975,6 +982,7 @@ ip_tags
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
+  EXPECT_CALL(stats_, counter("prefix.ip_tagging.ip_tags_reload_error"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
 
@@ -1012,7 +1020,6 @@ ip_tags
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter(absl::StrCat(ip_tagging_prefix, "ip_tags_reload_error")));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
   EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
   request_headers = {{"x-envoy-internal", "true"}};
@@ -1023,7 +1030,112 @@ ip_tags
   request_trailers = Http::TestRequestTrailerMapImpl{};
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
 
-  // Remove the file.
+  // Remove the files.
+  unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
+  unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_old_target.yaml").c_str());
+  unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
+}
+
+TEST_F(IpTaggingFilterTest, IpTagsReloadedInFlightRequestsNotAffected) {
+  simTime().advanceTimeWait(std::chrono::seconds(1));
+  unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
+  unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
+
+  envoy::config::core::v3::DataSource config;
+  TestEnvironment::createPath(TestEnvironment::temporaryPath("ip_tagging_test"));
+
+  const std::string yaml =
+      fmt::format(R"EOF(
+request_type: internal
+ip_tags_file_provider:
+  ip_tags_refresh_rate: 5s
+  ip_tags_datasource:
+      filename: "{}"
+      watched_directory:
+        path: "{}"
+  )EOF",
+                  TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
+                  TestEnvironment::temporaryPath("ip_tagging_test"));
+
+  TestEnvironment::writeStringToFileForTest(
+      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"), R"EOF(
+ip_tags:
+  - ip_tag_name: internal_request
+    ip_list:
+      - {address_prefix: 1.2.3.5, prefix_len: 32}
+ )EOF",
+      true);
+
+  TestEnvironment::writeStringToFileForTest(
+      TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"), R"EOF(
+ip_tags:
+  - ip_tag_name: internal_updated_request
+    ip_list:
+      - {address_prefix: 1.2.3.5, prefix_len: 32}
+ )EOF",
+      true);
+  initializeFilter(yaml);
+  EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
+  IpTaggingFilterPeer::synchronizer(filter_).enable();
+  std::string sync_point_name = "_trie_lookup_complete";
+
+  // Start a thread that issues request for ip tagging filter and wait in the worker thread right
+  // before performing lookup from the trie with ip tags.
+  IpTaggingFilterPeer::synchronizer(filter_).waitOn(sync_point_name);
+  std::thread t0([&] {
+    Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
+
+    Network::Address::InstanceConstSharedPtr remote_address =
+        Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
+    filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+        remote_address);
+
+    EXPECT_CALL(stats_, counter("prefix.ip_tagging.ip_tags_reload_success"));
+    EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
+    EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
+
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+    EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+    Http::TestRequestTrailerMapImpl request_trailers;
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+    // Second request should get the updated ip tags.
+    filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+        remote_address);
+
+    // EXPECT_CALL(stats_, counter("prefix.ip_tagging.ip_tags_reload_success"));
+    EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_updated_request.hit"));
+    EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
+    request_headers = {{"x-envoy-internal", "true"}};
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+    EXPECT_EQ("internal_updated_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+    request_trailers = Http::TestRequestTrailerMapImpl{};
+    EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers));
+  });
+  // Wait until the thread is actually waiting.
+  IpTaggingFilterPeer::synchronizer(filter_).barrierOn(sync_point_name);
+
+  // Update the symlink to point to the new file.
+  TestEnvironment::renameFile(
+      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"),
+      TestEnvironment::temporaryPath("ip_tagging_test/watcher_old_target.yaml"));
+  TestEnvironment::renameFile(
+      TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
+      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
+
+  auto contents = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
+  // Handle the events if any.
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
+  simTime().advanceTimeWait(std::chrono::seconds(6));
+
+  IpTaggingFilterPeer::synchronizer(filter_).signal(sync_point_name);
+  t0.join();
+  // Remove the files.
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_old_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());

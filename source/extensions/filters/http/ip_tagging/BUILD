@@ -21,6 +21,7 @@ envoy_cc_library(
         "//envoy/runtime:runtime_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:thread_synchronizer_lib",
         "//source/common/config:datasource_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",

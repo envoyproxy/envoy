@@ -14,6 +14,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "source/common/common/thread_synchronizer.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
@@ -84,7 +85,7 @@ public:
   IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                  IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                  IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
-                 Event::Dispatcher& dispatcher, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+                 Event::Dispatcher& main_dispatcher, Api::Api& api, ThreadLocal::SlotAllocator& tls,
                  Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
 
   ~IpTagsProvider();
@@ -107,8 +108,13 @@ private:
   IpTagsReloadErrorCb reload_error_cb_;
   mutable absl::Mutex ip_tags_mutex_;
   LcTrieSharedPtr tags_ ABSL_GUARDED_BY(ip_tags_mutex_);
+  Thread::ThreadPtr ip_tags_reload_thread_;
+  Event::DispatcherPtr ip_tags_reload_dispatcher_;
+  Event::TimerPtr ip_tags_reload_timer_;
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;
+
+  void updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 };
 
 using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
@@ -259,6 +265,10 @@ private:
 
   IpTaggingFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
+  // Used for testing only.
+  mutable Thread::ThreadSynchronizer synchronizer_;
+  // Allow the unit test to have access to private members.
+  friend class IpTaggingFilterPeer;
 };
 
 } // namespace IpTagging
