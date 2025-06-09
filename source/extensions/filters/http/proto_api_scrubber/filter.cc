@@ -52,10 +52,10 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
                    *decoder_callbacks_, data.length(), end_stream);
 
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
-    []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
+      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
   auto request_msg_converter = std::make_unique<MessageConverter>(
-    std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
+      std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
 
   // Buffer the data to complete the request message.
   auto messages = request_msg_converter->accumulateMessages(data, end_stream);
@@ -94,8 +94,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       continue;
     }
 
-    auto buf_convert_status =
-        request_msg_converter->convertBackToBuffer(std::move(stream_message));
+    auto buf_convert_status = request_msg_converter->convertBackToBuffer(std::move(stream_message));
     RELEASE_ASSERT(buf_convert_status.ok(), "failed to convert message back to envoy buffer");
 
     data.move(*buf_convert_status.value());
