@@ -64,36 +64,6 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
   return {first_available_priority, total_load};
 }
 
-absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
-LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
-
-  if (common_config.has_locality_weighted_lb_config()) {
-    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
-    locality_lb_config.mutable_locality_weighted_lb_config();
-    return locality_lb_config;
-  } else if (common_config.has_zone_aware_lb_config()) {
-    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
-    auto& zone_aware_lb_config = *locality_lb_config.mutable_zone_aware_lb_config();
-
-    const auto& legacy_zone_aware_lb_config = common_config.zone_aware_lb_config();
-    if (legacy_zone_aware_lb_config.has_routing_enabled()) {
-      *zone_aware_lb_config.mutable_routing_enabled() =
-          legacy_zone_aware_lb_config.routing_enabled();
-    }
-    if (legacy_zone_aware_lb_config.has_min_cluster_size()) {
-      *zone_aware_lb_config.mutable_min_cluster_size() =
-          legacy_zone_aware_lb_config.min_cluster_size();
-    }
-    zone_aware_lb_config.set_fail_traffic_on_panic(
-        legacy_zone_aware_lb_config.fail_traffic_on_panic());
-
-    return locality_lb_config;
-  }
-
-  return {};
-}
-
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
                                  const DegradedLoad& degraded_per_priority_load) {

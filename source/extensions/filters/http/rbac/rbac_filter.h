@@ -126,7 +126,8 @@ public:
 
 private:
   // Handles shadow engine evaluation and updates metrics
-  bool evaluateShadowEngine(Http::RequestHeaderMap& headers, ProtobufWkt::Struct& metrics);
+  bool evaluateShadowEngine(const Http::RequestHeaderMap& headers,
+                            ProtobufWkt::Struct& metrics) const;
 
   // Handles enforced engine evaluation and updates metrics
   Http::FilterHeadersStatus evaluateEnforcedEngine(Http::RequestHeaderMap& headers,

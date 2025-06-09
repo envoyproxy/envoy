@@ -296,7 +296,6 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
       "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
 
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  load_balancer_->chooseHost(&load_balancer_context_);
 
   setSelectedEndpointsMetadata("envoy.lb", R"pb(
     fields {
@@ -309,6 +308,58 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
   HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
   // Expect the the address from the header to be used.
   EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
+  // Next call to chooseHost will use the host from the metadata since it is
+  // second in the override source order.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:4]:80");
+  // Since there are no more overridden hosts, the fallback LB is called while always returns
+  // the first host in the set.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
+}
+
+TEST_F(OverrideHostLoadBalancerTest, HeaderWithMultipleValueIsPreferredOverMetadata) {
+  // In this configuration header based override source is configured before the metadata based
+  // override source. Verify that header based value is chosen first.
+  Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
+  Locality us_central1_b = makeLocality("us-central1", "us-central1-b");
+  Locality us_west3_c = makeLocality("us-west3", "us-west3-c");
+
+  MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
+                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
+                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
+                                    Host::HealthStatus::UNHEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
+                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
+                                    Host::HealthStatus::DEGRADED)};
+  host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
+      {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
+  makeCrossPriorityHostMap();
+
+  createLoadBalancer(makeDefaultConfigWithHeadersEnabled(
+      "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
+
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+
+  setSelectedEndpointsMetadata("envoy.lb", R"pb(
+    fields {
+      key: "x-gateway-destination-endpoint"
+      value: { string_value: "[2600:2d00:1:cc00:172:b9fb:a00:4]:80" }
+    }
+  )pb");
+  addHeader("x-gateway-destination-endpoint",
+            "[2600:2d00:1:cc00:172:b9fb:a00:3]:80,[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
+  EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+  HostConstSharedPtr host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  // Expect the the address from the header to be used.
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:3]:80");
+  // Next call to chooseHost will use the second host in the header.
+  host = load_balancer_->chooseHost(&load_balancer_context_).host;
+  EXPECT_EQ(host->address()->asString(), "[2600:2d00:1:cc00:172:b9fb:a00:2]:80");
   // Next call to chooseHost will use the host from the metadata since it is
   // second in the override source order.
   host = load_balancer_->chooseHost(&load_balancer_context_).host;
@@ -345,7 +396,6 @@ TEST_F(OverrideHostLoadBalancerTest, MetadataIsPreferredOverHeaders) {
       "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
 
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  load_balancer_->chooseHost(&load_balancer_context_);
 
   setSelectedEndpointsMetadata("envoy.lb", R"pb(
     fields {
@@ -395,7 +445,6 @@ TEST_F(OverrideHostLoadBalancerTest, UnparseableHeaderValueUsesFallback) {
       "x-gateway-destination-endpoint", "x-gateway-destination-endpoint-fallbacks"));
 
   EXPECT_CALL(stream_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
-  load_balancer_->chooseHost(&load_balancer_context_);
 
   setSelectedEndpointsMetadata("envoy.lb", R"pb(
     fields {

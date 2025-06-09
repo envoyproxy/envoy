@@ -9,7 +9,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
 constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
 constexpr char TOKEN[] = "Token";
@@ -38,8 +37,7 @@ public:
   friend class MetadataCredentialsProviderBaseFriend;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
-  MetadataCredentialsProviderBase(Api::Api& api,
-                                  Server::Configuration::ServerFactoryContext& context,
+  MetadataCredentialsProviderBase(Server::Configuration::ServerFactoryContext& context,
                                   AwsClusterManagerPtr aws_cluster_manager,
                                   absl::string_view cluster_name,
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
@@ -50,7 +48,7 @@ public:
   bool credentialsPending() override;
 
   // Get the Metadata credentials cache duration.
-  static std::chrono::seconds getCacheDuration();
+  std::chrono::seconds getCacheDuration();
 
   // Store the RAII cluster callback handle following registration call with AWS cluster manager
   void setClusterReadyCallbackHandle(AwsManagedClusterUpdateCallbacksHandlePtr handle) {
@@ -86,8 +84,6 @@ protected:
 
   virtual void refresh() PURE;
 
-  Api::Api& api_;
-  // The optional server factory context.
   Server::Configuration::ServerFactoryContext& context_;
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;

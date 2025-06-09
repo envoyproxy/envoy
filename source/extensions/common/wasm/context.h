@@ -444,7 +444,6 @@ protected:
   bool buffering_response_body_ = false;
   bool end_of_stream_ = false;
   bool local_reply_sent_ = false;
-  ProtobufWkt::Struct temporary_metadata_;
 
   // MB: must be a node-type map as we take persistent references to the entries.
   std::map<uint32_t, AsyncClientHandler> http_request_;

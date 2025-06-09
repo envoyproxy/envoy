@@ -13,23 +13,15 @@ Factory::create(OptRef<const Upstream::LoadBalancerConfig> lb_config,
                 const Upstream::PrioritySet& priority_set, Runtime::Loader& runtime,
                 Random::RandomGenerator& random, TimeSource&) {
 
-  auto active_or_legacy =
-      Common::ActiveOrLegacy<Upstream::TypedRingHashLbConfig,
-                             Upstream::LegacyRingHashLbConfig>::get(lb_config.ptr());
-
-  // Assume legacy config.
-  if (!active_or_legacy.hasActive()) {
-    return std::make_unique<Upstream::RingHashLoadBalancer>(
-        priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
-        active_or_legacy.hasLegacy() ? active_or_legacy.legacy()->lbConfig() : absl::nullopt,
-        cluster_info.lbConfig());
-  }
+  const auto typed_lb_config =
+      dynamic_cast<const Upstream::TypedRingHashLbConfig*>(lb_config.ptr());
+  ASSERT(typed_lb_config != nullptr, "Invalid ring hash load balancer config");
 
   return std::make_unique<Upstream::RingHashLoadBalancer>(
       priority_set, cluster_info.lbStats(), cluster_info.statsScope(), runtime, random,
       PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(cluster_info.lbConfig(),
                                                      healthy_panic_threshold, 100, 50),
-      active_or_legacy.active()->lb_config_);
+      typed_lb_config->lb_config_);
 }
 
 /**
