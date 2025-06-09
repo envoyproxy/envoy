@@ -5,7 +5,6 @@
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 #include <cstddef>
-#include <iostream>
 
 namespace Envoy {
 namespace Extensions {
