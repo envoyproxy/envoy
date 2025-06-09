@@ -84,6 +84,16 @@ public:
     }
   }
 
+  const StreamInfo::StreamInfo* streamInfo() const {
+    if (decoder_callbacks_) {
+      return &decoder_callbacks_->streamInfo();
+    } else if (encoder_callbacks_) {
+      return &encoder_callbacks_->streamInfo();
+    } else {
+      return nullptr;
+    }
+  }
+
   /**
    * Helper to get the upstream information of the stream.
    */
@@ -93,6 +103,19 @@ public:
       return stream_info->upstreamInfo().get();
     }
     return nullptr;
+  }
+
+  /**
+   * Helper to get the cluster information of the stream.
+   */
+  Upstream::ClusterInfoConstSharedPtr clusterInfo() const {
+    if (decoder_callbacks_) {
+      return decoder_callbacks_->clusterInfo();
+    } else if (encoder_callbacks_) {
+      return encoder_callbacks_->clusterInfo();
+    } else {
+      return nullptr;
+    }
   }
 
   /**
