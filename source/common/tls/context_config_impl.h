@@ -20,12 +20,12 @@ namespace Tls {
 
 static const std::string INLINE_STRING = "<inline>";
 
-struct TlsCertificateConfigProviderWithName {
+struct TlsCertificateConfigProviderSharedPtrWithName {
   const std::string certificate_name_;
   Secret::TlsCertificateConfigProviderSharedPtr provider_;
 };
 
-struct CertificateValidationContextConfigProviderWithName {
+struct CertificateValidationContextConfigProviderSharedPtrWithName {
   const std::string certificate_name_;
   Secret::CertificateValidationContextConfigProviderSharedPtr provider_;
 };
@@ -114,10 +114,11 @@ private:
   // Otherwise, default_cvc_ is nullptr.
   std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>
       default_cvc_;
-  std::vector<TlsCertificateConfigProviderWithName> tls_certificate_providers_;
+  std::vector<TlsCertificateConfigProviderSharedPtrWithName> tls_certificate_providers_;
   // Handle for TLS certificate dynamic secret callback.
   std::vector<Envoy::Common::CallbackHandlePtr> tc_update_callback_handles_;
-  CertificateValidationContextConfigProviderWithName certificate_validation_context_provider_;
+  CertificateValidationContextConfigProviderSharedPtrWithName
+      certificate_validation_context_provider_;
   // Handle for certificate validation context dynamic secret callback.
   Envoy::Common::CallbackHandlePtr cvc_update_callback_handle_;
   Envoy::Common::CallbackHandlePtr cvc_validation_callback_handle_;

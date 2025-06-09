@@ -35,11 +35,11 @@ std::string generateCertificateHash(const std::string& cert_data) {
   return hash.substr(0, 8);
 }
 
-std::vector<TlsCertificateConfigProviderWithName> getTlsCertificateConfigProviders(
+std::vector<TlsCertificateConfigProviderSharedPtrWithName> getTlsCertificateConfigProviders(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status) {
-  std::vector<TlsCertificateConfigProviderWithName> providers;
+  std::vector<TlsCertificateConfigProviderSharedPtrWithName> providers;
   if (!config.tls_certificates().empty()) {
     for (const auto& tls_certificate : config.tls_certificates()) {
       if (!tls_certificate.has_private_key_provider() && !tls_certificate.has_certificate_chain() &&
@@ -54,7 +54,7 @@ std::vector<TlsCertificateConfigProviderWithName> getTlsCertificateConfigProvide
         absl::StrAppend(&cert_id, hash_id);
       }
 
-      providers.push_back(TlsCertificateConfigProviderWithName{
+      providers.push_back(TlsCertificateConfigProviderSharedPtrWithName{
           cert_id,
           factory_context.serverFactoryContext().secretManager().createInlineTlsCertificateProvider(
               tls_certificate)});
@@ -65,7 +65,7 @@ std::vector<TlsCertificateConfigProviderWithName> getTlsCertificateConfigProvide
     for (const auto& sds_secret_config : config.tls_certificate_sds_secret_configs()) {
       if (sds_secret_config.has_sds_config()) {
         // Fetch dynamic secret.
-        providers.push_back(TlsCertificateConfigProviderWithName{
+        providers.push_back(TlsCertificateConfigProviderSharedPtrWithName{
             sds_secret_config.name(),
             factory_context.serverFactoryContext()
                 .secretManager()
@@ -82,8 +82,8 @@ std::vector<TlsCertificateConfigProviderWithName> getTlsCertificateConfigProvide
               fmt::format("Unknown static secret: {}", sds_secret_config.name()));
           return {};
         }
-        providers.push_back(
-            TlsCertificateConfigProviderWithName{sds_secret_config.name(), secret_provider});
+        providers.push_back(TlsCertificateConfigProviderSharedPtrWithName{sds_secret_config.name(),
+                                                                          secret_provider});
       }
     }
     return providers;
@@ -117,7 +117,8 @@ Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
   return nullptr;
 }
 
-CertificateValidationContextConfigProviderWithName getCertificateValidationContextConfigProvider(
+CertificateValidationContextConfigProviderSharedPtrWithName
+getCertificateValidationContextConfigProvider(
     const envoy::extensions::transport_sockets::tls::v3::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     std::unique_ptr<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>*
@@ -135,7 +136,7 @@ CertificateValidationContextConfigProviderWithName getCertificateValidationConte
         ca_cert_id = absl::StrCat(ca_cert_id, "_", hash_id);
       }
     }
-    return CertificateValidationContextConfigProviderWithName{
+    return CertificateValidationContextConfigProviderSharedPtrWithName{
         ca_cert_id,
         factory_context.serverFactoryContext()
             .secretManager()
@@ -144,7 +145,7 @@ CertificateValidationContextConfigProviderWithName getCertificateValidationConte
   case envoy::extensions::transport_sockets::tls::v3::CommonTlsContext::ValidationContextTypeCase::
       kValidationContextSdsSecretConfig: {
     const auto& sds_secret_config = config.validation_context_sds_secret_config();
-    return CertificateValidationContextConfigProviderWithName{
+    return CertificateValidationContextConfigProviderSharedPtrWithName{
         sds_secret_config.name(),
         getProviderFromSds(factory_context, sds_secret_config, creation_status)};
   }
@@ -155,7 +156,7 @@ CertificateValidationContextConfigProviderWithName getCertificateValidationConte
         config.combined_validation_context().default_validation_context());
     const auto& sds_secret_config =
         config.combined_validation_context().validation_context_sds_secret_config();
-    return CertificateValidationContextConfigProviderWithName{
+    return CertificateValidationContextConfigProviderSharedPtrWithName{
         sds_secret_config.name(),
         getProviderFromSds(factory_context, sds_secret_config, creation_status)};
   }
