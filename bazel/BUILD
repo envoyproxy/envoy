@@ -1073,7 +1073,7 @@ config_setting(
 
 bool_flag(
     name = "libc++",
-    build_setting_default = True,
+    build_setting_default = False,
 )
 
 config_setting(
