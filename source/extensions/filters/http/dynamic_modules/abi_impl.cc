@@ -1,10 +1,11 @@
+#include <cstddef>
+
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
-#include <cstddef>
 
 namespace Envoy {
 namespace Extensions {
