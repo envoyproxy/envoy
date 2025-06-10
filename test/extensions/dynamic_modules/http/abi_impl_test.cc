@@ -437,6 +437,9 @@ TEST(ABIImpl, dynamic_metadata) {
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(testing::Return(nullptr));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_CALL(testing::Const(stream_info), dynamicMetadata())
       .WillRepeatedly(testing::ReturnRef(metadata));
   filter.setDecoderFilterCallbacks(callbacks);
@@ -446,6 +449,16 @@ TEST(ABIImpl, dynamic_metadata) {
       key_ptr, key_length, &result_number));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
       &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      key_ptr, key_length, &result_str_ptr, &result_str_length));
+  // Test no metadata on all sources.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_cluster, namespace_ptr, namespace_length,
+      key_ptr, key_length, &result_str_ptr, &result_str_length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_route, namespace_ptr, namespace_length,
+      key_ptr, key_length, &result_str_ptr, &result_str_length));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_host, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_str_ptr, &result_str_length));
 
   // With namespace but non existing key.
