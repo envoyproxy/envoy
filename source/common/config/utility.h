@@ -395,10 +395,10 @@ public:
    * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
    *                         in the given index, a nullptr factory will be returned.
    * @param xdstp_config_source whether the config source will be used for xdstp config source.
-                                These sources must be of type AGGREGATED_GRPC or
-   AGGREGATED_DELTA_GRPC.
+   *                            These sources must be of type AGGREGATED_GRPC or
+   *                            AGGREGATED_DELTA_GRPC.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory, or nullptr if there's no
-   * grpc_service in the given index.
+   *         grpc_service in the given index.
    */
   static absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
