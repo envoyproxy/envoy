@@ -1022,7 +1022,7 @@ bool envoy_dynamic_module_callback_http_append_response_body(
 bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes);
 
-// ------------------------ Dynamic Metadata Callbacks -------------------------
+// ---------------------------- Metadata Callbacks -----------------------------
 
 /**
  * envoy_dynamic_module_callback_http_set_dynamic_metadata_number is called by the module to set
