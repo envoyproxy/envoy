@@ -102,6 +102,11 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, RequestNotGrpc) {
 
   // Pass through headers directly.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  // Pass through request data directly.
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue,
+            filter_->decodeData(
+                *Envoy::Grpc::Common::serializeToGrpcFrame(makeCreateApiKeyRequest()), true));
 }
 
 TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
@@ -111,6 +116,11 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
 
   // Pass through headers directly.
   EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  // Pass through request data directly.
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue,
+            filter_->decodeData(
+                *Envoy::Grpc::Common::serializeToGrpcFrame(makeCreateApiKeyRequest()), true));
 }
 
 // Following tests validate that the filter rejects the request for various failure scenarios.
