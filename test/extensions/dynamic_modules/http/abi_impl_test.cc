@@ -4,8 +4,6 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
-#include "gmock/gmock.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -704,15 +702,6 @@ TEST(ABIImpl, ClearRouteCache) {
 
 TEST(ABIImpl, GetAttributes) {
   DynamicModuleHttpFilter filter{nullptr};
-  std::initializer_list<std::pair<std::string, std::string>> headers = {
-      {":path", "/api/v1/action?param=value"},
-      {":scheme", "https"},
-      {":method", "GET"},
-      {":authority", "example.org"},
-      {"referer", "envoyproxy.io"},
-      {"user-agent", "curl/7.54.1"}};
-  Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter.request_headers_ = &request_headers;
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
@@ -739,6 +728,21 @@ TEST(ABIImpl, GetAttributes) {
   char* result_str_ptr = nullptr;
   size_t result_str_length = 0;
   uint64_t result_number = 0;
+
+  // envoy_dynamic_module_type_attribute_id_RequestPath with null headers map, should return false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_str_ptr,
+      &result_str_length));
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {
+      {":path", "/api/v1/action?param=value"},
+      {":scheme", "https"},
+      {":method", "GET"},
+      {":authority", "example.org"},
+      {"referer", "envoyproxy.io"},
+      {"user-agent", "curl/7.54.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  filter.request_headers_ = &request_headers;
 
   // Unsupported attributes.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(

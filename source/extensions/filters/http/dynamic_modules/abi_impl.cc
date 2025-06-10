@@ -1,5 +1,3 @@
-#include <cstddef>
-
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -39,6 +37,9 @@ size_t getHeaderValueImpl(const Http::HeaderMap* map,
 bool headerAsAttribute(const Http::HeaderMap* map, const Envoy::Http::LowerCaseString header,
                               envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
                               size_t* result_buffer_length_ptr) {
+  if (!map) {
+    return false;
+  }
   auto lower_header = header.get();
   envoy_dynamic_module_type_buffer_envoy_ptr key_ptr = const_cast<char*>(lower_header.data());
   auto size = getHeaderValueImpl(map, key_ptr, lower_header.size(), result_buffer_ptr,
