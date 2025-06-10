@@ -279,6 +279,11 @@ EngineBuilder::setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_int
   return *this;
 }
 
+EngineBuilder& EngineBuilder::setMaxConcurrentStreams(int max_concurrent_streams) {
+  max_concurrent_streams_ = max_concurrent_streams;
+  return *this;
+}
+
 EngineBuilder&
 EngineBuilder::enablePlatformCertificatesValidation(bool platform_certificates_validation_on) {
   platform_certificates_validation_on_ = platform_certificates_validation_on;
@@ -643,6 +648,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   h2_options->mutable_max_concurrent_streams()->set_value(100);
   h2_options->mutable_initial_stream_window_size()->set_value(initial_stream_window_size_);
   h2_options->mutable_initial_connection_window_size()->set_value(initial_connection_window_size_);
+  if (max_concurrent_streams_ > 0) {
+    h2_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams_);
+  }
 
   envoy::extensions::http::header_formatters::preserve_case::v3::PreserveCaseFormatterConfig
       preserve_case_config;
@@ -707,24 +715,30 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
         h3_proxy_socket;
     h3_proxy_socket.mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_inner_socket);
     h3_proxy_socket.mutable_transport_socket()->set_name("envoy.transport_sockets.quic");
-    alpn_options.mutable_auto_config()
-        ->mutable_http3_protocol_options()
-        ->mutable_quic_protocol_options()
-        ->set_connection_options(http3_connection_options_);
-    alpn_options.mutable_auto_config()
-        ->mutable_http3_protocol_options()
-        ->mutable_quic_protocol_options()
-        ->set_client_connection_options(http3_client_connection_options_);
-    alpn_options.mutable_auto_config()
-        ->mutable_http3_protocol_options()
-        ->mutable_quic_protocol_options()
-        ->mutable_initial_stream_window_size()
-        ->set_value(initial_stream_window_size_);
-    alpn_options.mutable_auto_config()
-        ->mutable_http3_protocol_options()
-        ->mutable_quic_protocol_options()
-        ->mutable_initial_connection_window_size()
-        ->set_value(initial_connection_window_size_);
+
+    auto* quic_protocol_options = alpn_options.mutable_auto_config()
+                                      ->mutable_http3_protocol_options()
+                                      ->mutable_quic_protocol_options();
+    quic_protocol_options->set_connection_options(http3_connection_options_);
+    quic_protocol_options->set_client_connection_options(http3_client_connection_options_);
+    quic_protocol_options->mutable_initial_stream_window_size()->set_value(
+        initial_stream_window_size_);
+    quic_protocol_options->mutable_initial_connection_window_size()->set_value(
+        initial_connection_window_size_);
+    quic_protocol_options->mutable_idle_network_timeout()->set_seconds(
+        quic_connection_idle_timeout_seconds_);
+    if (num_timeouts_to_trigger_port_migration_ > 0) {
+      quic_protocol_options->mutable_num_timeouts_to_trigger_port_migration()->set_value(
+          num_timeouts_to_trigger_port_migration_);
+    }
+    if (keepalive_initial_interval_ms_ > 0) {
+      quic_protocol_options->mutable_connection_keepalive()->mutable_initial_interval()->set_nanos(
+          keepalive_initial_interval_ms_ * 1000 * 1000);
+    }
+    if (max_concurrent_streams_ > 0) {
+      quic_protocol_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams_);
+    }
+
     alpn_options.mutable_auto_config()->mutable_alternate_protocols_cache_options()->set_name(
         "default_alternate_protocols_cache");
     for (const auto& [host, port] : quic_hints_) {
@@ -738,28 +752,6 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       alpn_options.mutable_auto_config()
           ->mutable_alternate_protocols_cache_options()
           ->add_canonical_suffixes(suffix);
-    }
-
-    if (num_timeouts_to_trigger_port_migration_ > 0) {
-      alpn_options.mutable_auto_config()
-          ->mutable_http3_protocol_options()
-          ->mutable_quic_protocol_options()
-          ->mutable_num_timeouts_to_trigger_port_migration()
-          ->set_value(num_timeouts_to_trigger_port_migration_);
-    }
-
-    alpn_options.mutable_auto_config()
-        ->mutable_http3_protocol_options()
-        ->mutable_quic_protocol_options()
-        ->mutable_idle_network_timeout()
-        ->set_seconds(quic_connection_idle_timeout_seconds_);
-
-    auto* quic_protocol_options = alpn_options.mutable_auto_config()
-                                      ->mutable_http3_protocol_options()
-                                      ->mutable_quic_protocol_options();
-    if (keepalive_initial_interval_ms_ > 0) {
-      quic_protocol_options->mutable_connection_keepalive()->mutable_initial_interval()->set_nanos(
-          keepalive_initial_interval_ms_ * 1000 * 1000);
     }
 
     base_cluster->mutable_transport_socket()->mutable_typed_config()->PackFrom(h3_proxy_socket);
