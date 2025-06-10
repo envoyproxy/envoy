@@ -366,6 +366,7 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
   const int expected_header_bytes_received = 0;
   checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
                        expected_header_bytes_sent, expected_header_bytes_received);
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(ConnectTerminationIntegrationTest, TestTimeout) {
