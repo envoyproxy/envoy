@@ -68,6 +68,7 @@ public:
   void addMatcherConfig(xds::type::matcher::v3::Matcher& matcher) {
     config_.mutable_bucket_matchers()->MergeFrom(matcher);
     match_tree_ = matcher_factory_.create(matcher)();
+    EXPECT_TRUE(visitor_.errors().empty());
   }
 
   void addMatcherConfig(MatcherConfigType config_type) {
