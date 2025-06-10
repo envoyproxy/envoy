@@ -576,10 +576,6 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
-#if defined(BORINGSSL_FIPS) && BORINGSSL_API_VERSION >= 18
-#error "Delete preprocessor check below; no longer needed"
-#endif
-
 #if BORINGSSL_API_VERSION >= 18
   // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
   // error but is allowed because the enforcement that rsa key usage and tls usage need to be
