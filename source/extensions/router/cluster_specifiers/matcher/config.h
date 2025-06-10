@@ -1,28 +1,28 @@
 #pragma once
 
-#include "source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.h"
+#include "source/extensions/router/cluster_specifiers/matcher/matcher_cluster_specifier.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Router {
-namespace Lua {
+namespace Matcher {
 
-class LuaClusterSpecifierPluginFactoryConfig
+class MatcherClusterSpecifierPluginFactoryConfig
     : public Envoy::Router::ClusterSpecifierPluginFactoryConfig {
 public:
-  LuaClusterSpecifierPluginFactoryConfig() = default;
+  MatcherClusterSpecifierPluginFactoryConfig() = default;
   Envoy::Router::ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext&) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<LuaClusterSpecifierConfigProto>();
+    return std::make_unique<MatcherClusterSpecifierConfigProto>();
   }
 
-  std::string name() const override { return "envoy.router.cluster_specifier_plugin.lua"; }
+  std::string name() const override { return "envoy.router.cluster_specifier_plugin.matcher"; }
 };
 
-} // namespace Lua
+} // namespace Matcher
 } // namespace Router
 } // namespace Extensions
 } // namespace Envoy

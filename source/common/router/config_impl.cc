@@ -136,30 +136,6 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
                                 src.headers_to_remove.end());
 }
 
-class RouteActionValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
-public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view type_url) override {
-    static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        createReflectableMessage(
-            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
-            ->GetDescriptor()
-            ->full_name());
-    static std::string filter_state_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        createReflectableMessage(envoy::extensions::matching::common_inputs::network::v3::
-                                     FilterStateInput::default_instance())
-            ->GetDescriptor()
-            ->full_name());
-    if (type_url == request_header_input_name || type_url == filter_state_input_name) {
-      return absl::OkStatus();
-    }
-
-    return absl::InvalidArgumentError(
-        fmt::format("Route table can only match on request headers, saw {}", type_url));
-  }
-};
-
 absl::Status validateWeightedClusterSpecifier(
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
   if (!cluster.name().empty() && !cluster.cluster_header().empty()) {
@@ -2581,6 +2557,26 @@ absl::optional<bool> PerFilterConfigs::disabled(absl::string_view name) const {
 
   const auto it = configs_.find(name);
   return it != configs_.end() ? absl::optional<bool>{it->second.disabled_} : absl::nullopt;
+}
+
+absl::Status RouteActionValidationVisitor::performDataInputValidation(
+    const Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
+  static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
+      createReflectableMessage(
+          envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
+          ->GetDescriptor()
+          ->full_name());
+  static std::string filter_state_input_name = TypeUtil::descriptorFullNameToTypeUrl(
+      createReflectableMessage(envoy::extensions::matching::common_inputs::network::v3::
+                                   FilterStateInput::default_instance())
+          ->GetDescriptor()
+          ->full_name());
+  if (type_url == request_header_input_name || type_url == filter_state_input_name) {
+    return absl::OkStatus();
+  }
+
+  return absl::InvalidArgumentError(
+      fmt::format("Route table can only match on request headers, saw {}", type_url));
 }
 
 Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(

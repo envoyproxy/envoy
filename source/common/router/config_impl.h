@@ -961,7 +961,7 @@ public:
     };
     const std::string& routeName() const override { return parent_->routeName(); }
 
-  private:
+  protected:
     const RouteEntryAndRoute* parent_;
 
     // If a DynamicRouteEntry instance is created and returned to the caller directly, then keep an
@@ -972,7 +972,9 @@ public:
     // avoid possible circular reference. For example, the WeightedClusterEntry (derived from
     // DynamicRouteEntry) will be member of the RouteEntryImplBase, so the owner_ should be nullptr.
     const RouteConstSharedPtr owner_;
-    const std::string cluster_name_;
+    // The dynamic route entry will not be accessed cross thread and it is safe to mark this be
+    // mutable.
+    mutable std::string cluster_name_;
   };
 
   /**
@@ -1727,6 +1729,13 @@ public:
 private:
   std::vector<Http::LowerCaseString> internal_only_headers_;
   const std::string name_;
+};
+
+class RouteActionValidationVisitor
+    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
+public:
+  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
+                                          absl::string_view type_url) override;
 };
 
 } // namespace Router
