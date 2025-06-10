@@ -1,7 +1,3 @@
-#include <asm-generic/socket.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-
 #include <cstdint>
 #include <memory>
 #include <string>
