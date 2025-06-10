@@ -87,11 +87,13 @@ IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& 
 }
 
 std::string IntegrationStreamDecoder::debugState() const {
-  return absl::StrCat("\nIntegrationStreamDecoder state:", "\n  saw_end_stream_=", saw_end_stream_,
-                      "\n  saw_reset_=", saw_reset_,
-                      "\n  headers_=", headers_ ? fmt::format("{}", *headers_) : "null",
-                      "\n  body_=", absl::CEscape(body_),
-                      "\n  trailers_=", trailers_ ? fmt::format("{}", *trailers_) : "null");
+  return absl::StrCat(
+      "\nIntegrationStreamDecoder state:", "\n  saw_end_stream_=", saw_end_stream_,
+      "\n  saw_reset_=", saw_reset_,
+      "\n  headers_=", headers_ ? fmt::format("{}", *headers_) : "null",
+      "\n  continue_headers_=", continue_headers_ ? fmt::format("{}", *continue_headers_) : "null",
+      "\n  body_=", absl::CEscape(body_),
+      "\n  trailers_=", trailers_ ? fmt::format("{}", *trailers_) : "null");
 }
 
 AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
