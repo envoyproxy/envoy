@@ -298,7 +298,7 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
   auto metadata_namespace = filter_metdata.find(namespace_view);
   if (metadata_namespace == filter_metdata.end()) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        fmt::format("namespace {} not found in dynamic metadata", namespace_view));
+                        fmt::format("namespace {} not found in metadata", namespace_view));
     return nullptr;
   }
   return &metadata_namespace->second;
