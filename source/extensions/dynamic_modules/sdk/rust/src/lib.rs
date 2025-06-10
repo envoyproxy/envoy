@@ -415,7 +415,8 @@ pub trait EnvoyHttpFilter {
     body: Option<&'a [u8]>,
   );
 
-  /// Get the number-typed dynamic metadata value with the given key.
+  /// Get the number-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
   fn get_metadata_number(
     &self,
@@ -430,7 +431,8 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
 
-  /// Get the string-typed dynamic metadata value with the given key.
+  /// Get the string-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
   fn get_metadata_string<'a>(
     &'a self,
