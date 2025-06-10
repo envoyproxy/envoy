@@ -838,6 +838,13 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(result_str_length, 13);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "envoyproxy.io");
 
+  // envoy_dynamic_module_type_attribute_id_RequestQuery
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestQuery, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 11);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "param=value");
+
   // envoy_dynamic_module_type_attribute_id_RequestUrlPath
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_RequestUrlPath, &result_str_ptr,
@@ -845,12 +852,17 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(result_str_length, 14);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
 
-  // envoy_dynamic_module_type_attribute_id_RequestQuery
+  // test again without query params for envoy_dynamic_module_type_attribute_id_RequestUrlPath
+  headers = {{":path", "/api/v1/action"}};
+  Http::TestRequestHeaderMapImpl updated_headers{headers};
+  filter.request_headers_ = &updated_headers;
+
+  // envoy_dynamic_module_type_attribute_id_RequestUrlPath
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
-      &filter, envoy_dynamic_module_type_attribute_id_RequestQuery, &result_str_ptr,
+      &filter, envoy_dynamic_module_type_attribute_id_RequestUrlPath, &result_str_ptr,
       &result_str_length));
-  EXPECT_EQ(result_str_length, 11);
-  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "param=value");
+  EXPECT_EQ(result_str_length, 14);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
 
   // envoy_dynamic_module_type_attribute_id_ResponseCode
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
