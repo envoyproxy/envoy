@@ -16,6 +16,7 @@ namespace Envoy {
 namespace Ssl {
 namespace Matching {
 
+using ::Envoy::Matcher::HasStringAction;
 using ::testing::Return;
 
 constexpr absl::string_view yaml = R"EOF(
@@ -76,9 +77,7 @@ TEST_F(NetworkInputsIntegrationTest, UriSanInput) {
   envoy::config::core::v3::Metadata metadata;
   Network::Matching::MatchingDataImpl data(socket, filter_state, metadata);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(NetworkInputsIntegrationTest, DnsSanInput) {
@@ -95,9 +94,7 @@ TEST_F(NetworkInputsIntegrationTest, DnsSanInput) {
   envoy::config::core::v3::Metadata metadata;
   Network::Matching::MatchingDataImpl data(socket, filter_state, metadata);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(NetworkInputsIntegrationTest, SubjectInput) {
@@ -113,9 +110,7 @@ TEST_F(NetworkInputsIntegrationTest, SubjectInput) {
   envoy::config::core::v3::Metadata metadata;
   Network::Matching::MatchingDataImpl data(socket, filter_state, metadata);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 using HttpInputsIntegrationTest = InputsIntegrationTest<Http::HttpMatchingData>;
@@ -132,9 +127,7 @@ TEST_F(HttpInputsIntegrationTest, UriSanInput) {
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillOnce(Return(uri_sans));
   Http::Matching::HttpMatchingDataImpl data(stream_info);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(HttpInputsIntegrationTest, DnsSanInput) {
@@ -149,9 +142,7 @@ TEST_F(HttpInputsIntegrationTest, DnsSanInput) {
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillOnce(Return(dns_sans));
   Http::Matching::HttpMatchingDataImpl data(stream_info);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 TEST_F(HttpInputsIntegrationTest, SubjectInput) {
@@ -165,9 +156,7 @@ TEST_F(HttpInputsIntegrationTest, SubjectInput) {
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillOnce(testing::ReturnRef(host));
   Http::Matching::HttpMatchingDataImpl data(stream_info);
 
-  const auto result = match_tree_()->match(data);
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
+  EXPECT_THAT(match_tree_()->match(data), HasStringAction("foo"));
 }
 
 } // namespace Matching
