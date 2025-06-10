@@ -2135,10 +2135,11 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
-    auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
+    Matcher::MatchResult match_result =
+        Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
-    if (match.result_) {
-      const auto result = match.result_();
+    if (match_result.isMatch()) {
+      const Matcher::ActionPtr result = match_result.action();
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
         const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
 
@@ -2151,7 +2152,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       PANIC("Action in router matcher should be Route or RouteList");
     }
 
-    ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
+    ENVOY_LOG(debug, "failed to match incoming request: {}",
+              match_result.isNoMatch() ? "no match" : "insufficient data");
 
     return nullptr;
   }

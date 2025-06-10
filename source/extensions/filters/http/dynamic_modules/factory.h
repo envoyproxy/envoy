@@ -12,18 +12,21 @@ namespace Server {
 namespace Configuration {
 
 using FilterConfig = envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilter;
+using RouteConfigProto =
+    envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute;
 
 class DynamicModuleConfigFactory
-    : public Extensions::HttpFilters::Common::DualFactoryBase<FilterConfig> {
+    : public Extensions::HttpFilters::Common::DualFactoryBase<FilterConfig, RouteConfigProto> {
 public:
   DynamicModuleConfigFactory() : DualFactoryBase("envoy.extensions.filters.http.dynamic_modules") {}
   absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const FilterConfig& raw_config, const std::string&, DualInfo,
                                     Server::Configuration::ServerFactoryContext& context) override;
 
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new FilterConfig()};
-  }
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(const RouteConfigProto&,
+                                       Server::Configuration::ServerFactoryContext&,
+                                       ProtobufMessage::ValidationVisitor&) override;
 
   std::string name() const override { return "envoy.extensions.filters.http.dynamic_modules"; }
 };

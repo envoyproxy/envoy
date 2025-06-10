@@ -69,7 +69,7 @@ TEST(ExactMapMatcherTest, DataNotAvailable) {
 
   TestData data;
   const auto result = matcher->match(data);
-  EXPECT_THAT(result, HasNotEnoughData());
+  EXPECT_THAT(result, HasInsufficientData());
 }
 
 TEST(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
@@ -82,7 +82,7 @@ TEST(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
 
   TestData data;
   const auto result = matcher->match(data);
-  EXPECT_THAT(result, HasNotEnoughData());
+  EXPECT_THAT(result, HasInsufficientData());
 }
 
 TEST(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
@@ -163,8 +163,8 @@ TEST(ExactMapMatcherTest, RecursiveMatchingWithKeepMatching) {
                                                /*.keep_matching=*/true});
 
   std::vector<ActionFactoryCb> skipped_results{};
-  SkippedMatchCb<TestData> skipped_match_cb = [&skipped_results](const OnMatch<TestData>& match) {
-    skipped_results.push_back(match.action_cb_);
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+    skipped_results.push_back(cb);
   };
   TestData data;
   const auto result = matcher->match(data, skipped_match_cb);
