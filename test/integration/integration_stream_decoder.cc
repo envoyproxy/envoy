@@ -84,10 +84,12 @@ IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& 
 }
 
 AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
+  waiting_for_end_stream_ = true;
   return waitForWithDispatcherRun([this]() { return saw_end_stream_; }, "end stream", timeout);
 }
 
 AssertionResult IntegrationStreamDecoder::waitForReset(std::chrono::milliseconds timeout) {
+  waiting_for_reset_ = true;
   return waitForWithDispatcherRun([this]() { return saw_reset_; }, "reset", timeout);
 }
 
