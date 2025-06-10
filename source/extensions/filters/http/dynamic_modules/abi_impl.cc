@@ -36,7 +36,7 @@ size_t getHeaderValueImpl(const Http::HeaderMap* map,
   return values.size();
 }
 
-bool headerAsRequestAttribute(const Http::HeaderMap* map, const Envoy::Http::LowerCaseString header,
+bool headerAsAttribute(const Http::HeaderMap* map, const Envoy::Http::LowerCaseString header,
                               envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
                               size_t* result_buffer_length_ptr) {
   auto lower_header = header.get();
@@ -673,32 +673,32 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestPath: {
-    ok = headerAsRequestAttribute(filter->request_headers_, Envoy::Http::Headers::get().Path,
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Path,
                                   result, result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestHost: {
-    ok = headerAsRequestAttribute(filter->request_headers_, Envoy::Http::Headers::get().Host,
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Host,
                                   result, result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestMethod: {
-    ok = headerAsRequestAttribute(filter->request_headers_, Envoy::Http::Headers::get().Method,
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Method,
                                   result, result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestScheme: {
-    ok = headerAsRequestAttribute(filter->request_headers_, Envoy::Http::Headers::get().Scheme,
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Scheme,
                                   result, result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestReferer: {
-    ok = headerAsRequestAttribute(filter->request_headers_,
+    ok = headerAsAttribute(filter->request_headers_,
                                   Envoy::Http::CustomHeaders::get().Referer, result, result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUserAgent: {
-    ok = headerAsRequestAttribute(filter->request_headers_, Envoy::Http::Headers::get().UserAgent,
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().UserAgent,
                                   result, result_length);
     break;
   }
