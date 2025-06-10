@@ -33,6 +33,8 @@ private:
   // Rejects requests and sends local reply back to the client.
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
+
+  bool is_valid_grpc_request_ = false;
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {

@@ -44,6 +44,7 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
+  is_valid_grpc_request_ = true;
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
@@ -51,13 +52,19 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
   ENVOY_STREAM_LOG(debug, "Called ProtoApiScrubber::decodeData: data size={} end_stream={}",
                    *decoder_callbacks_, data.length(), end_stream);
 
+  if (!is_valid_grpc_request_) {
+    ENVOY_STREAM_LOG(debug, "Request isn't gRPC. Passed through the request without scrubbing.",
+                     *decoder_callbacks_);
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
       []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
 
   auto request_msg_converter = std::make_unique<MessageConverter>(
       std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
 
-  // Buffer the data to complete the request message.
+  // Move the data to internal gRPC buffer messages representation.
   auto messages = request_msg_converter->accumulateMessages(data, end_stream);
   if (const absl::Status& status = messages.status(); !status.ok()) {
     rejectRequest(status.raw_code(), status.message(),
