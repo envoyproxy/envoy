@@ -35,8 +35,8 @@ size_t getHeaderValueImpl(const Http::HeaderMap* map,
 }
 
 bool headerAsAttribute(const Http::HeaderMap* map, const Envoy::Http::LowerCaseString header,
-                              envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
-                              size_t* result_buffer_length_ptr) {
+                       envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
+                       size_t* result_buffer_length_ptr) {
   if (!map) {
     return false;
   }
@@ -674,33 +674,33 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestPath: {
-    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Path,
-                                  result, result_length);
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Path, result,
+                           result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestHost: {
-    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Host,
-                                  result, result_length);
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Host, result,
+                           result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestMethod: {
-    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Method,
-                                  result, result_length);
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Method, result,
+                           result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestScheme: {
-    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Scheme,
-                                  result, result_length);
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Scheme, result,
+                           result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestReferer: {
-    ok = headerAsAttribute(filter->request_headers_,
-                                  Envoy::Http::CustomHeaders::get().Referer, result, result_length);
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::CustomHeaders::get().Referer, 
+                           result, result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUserAgent: {
-    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().UserAgent,
-                                  result, result_length);
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().UserAgent, result,
+                           result_length);
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestUrlPath: {
