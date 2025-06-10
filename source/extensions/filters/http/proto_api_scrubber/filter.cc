@@ -45,6 +45,13 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
   }
 
   is_valid_grpc_request_ = true;
+
+  auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
+      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
+
+  request_msg_converter_ = std::make_unique<MessageConverter>(
+      std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
+
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
@@ -58,14 +65,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
     return Envoy::Http::FilterDataStatus::Continue;
   }
 
-  auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
-      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
-
-  auto request_msg_converter = std::make_unique<MessageConverter>(
-      std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());
-
   // Move the data to internal gRPC buffer messages representation.
-  auto messages = request_msg_converter->accumulateMessages(data, end_stream);
+  auto messages = request_msg_converter_->accumulateMessages(data, end_stream);
   if (const absl::Status& status = messages.status(); !status.ok()) {
     rejectRequest(status.raw_code(), status.message(),
                   formatError(kRcDetailFilterProtoApiScrubber,
@@ -101,7 +102,8 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       continue;
     }
 
-    auto buf_convert_status = request_msg_converter->convertBackToBuffer(std::move(stream_message));
+    auto buf_convert_status =
+        request_msg_converter_->convertBackToBuffer(std::move(stream_message));
     RELEASE_ASSERT(buf_convert_status.ok(), "failed to convert message back to envoy buffer");
 
     data.move(*buf_convert_status.value());

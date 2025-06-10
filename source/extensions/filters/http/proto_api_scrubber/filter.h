@@ -35,6 +35,10 @@ private:
                      absl::string_view rc_detail);
 
   bool is_valid_grpc_request_ = false;
+
+  // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and
+  // vice-versa.
+  GrpcFieldExtraction::MessageConverterPtr request_msg_converter_{nullptr};
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {
