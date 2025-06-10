@@ -219,5 +219,9 @@ new_features:
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from
     network filters, such as the Proxy Protocol, etc.
+- area: lua
+  change: |
+    Added a new ``dynamicTypedMetadata()`` on ``streamInfo()`` which could be used to access the typed metadata from
+    HTTP filters, such as the Set Metadata filter, etc.
 
 deprecated:
