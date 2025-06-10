@@ -36,27 +36,11 @@ public:
   }
 };
 
-struct MaybeMatchResult {
-  const ActionFactoryCb result_;
-  const MatchState match_state_;
-};
-
 // TODO(snowp): Make this a class that tracks the progress to speed up subsequent traversals.
 template <class DataType>
-static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree, const DataType& data,
-                                             SkippedMatchCb<DataType> skipped_match_cb = nullptr) {
-  const auto result = match_tree.match(data, skipped_match_cb);
-  if (result.match_state_ == MatchState::UnableToMatch) {
-    return {nullptr, MatchState::UnableToMatch};
-  }
-
-  if (!result.on_match_) {
-    return {nullptr, MatchState::MatchComplete};
-  }
-
-  // Note: does not handle sub-matchers or keep_matching, MatchTree::match(...) implementations are
-  // expected to do so.
-  return {result.on_match_->action_cb_, MatchState::MatchComplete};
+static inline MatchResult evaluateMatch(MatchTree<DataType>& match_tree, const DataType& data,
+                                        SkippedMatchCb skipped_match_cb = nullptr) {
+  return match_tree.match(data, skipped_match_cb);
 }
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
@@ -71,8 +55,7 @@ public:
   explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
       : on_no_match_(std::move(on_no_match)) {}
 
-  typename MatchTree<DataType>::MatchResult
-  match(const DataType& data, SkippedMatchCb<DataType> skipped_match_cb = nullptr) override {
+  MatchResult match(const DataType& data, SkippedMatchCb skipped_match_cb = nullptr) override {
     return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
   const absl::optional<OnMatch<DataType>> on_no_match_;

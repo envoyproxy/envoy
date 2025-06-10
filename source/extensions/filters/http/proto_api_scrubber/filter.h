@@ -34,13 +34,11 @@ private:
   void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
                      absl::string_view rc_detail);
 
+  bool is_valid_grpc_request_ = false;
+
   // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and
   // vice-versa.
-  GrpcFieldExtraction::MessageConverterPtr request_msg_converter_ = nullptr;
-
-  // Response message converter which converts Envoy Buffer data to StreamMessage (for scrubbing)
-  // and vice-versa.
-  GrpcFieldExtraction::MessageConverterPtr response_msg_converter_ = nullptr;
+  GrpcFieldExtraction::MessageConverterPtr request_msg_converter_{nullptr};
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {

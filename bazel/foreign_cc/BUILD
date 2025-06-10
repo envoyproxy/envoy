@@ -1,3 +1,4 @@
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 load("@rules_foreign_cc//foreign_cc:configure.bzl", "configure_make")
 load("@rules_foreign_cc//foreign_cc:make.bzl", "make")
@@ -8,6 +9,21 @@ licenses(["notice"])  # Apache 2
 exports_files(["icu_data_filter.json"])
 
 envoy_package()
+
+# Global flag to enable parallel builds for all foreign_cc targets
+# When enabled, all foreign_cc (or related) builds will use whatever cores available.
+# Defaults to false to avoid OOM on developer machines.
+bool_flag(
+    name = "parallel_builds",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "parallel_builds_enabled",
+    flag_values = {
+        ":parallel_builds": "True",
+    },
+)
 
 configure_make(
     name = "liburing",
@@ -204,8 +220,29 @@ configure_make(
         "LIBS": "-l:libstdc++.a",
         "ICU_DATA_FILTER_FILE": "$(execpath //bazel/foreign_cc:icu_data_filter.json)",
         "ARFLAGS": "r",
-        "MAKEFLAGS": "ARFLAGS=r",
-    },
+    } | select({
+        "//bazel/foreign_cc:parallel_builds_enabled": {
+            "MAKEFLAGS": "-j ARFLAGS=r",
+        },
+        "//bazel:engflow_rbe_x86_64": {
+            "MAKEFLAGS": "-j ARFLAGS=r",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "MAKEFLAGS": "-j ARFLAGS=r",
+        },
+        "//conditions:default": {
+            "MAKEFLAGS": "-j1 ARFLAGS=r",
+        },
+    }),
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
     lib_source = "@com_github_unicode_org_icu//:all",
     out_static_libs = [
         "libicuuc.a",
@@ -225,6 +262,12 @@ cc_library(
 
 envoy_cmake(
     name = "libsxg",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//bazel:engflow_rbe_aarch64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
         "SXG_BUILD_EXECUTABLES": "off",
@@ -234,6 +277,19 @@ envoy_cmake(
         "RUN_TEST": "off",
         "CMAKE_INSTALL_LIBDIR": "lib",
     },
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@com_github_google_libsxg//:all",
     out_static_libs = ["libsxg.a"],
     tags = ["skip_on_windows"],
@@ -243,6 +299,12 @@ envoy_cmake(
 
 envoy_cmake(
     name = "ares",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//bazel:engflow_rbe_aarch64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     cache_entries = {
         "CARES_BUILD_TOOLS": "no",
         "CARES_SHARED": "no",
@@ -251,6 +313,19 @@ envoy_cmake(
         "CMAKE_INSTALL_LIBDIR": "lib",
     },
     defines = ["CARES_STATICLIB"],
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@com_github_c_ares_c_ares//:all",
     linkopts = select({
         "//bazel:apple": ["-lresolv"],
@@ -268,6 +343,12 @@ envoy_cmake(
 
 envoy_cmake(
     name = "event",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//bazel:engflow_rbe_aarch64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     cache_entries = {
         "EVENT__DISABLE_OPENSSL": "on",
         "EVENT__DISABLE_MBEDTLS": "on",
@@ -282,6 +363,19 @@ envoy_cmake(
         # More details https://github.com/envoyproxy/envoy-mobile/issues/116
         "_GNU_SOURCE": "on",
     },
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@com_github_libevent_libevent//:all",
     out_static_libs = select({
         # macOS organization of libevent is different from Windows/Linux.
@@ -306,6 +400,12 @@ envoy_cmake(
 
 envoy_cmake(
     name = "nghttp2",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//bazel:engflow_rbe_aarch64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     cache_entries = {
         "ENABLE_LIB_ONLY": "on",
         "BUILD_SHARED_LIBS": "off",
@@ -316,6 +416,19 @@ envoy_cmake(
     cmake_files_dir = "$BUILD_TMPDIR/lib/CMakeFiles",
     debug_cache_entries = {"ENABLE_DEBUG": "on"},
     defines = ["NGHTTP2_STATICLIB"],
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@com_github_nghttp2_nghttp2//:all",
     out_static_libs = select({
         "//bazel:windows_x86_64": ["nghttp2.lib"],
@@ -325,6 +438,12 @@ envoy_cmake(
 
 envoy_cmake(
     name = "wamr",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//bazel:engflow_rbe_aarch64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     cache_entries = {
         # interp by default
         # if want to gain more performance advantage with JIT or AOT
@@ -356,6 +475,19 @@ envoy_cmake(
         # linux perf. only for jit and aot
         "WAMR_BUILD_LINUX_PERF": "0",
     },
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@com_github_wamr//:all",
     out_static_libs = ["libvmlib.a"],
     tags = ["skip_on_windows"],
@@ -390,6 +522,10 @@ envoy_cmake(
         # Reference: https://github.com/zlib-ng/zlib-ng#advanced-build-options.
         "UNALIGNED_OK": "off",
     },
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = select({
         "//bazel:zlib_ng": "@com_github_zlib_ng_zlib_ng//:all",
         "//conditions:default": "@net_zlib//:all",
@@ -402,6 +538,12 @@ envoy_cmake(
 
 envoy_cmake(
     name = "zstd",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//bazel:engflow_rbe_aarch64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     build_data = ["@com_github_facebook_zstd//:all"],
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
@@ -409,6 +551,19 @@ envoy_cmake(
         "ZSTD_BUILD_SHARED": "off",
         "ZSTD_BUILD_STATIC": "on",
     },
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@com_github_facebook_zstd//:all",
     out_static_libs = select({
         "//bazel:windows_x86_64": ["zstd_static.lib"],
@@ -419,6 +574,12 @@ envoy_cmake(
 
 envoy_cmake(
     name = "maxmind",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//bazel:engflow_rbe_aarch64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_LIBDIR": "lib",
@@ -427,6 +588,19 @@ envoy_cmake(
         "BUILD_TESTING": "off",
     },
     defines = ["MAXMIND_STATICLIB"],
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@com_github_maxmind_libmaxminddb//:all",
     out_static_libs = ["libmaxminddb.a"],
     tags = ["skip_on_windows"],
