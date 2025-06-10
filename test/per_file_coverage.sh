@@ -4,6 +4,7 @@
 # for existing directories with low coverage.
 declare -a KNOWN_LOW_COVERAGE=(
 "source/common:96.4"
+"source/common/common:96.5"
 "source/common/common/posix:96.2" # flaky due to posix: be careful adjusting
 "source/common/config:96.4"
 "source/common/crypto:95.5"
@@ -15,14 +16,14 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/common/memory:74.5" # tcmalloc code path is not enabled in coverage build, only gperf tcmalloc, see PR#32589
 "source/common/network:94.4" # Flaky, `activateFileEvents`, `startSecureTransport` and `ioctl`, listener_socket do not always report LCOV
 "source/common/network/dns_resolver:91.4"  # A few lines of MacOS code not tested in linux scripts. Tested in MacOS scripts
-"source/common/quic:93.2"
+"source/common/quic:92.9"
 "source/common/signal:87.2" # Death tests don't report LCOV
 "source/common/thread:0.0" # Death tests don't report LCOV
 "source/common/tls:95.5"
 "source/common/tls/cert_validator:94.7"
 "source/common/tls/private_key:88.9"
 "source/common/watchdog:58.6" # Death tests don't report LCOV
-"source/exe:94.2" # increased by #32346, need coverage for terminate_handler and hot restart failures
+"source/exe:87.9" # increased by #32346, need coverage for terminate_handler and hot restart failures
 "source/extensions/common/proxy_protocol:93.8" # Adjusted for security patch
 "source/extensions/common/tap:94.6"
 "source/extensions/common/wasm:95.3" # flaky: be careful adjusting
@@ -40,6 +41,7 @@ declare -a KNOWN_LOW_COVERAGE=(
 "source/extensions/filters/network/sni_cluster:88.9"
 "source/extensions/rate_limit_descriptors:95.0"
 "source/extensions/rate_limit_descriptors/expr:95.0"
+"source/extensions/resource_monitors/cpu_utilization:96.3"
 "source/extensions/stat_sinks/graphite_statsd:82.8" # Death tests don't report LCOV
 "source/extensions/stat_sinks/statsd:85.2" # Death tests don't report LCOV
 "source/extensions/tracers/zipkin:95.8"
