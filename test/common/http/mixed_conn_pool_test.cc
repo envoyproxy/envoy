@@ -11,6 +11,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/connection.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
@@ -30,10 +31,12 @@ public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::ClusterConnectivityState& state,
                       Random::RandomGenerator& random, Upstream::ClusterInfoConstSharedPtr cluster,
                       HttpServerPropertiesCache::Origin origin,
-                      HttpServerPropertiesCacheSharedPtr cache)
-      : HttpConnPoolImplMixed(
-            dispatcher, random, Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
-            Upstream::ResourcePriority::Default, nullptr, nullptr, state, origin, cache) {}
+                      HttpServerPropertiesCacheSharedPtr cache,
+                      Server::OverloadManager& overload_manager)
+      : HttpConnPoolImplMixed(dispatcher, random,
+                              Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+                              Upstream::ResourcePriority::Default, nullptr, nullptr, state, origin,
+                              cache, overload_manager) {}
 };
 
 /**
@@ -46,7 +49,7 @@ public:
         cache_(std::make_shared<NiceMock<MockHttpServerPropertiesCache>>()),
         mock_cache_(*(dynamic_cast<MockHttpServerPropertiesCache*>(cache_.get()))),
         conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, state_, random_, cluster_,
-                                                         origin_, cache_)) {}
+                                                         origin_, cache_, overload_manager_)) {}
 
   ~MixedConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -59,6 +62,7 @@ public:
   Http::HttpServerPropertiesCacheSharedPtr cache_;
   MockHttpServerPropertiesCache& mock_cache_;
   HttpServerPropertiesCache::Origin origin_{"https", "hostname.com", 443};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Random::MockRandomGenerator> random_;
