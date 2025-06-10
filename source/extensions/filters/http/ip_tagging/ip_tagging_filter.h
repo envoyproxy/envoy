@@ -38,10 +38,10 @@ public:
                Stats::StatNameSetPtr& stat_name_set);
 
   /**
-   * Loads file based ip tags from a datasource and parses them into a trie structure.
-   * @param ip_tags_datasource file based datasource to load ip tags from.
-   * @param dispatcher The dispatcher for the thread used by a datasource provider.
-   * @param tls The thread local slot allocator used by a datasource provider.
+   * Loads file based ip tags from a data source and parses them into a trie structure.
+   * @param ip_tags_datasource file based data source to load ip tags from.
+   * @param dispatcher The dispatcher for the thread used by a data source provider.
+   * @param tls The thread local slot allocator used by a data source provider.
    * @param creation_status This status will be populated with error if loading fails.
    * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
    */
@@ -50,7 +50,7 @@ public:
            Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls);
 
   /**
-   * Performs periodic refresh of file based ip tags via datasource.
+   * Performs periodic refresh of file based ip tags via data source.
    * @param refresh_status This status will be populated with error if refresh fails.
    * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise..
    */

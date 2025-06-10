@@ -279,7 +279,7 @@ bool MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt:
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml, bool is_custom_thread) {
-  // If this is a custom (not main, worker or test) thread, skip macto validation.
+  // If this is a custom (not main, worker or test) thread, skip macro validation.
   if (is_custom_thread) {
     TRY_NEEDS_AUDIT { return parseYamlNode(YAML::Load(yaml)); }
     END_TRY

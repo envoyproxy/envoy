@@ -32,12 +32,12 @@ EXTENSIONS = {
     # Compression
     #
 
-    # "envoy.compression.gzip.compressor":                "//source/extensions/compression/gzip/compressor:config",
-    # "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
-    # "envoy.compression.brotli.compressor":              "//source/extensions/compression/brotli/compressor:config",
-    # "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
-    # "envoy.compression.zstd.compressor":                "//source/extensions/compression/zstd/compressor:config",
-    # "envoy.compression.zstd.decompressor":              "//source/extensions/compression/zstd/decompressor:config",
+    "envoy.compression.gzip.compressor":                "//source/extensions/compression/gzip/compressor:config",
+    "envoy.compression.gzip.decompressor":              "//source/extensions/compression/gzip/decompressor:config",
+    "envoy.compression.brotli.compressor":              "//source/extensions/compression/brotli/compressor:config",
+    "envoy.compression.brotli.decompressor":            "//source/extensions/compression/brotli/decompressor:config",
+    "envoy.compression.zstd.compressor":                "//source/extensions/compression/zstd/compressor:config",
+    "envoy.compression.zstd.decompressor":              "//source/extensions/compression/zstd/decompressor:config",
 
     #
     # Config validators
@@ -305,15 +305,15 @@ EXTENSIONS = {
     # Transport sockets
     #
 
-    # "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
-    # "envoy.transport_sockets.http_11_proxy":            "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
-    # "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
-    # "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
-    # "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
-    # "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
-    # "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
-    # "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
-    # "envoy.transport_sockets.internal_upstream":        "//source/extensions/transport_sockets/internal_upstream:config",
+    "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
+    "envoy.transport_sockets.http_11_proxy":            "//source/extensions/transport_sockets/http_11_proxy:upstream_config",
+    "envoy.transport_sockets.upstream_proxy_protocol":  "//source/extensions/transport_sockets/proxy_protocol:upstream_config",
+    "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
+    "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
+    "envoy.transport_sockets.starttls":                 "//source/extensions/transport_sockets/starttls:config",
+    "envoy.transport_sockets.tcp_stats":                "//source/extensions/transport_sockets/tcp_stats:config",
+    "envoy.transport_sockets.tls":                      "//source/extensions/transport_sockets/tls:config",
+    "envoy.transport_sockets.internal_upstream":        "//source/extensions/transport_sockets/internal_upstream:config",
 
     #
     # Retry host predicates
@@ -376,14 +376,14 @@ EXTENSIONS = {
     # IO socket
     #
 
-    #"envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
-    #"envoy.bootstrap.internal_listener":                "//source/extensions/bootstrap/internal_listener:config",
+    "envoy.io_socket.user_space":                       "//source/extensions/io_socket/user_space:config",
+    "envoy.bootstrap.internal_listener":                "//source/extensions/bootstrap/internal_listener:config",
 
     #
     # TLS peer certification validators
     #
 
-    #"envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
+    "envoy.tls.cert_validator.spiffe":                  "//source/extensions/transport_sockets/tls/cert_validator/spiffe:config",
 
     #
     # HTTP header formatters
@@ -428,14 +428,14 @@ EXTENSIONS = {
     # QUIC extensions
     #
 
-    # "envoy.quic.deterministic_connection_id_generator": "//source/extensions/quic/connection_id_generator/deterministic:envoy_deterministic_connection_id_generator_config",
-    # "envoy.quic.connection_id_generator.quic_lb":       "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_config",
-    # "envoy.quic.crypto_stream.server.quiche":           "//source/extensions/quic/crypto_stream:envoy_quic_default_crypto_server_stream",
-    # "envoy.quic.proof_source.filter_chain":             "//source/extensions/quic/proof_source:envoy_quic_default_proof_source",
-    # "envoy.quic.server_preferred_address.fixed":        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
-    # "envoy.quic.server_preferred_address.datasource":   "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_factory_config",
-    # "envoy.quic.connection_debug_visitor.basic":        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
-    # "envoy.quic.connection_debug_visitor.quic_stats":   "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
+    "envoy.quic.deterministic_connection_id_generator": "//source/extensions/quic/connection_id_generator/deterministic:envoy_deterministic_connection_id_generator_config",
+    "envoy.quic.connection_id_generator.quic_lb":       "//source/extensions/quic/connection_id_generator/quic_lb:quic_lb_config",
+    "envoy.quic.crypto_stream.server.quiche":           "//source/extensions/quic/crypto_stream:envoy_quic_default_crypto_server_stream",
+    "envoy.quic.proof_source.filter_chain":             "//source/extensions/quic/proof_source:envoy_quic_default_proof_source",
+    "envoy.quic.server_preferred_address.fixed":        "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
+    "envoy.quic.server_preferred_address.datasource":   "//source/extensions/quic/server_preferred_address:datasource_server_preferred_address_config_factory_config",
+    "envoy.quic.connection_debug_visitor.basic":        "//source/extensions/quic/connection_debug_visitor/basic:envoy_quic_connection_debug_visitor_basic",
+    "envoy.quic.connection_debug_visitor.quic_stats":   "//source/extensions/quic/connection_debug_visitor/quic_stats:config",
 
     #
     # UDP packet writers
