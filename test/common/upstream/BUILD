@@ -172,7 +172,7 @@ envoy_cc_test(
     deps = [
         ":cluster_manager_impl_test_common",
         "//source/extensions/clusters/static:static_cluster_lib",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/load_balancing_policies/ring_hash:config",
         "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/upstream:cds_api_mocks",
