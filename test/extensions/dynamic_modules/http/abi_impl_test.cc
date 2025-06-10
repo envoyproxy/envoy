@@ -853,11 +853,7 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
 
   // test again without query params for envoy_dynamic_module_type_attribute_id_RequestUrlPath
-  headers = {{":path", "/api/v1/action"}};
-  Http::TestRequestHeaderMapImpl updated_headers{headers};
-  filter.request_headers_ = &updated_headers;
-
-  // envoy_dynamic_module_type_attribute_id_RequestUrlPath
+  request_headers.setPath("/api/v1/action");
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_RequestUrlPath, &result_str_ptr,
       &result_str_length));
