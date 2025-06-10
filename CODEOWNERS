@@ -98,8 +98,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
-# aws_iam grpc credentials
-/*/extensions/grpc_credentials/aws_iam @mattklein123 @nbaws @niax
+# AWS common signing components
 /*/extensions/common/aws @mattklein123 @nbaws @niax
 # adaptive concurrency limit extension.
 /*/extensions/filters/http/adaptive_concurrency @tonya11en @mattklein123

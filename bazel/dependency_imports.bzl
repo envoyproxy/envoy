@@ -9,6 +9,7 @@ load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
 load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
 load("@envoy_toolshed//compile:sanitizer_libs.bzl", "setup_sanitizer_libs")
+load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
@@ -42,6 +43,9 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     pip_dev_dependencies()
     pip_fuzzing_dependencies()
     rules_pkg_dependencies()
+    emscripten_deps(emscripten_version = "4.0.6")
+    register_emscripten_toolchains()
+
     rust_repository_set(
         name = "rust_linux_s390x",
         exec_triple = "s390x-unknown-linux-gnu",
@@ -60,14 +64,13 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     )
     crate_universe_dependencies()
     crates_repositories()
+    grcov_repository()
     shellcheck_dependencies()
     proxy_wasm_rust_sdk_dependencies()
     rules_fuzzing_dependencies(
         oss_fuzz = True,
         honggfuzz = False,
     )
-    emscripten_deps(emscripten_version = "3.1.67")
-    register_emscripten_toolchains()
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
     parser_deps()

@@ -1,6 +1,7 @@
 #include "source/common/matcher/matcher.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
 
+#include "test/common/matcher/test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/proto/apikeys.pb.h"
@@ -22,6 +23,8 @@ using ::envoy::extensions::filters::http::proto_api_scrubber::v3::RestrictionCon
 using Http::HttpMatchingData;
 using xds::type::matcher::v3::HttpAttributesCelMatchInput;
 using MatchTreeHttpMatchingDataSharedPtr = Matcher::MatchTreeSharedPtr<HttpMatchingData>;
+using ::Envoy::Matcher::HasActionWithType;
+using ::Envoy::Matcher::HasNoMatch;
 using testing::NiceMock;
 
 // A class for testing filter config related capabilities eg, parsing and storing the filter
@@ -276,12 +279,9 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
     match_tree =
         filter_config_->getRequestFieldMatcher("/library.BookService/GetBook", "debug_info");
     ASSERT_NE(match_tree, nullptr);
-    Matcher::MatchTree<HttpMatchingData>::MatchResult match_result =
-        match_tree->match(http_matching_data_impl);
-    ASSERT_EQ(match_result.match_state_, Matcher::MatchState::MatchComplete);
-    ASSERT_TRUE(match_result.on_match_.has_value());
-    EXPECT_EQ(match_result.on_match_.value().action_cb_()->typeUrl(),
-              "envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction");
+    EXPECT_THAT(
+        match_tree->match(http_matching_data_impl),
+        HasActionWithType("envoy.extensions.filters.http.proto_api_scrubber.v3.RemoveFieldAction"));
   }
 
   {
@@ -291,10 +291,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
     match_tree =
         filter_config_->getResponseFieldMatcher("/library.BookService/GetBook", "book.debug_info");
     ASSERT_NE(match_tree, nullptr);
-    Matcher::MatchTree<HttpMatchingData>::MatchResult match_result =
-        match_tree->match(http_matching_data_impl);
-    ASSERT_EQ(match_result.match_state_, Matcher::MatchState::MatchComplete);
-    EXPECT_FALSE(match_result.on_match_.has_value());
+    EXPECT_THAT(match_tree->match(http_matching_data_impl), HasNoMatch());
   }
 
   {

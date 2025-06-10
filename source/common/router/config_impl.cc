@@ -193,7 +193,8 @@ getHeaderParsers(const HeaderParser* global_route_config_header_parser,
 // plugin is set to optional, then this null plugin will be used as a placeholder.
 class NullClusterSpecifierPlugin : public ClusterSpecifierPlugin {
 public:
-  RouteConstSharedPtr route(RouteConstSharedPtr, const Http::RequestHeaderMap&) const override {
+  RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr, const Http::RequestHeaderMap&,
+                            const StreamInfo::StreamInfo&) const override {
     return nullptr;
   }
 };
@@ -1389,13 +1390,13 @@ RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
     final_cluster_name = std::string(entry[0]->value().getStringView());
   }
 
-  return std::make_shared<DynamicRouteEntry>(route_selector_override
-                                                 ? route_selector_override
-                                                 : static_cast<const RouteEntryAndRoute*>(this),
+  return std::make_shared<DynamicRouteEntry>(route_selector_override ? route_selector_override
+                                                                     : this,
                                              shared_from_this(), final_cluster_name);
 }
 
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
+                                                     const StreamInfo::StreamInfo& stream_info,
                                                      uint64_t random_value) const {
   // Gets the route object chosen from the list of weighted clusters
   // (if there is one) or returns self.
@@ -1409,7 +1410,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
       // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
       // cluster specifier plugin.
       ASSERT(cluster_specifier_plugin_ != nullptr);
-      return cluster_specifier_plugin_->route(shared_from_this(), headers);
+      return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info);
     }
   }
   return pickWeightedCluster(headers, random_value);
@@ -1685,7 +1686,7 @@ UriTemplateMatcherRouteEntryImpl::matches(const Http::RequestHeaderMap& headers,
                                           uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       path_matcher_->match(headers.getPathValue())) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
   return nullptr;
 }
@@ -1716,7 +1717,7 @@ RouteConstSharedPtr PrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& 
                                                   uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
   return nullptr;
 }
@@ -1748,7 +1749,7 @@ RouteConstSharedPtr PathRouteEntryImpl::matches(const Http::RequestHeaderMap& he
                                                 uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value) &&
       path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
 
   return nullptr;
@@ -1787,7 +1788,7 @@ RouteConstSharedPtr RegexRouteEntryImpl::matches(const Http::RequestHeaderMap& h
                                                  uint64_t random_value) const {
   if (RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
     if (path_matcher_->match(sanitizePathBeforePathMatching(headers.getPathValue()))) {
-      return clusterEntry(headers, random_value);
+      return clusterEntry(headers, stream_info, random_value);
     }
   }
   return nullptr;
@@ -1817,7 +1818,7 @@ RouteConstSharedPtr ConnectRouteEntryImpl::matches(const Http::RequestHeaderMap&
   if ((Http::HeaderUtility::isConnect(headers) ||
        Http::HeaderUtility::isConnectUdpRequest(headers)) &&
       RouteEntryImplBase::matchRoute(headers, stream_info, random_value)) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
   return nullptr;
 }
@@ -1856,7 +1857,7 @@ PathSeparatedPrefixRouteEntryImpl::matches(const Http::RequestHeaderMap& headers
   const size_t matcher_size = matcher().size();
   if (sanitized_size >= matcher_size && path_matcher_->match(sanitized_path) &&
       (sanitized_size == matcher_size || sanitized_path[matcher_size] == '/')) {
-    return clusterEntry(headers, random_value);
+    return clusterEntry(headers, stream_info, random_value);
   }
   return nullptr;
 }
@@ -2135,10 +2136,11 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
-    auto match = Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
+    Matcher::MatchResult match_result =
+        Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
-    if (match.result_) {
-      const auto result = match.result_();
+    if (match_result.isMatch()) {
+      const Matcher::ActionPtr result = match_result.action();
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
         const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
 
@@ -2151,7 +2153,8 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
       PANIC("Action in router matcher should be Route or RouteList");
     }
 
-    ENVOY_LOG(debug, "failed to match incoming request: {}", static_cast<int>(match.match_state_));
+    ENVOY_LOG(debug, "failed to match incoming request: {}",
+              match_result.isNoMatch() ? "no match" : "insufficient data");
 
     return nullptr;
   }
