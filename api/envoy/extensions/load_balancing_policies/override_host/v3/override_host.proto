@@ -19,19 +19,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the Override Host Load Balancing policy.
 //
-// This policy allows endpoint picking to be implemented in an external to Envoy
-// component. For example an ext_proc RPC to a service that implements k8s proposal for AI gateway inferences extensions
+// This policy allows endpoint picking to be implemented in downstream HTTP filters. For example an ext_proc RPC to a service
+// that implements k8s proposal for AI gateway inferences extensions
 // https://github.com/kubernetes-sigs/gateway-api-inference-extension/tree/main/docs/proposals/004-endpoint-picker-protocol
 // can provide hosts for serving a request using Override Host load balancing policy.
 //
-// This policy uses selected endpoints from either request headers or request metadata.
+// This policy extracts selected override hosts from a list of ``OverrideHostSource`` (request headers, metadata, etc.).
 //
-// The primary host override source must specify a single ``IP:port`` value in either the header or the
-// metadata. For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
+// The override host source must specify at least one host in ``IP:Port`` format or multiple hosts in ``IP:Port,IP:Port,...``
+// format. For example ``10.0.0.5:8080`` or ``[2600:4040:5204::1574:24ae]:80``. The IPv6 address is enclosed in square brackets.
 //
-// For example, to support k8s gateway inference extensions, which uses the ``x-gateway-destination-endpoint`` header or metadata
-// value under the "envoy.lb" key for the primary endpoint, the Override Host load balancing policy should be configured in the
-// following way:
+// For specific example, to support k8s gateway inference extensions, which uses the ``x-gateway-destination-endpoint``
+// header or metadata value under the "envoy.lb" key for selected hosts, the Override Host load balancing policy should be
+// configured in the following way:
 //
 // .. code-block:: yaml
 //
@@ -41,9 +41,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //          key: "envoy.lb"
 //          path:
 //          - key: "x-gateway-destination-endpoint"
-//      - header: "x-gateway-fallback-endpoints"
 //
-// If neither header nor metadata is present, then the specified fallback load balancing policy is used. This allows load
+// If no valid host in the override host list, then the specified fallback load balancing policy is used. This allows load
 // balancing to degrade to a a built in policy (i.e. Round Robin) in case external endpoint picker fails.
 //
 // See the :ref:`load balancing architecture
@@ -51,13 +50,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 message OverrideHost {
   message OverrideHostSource {
-    // The header to get the override host addresses. Only one of the header or metadata field must be set.
+    // The header to get the override host addresses.
+    //
+    // Only one of the header or metadata field could be set.
     string header = 1
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
     // The metadata key to get the override host addresses from the request dynamic metadata. If
     // set this field then it will take precedence over the header field.
-    // Only one of the header or metadata field must be set.
+    //
+    // Only one of the header or metadata field could be set.
     type.metadata.v3.MetadataKey metadata = 2;
   }
 

@@ -4,6 +4,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_select_admin_functionality",
+    "envoy_select_boringssl",
     "envoy_sh_test",
 )
 
@@ -147,14 +148,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "check_extensions_against_registry_test",
+    name = "all_extensions_build_test",
     size = "large",
-    srcs = ["check_extensions_against_registry_test.cc"],
+    srcs = ["all_extensions_build_test.cc"],
+    copts = envoy_select_boringssl(["-DENVOY_SSL_FIPS"]),
     data = [
+        "fips_check.sh",
         "//source/extensions:extensions_metadata.yaml",
     ],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/version:version_lib",
         "//test/test_common:environment_lib",
     ] + select({
         # gcc RBE build has trouble compiling target with all extensions

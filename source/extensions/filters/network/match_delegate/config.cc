@@ -101,13 +101,13 @@ void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
   }
 
   ASSERT(matching_data_ != nullptr);
-  const auto match_result =
+  const Matcher::MatchResult match_result =
       Matcher::evaluateMatch<Envoy::Network::MatchingData>(*match_tree_, *matching_data_);
 
-  match_tree_evaluated_ = match_result.match_state_ == Matcher::MatchState::MatchComplete;
+  match_tree_evaluated_ = match_result.isComplete();
 
-  if (match_tree_evaluated_ && match_result.result_) {
-    const auto result = match_result.result_();
+  if (match_tree_evaluated_ && match_result.isMatch()) {
+    const Matcher::ActionPtr result = match_result.action();
     if ((result == nullptr) || (SkipAction().typeUrl() == result->typeUrl())) {
       skip_filter_ = true;
     } else {
