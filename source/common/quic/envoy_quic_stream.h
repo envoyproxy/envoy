@@ -157,15 +157,15 @@ public:
       return true;
     }
     if (is_trailing_headers) {
-      return header_validator_.FinishHeaderBlock(
-          quic_session_.perspective() == quic::Perspective::IS_CLIENT
-          ? http2::adapter::HeaderType::RESPONSE_TRAILER
-          : http2::adapter::HeaderType::REQUEST_TRAILER);
+      return header_validator_.FinishHeaderBlock(quic_session_.perspective() ==
+                                                         quic::Perspective::IS_CLIENT
+                                                     ? http2::adapter::HeaderType::RESPONSE_TRAILER
+                                                     : http2::adapter::HeaderType::REQUEST_TRAILER);
     }
-    return header_validator_.FinishHeaderBlock(
-        quic_session_.perspective() == quic::Perspective::IS_CLIENT
-        ? http2::adapter::HeaderType::RESPONSE
-        : http2::adapter::HeaderType::REQUEST);
+    return header_validator_.FinishHeaderBlock(quic_session_.perspective() ==
+                                                       quic::Perspective::IS_CLIENT
+                                                   ? http2::adapter::HeaderType::RESPONSE
+                                                   : http2::adapter::HeaderType::REQUEST);
   }
 
   absl::string_view responseDetails() override { return details_; }
@@ -216,9 +216,7 @@ protected:
     return received_metadata_bytes_ > 1 << 20;
   }
 
-  http2::adapter::HeaderValidator& header_validator() {
-    return header_validator_;
-  }
+  http2::adapter::HeaderValidator& header_validator() { return header_validator_; }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Setting |http_datagram_handler_| enables HTTP Datagram support.

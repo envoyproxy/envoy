@@ -138,15 +138,15 @@ TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
   // 6 headers are allowed.
-  EXPECT_NE(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
-      quic_headers, validator, 60, 6, details, rst));
+  EXPECT_NE(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 6, details, rst));
   // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
-  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
-      quic_headers, validator, 60, 5, details, rst));
+  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 5, details, rst));
   EXPECT_EQ("http3.too_many_headers", details);
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
-  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
-      quic_headers, validator, 60, 4, details, rst));
+  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 4, details, rst));
   EXPECT_EQ("http3.too_many_headers", details);
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
