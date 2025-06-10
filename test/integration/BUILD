@@ -2644,6 +2644,33 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_client_cert_integration_test",
+    size = "large",
+    srcs = select({
+        "//bazel:disable_http3": [],
+        "//bazel:disable_admin_functionality": [],
+        "//conditions:default": ["quic_client_cert_integration_test.cc"],
+    }),
+    data = [
+        "//test/common/tls/test_data:certs",
+        "//test/config/integration/certs",
+    ],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+        "fails_on_clang_cl",
+        "fails_on_windows",
+    ],
+    deps = envoy_select_enable_http3([
+        ":quic_http_integration_test_lib",
+        "//test/config/integration/certs:hashes",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
+    ]),
+)
+
+envoy_cc_test(
     name = "original_ip_detection_integration_test",
     size = "large",
     srcs = [
