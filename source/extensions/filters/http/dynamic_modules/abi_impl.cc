@@ -246,36 +246,37 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
                      envoy_dynamic_module_type_metadata_source metadata_source,
                      envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
                      size_t namespace_length) {
-  auto filter = static_cast<const DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  auto stream_info = filter->streamInfo();
-  if (!stream_info) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto* callbacks = filter->callbacks();
+  if (!callbacks) {
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "stream info is not available");
+                        "callbacks are not available");
     return nullptr;
   }
+  auto& stream_info = callbacks->streamInfo();
   const envoy::config::core::v3::Metadata* metadata = nullptr;
 
   switch (metadata_source) {
   case envoy_dynamic_module_type_metadata_source_dynamic: {
-    metadata = &stream_info->dynamicMetadata();
+    metadata = &stream_info.dynamicMetadata();
     break;
   }
   case envoy_dynamic_module_type_metadata_source_route: {
-    auto route = stream_info->route();
+    auto route = stream_info.route();
     if (route) {
       metadata = &route->metadata();
     }
     break;
   }
   case envoy_dynamic_module_type_metadata_source_cluster: {
-    auto clusterInfo = filter->clusterInfo();
+    auto clusterInfo = callbacks->clusterInfo();
     if (clusterInfo) {
       metadata = &clusterInfo->metadata();
     }
     break;
   }
   case envoy_dynamic_module_type_metadata_source_host: {
-    auto upstreamInfo = stream_info->upstreamInfo();
+    auto upstreamInfo = stream_info.upstreamInfo();
     if (upstreamInfo) {
       auto hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {

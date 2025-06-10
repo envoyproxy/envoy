@@ -72,26 +72,27 @@ public:
   Buffer::Instance* current_response_body_ = nullptr;
 
   /**
-   * Helper to get the downstream information of the stream.
+   * Helper to get the correct callbacks.
    */
-  StreamInfo::StreamInfo* streamInfo() {
+  Http::StreamFilterCallbacks* callbacks() {
     if (decoder_callbacks_) {
-      return &decoder_callbacks_->streamInfo();
+      return decoder_callbacks_;
     } else if (encoder_callbacks_) {
-      return &encoder_callbacks_->streamInfo();
+      return encoder_callbacks_;
     } else {
       return nullptr;
     }
   }
 
-  const StreamInfo::StreamInfo* streamInfo() const {
-    if (decoder_callbacks_) {
-      return &decoder_callbacks_->streamInfo();
-    } else if (encoder_callbacks_) {
-      return &encoder_callbacks_->streamInfo();
-    } else {
-      return nullptr;
+  /**
+   * Helper to get the downstream information of the stream.
+   */
+  StreamInfo::StreamInfo* streamInfo() {
+    auto cb = callbacks();
+    if (cb) {
+      return &cb->streamInfo();
     }
+    return nullptr;
   }
 
   /**
@@ -103,19 +104,6 @@ public:
       return stream_info->upstreamInfo().get();
     }
     return nullptr;
-  }
-
-  /**
-   * Helper to get the cluster information of the stream.
-   */
-  Upstream::ClusterInfoConstSharedPtr clusterInfo() const {
-    if (decoder_callbacks_) {
-      return decoder_callbacks_->clusterInfo();
-    } else if (encoder_callbacks_) {
-      return encoder_callbacks_->clusterInfo();
-    } else {
-      return nullptr;
-    }
   }
 
   /**
