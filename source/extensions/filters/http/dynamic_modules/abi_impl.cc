@@ -694,7 +694,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestReferer: {
-    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::CustomHeaders::get().Referer, 
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::CustomHeaders::get().Referer,
                            result, result_length);
     break;
   }
