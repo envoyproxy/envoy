@@ -69,17 +69,29 @@ IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& 
   while (!condition()) {
     if (!bound.withinBound()) {
       return AssertionFailure() << "Timed out (" << timeout.count() << "ms) waiting for "
-                                << description;
+                                << description << debugState();
     }
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     if (condition()) {
       break;
+    }
+    if (isFinished()) {
+      return AssertionFailure() << "Stream finished while waiting for " << description
+                                << debugState();
     }
     // Wait for a short time before running the dispatcher again to avoid spinning.
     // Using this silly form of wait because using sleep is forbidden.
     mu.AwaitWithTimeout(absl::Condition(&always_false), absl::Milliseconds(5));
   }
   return AssertionSuccess();
+}
+
+std::string IntegrationStreamDecoder::debugState() const {
+  return absl::StrCat("\nIntegrationStreamDecoder state:", "\n  saw_end_stream_=", saw_end_stream_,
+                      "\n  saw_reset_=", saw_reset_,
+                      "\n  headers_=", headers_ ? fmt::format("{}", *headers_) : "null",
+                      "\n  body_=", absl::CEscape(body_),
+                      "\n  trailers_=", trailers_ ? fmt::format("{}", *trailers_) : "null");
 }
 
 AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
@@ -90,6 +102,12 @@ AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::millisec
 AssertionResult IntegrationStreamDecoder::waitForReset(std::chrono::milliseconds timeout) {
   waiting_for_reset_ = true;
   return waitForWithDispatcherRun([this]() { return saw_reset_; }, "reset", timeout);
+}
+
+AssertionResult IntegrationStreamDecoder::waitForAnyTermination(std::chrono::milliseconds timeout) {
+  waiting_for_end_stream_ = true;
+  waiting_for_reset_ = true;
+  return waitForWithDispatcherRun([this]() { return isFinished(); }, "any termination", timeout);
 }
 
 void IntegrationStreamDecoder::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {

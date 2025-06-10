@@ -5471,7 +5471,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DuplicatedMethodHeaders) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {":method", "POST"}});
-  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(response->waitForAnyTermination());
   EXPECT_THAT(
       waitForAccessLog(access_log_name_),
       HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
@@ -5487,7 +5487,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MethodHeaderWithWhitespace) {
   // Start the request.
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET /admin"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(response->waitForAnyTermination());
   EXPECT_THAT(
       waitForAccessLog(access_log_name_),
       HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
@@ -5503,7 +5503,7 @@ TEST_P(DownstreamProtocolIntegrationTest, EmptyMethodHeader) {
   // Start the request.
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", ""}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(response->waitForAnyTermination());
   EXPECT_THAT(
       waitForAccessLog(access_log_name_),
       HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
