@@ -63,9 +63,6 @@ IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& 
                                                    absl::string_view description,
                                                    std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  absl::Mutex mu;
-  absl::MutexLock lock(&mu);
-  bool always_false = false;
   while (!condition()) {
     if (!bound.withinBound()) {
       return AssertionFailure() << "Timed out (" << timeout.count() << "ms) waiting for "
@@ -79,9 +76,8 @@ IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& 
       return AssertionFailure() << "Stream finished while waiting for " << description
                                 << debugState();
     }
-    // Wait for a short time before running the dispatcher again to avoid spinning.
-    // Using this silly form of wait because using sleep is forbidden.
-    mu.AwaitWithTimeout(absl::Condition(&always_false), absl::Milliseconds(5));
+    // Wait for a moment before running the dispatcher again to avoid spinning.
+    std::this_thread::yield();
   }
   return AssertionSuccess();
 }
