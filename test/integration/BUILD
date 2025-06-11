@@ -419,7 +419,10 @@ envoy_sh_test(
         "//test/config/integration:server_config_files",
     ],
     rbe_pool = "6gig",
-    tags = ["skip_on_windows"],
+    tags = [
+        "nocoverage",
+        "skip_on_windows",
+    ],
 )
 
 envoy_cc_test(
