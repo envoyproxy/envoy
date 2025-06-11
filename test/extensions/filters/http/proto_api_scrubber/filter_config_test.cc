@@ -27,6 +27,8 @@ using ::Envoy::Matcher::HasActionWithType;
 using ::Envoy::Matcher::HasNoMatch;
 using testing::NiceMock;
 
+inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
+
 // A class for testing filter config related capabilities eg, parsing and storing the filter
 // config in internal data structures, etc.
 class ProtoApiScrubberFilterConfigTest : public ::testing::Test {
@@ -40,7 +42,7 @@ protected:
     Protobuf::TextFormat::ParseFromString(getDefaultProtoConfig(), &proto_config_);
     *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
-            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
             .value();
   }
 
@@ -183,7 +185,7 @@ protected:
     Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
-            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
             .value();
     return proto_config;
   }
@@ -208,7 +210,7 @@ protected:
     Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
-            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
             .value();
     return proto_config;
   }
@@ -279,7 +281,7 @@ protected:
     Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
-            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
             .value();
     return proto_config;
   }
@@ -384,7 +386,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     ProtoApiScrubberConfig config;
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
         api_->fileSystem()
-            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
             .value();
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
@@ -409,7 +411,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     // Valid descriptors from file.
     ProtoApiScrubberConfig config;
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
-        TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+        TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath);
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
@@ -420,7 +422,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     ProtoApiScrubberConfig config;
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_string() =
         api_->fileSystem()
-            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath("test/proto/apikeys.descriptor"))
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
             .value();
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
@@ -614,7 +616,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FilteringModeValidations) {
   {
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"pb(filtering_mode: 0)pb", &proto_config));
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
-        TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+        TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath);
     filter_config = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
@@ -625,7 +627,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FilteringModeValidations) {
   {
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"pb(filtering_mode: 999)pb", &proto_config));
     *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
-        TestEnvironment::runfilesPath("test/proto/apikeys.descriptor");
+        TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath);
     filter_config = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
