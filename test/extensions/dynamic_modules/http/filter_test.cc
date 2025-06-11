@@ -138,11 +138,32 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
   filter->initializeInModuleFilter();
 
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(route));
+  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(callbacks.cluster_info_));
+
+  Envoy::Config::Metadata::mutableMetadataValue(callbacks.cluster_info_->metadata_, "metadata",
+                                                "cluster_key")
+      .set_string_value("cluster");
+  Envoy::Config::Metadata::mutableMetadataValue(route->metadata_, "metadata", "route_key")
+      .set_string_value("route");
+
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto host_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  EXPECT_CALL(*upstream_host, metadata()).WillRepeatedly(testing::Return(host_metadata));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  upstream_info->upstream_host_ = upstream_host;
+  Envoy::Config::Metadata::mutableMetadataValue(*host_metadata, "metadata", "host_key")
+      .set_string_value("host");
   filter->setDecoderFilterCallbacks(callbacks);
 
   Http::TestRequestHeaderMapImpl request_headers{};

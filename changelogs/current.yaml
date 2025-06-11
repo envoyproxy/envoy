@@ -5,7 +5,7 @@ behavior_changes:
 - area: aws_iam
   change: |
     As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
-    grpc_credentials/aws_iam extension is being deleted. Any configuration referencing this extension
+    ``grpc_credentials/aws_iam`` extension is being deleted. Any configuration referencing this extension
     will fail to load.
 - area: prefix_match_map
   change: |
@@ -13,7 +13,7 @@ behavior_changes:
     now continues to search for a match with shorter prefix if a longer match
     does not find an action. This brings it in line with the behavior of ``matcher_list``.
     This change can temporarily be reverted by setting the runtime guard
-    ``envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss`` to false.
+    ``envoy.reloadable_features.prefix_map_matcher_resume_after_subtree_miss`` to ``false``.
     If the old behavior is desired more permanently, this can be achieved in config by setting
     an ``on_no_match`` action that responds with 404 for each subtree.
 - area: server
@@ -30,21 +30,21 @@ minor_behavior_changes:
     And if not found, it will search by the canonical name of the filter ``envoy.filters.http.lua``.
 - area: grpc-json
   change: |
-    Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` json print options configurable.
+    Make the :ref:`gRPC JSON transcoder filter's <config_http_filters_grpc_json_reverse_transcoder>` JSON print options configurable.
 - area: oauth2
   change: |
     Reset CSRF token when token validation fails during redirection.
     If the CSRF token cookie is present during the redirection to the authorization server, it will be validated.
-    Previously, if this validation failed, the oauth flow would fail. Now the CSRF token will simply be reset. This fixes
-    the case where an hmac secret change causes a redirect flow, but the CSRF token cookie hasn't yet expired
+    Previously, if this validation failed, the OAuth flow would fail. Now the CSRF token will simply be reset. This fixes
+    the case where an HMAC secret change causes a redirect flow, but the CSRF token cookie hasn't yet expired
     causing a CSRF token validation failure.
 - area: cel
   change: |
-    Precompile regexes in cel expressions. This can be disabled by setting the runtime guard
-    ``envoy.reloadable_features.enable_cel_regex_precompilation`` to false.
+    Precompile regexes in CEL expressions. This can be disabled by setting the runtime guard
+    ``envoy.reloadable_features.enable_cel_regex_precompilation`` to ``false``.
 - area: dns
   change: |
-    Allow getaddrinfo to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
+    Allow ``getaddrinfo`` to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
     <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
 - area: grpc-json-transcoding
   change: |
@@ -76,11 +76,11 @@ bug_fixes:
     for a long time.
 - area: hcm
   change: |
-    Fixes a bug where the lifetime of the HttpConnectionManager's ActiveStream can be out of sync
+    Fixes a bug where the lifetime of the ``HttpConnectionManager``'s ``ActiveStream`` can be out of sync
     with the lifetime of the codec stream.
 - area: quic
   change: |
-    Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a "transfer-encoding" header is incorrectly appended.
+    Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a ``transfer-encoding`` header is incorrectly appended.
     Protected by runtime guard ``envoy.reloadable_features.quic_signal_headers_only_to_http1_backend``.
 - area: tls
   change: |
@@ -136,14 +136,14 @@ removed_config_or_runtime:
 new_features:
 - area: redis
   change: |
-    Added support for scan and info.
+    Added support for ``scan`` and ``info``.
 - area: http
   change: |
-    added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
-    used to record the original host header value before it is mutated by the router filter.
+    Added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
+    is used to record the original host header value before it is mutated by the router filter.
 - area: stateful_session
   change: |
-    Supports envelope stateful session extension to keep the exist session header value
+    Supports envelope stateful session extension to keep the existing session header value
     from upstream server. See :ref:`mode
     <envoy_v3_api_msg_extensions.http.stateful_session.envelope.v3.EnvelopeSessionState>`
     for more details.
@@ -157,23 +157,23 @@ new_features:
     See :ref:`filterContext() <config_http_filters_lua_stream_handle_api_filter_context>` for more details.
 - area: resource_monitors
   change: |
-    added new cgroup memory resource monitor that reads memory usage/limit from cgroup v1/v2 subsystems and calculates
-    memory pressure, with configurable max_memory_bytes limit
+    Added new cgroup memory resource monitor that reads memory usage/limit from cgroup v1/v2 subsystems and calculates
+    memory pressure, with configurable ``max_memory_bytes`` limit
     :ref:`existing extension <envoy_v3_api_msg_extensions.resource_monitors.cgroup_memory.v3.CgroupMemoryConfig>`.
 - area: ext_authz
   change: |
-    Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ext_authz http filter.
+    Added ``grpc_status`` to ``ExtAuthzLoggingInfo`` in ``ext_authz`` HTTP filter.
 - area: http
   change: |
     Add :ref:`response trailers mutations
     <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.response_trailers_mutations>` and
-    :ref:`quest trailers mutations
+    :ref:`request trailers mutations
     <envoy_v3_api_field_extensions.filters.http.header_mutation.v3.Mutations.request_trailers_mutations>`
     to :ref:`Header Mutation Filter <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
     for adding/removing trailers from the request and the response.
 - area: url_template
   change: |
-    Included the asterisk ``*`` in the match pattern when using the * or ** operators in the URL template.
+    Included the asterisk ``*`` in the match pattern when using the ``*`` or ``**`` operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
 - area: socket
@@ -181,13 +181,13 @@ new_features:
     Added ``network_namespace_filepath`` to ``SocketAddress``. Currently only used by listeners.
 - area: rbac filter
   change: |
-    allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
+    Allow listed ``FilterStateInput`` to be used with the xDS matcher in the HTTP RBAC filter.
 - area: rbac filter
   change: |
-    allow listed ``FilterStateInput`` to be used with the xDS matcher in the Network RBAC filter.
+    Allow listed ``FilterStateInput`` to be used with the xDS matcher in the Network RBAC filter.
 - area: tls_inspector filter
   change: |
-    added :ref:`enable_ja4_fingerprinting
+    Added :ref:`enable_ja4_fingerprinting
     <envoy_v3_api_field_extensions.filters.listener.tls_inspector.v3.TlsInspector.enable_ja4_fingerprinting>` to create
     a JA4 fingerprint hash from the Client Hello message.
 - area: local_ratelimit
@@ -196,20 +196,24 @@ new_features:
 - area: oauth2
   change: |
     Added :ref:`end_session_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.end_session_endpoint>`
-    to the oauth2 filter to support OIDC RP initiated logout. This field is only used when
+    to the ``oauth2`` filter to support OIDC RP initiated logout. This field is only used when
     ``openid`` is in the :ref:`auth_scopes <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.auth_scopes>` field.
     If configured, the OAuth2 filter will redirect users to this endpoint when they access the
     :ref:`signout_path <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.signout_path>`. This allows users to
     be logged out of the Authorization server.
+- area: load shed point
+  change: |
+    Added load shed point ``envoy.load_shed_points.connection_pool_new_connection`` in the connection pool, and it will not
+    create new connections when Envoy is under pressure, and the pending downstream requests will be cancelled.
 - area: api_key_auth
   change: |
-    Added :ref:`forwarding configuration <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Forwarding>`.
+    Added :ref:`forwarding configuration <envoy_v3_api_msg_extensions.filters.http.api_key_auth.v3.Forwarding>`
     to the API Key Auth filter, which allows forwarding the authenticated client identity
     using a custom header, and also offers the option to remove the API key from the request
     before forwarding.
 - area: lua
   change: |
-    Added a new ``typedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from
+    Added a new ``dynamicTypedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from
     network filters, such as the Proxy Protocol, etc.
 
 deprecated:
