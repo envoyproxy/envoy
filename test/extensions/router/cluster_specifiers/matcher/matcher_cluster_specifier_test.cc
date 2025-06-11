@@ -33,6 +33,7 @@ cluster_matcher:
     - predicate:
         single_predicate:
           input:
+            name: "header"
             typed_config:
               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
               header_name: env
@@ -40,12 +41,14 @@ cluster_matcher:
             exact: staging
       on_match:
         action:
+          name: "staging-cluster"
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
             cluster: "staging-cluster"
     - predicate:
         single_predicate:
           input:
+            name: "header"
             typed_config:
               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
               header_name: env
@@ -53,12 +56,14 @@ cluster_matcher:
             exact: prod
       on_match:
         action:
+          name: "prod-cluster"
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
             cluster: "prod-cluster"
   # Catch-all with a default cluster.
   on_no_match:
     action:
+      name: "default-cluster"
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
         cluster: "default-cluster"
@@ -71,6 +76,7 @@ cluster_matcher:
     - predicate:
         single_predicate:
           input:
+            name: "header"
             typed_config:
               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
               header_name: env
@@ -78,12 +84,14 @@ cluster_matcher:
             exact: staging
       on_match:
         action:
+          name: "staging-cluster"
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
             cluster: "staging-cluster"
     - predicate:
         single_predicate:
           input:
+            name: "header"
             typed_config:
               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
               header_name: env
@@ -91,6 +99,7 @@ cluster_matcher:
             exact: prod
       on_match:
         action:
+          name: "prod-cluster"
           typed_config:
             '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
             cluster: "prod-cluster"

@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.router.cluster_specifier_plugin.matcher"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/router/cluster_specifiers/matcher:config",
         "//source/extensions/router/cluster_specifiers/matcher:matcher_cluster_specifier_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/server:factory_context_mocks",

@@ -1,5 +1,7 @@
 #include "source/extensions/router/cluster_specifiers/matcher/matcher_cluster_specifier.h"
 
+#include "envoy/extensions/router/cluster_specifiers/matcher/v3/matcher.pb.validate.h"
+
 #include "source/common/router/config_impl.h"
 
 namespace Envoy {
@@ -16,6 +18,8 @@ Envoy::Matcher::ActionFactoryCb ClusterActionFactory::createActionFactoryCb(
 
   return [cluster]() { return std::make_unique<ClusterAction>(cluster); };
 }
+
+REGISTER_FACTORY(ClusterActionFactory, Envoy::Matcher::ActionFactory<ClusterActionContext>);
 
 class MatcherRouteEntry : public Envoy::Router::RouteEntryImplBase::DynamicRouteEntry {
 public:
