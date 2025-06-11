@@ -18,6 +18,8 @@
 namespace Envoy {
 namespace {
 
+// REMOVE ME: ARB CHANGE
+
 // Terminating CONNECT and sending raw TCP upstream.
 class ConnectTerminationIntegrationTest : public HttpProtocolIntegrationTest {
 public:
