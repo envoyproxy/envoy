@@ -329,7 +329,7 @@ case $CI_TARGET in
               --output_base="${ENVOY_CACHE_ROOT}/base" \
               aquery "deps(${ENVOY_CACHE_TARGETS})" \
               --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
-              "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
               > /dev/null
         ;;
 
