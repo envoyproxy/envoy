@@ -10,4 +10,4 @@ Envoy data
   core/core
   dns/dns
   tap/tap
-  ip_tagging/ip_tagging
+
