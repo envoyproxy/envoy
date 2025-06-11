@@ -11,14 +11,17 @@ namespace DirectResponse {
 Network::FilterStatus DirectResponseFilter::onNewConnection() {
   auto& connection = read_callbacks_->connection();
   ENVOY_CONN_LOG(trace, "direct_response: new connection", connection);
+  bool close_after_response = !keep_open_after_response_;
   if (!response_.empty()) {
     Buffer::OwnedImpl data(response_);
-    connection.write(data, true);
+    connection.write(data, close_after_response);
     ASSERT(0 == data.length());
   }
   connection.streamInfo().setResponseCodeDetails(
       StreamInfo::ResponseCodeDetails::get().DirectResponse);
-  connection.close(Network::ConnectionCloseType::FlushWrite);
+  if (close_after_response) {
+    connection.close(Network::ConnectionCloseType::FlushWrite);
+  }
   return Network::FilterStatus::StopIteration;
 }
 
