@@ -39,7 +39,6 @@ envoy_cc_extension(
     deps = [
         "//envoy/registry",
         "//envoy/thread_local:thread_local_interface",
-        "//source/common/network:lc_trie_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/ip_tagging:ip_tagging_filter_lib",

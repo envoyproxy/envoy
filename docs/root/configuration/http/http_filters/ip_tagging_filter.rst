@@ -24,8 +24,7 @@ G. Karlsson.
 
 IP tags can either be provided directly using the :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` api field or
 can be loaded from file if :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` api field is configured.
-Both :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` and file with *filename* from :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
-use :ref:`IPTag <envoy_v3_api_msg_data.ip_tagging.v3.IPTag>` proto format for defining individual ip tags.
+For file based ip tags *yaml* and *json* file formats are supported.
 Ip tags will be dynamically reloaded if *watched_directory* is configured for :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
 and :ref:`ip_tags_refresh_rate <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_refresh_rate>` is set to value greater than zero.
 
@@ -33,6 +32,91 @@ Configuration
 -------------
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging>`
+
+An example configuration of the filter with inline ip tags may look like the following:
+
+.. code-block:: yaml
+
+    http_filters:
+    - name: ip_tagging
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+        request_type: both
+        ip_tags:
+        - ip_tag_name: external_request
+          ip_list:
+            - {address_prefix: 1.2.3.4, prefix_len: 32}
+
+Below is an example configuration of the filter with the file based ip tags in yaml format:
+
+.. code-block:: yaml
+
+    http_filters:
+    - name: ip_tagging
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+        request_type: both
+        ip_tags_file_provider:
+          ip_tags_refresh_rate: 5s
+          ip_tags_datasource:
+            filename: "/geoip/ip-tags.yaml"
+            watched_directory:
+              path: "/geoip/"
+
+Where the *ip-tags.yaml* file would have the following content:
+
+.. code-block:: yaml
+
+    ip_tags:
+    - ip_tag_name: external_request
+      ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+    - ip_tag_name: internal_request
+      ip_list:
+      - {address_prefix: 1.2.3.5, prefix_len: 32}
+
+And here is an example configuration of the filter with the file based ip tags in json format:
+
+.. code-block:: yaml
+
+    http_filters:
+    - name: ip_tagging
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+        request_type: both
+        ip_tags_file_provider:
+          ip_tags_refresh_rate: 5s
+          ip_tags_datasource:
+            filename: "/geoip/ip-tags.json"
+            watched_directory:
+              path: "/geoip/"
+
+Where the *ip-tags.json* file would have the following content:
+
+.. code-block:: json
+
+  {
+  "ip_tags": [
+      {
+      "ip_tag_name": "external_request",
+      "ip_list": [
+          {
+          "address_prefix": "1.2.3.4",
+          "prefix_len": 32
+          }
+      ]
+      },
+      {
+          "ip_tag_name": "internal_request",
+          "ip_list": [
+              {
+              "address_prefix": "1.2.3.5",
+              "prefix_len": 32
+              }
+          ]
+          }
+  ]
+  }
 
 Statistics
 ----------
