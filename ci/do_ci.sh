@@ -314,6 +314,25 @@ case $CI_TARGET in
         # fi
         ;;
 
+    cache-create)
+        if [[ -z "${ENVOY_CACHE_TARGETS}" ]]; then
+            echo "ENVOY_CACHE_TARGETS not set" >&2
+            exit 1
+        fi
+        if [[ -z "${ENVOY_CACHE_ROOT}" ]]; then
+            echo "ENVOY_CACHE_ROOT not set" >&2
+            exit 1
+        fi
+        setup_clang_toolchain
+        echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
+        bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
+              --output_base="${ENVOY_CACHE_ROOT}/base" \
+              aquery "deps(${ENVOY_CACHE_TARGETS})" \
+              --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              > /dev/null
+        ;;
+
     format-api|check_and_fix_proto_format)
         setup_clang_toolchain
         echo "Check and fix proto format ..."
