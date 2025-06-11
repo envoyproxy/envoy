@@ -52,6 +52,9 @@ bool TargetImpl::ready() {
     return local_watcher_handle->ready();
   }
 
+  // If the watcher handle is not initialized, it means that the manager did not initialize its
+  // targets yet. Disposing the callback here so when the manager initializes it will not hang
+  // waiting for this target since it is already marked as ready.
   fn_.reset();
   return false;
 }
