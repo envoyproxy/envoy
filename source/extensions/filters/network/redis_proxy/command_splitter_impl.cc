@@ -638,6 +638,83 @@ void InfoRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t 
   }
 }
 
+SplitRequestPtr SelectRequest::create(Router& router,
+                                      Common::Redis::RespValuePtr&& incoming_request,
+                                      SplitCallbacks& callbacks, CommandStats& command_stats,
+                                      TimeSource& time_source, bool delay_command_latency,
+                                      const StreamInfo::StreamInfo& stream_info) {
+  if (incoming_request->asArray().size() != 2) {
+    onWrongNumberOfArguments(callbacks, *incoming_request);
+    command_stats.error_.inc();
+    return nullptr;
+  }
+  const auto route = router.upstreamPool(incoming_request->asArray()[1].asString(), stream_info);
+  uint32_t shard_size =
+      route ? route->upstream(incoming_request->asArray()[0].asString())->shardSize() : 0;
+  if (shard_size == 0) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  std::unique_ptr<SelectRequest> request_ptr{
+      new SelectRequest(callbacks, command_stats, time_source, delay_command_latency)};
+  request_ptr->num_pending_responses_ = shard_size;
+  request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
+
+  request_ptr->pending_response_ = std::make_unique<Common::Redis::RespValue>();
+  request_ptr->pending_response_->type(Common::Redis::RespType::Array);
+
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  for (uint32_t shard_index = 0; shard_index < shard_size; shard_index++) {
+    request_ptr->pending_requests_.emplace_back(*request_ptr, shard_index);
+    PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+    ENVOY_LOG(debug, "select request shard index {}: {}", shard_index, base_request->toString());
+    pending_request.handle_ =
+        makeFragmentedRequestToShard(route, base_request->asArray()[0].asString(), shard_index,
+                                     *base_request, pending_request, callbacks.transaction());
+
+    if (!pending_request.handle_) {
+      pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    }
+  }
+
+  if (request_ptr->num_pending_responses_ > 0) {
+    return request_ptr;
+  }
+
+  return nullptr;
+}
+
+void SelectRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
+  pending_requests_[index].handle_ = nullptr;
+
+  switch (value->type()) {
+  case Common::Redis::RespType::SimpleString: {
+    break;
+  }
+  default: {
+    error_count_++;
+    break;
+  }
+  }
+
+  ASSERT(num_pending_responses_ > 0);
+  if (--num_pending_responses_ == 0) {
+    updateStats(error_count_ == 0);
+    if (error_count_ > 0) {
+      callbacks_.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("finished with {} error(s) from select", error_count_)));
+    } else {
+      Common::Redis::RespValuePtr ok_response = std::make_unique<Common::Redis::RespValue>();
+      ok_response->type(Common::Redis::RespType::SimpleString);
+      ok_response->asString() = Response::get().OK;
+      callbacks_.onResponse(std::move(ok_response));
+    }
+  }
+}
+
 SplitRequestPtr
 SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                   SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -851,7 +928,8 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       keys_handler_(*router_), scan_handler_(*router_), info_handler_(*router_),
-      split_keys_sum_result_handler_(*router_), transaction_handler_(*router_),
+      select_handler_(*router_), split_keys_sum_result_handler_(*router_),
+      transaction_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)),
       custom_commands_(std::move(custom_commands)) {
@@ -882,6 +960,9 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
 
   addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::info(), latency_in_micros,
              info_handler_);
+
+  addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::select(), latency_in_micros,
+             select_handler_);
 
   for (const std::string& command : Common::Redis::SupportedCommands::transactionCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, transaction_handler_);
@@ -987,13 +1068,11 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
   }
 
   if (command_name == Common::Redis::SupportedCommands::select()) {
-    // Respond to OK locally.
-    if (request->asArray().size() != 2) {
-      onInvalidRequest(callbacks);
+    if (request->asArray().size() == 1) {
+      callbacks.onResponse(Common::Redis::Utility::makeError(fmt::format(
+          "ERR wrong number of arguments for '{}' command", request->asArray()[0].asString())));
       return nullptr;
     }
-    localResponse(callbacks, "OK");
-    return nullptr;
   }
 
   if (command_name == Common::Redis::SupportedCommands::scan()) {
