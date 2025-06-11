@@ -41,6 +41,7 @@ envoy_cc_test(
         "GODEBUG": "cgocheck=0",
     },
     rbe_pool = "6gig",
+    tags = ["nocoverage"],
     deps = [
         ":example_configs_test_lib",
     ],
