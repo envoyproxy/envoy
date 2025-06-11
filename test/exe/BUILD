@@ -125,6 +125,8 @@ envoy_cc_test(
     size = "large",
     srcs = ["extra_extensions_test.cc"],
     rbe_pool = "6gig",
+    # output is too large for workers
+    tags = ["nocoverage"],
     deps = [
         "//test/test_common:environment_lib",
     ] + select({
@@ -154,6 +156,7 @@ envoy_cc_test(
         "//source/extensions:extensions_metadata.yaml",
     ],
     rbe_pool = "6gig",
+    tags = ["nocoverage"],
     deps = [
         "//test/test_common:environment_lib",
     ] + select({
