@@ -15,7 +15,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Matcher Based Cluster Specifier]
 // [#extension: envoy.router.cluster_specifier_plugin.matcher]
-// [#not-implemented-hide:]
 
 message ClusterAction {
   // Indicates the upstream cluster to which the request should be routed

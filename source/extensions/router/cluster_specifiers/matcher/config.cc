@@ -1,5 +1,7 @@
 #include "source/extensions/router/cluster_specifiers/matcher/config.h"
 
+#include "envoy/extensions/router/cluster_specifiers/matcher/v3/matcher.pb.validate.h"
+
 #include "source/common/router/config_impl.h"
 
 namespace Envoy {

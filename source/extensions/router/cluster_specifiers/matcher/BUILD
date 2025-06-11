@@ -36,5 +36,6 @@ envoy_cc_extension(
     deps = [
         ":matcher_cluster_specifier_lib",
         "//envoy/registry",
+        "@envoy_api//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg_cc_proto",
     ],
 )
