@@ -65,14 +65,26 @@ ValidationInstance::ValidationInstance(
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), time_system_(time_system),
       server_contexts_(*this), quic_stat_names_(stats_store_.symbolTable()) {
+
+  // Register the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::initialize(&server_contexts_);
+
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     shutdown();
+
+    // Clear the server factory context on the main thread.
+    Configuration::ServerFactoryContextInstance::clear();
     throw;
   }
+}
+
+ValidationInstance::~ValidationInstance() {
+  // Clear the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::clear();
 }
 
 void ValidationInstance::initialize(const Options& options,
