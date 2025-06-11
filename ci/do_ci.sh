@@ -40,15 +40,12 @@ setup_clang_toolchain() {
         CONFIG_PARTS+=("arm64")
     fi
     CONFIG_PARTS+=("clang")
-    ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
-    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
-        CONFIG_PARTS+=("libc++")
-    fi
+    # We only support clang with libc++ now
     CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
     BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
-    echo "clang toolchain with ${ENVOY_STDLIB} configured: ${CONFIG}"
+    echo "clang toolchain configured: ${CONFIG}"
 }
 
 function collect_build_profile() {
@@ -296,14 +293,9 @@ case $CI_TARGET in
 
     asan)
         setup_clang_toolchain
-        if [[ -n "$ENVOY_RBE" ]]; then
-            ASAN_CONFIG="--config=rbe-toolchain-asan"
-        else
-            ASAN_CONFIG="--config=clang-asan"
-        fi
         BAZEL_BUILD_OPTIONS+=(
             -c dbg
-            "${ASAN_CONFIG}"
+            "--config=asan"
             "--build_tests_only"
             "--remote_download_minimal")
         echo "bazel ASAN/UBSAN debug build with tests"
@@ -335,8 +327,6 @@ case $CI_TARGET in
         ;;
 
     clang-tidy)
-        # clang-tidy will warn on standard library issues with libc++
-        ENVOY_STDLIB="libstdc++"
         setup_clang_toolchain
         export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
@@ -372,7 +362,6 @@ case $CI_TARGET in
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-        # Building all the dependencies from scratch to link them against libc++.
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -651,10 +640,6 @@ case $CI_TARGET in
         ;;
 
     gcc)
-        if [[ -n "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
-            echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
-            exit 1
-        fi
         if [[ -n "${ENVOY_RBE}" ]]; then
             CONFIG_PREFIX="remote-"
         fi
@@ -678,9 +663,9 @@ case $CI_TARGET in
 
     msan)
         setup_clang_toolchain
-        # rbe-toolchain-msan must comes as first to win library link order.
+        # msan must comes as first to win library link order.
         BAZEL_BUILD_OPTIONS=(
-            "--config=rbe-toolchain-msan"
+            "--config=msan"
             "${BAZEL_BUILD_OPTIONS[@]}"
             "-c" "dbg"
             "--build_tests_only"
@@ -831,7 +816,7 @@ case $CI_TARGET in
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
-             --config=rbe-toolchain-tsan \
+             --config=tsan \
              -c dbg \
              --build_tests_only \
              --remote_download_minimal \
