@@ -15,6 +15,7 @@
 #include "source/common/ssl/certificate_validation_context_config_impl.h"
 #include "source/common/tls/ssl_handshaker.h"
 
+#include "openssl/crypto.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -49,7 +50,8 @@ std::vector<Secret::TlsCertificateConfigProviderSharedPtr> getTlsCertificateConf
                                 .secretManager()
                                 .findOrCreateTlsCertificateProvider(
                                     sds_secret_config.sds_config(), sds_secret_config.name(),
-                                    factory_context, factory_context.initManager()));
+                                    factory_context.serverFactoryContext(),
+                                    factory_context.initManager()));
       } else {
         // Load static secret.
         auto secret_provider =
@@ -76,9 +78,9 @@ Secret::CertificateValidationContextConfigProviderSharedPtr getProviderFromSds(
     // Fetch dynamic secret.
     return factory_context.serverFactoryContext()
         .secretManager()
-        .findOrCreateCertificateValidationContextProvider(sds_secret_config.sds_config(),
-                                                          sds_secret_config.name(), factory_context,
-                                                          factory_context.initManager());
+        .findOrCreateCertificateValidationContextProvider(
+            sds_secret_config.sds_config(), sds_secret_config.name(),
+            factory_context.serverFactoryContext(), factory_context.initManager());
   } else {
     // Load static secret.
     auto secret_provider =
@@ -125,6 +127,20 @@ getCertificateValidationContextConfigProvider(
   }
 }
 
+absl::optional<envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+compliancePolicyFromProto(
+    const envoy::extensions::transport_sockets::tls::v3::TlsParameters& params) {
+  switch (params.compliance_policies_size()) {
+  case 0:
+    return absl::nullopt;
+  case 1:
+    return params.compliance_policies(0);
+  default:
+    IS_ENVOY_BUG("more than one policies are not supported");
+    return absl::nullopt;
+  }
+}
+
 } // namespace
 
 ContextConfigImpl::ContextConfigImpl(
@@ -153,7 +169,8 @@ ContextConfigImpl::ContextConfigImpl(
                                                 default_min_protocol_version)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 default_max_protocol_version)),
-      factory_context_(factory_context), tls_keylog_path_(config.key_log().path()) {
+      factory_context_(factory_context), tls_keylog_path_(config.key_log().path()),
+      compliance_policy_(compliancePolicyFromProto(config.tls_params())) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   auto list_or_error = Network::Address::IpList::create(config.key_log().local_address_range());
   SET_AND_RETURN_IF_NOT_OK(list_or_error.status(), creation_status);
@@ -317,21 +334,21 @@ const unsigned ClientContextConfigImpl::DEFAULT_MIN_VERSION = TLS1_2_VERSION;
 const unsigned ClientContextConfigImpl::DEFAULT_MAX_VERSION = TLS1_2_VERSION;
 
 const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES =
-#ifndef BORINGSSL_FIPS
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"
     "[ECDHE-RSA-AES128-GCM-SHA256|ECDHE-RSA-CHACHA20-POLY1305]:"
-#else // BoringSSL FIPS
-    "ECDHE-ECDSA-AES128-GCM-SHA256:"
-    "ECDHE-RSA-AES128-GCM-SHA256:"
-#endif
     "ECDHE-ECDSA-AES256-GCM-SHA384:"
     "ECDHE-RSA-AES256-GCM-SHA384:";
 
-const std::string ClientContextConfigImpl::DEFAULT_CURVES =
-#ifndef BORINGSSL_FIPS
-    "X25519:"
-#endif
-    "P-256";
+const std::string ClientContextConfigImpl::DEFAULT_CIPHER_SUITES_FIPS =
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+    "ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "ECDHE-RSA-AES256-GCM-SHA384:";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES = "X25519:"
+                                                            "P-256";
+
+const std::string ClientContextConfigImpl::DEFAULT_CURVES_FIPS = "P-256";
 
 absl::StatusOr<std::unique_ptr<ClientContextConfigImpl>> ClientContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
@@ -347,9 +364,10 @@ ClientContextConfigImpl::ClientContextConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     absl::Status& creation_status)
-    : ContextConfigImpl(config.common_tls_context(), config.auto_sni_san_validation(),
-                        DEFAULT_MIN_VERSION, DEFAULT_MAX_VERSION, DEFAULT_CIPHER_SUITES,
-                        DEFAULT_CURVES, factory_context, creation_status),
+    : ContextConfigImpl(
+          config.common_tls_context(), config.auto_sni_san_validation(), DEFAULT_MIN_VERSION,
+          DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
+          FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
       server_name_indication_(config.sni()), auto_host_sni_(config.auto_host_sni()),
       allow_renegotiation_(config.allow_renegotiation()),
       enforce_rsa_key_usage_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforce_rsa_key_usage, false)),

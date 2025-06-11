@@ -126,7 +126,6 @@ class DetectorHostMonitorNullImpl : public Outlier::DetectorHostMonitor {
 public:
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return 0; }
-  void putHttpResponseCode(uint64_t) override {}
   void putResult(Outlier::Result, absl::optional<uint64_t>) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
@@ -641,7 +640,7 @@ private:
                                         const LocalityWeights& locality_weights,
                                         uint32_t overprovisioning_factor);
 
-  uint32_t priority_;
+  const uint32_t priority_;
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;
   HostVectorConstSharedPtr hosts_;
@@ -933,7 +932,7 @@ public:
     return *upstream_config_;
   }
   bool maintenanceMode() const override;
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   absl::optional<uint16_t> maxResponseHeadersKb() const override {
     return max_response_headers_kb_;
@@ -1103,15 +1102,15 @@ private:
   ::Envoy::Http::HeaderValidatorStats& getHeaderValidatorStats(Http::Protocol protocol) const;
 #endif
 
-  Runtime::Loader& runtime_;
+  const Runtime::Loader& runtime_;
   const std::string name_;
-  std::unique_ptr<const std::string> observability_name_;
-  std::unique_ptr<const std::string> eds_service_name_;
+  const std::unique_ptr<const std::string> observability_name_;
+  const std::unique_ptr<const std::string> eds_service_name_;
   const absl::flat_hash_map<std::string, ProtocolOptionsConfigConstSharedPtr>
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
-  const uint64_t max_requests_per_connection_;
+  const uint32_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
   OptionalTimeouts optional_timeouts_;
   const float per_upstream_preconnect_ratio_;
@@ -1128,15 +1127,15 @@ private:
   const uint64_t features_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
-  UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
-  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
-  std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
-  std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
+  const UpstreamLocalAddressSelectorConstSharedPtr upstream_local_address_selector_;
+  const std::unique_ptr<const envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
+  const std::unique_ptr<const envoy::config::core::v3::Metadata> metadata_;
+  const std::unique_ptr<ClusterTypedMetadata> typed_metadata_;
   LoadBalancerConfigPtr load_balancer_config_;
   TypedLoadBalancerFactory* load_balancer_factory_ = nullptr;
   const std::shared_ptr<const envoy::config::cluster::v3::Cluster::CommonLbConfig>
       common_lb_config_;
-  std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
+  const std::unique_ptr<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type_;
   // TODO(ohadvano): http_filter_config_provider_manager_ and
   // network_filter_config_provider_manager_ should be maintained in the ClusterManager object as
   // a singleton. This is currently not possible due to circular dependency (filter config
@@ -1152,9 +1151,10 @@ private:
   mutable Http::Http2::CodecStats::AtomicPtr http2_codec_stats_;
   mutable Http::Http3::CodecStats::AtomicPtr http3_codec_stats_;
   UpstreamFactoryContextImpl upstream_context_;
-  std::unique_ptr<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  const std::unique_ptr<
+      const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
       happy_eyeballs_config_;
-  const std::unique_ptr<Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
+  const std::unique_ptr<const Envoy::Orca::LrsReportMetricNames> lrs_report_metric_names_;
 
   // Keep small values like bools and enums at the end of the class to reduce
   // overhead via alignment

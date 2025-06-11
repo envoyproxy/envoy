@@ -15,6 +15,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/printers.h"
@@ -45,7 +46,8 @@ public:
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   Envoy::Upstream::ClusterConnectivityState& state)
+                   Envoy::Upstream::ClusterConnectivityState& state,
+                   Server::OverloadManager& overload_manager)
       : FixedHttpConnPoolImpl(
             std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
             random_generator, state,
@@ -53,7 +55,7 @@ public:
               return std::make_unique<ActiveClient>(*pool, absl::nullopt);
             },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) { return nullptr; },
-            std::vector<Protocol>{Protocol::Http2}) {}
+            std::vector<Protocol>{Protocol::Http2}, overload_manager, absl::nullopt, nullptr) {}
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
     // We expect to own the connection, but already have it, so just release it to prevent it from
@@ -82,7 +84,7 @@ public:
         upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         pool_(std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
                                                  Upstream::ResourcePriority::Default, nullptr,
-                                                 nullptr, state_)) {
+                                                 nullptr, state_, overload_manager_)) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -219,6 +221,7 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime())};
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   std::unique_ptr<TestConnPoolImpl> pool_;
   std::vector<TestCodecClient> test_clients_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -347,8 +350,9 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
   // our test transport socket factory.
   host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime());
   new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  pool_ = std::make_unique<TestConnPoolImpl>(
-      dispatcher_, random_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, state_);
+  pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
+                                             Upstream::ResourcePriority::Default, nullptr, nullptr,
+                                             state_, overload_manager_);
 
   // This requires some careful set up of expectations ordering: the call to createTransportSocket
   // happens before all the connection set up but after the test client is created (due to some)
@@ -1803,6 +1807,97 @@ TEST_F(Http2ConnPoolImplTest, TestUnusedCapacity) {
   pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
   closeAllClients();
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+}
+
+TEST_F(Http2ConnPoolImplTest, TestNegativeUnusedCapacity) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(4);
+
+  expectClientsCreate(2);
+  ActiveTestRequest r1(*this, 0, false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 4 /*capacity*/);
+  expectClientConnect(0, r1);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  ActiveTestRequest r2(*this, 0, true);
+  ActiveTestRequest r3(*this, 0, true);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 1 /*capacity*/);
+
+  // Settings frame results in negative unused capacity.
+  NiceMock<MockReceivedSettings> settings;
+  settings.max_concurrent_streams_ = 1;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, -2 /*capacity*/);
+
+  completeRequest(r1);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, -1 /*capacity*/);
+
+  // With negative capacity, verify that a new request creates a new connection.
+  ActiveTestRequest r4(*this, 1, false);
+  CHECK_STATE(2 /*active*/, 1 /*pending*/, 3 /*capacity*/);
+  expectClientConnect(1, r4);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 2 /*capacity*/);
+
+  completeRequest(r2);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  completeRequest(r3);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 4 /*capacity*/);
+
+  completeRequest(r4);
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 5 /*capacity*/);
+
+  // Clean up with an outstanding stream.
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  closeAllClients();
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+}
+
+TEST_F(Http2ConnPoolImplTest, TestDrainingNegativeUnusedCapacity) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(4);
+
+  expectClientsCreate(2);
+  ActiveTestRequest r1(*this, 0, false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 4 /*capacity*/);
+  expectClientConnect(0, r1);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  ActiveTestRequest r2(*this, 0, true);
+  ActiveTestRequest r3(*this, 0, true);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 1 /*capacity*/);
+
+  // Settings frame results in negative unused capacity.
+  NiceMock<MockReceivedSettings> settings;
+  settings.max_concurrent_streams_ = 2;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, -1 /*capacity*/);
+
+  // Clean up with an outstanding stream.
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+
+  completeRequest(r1);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+
+  // With negative capacity, verify that a new request creates a new connection.
+  ActiveTestRequest r4(*this, 1, false);
+  CHECK_STATE(2 /*active*/, 1 /*pending*/, 4 /*capacity*/);
+  expectClientConnect(1, r4);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  // Completing this request does NOT add more capacity because the connection is
+  // draining, and that connection's capacity is no longer negative.
+  completeRequest(r2);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  // After r3 completes, the draining connection should close.
+  EXPECT_CALL(*this, onClientDestroy());
+  completeRequest(r3);
+  dispatcher_.clearDeferredDeleteList();
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  completeRequest(r4);
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 4 /*capacity*/);
+
+  closeClient(1);
 }
 
 TEST_F(Http2ConnPoolImplTest, TestStateWithMultiplexing) {

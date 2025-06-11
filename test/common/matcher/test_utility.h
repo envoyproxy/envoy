@@ -261,39 +261,130 @@ createSingleMatcher(absl::optional<absl::string_view> input,
       .value();
 }
 
+void PrintTo(const FieldMatchResult& result, std::ostream* os) {
+  if (result.isInsufficientData()) {
+    *os << "InsufficientData";
+  } else if (result.isNoMatch()) {
+    *os << "NoMatch";
+  } else if (result.isMatched()) {
+    *os << "Matched";
+  } else {
+    *os << "UnknownState";
+  }
+}
+
 // Creates a StringAction from a provided string.
 std::unique_ptr<StringAction> stringValue(absl::string_view value) {
   return std::make_unique<StringAction>(std::string(value));
 }
 
 // Creates an OnMatch that evaluates to a StringValue with the provided value.
-template <class T> OnMatch<T> stringOnMatch(absl::string_view value) {
-  return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr};
+template <class T> OnMatch<T> stringOnMatch(absl::string_view value, bool keep_matching = false) {
+  return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr, keep_matching};
 }
 
-// Verifies the match tree completes the matching with an not match result.
-void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
-  EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
-  EXPECT_FALSE(result.on_match_.has_value());
+inline void PrintTo(const Action& action, std::ostream* os) {
+  if (action.typeUrl() == "google.protobuf.StringValue") {
+    *os << "{string_value=\"" << action.getTyped<StringAction>().string_ << "\"}";
+    return;
+  }
+  *os << "{type=" << action.typeUrl() << "}";
 }
 
-// Verifies the match tree completes the matching with the expected value.
-void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
-                          absl::string_view expected_value) {
-  EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
-  EXPECT_TRUE(result.on_match_.has_value());
-
-  EXPECT_EQ(nullptr, result.on_match_->matcher_);
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
-
-  EXPECT_EQ(result.on_match_->action_cb_().get()->getTyped<StringAction>(),
-            *stringValue(expected_value));
+inline void PrintTo(const ActionFactoryCb& action_cb, std::ostream* os) {
+  if (action_cb == nullptr) {
+    *os << "nullptr";
+    return;
+  }
+  ActionPtr action = action_cb();
+  PrintTo(*action, os);
 }
 
-// Verifies the match tree fails to match since the data are not enough.
-void verifyNotEnoughDataForMatch(const MatchTree<TestData>::MatchResult& result) {
-  EXPECT_EQ(MatchState::UnableToMatch, result.match_state_);
-  EXPECT_FALSE(result.on_match_.has_value());
+inline void PrintTo(const MatchResult& result, std::ostream* os) {
+  if (result.isInsufficientData()) {
+    *os << "InsufficientData";
+  } else if (result.isNoMatch()) {
+    *os << "NoMatch";
+  } else if (result.isMatch()) {
+    *os << "Match{ActionFactoryCb=";
+    PrintTo(result.actionFactory(), os);
+    *os << "}";
+  } else {
+    *os << "UnknownState";
+  }
+}
+
+inline void PrintTo(const MatchTree<TestData>& matcher, std::ostream* os) {
+  *os << "{type=" << typeid(matcher).name() << "}";
+}
+
+inline void PrintTo(const OnMatch<TestData>& on_match, std::ostream* os) {
+  if (on_match.action_cb_) {
+    *os << "{action_cb_=";
+    PrintTo(on_match.action_cb_, os);
+    *os << "}";
+  } else if (on_match.matcher_) {
+    *os << "{matcher_=";
+    PrintTo(*on_match.matcher_, os);
+    *os << "}";
+  } else {
+    *os << "{invalid, no value set}";
+  }
+}
+
+MATCHER(HasInsufficientData, "") {
+  // Takes a MatchResult& and validates that it
+  // is in the InsufficientData state.
+  return arg.isInsufficientData();
+}
+
+MATCHER_P(IsActionWithType, matcher, "") {
+  // Takes an ActionFactoryCb argument, and compares its action type against matcher.
+  if (arg == nullptr) {
+    return false;
+  }
+  ActionPtr action = arg();
+  return ::testing::ExplainMatchResult(testing::Matcher<absl::string_view>(matcher),
+                                       action->typeUrl(), result_listener);
+}
+
+MATCHER_P(IsStringAction, matcher, "") {
+  // Takes an ActionFactoryCb argument, and compares its StringAction's string against matcher.
+  if (arg == nullptr) {
+    return false;
+  }
+  ActionPtr action = arg();
+  if (action->typeUrl() != "google.protobuf.StringValue") {
+    return false;
+  }
+  return ::testing::ExplainMatchResult(testing::Matcher<std::string>(matcher),
+                                       action->template getTyped<StringAction>().string_,
+                                       result_listener);
+}
+
+MATCHER_P(HasStringAction, matcher, "") {
+  // Takes a MatchResult& and validates that it
+  // has a StringAction with contents matching matcher.
+  if (!arg.isMatch()) {
+    return false;
+  }
+  return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.actionFactory(),
+                                       result_listener);
+}
+
+MATCHER_P(HasActionWithType, matcher, "") {
+  // Takes a MatchResult& and validates that it
+  // has an action whose type matches matcher.
+  if (!arg.isMatch()) {
+    return false;
+  }
+  return ::testing::ExplainMatchResult(IsActionWithType(matcher), arg.actionFactory(),
+                                       result_listener);
+}
+
+MATCHER(HasNoMatch, "") {
+  // Takes a MatchResult& and validates that it is NoMatch.
+  return arg.isNoMatch();
 }
 
 } // namespace Matcher

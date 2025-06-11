@@ -11,7 +11,6 @@
 #include "envoy/http/header_map.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/http/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -64,23 +63,33 @@ IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& 
                                                    absl::string_view description,
                                                    std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
-  absl::Mutex mu;
-  absl::MutexLock lock(&mu);
-  bool always_false = false;
   while (!condition()) {
     if (!bound.withinBound()) {
       return AssertionFailure() << "Timed out (" << timeout.count() << "ms) waiting for "
-                                << description;
+                                << description << debugState();
     }
     dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
     if (condition()) {
       break;
     }
-    // Wait for a short time before running the dispatcher again to avoid spinning.
-    // Using this silly form of wait because using sleep is forbidden.
-    mu.AwaitWithTimeout(absl::Condition(&always_false), absl::Milliseconds(5));
+    if (isFinished()) {
+      return AssertionFailure() << "Stream finished while waiting for " << description
+                                << debugState();
+    }
+    // Wait for a moment before running the dispatcher again to avoid spinning.
+    std::this_thread::yield();
   }
   return AssertionSuccess();
+}
+
+std::string IntegrationStreamDecoder::debugState() const {
+  return absl::StrCat(
+      "\nIntegrationStreamDecoder state:", "\n  saw_end_stream_=", saw_end_stream_,
+      "\n  saw_reset_=", saw_reset_,
+      "\n  headers_=", headers_ ? fmt::format("{}", *headers_) : "null",
+      "\n  continue_headers_=", continue_headers_ ? fmt::format("{}", *continue_headers_) : "null",
+      "\n  body_=", absl::CEscape(body_),
+      "\n  trailers_=", trailers_ ? fmt::format("{}", *trailers_) : "null");
 }
 
 AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
@@ -93,6 +102,12 @@ AssertionResult IntegrationStreamDecoder::waitForReset(std::chrono::milliseconds
   return waitForWithDispatcherRun([this]() { return saw_reset_; }, "reset", timeout);
 }
 
+AssertionResult IntegrationStreamDecoder::waitForAnyTermination(std::chrono::milliseconds timeout) {
+  waiting_for_end_stream_ = true;
+  waiting_for_reset_ = true;
+  return waitForWithDispatcherRun([this]() { return isFinished(); }, "any termination", timeout);
+}
+
 void IntegrationStreamDecoder::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   continue_headers_ = std::move(headers);
   if (waiting_for_continue_headers_) {
@@ -102,7 +117,6 @@ void IntegrationStreamDecoder::decode1xxHeaders(Http::ResponseHeaderMapPtr&& hea
 
 void IntegrationStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& headers,
                                              bool end_stream) {
-  std::cerr << "ISD decodeHeaders " << end_stream << std::endl;
   saw_end_stream_ = end_stream;
   headers_ = std::move(headers);
   if ((end_stream && (waiting_for_reset_ || waiting_for_end_stream_)) || waiting_for_headers_) {
@@ -111,8 +125,6 @@ void IntegrationStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& header
 }
 
 void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
-  std::cerr << "ISD decodeData body_data_waiting_length_=" << body_data_waiting_length_
-            << ", end_stream=" << end_stream << std::endl;
   saw_end_stream_ = end_stream;
   body_ += data.toString();
 
@@ -127,7 +139,6 @@ void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_strea
 }
 
 void IntegrationStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
-  std::cerr << "ISD decodeTrailers" << std::endl;
   saw_end_stream_ = true;
   trailers_ = std::move(trailers);
   if (waiting_for_reset_ || waiting_for_end_stream_) {
@@ -145,8 +156,6 @@ void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_ma
 }
 
 void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, absl::string_view) {
-  std::cerr << "ISD onResetStream: reason=" << Http::Utility::resetReasonToString(reason)
-            << std::endl;
   saw_reset_ = true;
   reset_reason_ = reason;
   if (waiting_for_reset_ || waiting_for_end_stream_ || waiting_for_continue_headers_ ||

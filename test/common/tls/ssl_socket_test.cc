@@ -63,6 +63,7 @@
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 #include "openssl/ssl.h"
 
 using testing::_;
@@ -5650,12 +5651,50 @@ TEST_P(SslSocketTest, CipherSuites) {
   updateFilterChain(tls_context, *filter_chain);
   // Verify that ECDHE-RSA-CHACHA20-POLY1305 is not offered by default in FIPS builds.
   client_params->add_cipher_suites(common_cipher_suite);
-#ifdef BORINGSSL_FIPS
-  testUtilV2(error_test_options);
-#else
-  testUtilV2(cipher_test_options);
-#endif
+  if (FIPS_mode()) {
+    testUtilV2(error_test_options);
+  } else {
+    testUtilV2(cipher_test_options);
+  }
   client_params->clear_cipher_suites();
+}
+
+TEST_P(SslSocketTest, CipherSuitesWithPolicy) {
+  envoy::config::listener::v3::Listener listener;
+  envoy::config::listener::v3::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
+      tls_context.mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"));
+  updateFilterChain(tls_context, *filter_chain);
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* client_params =
+      client.mutable_common_tls_context()->mutable_tls_params();
+  envoy::extensions::transport_sockets::tls::v3::TlsParameters* server_params =
+      tls_context.mutable_common_tls_context()->mutable_tls_params();
+
+  // Connection using a common cipher (client & server) succeeds.
+  client_params->clear_cipher_suites();
+  client_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+  server_params->clear_cipher_suites();
+  server_params->add_cipher_suites("ECDHE-RSA-CHACHA20-POLY1305");
+  server_params->add_cipher_suites("AES256-GCM-SHA384");
+  updateFilterChain(tls_context, *filter_chain);
+  TestUtilOptionsV2 test_options(listener, client, true, version_);
+  testUtilV2(test_options);
+
+  // Client connects with an unsupported client cipher suite for a server policy, connection fails.
+  server_params->add_compliance_policies(
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::FIPS_202205);
+  updateFilterChain(tls_context, *filter_chain);
+  TestUtilOptionsV2 error_test_options(listener, client, false, version_);
+  error_test_options.setExpectedServerStats("ssl.connection_error");
+  testUtilV2(error_test_options);
 }
 
 TEST_P(SslSocketTest, EcdhCurves) {
@@ -5716,11 +5755,11 @@ TEST_P(SslSocketTest, EcdhCurves) {
   client_params->add_ecdh_curves("X25519");
   server_params->add_cipher_suites("ECDHE-RSA-AES128-GCM-SHA256");
   updateFilterChain(tls_context, *filter_chain);
-#ifdef BORINGSSL_FIPS
-  testUtilV2(error_test_options);
-#else
-  testUtilV2(ecdh_curves_test_options);
-#endif
+  if (FIPS_mode()) {
+    testUtilV2(error_test_options);
+  } else {
+    testUtilV2(ecdh_curves_test_options);
+  }
   client_params->clear_ecdh_curves();
   server_params->clear_cipher_suites();
 }
@@ -7840,9 +7879,9 @@ TEST_P(SslSocketTest, RsaKeyUsageVerificationEnforcementOff) {
   // be successful.
   TestUtilOptionsV2 test_options(listener, client_tls_context, true, version_);
   // `was_key_usage_invalid` stats is expected to set to report the mismatched usage.
-#ifndef BORINGSSL_FIPS
-  test_options.setExpectedClientStats("ssl.was_key_usage_invalid");
-#endif
+  if (!FIPS_mode()) {
+    test_options.setExpectedClientStats("ssl.was_key_usage_invalid");
+  }
   testUtilV2(test_options);
 }
 

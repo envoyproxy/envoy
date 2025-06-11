@@ -95,7 +95,7 @@ message RateLimit {
   //   in :ref:`duration_until_reset<envoy_v3_api_field_service.ratelimit.v3.RateLimitResponse.DescriptorStatus.duration_until_reset>`
   //   field.
   //
-  // In case rate limiting policy specifies more then one time window, the values
+  // In case rate limiting policy specifies more than one time window, the values
   // above represent the window that is closest to reaching its limit.
   //
   // For more information about the headers specification see selected version of

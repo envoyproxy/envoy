@@ -926,7 +926,9 @@ TEST(Context, XDSAttributes) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto host_metadata = std::make_shared<const envoy::config::core::v3::Metadata>();
+  auto locality_metadata = std::make_shared<const envoy::config::core::v3::Metadata>();
   EXPECT_CALL(*upstream_host, metadata()).WillRepeatedly(Return(host_metadata));
+  EXPECT_CALL(*upstream_host, localityMetadata()).WillRepeatedly(Return(locality_metadata));
   info.upstreamInfo()->setUpstreamHost(upstream_host);
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
   EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
@@ -987,6 +989,12 @@ TEST(Context, XDSAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
     EXPECT_EQ(host_metadata.get(), value.value().MessageOrDie());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(UpstreamHostLocalityMetadata)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_EQ(locality_metadata.get(), value.value().MessageOrDie());
   }
   {
     const auto value = wrapper[CelValue::CreateStringView(FilterChainName)];

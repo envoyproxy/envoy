@@ -41,6 +41,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "absl/time/time.h"
 #include "gtest/gtest.h"
@@ -3006,7 +3007,7 @@ TEST_P(DownstreamProtocolIntegrationTest, TestDelayedConnectionTeardownTimeoutTr
 // Resets the downstream stream immediately and verifies that we clean up everything.
 TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
   useAccessLog("%RESPONSE_FLAGS% %RESPONSE_CODE_DETAILS%");
-  config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100));
+  config_helper_.setDownstreamHttpIdleTimeout(std::chrono::milliseconds(100 * TIMEOUT_FACTOR));
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -5377,9 +5378,10 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithErrorAndBufferedR
     } else if (downstreamProtocol() == Http::CodecType::HTTP2 ||
                downstreamProtocol() == Http::CodecType::HTTP3) {
       ASSERT_TRUE(upstream_request_->waitForReset());
-      ASSERT_TRUE(response->waitForReset());
+      ASSERT_TRUE(response->waitForAnyTermination());
     }
   }
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(ProtocolIntegrationTest, H2UpstreamHalfCloseBeforeH1Downstream) {
@@ -5446,7 +5448,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {":scheme", "http"}});
-  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(response->waitForAnyTermination());
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("invalid"));
 }
 
@@ -5470,7 +5472,7 @@ TEST_P(DownstreamProtocolIntegrationTest, DuplicatedMethodHeaders) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {":method", "POST"}});
-  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(response->waitForAnyTermination());
   EXPECT_THAT(
       waitForAccessLog(access_log_name_),
       HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
@@ -5486,7 +5488,7 @@ TEST_P(DownstreamProtocolIntegrationTest, MethodHeaderWithWhitespace) {
   // Start the request.
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", "GET /admin"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(response->waitForAnyTermination());
   EXPECT_THAT(
       waitForAccessLog(access_log_name_),
       HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
@@ -5502,7 +5504,7 @@ TEST_P(DownstreamProtocolIntegrationTest, EmptyMethodHeader) {
   // Start the request.
   auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
       {":method", ""}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}});
-  ASSERT_TRUE(response->waitForReset());
+  ASSERT_TRUE(response->waitForAnyTermination());
   EXPECT_THAT(
       waitForAccessLog(access_log_name_),
       HasSubstr(downstreamProtocol() == Http::CodecType::HTTP1 ? "codec_error" : "invalid"));
@@ -5739,6 +5741,35 @@ TEST_P(DownstreamProtocolIntegrationTest, DownstreamCxStats) {
   EXPECT_EQ(512U, response->body().size());
 
   test_server_->waitForCounterGe("http.config_test.downstream_cx_tx_bytes_total", 512);
+}
+
+// When upstream protocol is HTTP1, an OPTIONS request with no body will not
+// append transfer-encoding chunked.
+TEST_P(DownstreamProtocolIntegrationTest, OptionsWithNoBodyNotChunked) {
+  // This test is only relevant to H1 upstream.
+  if (upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "OPTIONS"},
+      {":path", "/foo"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"access-control-request-method", "GET"},
+      {"origin", "test-origin"},
+  };
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(upstream_request_->headers().TransferEncoding(), nullptr);
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
 }
 
 } // namespace Envoy

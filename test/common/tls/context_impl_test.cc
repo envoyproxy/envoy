@@ -29,9 +29,11 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
@@ -1153,6 +1155,121 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
                             "is insecure and not allowed");
 }
 
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCA) {
+  const std::string empty_ca_path = TestEnvironment::writeStringToFileForTest("test_envoy", "");
+  const std::string yaml = fmt::format(R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          filename: "{}"
+  )EOF",
+                                       empty_ca_path);
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
+                            fmt::format("file {} is empty", empty_ca_path));
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineString) {
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          inline_string: ""
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException, "DataSource cannot be empty");
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineBytes) {
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          inline_bytes: ""
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException, "DataSource cannot be empty");
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
+  const std::string empty_ca_path = TestEnvironment::writeStringToFileForTest("test_envoy", "");
+  const std::string yaml = fmt::format(R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          filename: "{}"
+  )EOF",
+                                       empty_ca_path);
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineStringWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          inline_string: ""
+  )EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineByteWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          inline_bytes: ""
+  )EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
+}
+
+TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHash) {
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        verify_certificate_hash: "df6ff72fe9116521268f6f2dd4966f51df479883fe7037b39f75916ac3049d1a"
+  )EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
+}
+
 TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledByDefault) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   const std::string tls_context_yaml = R"EOF(
@@ -1350,14 +1467,11 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
 
-  std::string error_msg(
-      "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
-#ifdef BORINGSSL_FIPS
-      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
-#else
-      "with 2048-bit or larger keys are supported"
-#endif
-  );
+  std::string error_msg(absl::StrCat(
+      "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA "
+      "certificates ",
+      (FIPS_mode() ? "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+                   : "with 2048-bit or larger keys are supported")));
   EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
                   .status()
                   .message(),
@@ -1376,14 +1490,11 @@ TEST_F(ClientContextConfigImplTest, RSA1024Pkcs12) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
 
-  std::string error_msg("Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
-                        "only RSA certificates "
-#ifdef BORINGSSL_FIPS
-                        "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
-#else
-                        "with 2048-bit or larger keys are supported"
-#endif
-  );
+  std::string error_msg(absl::StrCat(
+      "Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
+      "only RSA certificates ",
+      (FIPS_mode() ? "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+                   : "with 2048-bit or larger keys are supported")));
   EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
                   .status()
                   .message(),

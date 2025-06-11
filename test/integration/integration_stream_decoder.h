@@ -47,8 +47,12 @@ public:
   ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   ABSL_MUST_USE_RESULT testing::AssertionResult
+  waitForAnyTermination(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+  ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForWithDispatcherRun(const std::function<bool()>& condition, absl::string_view description,
                            std::chrono::milliseconds timeout);
+  std::string debugState() const;
+  bool isFinished() const { return saw_end_stream_ || saw_reset_; }
   void clearBody() { body_.clear(); }
 
   // Http::StreamDecoder

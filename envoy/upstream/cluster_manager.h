@@ -333,6 +333,15 @@ public:
    */
   virtual ClusterInfoMaps clusters() const PURE;
 
+  /**
+   * Receives a cluster name and returns an active cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
+
   using ClusterSet = absl::flat_hash_set<std::string>;
 
   /**
@@ -394,15 +403,6 @@ public:
   virtual Config::GrpcMuxSharedPtr adsMux() PURE;
 
   /**
-   * Replaces the current ADS mux with a new one based on the given config.
-   * Assumes that the given ads_config is syntactically valid (according to the PGV constraints).
-   * @param ads_config an ADS config source to use.
-   * @return the status of the operation.
-   */
-  virtual absl::Status
-  replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ads_config) PURE;
-
-  /**
    * @return Grpc::AsyncClientManager& the cluster manager's gRPC client manager.
    */
   virtual Grpc::AsyncClientManager& grpcAsyncClientManager() PURE;
@@ -427,11 +427,6 @@ public:
    */
   virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
-
-  /**
-   * Return the factory to use for creating cluster manager related objects.
-   */
-  virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 
   /**
    * Obtain the subscription factory for the cluster manager. Since subscriptions may have an
@@ -618,16 +613,6 @@ public:
   virtual absl::StatusOr<CdsApiPtr>
   createCds(const envoy::config::core::v3::ConfigSource& cds_config,
             const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) PURE;
-
-  /**
-   * Returns the secret manager.
-   */
-  virtual Secret::SecretManager& secretManager() PURE;
-
-  /**
-   * Returns the singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
 };
 
 /**

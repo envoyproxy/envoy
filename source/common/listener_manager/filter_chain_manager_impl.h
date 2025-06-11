@@ -63,9 +63,8 @@ public:
   Init::Manager& initManager() override;
   Stats::Scope& scope() override;
   const Network::ListenerInfo& listenerInfo() const override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
-  Configuration::ServerFactoryContext& serverFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Configuration::ServerFactoryContext& serverFactoryContext() override;
   Stats::Scope& listenerScope() override;
 
   void startDraining() override { is_draining_.store(true); }
@@ -82,6 +81,8 @@ private:
 
 using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
 using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+using FilterChainsByMatcher = absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch,
+                                                  std::string, MessageUtil, MessageUtil>;
 
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
@@ -214,6 +215,19 @@ private:
   using DestinationIPsTriePtr = std::unique_ptr<DestinationIPsTrie>;
   using DestinationPortsMap =
       absl::flat_hash_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>;
+
+  absl::Status
+  verifyNoDuplicateMatchers(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                            FilterChainsByMatcher& filter_chains,
+                            const envoy::config::listener::v3::FilterChain& filter_chain);
+  absl::Status
+  setupFilterChainMatcher(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                          FilterChainsByName& filter_chains_by_name,
+                          const envoy::config::listener::v3::FilterChain& filter_chain,
+                          const Network::DrainableFilterChainSharedPtr& filter_chain_impl);
+  void maybeConstructMatcher(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                             const FilterChainsByName& filter_chains_by_name,
+                             Configuration::FactoryContext& parent_context);
 
   absl::Status addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
