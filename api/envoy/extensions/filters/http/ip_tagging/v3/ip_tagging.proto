@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ip_tagging.v3;
 
+import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/data/ip_tagging/v3/ip_tagging.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -42,6 +42,25 @@ message IPTagging {
     // Only external requests will be tagged.
     EXTERNAL = 2;
   }
+
+    // Supplies the IP tag name and the IP address subnets.
+  message IPTag {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.ip_tagging.v2.IPTagging.IPTag";
+
+    // Specifies the IP tag name to apply.
+    string ip_tag_name = 1;
+
+    // A list of IP address subnets that will be tagged with
+    // ip_tag_name. Both IPv4 and IPv6 are supported.
+    repeated config.core.v3.CidrRange ip_list = 2;
+  }
+
+  // Specifies the content of the IP tag file.
+// Allow the file to be created with no IP tags.
+message IPTagFile {
+  repeated IPTag ip_tags = 1;
+}
 
   // Specify to which header the tags will be written.
   message IpTagHeader {
@@ -83,7 +102,7 @@ message IPTagging {
     // See :ref:`watched_directory <envoy_v3_api_msg_config.core.v3.DataSource>` for more information about the ``watched_directory`` field.
     config.core.v3.DataSource ip_tags_datasource = 1;
 
-    // When :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>` is configured
+    // When :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_file_provider.ip_tags_datasource>` is configured
     // the ip tags will be reloaded from file every ``ip_tags_refresh_rate`` milliseconds.
     // Defaults to 0, in this case no refresh will be attempted.
     google.protobuf.Duration ip_tags_refresh_rate = 2 [(validate.rules).duration = {gt {}}];
@@ -94,9 +113,9 @@ message IPTagging {
 
   // The set of IP tags for the filter.
   // Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
-  // or :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_datasource>`
+  // or :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_file_provider.ip_tags_datasource>`
   // can be set for the Ip Tagging filter.
-  repeated data.ip_tagging.v3.IPTag ip_tags = 4;
+  repeated IPTag ip_tags = 4;
 
   // Specify to which header the tags will be written.
   //

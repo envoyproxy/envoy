@@ -52,8 +52,6 @@ public:
 namespace {
 namespace {
 
-const std::string ip_tagging_prefix = "prefix.ip_tagging.";
-
 const std::string internal_request_config = R"EOF(
 request_type: internal
 ip_tags:
@@ -1104,7 +1102,6 @@ ip_tags:
     filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         remote_address);
 
-    // EXPECT_CALL(stats_, counter("prefix.ip_tagging.ip_tags_reload_success"));
     EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_updated_request.hit"));
     EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
     request_headers = {{"x-envoy-internal", "true"}};

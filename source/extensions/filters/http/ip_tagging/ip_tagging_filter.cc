@@ -86,7 +86,7 @@ void IpTagsProvider::updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(
   tags_ = new_tags;
 }
 
-std::shared_ptr<IpTagsProvider> IpTagsRegistrySingleton::get(
+std::shared_ptr<IpTagsProvider> IpTagsRegistrySingleton::getOrCreateProvider(
     const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
     uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
     IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
@@ -144,7 +144,7 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   if (data_source_provider_) {
     IpTagFileProto ip_tags_proto;
-    auto new_data = std::move(data_source_provider_->data());
+    auto new_data = data_source_provider_->data();
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       TRY_NEEDS_AUDIT {
         MessageUtil::loadFromYaml(new_data, ip_tags_proto, validation_visitor_,
@@ -169,7 +169,8 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
-    const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags) {
+    const Protobuf::RepeatedPtrField<
+        envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags) {
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(ip_tags.size());
   for (const auto& ip_tag : ip_tags) {
@@ -259,7 +260,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     }
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
-    provider_ = ip_tags_registry_->get(
+    provider_ = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
         ip_tags_refresh_interval_ms, [this]() { incIpTagsReloadSuccess(); },
         [this]() { incIpTagsReloadError(); }, api, tls, dispatcher, ip_tags_registry_,

@@ -25,7 +25,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-using IpTagFileProto = envoy::data::ip_tagging::v3::IPTagFile;
+using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
 using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
 
 /**
@@ -63,7 +63,8 @@ public:
    * @return Valid LcTrieSharedPtr if parsing succeeded or error status otherwise.
    */
   absl::StatusOr<LcTrieSharedPtr>
-  parseIpTagsAsProto(const Protobuf::RepeatedPtrField<envoy::data::ip_tagging::v3::IPTag>& ip_tags);
+  parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
+                     envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
 private:
   Api::Api& api_;
@@ -77,7 +78,7 @@ using IpTagsReloadSuccessCb = std::function<void()>;
 using IpTagsReloadErrorCb = std::function<void()>;
 
 /**
- * This class owns ip tags trie structure for a configured abosulte file path and provides access to
+ * This class owns ip tags trie structure for a configured absolute file path and provides access to
  * the ip tags data. It also performs periodic refresh of ip tags data.
  */
 class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
@@ -128,8 +129,8 @@ class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
   IpTagsRegistrySingleton() {}
 
-  std::shared_ptr<IpTagsProvider>
-  get(const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
+  std::shared_ptr<IpTagsProvider> getOrCreateProvider(
+      const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
       uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
       IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
       Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton,
