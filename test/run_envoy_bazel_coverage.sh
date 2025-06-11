@@ -113,13 +113,13 @@ else
     cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 fi
 
-COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
+COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}/html" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
 COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
 echo "Compressing coveraged data"
 if [[ "${FUZZ_COVERAGE}" == "true" ]]; then
     if [[ -n "${ENVOY_FUZZ_COVERAGE_ARTIFACT}" ]]; then
-        tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./fuzz_coverage/' . \
+        tar cf - -C "${COVERAGE_DIR}/html" --transform 's/^\./fuzz_coverage/' . \
             | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
                     - -T0 -o "${ENVOY_FUZZ_COVERAGE_ARTIFACT}"
     fi
@@ -128,7 +128,7 @@ elif [[ -n "${ENVOY_COVERAGE_ARTIFACT}" ]]; then
         rm "${ENVOY_COVERAGE_ARTIFACT}"
     fi
 
-     tar cf - -C "${COVERAGE_DIR}" --transform 's/^\./coverage/' . \
+     tar cf - -C "${COVERAGE_DIR}/html" --transform 's/^\./coverage/' . \
          | bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/zstd -- \
                  - -T0 -o "${ENVOY_COVERAGE_ARTIFACT}"
 fi
@@ -168,4 +168,4 @@ if [[ -e ./test/per_file_coverage.sh ]]; then
 else
     echo "No per-file-coverage file found"
 fi
-echo "HTML coverage report is in ${COVERAGE_DIR}/index.html"
+echo "HTML coverage report is in ${COVERAGE_DIR}/html/index.html"
