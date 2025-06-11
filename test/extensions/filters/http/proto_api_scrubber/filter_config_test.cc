@@ -377,8 +377,6 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     EXPECT_THAT(filter_config.status().message(),
                 testing::HasSubstr("Error encountered during config initialization. Unable to "
                                    "parse proto descriptor from inline bytes"));
-    // EXPECT_EQ(filter_config.status().message(),"Error encountered during config initialization.
-    // Unable to parse proto descriptor from inline bytes `123`");
   }
 
   {
@@ -403,8 +401,6 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     EXPECT_THAT(filter_config.status().message(),
                 testing::HasSubstr("Error encountered during config initialization. Unable to "
                                    "parse proto descriptor from file"));
-    // EXPECT_TRUE(absl::StrContains(filter_config.status().message(), "Error encountered during
-    // config initialization. Unable to parse proto descriptor from file"));
   }
 
   {
