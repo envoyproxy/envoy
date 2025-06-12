@@ -420,6 +420,8 @@ FilterConfig::FilterConfig(
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
+      default_csrf_token_expires_in_(
+          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_csrf_token_expires_in, 600)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -791,9 +793,11 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   if (!csrf_token_cookie_exists) {
     // Generate a CSRF token to prevent CSRF attacks.
     csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
-    // Expire the CSRF token cookie in 10 minutes.
-    // This should be enough time for the user to complete the OAuth flow.
-    std::string csrf_expires = std::to_string(10 * 60);
+
+    const std::chrono::seconds default_csrf_token_expires_in =
+        config_->defaultCsrfTokenExpiresIn();
+    std::string csrf_expires = std::to_string(default_csrf_token_expires_in.count());
+
     std::string same_site = getSameSiteString(config_->nonceCookieSettings().same_site_);
     std::string cookie_tail_http_only =
         fmt::format(CookieTailHttpOnlyFormatString, csrf_expires, same_site);
