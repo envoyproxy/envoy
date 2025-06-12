@@ -12,6 +12,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -173,6 +174,7 @@ public:
   Network::ConnectionSocket::OptionsSharedPtr options_;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options_;
   bool has_idle_timers_{false};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 
 protected:
   class ConnPoolImplForTest : public ConnPoolImpl {
@@ -180,9 +182,9 @@ protected:
     ConnPoolImplForTest(Event::MockDispatcher& dispatcher, Upstream::HostSharedPtr host,
                         Network::ConnectionSocket::OptionsSharedPtr options,
                         Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
-                        ConnPoolBase& parent)
+                        ConnPoolBase& parent, Server::OverloadManager& overload_manager)
         : ConnPoolImpl(dispatcher, host, Upstream::ResourcePriority::Default, options,
-                       transport_socket_options, state_, absl::nullopt),
+                       transport_socket_options, state_, absl::nullopt, overload_manager),
           parent_(parent) {}
 
     void onConnReleased(Envoy::ConnectionPool::ActiveClient& client) override {
@@ -213,8 +215,8 @@ ConnPoolBase::ConnPoolBase(Event::MockDispatcher& dispatcher, Upstream::HostShar
                            Network::TransportSocketOptionsConstSharedPtr transport_socket_options)
     : mock_dispatcher_(dispatcher), mock_upstream_ready_cb_(upstream_ready_cb), options_(options),
       transport_socket_options_(transport_socket_options) {
-  conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher, host, options,
-                                                     transport_socket_options, *this);
+  conn_pool_ = std::make_unique<ConnPoolImplForTest>(
+      dispatcher, host, options, transport_socket_options, *this, overload_manager_);
 }
 
 void ConnPoolBase::expectEnableUpstreamReady(bool run) {
@@ -269,7 +271,7 @@ public:
     host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime());
     conn_pool_ =
         std::make_unique<ConnPoolImpl>(dispatcher_, host_, Upstream::ResourcePriority::Default,
-                                       nullptr, nullptr, state_, absl::nullopt);
+                                       nullptr, nullptr, state_, absl::nullopt, overload_manager_);
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   }
   ~TcpConnPoolImplDestructorTest() override = default;
@@ -314,6 +316,7 @@ public:
   Network::MockClientConnection* connection_;
   std::unique_ptr<Tcp::ConnectionPool::Instance> conn_pool_;
   std::unique_ptr<ConnPoolCallbacks> callbacks_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 /**

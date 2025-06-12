@@ -2,6 +2,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
@@ -98,7 +99,8 @@ class ConnPoolImplBaseTest : public testing::Test {
 public:
   ConnPoolImplBaseTest()
       : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_) {
+        pool_(host_, Upstream::ResourcePriority::Default, dispatcher_, nullptr, nullptr, state_,
+              overload_manager_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -128,6 +130,7 @@ public:
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   Upstream::HostSharedPtr host_{
       Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", dispatcher_.timeSource())};
   TestConnPoolImplBase pool_;
@@ -140,7 +143,8 @@ public:
   ConnPoolImplDispatcherBaseTest()
       : api_(Api::createApiForTest(time_system_)),
         dispatcher_(api_->allocateDispatcher("test_thread")),
-        pool_(host_, Upstream::ResourcePriority::Default, *dispatcher_, nullptr, nullptr, state_) {
+        pool_(host_, Upstream::ResourcePriority::Default, *dispatcher_, nullptr, nullptr, state_,
+              overload_manager_) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -228,6 +232,7 @@ public:
   Event::SimulatedTimeSystemHelper time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   uint32_t max_connection_duration_ = 5000;
   absl::optional<std::chrono::milliseconds> max_connection_duration_opt_{max_connection_duration_};
   uint32_t stream_limit_ = 100;

@@ -9,7 +9,7 @@ This directory contains tests that verify Envoy's toolchain detection and select
 The test suite validates toolchain behavior in the following scenarios:
 
 - **Default build**: Testing what toolchain is selected with no explicit configuration
-- **Config-based selection**: Testing `--config=clang-libc++` and `--config=gcc` flags
+- **Config-based selection**: Testing `--config=clang` and `--config=gcc` flags
 - **Environment-based selection**: Testing `CC`/`CXX` environment variable overrides
 - **Compiler availability**: Testing behavior when only specific compilers are available
 

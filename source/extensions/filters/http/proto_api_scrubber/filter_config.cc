@@ -30,6 +30,21 @@ bool isApiNameValid(absl::string_view api_name) {
                       [](const absl::string_view s) { return s.empty(); });
 }
 
+// Creates and returns a CEL matcher.
+MatchTreeHttpMatchingDataSharedPtr
+getCelMatcher(Envoy::Server::Configuration::ServerFactoryContext& server_factory_context,
+              const xds::type::matcher::v3::Matcher& matcher) {
+  ProtoApiScrubberRemoveFieldAction remove_field_action;
+  MatcherInputValidatorVisitor validation_visitor;
+  Matcher::MatchTreeFactory<HttpMatchingData, ProtoApiScrubberRemoveFieldAction> matcher_factory(
+      remove_field_action, server_factory_context, validation_visitor);
+  Matcher::MatchTreeFactoryCb<HttpMatchingData> match_tree_factory_cb =
+      matcher_factory.create(matcher);
+
+  // Call the match tree factory callback to return the underlying match_tree.
+  return match_tree_factory_cb();
+}
+
 } // namespace
 
 absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>>
@@ -127,21 +142,8 @@ absl::Status ProtoApiScrubberFilterConfig::initializeMethodRestrictions(
   for (const auto& restriction : restrictions) {
     absl::string_view field_mask = restriction.first;
     RETURN_IF_ERROR(validateFieldMask(field_mask));
-    ProtoApiScrubberRemoveFieldAction remove_field_action;
-    MatcherInputValidatorVisitor validation_visitor;
-    Matcher::MatchTreeFactory<HttpMatchingData, ProtoApiScrubberRemoveFieldAction> matcher_factory(
-        remove_field_action, context.serverFactoryContext(), validation_visitor);
-
-    absl::optional<Matcher::MatchTreeFactoryCb<HttpMatchingData>> factory_cb =
-        matcher_factory.create(restriction.second.matcher());
-    if (factory_cb.has_value()) {
-      field_restrictions[std::make_pair(std::string(method_name), std::string(field_mask))] =
-          factory_cb.value()();
-    } else {
-      return absl::InvalidArgumentError(fmt::format(
-          "{} Failed to initialize matcher factory callback for method {} and field mask {}.",
-          kConfigInitializationError, method_name, field_mask));
-    }
+    field_restrictions[std::make_pair(std::string(method_name), std::string(field_mask))] =
+        getCelMatcher(context.serverFactoryContext(), restriction.second.matcher());
   }
 
   return absl::OkStatus();
