@@ -904,6 +904,15 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(result_number, 4321);
 }
 
+TEST(ABIImpl, HttpCallout) {
+  DynamicModuleHttpFilter filter{nullptr};
+  const std::string cluster{"some_cluster"};
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_http_callout(
+                &filter, 1, const_cast<char*>(cluster.data()), cluster.size(), nullptr, 0, nullptr,
+                0, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions
