@@ -11,6 +11,12 @@ class MatcherClusterSpecifierPluginFactoryConfig
     : public Envoy::Router::ClusterSpecifierPluginFactoryConfig {
 public:
   MatcherClusterSpecifierPluginFactoryConfig() = default;
+  /**
+   * Creates a matcher-based cluster specifier plugin.
+   * @param config the matcher cluster specifier configuration
+   * @param context the factory context for accessing cluster manager and other services
+   * @return shared pointer to the created cluster specifier plugin
+   */
   Envoy::Router::ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext&) override;
