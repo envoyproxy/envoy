@@ -163,6 +163,9 @@ public:
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
   }
+  std::chrono::seconds defaultCsrfTokenExpiresIn() const {
+    return default_csrf_token_expires_in_;
+  }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
   bool disableRefreshTokenSetCookie() const { return disable_refresh_token_set_cookie_; }
@@ -223,6 +226,7 @@ private:
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
+  const std::chrono::seconds default_csrf_token_expires_in_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
