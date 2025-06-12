@@ -28,20 +28,25 @@ namespace Matcher {
 namespace {
 
 using ::Envoy::Matcher::ActionFactory;
+using ::Envoy::Matcher::ActionFactoryCb;
 using ::Envoy::Matcher::CustomMatcherFactory;
 using ::Envoy::Matcher::DataInputGetResult;
-using ::Envoy::Matcher::evaluateMatch;
+using ::Envoy::Matcher::HasInsufficientData;
+using ::Envoy::Matcher::HasNoMatch;
+using ::Envoy::Matcher::HasStringAction;
+using ::Envoy::Matcher::IsStringAction;
+using ::Envoy::Matcher::MatchResult;
 using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MatchTreePtr;
 using ::Envoy::Matcher::MatchTreeSharedPtr;
-using ::Envoy::Matcher::MaybeMatchResult;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::StringAction;
 using ::Envoy::Matcher::StringActionFactory;
 using ::Envoy::Matcher::TestData;
 using ::Envoy::Matcher::TestDataInputBoolFactory;
 using ::Envoy::Matcher::TestDataInputStringFactory;
+using ::testing::ElementsAre;
 
 class TrieMatcherTest : public ::testing::Test {
 public:
@@ -56,39 +61,9 @@ public:
     TestUtility::validate(matcher_);
   }
 
-  void validateOnMatch(const OnMatch<TestData>& on_match, const std::string& output) {
-    ASSERT_NE(on_match.action_cb_, nullptr);
-    auto action = on_match.action_cb_();
-    ASSERT_NE(action, nullptr);
-    const auto value = action->getTyped<StringAction>();
-    EXPECT_EQ(value.string_, output);
-  }
-  void validateMatch(MatchTree<TestData>* match_tree, const std::string& output) {
-    auto result = match_tree->match(TestData());
-    ASSERT_TRUE(result.on_match_.has_value());
-    validateOnMatch(*result.on_match_, output);
-  }
-  void validateMatch(const std::string& output) {
+  MatchResult doMatch() {
     MatchTreePtr<TestData> match_tree = factory_.create(matcher_)();
-    validateMatch(match_tree.get(), output);
-  }
-  void validateNoMatch(MatchTree<TestData>* match_tree) {
-    auto result = match_tree->match(TestData());
-    EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-    EXPECT_FALSE(result.on_match_.has_value());
-  }
-  void validateNoMatch() {
-    MatchTreePtr<TestData> match_tree = factory_.create(matcher_)();
-    validateNoMatch(match_tree.get());
-  }
-  void validateUnableToMatch(MatchTree<TestData>* match_tree) {
-    auto result = match_tree->match(TestData());
-    EXPECT_EQ(result.match_state_, MatchState::UnableToMatch);
-  }
-  void validateUnableToMatch() {
-    MatchTreePtr<TestData> match_tree = factory_.create(matcher_)();
-
-    validateUnableToMatch(match_tree.get());
+    return match_tree->match(TestData(), skipped_match_cb_);
   }
 
   StringActionFactory action_factory_;
@@ -102,7 +77,7 @@ public:
   MatchTreeFactory<TestData, absl::string_view> factory_;
   xds::type::matcher::v3::Matcher matcher_;
   // If expecting keep_matching matchers, set this cb & mark its support in the validation_visitor_.
-  SkippedMatchCb<TestData> skipped_match_cb_ = nullptr;
+  SkippedMatchCb skipped_match_cb_ = nullptr;
 };
 
 TEST_F(TrieMatcherTest, TestMatcher) {
@@ -140,19 +115,19 @@ matcher_tree:
 
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
-    validateMatch("foo");
+    EXPECT_THAT(doMatch(), HasStringAction("foo"));
   }
   {
     auto input = TestDataInputStringFactory("192.101.0.1");
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
   {
     auto input = TestDataInputStringFactory("128.0.0.1");
-    validateNoMatch();
+    EXPECT_THAT(doMatch(), HasNoMatch());
   }
   {
     auto input = TestDataInputStringFactory("xxx");
-    validateNoMatch();
+    EXPECT_THAT(doMatch(), HasNoMatch());
   }
 }
 
@@ -227,23 +202,23 @@ on_no_match:
 
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
-    validateMatch("foo");
+    EXPECT_THAT(doMatch(), HasStringAction("foo"));
   }
   {
     // No range matches.
     auto input = TestDataInputStringFactory("128.0.0.1");
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
   {
     // Input is not a valid IP.
     auto input = TestDataInputStringFactory("xxx");
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
   {
     // Input is nullopt.
     auto input = TestDataInputStringFactory(
         {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
 }
 
@@ -290,15 +265,15 @@ matcher_tree:
 
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
-    validateMatch("foo");
+    EXPECT_THAT(doMatch(), HasStringAction("foo"));
   }
   {
     auto input = TestDataInputStringFactory("192.0.0.1");
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
   {
     auto input = TestDataInputStringFactory("255.0.0.1");
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
 }
 
@@ -346,17 +321,17 @@ matcher_tree:
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("baz");
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("");
-    validateMatch("foo");
+    EXPECT_THAT(doMatch(), HasStringAction("foo"));
   }
   {
     auto input = TestDataInputStringFactory("128.0.0.1");
     auto nested = TestDataInputBoolFactory("");
-    validateMatch("foo");
+    EXPECT_THAT(doMatch(), HasStringAction("foo"));
   }
 }
 
@@ -406,17 +381,17 @@ matcher_tree:
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("baz");
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("");
-    validateNoMatch();
+    EXPECT_THAT(doMatch(), HasNoMatch());
   }
   {
     auto input = TestDataInputStringFactory("128.0.0.1");
     auto nested = TestDataInputBoolFactory("");
-    validateMatch("foo");
+    EXPECT_THAT(doMatch(), HasStringAction("foo"));
   }
 }
 
@@ -479,17 +454,17 @@ matcher_tree:
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("baz");
-    validateMatch("baz");
+    EXPECT_THAT(doMatch(), HasStringAction("baz"));
   }
   {
     auto input = TestDataInputStringFactory("192.0.100.1");
     auto nested = TestDataInputBoolFactory("bar");
-    validateMatch("bar");
+    EXPECT_THAT(doMatch(), HasStringAction("bar"));
   }
   {
     auto input = TestDataInputStringFactory("128.0.0.1");
     auto nested = TestDataInputBoolFactory("");
-    validateMatch("foo");
+    EXPECT_THAT(doMatch(), HasStringAction("foo"));
   }
 }
 
@@ -535,25 +510,25 @@ matcher_tree:
     auto input = TestDataInputStringFactory(
         {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
     auto nested = TestDataInputBoolFactory("");
-    validateNoMatch();
+    EXPECT_THAT(doMatch(), HasNoMatch());
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
         {DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()});
-    validateNoMatch();
+    EXPECT_THAT(doMatch(), HasNoMatch());
   }
   {
     auto input = TestDataInputStringFactory(
         {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
     auto nested = TestDataInputBoolFactory("");
-    validateUnableToMatch();
+    EXPECT_THAT(doMatch(), HasInsufficientData());
   }
   {
     auto input = TestDataInputStringFactory("127.0.0.1");
     auto nested = TestDataInputBoolFactory(
         {DataInputGetResult::DataAvailability::NotAvailable, absl::monostate()});
-    validateUnableToMatch();
+    EXPECT_THAT(doMatch(), HasInsufficientData());
   }
 }
 
@@ -629,23 +604,15 @@ on_no_match:
   // Skip baz because the nested matcher is set with keep_matching.
   // Skip bag because the nested matcher returns on_no_match, but the top-level matcher is set to
   // keep_matching.
-  int skip_count = 0;
-  skipped_match_cb_ = [&](const OnMatch<TestData>& on_match) {
-    if (skip_count == 0) {
-      validateOnMatch(on_match, "foo");
-    } else if (skip_count == 1) {
-      validateOnMatch(on_match, "baz");
-    } else if (skip_count == 2) {
-      validateOnMatch(on_match, "bag");
-    } else {
-      FAIL() << "Unexpected skip count: " << skip_count;
-    }
-    skip_count++;
-  };
+  std::vector<ActionFactoryCb> skipped_results{};
+  skipped_match_cb_ = [&skipped_results](ActionFactoryCb cb) { skipped_results.push_back(cb); };
+
   auto input = TestDataInputStringFactory("192.101.0.1");
   auto nested = TestDataInputBoolFactory("baz");
   // Matches 192.101.0.0, 192.0.0.0, and 0.0.0.0.
-  validateMatch("bar");
+  EXPECT_THAT(doMatch(), HasStringAction("bar"));
+  EXPECT_THAT(skipped_results,
+              ElementsAre(IsStringAction("foo"), IsStringAction("baz"), IsStringAction("bag")));
 }
 
 TEST(TrieMatcherIntegrationTest, NetworkMatchingData) {
@@ -690,9 +657,8 @@ matcher_tree:
   envoy::config::core::v3::Metadata metadata;
   Network::Matching::MatchingDataImpl data(socket, filter_state, metadata);
 
-  const auto result = match_tree()->match(data);
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_->action_cb_()->getTyped<StringAction>().string_, "foo");
+  const MatchResult result = match_tree()->match(data);
+  EXPECT_THAT(result, HasStringAction("foo"));
 }
 
 TEST(TrieMatcherIntegrationTest, UdpNetworkMatchingData) {
@@ -734,9 +700,8 @@ matcher_tree:
   const Network::Address::Ipv4Instance address("192.168.0.1", 8080);
   Network::Matching::UdpMatchingDataImpl data(address, address);
 
-  const auto result = match_tree()->match(data);
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_->action_cb_()->getTyped<StringAction>().string_, "foo");
+  const MatchResult result = match_tree()->match(data);
+  EXPECT_THAT(result, HasStringAction("foo"));
 }
 
 TEST(TrieMatcherIntegrationTest, HttpMatchingData) {
@@ -782,9 +747,8 @@ matcher_tree:
 
   Http::Matching::HttpMatchingDataImpl data(stream_info);
 
-  const auto result = match_tree()->match(data);
-  EXPECT_EQ(result.match_state_, MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_->action_cb_()->getTyped<StringAction>().string_, "foo");
+  const MatchResult result = match_tree()->match(data);
+  EXPECT_THAT(result, HasStringAction("foo"));
 }
 
 } // namespace

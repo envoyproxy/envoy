@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/circuit_breaker.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -63,6 +64,18 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
+const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+defaultHappyEyeballsConfig() {
+  CONSTRUCT_ON_FIRST_USE(
+      envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig, []() {
+        envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
+        default_config.set_first_address_family_version(
+            envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT);
+        default_config.mutable_first_address_family_count()->set_value(1);
+        return default_config;
+      }());
+}
+
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
   if (!address) {
     return "";
@@ -605,18 +618,16 @@ Host::CreateConnectionData HostImplBase::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
-    absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+    // TODO(adisuissa): convert from OptRef to reference once the runtime flag
+    // envoy.reloadable_features.use_config_in_happy_eyeballs is deprecated.
+    OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
       ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
       if (cluster.happyEyeballsConfig().has_value()) {
-        happy_eyeballs_config = *cluster.happyEyeballsConfig();
+        happy_eyeballs_config = cluster.happyEyeballsConfig();
       } else {
-        envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
-        default_config.set_first_address_family_version(
-            envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT);
-        default_config.mutable_first_address_family_count()->set_value(1);
-        happy_eyeballs_config = absl::make_optional(default_config);
+        happy_eyeballs_config = defaultHappyEyeballsConfig();
       }
     }
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
