@@ -37,3 +37,16 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "integration_test",
+    srcs = ["integration_test.cc"],
+    extension_names = ["envoy.router.cluster_specifier_plugin.matcher"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/extensions/router/cluster_specifiers/matcher:config",
+        "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg_cc_proto",
+    ],
+)
