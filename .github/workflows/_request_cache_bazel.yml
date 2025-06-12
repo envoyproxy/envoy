@@ -89,16 +89,12 @@ jobs:
           cd /source
           git clone "$GITHUB_WORKSPACE" .
 
-          targets=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
-          echo "Fetching: ${targets}"
+          BAZEL_BUILD_EXTRA_OPTIONS="--config=ci ${{ inputs.bazel-extra }}"
+          ENVOY_CACHE_ROOT=/build/bazel_root
+          ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
           # ironically the repository_cache is just about the only thing you dont want to cache
-          bazel --output_user_root=/build/bazel_root \
-                --output_base=/build/bazel_root/base \
-                aquery "deps(${targets})" \
-                --config=ci \
-                --repository_cache=/tmp/cache \
-                ${{ inputs.bazel-extra }} \
-                > /dev/null
+          ENVOY_REPOSITORY_CACHE=/tmp/cache
+          ./ci/do_ci.sh cache-create
         gcs-bucket: ${{ inputs.gcs-cache-bucket }}
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch }}
         lock-token: ${{ steps.appauth.outputs.token }}

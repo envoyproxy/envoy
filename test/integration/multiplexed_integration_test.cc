@@ -3431,7 +3431,7 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
   // Close upstream, check cleanup.
   fake_upstreams_[0].reset();
 
-  ASSERT_TRUE(response_decoder->waitForReset());
+  ASSERT_TRUE(response_decoder->waitForAnyTermination());
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
   test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);

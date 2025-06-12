@@ -415,9 +415,15 @@ pub trait EnvoyHttpFilter {
     body: Option<&'a [u8]>,
   );
 
-  /// Get the number-typed dynamic metadata value with the given key.
+  /// Get the number-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
-  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64>;
+  fn get_metadata_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<f64>;
 
   /// Set the number-typed dynamic metadata value with the given key.
   /// If the namespace is not found, this will create a new namespace.
@@ -425,10 +431,12 @@ pub trait EnvoyHttpFilter {
   /// Returns true if the operation is successful.
   fn set_dynamic_metadata_number(&mut self, namespace: &str, key: &str, value: f64) -> bool;
 
-  /// Get the string-typed dynamic metadata value with the given key.
+  /// Get the string-typed metadata value with the given key.
+  /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.
-  fn get_dynamic_metadata_string<'a>(
+  fn get_metadata_string<'a>(
     &'a self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
     namespace: &str,
     key: &str,
   ) -> Option<EnvoyBuffer<'a>>;
@@ -799,15 +807,21 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_number(&self, namespace: &str, key: &str) -> Option<f64> {
+  fn get_metadata_number(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<f64> {
     let namespace_ptr = namespace.as_ptr();
     let namespace_size = namespace.len();
     let key_ptr = key.as_ptr();
     let key_size = key.len();
     let mut value: f64 = 0f64;
     let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+      abi::envoy_dynamic_module_callback_http_get_metadata_number(
         self.raw_ptr,
+        source,
         namespace_ptr as *const _ as *mut _,
         namespace_size,
         key_ptr as *const _ as *mut _,
@@ -839,7 +853,12 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn get_dynamic_metadata_string(&self, namespace: &str, key: &str) -> Option<EnvoyBuffer> {
+  fn get_metadata_string(
+    &self,
+    source: abi::envoy_dynamic_module_type_metadata_source,
+    namespace: &str,
+    key: &str,
+  ) -> Option<EnvoyBuffer> {
     let namespace_ptr = namespace.as_ptr();
     let namespace_size = namespace.len();
     let key_ptr = key.as_ptr();
@@ -847,8 +866,9 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     let mut result_ptr: *const u8 = std::ptr::null();
     let mut result_size: usize = 0;
     let success = unsafe {
-      abi::envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+      abi::envoy_dynamic_module_callback_http_get_metadata_string(
         self.raw_ptr,
+        source,
         namespace_ptr as *const _ as *mut _,
         namespace_size,
         key_ptr as *const _ as *mut _,
