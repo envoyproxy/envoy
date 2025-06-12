@@ -2952,7 +2952,7 @@ envoy_cc_library(
         ":quic_core_versions_lib",
         ":quic_platform_base",
         ":quiche_common_buffer_allocator_lib",
-        ":quiche_common_platform_quiche_mem_slice",
+        ":quiche_common_mem_slice",
     ],
 )
 
@@ -3982,6 +3982,8 @@ envoy_quic_cc_library(
         ":quic_core_server_id_lib",
         ":quic_core_session_notifier_interface_lib",
         ":quic_core_stream_frame_data_producer_lib",
+        ":quic_core_stream_send_buffer_base_lib",
+        ":quic_core_stream_send_buffer_inlining_lib",
         ":quic_core_stream_send_buffer_lib",
         ":quic_core_stream_sequencer_buffer_lib",
         ":quic_core_types_lib",
@@ -4060,6 +4062,52 @@ envoy_quic_cc_library(
 )
 
 envoy_quic_cc_library(
+    name = "quic_core_stream_send_buffer_base_lib",
+    srcs = ["quiche/quic/core/quic_stream_send_buffer_base.cc"],
+    hdrs = ["quiche/quic/core/quic_stream_send_buffer_base.h"],
+    deps = [
+        ":quic_core_interval_lib",
+        ":quic_core_interval_set_lib",
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+        ":quic_platform_bug_tracker",
+        ":quiche_common_mem_slice",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+envoy_quic_cc_library(
+    name = "quic_core_inlined_string_view_lib",
+    hdrs = ["quiche/quic/core/quic_inlined_string_view.h"],
+    deps = [
+        ":quic_platform_base",
+        "@com_google_absl//absl/numeric:bits",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_quic_cc_library(
+    name = "quic_core_stream_send_buffer_inlining_lib",
+    srcs = ["quiche/quic/core/quic_stream_send_buffer_inlining.cc"],
+    hdrs = ["quiche/quic/core/quic_stream_send_buffer_inlining.h"],
+    deps = [
+        ":quic_core_data_lib",
+        ":quic_core_inlined_string_view_lib",
+        ":quic_core_interval_deque_lib",
+        ":quic_core_interval_lib",
+        ":quic_core_interval_set_lib",
+        ":quic_core_stream_send_buffer_base_lib",
+        ":quic_core_types_lib",
+        ":quic_platform_base",
+        ":quic_platform_bug_tracker",
+        ":quiche_common_mem_slice",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+envoy_quic_cc_library(
     name = "quic_core_stream_send_buffer_lib",
     srcs = ["quiche/quic/core/quic_stream_send_buffer.cc"],
     hdrs = ["quiche/quic/core/quic_stream_send_buffer.h"],
@@ -4069,6 +4117,7 @@ envoy_quic_cc_library(
         ":quic_core_interval_deque_lib",
         ":quic_core_interval_lib",
         ":quic_core_interval_set_lib",
+        ":quic_core_stream_send_buffer_base_lib",
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
         ":quic_platform_base",
@@ -4639,10 +4688,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quiche_common_platform_quiche_mem_slice",
-    srcs = ["quiche/common/platform/api/quiche_mem_slice.cc"],
-    hdrs = ["quiche/common/platform/api/quiche_mem_slice.h"],
+    name = "quiche_common_mem_slice",
+    srcs = ["quiche/common/quiche_mem_slice.cc"],
+    hdrs = ["quiche/common/quiche_mem_slice.h"],
     repository = "@envoy",
+    visibility = ["//visibility:public"],
     deps = [
         ":quiche_common_buffer_allocator_lib",
         ":quiche_common_callbacks",
@@ -4973,13 +5023,13 @@ envoy_cc_test_library(
 
 envoy_cc_test(
     name = "quiche_common_mem_slice_test",
-    srcs = ["quiche/common/platform/api/quiche_mem_slice_test.cc"],
+    srcs = ["quiche/common/quiche_mem_slice_test.cc"],
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
         ":quiche_common_buffer_allocator_lib",
+        ":quiche_common_mem_slice",
         ":quiche_common_platform",
-        ":quiche_common_platform_quiche_mem_slice",
         ":quiche_common_platform_test",
     ],
 )
