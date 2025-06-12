@@ -7,7 +7,7 @@ load(
 
 licenses(["notice"])  # Apache 2
 
-# Lua cluster specifier plugin.
+# Matcher cluster specifier plugin.
 
 envoy_extension_package()
 
