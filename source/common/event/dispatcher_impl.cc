@@ -175,16 +175,11 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
   // expects a non-null connection as of today so we cannot gracefully handle unsupported address
   // type.
 
+  Network::ClientConnectionPtr conn;
 #if defined(__linux__)
-  constexpr bool is_linux = true;
-#else
-  constexpr bool is_linux = false;
-#endif
-
   // For Linux, the source address' network namespace is relevant for client connections, since that
   // is where the netns would be specified.
-  Network::ClientConnectionPtr conn;
-  if (is_linux && source_address && source_address->networkNamespace().has_value()) {
+  if (source_address && source_address->networkNamespace().has_value()) {
     auto f = [&]() -> bool {
       conn = factory->createClientConnection(
           *this, address, source_address, std::move(transport_socket), options, transport_options);
@@ -198,10 +193,11 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
                 source_address->networkNamespace().value(), result.status().ToString());
       return nullptr;
     }
-  } else {
-    conn = factory->createClientConnection(*this, address, source_address,
-                                           std::move(transport_socket), options, transport_options);
   }
+#else
+  conn = factory->createClientConnection(*this, address, source_address,
+                                         std::move(transport_socket), options, transport_options);
+#endif
 
   return conn;
 }
