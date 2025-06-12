@@ -28,6 +28,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    The lookup for asn information is fetched from ``asn_db`` if asn_db_path is defined and from ``isb_db`` if asn_db_path is not defined.
 - area: lua
   change: |
     The ``metadata()`` of lua filter now will search the metadata by the :ref:`filter config name
