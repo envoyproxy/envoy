@@ -391,9 +391,9 @@ public:
     EXPECT_CALL(*mock_host_, cluster())
         .WillRepeatedly(ReturnRef(*cm_.thread_local_cluster_.cluster_.info_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
-    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, api_->randomGenerator(),
-                                                    host_ptr_, Upstream::ResourcePriority::Default,
-                                                    nullptr, nullptr, state_);
+    http_conn_pool_ = Http::Http2::allocateConnPool(
+        *dispatcher_, api_->randomGenerator(), host_ptr_, Upstream::ResourcePriority::Default,
+        nullptr, nullptr, state_, server_factory_context_.overloadManager());
     EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillRepeatedly(Invoke([this] {
       return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
     }));

@@ -27,7 +27,7 @@ host when forwarding. See the example below within the configured routes.
   untrusted are subject to confused deputy attacks. For example, a client may attempt to use the
   dynamic forward capability to access a port on the server's localhost, link-local addresses,
   Cloud-provider metadata server or the private network in which the proxy is operating. Similarly,
-  an untrusted network endpoint might establish DNS records that point to any of the forementioned
+  an untrusted network endpoint might establish DNS records that point to any of the aforementioned
   locations. Dynamic forward proxy servers should be protected by network firewalls, default-deny RBAC and
   other restrictions on container or kernel networking; the details are setup specific. Please
   consider carefully auditing the dynamic forward proxy server's networking configuration with the
@@ -36,7 +36,7 @@ host when forwarding. See the example below within the configured routes.
 
 .. warning::
 
-  If a custom preceding filter sets the ``envoy.upstream.dynamic_host``` and ``envoy.upstream.dynamic_port``` filter
+  If a custom preceding filter sets the ``envoy.upstream.dynamic_host`` and ``envoy.upstream.dynamic_port`` filter
   state, the HTTP Dynamic Forward Proxy filter might not function correctly unless the filter state values match the
   host used for DNS lookups by the filter. The Dynamic Forward Proxy cluster prioritizes cache lookups using the filter
   state values first, so mismatched hosts between the filter's resolution logic and the cluster's cache lookup can
@@ -69,8 +69,8 @@ Dynamic Forward Proxy cluster has two types of circuit breakers:
 .. literalinclude:: _include/dns-cache-circuit-breaker.yaml
     :language: yaml
 
-Above example is using typed config :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`.
-To use :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>` (iOS/macOS only), follow below example:
+The above example uses typed config :ref:`CaresDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig>`.
+To use :ref:`AppleDnsResolverConfig<envoy_v3_api_msg_extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig>` (iOS/macOS only), follow the below example:
 
 .. literalinclude:: _include/dns-cache-circuit-breaker-apple.yaml
     :language: yaml
@@ -93,9 +93,9 @@ namespace.
   host_added, Counter, Number of hosts that have been added to the cache.
   host_removed, Counter, Number of hosts that have been removed from the cache.
   num_hosts, Gauge, Number of hosts that are currently in the cache.
-  dns_rq_pending_overflow, Counter, Number of dns pending request overflow.
+  dns_rq_pending_overflow, Counter, Number of DNS pending request overflow.
 
-The dynamic forward proxy DNS cache circuit breakers outputs statistics in the ``dns_cache.<dns_cache_name>.circuit_breakers``
+The dynamic forward proxy DNS cache circuit breakers output statistics in the ``dns_cache.<dns_cache_name>.circuit_breakers``
 namespace.
 
 .. csv-table::
