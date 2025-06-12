@@ -594,17 +594,13 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
 }
 
 void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
-  // Early return if no certificate or no config
-  if (ca_cert_ == nullptr || config_ == nullptr) {
+  // Early return if no config
+  if (config_ == nullptr) {
     return;
   }
 
-  if (!expiration_gauge_) {
-    expiration_gauge_ = &createCertificateExpirationGauge(scope, config_->caCertName());
-  }
-
-  const uint64_t expiration_unix_time_seconds = Utility::getExpirationUnixTime(ca_cert_.get());
-  expiration_gauge_->set(expiration_unix_time_seconds);
+  Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(scope, config_->caCertName());
+  expiration_gauge.set(Utility::getExpirationUnixTime(ca_cert_.get()).count());
 }
 
 absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {

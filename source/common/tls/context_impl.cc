@@ -214,11 +214,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
 
       // Create and set the certificate expiration gauge.
-      ctx.createCertExpirationGauge(scope, tls_certificate.certificateName());
-      if (ctx.cert_chain_.get() != nullptr) {
-        ctx.setExpirationOnCertStats(
-            std::chrono::seconds(Utility::getExpirationUnixTime(ctx.cert_chain_.get())));
-      }
+      Stats::Gauge& expiration_gauge =
+          Extensions::TransportSockets::Tls::createCertificateExpirationGauge(
+              scope, tls_certificate.certificateName());
+      expiration_gauge.set(Utility::getExpirationUnixTime(ctx.cert_chain_.get()).count());
 
       // The must staple extension means the certificate promises to carry
       // with it an OCSP staple. https://tools.ietf.org/html/rfc7633#section-6
@@ -813,15 +812,6 @@ absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
     }
   }
   return absl::OkStatus();
-}
-
-void TlsContext::createCertExpirationGauge(Stats::Scope& scope, const std::string& cert_name) {
-  expiration_gauge_ =
-      &Extensions::TransportSockets::Tls::createCertificateExpirationGauge(scope, cert_name);
-}
-
-void TlsContext::setExpirationOnCertStats(std::chrono::seconds duration) {
-  expiration_gauge_->set(duration.count());
 }
 
 } // namespace Ssl

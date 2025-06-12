@@ -118,7 +118,6 @@ private:
   std::shared_ptr<SpiffeData> spiffe_data_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_{};
   std::unique_ptr<Filesystem::Watcher> file_watcher_;
-  absl::flat_hash_map<std::string, Stats::Gauge*> expiration_gauges_map_;
   Api::Api& api_;
   SslStats& stats_;
   TimeSource& time_source_;

@@ -143,7 +143,7 @@ TEST(UtilityTest, TestExpirationWithUnixTimeWithExpiredCert) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()));
+  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
 }
 
 TEST(UtilityTest, TestExpirationWithUnixTimeWithNotExpiredCert) {
@@ -153,7 +153,7 @@ TEST(UtilityTest, TestExpirationWithUnixTimeWithNotExpiredCert) {
   Event::SimulatedTimeSystem time_source;
   time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
 
-  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()));
+  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
 }
 
 TEST(UtilityTest, TestDaysUntilExpiration) {

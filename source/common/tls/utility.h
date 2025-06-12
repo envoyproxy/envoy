@@ -118,10 +118,10 @@ absl::string_view getCertificateExtensionValue(X509& cert, absl::string_view ext
 
 /**
  * Returns the seconds since unix epoch of the expiration time of this certificate.
- * @param cert the certificate (must not be null)
- * @return the seconds since unix epoch of the expiration time of this certificate.
+ * @param cert the certificate
+ * @return the seconds since unix epoch as a duration, or max duration if cert is null.
  */
-uint64_t getExpirationUnixTime(const X509* cert);
+std::chrono::seconds getExpirationUnixTime(const X509* cert);
 
 /**
  * Returns the days until this certificate is valid.

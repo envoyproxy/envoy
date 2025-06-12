@@ -454,13 +454,8 @@ void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope,
     // Add underscore between cert name and index to avoid collisions
     std::string cert_name_with_idx = absl::StrCat(cert_name, "_", idx);
 
-    Stats::Gauge*& expiration_gauge = expiration_gauges_map_[cert_name_with_idx];
-    if (expiration_gauge == nullptr) {
-      expiration_gauge = &createCertificateExpirationGauge(scope, cert_name_with_idx);
-    }
-
-    const uint64_t expiration_unix_time_seconds = Utility::getExpirationUnixTime(cert.get());
-    expiration_gauge->set(expiration_unix_time_seconds);
+    Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(scope, cert_name_with_idx);
+    expiration_gauge.set(Utility::getExpirationUnixTime(cert.get()).count());
 
     idx++;
   }
