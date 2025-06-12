@@ -198,8 +198,7 @@ filter_config:
         proto_config, context, ProtobufMessage::getNullValidationVisitor());
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
-    EXPECT_THAT(result.status().message(),
-                testing::HasSubstr("Failed to load dynamic module:"));
+    EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module:"));
   }
 
   std::vector<std::pair<std::string, std::string>> per_route_test_cases = {
