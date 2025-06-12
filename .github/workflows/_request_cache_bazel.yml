@@ -89,11 +89,11 @@ jobs:
           cd /source
           git clone "$GITHUB_WORKSPACE" .
 
-          BAZEL_BUILD_EXTRA_OPTIONS="--config=ci ${{ inputs.bazel-extra }}"
-          ENVOY_CACHE_ROOT=/build/bazel_root
-          ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
+          export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci ${{ inputs.bazel-extra }}"
+          export ENVOY_CACHE_ROOT=/build/bazel_root
+          export ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
           # ironically the repository_cache is just about the only thing you dont want to cache
-          ENVOY_REPOSITORY_CACHE=/tmp/cache
+          export ENVOY_REPOSITORY_CACHE=/tmp/cache
           ./ci/do_ci.sh cache-create
         gcs-bucket: ${{ inputs.gcs-cache-bucket }}
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch }}
