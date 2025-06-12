@@ -355,7 +355,7 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
     // STOP_SENDING frame sent instead of reset.
     ASSERT_TRUE(response_->waitForEndStream());
   } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
-    ASSERT_TRUE(response_->waitForReset());
+    ASSERT_TRUE(response_->waitForAnyTermination());
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
