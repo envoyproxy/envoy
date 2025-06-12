@@ -202,7 +202,6 @@ TEST_P(StatsIntegrationTest, WithExpiringCert) {
   initialize();
   auto cert_expiry = TestUtility::parseTime(TEST_SERVER_CERT_NOT_AFTER, "%b %d %H:%M:%S %Y GMT");
   int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
-
   EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(),
             days_until_expiry);
 
