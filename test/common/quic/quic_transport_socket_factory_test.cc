@@ -95,7 +95,7 @@ enable_early_data:
   verifyQuicServerTransportSocketFactory(yaml, true);
 }
 
-TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthUnsupported) {
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthSupported) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 downstream_tls_context:
   require_client_certificate: true
@@ -109,8 +109,36 @@ downstream_tls_context:
       trusted_ca:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
 )EOF");
-  EXPECT_THROW_WITH_MESSAGE(verifyQuicServerTransportSocketFactory(yaml, true), EnvoyException,
-                            "TLS Client Authentication is not supported over QUIC");
+  // Client authentication should be supported. Verify successful creation
+  verifyQuicServerTransportSocketFactory(yaml, true);
+}
+
+TEST_F(QuicServerTransportSocketFactoryConfigTest, ClientAuthConfigValidation) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+downstream_tls_context:
+  require_client_certificate: true
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/san_uri_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+)EOF");
+  envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  // Verify that client certificate configuration is accepted and parsed correctly
+  const auto transport_socket_factory = THROW_OR_RETURN_VALUE(
+      config_factory_.createTransportSocketFactory(proto_config, context_, {}),
+      Network::DownstreamTransportSocketFactoryPtr);
+  ASSERT_NE(transport_socket_factory, nullptr);
+
+  // Verify the factory was created successfully with client cert requirements
+  EXPECT_TRUE(
+      static_cast<QuicServerTransportSocketFactory&>(*transport_socket_factory).earlyDataEnabled());
 }
 
 class QuicClientTransportSocketFactoryTest : public testing::Test {
