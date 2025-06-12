@@ -37,6 +37,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
@@ -92,9 +93,9 @@ public:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
       ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& /*quic_info*/,
       OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) override {
-    return Http::ConnectionPool::InstancePtr{allocateConnPool_(host, alternate_protocol_options,
-                                                               options, transport_socket_options,
-                                                               state, network_observer_registry)};
+    return Http::ConnectionPool::InstancePtr{
+        allocateConnPool_(host, alternate_protocol_options, options, transport_socket_options,
+                          state, network_observer_registry, overload_manager_)};
   }
 
   Tcp::ConnectionPool::InstancePtr
@@ -133,7 +134,8 @@ public:
                    alternate_protocol_options,
                Network::ConnectionSocket::OptionsSharedPtr,
                Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&,
-               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry));
+               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
+               Server::OverloadManager& overload_manager));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
               (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
@@ -155,6 +157,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   Server::MockOptions& options_ = server_context_.options_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the

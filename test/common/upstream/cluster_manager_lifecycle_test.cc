@@ -743,7 +743,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
   EXPECT_EQ(1UL, cluster_manager_->clusters().active_clusters_.size());
   Http::ConnectionPool::MockInstance* cp = new Http::ConnectionPool::MockInstance();
   Http::ConnectionPool::Instance::IdleCb idle_cb;
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _)).WillOnce(Return(cp));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp));
   EXPECT_CALL(*cp, addIdleCallback(_)).WillOnce(SaveArg<0>(&idle_cb));
   EXPECT_EQ(
       cp,
@@ -967,7 +967,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
         }));
     create(parseBootstrapFromV3Json(json));
 
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _)).WillOnce(Return(cp1));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp1));
     cluster_manager_->getThreadLocalCluster("some_cluster")
         ->httpConnPool(
             cluster_manager_->getThreadLocalCluster("some_cluster")->chooseHost(nullptr).host,
@@ -983,7 +983,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
     test_host->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
     outlier_detector.runCallbacks(test_host);
 
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _)).WillOnce(Return(cp2));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp2));
     cluster_manager_->getThreadLocalCluster("some_cluster")
         ->httpConnPool(
             cluster_manager_->getThreadLocalCluster("some_cluster")->chooseHost(nullptr).host,
@@ -1042,7 +1042,7 @@ TEST_P(ClusterManagerLifecycleTest,
       }));
   create(parseBootstrapFromV3Json(json));
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _)).WillOnce(Return(cp1));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp1));
   cluster_manager_->getThreadLocalCluster("some_cluster")
       ->httpConnPool(test_host, ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
@@ -1094,7 +1094,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsAndDeletePoolOnHealthFai
       }));
   create(parseBootstrapFromV3Json(json));
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _)).WillOnce(Return(cp1));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp1));
   cluster_manager_->getThreadLocalCluster("some_cluster")
       ->httpConnPool(test_host, ResourcePriority::Default, Http::Protocol::Http11, nullptr);
 
@@ -1358,7 +1358,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemove) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(4)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
@@ -1526,7 +1526,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveWithTls) {
   EXPECT_CALL(initialized, ready());
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(4)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
@@ -1844,7 +1844,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicHostRemoveDefaultPriority) {
   dns_callback(Network::DnsResolver::ResolutionStatus::Completed, "",
                TestUtility::makeDnsResponse({"127.0.0.2"}));
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .WillOnce(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
   EXPECT_CALL(factory_, allocateTcpConnPool_)
@@ -1942,7 +1942,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolDestroyWithDraining) {
 
   MockConnPoolWithDestroy* mock_cp = new MockConnPoolWithDestroy();
   Http::ConnectionPool::Instance::IdleCb drained_cb;
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _)).WillOnce(Return(mock_cp));
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(mock_cp));
   EXPECT_CALL(*mock_cp, addIdleCallback(_)).WillOnce(SaveArg<0>(&drained_cb));
   EXPECT_CALL(*mock_cp, drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainAndDelete));
 
@@ -2487,7 +2487,7 @@ TEST_P(ClusterManagerLifecycleTest, DrainConnectionsPredicate) {
       123, absl::nullopt, 100);
 
   // Using RR LB get a pool for each host.
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(2)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
   Http::ConnectionPool::MockInstance* cp1 = HttpPoolDataPeer::getPool(
@@ -2568,7 +2568,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsDrainedOnHostSetChange) {
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(3)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
@@ -2695,7 +2695,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsNotDrainedOnHostSetChange) {
       0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts, {},
       123, absl::nullopt, 100);
 
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(1)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
 
@@ -2770,7 +2770,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsIdleDeleted) {
 
   {
     auto* cp1 = new NiceMock<Http::ConnectionPool::MockInstance>();
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _)).WillOnce(Return(cp1));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp1));
     std::function<void()> idle_callback;
     EXPECT_CALL(*cp1, addIdleCallback(_)).WillOnce(SaveArg<0>(&idle_callback));
 
@@ -2794,7 +2794,7 @@ TEST_P(ClusterManagerLifecycleTest, ConnPoolsIdleDeleted) {
     idle_callback();
 
     auto* cp2 = new NiceMock<Http::ConnectionPool::MockInstance>();
-    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _)).WillOnce(Return(cp2));
+    EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _)).WillOnce(Return(cp2));
     EXPECT_CALL(*cp2, addIdleCallback(_));
 
     // This time we expect cp2 since cp1 will have been destroyed

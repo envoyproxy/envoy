@@ -832,6 +832,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::CodecImplFuzzTestCase& input) {
     // need to further evaluate. However, in fuzzing we allow oghttp2 reaching FATAL states that may
     // happen in production environments.
     quiche::test::QuicheScopedDisableExitOnDFatal scoped_object;
+    // This allows sending NUL, CR and LF in headers without triggering ASSERTs in Envoy.
+    HeaderStringValidator::disable_validation_for_tests_ = true;
     codecFuzzHttp2Oghttp2(input);
 #endif
   } catch (const EnvoyException& e) {

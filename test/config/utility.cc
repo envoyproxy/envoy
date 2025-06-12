@@ -674,7 +674,8 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
 }
 
 envoy::config::route::v3::RouteConfiguration
-ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster) {
+ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster,
+                               bool header_mutations) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
 #ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -688,10 +689,31 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
     )EOF",
                                         name, cluster),
                             route);
+
+  if (header_mutations) {
+    auto* route_entry = route.mutable_virtual_hosts(0)->mutable_routes(0);
+    auto* header1 = route_entry->add_request_headers_to_add();
+    *header1->mutable_header()->mutable_key() = "test-metadata";
+    *header1->mutable_header()->mutable_value() = "%METADATA(ROUTE:com.test.my_filter)%";
+
+    auto* header2 = route_entry->add_response_headers_to_add();
+    *header2->mutable_header()->mutable_key() = "test-cel";
+    *header2->mutable_header()->mutable_value() = "%CEL(request.headers['some-header'])%";
+
+    auto* header3 = route_entry->add_response_headers_to_add();
+    *header3->mutable_header()->mutable_key() = "test-other-command";
+    *header3->mutable_header()->mutable_value() = "%START_TIME%";
+
+    auto* header4 = route_entry->add_response_headers_to_add();
+    *header4->mutable_header()->mutable_key() = "test-plain";
+    *header4->mutable_header()->mutable_value() = "plain";
+  }
+
   return route;
 #else
   UNREFERENCED_PARAMETER(name);
   UNREFERENCED_PARAMETER(cluster);
+  UNREFERENCED_PARAMETER(header_mutations);
   PANIC("YAML support compiled out");
 #endif
 }

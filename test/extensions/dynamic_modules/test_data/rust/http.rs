@@ -308,15 +308,48 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // No namespace.
-    let no_namespace = envoy_filter.get_dynamic_metadata_number("no_namespace", "key");
+    let no_namespace = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "no_namespace",
+      "key",
+    );
     assert!(no_namespace.is_none());
     // Set a number.
     envoy_filter.set_dynamic_metadata_number("ns_req_header", "key", 123f64);
-    let ns_req_header = envoy_filter.get_dynamic_metadata_number("ns_req_header", "key");
+    let ns_req_header = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "ns_req_header",
+      "key",
+    );
     assert_eq!(ns_req_header, Some(123f64));
     // Try getting a number as string.
-    let ns_req_header = envoy_filter.get_dynamic_metadata_string("ns_req_header", "key");
+    let ns_req_header = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "ns_req_header",
+      "key",
+    );
     assert!(ns_req_header.is_none());
+
+    // Try getting metadata from rotuer cluster and host.
+    let metadata = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::route,
+      "metadata",
+      "route_key",
+    );
+    assert_eq!(metadata.unwrap().as_slice(), b"route");
+    let metadata = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::cluster,
+      "metadata",
+      "cluster_key",
+    );
+    assert_eq!(metadata.unwrap().as_slice(), b"cluster");
+    let metadata = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::host,
+      "metadata",
+      "host_key",
+    );
+    assert_eq!(metadata.unwrap().as_slice(), b"host");
+
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -326,15 +359,27 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     // No namespace.
-    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    let no_namespace = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "no_namespace",
+      "key",
+    );
     assert!(no_namespace.is_none());
     // Set a string.
     envoy_filter.set_dynamic_metadata_string("ns_req_body", "key", "value");
-    let ns_req_body = envoy_filter.get_dynamic_metadata_string("ns_req_body", "key");
+    let ns_req_body = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "ns_req_body",
+      "key",
+    );
     assert!(ns_req_body.is_some());
     assert_eq!(ns_req_body.unwrap().as_slice(), b"value");
     // Try getting a string as number.
-    let ns_req_body = envoy_filter.get_dynamic_metadata_number("ns_req_body", "key");
+    let ns_req_body = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "ns_req_body",
+      "key",
+    );
     assert!(ns_req_body.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
   }
@@ -345,14 +390,26 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     // No namespace.
-    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    let no_namespace = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "no_namespace",
+      "key",
+    );
     assert!(no_namespace.is_none());
     // Set a number.
     envoy_filter.set_dynamic_metadata_number("ns_res_header", "key", 123f64);
-    let ns_res_header = envoy_filter.get_dynamic_metadata_number("ns_res_header", "key");
+    let ns_res_header = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "ns_res_header",
+      "key",
+    );
     assert_eq!(ns_res_header, Some(123f64));
     // Try getting a number as string.
-    let ns_res_header = envoy_filter.get_dynamic_metadata_string("ns_res_header", "key");
+    let ns_res_header = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "ns_res_header",
+      "key",
+    );
     assert!(ns_res_header.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
@@ -363,14 +420,26 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     // No namespace.
-    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    let no_namespace = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "no_namespace",
+      "key",
+    );
     assert!(no_namespace.is_none());
     // Set a string.
     envoy_filter.set_dynamic_metadata_string("ns_res_body", "key", "value");
-    let ns_res_body = envoy_filter.get_dynamic_metadata_string("ns_res_body", "key");
+    let ns_res_body = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "ns_res_body",
+      "key",
+    );
     assert!(ns_res_body.is_some());
     // Try getting a string as number.
-    let ns_res_body = envoy_filter.get_dynamic_metadata_number("ns_res_body", "key");
+    let ns_res_body = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::dynamic,
+      "ns_res_body",
+      "key",
+    );
     assert!(ns_res_body.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }

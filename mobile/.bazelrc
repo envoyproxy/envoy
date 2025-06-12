@@ -89,13 +89,13 @@ build:mobile-android --noincompatible_enable_android_toolchain_resolution
 build:mobile-test-ios --config=ios
 
 # Clang ASAN.
-build:mobile-clang-asan --config=clang-asan-common
+build:mobile-clang-asan --config=asan --config=clang
 
 # Clang TSAN.
-build:mobile-clang-tsan --config=clang-tsan
+build:mobile-clang-tsan --config=tsan --config=clang
 
 # Clang MSAN.
-build:mobile-clang-msan --config=clang-msan
+build:mobile-clang-msan --config=msan --config=clang
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
@@ -191,7 +191,7 @@ test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
 # mobile-remote-ci-linux-tsan: These options are Linux-only using Clang and ThreadSanitizer
 #############################################################################
-build:mobile-remote-ci-linux-tsan --config=clang-tsan
+build:mobile-remote-ci-linux-tsan --config=mobile-clang-tsan
 build:mobile-remote-ci-linux-tsan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-tsan --config=remote-ci
 build:mobile-remote-ci-linux-tsan --build_tests_only
