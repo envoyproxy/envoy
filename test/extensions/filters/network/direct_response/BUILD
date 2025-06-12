@@ -23,6 +23,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/direct_response:config",
         "//test/integration:integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/filters/network/direct_response/v3:pkg_cc_proto",
     ],
 )
 
