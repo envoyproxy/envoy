@@ -214,6 +214,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("bazel_toolchains")
     external_http_archive("bazel_compdb")
     external_http_archive("envoy_examples")
+    external_http_archive("envoy_toolshed")
 
     _com_github_maxmind_libmaxminddb()
 
@@ -235,7 +236,6 @@ def envoy_dependencies(skip_targets = []):
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-
     _com_github_wamr()
     _com_github_wasmtime()
 
@@ -261,6 +261,30 @@ def _boringssl_fips():
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
         patches = ["@envoy//bazel:boringssl_fips.patch"],
         patch_args = ["-p1"],
+    )
+
+    NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_ninja",
+        build_file_content = NINJA_BUILD_CONTENT,
+    )
+    CMAKE_BUILD_CONTENT = "%s\nexports_files([\"bin/cmake\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_cmake_linux_x86_64",
+        build_file_content = CMAKE_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "fips_cmake_linux_aarch64",
+        build_file_content = CMAKE_BUILD_CONTENT,
+    )
+    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_go_linux_amd64",
+        build_file_content = GO_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "fips_go_linux_arm64",
+        build_file_content = GO_BUILD_CONTENT,
     )
 
 def _aws_lc():
@@ -534,8 +558,6 @@ def _io_vectorscan():
 def _io_opentelemetry_api_cpp():
     external_http_archive(
         name = "io_opentelemetry_cpp",
-        patches = ["@envoy//bazel:io_opentelemetry_cpp.patch"],
-        patch_args = ["-p1"],
     )
 
 def _com_github_datadog_dd_trace_cpp():

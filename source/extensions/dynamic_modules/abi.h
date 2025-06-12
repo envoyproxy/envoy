@@ -89,6 +89,19 @@ typedef const void* envoy_dynamic_module_type_http_filter_config_envoy_ptr;
 typedef const void* envoy_dynamic_module_type_http_filter_config_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_http_filter_per_route_config_module_ptr is a pointer to an in-module
+ * HTTP configuration corresponding to an Envoy HTTP per route filter configuration. The config is
+ * responsible for changing HTTP filter's behavior on specific routes.
+ *
+ * This has 1:1 correspondence with the DynamicModuleHttpPerRouteFilterConfig class in Envoy.
+ *
+ * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
+ * released when envoy_dynamic_module_on_http_filter_per_route_config_destroy is called for the same
+ * pointer.
+ */
+typedef const void* envoy_dynamic_module_type_http_filter_per_route_config_module_ptr;
+
+/**
  * envoy_dynamic_module_type_http_filter_envoy_ptr is a raw pointer to the DynamicModuleHttpFilter
  * class in Envoy. This is passed to the module when creating a new HTTP filter for each HTTP stream
  * and used to access the HTTP filter-scoped information such as headers, body, trailers, etc.
@@ -229,6 +242,21 @@ typedef enum {
   envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue,
   envoy_dynamic_module_type_on_http_filter_response_trailers_status_StopIteration
 } envoy_dynamic_module_type_on_http_filter_response_trailers_status;
+
+/**
+ * envoy_dynamic_module_type_metadata_source represents the location of metadata to get when calling
+ * envoy_dynamic_module_callback_http_get_metadata_* functions.
+ */
+typedef enum {
+  // stream's dynamic metadata.
+  envoy_dynamic_module_type_metadata_source_dynamic,
+  // route metadata
+  envoy_dynamic_module_type_metadata_source_route,
+  // cluster metadata
+  envoy_dynamic_module_type_metadata_source_cluster,
+  // host (LbEndpoint in xDS) metadata
+  envoy_dynamic_module_type_metadata_source_host,
+} envoy_dynamic_module_type_metadata_source;
 
 /**
  * envoy_dynamic_module_type_attribute_id represents an attribute described in
@@ -457,6 +485,47 @@ envoy_dynamic_module_on_http_filter_config_new(
  */
 void envoy_dynamic_module_on_http_filter_config_destroy(
     envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_per_route_config_new is called by the main thread when the
+ * http per-route filter config is loaded. The function returns a
+ * envoy_dynamic_module_type_http_filter_per_route_config_module_ptr for given name and config.
+ *
+ * @param name_ptr is the name of the filter.
+ * @param name_size is the size of the name.
+ * @param config_ptr is the configuration for the module.
+ * @param config_size is the size of the configuration.
+ * @return envoy_dynamic_module_type_http_filter_per_route_config_module_ptr is the pointer to the
+ * in-module HTTP filter configuration. Returning nullptr indicates a failure to initialize the
+ * module. When it fails, the filter configuration will be rejected.
+ */
+envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
+envoy_dynamic_module_on_http_filter_per_route_config_new(const char* name_ptr, size_t name_size,
+                                                         const char* config_ptr,
+                                                         size_t config_size);
+
+/**
+ * envoy_dynamic_module_callback_get_most_specific_route_config may be called by an HTTP filter
+ * to retrieve the most specific per-route filter (based on the route object hierarchy).
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the corresponding
+ * HTTP filter.
+ * @return null if no per-route config exist. Otherwise, a pointer to the per-route config is
+ * returned.
+ */
+envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
+envoy_dynamic_module_callback_get_most_specific_route_config(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP per-route filter
+ * configuration is destroyed in Envoy. The module should release any resources associated with the
+ * corresponding in-module HTTP filter configuration.
+ * @param filter_config_ptr is a pointer to the in-module HTTP filter configuration whose
+ * corresponding Envoy HTTP filter configuration is being destroyed.
+ */
+void envoy_dynamic_module_on_http_filter_per_route_config_destroy(
+    envoy_dynamic_module_type_http_filter_per_route_config_module_ptr filter_config_ptr);
 
 /**
  * envoy_dynamic_module_on_http_filter_new is called when the HTTP filter is created for each HTTP
@@ -953,7 +1022,7 @@ bool envoy_dynamic_module_callback_http_append_response_body(
 bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes);
 
-// ------------------------ Dynamic Metadata Callbacks -------------------------
+// ---------------------------- Metadata Callbacks -----------------------------
 
 /**
  * envoy_dynamic_module_callback_http_set_dynamic_metadata_number is called by the module to set
@@ -990,8 +1059,9 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
  * be stored.
  * @return true if the operation is successful, false otherwise.
  */
-bool envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+bool envoy_dynamic_module_callback_http_get_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result);
 
@@ -1038,8 +1108,9 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
  * they are guaranteed to be valid until the end of the current event hook unless the setter
  * callback is called.
  */
-bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+bool envoy_dynamic_module_callback_http_get_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);

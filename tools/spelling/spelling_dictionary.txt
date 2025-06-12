@@ -808,6 +808,7 @@ fdstat
 filename
 filenames
 fileno
+filepath
 filesystem
 firefox
 fixdate
@@ -1045,6 +1046,7 @@ netblocks
 netfilter
 netlink
 netmask
+netns
 NLB
 NLMSG
 nonblocking
@@ -1070,6 +1072,7 @@ oneof
 oneway
 oob
 opcode
+openid
 openssl
 opentracing
 optimizations
@@ -1206,6 +1209,7 @@ redis
 redispatch
 redistributions
 reentrant
+reentrants
 refactor
 refactored
 refcount
@@ -1305,6 +1309,7 @@ sigactions
 sigaltstack
 siginfo
 signalstack
+signout
 sigv
 sigv4
 sigv4a

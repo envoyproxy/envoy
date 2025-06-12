@@ -570,95 +570,45 @@ TEST(HttpUtility, appendVia) {
 
 TEST(HttpUtility, updateAuthority) {
   {
-    TestRequestHeaderMapImpl headers;
-    Utility::updateAuthority(headers, "dns.name", true);
-    EXPECT_EQ("dns.name", headers.get_(":authority"));
-    EXPECT_EQ("", headers.get_("x-forwarded-host"));
-  }
+    for (absl::string_view new_host : {"dns.name", ""}) {
+      for (absl::string_view old_host : {"host.com", ""}) {
+        for (absl::string_view old_xfh : {"old.xfh.com", ""}) {
+          for (bool append_xfh_or_keep_old_hosdt : {true, false}) {
+            TestRequestHeaderMapImpl headers;
+            if (!old_host.empty()) {
+              headers.setHost(old_host);
+            }
+            if (!old_xfh.empty()) {
+              headers.setForwardedHost(old_xfh);
+            }
 
-  {
-    TestRequestHeaderMapImpl headers;
-    Utility::updateAuthority(headers, "dns.name", false);
-    EXPECT_EQ("dns.name", headers.get_(":authority"));
-    EXPECT_EQ("", headers.get_("x-forwarded-host"));
-  }
+            Utility::updateAuthority(headers, new_host, append_xfh_or_keep_old_hosdt,
+                                     append_xfh_or_keep_old_hosdt);
+            EXPECT_EQ(new_host, headers.getHostValue());
 
-  {
-    TestRequestHeaderMapImpl headers;
-    Utility::updateAuthority(headers, "", true);
-    EXPECT_EQ("", headers.get_(":authority"));
-    EXPECT_EQ("", headers.get_("x-forwarded-host"));
-  }
+            if (old_host.empty() || !append_xfh_or_keep_old_hosdt) {
+              // No original host or the flag not allowing to append x-forwarded-host or keep
+              // original host.
+              EXPECT_EQ(old_xfh, headers.getForwardedHostValue());
+              EXPECT_EQ("", headers.getEnvoyOriginalHostValue());
+              continue;
+            }
 
-  {
-    TestRequestHeaderMapImpl headers;
-    Utility::updateAuthority(headers, "", false);
-    EXPECT_EQ("", headers.get_(":authority"));
-    EXPECT_EQ("", headers.get_("x-forwarded-host"));
-  }
-
-  {
-    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
-    Utility::updateAuthority(headers, "dns.name", true);
-    EXPECT_EQ("dns.name", headers.get_(":authority"));
-    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
-  }
-
-  {
-    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
-    Utility::updateAuthority(headers, "dns.name", false);
-    EXPECT_EQ("dns.name", headers.get_(":authority"));
-    EXPECT_EQ("", headers.get_("x-forwarded-host"));
-  }
-
-  {
-    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
-    Utility::updateAuthority(headers, "", true);
-    EXPECT_EQ("", headers.get_(":authority"));
-    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
-  }
-
-  {
-    TestRequestHeaderMapImpl headers{{":authority", "host.com"}};
-    Utility::updateAuthority(headers, "", false);
-    EXPECT_EQ("", headers.get_(":authority"));
-    EXPECT_EQ("", headers.get_("x-forwarded-host"));
-  }
-
-  {
-    TestRequestHeaderMapImpl headers{{":authority", "dns.name"}, {"x-forwarded-host", "host.com"}};
-    Utility::updateAuthority(headers, "newhost.com", true);
-    EXPECT_EQ("newhost.com", headers.get_(":authority"));
-    EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
-  }
-
-  {
-    TestRequestHeaderMapImpl headers{{":authority", "dns.name"}, {"x-forwarded-host", "host.com"}};
-    Utility::updateAuthority(headers, "newhost.com", false);
-    EXPECT_EQ("newhost.com", headers.get_(":authority"));
-    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
-  }
-
-  {
-    TestRequestHeaderMapImpl headers{{"x-forwarded-host", "host.com"}};
-    Utility::updateAuthority(headers, "dns.name", true);
-    EXPECT_EQ("dns.name", headers.get_(":authority"));
-    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
-  }
-
-  {
-    TestRequestHeaderMapImpl headers{{"x-forwarded-host", "host.com"}};
-    Utility::updateAuthority(headers, "dns.name", false);
-    EXPECT_EQ("dns.name", headers.get_(":authority"));
-    EXPECT_EQ("host.com", headers.get_("x-forwarded-host"));
+            EXPECT_EQ(old_xfh.empty() ? std::string(old_host)
+                                      : fmt::format("{},{}", old_xfh, old_host),
+                      headers.getForwardedHostValue());
+            EXPECT_EQ(old_host, headers.getEnvoyOriginalHostValue());
+          }
+        }
+      }
+    }
   }
 
   // Test that we only append to x-forwarded-host if it is not already present.
   {
     TestRequestHeaderMapImpl headers{{":authority", "dns.name"},
                                      {"x-forwarded-host", "host.com,dns.name"}};
-    Utility::updateAuthority(headers, "newhost.com", true);
-    EXPECT_EQ("newhost.com", headers.get_(":authority"));
+    Utility::updateAuthority(headers, "newhost.com", true, true);
     EXPECT_EQ("host.com,dns.name", headers.get_("x-forwarded-host"));
   }
 }
@@ -1125,6 +1075,24 @@ TEST(HttpUtility, TestMakeSetCookieValue) {
   EXPECT_EQ("name=\"value\"; Path=/; SameSite=None; Secure; Partitioned; HttpOnly",
             Utility::makeSetCookieValue("name", "value", "/", std::chrono::seconds::zero(), true,
                                         ref_attributes));
+}
+
+TEST(HttpUtility, TestRemoveCookieValue) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "somekey=somevalue; someotherkey=someothervalue"},
+      {"cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
+      {"cookie", "key2=value2; key3=value3"}};
+
+  std::string key{"token"};
+  Utility::removeCookieValue(headers, key);
+
+  TestRequestHeaderMapImpl new_headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "somekey=somevalue; someotherkey=someothervalue; abc=def; "
+                 "Expires=Wed, 09 Jun 2021 10:18:14 GMT; key2=value2; key3=value3"}};
+
+  EXPECT_EQ(new_headers, headers);
 }
 
 TEST(HttpUtility, SendLocalReply) {

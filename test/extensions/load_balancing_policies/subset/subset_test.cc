@@ -3337,6 +3337,9 @@ TEST(LoadBalancerContextWrapperTest, LoadBalancingContextWrapperTest) {
 
   EXPECT_CALL(mock_context, overrideHostToSelect());
   wrapper.overrideHostToSelect();
+
+  EXPECT_CALL(mock_context, setHeadersModifier(_));
+  wrapper.setHeadersModifier(nullptr);
 }
 
 } // namespace
