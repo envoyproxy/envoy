@@ -789,9 +789,7 @@ Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
   // We previously already finished up the headers, these headers are
   // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
-    std::cerr << "XXXXX ConnectionImpl::isTrailers" << std::endl;
     if (!enableTrailers()) {
-      std::cerr << "XXXXX ConnectionImpl::trailers ignored!" << std::endl;
       // Ignore trailers.
       return okStatus();
     }
@@ -1603,8 +1601,6 @@ CallbackResult ClientConnectionImpl::onMessageCompleteBase() {
           std::move(absl::get<ResponseHeaderMapPtr>(headers_or_trailers_)), true);
       deferred_end_stream_headers_ = false;
     } else if (processing_trailers_) {
-      std::cerr << "XXXXX ClientConnectionImpl::onMessageCompleteBase calling decodeTrailers"
-                << std::endl;
       response.decoder_->decodeTrailers(
           std::move(absl::get<ResponseTrailerMapPtr>(headers_or_trailers_)));
     } else {

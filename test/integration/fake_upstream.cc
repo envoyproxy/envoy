@@ -180,7 +180,6 @@ void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
         return;
       }
     }
-    std::cerr << "XXXXX FS encodeTrailers" << std::endl;
     encoder_.encodeTrailers(*trailers_copy);
   });
 }
@@ -250,18 +249,14 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
                               const std::function<bool()>& condition,
                               Event::Dispatcher& client_dispatcher, milliseconds timeout)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock) {
-  std::cerr << "waitForWithDispatcherRun" << std::endl;
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
     // Wake up periodically to run the client dispatcher.
     if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TIMEOUT_FACTOR)) {
-      std::cerr << "/waitForWithDispatcherRun" << std::endl;
       return true;
     }
-    std::cerr << "dispatcher.run" << std::endl;
     // Run the client dispatcher since we may need to process window updates, etc.
     client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
-    std::cerr << "/dispatcher.run" << std::endl;
   }
   return false;
 }
@@ -314,16 +309,13 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
-  std::cerr << "waitForEndStream" << std::endl;
   absl::MutexLock lock(&lock_);
-  std::cerr << "locked" << std::endl;
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
           [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return end_stream_; }, client_dispatcher,
           timeout)) {
     return AssertionFailure() << "Timed out waiting for end of stream.";
   }
-  std::cerr << "/waitForEndStream" << std::endl;
   return AssertionSuccess();
 }
 

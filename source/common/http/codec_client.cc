@@ -165,7 +165,6 @@ void CodecClient::onReset(ActiveRequest& request, StreamResetReason reason) {
 }
 
 void CodecClient::onData(Buffer::Instance& data) {
-  std::cerr << "XXXXX CodecClient::onData " << absl::CEscape(data.toString()) << std::endl;
   const Status status = codec_->dispatch(data);
 
   if (!status.ok()) {
