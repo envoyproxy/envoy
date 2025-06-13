@@ -43,7 +43,7 @@ message IPTagging {
     EXTERNAL = 2;
   }
 
-    // Supplies the IP tag name and the IP address subnets.
+  // Supplies the IP tag name and the IP address subnets.
   message IPTag {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.ip_tagging.v2.IPTagging.IPTag";
@@ -57,10 +57,10 @@ message IPTagging {
   }
 
   // Specifies the content of the IP tag file.
-// Allow the file to be created with no IP tags.
-message IPTagFile {
-  repeated IPTag ip_tags = 1;
-}
+  // Allow the file to be created with no IP tags.
+  message IPTagFile {
+    repeated IPTag ip_tags = 1;
+  }
 
   // Specify to which header the tags will be written.
   message IpTagHeader {
