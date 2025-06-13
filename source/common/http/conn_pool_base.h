@@ -54,7 +54,7 @@ public:
       Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
-      std::vector<Http::Protocol> protocols);
+      std::vector<Http::Protocol> protocols, Server::OverloadManager& overload_manager);
   ~HttpConnPoolImplBase() override;
 
   // Event::DeferredDeletable
@@ -164,10 +164,11 @@ public:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
       Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
       CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
+      Server::OverloadManager& overload_manager,
       absl::optional<Http::HttpServerPropertiesCache::Origin> origin = absl::nullopt,
       Http::HttpServerPropertiesCacheSharedPtr cache = nullptr)
       : HttpConnPoolImplBase(host, priority, dispatcher, options, transport_socket_options,
-                             random_generator, state, protocols),
+                             random_generator, state, protocols, overload_manager),
         codec_fn_(codec_fn), client_fn_(client_fn), protocol_(protocols[0]), cache_(cache) {
     setOrigin(origin);
     ASSERT(protocols.size() == 1);

@@ -244,6 +244,21 @@ typedef enum {
 } envoy_dynamic_module_type_on_http_filter_response_trailers_status;
 
 /**
+ * envoy_dynamic_module_type_metadata_source represents the location of metadata to get when calling
+ * envoy_dynamic_module_callback_http_get_metadata_* functions.
+ */
+typedef enum {
+  // stream's dynamic metadata.
+  envoy_dynamic_module_type_metadata_source_dynamic,
+  // route metadata
+  envoy_dynamic_module_type_metadata_source_route,
+  // cluster metadata
+  envoy_dynamic_module_type_metadata_source_cluster,
+  // host (LbEndpoint in xDS) metadata
+  envoy_dynamic_module_type_metadata_source_host,
+} envoy_dynamic_module_type_metadata_source;
+
+/**
  * envoy_dynamic_module_type_attribute_id represents an attribute described in
  * https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
  */
@@ -1007,7 +1022,7 @@ bool envoy_dynamic_module_callback_http_append_response_body(
 bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes);
 
-// ------------------------ Dynamic Metadata Callbacks -------------------------
+// ---------------------------- Metadata Callbacks -----------------------------
 
 /**
  * envoy_dynamic_module_callback_http_set_dynamic_metadata_number is called by the module to set
@@ -1044,8 +1059,9 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
  * be stored.
  * @return true if the operation is successful, false otherwise.
  */
-bool envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
+bool envoy_dynamic_module_callback_http_get_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result);
 
@@ -1092,8 +1108,9 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
  * they are guaranteed to be valid until the end of the current event hook unless the setter
  * callback is called.
  */
-bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
+bool envoy_dynamic_module_callback_http_get_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);

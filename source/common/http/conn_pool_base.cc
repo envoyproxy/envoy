@@ -46,10 +46,10 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
-    std::vector<Http::Protocol> protocols)
+    std::vector<Http::Protocol> protocols, Server::OverloadManager& overload_manager)
     : Envoy::ConnectionPool::ConnPoolImplBase(
           host, priority, dispatcher, options,
-          wrapTransportSocketOptions(transport_socket_options, protocols), state),
+          wrapTransportSocketOptions(transport_socket_options, protocols), state, overload_manager),
       random_generator_(random_generator) {
   ASSERT(!protocols.empty());
 }

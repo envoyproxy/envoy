@@ -71,6 +71,8 @@ public:
                      Filesystem::Instance& file_system,
                      const ProcessContextOptRef& process_context = absl::nullopt);
 
+  ~ValidationInstance() override;
+
   // Server::Instance
   void run() override { PANIC("not implemented"); }
   OptRef<Admin> admin() override {
