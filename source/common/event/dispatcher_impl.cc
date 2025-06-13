@@ -193,6 +193,9 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
                 source_address->networkNamespace().value(), result.status().ToString());
       return nullptr;
     }
+  } else {
+    conn = factory->createClientConnection(*this, address, source_address,
+                                           std::move(transport_socket), options, transport_options);
   }
 #else
   conn = factory->createClientConnection(*this, address, source_address,
