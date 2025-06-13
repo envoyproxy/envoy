@@ -66,7 +66,7 @@ jobs:
            --discard_analysis_cache \
            --nouse_action_cache \
            --features="-layering_check" \
-           --config=clang-libc++ \
+           --config=clang \
            --config=ci \
            //source/common/http/...
 

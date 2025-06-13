@@ -20,6 +20,11 @@ behavior_changes:
   change: |
     Envoy will automatically raise the soft limit on the file descriptors to the hard limit. This behavior
     can be reverted using the runtime guard ``envoy_restart_features_raise_file_limits``.
+- area: build
+  change: |
+    Removed the clang-libstdc++ toolchain setup as this is no longer used or tested by the project.
+    Consolidated clang and gcc toolchains which can be used with ``--config=clang`` or ``--config=gcc``.
+    These use libc++ and libstdc++ respectively.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -78,6 +83,10 @@ bug_fixes:
   change: |
     Fixes a bug where the lifetime of the ``HttpConnectionManager``'s ``ActiveStream`` can be out of sync
     with the lifetime of the codec stream.
+- area: config_validation
+  change: |
+    Fixed an bug where the config validation server will crash when the configuration contains
+    ``%CEL%`` or ``%METADATA%`` substitution formatter.
 - area: quic
   change: |
     Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a ``transfer-encoding`` header is incorrectly appended.
