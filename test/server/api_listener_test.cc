@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "envoy/config/listener/v3/listener.pb.h"
 
@@ -15,7 +16,6 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include <vector>
 
 namespace Envoy {
 namespace Server {
