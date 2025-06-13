@@ -91,6 +91,15 @@ RedisCluster::RedisCluster(
   }
 }
 
+RedisCluster::~RedisCluster() {
+  if (redis_discovery_session_->resolve_timer_) {
+    redis_discovery_session_->resolve_timer_->disableTimer();
+  }
+  if (redis_discovery_session_->current_request_) {
+    redis_discovery_session_->current_request_->cancel();
+  }
+}
+
 void RedisCluster::startPreInit() {
   for (const DnsDiscoveryResolveTargetPtr& target : dns_discovery_resolve_targets_) {
     target->startResolveDns();
@@ -268,7 +277,7 @@ RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
     current_request_ = nullptr;
   }
   // Disable timer for mock tests.
-  if (resolve_timer_) {
+  if (resolve_timer_ && resolve_timer_->enabled()) {
     resolve_timer_->disableTimer();
   }
 
