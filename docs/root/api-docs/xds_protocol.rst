@@ -393,18 +393,19 @@ in the sequence diagram:
 
 .. note::
 
-   If an xDS client responds with an ACK, it does _not_ mean that a configuration was successfully
-   applied. ACKing an xDS resource simply means that when evaluated in isolation, the xDS resource
-   is valid. It is still possible that ACKed resources fail to apply successfully.
+   ACKing simply means that the client considered each of the resources in the response to be valid
+   when evaluated in isolation.
 
 NACK
 ^^^^
 
-If Envoy had instead rejected configuration
-update ``X``, it would reply with :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>`
+If Envoy had instead found some resources in configuration
+update ``X`` to be invalid, it would reply with :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>`
 populated and its previous version, which in this case was the empty
-initial version. The :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>` has
-more details around the exact error message populated in the message field:
+initial version. Note that a ``NACK`` does not necessarily mean that none of the resources were
+accepted. The :ref:`error_detail
+<envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>` has more details around the
+exact error message populated in the message field:
 
 .. figure:: diagrams/simple-nack.svg
    :alt: No version update after NACK
@@ -444,7 +445,8 @@ ACK and NACK semantics summary
   :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` from the
   :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`. This does not
   mean that the configuration was applied.
-- ``NACK`` signifies that the resources are rejected and is indicated by the presence of the
+- ``NACK`` signifies that at least one of the resources in the response were considered invalid. A ``NACK``
+  is indicated by the presence of the
   :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>` field. The :ref:`version_info
   <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` indicates the most recent version that the
   client is using, although that may not be an older version in the case where the client has
