@@ -11,6 +11,34 @@ index 848e65dabb857..84aea6256b976 100644
      ],
  )
 
+diff --git a/bazel/grpc_build_system.bzl b/bazel/grpc_build_system.bzl
+index 0fc2e1d061..aab6e990a6 100644
+--- a/bazel/grpc_build_system.bzl
++++ b/bazel/grpc_build_system.bzl
+@@ -27,7 +27,6 @@
+ Contains macros used throughout the repo.
+ """
+ 
+-load("@build_bazel_apple_support//rules:universal_binary.bzl", "universal_binary")
+ load("@build_bazel_rules_apple//apple:ios.bzl", "ios_unit_test")
+ load("@build_bazel_rules_apple//apple/testing/default_runner:ios_test_runner.bzl", "ios_test_runner")
+ load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+@@ -194,14 +193,9 @@ def grpc_proto_plugin(name, srcs = [], deps = []):
+         srcs = srcs,
+         deps = deps,
+     )
+-    universal_binary(
+-        name = name + "_universal",
+-        binary = name + "_native",
+-    )
+     native.genrule(
+         name = name,
+         srcs = select({
+-            "@platforms//os:macos": [name + "_universal"],
+             "//conditions:default": [name + "_native"],
+         }),
+         outs = [name],
+
 diff --git a/src/core/BUILD b/src/core/BUILD
 index e8bf5e85629c4..442348ddf70ca 100644
 --- a/src/core/BUILD
@@ -39,26 +67,47 @@ diff --git a/src/proto/grpc/health/v1/BUILD b/src/proto/grpc/health/v1/BUILD
 +    visibility = ["//visibility:public"],
 +)
 diff --git a/third_party/BUILD b/third_party/BUILD
+index 9cf5e50cb8..d15970783c 100644
 --- a/third_party/BUILD
 +++ b/third_party/BUILD
-@@ -49,7 +49,7 @@
-
+@@ -31,25 +31,19 @@ config_setting(
+ 
+ alias(
+     name = "libssl",
+-    actual = select({
+-        ":grpc_use_openssl_setting": "@openssl//:ssl",
+-        "//conditions:default": "@boringssl//:ssl",
+-    }),
++    actual = "@envoy//bazel:boringssl",
+     tags = ["manual"],
+ )
+ 
+ alias(
+     name = "libcrypto",
+-    actual = select({
+-        ":grpc_use_openssl_setting": "@openssl//:crypto",
+-        "//conditions:default": "@boringssl//:crypto",
+-    }),
++    actual = "@envoy//bazel:boringcrypto",
+     tags = ["manual"],
+ )
+ 
  alias(
      name = "madler_zlib",
 -    actual = "@zlib//:zlib",
 +    actual = "@envoy//bazel/foreign_cc:zlib",
      tags = ["manual"],
  )
-
-@@ -80,7 +80,7 @@
-
+ 
+@@ -80,7 +74,7 @@ alias(
+ 
  alias(
      name = "cares",
 -    actual = "@com_github_cares_cares//:ares",
 +    actual = "@envoy//bazel/foreign_cc:ares",
      tags = ["manual"],
  )
-
+ 
 diff --git a/src/core/lib/promise/detail/promise_factory.h b/src/core/lib/promise/detail/promise_factory.h
 --- a/src/core/lib/promise/detail/promise_factory.h
 +++ b/src/core/lib/promise/detail/promise_factory.h

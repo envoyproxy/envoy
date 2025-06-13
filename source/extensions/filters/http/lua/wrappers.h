@@ -365,7 +365,8 @@ public:
   ConnectionStreamInfoWrapper(const StreamInfo::StreamInfo& connection_stream_info)
       : connection_stream_info_{connection_stream_info} {}
   static ExportedFunctions exportedFunctions() {
-    return {{"dynamicMetadata", static_luaConnectionDynamicMetadata}};
+    return {{"dynamicMetadata", static_luaConnectionDynamicMetadata},
+            {"dynamicTypedMetadata", static_luaConnectionDynamicTypedMetadata}};
   }
 
 private:
@@ -374,6 +375,12 @@ private:
    * @return ConnectionDynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
   DECLARE_LUA_FUNCTION(ConnectionStreamInfoWrapper, luaConnectionDynamicMetadata);
+
+  /**
+   * Get reference to stream info typed metadata object.
+   * @return typed metadata wrapped as a Lua table.
+   */
+  DECLARE_LUA_FUNCTION(ConnectionStreamInfoWrapper, luaConnectionDynamicTypedMetadata);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { connection_dynamic_metadata_wrapper_.reset(); }

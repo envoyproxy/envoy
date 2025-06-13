@@ -278,6 +278,13 @@ std::string makeSetCookieValue(absl::string_view name, absl::string_view value,
                                absl::Span<const CookieAttribute> attributes);
 
 /**
+ * Remove a particular key value pair from a cookie.
+ * @param headers supplies the headers to remove the cookie pair from.
+ * @param key the key for the particular cookie value to remove.
+ */
+void removeCookieValue(HeaderMap& headers, const std::string& key);
+
+/**
  * Get the response status from the response headers.
  * @param headers supplies the headers to get the status from.
  * @return uint64_t the response code or returns 0 if headers are invalid.
