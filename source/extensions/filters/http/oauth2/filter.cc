@@ -571,6 +571,10 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
+  // the request upstream.
+  decryptAndUpdateOAuthTokenCookies(headers);
+
   // Skip Filter and continue chain if a Passthrough header is matching
   // Must be done before the sanitation of the authorization header,
   // otherwise the authorization header might be altered or removed
@@ -606,10 +610,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   if (config_->signoutPath().match(path_header->value().getStringView())) {
     return signOutUser(headers);
   }
-
-  // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
-  // the request upstream.
-  decryptAndUpdateOAuthTokenCookies(headers);
 
   if (canSkipOAuth(headers)) {
     // Update the path header with the query string parameters after a successful OAuth login.
@@ -766,24 +766,34 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
   const std::string encrypted_id_token = findValue(cookies, cookie_names.id_token_);
   const std::string encrypted_refresh_token = findValue(cookies, cookie_names.refresh_token_);
 
-  if (!encrypted_access_token.empty()) {
-    cookies.insert_or_assign(cookie_names.bearer_token_,
-                             decryptToken(encrypted_access_token, config_->hmacSecret()));
-  }
-
-  if (!encrypted_id_token.empty()) {
-    cookies.insert_or_assign(cookie_names.id_token_,
-                             decryptToken(encrypted_id_token, config_->hmacSecret()));
-  }
-
-  if (!encrypted_refresh_token.empty()) {
-    cookies.insert_or_assign(cookie_names.refresh_token_,
-                             decryptToken(encrypted_refresh_token, config_->hmacSecret()));
-  }
-
   if (!encrypted_access_token.empty() || !encrypted_id_token.empty() ||
       !encrypted_refresh_token.empty()) {
-    std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+    std::string new_cookies =
+        std::string(headers.get(Http::Headers::get().Cookie)[0]->value().getStringView());
+    if (!encrypted_access_token.empty()) {
+      size_t pos = new_cookies.find(encrypted_access_token);
+      if (pos != std::string::npos) {
+        new_cookies.replace(pos, encrypted_access_token.length(),
+                            decryptToken(encrypted_access_token, config_->hmacSecret()));
+      }
+    }
+
+    if (!encrypted_id_token.empty()) {
+      size_t pos = new_cookies.find(encrypted_id_token);
+      if (pos != std::string::npos) {
+        new_cookies.replace(pos, encrypted_id_token.length(),
+                            decryptToken(encrypted_id_token, config_->hmacSecret()));
+      }
+    }
+
+    // todo: we don't need to pass the refresh token to upstream services
+    if (!encrypted_refresh_token.empty()) {
+      size_t pos = new_cookies.find(encrypted_refresh_token);
+      if (pos != std::string::npos) {
+        new_cookies.replace(pos, encrypted_refresh_token.length(),
+                            decryptToken(encrypted_refresh_token, config_->hmacSecret()));
+      }
+    }
     headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
   }
 }
