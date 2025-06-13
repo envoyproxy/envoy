@@ -67,19 +67,20 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
   // Setup the xDS-TP based config-sources.
   // Iterate over the ConfigSources defined in the bootstrap and initialize each as an ADS source.
   for (const auto& config_source : bootstrap.config_sources()) {
-    absl::StatusOr<AuthorityDataIterator> it_or_error = addAuthority(config_source, false);
-    RETURN_IF_NOT_OK(it_or_error.status());
+    absl::StatusOr<AuthorityData> authority_or_error = createAuthority(config_source, false);
+    RETURN_IF_NOT_OK(authority_or_error.status());
+    authorities_.emplace_back(std::move(*authority_or_error));
   }
   // Initialize the default_config_source as an ADS source.
   if (bootstrap.has_default_config_source()) {
-    absl::StatusOr<AuthorityDataIterator> it_or_error =
-        addAuthority(bootstrap.default_config_source(), true);
-    RETURN_IF_NOT_OK(it_or_error.status());
-    default_authority_ = it_or_error.value();
+    absl::StatusOr<AuthorityData> authority_or_error =
+        createAuthority(bootstrap.default_config_source(), true);
+    RETURN_IF_NOT_OK(authority_or_error.status());
+    default_authority_ = std::make_unique<AuthorityData>(std::move(*authority_or_error));
   }
 
   // TODO(adisuissa): the rest of this function should be refactored so the shared
-  // code with "addAuthority" is only defined once.
+  // code with "createAuthority" is only defined once.
   // Setup the ads_config mux.
   const auto& dyn_resources = bootstrap.dynamic_resources();
   // This is the only point where distinction between delta ADS and state-of-the-world ADS is made.
@@ -191,9 +192,9 @@ XdsManagerImpl::setAdsConfigSource(const envoy::config::core::v3::ApiConfigSourc
   return replaceAdsMux(config_source);
 }
 
-absl::StatusOr<XdsManagerImpl::AuthorityDataIterator>
-XdsManagerImpl::addAuthority(const envoy::config::core::v3::ConfigSource& config_source,
-                             bool allow_no_authority_names) {
+absl::StatusOr<XdsManagerImpl::AuthorityData>
+XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& config_source,
+                                bool allow_no_authority_names) {
   // Only the config_source.api_config_source can be used for authorities at the moment.
   if (!config_source.has_api_config_source()) {
     return absl::InvalidArgumentError(
@@ -316,10 +317,7 @@ XdsManagerImpl::addAuthority(const envoy::config::core::v3::ConfigSource& config
   }
   ASSERT(authority_mux != nullptr);
 
-  // Add the authority to the authorities vector, and update the map to point all the authority
-  // names to the new authority data.
-  authorities_.emplace_back(std::move(config_source_authorities), std::move(authority_mux));
-  return std::prev(authorities_.end());
+  return AuthorityData(std::move(config_source_authorities), std::move(authority_mux));
 }
 
 absl::Status

@@ -42,14 +42,12 @@ private:
     // The ADS gRPC mux to the server.
     Config::GrpcMuxSharedPtr grpc_mux_;
   };
-  using AuthorityDataIterator = std::vector<AuthorityData>::iterator;
 
-  // Adds an authority config source given the authority name.
-  // Returns an iterator to the authorities_ vector entry that was added or an error if one
-  // occurred.
-  absl::StatusOr<AuthorityDataIterator>
-  addAuthority(const envoy::config::core::v3::ConfigSource& config_source,
-               bool allow_no_authority_names);
+  // Creates an authority based on a given config source.
+  // Returns the new authority, or an error if one occurred.
+  absl::StatusOr<AuthorityData>
+  createAuthority(const envoy::config::core::v3::ConfigSource& config_source,
+                  bool allow_no_authority_names);
 
   // Validates (syntactically) the config_source by doing the PGV validation.
   absl::Status validateAdsConfig(const envoy::config::core::v3::ApiConfigSource& config_source);
@@ -78,14 +76,14 @@ private:
   Upstream::ClusterManager* cm_;
   GrpcMuxSharedPtr ads_mux_;
 
-  // Stores all authorities as configured in the bootstrap.
-  // Also includes the default config-source (the one that will be used for cases where the
-  // authority in a resource doesn't exist, or doesn't match).
+  // Stores all authorities as configured in the bootstrap under config_sources.
+  // It does not include the default config-source.
   std::vector<AuthorityData> authorities_;
 
   // The default authority that will be used for cases where the authority in a resource doesn't
-  // exist, or doesn't match.
-  AuthorityDataIterator default_authority_;
+  // exist, or doesn't match. This will only be populated if default_config_source
+  // is defined in the bootstrap.
+  std::unique_ptr<AuthorityData> default_authority_;
 };
 
 } // namespace Config
