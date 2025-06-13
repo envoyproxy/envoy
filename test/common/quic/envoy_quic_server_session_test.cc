@@ -1206,5 +1206,13 @@ TEST_F(EnvoyQuicServerSessionTestWillNotInitialize, GetRttAndCwnd) {
   EXPECT_EQ(envoy_quic_session_.congestionWindowInBytes(), absl::nullopt);
 }
 
+TEST_F(EnvoyQuicServerSessionTest, SetSocketOption) {
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(envoy_quic_session_.setSocketOption(sockopt_name, sockopt_val));
+}
+
 } // namespace Quic
 } // namespace Envoy
