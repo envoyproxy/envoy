@@ -72,6 +72,9 @@ constexpr absl::string_view SameSiteStrict = ";SameSite=Strict";
 constexpr absl::string_view SameSiteNone = ";SameSite=None";
 constexpr absl::string_view HmacPayloadSeparator = "\n";
 
+constexpr int DEFAULT_CSRF_TOKEN_EXPIRES_IN = 600;
+constexpr int DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN = 600;
+
 template <class T>
 std::vector<Http::HeaderUtility::HeaderDataPtr>
 headerMatchers(const T& matcher_protos, Server::Configuration::CommonFactoryContext& context) {
@@ -421,9 +424,13 @@ FilterConfig::FilterConfig(
       default_refresh_token_expires_in_(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
       csrf_token_expires_in_(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, csrf_token_expires_in, 600)),
+          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config,
+                                          csrf_token_expires_in,
+                                          DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
       code_verifier_token_expires_in_(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, code_verifier_token_expires_in, 600)),
+          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config,
+                                          code_verifier_token_expires_in,
+                                          DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
