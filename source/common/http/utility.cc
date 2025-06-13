@@ -608,6 +608,27 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   return cookie_value;
 }
 
+void Utility::removeCookieValue(HeaderMap& headers, const std::string& key) {
+  const LowerCaseString& cookie_header = Http::Headers::get().Cookie;
+  std::vector<std::string> new_cookies;
+
+  forEachCookie(headers, cookie_header,
+                [&new_cookies, &key](absl::string_view k, absl::string_view v) -> bool {
+                  if (key != k) {
+                    new_cookies.emplace_back(fmt::format("{}={}", k, v));
+                  }
+
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
+
+  // Remove the existing Cookie header
+  headers.remove(cookie_header);
+  if (!new_cookies.empty()) {
+    headers.setReferenceKey(cookie_header, absl::StrJoin(new_cookies, "; "));
+  }
+}
+
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
   auto status = Utility::getResponseStatusOrNullopt(headers);
   if (!status.has_value()) {
