@@ -205,11 +205,6 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
       hash = context->computeHashKey();
     }
   }
-  if (hash.has_value()) {
-    std::cout << "hash: " << hash.value() << std::endl;
-  } else {
-    std::cout << "hash: no hash" << std::endl;
-  }
 
   const uint64_t h = hash ? hash.value() : random_.random();
 
