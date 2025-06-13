@@ -302,6 +302,9 @@ void CacheSession::onTrailersInserted(Http::ResponseTrailerMapPtr trailers) {
     cache_sessions->stats().subCacheSessionsSubscribers(trailer_subscribers_.size());
   }
   trailer_subscribers_.clear();
+  // If there's a body subscriber waiting for more body that doesn't exist,
+  // it needs to be notified so it can call getTrailers.
+  abortBodyOutOfRangeSubscribers();
 }
 
 void CacheSession::sendTrailersTo(TrailerSubscriber& subscriber) {
