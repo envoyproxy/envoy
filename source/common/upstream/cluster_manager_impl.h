@@ -291,8 +291,7 @@ public:
 
   bool hasCluster(const std::string& cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
-    return (active_clusters_.find(cluster_name) != active_clusters_.end()) ||
-           (warming_clusters_.find(cluster_name) != warming_clusters_.end());
+    return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);
   }
 
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
