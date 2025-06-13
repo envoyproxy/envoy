@@ -797,7 +797,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
 
     const std::chrono::seconds csrf_token_expires_in =
-        config_->csrfTokenExpiresIn();
+        config_->getCsrfTokenExpiresIn();
     std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
 
     std::string same_site = getSameSiteString(config_->nonceCookieSettings().same_site_);
@@ -830,7 +830,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
       encrypt(code_verifier, config_->hmacSecret(), random_);
 
   const std::chrono::seconds code_verifier_token_expires_in =
-      config_->codeVerifierTokenExpiresIn();
+      config_->getCodeVerifierTokenExpiresIn();
   std::string expire_in = std::to_string(code_verifier_token_expires_in.count());
 
   std::string same_site = getSameSiteString(config_->codeVerifierCookieSettings().same_site_);
