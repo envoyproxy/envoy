@@ -45,7 +45,7 @@ public:
     }
 
     const Envoy::Matcher::ActionPtr result = match_result.action();
-    cluster_name_ = std::string(result->getTyped<ClusterAction>().cluster());
+    cluster_name_.emplace(result->getTyped<ClusterAction>().cluster());
   }
 
 private:

@@ -28,7 +28,7 @@ class ClusterAction : public Envoy::Matcher::ActionBase<ClusterActionProto> {
 public:
   explicit ClusterAction(std::shared_ptr<std::string> cluster) : cluster_(cluster) {}
 
-  absl::string_view cluster() const { return *cluster_; }
+  const std::string& cluster() const { return *cluster_; }
 
 private:
   const std::shared_ptr<std::string> cluster_;
