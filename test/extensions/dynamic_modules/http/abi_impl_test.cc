@@ -733,6 +733,8 @@ TEST(ABIImpl, GetAttributes) {
   StreamInfo::StreamIdProviderImpl id_provider("ffffffff-0012-0110-00ff-0c00400600ff");
   EXPECT_CALL(stream_info, getStreamIdProvider())
       .WillRepeatedly(testing::Return(makeOptRef<const StreamInfo::StreamIdProvider>(id_provider)));
+  const std::string route_name{"test_route"};
+  EXPECT_CALL(stream_info, getRouteName()).WillRepeatedly(testing::ReturnRef(route_name));
 
   NiceMock<StreamInfo::MockStreamInfo> info;
   EXPECT_CALL(stream_info, downstreamAddressProvider())
@@ -745,6 +747,21 @@ TEST(ABIImpl, GetAttributes) {
   char* result_str_ptr = nullptr;
   size_t result_str_length = 0;
   uint64_t result_number = 0;
+
+  // envoy_dynamic_module_type_attribute_id_RequestPath with null headers map, should return false.
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_str_ptr,
+      &result_str_length));
+
+  std::initializer_list<std::pair<std::string, std::string>> headers = {
+      {":path", "/api/v1/action?param=value"},
+      {":scheme", "https"},
+      {":method", "GET"},
+      {":authority", "example.org"},
+      {"referer", "envoyproxy.io"},
+      {"user-agent", "curl/7.54.1"}};
+  Http::TestRequestHeaderMapImpl request_headers{headers};
+  filter.request_headers_ = &request_headers;
 
   // Unsupported attributes.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
@@ -795,6 +812,77 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(result_str_length, 36);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "ffffffff-0012-0110-00ff-0c00400600ff");
 
+  // envoy_dynamic_module_type_attribute_id_XdsRouteName
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_XdsRouteName, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 10);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "test_route");
+
+  // envoy_dynamic_module_type_attribute_id_RequestPath
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 26);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action?param=value");
+
+  // envoy_dynamic_module_type_attribute_id_RequestHost
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestHost, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 11);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "example.org");
+
+  // envoy_dynamic_module_type_attribute_id_RequestMethod
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestMethod, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 3);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "GET");
+
+  // envoy_dynamic_module_type_attribute_id_RequestScheme
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestScheme, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 5);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "https");
+
+  // envoy_dynamic_module_type_attribute_id_RequestUserAgent
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestUserAgent, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 11);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "curl/7.54.1");
+
+  // envoy_dynamic_module_type_attribute_id_RequestReferer
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestReferer, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 13);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "envoyproxy.io");
+
+  // envoy_dynamic_module_type_attribute_id_RequestQuery
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestQuery, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 11);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "param=value");
+
+  // envoy_dynamic_module_type_attribute_id_RequestUrlPath
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestUrlPath, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 14);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
+
+  // test again without query params for envoy_dynamic_module_type_attribute_id_RequestUrlPath
+  request_headers.setPath("/api/v1/action");
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_RequestUrlPath, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, 14);
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
+
   // envoy_dynamic_module_type_attribute_id_ResponseCode
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ResponseCode, &result_number));
@@ -814,6 +902,15 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_DestinationPort, &result_number));
   EXPECT_EQ(result_number, 4321);
+}
+
+TEST(ABIImpl, HttpCallout) {
+  DynamicModuleHttpFilter filter{nullptr};
+  const std::string cluster{"some_cluster"};
+  EXPECT_EQ(envoy_dynamic_module_callback_http_filter_http_callout(
+                &filter, 1, const_cast<char*>(cluster.data()), cluster.size(), nullptr, 0, nullptr,
+                0, 1000),
+            envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
 }
 
 } // namespace HttpFilters

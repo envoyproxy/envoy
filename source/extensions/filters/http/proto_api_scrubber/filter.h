@@ -1,17 +1,12 @@
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.h"
-#include "envoy/extensions/filters/http/proto_api_scrubber/v3/config.pb.validate.h"
 #include "envoy/http/filter.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
-
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,30 +15,37 @@ namespace ProtoApiScrubber {
 
 inline constexpr const char kFilterName[] = "envoy.filters.http.proto_api_scrubber";
 
-class ProtoApiScrubberFilter : public Envoy::Http::PassThroughFilter,
-                               Envoy::Logger::Loggable<Envoy::Logger::Id::filter> {
+/**
+ * A filter that supports scrubbing of request and response protobuf payloads based on configured
+ * restrictions.
+ */
+class ProtoApiScrubberFilter : public Http::PassThroughFilter,
+                               Logger::Loggable<Logger::Id::filter> {
 public:
-  explicit ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig&);
+  explicit ProtoApiScrubberFilter(const ProtoApiScrubberFilterConfig&) {};
 
-  Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
-                                                 bool end_stream) override;
+  Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
+                                          bool end_stream) override;
 
-  Envoy::Http::FilterDataStatus decodeData(Envoy::Buffer::Instance& data, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
-  Envoy::Http::FilterHeadersStatus encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
-                                                 bool end_stream) override;
+private:
+  // Rejects requests and sends local reply back to the client.
+  void rejectRequest(Envoy::Grpc::Status::GrpcStatus grpc_status, absl::string_view error_msg,
+                     absl::string_view rc_detail);
 
-  Envoy::Http::FilterDataStatus encodeData(Envoy::Buffer::Instance& data, bool end_stream) override;
+  bool is_valid_grpc_request_ = false;
+
+  // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and
+  // vice-versa.
+  GrpcFieldExtraction::MessageConverterPtr request_msg_converter_{nullptr};
 };
 
-class FilterFactory
-    : public Envoy::Extensions::HttpFilters::Common::FactoryBase<
-          envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig> {
+class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {
 private:
-  Envoy::Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::proto_api_scrubber::v3::ProtoApiScrubberConfig&
-          proto_config,
-      const std::string&, Envoy::Server::Configuration::FactoryContext&) override;
+  Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const ProtoApiScrubberConfig& proto_config, const std::string&,
+                                    Server::Configuration::FactoryContext&) override;
 };
 } // namespace ProtoApiScrubber
 } // namespace HttpFilters
