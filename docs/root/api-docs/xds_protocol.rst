@@ -384,7 +384,7 @@ as well as a mechanism to ACK/NACK configuration updates.
 ACK
 ^^^
 
-If the update contained valid resources, the
+If _all_ resources in the update were valid, the
 :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.version_info>` will be ``X``, as indicated
 in the sequence diagram:
 
