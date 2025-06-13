@@ -23,4 +23,7 @@ message Config {
 
   // Response data as a data source.
   config.core.v3.DataSource response = 1;
+
+  // If true, the filter will not actively close the connection after sending the response.
+  bool keep_open_after_response = 2;
 }

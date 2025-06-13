@@ -28,6 +28,10 @@ envoy_cc_library(
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
+    # The direct response filter can be used in integration tests which don't need an upstream.
+    extra_visibility = [
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         ":filter",
         "//envoy/registry",
