@@ -2,7 +2,8 @@
 
 #include "envoy/extensions/router/cluster_specifiers/matcher/v3/matcher.pb.validate.h"
 
-#include "source/common/router/config_impl.h"
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/router/delegating_route_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,14 +22,18 @@ Envoy::Matcher::ActionFactoryCb ClusterActionFactory::createActionFactoryCb(
 
 REGISTER_FACTORY(ClusterActionFactory, Envoy::Matcher::ActionFactory<ClusterActionContext>);
 
-class MatcherRouteEntry : public Envoy::Router::RouteEntryImplBase::DynamicRouteEntry {
+class MatcherRouteEntry : public Envoy::Router::DelegatingRouteEntry {
 public:
   MatcherRouteEntry(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
                     Envoy::Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree)
-      : DynamicRouteEntry(std::move(parent), ""), match_tree_(std::move(match_tree)) {}
+      : DelegatingRouteEntry(std::move(parent)), match_tree_(std::move(match_tree)) {}
+
+  const std::string& clusterName() const override {
+    return cluster_name_.has_value() ? *cluster_name_ : EMPTY_STRING;
+  }
 
   void refreshRouteCluster(const Http::RequestHeaderMap& headers,
-                           const StreamInfo::StreamInfo& stream_info) const {
+                           const StreamInfo::StreamInfo& stream_info) {
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
@@ -45,6 +50,7 @@ public:
 
 private:
   Envoy::Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree_;
+  OptRef<const std::string> cluster_name_;
 };
 
 Envoy::Router::RouteConstSharedPtr

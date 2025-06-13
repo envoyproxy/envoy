@@ -42,6 +42,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/matcher_visitor.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -2557,26 +2558,6 @@ absl::optional<bool> PerFilterConfigs::disabled(absl::string_view name) const {
 
   const auto it = configs_.find(name);
   return it != configs_.end() ? absl::optional<bool>{it->second.disabled_} : absl::nullopt;
-}
-
-absl::Status RouteActionValidationVisitor::performDataInputValidation(
-    const Matcher::DataInputFactory<Http::HttpMatchingData>&, absl::string_view type_url) {
-  static const std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-      createReflectableMessage(
-          envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
-          ->GetDescriptor()
-          ->full_name());
-  static const std::string filter_state_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-      createReflectableMessage(envoy::extensions::matching::common_inputs::network::v3::
-                                   FilterStateInput::default_instance())
-          ->GetDescriptor()
-          ->full_name());
-  if (type_url == request_header_input_name || type_url == filter_state_input_name) {
-    return absl::OkStatus();
-  }
-
-  return absl::InvalidArgumentError(
-      fmt::format("Route table can only match on request headers, saw {}", type_url));
 }
 
 Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(

@@ -23,8 +23,9 @@ envoy_cc_library(
         "//envoy/router:cluster_specifier_plugin_interface",
         "//source/common/common:utility_lib",
         "//source/common/http:utility_lib",
-        "//source/common/router:config_lib",
-        "//source/common/runtime:runtime_features_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/router:delegating_route_lib",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg_cc_proto",
     ],
 )
@@ -36,6 +37,7 @@ envoy_cc_extension(
     deps = [
         ":matcher_cluster_specifier_lib",
         "//envoy/registry",
+        "//source/common/router:matcher_visitor_lib",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg_cc_proto",
     ],
 )
