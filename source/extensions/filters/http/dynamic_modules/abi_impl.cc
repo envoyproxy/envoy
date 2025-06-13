@@ -34,7 +34,7 @@ size_t getHeaderValueImpl(const Http::HeaderMap* map,
   return values.size();
 }
 
-bool headerAsAttribute(const Http::HeaderMap* map, const Envoy::Http::LowerCaseString header,
+bool headerAsAttribute(const Http::HeaderMap* map, const Envoy::Http::LowerCaseString& header,
                        envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
                        size_t* result_buffer_length_ptr) {
   if (!map) {
