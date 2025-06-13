@@ -34,6 +34,19 @@ size_t getHeaderValueImpl(const Http::HeaderMap* map,
   return values.size();
 }
 
+bool headerAsAttribute(const Http::HeaderMap* map, const Envoy::Http::LowerCaseString& header,
+                       envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
+                       size_t* result_buffer_length_ptr) {
+  if (!map) {
+    return false;
+  }
+  auto lower_header = header.get();
+  envoy_dynamic_module_type_buffer_envoy_ptr key_ptr = const_cast<char*>(lower_header.data());
+  auto size = getHeaderValueImpl(map, key_ptr, lower_header.size(), result_buffer_ptr,
+                                 result_buffer_length_ptr, 0);
+  return size > 0;
+}
+
 size_t envoy_dynamic_module_callback_http_get_request_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
@@ -725,6 +738,79 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
           ok = true;
         }
       }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestPath: {
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Path, result,
+                           result_length);
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestHost: {
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Host, result,
+                           result_length);
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestMethod: {
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Method, result,
+                           result_length);
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestScheme: {
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().Scheme, result,
+                           result_length);
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestReferer: {
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::CustomHeaders::get().Referer,
+                           result, result_length);
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestUserAgent: {
+    ok = headerAsAttribute(filter->request_headers_, Envoy::Http::Headers::get().UserAgent, result,
+                           result_length);
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestUrlPath: {
+    const auto values = filter->request_headers_->get(Envoy::Http::Headers::get().Path);
+    if (!values.empty()) {
+      const auto& path = values[0]->value().getStringView();
+      size_t query_offset = path.find('?');
+      if (query_offset == absl::string_view::npos) {
+        *result = const_cast<char*>(path.data());
+        *result_length = path.size();
+      } else {
+        const auto url_path = path.substr(0, query_offset);
+        *result = const_cast<char*>(url_path.data());
+        *result_length = url_path.length();
+      }
+      ok = true;
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_RequestQuery: {
+    const auto values = filter->request_headers_->get(Envoy::Http::Headers::get().Path);
+    if (!values.empty()) {
+      const auto& path = values[0]->value().getStringView();
+      size_t query_offset = path.find('?');
+      if (query_offset != absl::string_view::npos) {
+        auto query = path.substr(query_offset + 1);
+        const auto fragment_offset = query.find('#');
+        query = query.substr(0, fragment_offset);
+        *result = const_cast<char*>(query.data());
+        *result_length = query.length();
+        ok = true;
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_attribute_id_XdsRouteName: {
+    const auto stream_info = filter->streamInfo();
+    if (stream_info) {
+      const auto& route_name = stream_info->getRouteName();
+      *result = const_cast<char*>(route_name.data());
+      *result_length = route_name.size();
+      ok = true;
     }
     break;
   }
