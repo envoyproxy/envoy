@@ -1029,17 +1029,24 @@ This method ensures type-safe access to metadata but returns nil in the followin
 
   function envoy_on_request(request_handle)
     -- Access proxy protocol typed metadata
-    local typed_meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
+    local ppv2_metadata = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
 
-    -- Check if metadata exists
-    if typed_meta then
-      -- Access specific TLV values
-      local tlv_type_authority = typed_meta.typed_metadata.tlv_type_authority  -- Authority identifier from proxy protocol TLV
-      local tlv_value = typed_meta.typed_metadata.tlv_value                    -- Value from the proxy protocol TLV data
+    -- Check if typed metadata exists
+    if ppv2_metadata then
+      -- Access TLV values
+      local ppv2_typed_metadata = ppv2_metadata.typed_metadata
 
-      request_handle:logInfo(string.format("TLV Authority: %s, Value: %s", tlv_type_authority or "none", tlv_value or "none"))
+      -- Check if TLV values exist
+      if ppv2_typed_metadata then
+        for tlv_key, tlv_value in pairs(ppv2_typed_metadata) do
+          -- Log each TLV key and value
+          request_handle:logInfo(string.format("TLV: %s, Value: %s", tlv_key or "none", request_handle:base64Escape(tlv_value) or "none"))
+        end
+      else
+        request_handle:logDebug("No typed metadata found in proxy protocol metadata.")
+      end
     else
-      request_handle:logInfo("No proxy protocol metadata available")
+      request_handle:logInfo("No proxy protocol metadata available.")
     end
   end
 
