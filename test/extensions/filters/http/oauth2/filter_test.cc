@@ -151,7 +151,7 @@ public:
       ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite code_verifier_samesite =
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
               CookieConfig_SameSite_DISABLED,
-      int default_csrf_token_expires_in = 0, int default_code_verifier_token_expires_in = 0) {
+      int csrf_token_expires_in = 0, int code_verifier_token_expires_in = 0) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -176,14 +176,14 @@ public:
       refresh_token_expires_in->set_seconds(default_refresh_token_expires_in);
     }
 
-    if (default_csrf_token_expires_in != 0) {
-      auto* csrf_token_expires_in = p.mutable_default_csrf_token_expires_in();
-      csrf_token_expires_in->set_seconds(default_csrf_token_expires_in);
+    if (csrf_token_expires_in != 0) {
+      auto* expires_in = p.mutable_csrf_token_expires_in();
+      expires_in->set_seconds(csrf_token_expires_in);
     }
 
-    if (default_code_verifier_token_expires_in != 0) {
-      auto* code_verifier_token_expires_in = p.mutable_default_code_verifier_token_expires_in();
-      code_verifier_token_expires_in->set_seconds(default_code_verifier_token_expires_in);
+    if (code_verifier_token_expires_in != 0) {
+      auto* expires_in = p.mutable_code_verifier_token_expires_in();
+      expires_in->set_seconds(code_verifier_token_expires_in);
     }
 
     p.set_auth_type(auth_type);
@@ -487,7 +487,7 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
 }
 
 // Verifies that the CSRF token cookie expiration (Max-Age) uses the custom
-// value from default_csrf_token_expires_in configuration.
+// value from csrf_token_expires_in configuration.
 TEST_F(OAuth2Test, CustomCsrfTokenExpiresIn) {
   // Create a filter config with a custom CSRF token expiration.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
@@ -506,7 +506,7 @@ TEST_F(OAuth2Test, CustomCsrfTokenExpiresIn) {
 
   // Set custom CSRF token expiration
   const int custom_csrf_token_expires_in = 1234;
-  auto* csrf_token_expires_in = p.mutable_default_csrf_token_expires_in();
+  auto* csrf_token_expires_in = p.mutable_csrf_token_expires_in();
   csrf_token_expires_in->set_seconds(custom_csrf_token_expires_in);
 
   // Create the OAuth config.
@@ -554,7 +554,7 @@ TEST_F(OAuth2Test, CustomCsrfTokenExpiresIn) {
 }
 
 // Verifies that the code verifier token cookie expiration (Max-Age) uses the custom
-// value from default_code_verifier_token_expires_in configuration.
+// value from code_verifier_token_expires_in configuration.
 TEST_F(OAuth2Test, CustomCodeVerifierTokenExpiresIn) {
   // Create a filter config with a custom code verifier token expiration.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
@@ -573,7 +573,7 @@ TEST_F(OAuth2Test, CustomCodeVerifierTokenExpiresIn) {
 
   // Set custom code verifier token expiration
   const int custom_code_verifier_token_expires_in = 1234;
-  auto* code_verifier_token_expires_in = p.mutable_default_code_verifier_token_expires_in();
+  auto* code_verifier_token_expires_in = p.mutable_code_verifier_token_expires_in();
   code_verifier_token_expires_in->set_seconds(custom_code_verifier_token_expires_in);
 
   // Create the OAuth config.
