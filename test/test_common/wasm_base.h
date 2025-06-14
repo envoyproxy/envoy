@@ -83,7 +83,8 @@ public:
     // Passes ownership of root_context_.
     Extensions::Common::Wasm::createWasm(
         plugin_, scope_, cluster_manager_, init_manager_, dispatcher_, *api, lifecycle_notifier_,
-        remote_data_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
+        transport_socket_factory_context_, tls_, remote_data_provider_, oci_manifest_provider_,
+        oci_blob_provider_, [this](WasmHandleSharedPtr wasm) { wasm_ = wasm; }, create_root);
     plugin_handle_ = getOrCreateThreadLocalPlugin(
         wasm_, plugin_, dispatcher_,
         [this, create_root](Wasm* wasm, const std::shared_ptr<Plugin>& plugin) {
@@ -100,6 +101,8 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr scope_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   NiceMock<Init::MockManager> init_manager_;
@@ -115,6 +118,8 @@ public:
   envoy::config::core::v3::Metadata listener_metadata_;
   Context* root_context_ = nullptr; // Unowned.
   RemoteAsyncDataProviderPtr remote_data_provider_;
+  Oci::ManifestProviderPtr oci_manifest_provider_;
+  Oci::BlobProviderPtr oci_blob_provider_;
 
   void setRootId(std::string root_id) { root_id_ = root_id; }
   void setVmConfiguration(std::string vm_configuration) { vm_configuration_ = vm_configuration; }
@@ -211,6 +216,8 @@ public:
 
   void setUp(const envoy::extensions::wasm::v3::PluginConfig plugin_config,
              bool singleton = false) {
+    ON_CALL(server_, getTransportSocketFactoryContext())
+        .WillByDefault(ReturnRef(transport_socket_factory_context_));
     plugin_config_ = std::make_shared<PluginConfig>(
         plugin_config, server_, server_.scope(), server_.initManager(),
         envoy::config::core::v3::TrafficDirection::UNSPECIFIED, /*metadata=*/nullptr, singleton);
@@ -226,6 +233,8 @@ public:
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext>
+      transport_socket_factory_context_;
   PluginConfigSharedPtr plugin_config_;
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
