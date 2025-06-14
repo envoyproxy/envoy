@@ -256,6 +256,16 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
     _response_body: Option<&[EnvoyBuffer]>,
   ) {
   }
+
+  /// This is called when the new event is scheduled via the [`EnvoyHttpFilterScheduler::commit`]
+  /// for this [`HttpFilter`].
+  ///
+  /// * `envoy_filter` can be used to interact with the underlying Envoy filter object.
+  /// * `event_id` is the ID of the event that was scheduled with
+  ///   [`EnvoyHttpFilterScheduler::commit`] to distinguish multiple scheduled events.
+  ///
+  /// See [`EnvoyHttpFilter::new_scheduler`] for more details on how to use this.
+  fn on_scheduled(&mut self, _envoy_filter: &mut EHF, _event_id: u64) {}
 }
 
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
@@ -623,6 +633,54 @@ pub trait EnvoyHttpFilter {
   /// returns the most specific per-route configuration (i.e. the one most up along the config
   /// hierarchy) created by the filter.
   fn get_most_specific_route_config(&self) -> Option<std::sync::Arc<dyn Any>>;
+
+  /// This can be called to continue the decoding of the HTTP request when the processing is
+  /// stopped.
+  ///
+  /// For example, this can be used inside the [`HttpFilter::on_http_callout_done`] or
+  /// [`HttpFilter::on_scheduled`] methods to continue the decoding of the request body
+  /// after the callout or scheduled event is done.
+  fn continue_decoding(&mut self);
+
+  /// This is exactly the same as [`EnvoyHttpFilter::continue_decoding`], but it is
+  /// used to continue the encoding of the HTTP response.
+  fn continue_encoding(&mut self);
+
+  /// Create a new implementation of the [`EnvoyHttpFilterScheduler`] trait.
+  ///
+  /// ## Example Usage
+  ///
+  /// ```
+  /// use abi::*;
+  /// use envoy_proxy_dynamic_modules_rust_sdk::*;
+  /// use std::thread;
+  ///
+  /// struct TestFilter;
+  /// impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for TestFilter {
+  ///   fn on_request_headers(
+  ///     &mut self,
+  ///     envoy_filter: &mut EHF,
+  ///     _end_of_stream: bool,
+  ///   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+  ///     let scheduler = envoy_filter.new_scheduler();
+  ///     let _ = std::thread::spawn(move || {
+  ///       // Do some work in a separate thread.
+  ///       // ...
+  ///       // Then schedule the event to continue processing.
+  ///       scheduler.commit(12345);
+  ///     });
+  ///     // Stops the iteration and schedules the event from the separate thread.
+  ///     envoy_dynamic_module_type_on_http_filter_request_headers_status::StopIteration
+  ///   }
+  ///   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+  ///     // The event_id should match the one we scheduled.
+  ///     assert_eq!(event_id, 12345);
+  ///     // Then we can continue processing the request.
+  ///     envoy_filter.continue_decoding();
+  ///   }
+  /// }
+  /// ```
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1154,6 +1212,28 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       filter_config_ptr.as_ref().cloned()
     }
   }
+
+  fn continue_decoding(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_continue_decoding(self.raw_ptr);
+    }
+  }
+
+  fn continue_encoding(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_continue_encoding(self.raw_ptr);
+    }
+  }
+
+  fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler> {
+    unsafe {
+      let scheduler_ptr =
+        abi::envoy_dynamic_module_callback_http_filter_scheduler_new(self.raw_ptr);
+      Box::new(EnvoyHttpFilterSchedulerImpl {
+        raw_ptr: scheduler_ptr,
+      })
+    }
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -1284,6 +1364,53 @@ impl EnvoyHttpFilterImpl {
       results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     }
     results
+  }
+}
+
+/// This represents a thin thread-safe object that can be used to schedule a generic event to the
+/// Envoy HTTP filter on the work thread.
+///
+/// For eaxmple, this can be used to offload some blocking work from the HTTP filter processing
+/// thread to a module-managed thread, and then schedule an event to continue
+/// processing the request.
+///
+/// Since this is primarily designed to be used from a different thread than the one
+/// where the [`HttpFilter`] instance was created, it is marked as `Send` so that
+/// the [`Box<dyn EnvoyHttpFilterScheduler>`] can be sent across threads.
+#[automock]
+pub trait EnvoyHttpFilterScheduler: Send {
+  /// Commit the scheduled event to the worker thread where [`HttpFilter`] is running.
+  ///
+  /// It accepts an `event_id` which can be used to distinguish different events
+  /// scheduled by the same filter. The `event_id` can be any value.
+  ///
+  /// Once this is called, [`HttpFilter::on_scheduled`] will be called with
+  /// the same `event_id` on the worker thread where the filter is running IF
+  /// by the time the event is committed, the filter is still alive.
+  fn commit(&self, event_id: u64);
+}
+
+/// This implements the [`EnvoyHttpFilterScheduler`] trait with the given raw pointer to the Envoy
+/// HTTP filter scheduler object.
+struct EnvoyHttpFilterSchedulerImpl {
+  raw_ptr: abi::envoy_dynamic_module_type_http_filter_scheduler_module_ptr,
+}
+
+unsafe impl Send for EnvoyHttpFilterSchedulerImpl {}
+
+impl Drop for EnvoyHttpFilterSchedulerImpl {
+  fn drop(&mut self) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_scheduler_delete(self.raw_ptr);
+    }
+  }
+}
+
+impl EnvoyHttpFilterScheduler for EnvoyHttpFilterSchedulerImpl {
+  fn commit(&self, event_id: u64) {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_scheduler_commit(self.raw_ptr, event_id);
+    }
   }
 }
 
@@ -1563,4 +1690,15 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_http_callout_done(
     headers,
     body,
   )
+}
+
+#[no_mangle]
+unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
+  envoy_ptr: abi::envoy_dynamic_module_type_http_filter_envoy_ptr,
+  filter_ptr: abi::envoy_dynamic_module_type_http_filter_module_ptr,
+  event_id: u64,
+) {
+  let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
+  let filter = &mut **filter;
+  filter.on_scheduled(&mut EnvoyHttpFilterImpl::new(envoy_ptr), event_id);
 }

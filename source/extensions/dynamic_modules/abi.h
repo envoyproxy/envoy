@@ -125,6 +125,19 @@ typedef void* envoy_dynamic_module_type_http_filter_envoy_ptr;
 typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_http_filter_scheduler_ptr is a raw pointer to the
+ * DynamicModuleHttpFilterScheduler class in Envoy.
+ *
+ * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
+ * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
+ * when scheduling the HTTP filter event is done. The creation of this pointer is done by
+ * envoy_dynamic_module_callback_http_filter_scheduler_new and the scheduling and destruction is
+ * done by envoy_dynamic_module_callback_http_filter_scheduler_delete. Since its lifecycle is
+ * owned/managed by the module, this has _module_ptr suffix.
+ */
+typedef void* envoy_dynamic_module_type_http_filter_scheduler_module_ptr;
+
+/**
  * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
  * represents a contiguous block of memory in bytes.
  *
@@ -689,6 +702,22 @@ void envoy_dynamic_module_on_http_filter_http_callout_done(
     envoy_dynamic_module_type_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_envoy_buffer* body_vector, size_t body_vector_size);
 
+/**
+ * envoy_dynamic_module_on_http_filter_scheduled is called when the HTTP filter is scheduled
+ * to be executed on the worker thread where the HTTP filter is running with
+ * envoy_dynamic_module_callback_http_filter_scheduler_commit callback.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
+ * envoy_dynamic_module_on_http_filter_new.
+ * @param event_id is the ID of the event passed to
+ * envoy_dynamic_module_callback_http_filter_scheduler_commit.
+ */
+void envoy_dynamic_module_on_http_filter_scheduled(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t event_id);
+
 // -----------------------------------------------------------------------------
 // -------------------------------- Callbacks ----------------------------------
 // -----------------------------------------------------------------------------
@@ -1159,6 +1188,54 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
 
+// ---------------------- HTTP filter scheduler callbacks ------------------------
+
+/**
+ * envoy_dynamic_module_callback_http_filter_scheduler_new is called by the module to create a new
+ * HTTP filter scheduler. The scheduler is used to dispatch HTTP filter operations from any thread
+ * including the ones managed by the module.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @return envoy_dynamic_module_type_http_filter_scheduler_module_ptr is the pointer to the
+ * created HTTP filter scheduler.
+ *
+ * NOTE: it is caller's responsibility to delete the scheduler using
+ * envoy_dynamic_module_callback_http_filter_scheduler_delete when it is no longer needed.
+ * See the comment on envoy_dynamic_module_type_http_filter_scheduler_module_ptr.
+ */
+envoy_dynamic_module_type_http_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_http_filter_scheduler_new(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_scheduler_commit is called by the module to
+ * schedule a generic event to the HTTP filter on the worker thread it is running on.
+ *
+ * This will eventually end up invoking envoy_dynamic_module_on_http_filter_scheduled
+ * event hook on the worker thread.
+ *
+ * This can be called multiple times to schedule multiple events to the same filter.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
+ * envoy_dynamic_module_callback_http_filter_scheduler_new.
+ * @param event_id is the ID of the event. This can be used to differentiate between multiple
+ * events scheduled to the same filter. It can be any module-defined value.
+ */
+void envoy_dynamic_module_callback_http_filter_scheduler_commit(
+    envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_scheduler_delete is called by the module to delete
+ * the HTTP filter scheduler created by envoy_dynamic_module_callback_http_filter_scheduler_new.
+ *
+ * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
+ * envoy_dynamic_module_callback_http_filter_scheduler_new.
+ */
+void envoy_dynamic_module_callback_http_filter_scheduler_delete(
+    envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr);
+
 // ------------------- Misc Callbacks for HTTP Filters -------------------------
 
 /**
@@ -1233,6 +1310,26 @@ envoy_dynamic_module_callback_http_filter_http_callout(
     envoy_dynamic_module_type_http_header* headers, size_t headers_size,
     envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
     uint64_t timeout_milliseconds);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_continue_decoding is called by the module to continue
+ * decoding the HTTP request.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_filter_continue_decoding(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_continue_encoding is called by the module to continue
+ * encoding the HTTP response.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ */
+void envoy_dynamic_module_callback_http_filter_continue_encoding(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 #ifdef __cplusplus
 }
