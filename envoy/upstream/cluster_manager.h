@@ -342,6 +342,16 @@ public:
    */
   virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
 
+  /**
+   * Returns true iff the given cluster name is known in the cluster-manager
+   * (either as active or as warming).
+   * @param cluster_name the name of the cluster.
+   * @return bool true if the cluster name is known, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasCluster(const std::string& cluster_name) const PURE;
+
   using ClusterSet = absl::flat_hash_set<std::string>;
 
   /**
