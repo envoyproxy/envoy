@@ -1,7 +1,5 @@
-diff --git a/lib/private/yq.bzl b/lib/private/yq.bzl
-index 29ca3d7..c8cd5eb 100644
---- a/lib/private/yq.bzl
-+++ b/lib/private/yq.bzl
+--- a/yq/private/yq.bzl
++++ b/yq/private/yq.bzl
 @@ -71,10 +71,13 @@ def _yq_impl(ctx):
  
      # For split operations, yq outputs files in the same directory so we
