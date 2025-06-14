@@ -517,7 +517,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   });
 
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
-  token_ = findValue(cookies, cookie_names_.bearer_token_);
+  access_token_ = findValue(cookies, cookie_names_.bearer_token_);
   id_token_ = findValue(cookies, cookie_names_.id_token_);
   refresh_token_ = findValue(cookies, cookie_names_.refresh_token_);
   hmac_ = findValue(cookies, cookie_names_.oauth_hmac_);
@@ -533,9 +533,9 @@ bool OAuth2CookieValidator::hmacIsValid() const {
   if (!cookie_domain_.empty()) {
     cookie_domain = cookie_domain_;
   }
-  return ((encodeHmacBase64(secret_, cookie_domain, expires_, token_, id_token_, refresh_token_) ==
-           hmac_) ||
-          (encodeHmacHexBase64(secret_, cookie_domain, expires_, token_, id_token_,
+  return ((encodeHmacBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
+                            refresh_token_) == hmac_) ||
+          (encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
                                refresh_token_) == hmac_));
 }
 
@@ -571,6 +571,10 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
+  // the request upstream.
+  decryptAndUpdateOAuthTokenCookies(headers);
+
   // Skip Filter and continue chain if a Passthrough header is matching
   // Must be done before the sanitation of the authorization header,
   // otherwise the authorization header might be altered or removed
@@ -706,7 +710,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
 
   DecryptResult decrypt_result = decrypt(encrypted_code_verifier, config_->hmacSecret());
   if (decrypt_result.error.has_value()) {
-    ENVOY_LOG(error, "decryption failed: {}", decrypt_result.error.value());
+    ENVOY_LOG(error, "failed to decrypt code verifier: {}, error: {}", encrypted_code_verifier,
+              decrypt_result.error.value());
     sendUnauthorizedResponse();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -745,6 +750,63 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   }
   ENVOY_LOG(debug, "can not skip oauth flow");
   return false;
+}
+
+// Decrypt the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
+// the request upstream.
+void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) {
+  absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
+  if (cookies.empty()) {
+    return;
+  }
+
+  const CookieNames& cookie_names = config_->cookieNames();
+
+  const std::string encrypted_access_token = findValue(cookies, cookie_names.bearer_token_);
+  const std::string encrypted_id_token = findValue(cookies, cookie_names.id_token_);
+  const std::string encrypted_refresh_token = findValue(cookies, cookie_names.refresh_token_);
+
+  if (!encrypted_access_token.empty()) {
+    cookies.insert_or_assign(cookie_names.bearer_token_,
+                             decryptToken(encrypted_access_token, config_->hmacSecret()));
+  }
+
+  if (!encrypted_id_token.empty()) {
+    cookies.insert_or_assign(cookie_names.id_token_,
+                             decryptToken(encrypted_id_token, config_->hmacSecret()));
+  }
+
+  if (!encrypted_refresh_token.empty()) {
+    cookies.insert_or_assign(cookie_names.refresh_token_,
+                             decryptToken(encrypted_refresh_token, config_->hmacSecret()));
+  }
+
+  if (!encrypted_access_token.empty() || !encrypted_id_token.empty() ||
+      !encrypted_refresh_token.empty()) {
+    std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+    headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
+  }
+}
+
+std::string OAuth2Filter::decryptToken(const std::string& encrypted_token,
+                                       const std::string& secret) {
+  if (encrypted_token.empty()) {
+    return EMPTY_STRING;
+  }
+
+  DecryptResult decrypt_result = decrypt(encrypted_token, secret);
+  if (decrypt_result.error.has_value()) {
+    ENVOY_LOG(error, "failed to decrypt token: {}, error: {}", encrypted_token,
+              decrypt_result.error.value());
+    // There are two cases:
+    // 1. The token is a legacy unencrypted token.
+    // In this case, we return the token as-is to allow the request to proceed.
+    // 2. The token is encrypted, but the decryption failed due to the HMAC secret is changed.
+    // In this case, we return the original encrypted token, the HMAC validation will fail
+    // and the user will be redirected to the OAuth server for re-authentication.
+    return encrypted_token;
+  }
+  return decrypt_result.plaintext;
 }
 
 bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const {
@@ -819,9 +881,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 
   // Generate a PKCE code verifier and challenge for the OAuth flow.
   const std::string code_verifier = generateCodeVerifier(random_);
-  // Encrypt the code verifier, using HMAC secret as the symmetric key.
-  const std::string encrypted_code_verifier =
-      encrypt(code_verifier, config_->hmacSecret(), random_);
 
   // Expire the code verifier cookie in 10 minutes.
   // This should be enough time for the user to complete the OAuth flow.
@@ -833,9 +892,10 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     cookie_tail_http_only = absl::StrCat(
         fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
   }
-  response_headers->addReferenceKey(Http::Headers::get().SetCookie,
-                                    absl::StrCat(config_->cookieNames().code_verifier_, "=",
-                                                 encrypted_code_verifier, cookie_tail_http_only));
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(config_->cookieNames().code_verifier_, "=",
+                   encrypt(code_verifier, config_->hmacSecret(), random_), cookie_tail_http_only));
 
   const std::string code_challenge = generateCodeChallenge(code_verifier);
   query_params.overwrite(queryParamsCodeChallenge, code_challenge);
@@ -1154,7 +1214,8 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
 
   if (!access_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(cookie_names.bearer_token_, "=", access_token_,
+                            absl::StrCat(cookie_names.bearer_token_, "=",
+                                         encrypt(access_token_, config_->hmacSecret(), random_),
                                          BuildCookieTail(1))); // BEARER_TOKEN
   } else if (request_cookies.contains(cookie_names.bearer_token_)) {
     headers.addReferenceKey(
@@ -1164,9 +1225,10 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   }
 
   if (!id_token_.empty()) {
-    headers.addReferenceKey(
-        Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.id_token_, "=", id_token_, BuildCookieTail(4))); // ID_TOKEN
+    headers.addReferenceKey(Http::Headers::get().SetCookie,
+                            absl::StrCat(cookie_names.id_token_, "=",
+                                         encrypt(id_token_, config_->hmacSecret(), random_),
+                                         BuildCookieTail(4))); // ID_TOKEN
   } else if (request_cookies.contains(cookie_names.id_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
@@ -1176,7 +1238,8 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
 
   if (!refresh_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
+                            absl::StrCat(cookie_names.refresh_token_, "=",
+                                         encrypt(refresh_token_, config_->hmacSecret(), random_),
                                          BuildCookieTail(5))); // REFRESH_TOKEN
   } else if (request_cookies.contains(cookie_names.refresh_token_)) {
     headers.addReferenceKey(
