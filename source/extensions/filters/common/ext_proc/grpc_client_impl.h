@@ -31,7 +31,7 @@ public:
   create(Grpc::AsyncClient<RequestType, ResponseType>&& client,
          ProcessorCallbacks<ResponseType>& callbacks, Http::AsyncClient::StreamOptions& options,
          Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks,
-         const std::string& service_method);
+         absl::string_view service_method);
 
   void send(RequestType&& request, bool end_stream) override;
   // Close the stream. This is idempotent and will return true if we
@@ -70,8 +70,7 @@ public:
 
 private:
   // Private constructor only can be invoked within this class.
-  ProcessorStreamImpl(ProcessorCallbacks<ResponseType>& callbacks,
-                      const std::string& service_method)
+  ProcessorStreamImpl(ProcessorCallbacks<ResponseType>& callbacks, absl::string_view service_method)
       : callbacks_(callbacks), service_method_(service_method),
         grpc_side_stream_flow_control_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.grpc_side_stream_flow_control")) {}
@@ -86,8 +85,9 @@ private:
   Grpc::AsyncStream<RequestType> stream_;
   Http::AsyncClient::ParentContext grpc_context_;
   bool stream_closed_ = false;
-  // Service method name
-  const std::string service_method_;
+  // The service method name. The service-method for ext-proc is statically
+  // defined in Envoy's source files, so keeping a reference here is valid.
+  absl::string_view service_method_;
   // Boolean flag initiated by runtime flag.
   const bool grpc_side_stream_flow_control_;
 };
@@ -99,7 +99,7 @@ ProcessorStreamImpl<RequestType, ResponseType>::create(
     Grpc::AsyncClient<RequestType, ResponseType>&& client,
     ProcessorCallbacks<ResponseType>& callbacks, Http::AsyncClient::StreamOptions& options,
     Http::StreamFilterSidestreamWatermarkCallbacks& sidestream_watermark_callbacks,
-    const std::string& service_method) {
+    absl::string_view service_method) {
   auto stream = std::unique_ptr<ProcessorStreamImpl<RequestType, ResponseType>>(
       new ProcessorStreamImpl<RequestType, ResponseType>(callbacks, service_method));
 
@@ -216,7 +216,7 @@ template <typename RequestType, typename ResponseType>
 class ProcessorClientImpl : public ProcessorClient<RequestType, ResponseType> {
 public:
   ProcessorClientImpl(Grpc::AsyncClientManager& client_manager, Stats::Scope& scope,
-                      const std::string& service_method)
+                      absl::string_view service_method)
       : client_manager_(client_manager), scope_(scope), service_method_(service_method) {}
 
   ProcessorStreamPtr<RequestType, ResponseType>
@@ -250,7 +250,9 @@ public:
 private:
   Grpc::AsyncClientManager& client_manager_;
   Stats::Scope& scope_;
-  const std::string service_method_;
+  // The service-method for ext-proc is statically defined in Envoy's source
+  // files, so keeping a reference here is valid.
+  absl::string_view service_method_;
 };
 
 } // namespace ExternalProcessing
