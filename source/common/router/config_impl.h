@@ -671,6 +671,8 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  void refreshRouteCluster(const Http::RequestHeaderMap&,
+                           const StreamInfo::StreamInfo&) const override {}
   const RouteStatsContextOptRef routeStatsContext() const override {
     if (route_stats_context_ != nullptr) {
       return *route_stats_context_;
@@ -840,6 +842,10 @@ public:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                             const StreamInfo::StreamInfo& stream_info) const override {
+      return parent_->refreshRouteCluster(headers, stream_info);
+    }
     Http::Code clusterNotFoundResponseCode() const override {
       return parent_->clusterNotFoundResponseCode();
     }
@@ -958,7 +964,7 @@ public:
     };
     const std::string& routeName() const override { return parent_->routeName(); }
 
-  private:
+  protected:
     const RouteEntryAndRoute* parent_;
 
     // If a DynamicRouteEntry instance is created and returned to the caller directly, then keep an
@@ -969,7 +975,9 @@ public:
     // avoid possible circular reference. For example, the WeightedClusterEntry (derived from
     // DynamicRouteEntry) will be member of the RouteEntryImplBase, so the owner_ should be nullptr.
     const RouteConstSharedPtr owner_;
-    const std::string cluster_name_;
+    // The dynamic route entry will not be accessed cross thread and it is safe to mark this be
+    // mutable.
+    mutable std::string cluster_name_;
   };
 
   /**

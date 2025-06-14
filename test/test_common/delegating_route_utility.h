@@ -32,22 +32,5 @@ private:
   const absl::optional<std::chrono::milliseconds> custom_idle_timeout_;
 };
 
-// Example derived class of DelegatingRoute. Leverages ExampleDerivedDelegatingRouteEntry to create
-// a route with a custom upstream cluster override.
-class ExampleDerivedDelegatingRoute : public Router::DelegatingRoute {
-public:
-  ExampleDerivedDelegatingRoute(
-      Router::RouteConstSharedPtr base_route, const std::string& cluster_name_override,
-      absl::optional<std::chrono::milliseconds> idle_timeout_override = absl::nullopt)
-      : DelegatingRoute(base_route),
-        custom_route_entry_(std::make_unique<const ExampleDerivedDelegatingRouteEntry>(
-            std::move(base_route), cluster_name_override, idle_timeout_override)) {}
-
-  const Router::RouteEntry* routeEntry() const override { return custom_route_entry_.get(); }
-
-private:
-  const std::unique_ptr<const ExampleDerivedDelegatingRouteEntry> custom_route_entry_;
-};
-
 } // namespace Router
 } // namespace Envoy
