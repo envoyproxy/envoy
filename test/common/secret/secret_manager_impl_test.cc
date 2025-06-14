@@ -83,10 +83,11 @@ tls_certificate:
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
-      Ssl::TlsCertificateConfigImpl::create(
-          *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx, *api_)
-          .value());
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config =
+      std::move(Ssl::TlsCertificateConfigImpl::create(
+                    *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx,
+                    *api_, "cert_name")
+                    .value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config.certificateChain());
@@ -137,7 +138,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
   auto cvc_config =
       Ssl::CertificateValidationContextConfigImpl::create(
           *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
-          false, *api_)
+          false, *api_, "ca_cert_name")
           .value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -385,7 +386,8 @@ tls_certificate:
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
-      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value());
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_, "cert_name")
+          .value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             tls_config.certificateChain());
@@ -485,7 +487,8 @@ tls_certificate:
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
   Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
-      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value());
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_, "cert_name")
+          .value());
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
   EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
   EXPECT_EQ("DUMMY_PASSWORD", tls_config.password());
@@ -531,9 +534,10 @@ validation_context:
   EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources_2.refvec_, "validation-context-v1")
                   .ok());
-  auto cert_validation_context = Ssl::CertificateValidationContextConfigImpl::create(
-                                     *context_secret_provider->secret(), false, *api_)
-                                     .value();
+  auto cert_validation_context =
+      Ssl::CertificateValidationContextConfigImpl::create(*context_secret_provider->secret(), false,
+                                                          *api_, "ca_cert_name")
+          .value();
   EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context->caCert());
   const std::string updated_config_dump = R"EOF(
 dynamic_active_secrets:
@@ -1125,10 +1129,11 @@ tls_certificate:
       .WillRepeatedly(ReturnRef(private_key_method_manager));
   EXPECT_CALL(ctx.server_context_, sslContextManager())
       .WillRepeatedly(ReturnRef(ssl_context_manager));
-  EXPECT_EQ(Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_)
-                .status()
-                .message(),
-            "Failed to load private key provider: test");
+  EXPECT_EQ(
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_, "cert_name")
+          .status()
+          .message(),
+      "Failed to load private key provider: test");
 }
 
 // Verify that using the match_subject_alt_names will result in a typed matcher, one for each of
@@ -1154,7 +1159,7 @@ TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
   auto cvc_config =
       Ssl::CertificateValidationContextConfigImpl::create(
           *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
-          false, *api_)
+          false, *api_, "ca_cert_name")
           .value();
   EXPECT_EQ(cvc_config->subjectAltNameMatchers().size(), 4);
   EXPECT_EQ("example.foo", cvc_config->subjectAltNameMatchers()[0].matcher().exact());

@@ -693,6 +693,7 @@ public:
   };
   const std::string& caCert() const override { return s_; }
   const std::string& caCertPath() const override { return s_; }
+  const std::string& caCertName() const override { return s_; }
   const std::string& certificateRevocationList() const override { return s_; }
   const std::string& certificateRevocationListPath() const override { return s_; }
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
@@ -732,7 +733,7 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
   auto validator =
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
-  EXPECT_THAT(validator->initializeSslContexts(ctx, false).status().message(),
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
               testing::ContainsRegex("Failed to create string SAN matcher of type.*"));
 }
 
@@ -750,7 +751,7 @@ TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
   auto validator =
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
-  EXPECT_THAT(validator->initializeSslContexts(ctx, false).status().message(),
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
               testing::ContainsRegex("Failed to load trusted CA certificates from.*"));
 }
 
