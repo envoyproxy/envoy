@@ -268,7 +268,8 @@ public:
                                           bool& has_unknown_fileld);
   static void loadFromJson(absl::string_view json, ProtobufWkt::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor);
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           bool is_custom_thread = false);
 #endif
 
   // This function attempts to load Envoy configuration from the specified file
@@ -607,7 +608,7 @@ public:
   /**
    * Load YAML string into ProtobufWkt::Value.
    */
-  static ProtobufWkt::Value loadFromYaml(const std::string& yaml);
+  static ProtobufWkt::Value loadFromYaml(const std::string& yaml, bool is_custom_thread = false);
 #endif
 
   /**
