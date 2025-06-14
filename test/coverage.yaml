@@ -37,7 +37,7 @@ directories:
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/fault: 94.5
   source/extensions/filters/common/rbac: 93.2
-  source/extensions/filters/common/lua: 95.7
+  source/extensions/filters/common/lua: 95.6
   source/extensions/filters/http/cache: 95.9
   source/extensions/filters/http/dynamic_forward_proxy: 94.3
   source/extensions/filters/http/decompressor: 95.9

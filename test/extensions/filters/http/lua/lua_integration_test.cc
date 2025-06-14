@@ -1797,5 +1797,234 @@ typed_config:
   cleanup();
 }
 
+// Test StreamInfo dynamicTypedMetadata basic functionality.
+TEST_P(LuaIntegrationTest, StreamInfoDynamicTypedMetadataBasic) {
+  const std::string FILTER_AND_CODE = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        -- Test dynamicTypedMetadata function with non-existent filter
+        local result = request_handle:streamInfo():dynamicTypedMetadata("nonexistent.filter")
+        if result == nil then
+          request_handle:headers():add("typed_metadata_result", "nil")
+        else
+          request_handle:headers():add("typed_metadata_result", "unexpected")
+        end
+
+        -- Test another non-existent filter name
+        local result2 = request_handle:streamInfo():dynamicTypedMetadata("test.filter")
+        if result2 == nil then
+          request_handle:headers():add("typed_metadata_result2", "nil")
+        else
+          request_handle:headers():add("typed_metadata_result2", "unexpected")
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify both calls return nil as expected
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("typed_metadata_result"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("typed_metadata_result2"))[0]
+                       ->value()
+                       .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test StreamInfo dynamicTypedMetadata with actual metadata from set_metadata filter.
+TEST_P(LuaIntegrationTest, StreamInfoDynamicTypedMetadata) {
+  // First, configure the set_metadata filter to set actual typed metadata
+  const std::string SET_METADATA_FILTER = R"EOF(
+name: envoy.filters.http.set_metadata
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+  metadata:
+  - metadata_namespace: test.namespace
+    typed_value:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        test_key: "test_value"
+        version: "1.0.0"
+        enabled: true
+        count: 42
+  - metadata_namespace: simple.typed.metadata
+    typed_value:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: "simple_string_value"
+)EOF";
+
+  // Then configure the Lua filter to read the typed metadata
+  const std::string LUA_FILTER = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local stream_info = request_handle:streamInfo()
+
+        -- Test retrieving the structured typed metadata from set_metadata filter
+        local struct_meta = stream_info:dynamicTypedMetadata("test.namespace")
+        if struct_meta then
+          request_handle:headers():add("struct_meta_found", "true")
+
+          -- Access the values directly from the Struct (converted to Lua table)
+          if struct_meta.test_key then
+            request_handle:headers():add("struct_test_key", struct_meta.test_key)
+          end
+          if struct_meta.version then
+            request_handle:headers():add("struct_version", struct_meta.version)
+          end
+          if struct_meta.enabled ~= nil then
+            request_handle:headers():add("struct_enabled", tostring(struct_meta.enabled))
+          end
+          if struct_meta.count then
+            request_handle:headers():add("struct_count", tostring(struct_meta.count))
+          end
+        else
+          request_handle:headers():add("struct_meta_found", "false")
+
+          -- Debug: Try a few other possible namespaces
+          local alt1 = stream_info:dynamicTypedMetadata("envoy.filters.http.set_metadata")
+          if alt1 then
+            request_handle:headers():add("debug_alt1", "found")
+          else
+            request_handle:headers():add("debug_alt1", "nil")
+          end
+
+          local alt2 = stream_info:dynamicTypedMetadata("set_metadata")
+          if alt2 then
+            request_handle:headers():add("debug_alt2", "found")
+          else
+            request_handle:headers():add("debug_alt2", "nil")
+          end
+        end
+
+        -- Test retrieving the simple typed metadata
+        local simple_meta = stream_info:dynamicTypedMetadata("simple.typed.metadata")
+        if simple_meta then
+          request_handle:headers():add("simple_meta_found", "true")
+          if simple_meta.value then
+            request_handle:headers():add("simple_value", simple_meta.value)
+          end
+        else
+          request_handle:headers():add("simple_meta_found", "false")
+        end
+
+        -- Test non-existent metadata still returns nil
+        local missing_meta = stream_info:dynamicTypedMetadata("nonexistent.filter")
+        if missing_meta == nil then
+          request_handle:headers():add("missing_meta", "nil")
+        else
+          request_handle:headers():add("missing_meta", "found")
+        end
+      end
+)EOF";
+
+  // Configure both filters in the chain (set_metadata first, then lua)
+  config_helper_.prependFilter(LUA_FILTER);
+  config_helper_.prependFilter(SET_METADATA_FILTER);
+
+  // Create static clusters
+  createClusters();
+
+  // Add basic route configuration
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->set_prefix("/test/long/url");
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Check what we found for struct metadata
+  auto struct_found_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("struct_meta_found"));
+  std::string struct_meta_result = std::string(struct_found_headers[0]->value().getStringView());
+  // Verify structured typed metadata was successfully retrieved
+  auto test_key_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("struct_test_key"));
+  if (!test_key_headers.empty()) {
+    EXPECT_EQ("test_value", test_key_headers[0]->value().getStringView());
+  }
+
+  auto version_headers = upstream_request_->headers().get(Http::LowerCaseString("struct_version"));
+  if (!version_headers.empty()) {
+    EXPECT_EQ("1.0.0", version_headers[0]->value().getStringView());
+  }
+
+  auto enabled_headers = upstream_request_->headers().get(Http::LowerCaseString("struct_enabled"));
+  if (!enabled_headers.empty()) {
+    EXPECT_EQ("true", enabled_headers[0]->value().getStringView());
+  }
+
+  auto count_headers = upstream_request_->headers().get(Http::LowerCaseString("struct_count"));
+  if (!count_headers.empty()) {
+    EXPECT_EQ("42", count_headers[0]->value().getStringView());
+  }
+
+  // Verify simple typed metadata was successfully retrieved
+  auto simple_found_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("simple_meta_found"));
+  if (simple_found_headers.empty()) {
+    FAIL() << "simple_meta_found header not present - Lua code crashed before checking simple "
+              "metadata";
+  }
+  EXPECT_EQ("true", simple_found_headers[0]->value().getStringView());
+
+  auto simple_value_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("simple_value"));
+  if (!simple_value_headers.empty()) {
+    EXPECT_EQ("simple_string_value", simple_value_headers[0]->value().getStringView());
+  }
+
+  // Verify non-existent metadata still returns nil
+  auto missing_meta_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("missing_meta"));
+  if (!missing_meta_headers.empty()) {
+    EXPECT_EQ("nil", missing_meta_headers[0]->value().getStringView());
+  }
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

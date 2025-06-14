@@ -40,6 +40,7 @@ envoy_cc_library(
     srcs = ["protobuf_converter.cc"],
     hdrs = ["protobuf_converter.h"],
     deps = [
+        ":lua_lib",
         "//bazel/foreign_cc:luajit",
         "//source/common/protobuf",
         "//source/common/protobuf:create_reflectable_message_lib",
