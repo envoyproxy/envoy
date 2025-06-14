@@ -112,10 +112,10 @@ func getOrCreateState(s *C.processState) *processState {
 		req = createRequest(r)
 	}
 	if s.is_encoding == 0 {
-		if req.decodingState.processState == nil {
-			req.decodingState.processState = s
+		if req.decodingState.processState.processState == nil {
+			req.decodingState.processState.processState = s
 		}
-		return &req.decodingState
+		return &req.decodingState.processState
 	}
 
 	// s.is_encoding == 1
@@ -158,7 +158,7 @@ func getState(s *C.processState) *processState {
 	r := s.req
 	req := getRequest(r)
 	if s.is_encoding == 0 {
-		return &req.decodingState
+		return &req.decodingState.processState
 	}
 	// s.is_encoding == 1
 	return &req.encodingState
