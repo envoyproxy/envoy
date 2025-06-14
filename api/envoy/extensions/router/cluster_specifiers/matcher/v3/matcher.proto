@@ -15,11 +15,61 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Matcher Based Cluster Specifier]
 // [#extension: envoy.router.cluster_specifier_plugin.matcher]
-// [#not-implemented-hide:]
+
+message ClusterAction {
+  // Indicates the upstream cluster to which the request should be routed
+  // to.
+  string cluster = 1 [(validate.rules).string = {min_len: 1}];
+}
 
 message MatcherClusterSpecifier {
   // The matcher for cluster selection after the route has been selected. This is used when the
   // route has multiple clusters (like multiple clusters for different users) and the matcher
   // is used to select the cluster to use for the request.
+  //
+  // The match tree to use for grouping incoming requests into buckets.
+  //
+  // Example:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: xds.type.matcher.v3.Matcher
+  //
+  //   matcher_list:
+  //     matchers:
+  //     - predicate:
+  //         single_predicate:
+  //           input:
+  //             typed_config:
+  //               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //               header_name: env
+  //           value_match:
+  //             exact: staging
+  //       on_match:
+  //         action:
+  //           typed_config:
+  //             '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
+  //             cluster: "staging-cluster"
+  //
+  //     - predicate:
+  //         single_predicate:
+  //           input:
+  //             typed_config:
+  //               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //               header_name: env
+  //           value_match:
+  //             exact: prod
+  //       on_match:
+  //         action:
+  //           typed_config:
+  //             '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
+  //             cluster: "prod-cluster"
+  //
+  //   # Catch-all with a default cluster.
+  //   on_no_match:
+  //     action:
+  //       typed_config:
+  //         '@type': type.googleapis.com/envoy.extensions.router.cluster_specifiers.matcher.v3.ClusterAction
+  //         cluster: "default-cluster"
+  //
   xds.type.matcher.v3.Matcher cluster_matcher = 1 [(validate.rules).message = {required: true}];
 }

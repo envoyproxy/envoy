@@ -7,7 +7,7 @@ namespace Lua {
 
 Envoy::Router::ClusterSpecifierPluginSharedPtr
 LuaClusterSpecifierPluginFactoryConfig::createClusterSpecifierPlugin(
-    const Protobuf::Message& config, Server::Configuration::CommonFactoryContext& context) {
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
 
   const auto& typed_config = dynamic_cast<const LuaClusterSpecifierConfigProto&>(config);
   auto cluster_config = std::make_shared<LuaClusterSpecifierConfig>(typed_config, context);
