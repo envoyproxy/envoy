@@ -26,6 +26,7 @@
 #include "source/common/filesystem/watcher_impl.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "event2/event.h"
@@ -167,13 +168,41 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
 
   auto* factory = Config::Utility::getFactoryByName<Network::ClientConnectionFactory>(
       std::string(address->addressType()));
+
   // The target address is usually offered by EDS and the EDS api should reject the unsupported
   // address.
   // TODO(lambdai): Return a closed connection if the factory is not found. Note that the caller
   // expects a non-null connection as of today so we cannot gracefully handle unsupported address
   // type.
-  return factory->createClientConnection(*this, address, source_address,
+
+  Network::ClientConnectionPtr conn;
+#if defined(__linux__)
+  // For Linux, the source address' network namespace is relevant for client connections, since that
+  // is where the netns would be specified.
+  if (source_address && source_address->networkNamespace().has_value()) {
+    auto f = [&]() -> bool {
+      conn = factory->createClientConnection(
+          *this, address, source_address, std::move(transport_socket), options, transport_options);
+      // The function has to return something because absl::StatusOr cannot wrap a void type.
+      return true;
+    };
+    auto result = Network::Utility::execInNetworkNamespace(
+        std::move(f), source_address->networkNamespace()->c_str());
+    if (!result.ok()) {
+      ENVOY_LOG(error, "failed to create connection in network namespace {}: {}",
+                source_address->networkNamespace().value(), result.status().ToString());
+      return nullptr;
+    }
+  } else {
+    conn = factory->createClientConnection(*this, address, source_address,
+                                           std::move(transport_socket), options, transport_options);
+  }
+#else
+  conn = factory->createClientConnection(*this, address, source_address,
                                          std::move(transport_socket), options, transport_options);
+#endif
+
+  return conn;
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(os_fd_t fd, FileReadyCb cb, FileTriggerType trigger,
