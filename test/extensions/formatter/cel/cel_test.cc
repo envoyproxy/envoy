@@ -67,6 +67,28 @@ TEST_F(CELFormatterTest, TestNullFormatValue) {
               ProtoEq(ValueUtil::nullValue()));
 }
 
+TEST_F(CELFormatterTest, TestFormatConversionV1AlphaToDevCel) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+
+  // Test with a basic path expression
+  auto formatter1 = cel_parser->parse("CEL", "request.path", max_length);
+  EXPECT_THAT(formatter1->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("/request/path?secret=parameter")));
+
+  // Test with a more complex expression
+  auto formatter2 = cel_parser->parse("CEL", "request.headers[':method'] == 'GET'", max_length);
+  // The formatter returns boolean expressions as strings
+  EXPECT_THAT(formatter2->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("true")));
+
+  // Test with string operations
+  auto formatter3 = cel_parser->parse("CEL", "request.path.startsWith('/request')", max_length);
+  // The formatter returns boolean expressions as strings
+  EXPECT_THAT(formatter3->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("true")));
+}
+
 TEST_F(CELFormatterTest, TestRequestHeaderWithLegacyConfiguration) {
   const std::string yaml = R"EOF(
   text_format_source:
