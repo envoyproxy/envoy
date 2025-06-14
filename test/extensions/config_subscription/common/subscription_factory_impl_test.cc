@@ -247,7 +247,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultiton) {
   EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
-                          fmt::format("{}::.DELTA_.GRPC must have no "
+                          fmt::format("{}::.AGGREGATED_..DELTA_.GRPC must have no "
                                       "more than 1 gRPC services specified:",
                                       config.mutable_api_config_source()->GetTypeName()));
 }
@@ -327,7 +327,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
     EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
 
     EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
-                            fmt::format("{}::.DELTA_.GRPC must have no "
+                            fmt::format("{}::.AGGREGATED_..DELTA_.GRPC must have no "
                                         "more than 2 gRPC services specified:",
                                         config.mutable_api_config_source()->GetTypeName()));
   }
