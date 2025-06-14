@@ -571,6 +571,10 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
+  // the request upstream.
+  decryptAndUpdateOAuthTokenCookies(headers);
+
   // Skip Filter and continue chain if a Passthrough header is matching
   // Must be done before the sanitation of the authorization header,
   // otherwise the authorization header might be altered or removed
@@ -606,10 +610,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   if (config_->signoutPath().match(path_header->value().getStringView())) {
     return signOutUser(headers);
   }
-
-  // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
-  // the request upstream.
-  decryptAndUpdateOAuthTokenCookies(headers);
 
   if (canSkipOAuth(headers)) {
     // Update the path header with the query string parameters after a successful OAuth login.
