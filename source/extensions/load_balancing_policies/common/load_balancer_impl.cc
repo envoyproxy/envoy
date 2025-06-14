@@ -66,7 +66,8 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
 
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
 LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
-                                 const DegradedLoad& degraded_per_priority_load) {
+                                 const DegradedLoad& degraded_per_priority_load,
+                                 const PrioritySet& priority_set) {
   hash = hash % 100 + 1; // 1-100
   uint32_t aggregate_percentage_load = 0;
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
@@ -77,6 +78,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   for (size_t priority = 0; priority < healthy_per_priority_load.get().size(); ++priority) {
     aggregate_percentage_load += healthy_per_priority_load.get()[priority];
     if (hash <= aggregate_percentage_load) {
+      priority_set.recordPriorityStatsPerRequest(static_cast<uint32_t>(priority));
       return {static_cast<uint32_t>(priority), HostAvailability::Healthy};
     }
   }
@@ -86,6 +88,7 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   for (size_t priority = 0; priority < degraded_per_priority_load.get().size(); ++priority) {
     aggregate_percentage_load += degraded_per_priority_load.get()[priority];
     if (hash <= aggregate_percentage_load) {
+      priority_set.recordPriorityStatsPerRequest(static_cast<uint32_t>(priority));
       return {static_cast<uint32_t>(priority), HostAvailability::Degraded};
     }
   }
@@ -358,14 +361,16 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) con
   if (context) {
     const auto priority_loads = context->determinePriorityLoad(
         priority_set_, per_priority_load_, Upstream::RetryPriority::defaultPriorityMapping);
-    const auto priority_and_source = choosePriority(hash, priority_loads.healthy_priority_load_,
-                                                    priority_loads.degraded_priority_load_);
+    const auto priority_and_source =
+        choosePriority(hash, priority_loads.healthy_priority_load_,
+                       priority_loads.degraded_priority_load_, priority_set_);
     return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
             priority_and_source.second};
   }
 
-  const auto priority_and_source = choosePriority(hash, per_priority_load_.healthy_priority_load_,
-                                                  per_priority_load_.degraded_priority_load_);
+  const auto priority_and_source =
+      choosePriority(hash, per_priority_load_.healthy_priority_load_,
+                     per_priority_load_.degraded_priority_load_, priority_set_);
   return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
           priority_and_source.second};
 }

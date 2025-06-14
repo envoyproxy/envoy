@@ -323,6 +323,7 @@ the following statistics:
   lb_zone_number_differs, Counter, No zone aware routing because the feature flag is disabled and the number of zones in local and upstream cluster is different
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
   original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
+  lb_priority_selected, Counter, Total number of requests tagged by the priority
 
 .. _config_cluster_manager_cluster_stats_subset_lb:
 

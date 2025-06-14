@@ -31,6 +31,7 @@ public:
                HostMapConstSharedPtr cross_priority_host_map));
   MOCK_METHOD(void, batchHostUpdate, (BatchUpdateCb&));
   MOCK_METHOD(HostMapConstSharedPtr, crossPriorityHostMap, (), (const));
+  MOCK_METHOD(void, recordPriorityStatsPerRequest, (uint32_t priority), (const));
 
   MockHostSet* getMockHostSet(uint32_t priority) {
     getHostSet(priority); // Ensure the host set exists.

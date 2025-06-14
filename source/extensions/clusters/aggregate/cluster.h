@@ -28,6 +28,8 @@ struct PriorityContext {
   Upstream::PrioritySetImpl priority_set_;
   PriorityToClusterVector priority_to_cluster_;
   ClusterAndPriorityToLinearizedPriorityMap cluster_and_priority_to_linearized_priority_;
+
+  explicit PriorityContext(Stats::Scope& stats_scope) : priority_set_(stats_scope) {}
 };
 
 using PriorityContextPtr = std::unique_ptr<PriorityContext>;

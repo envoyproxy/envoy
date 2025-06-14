@@ -347,15 +347,16 @@ HdsCluster::HdsCluster(Server::Configuration::ServerFactoryContext& server_conte
                        ClusterInfoFactory& info_factory, ThreadLocal::SlotAllocator& tls)
     : server_context_(server_context), cluster_(std::move(cluster)), stats_(stats),
       ssl_context_manager_(ssl_context_manager), added_via_api_(added_via_api),
-      hosts_(new HostVector()), time_source_(server_context_.mainThreadDispatcher().timeSource()) {
+      hosts_(new HostVector()),
+      info_(info_factory.createClusterInfo({server_context, cluster_, bind_config, stats_,
+                                            ssl_context_manager_, added_via_api_, tls})),
+      time_source_(server_context_.mainThreadDispatcher().timeSource()),
+      priority_set_(info_->statsScope()) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
   // Set initial hashes for possible delta updates.
   config_hash_ = MessageUtil::hash(cluster_);
   socket_match_hash_ = RepeatedPtrUtil::hash(cluster_.transport_socket_matches());
-
-  info_ = info_factory.createClusterInfo(
-      {server_context, cluster_, bind_config, stats_, ssl_context_manager_, added_via_api_, tls});
 
   // Temporary structure to hold Host pointers grouped by locality, to build
   // initial_hosts_per_locality_.
