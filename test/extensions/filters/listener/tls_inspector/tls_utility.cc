@@ -226,7 +226,7 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
     }
   }
 
-  // Build initial clienthello message
+  // Build initial client hello message
   std::vector<uint8_t> clienthello_message =
       buildClientHelloMessage(ciphers, extensions, tls_version);
 
@@ -249,7 +249,7 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
   return clienthello_message;
 }
 
-// Helper function to build the clienthello message
+// Helper function to build the client hello message
 std::vector<uint8_t> buildClientHelloMessage(const std::vector<uint8_t>& ciphers,
                                              const std::vector<uint8_t>& extensions,
                                              uint16_t tls_version) {
