@@ -439,7 +439,7 @@ std::string JsonFormatterImpl::formatWithContext(const Context& context,
     } else {
       // 3. Handle the formatter element with a single provider and value
       //    type needs to be kept.
-      auto value = formatters[0]->formatValueWithContext(context, info);
+      const auto value = formatters[0]->formatValueWithContext(context, info);
       Json::Utility::appendValueToString(value, log_line);
     }
   }
