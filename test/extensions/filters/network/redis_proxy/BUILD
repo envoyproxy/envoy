@@ -105,6 +105,25 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "aws_iam_auth_test",
+    srcs = ["aws_iam_auth_test.cc"],
+    extension_names = ["envoy.filters.network.redis_proxy"],
+    rbe_pool = "6gig",
+    deps = [
+        ":redis_mocks",
+        "//source/extensions/filters/network/common/redis:aws_iam_authenticator_lib",
+        "//source/extensions/filters/network/common/redis:client_interface",
+        "//source/extensions/filters/network/common/redis:client_lib",
+        "//source/extensions/filters/network/common/redis:redis_command_stats_lib",
+        "//test/extensions/common/aws:aws_mocks",
+        "//test/extensions/filters/network/common/redis:redis_mocks",
+        "//test/extensions/filters/network/common/redis:test_utils_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_mock(
     name = "redis_mocks",
     srcs = ["mocks.cc"],

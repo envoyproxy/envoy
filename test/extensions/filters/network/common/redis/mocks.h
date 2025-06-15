@@ -88,6 +88,9 @@ public:
   MOCK_METHOD(PoolRequest*, makeRequest_,
               (const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
   MOCK_METHOD(void, initialize, (const std::string& username, const std::string& password));
+  MOCK_METHOD(void, sendAwsIamAuth,
+              (const std::string& auth_username,
+               const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
   std::list<ClientCallbacks*> client_callbacks_;
@@ -113,6 +116,21 @@ public:
 
 } // namespace Client
 
+namespace AwsIamAuthenticator {
+class MockAwsIamAuthenticator : public Envoy::Extensions::NetworkFilters::Common::Redis::
+                                    AwsIamAuthenticator::AwsIamAuthenticatorImpl {
+public:
+  MockAwsIamAuthenticator(Envoy::Extensions::Common::Aws::SignerPtr signer)
+      : AwsIamAuthenticatorImpl(std::move(signer)) {}
+  ~MockAwsIamAuthenticator() override = default;
+  MOCK_METHOD(std::string, getAuthToken,
+              (absl::string_view auth_user,
+               const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config));
+  MOCK_METHOD(bool, addCallbackIfCredentialsPending,
+              (Extensions::Common::Aws::CredentialsPendingCallback && cb));
+};
+
+} // namespace AwsIamAuthenticator
 } // namespace Redis
 } // namespace Common
 } // namespace NetworkFilters
