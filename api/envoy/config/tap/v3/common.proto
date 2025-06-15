@@ -154,6 +154,7 @@ message HttpGenericBodyMatch {
 }
 
 // Tap output configuration.
+// [#next-free-field: 6]
 message OutputConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.tap.v2alpha.OutputConfig";
@@ -181,6 +182,14 @@ message OutputConfig {
   // match can be determined. See the HTTP tap filter :ref:`streaming
   // <config_http_filters_tap_streaming>` documentation for more information.
   bool streaming = 4;
+
+  // For streamed tapping, tapped messages are sent on each read/write event,
+  // even for small payloads (e.g., 9 bytes, the minimum HTTP/2 frame size).
+  // To improve performance under high traffic, use min_streamed_sent_bytes
+  // to control when tapped messages are sent based on a configured size threshold.
+  // If specified, the minimum allowed value for min_streamed_sent_bytes is 9 bytes.
+  // This setting is only applicable when stream tracing is enabled.
+  google.protobuf.UInt32Value min_streamed_sent_bytes = 5;
 }
 
 // Tap output sink configuration.

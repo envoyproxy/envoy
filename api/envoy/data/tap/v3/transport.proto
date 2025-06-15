@@ -112,4 +112,7 @@ message SocketStreamedTraceSegment {
     // Socket event.
     SocketEvent event = 3;
   }
+
+  // Sequence of observed events.
+  repeated SocketEvent events = 4;
 }

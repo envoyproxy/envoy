@@ -80,6 +80,23 @@ emitted. When streaming, a series of :ref:`SocketStreamedTraceSegment
 See the :ref:`HTTP tap filter streaming <config_http_filters_tap_streaming>` documentation for more
 information. Most of the concepts overlap between the HTTP filter and the transport socket.
 
+Statistics
+----------
+
+The tap filter emits statistics within the ``transport.tap.<stat_prefix>`` namespace.
+To customize the prefix used in these statistics, configure the :ref:`stats_prefix
+<envoy_v3_api_field_extensions.transport_sockets.tap.v3.SocketTapConfig.stats_prefix>` field accordingly.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  streamed_init_submit, Counter, The total count of submissions triggered by streamed init events
+  streamed_read_submit, Counter, The total count of submissions triggered by streamed read events
+  streamed_write_submit, Counter, The total count of submissions triggered by streamed write events
+  streamed_close_submit, Counter, The total count of submissions triggered by streamed close events
+  buffered_close_submit, Counter, The total count of submissions triggered by buffered close events
+
 PCAP generation
 ---------------
 
