@@ -41,10 +41,12 @@ public:
               (uint64_t trace_id));
   MOCK_METHOD(uint32_t, maxBufferedRxBytes, (), (const));
   MOCK_METHOD(uint32_t, maxBufferedTxBytes, (), (const));
+  MOCK_METHOD(uint32_t, minStreamedSentBytes, (), (const));
   MOCK_METHOD(Extensions::Common::Tap::Matcher::MatchStatusVector, createMatchStatusVector, (),
               (const));
   MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
   MOCK_METHOD(bool, streaming, (), (const));
+  MOCK_METHOD(bool, shouldSendStreamedMsgByConfiguredSize, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, (), (const));
 };
 
@@ -69,11 +71,19 @@ public:
           statuses[0].might_change_status_ = false;
         }));
     EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(streaming));
+    EXPECT_CALL(*config_, shouldSendStreamedMsgByConfiguredSize()).WillRepeatedly(Return(false));
     EXPECT_CALL(*config_, maxBufferedRxBytes()).WillRepeatedly(Return(1024));
     EXPECT_CALL(*config_, maxBufferedTxBytes()).WillRepeatedly(Return(1024));
     EXPECT_CALL(*config_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
     time_system_.setSystemTime(std::chrono::seconds(0));
-
+    if (send_streamed_msg_on_configured_size_) {
+      EXPECT_CALL(*config_, shouldSendStreamedMsgByConfiguredSize()).WillRepeatedly(Return(true));
+      EXPECT_CALL(*config_, minStreamedSentBytes())
+          .WillRepeatedly(Return(default_min_buffered_bytes_));
+    } else {
+      EXPECT_CALL(*config_, shouldSendStreamedMsgByConfiguredSize()).WillRepeatedly(Return(false));
+      EXPECT_CALL(*config_, minStreamedSentBytes()).WillRepeatedly(Return(0));
+    }
     // Only for streaming trace
     tap_config_.set_set_connection_per_event(output_conn_info_per_event_);
 
@@ -83,11 +93,6 @@ public:
         ALL_TRANSPORT_TAP_STATS(POOL_COUNTER_PREFIX(*stats_store_.rootScope(), final_prefix))};
     if (pegging_counter_) {
       tap_config_.set_stats_prefix("tranTapPrefix");
-    }
-
-    // Only for buffered trace
-    if (sending_tapped_msg_on_configured_size_) {
-      tap_config_.mutable_min_buffered_bytes()->set_value(default_min_buffered_bytes_);
     }
 
     tapper_ = std::make_unique<PerSocketTapperImpl>(config_, tap_config_, stats, connection_);
@@ -109,12 +114,13 @@ public:
   bool output_conn_info_per_event_{false};
   bool pegging_counter_{false};
   Stats::IsolatedStoreImpl stats_store_;
-  bool sending_tapped_msg_on_configured_size_{false};
+  bool send_streamed_msg_on_configured_size_{false};
   unsigned int default_min_buffered_bytes_ = 20;
 };
 
 // Verify the full streaming flow.
 TEST_F(PerSocketTapperImplTest, StreamingFlow) {
+  std::cout << "enter StreamingFlow" << std::endl;
   EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
                                   R"EOF(
 socket_streamed_trace_segment:
@@ -270,13 +276,16 @@ socket_streamed_trace_segment:
   output_conn_info_per_event_ = local_output_conn_info_per_event;
 }
 
-// Verify the full streaming flow for peg counter.
-TEST_F(PerSocketTapperImplTest, StreamingFlowPegCounter) {
-  // keep the original value
+// Verify the full streaming flow for submiting tapped message on all cases
+// When send_streamed_msg_on_configured_size_ is false
+TEST_F(PerSocketTapperImplTest, StreamingFlowWhenSendStreamedMsgIsFalse) {
+  // Keep the original value.
   bool local_output_conn_info_per_event = output_conn_info_per_event_;
   output_conn_info_per_event_ = true;
   bool local_pegging_counter = pegging_counter_;
   pegging_counter_ = true;
+
+  // Submit when the transport socket is created
   EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
                                   R"EOF(
 socket_streamed_trace_segment:
@@ -295,6 +304,7 @@ socket_streamed_trace_segment:
 
   InSequence s;
 
+  // Submit when the transport socket is gotten read event
   EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
                                   R"EOF(
 socket_streamed_trace_segment:
@@ -316,6 +326,7 @@ socket_streamed_trace_segment:
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("hello"), 5);
 
+  // Submit when the transport socket is gotten write event
   EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
                                   R"EOF(
 socket_streamed_trace_segment:
@@ -339,6 +350,7 @@ socket_streamed_trace_segment:
   time_system_.setSystemTime(std::chrono::seconds(1));
   tapper_->onWrite(Buffer::OwnedImpl("world"), 5, true);
 
+  // Submit when the transport socket is gotten close event
   EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
                                   R"EOF(
 socket_streamed_trace_segment:
@@ -359,18 +371,323 @@ socket_streamed_trace_segment:
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
 
-  // restore the value
+  // Restore the value
   output_conn_info_per_event_ = local_output_conn_info_per_event;
   pegging_counter_ = local_pegging_counter;
 }
 
-// Verify the full buffered flow for submit data in close event.
-TEST_F(PerSocketTapperImplTest, BufferedFlow) {
-  // keep the original value
+// Verify the full streaming flow for submiting tapped message on all cases
+// When send_streamed_msg_on_configured_size_ is True
+TEST_F(PerSocketTapperImplTest, StreamingFlowWhenSendStreamedMsgIsTrue) {
+  // Keep the original value.
+  bool local_output_conn_info_per_event = output_conn_info_per_event_;
+  output_conn_info_per_event_ = true;
   bool local_pegging_counter = pegging_counter_;
   pegging_counter_ = true;
-  bool local_sending_tapped_msg_on_configured_size = sending_tapped_msg_on_configured_size_;
-  sending_tapped_msg_on_configured_size_ = true;
+  bool local_send_streamed_msg_on_configured_size_ = send_streamed_msg_on_configured_size_;
+  send_streamed_msg_on_configured_size_ = true;
+  bool local_default_min_buffered_bytes = default_min_buffered_bytes_;
+  default_min_buffered_bytes_ = 15;
+
+  // Submit when the transport socket is created
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  connection:
+    local_address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1000
+    remote_address:
+      socket_address:
+        address: 10.0.0.3
+        port_value: 50000
+)EOF")));
+  setup(true);
+
+  InSequence s;
+
+  // Submit when the transport socket is gotten read event
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  events:
+  - timestamp: 1970-01-01T00:00:00Z
+    read:
+      data:
+        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
+
+  // Submit when the transport socket is gotten write event
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  events:
+  - timestamp: 1970-01-01T00:00:01Z
+    write:
+      data:
+        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
+      end_stream: true
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  time_system_.setSystemTime(std::chrono::seconds(1));
+  tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
+                   true);
+
+  // Submit when the transport socket is gotten close event
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  events:
+  - timestamp: 1970-01-01T00:00:02Z
+    closed: {}
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  time_system_.setSystemTime(std::chrono::seconds(2));
+  tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
+
+  // Restore the value
+  output_conn_info_per_event_ = local_output_conn_info_per_event;
+  pegging_counter_ = local_pegging_counter;
+  send_streamed_msg_on_configured_size_ = local_send_streamed_msg_on_configured_size_;
+  default_min_buffered_bytes_ = local_default_min_buffered_bytes;
+}
+
+// Verify the full streaming flow for submiting tapped message on all cases
+// When send_streamed_msg_on_configured_size_ is True and two read events
+TEST_F(PerSocketTapperImplTest, StreamingFlowWhenSendStreamedMsgIsTrueTwoReadEvents) {
+  // Keep the original value.
+  bool local_output_conn_info_per_event = output_conn_info_per_event_;
+  output_conn_info_per_event_ = true;
+  bool local_pegging_counter = pegging_counter_;
+  pegging_counter_ = true;
+  bool local_send_streamed_msg_on_configured_size_ = send_streamed_msg_on_configured_size_;
+  send_streamed_msg_on_configured_size_ = true;
+  bool local_default_min_buffered_bytes = default_min_buffered_bytes_;
+  default_min_buffered_bytes_ = 100;
+
+  // Submit when the transport socket is created
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  connection:
+    local_address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1000
+    remote_address:
+      socket_address:
+        address: 10.0.0.3
+        port_value: 50000
+)EOF")));
+  setup(true);
+
+  InSequence s;
+
+  // Submit when the transport socket is gotten read event
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  events:
+  - timestamp: 1970-01-01T00:00:00Z
+    read:
+      data:
+        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+  - timestamp: 1970-01-01T00:00:01Z
+    read:
+      data:
+        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
+  time_system_.setSystemTime(std::chrono::seconds(1));
+  tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
+
+  // Submit when the transport socket is gotten close event
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  events:
+  - timestamp: 1970-01-01T00:00:02Z
+    closed: {}
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  time_system_.setSystemTime(std::chrono::seconds(2));
+  tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
+
+  // Restore the value
+  output_conn_info_per_event_ = local_output_conn_info_per_event;
+  pegging_counter_ = local_pegging_counter;
+  send_streamed_msg_on_configured_size_ = local_send_streamed_msg_on_configured_size_;
+  default_min_buffered_bytes_ = local_default_min_buffered_bytes;
+}
+
+// Verify the full streaming flow for submiting tapped message on all cases
+// When send_streamed_msg_on_configured_size_ is True and two write events
+TEST_F(PerSocketTapperImplTest, StreamingFlowWhenSendStreamedMsgIsTruetwoWriteEvents) {
+  // Keep the original value.
+  bool local_output_conn_info_per_event = output_conn_info_per_event_;
+  output_conn_info_per_event_ = true;
+  bool local_pegging_counter = pegging_counter_;
+  pegging_counter_ = true;
+  bool local_send_streamed_msg_on_configured_size_ = send_streamed_msg_on_configured_size_;
+  send_streamed_msg_on_configured_size_ = true;
+  bool local_default_min_buffered_bytes = default_min_buffered_bytes_;
+  default_min_buffered_bytes_ = 100;
+
+  // Submit when the transport socket is created
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  connection:
+    local_address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1000
+    remote_address:
+      socket_address:
+        address: 10.0.0.3
+        port_value: 50000
+)EOF")));
+  setup(true);
+
+  InSequence s;
+
+  // Submit when the transport socket is gotten write event
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  events:
+  - timestamp: 1970-01-01T00:00:00Z
+    write:
+      data:
+        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
+      end_stream: true
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+  - timestamp: 1970-01-01T00:00:01Z
+    write:
+      data:
+        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
+      end_stream: true
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
+                   true);
+  time_system_.setSystemTime(std::chrono::seconds(1));
+  tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
+                   true);
+
+  // Submit when the transport socket is gotten close event
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+socket_streamed_trace_segment:
+  trace_id: 1
+  events:
+  - timestamp: 1970-01-01T00:00:02Z
+    closed: {}
+    connection:
+      local_address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 1000
+      remote_address:
+        socket_address:
+          address: 10.0.0.3
+          port_value: 50000
+)EOF")));
+  time_system_.setSystemTime(std::chrono::seconds(2));
+  tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
+
+  // Restore the value
+  output_conn_info_per_event_ = local_output_conn_info_per_event;
+  pegging_counter_ = local_pegging_counter;
+  send_streamed_msg_on_configured_size_ = local_send_streamed_msg_on_configured_size_;
+  default_min_buffered_bytes_ = local_default_min_buffered_bytes;
+}
+
+// Verify the full buffered flow for submit data in close event.
+TEST_F(PerSocketTapperImplTest, BufferedFlow) {
+  // Keep the original value
+  bool local_pegging_counter = pegging_counter_;
+  pegging_counter_ = true;
+  bool local_sending_tapped_msg_on_configured_size = send_streamed_msg_on_configured_size_;
+  send_streamed_msg_on_configured_size_ = true;
   bool local_default_min_buffered_bytes = default_min_buffered_bytes_;
   default_min_buffered_bytes_ = 30;
 
@@ -411,88 +728,9 @@ socket_buffered_trace:
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
 
-  // restore the value.
+  // Restore the value.
   pegging_counter_ = local_pegging_counter;
-  sending_tapped_msg_on_configured_size_ = local_sending_tapped_msg_on_configured_size;
-  default_min_buffered_bytes_ = local_default_min_buffered_bytes;
-}
-
-// Verify the full buffered flow for submit data in Read/Write event.
-TEST_F(PerSocketTapperImplTest, BufferedFlowSubmitOnReadOnWrite) {
-  // keep the original value
-  bool local_pegging_counter = pegging_counter_;
-  pegging_counter_ = true;
-  bool local_sending_tapped_msg_on_configured_size = sending_tapped_msg_on_configured_size_;
-  sending_tapped_msg_on_configured_size_ = true;
-  bool local_default_min_buffered_bytes = default_min_buffered_bytes_;
-  default_min_buffered_bytes_ = 30;
-
-  setup(false);
-  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
-                                  R"EOF(
-socket_buffered_trace:
-  trace_id: 1
-  connection:
-    local_address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 1000
-    remote_address:
-      socket_address:
-        address: 10.0.0.3
-        port_value: 50000
-  events:
-  - timestamp: 1970-01-01T00:00:00Z
-    read:
-      data:
-        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
-)EOF")));
-  tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
-
-  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
-                                  R"EOF(
-socket_buffered_trace:
-  trace_id: 1
-  connection:
-    local_address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 1000
-    remote_address:
-      socket_address:
-        address: 10.0.0.3
-        port_value: 50000
-  events:
-  - timestamp: 1970-01-01T00:00:01Z
-    write:
-      data:
-        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
-      end_stream: true
-)EOF")));
-  // Call onWrite after one seconds
-  time_system_.setSystemTime(std::chrono::seconds(1));
-  tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
-                   true);
-
-  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
-                                  R"EOF(
-socket_buffered_trace:
-  trace_id: 1
-  connection:
-    local_address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 1000
-    remote_address:
-      socket_address:
-        address: 10.0.0.3
-        port_value: 50000
-)EOF")));
-  time_system_.setSystemTime(std::chrono::seconds(2));
-  tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
-  // restore the value
-  pegging_counter_ = local_pegging_counter;
-  sending_tapped_msg_on_configured_size_ = local_sending_tapped_msg_on_configured_size;
+  send_streamed_msg_on_configured_size_ = local_sending_tapped_msg_on_configured_size;
   default_min_buffered_bytes_ = local_default_min_buffered_bytes;
 }
 

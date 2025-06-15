@@ -153,6 +153,17 @@ public:
   virtual uint32_t maxBufferedTxBytes() const PURE;
 
   /**
+   * Return the minimum transmitted bytes that can be buffered in memory. Streaming taps are still
+   * subject to this limit depending on match status.
+   */
+  virtual uint32_t minStreamedSentBytes() const PURE;
+
+  /**
+   * Return whether streamed msg should be sent by configured size
+   */
+  virtual bool shouldSendStreamedMsgByConfiguredSize() const PURE;
+
+  /**
    * Return a new match status vector that is correctly sized for the number of matchers that are in
    * the configuration.
    */

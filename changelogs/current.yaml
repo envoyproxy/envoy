@@ -112,7 +112,7 @@ new_features:
 - area: transport tap
   change: |
     Add counter in transport tap for streaming and buffer trace.
-    Buffer trace can sent tapped message based on configured size.
+    streamed trace can sent tapped message based on configured size.
 - area: load_balancing
   change: |
     Added Override Host Load Balancing policy. See

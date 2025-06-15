@@ -28,6 +28,12 @@ public:
 private:
   void initEvent(envoy::data::tap::v3::SocketEvent&);
   void initStreamingEvent(envoy::data::tap::v3::SocketEvent&);
+  void makeStreamedTraceIfNeeded() {
+    if (streamed_trace_ == nullptr) {
+      streamed_trace_ = Extensions::Common::Tap::makeTraceWrapper();
+      streamed_trace_->mutable_socket_streamed_trace_segment()->set_trace_id(connection_.id());
+    }
+  }
   void fillConnectionInfo(envoy::data::tap::v3::Connection& connection);
   void makeBufferedTraceIfNeeded() {
     if (buffered_trace_ == nullptr) {
@@ -42,9 +48,9 @@ private:
   }
   void pegReadWriteSubmitCounter(const bool onStreaming, const bool isRead);
   void pegCloseSubmitCounter(const bool isStreaming);
-  void handleSendingTappedMsgPerConfigSize(const Buffer::Instance& data, const uint32_t totalBytes,
-                                           envoy::data::tap::v3::SocketEvent& event,
-                                           const bool isRead);
+  void handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
+                                                 const uint32_t totalBytes, const bool isRead,
+                                                 const bool isEndStream);
   // This is the default value for min buffered bytes.
   // (This means that per transport socket buffer trace, the minimum amount
   // which triggering to send the tapped messages size is 9 bytes).
@@ -58,9 +64,8 @@ private:
   uint32_t rx_bytes_buffered_{};
   uint32_t tx_bytes_buffered_{};
   const bool should_output_conn_info_per_event_{false};
-  bool should_sending_tapped_msg_on_configured_size_{false};
-  uint32_t min_sending_buffered_bytes_{0};
-  uint32_t current_buffered_rx_tx_bytes_{0};
+  uint32_t current_streamed_rx_tx_bytes_{0};
+  Extensions::Common::Tap::TraceWrapperPtr streamed_trace_{nullptr};
   const TransportTapStats stats_;
 };
 

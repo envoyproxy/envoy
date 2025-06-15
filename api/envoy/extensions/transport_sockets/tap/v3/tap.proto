@@ -5,8 +5,6 @@ package envoy.extensions.transport_sockets.tap.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/extensions/common/tap/v3/common.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -45,11 +43,4 @@ message SocketTapConfig {
 
   // The contents of the transport tap's statistics prefix.
   string stats_prefix = 2;
-
-  // For buffer tracing, tapped messages are sent only on connection closure by default.
-  // This is suitable for HTTP/1 but not for HTTP/2.
-  // Tapped messages are sent based on the min_buffered_bytes threshold
-  // If the min_buffered_bytes is specified, the min value is 9 bytes (min HTTP/2 frame size).
-  // This is only applicable if the buffer trace is enabled.
-  google.protobuf.UInt32Value min_buffered_bytes = 3;
 }
