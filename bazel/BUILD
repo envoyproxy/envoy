@@ -67,17 +67,6 @@ genrule(
     stamp = 1,
 )
 
-# A target to optionally link C++ standard library dynamically in sanitizer runs.
-# TSAN doesn't support libc/libstdc++ static linking per doc:
-#   http://releases.llvm.org/8.0.1/tools/clang/docs/ThreadSanitizer.html
-cc_library(
-    name = "dynamic_stdlib",
-    linkopts = envoy_select_force_libcpp(
-        ["-lc++"],
-        ["-lstdc++"],
-    ),
-)
-
 cc_library(
     name = "static_stdlib",
     linkopts = select({
@@ -1090,5 +1079,17 @@ config_setting(
     name = "libc++_enabled",
     flag_values = {
         ":libc++": "True",
+    },
+)
+
+bool_flag(
+    name = "libstdc++",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "libstdc++_enabled",
+    flag_values = {
+        ":libstdc++": "True",
     },
 )

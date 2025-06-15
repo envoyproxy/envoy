@@ -25,6 +25,9 @@ build --tool_java_runtime_version=remotejdk_11
 build --platform_mappings=bazel/platform_mappings
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4
+# Global C++ standard and common warning suppressions
+build --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
+build --copt=-Wno-deprecated-declarations
 build --define envoy_mobile_listener=enabled
 build --experimental_repository_downloader_retries=2
 build --enable_platform_specific_config
@@ -66,8 +69,6 @@ build:linux --copt=-fdebug-types-section
 # Enable position independent code (this is the default on macOS and Windows)
 # (Workaround for https://github.com/bazelbuild/rules_foreign_cc/issues/421)
 build:linux --copt=-fPIC
-build:linux --copt=-Wno-deprecated-declarations
-build:linux --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
 build:linux --cxxopt=-fsized-deallocation --host_cxxopt=-fsized-deallocation
 build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
@@ -85,19 +86,29 @@ build --@com_googlesource_googleurl//build_config:system_icu=0
 build:sanitizer --define tcmalloc=disabled
 build:sanitizer --linkopt -ldl
 
-# Common flags for Clang
-build:clang --action_env=BAZEL_COMPILER=clang
-build:clang --linkopt=-fuse-ld=lld
-build:clang --action_env=CC=clang --host_action_env=CC=clang
-build:clang --action_env=CXX=clang++ --host_action_env=CXX=clang++
-build:clang --incompatible_enable_cc_toolchain_resolution=false
+# Common flags for Clang (shared between all clang variants)
+build:clang-common --action_env=BAZEL_COMPILER=clang
+build:clang-common --linkopt=-fuse-ld=lld
+build:clang-common --action_env=CC=clang --host_action_env=CC=clang
+build:clang-common --action_env=CXX=clang++ --host_action_env=CXX=clang++
+build:clang-common --incompatible_enable_cc_toolchain_resolution=false
+
+# Clang with libc++ (default)
+build:clang --config=clang-common
+build:clang --config=libc++
+
+build:arm64-clang --config=clang
 
 # Flags for Clang + PCH
 build:clang-pch --spawn_strategy=local
 build:clang-pch --define=ENVOY_CLANG_PCH=1
 
+# libstdc++ - currently only used for gcc
+build:libstdc++ --@envoy//bazel:libc++=false
+build:libstdc++ --@envoy//bazel:libstdc++=true
+
 # Use gold linker for gcc compiler.
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
+build:gcc --config=libstdc++
 build:gcc --test_env=HEAPCHECK=
 build:gcc --action_env=BAZEL_COMPILER=gcc
 build:gcc --action_env=CC=gcc --action_env=CXX=g++
@@ -114,6 +125,7 @@ build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --incompatible_enable_cc_toolchain_resolution=false
+build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
@@ -123,45 +135,40 @@ build:clang-tidy --aspects @envoy_toolshed//format/clang_tidy:clang_tidy.bzl%cla
 build:clang-tidy --output_groups=report
 build:clang-tidy --build_tag_filters=-notidy
 
-# Basic ASAN/UBSAN that works for gcc
-build:asan --config=sanitizer
+# Basic ASAN/UBSAN that works for gcc or llvm
+build:asan-common --config=sanitizer
 # ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
-build:asan --define signal_trace=disabled
-build:asan --define ENVOY_CONFIG_ASAN=1
-build:asan --build_tag_filters=-no_san
-build:asan --test_tag_filters=-no_san
-build:asan --copt -fsanitize=address,undefined
-build:asan --linkopt -fsanitize=address,undefined
-# vptr and function sanitizer are enabled in clang-asan if it is set up via bazel/setup_clang.sh.
-build:asan --copt -fno-sanitize=vptr,function
-build:asan --linkopt -fno-sanitize=vptr,function
-build:asan --copt -DADDRESS_SANITIZER=1
-build:asan --copt -DUNDEFINED_SANITIZER=1
-build:asan --copt -D__SANITIZE_ADDRESS__
-build:asan --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
-build:asan --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
-build:asan --test_env=ASAN_SYMBOLIZER_PATH
+build:asan-common --define signal_trace=disabled
+build:asan-common --define ENVOY_CONFIG_ASAN=1
+build:asan-common --build_tag_filters=-no_san
+build:asan-common --test_tag_filters=-no_san
+build:asan-common --copt -fsanitize=address,undefined
+build:asan-common --linkopt -fsanitize=address,undefined
+# vptr and function sanitizer are enabled in asan if it is set up via bazel/setup_clang.sh.
+build:asan-common --copt -fno-sanitize=vptr,function
+build:asan-common --linkopt -fno-sanitize=vptr,function
+build:asan-common --copt -DADDRESS_SANITIZER=1
+build:asan-common --copt -DUNDEFINED_SANITIZER=1
+build:asan-common --copt -D__SANITIZE_ADDRESS__
+build:asan-common --test_env=ASAN_OPTIONS=handle_abort=1:allow_addr2line=true:check_initialization_order=true:strict_init_order=true:detect_odr_violation=1
+build:asan-common --test_env=UBSAN_OPTIONS=halt_on_error=true:print_stacktrace=1
+build:asan-common --test_env=ASAN_SYMBOLIZER_PATH
 # ASAN needs -O1 to get reasonable performance.
-build:asan --copt -O1
-build:asan --copt -fno-optimize-sibling-calls
+build:asan-common --copt -O1
+build:asan-common --copt -fno-optimize-sibling-calls
 
-# Clang ASAN/UBSAN
-build:clang-asan-common --config=clang
-build:clang-asan-common --config=asan
-build:clang-asan-common --linkopt -fuse-ld=lld
-build:clang-asan-common --linkopt --rtlib=compiler-rt
-build:clang-asan-common --linkopt --unwindlib=libgcc
-
-build:clang-asan --config=clang-asan-common
-build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
-build:clang-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
-build:clang-asan --action_env=ENVOY_UBSAN_VPTR=1
-build:clang-asan --copt=-fsanitize=vptr,function
-build:clang-asan --linkopt=-fsanitize=vptr,function
+# ASAN config with clang runtime
+build:asan --config=asan-common
+build:asan --linkopt --rtlib=compiler-rt
+build:asan --linkopt --unwindlib=libgcc
+build:asan --linkopt=-l:libclang_rt.ubsan_standalone.a
+build:asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
+build:asan --action_env=ENVOY_UBSAN_VPTR=1
+build:asan --copt=-fsanitize=vptr,function
+build:asan --linkopt=-fsanitize=vptr,function
+build:asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
 
 # macOS
-build:macos --cxxopt=-std=c++20 --host_cxxopt=-std=c++20
-build:macos --copt=-Wno-deprecated-declarations
 build:macos --action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --host_action_env=PATH=/opt/homebrew/bin:/opt/local/bin:/usr/local/bin:/usr/bin:/bin
 build:macos --define tcmalloc=disabled
@@ -176,57 +183,47 @@ build:macos-asan --copt -DGRPC_BAZEL_BUILD
 # Dynamic link cause issues like: `dyld: malformed mach-o: load commands size (59272) > 32768`
 build:macos-asan --dynamic_mode=off
 
-# Clang TSAN
-build:clang-tsan --action_env=ENVOY_TSAN=1
-build:clang-tsan --config=sanitizer
-build:clang-tsan --define ENVOY_CONFIG_TSAN=1
-build:clang-tsan --copt -fsanitize=thread
-build:clang-tsan --linkopt -fsanitize=thread
-build:clang-tsan --linkopt -fuse-ld=lld
-build:clang-tsan --copt -DTHREAD_SANITIZER=1
-build:clang-tsan --build_tag_filters=-no_san,-no_tsan
-build:clang-tsan --test_tag_filters=-no_san,-no_tsan
+# Base TSAN config
+build:tsan --action_env=ENVOY_TSAN=1
+build:tsan --config=sanitizer
+build:tsan --define ENVOY_CONFIG_TSAN=1
+build:tsan --copt -fsanitize=thread
+build:tsan --linkopt -fsanitize=thread
+build:tsan --copt -DTHREAD_SANITIZER=1
+build:tsan --build_tag_filters=-no_san,-no_tsan
+build:tsan --test_tag_filters=-no_san,-no_tsan
 # Needed due to https://github.com/libevent/libevent/issues/777
-build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
+build:tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 # https://github.com/abseil/abseil-cpp/issues/760
 # https://github.com/google/sanitizers/issues/953
-build:clang-tsan --test_env="TSAN_OPTIONS=report_atomic_races=0"
-build:clang-tsan --test_timeout=120,600,1500,4800
+build:tsan --test_env="TSAN_OPTIONS=report_atomic_races=0"
+build:tsan --test_timeout=120,600,1500,4800
 
-# Clang MSAN - this is the base config for remote-msan and docker-msan. To run this config without
-# our build image, follow https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo
-# with libc++ instruction and provide corresponding `--copt` and `--linkopt` as well.
-build:clang-msan --action_env=ENVOY_MSAN=1
-build:clang-msan --config=sanitizer
-build:clang-msan --build_tag_filters=-no_san
-build:clang-msan --test_tag_filters=-no_san
-build:clang-msan --define ENVOY_CONFIG_MSAN=1
-build:clang-msan --copt -fsanitize=memory
-build:clang-msan --linkopt -fsanitize=memory
-build:clang-msan --linkopt -fuse-ld=lld
-build:clang-msan --copt -fsanitize-memory-track-origins=2
-build:clang-msan --copt -DMEMORY_SANITIZER=1
-build:clang-msan --test_env=MSAN_SYMBOLIZER_PATH
+# Base MSAN config
+build:msan --action_env=ENVOY_MSAN=1
+build:msan --config=sanitizer
+build:msan --build_tag_filters=-no_san
+build:msan --test_tag_filters=-no_san
+build:msan --define ENVOY_CONFIG_MSAN=1
+build:msan --copt -fsanitize=memory
+build:msan --linkopt -fsanitize=memory
+build:msan --copt -fsanitize-memory-track-origins=2
+build:msan --copt -DMEMORY_SANITIZER=1
+build:msan --test_env=MSAN_SYMBOLIZER_PATH
 # MSAN needs -O1 to get reasonable performance.
-build:clang-msan --copt -O1
-build:clang-msan --copt -fno-optimize-sibling-calls
+build:msan --copt -O1
+build:msan --copt -fno-optimize-sibling-calls
 
-# Clang with libc++
-build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
-build:libc++ --//bazel:libc++=true
-build:clang-libc++ --config=libc++
-build:clang-libc++ --action_env=ARFLAGS=r
-build:arm64-clang-libc++ --config=clang-libc++
+build:libc++ --@envoy//bazel:libc++=true
 
-build:libc++20 --config=libc++
-# gRPC has a lot of deprecated-enum-enum-conversion warning. Remove once it is addressed
-build:libc++20 --copt=-Wno-error=deprecated-enum-enum-conversion
+
+
 
 # Optimize build for binary size reduction.
 build:sizeopt -c opt --copt -Os
@@ -285,44 +282,25 @@ build:rbe-toolchain --action_env=BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN=1
 build:rbe-toolchain --incompatible_enable_cc_toolchain_resolution=false
 
 build:rbe-toolchain-clang --config=rbe-toolchain
+build:rbe-toolchain-clang --config=clang
 build:rbe-toolchain-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
 build:rbe-toolchain-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_platform
 build:rbe-toolchain-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
 build:rbe-toolchain-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain
 build:rbe-toolchain-clang --action_env=CC=clang --action_env=CXX=clang++
 
-build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
-build:rbe-toolchain-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
-build:rbe-toolchain-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_clang_libcxx_platform
-build:rbe-toolchain-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
-build:rbe-toolchain-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain
-build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
-build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
-build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
-build:rbe-toolchain-arm64-clang-libc++ --config=rbe-toolchain
-build:rbe-toolchain-arm64-clang-libc++ --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
-build:rbe-toolchain-arm64-clang-libc++ --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_libcxx_platform
-build:rbe-toolchain-arm64-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/cc:toolchain
-build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain-arm64
-build:rbe-toolchain-arm64-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
-build:rbe-toolchain-arm64-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:rbe-toolchain-arm64-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
-build:rbe-toolchain-arm64-clang-libc++ --define force_libcpp=enabled
+build:rbe-toolchain-arm64-clang --config=rbe-toolchain
+build:rbe-toolchain-arm64-clang --config=clang
+build:rbe-toolchain-arm64-clang --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_platform
+build:rbe-toolchain-arm64-clang --host_platform=@envoy//bazel/rbe/toolchains:rbe_linux_arm64_clang_platform
+build:rbe-toolchain-arm64-clang --crosstool_top=@envoy//bazel/rbe/toolchains/configs/linux/clang/cc:toolchain
+build:rbe-toolchain-arm64-clang --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang/config:cc-toolchain-arm64
+build:rbe-toolchain-arm64-clang --action_env=CC=clang --action_env=CXX=clang++
 
-build:rbe-toolchain-asan --config=clang-asan
-build:rbe-toolchain-asan --linkopt -fuse-ld=lld
-build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
-build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
-build:rbe-toolchain-asan --linkopt='-L/opt/llvm/lib/clang/18/lib/x86_64-unknown-linux-gnu'
-build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone.a
-build:rbe-toolchain-asan --linkopt=-l:libclang_rt.ubsan_standalone_cxx.a
 
-build:rbe-toolchain-msan --config=clang-msan
-
-build:rbe-toolchain-tsan --config=clang-tsan
+# Sanitizer configs - CI uses the *-common configs directly
+# Note: clang config comes from rbe-toolchain-clang to avoid duplication
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --platforms=@envoy//bazel/rbe/toolchains:rbe_linux_gcc_platform
@@ -348,27 +326,26 @@ build:remote-windows --remote_download_toplevel
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
 
-build:remote-clang-libc++ --config=remote
-build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
 
-build:remote-arm64-clang-libc++ --config=remote
-build:remote-arm64-clang-libc++ --config=rbe-toolchain-arm64-clang-libc++
+build:remote-arm64-clang --config=remote
+build:remote-arm64-clang --config=rbe-toolchain-arm64-clang
+
 
 build:remote-gcc --config=remote
 build:remote-gcc --config=gcc
 build:remote-gcc --config=rbe-toolchain-gcc
 
 build:remote-asan --config=remote
-build:remote-asan --config=rbe-toolchain-clang-libc++
-build:remote-asan --config=rbe-toolchain-asan
+build:remote-asan --config=rbe-toolchain-clang
+build:remote-asan --config=asan
 
 build:remote-msan --config=remote
-build:remote-msan --config=rbe-toolchain-clang-libc++
-build:remote-msan --config=rbe-toolchain-msan
+build:remote-msan --config=rbe-toolchain-clang
+build:remote-msan --config=msan
 
 build:remote-tsan --config=remote
-build:remote-tsan --config=rbe-toolchain-clang-libc++
-build:remote-tsan --config=rbe-toolchain-tsan
+build:remote-tsan --config=rbe-toolchain-clang
+build:remote-tsan --config=tsan
 
 build:remote-msvc-cl --config=remote-windows
 build:remote-msvc-cl --config=msvc-cl
@@ -392,7 +369,8 @@ build:compile-time-options --define=deprecated_features=disabled
 build:compile-time-options --define=tcmalloc=gperftools
 build:compile-time-options --define=zlib=ng
 build:compile-time-options --define=uhv=enabled
-build:compile-time-options --config=libc++20
+# gRPC has a lot of deprecated-enum-enum-conversion warnings with C++20
+build:compile-time-options --copt=-Wno-error=deprecated-enum-enum-conversion
 build:compile-time-options --test_env=ENVOY_HAS_EXTRA_EXTENSIONS=true
 build:compile-time-options --@envoy//bazel:http3=False
 build:compile-time-options --@envoy//source/extensions/filters/http/kill_request:enabled
@@ -411,24 +389,22 @@ build:docker-sandbox --experimental_enable_docker_sandbox
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
 
-build:docker-clang-libc++ --config=docker-sandbox
-build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=gcc
 build:docker-gcc --config=rbe-toolchain-gcc
 
 build:docker-asan --config=docker-sandbox
-build:docker-asan --config=rbe-toolchain-clang-libc++
-build:docker-asan --config=rbe-toolchain-asan
+build:docker-asan --config=rbe-toolchain-clang
+build:docker-asan --config=asan
 
 build:docker-msan --config=docker-sandbox
-build:docker-msan --config=rbe-toolchain-clang-libc++
-build:docker-msan --config=rbe-toolchain-msan
+build:docker-msan --config=rbe-toolchain-clang
+build:docker-msan --config=msan
 
 build:docker-tsan --config=docker-sandbox
-build:docker-tsan --config=rbe-toolchain-clang-libc++
-build:docker-tsan --config=rbe-toolchain-tsan
+build:docker-tsan --config=rbe-toolchain-clang
+build:docker-tsan --config=tsan
 
 # CI configurations
 build:remote-ci --config=ci
@@ -444,7 +420,6 @@ common:ci --test_output=errors
 # Shared fuzzing configuration.
 build:fuzzing --define=ENVOY_CONFIG_ASAN=1
 build:fuzzing --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-build:fuzzing --config=libc++
 
 # Fuzzing without ASAN. This is useful for profiling fuzzers without any ASAN artifacts.
 build:plain-fuzzer --config=fuzzing
@@ -455,14 +430,16 @@ build:plain-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:plain-fuzzer --copt=-fsanitize=fuzzer-no-link
 build:plain-fuzzer --linkopt=-fsanitize=fuzzer-no-link
 
+# ASAN fuzzer
 build:asan-fuzzer --config=plain-fuzzer
-build:asan-fuzzer --config=clang-asan
+build:asan-fuzzer --config=asan
 build:asan-fuzzer --copt=-fno-omit-frame-pointer
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 build:asan-fuzzer --linkopt=-lc++
 
 build:oss-fuzz --config=fuzzing
+build:oss-fuzz --config=libc++
 build:oss-fuzz --define=FUZZING_ENGINE=oss-fuzz
 build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_instrumentation=oss-fuzz
 build:oss-fuzz --@rules_fuzzing//fuzzing:cc_engine_sanitizer=none
