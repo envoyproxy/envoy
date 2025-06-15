@@ -97,6 +97,8 @@ envoy_cc_library(
         "//source/extensions/common/aws/credential_providers:container_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:environment_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:instance_profile_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:webidentity_credentials_provider_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",

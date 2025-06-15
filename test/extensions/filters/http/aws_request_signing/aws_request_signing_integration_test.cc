@@ -1,12 +1,8 @@
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/common/common/logger.h"
-#include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 
-#include "test/common/upstream/utility.h"
-#include "test/extensions/common/aws/mocks.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
@@ -54,6 +50,49 @@ typed_config:
   - exact: x-amzn-trace-id
 )EOF";
 
+const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE = R"EOF(
+aws_request_signing:
+  credential_provider:
+    iam_roles_anywhere_credential_provider:
+      role_arn: arn:aws:iam::012345678901:role/rolesanywhere
+      certificate: {environment_variable: CERT}
+      private_key: {environment_variable: PKEY}
+      trust_anchor_arn: arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/8d105284-f0a7-4939-a7e6-8df768ea535f
+      profile_arn: arn:aws:rolesanywhere:ap-southeast-2:012345678901:profile/4af0c6cf-506a-4469-b1b5-5f3fecdaabdf
+      session_duration: 900s
+  service_name: vpc-lattice-svcs
+  region: ap-southeast-2
+  signing_algorithm: aws_sigv4
+  use_unsigned_payload: true
+  match_excluded_headers:
+  - prefix: x-envoy
+  - prefix: x-forwarded
+  - exact: x-amzn-trace-id
+stat_prefix: some-prefix
+  )EOF";
+
+const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE_CUSTOM = R"EOF(
+aws_request_signing:
+  credential_provider:
+    custom_credential_provider_chain: true
+    iam_roles_anywhere_credential_provider:
+      role_arn: arn:aws:iam::012345678901:role/rolesanywhere
+      certificate: {environment_variable: CERT}
+      private_key: {environment_variable: PKEY}
+      trust_anchor_arn: arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/8d105284-f0a7-4939-a7e6-8df768ea535f
+      profile_arn: arn:aws:rolesanywhere:ap-southeast-2:012345678901:profile/4af0c6cf-506a-4469-b1b5-5f3fecdaabdf
+      session_duration: 900s
+  service_name: vpc-lattice-svcs
+  region: ap-southeast-2
+  signing_algorithm: aws_sigv4
+  use_unsigned_payload: true
+  match_excluded_headers:
+  - prefix: x-envoy
+  - prefix: x-forwarded
+  - exact: x-amzn-trace-id
+stat_prefix: some-prefix
+  )EOF";
+
 const std::string AWS_REQUEST_SIGNING_CONFIG_SIGV4A = R"EOF(
 name: envoy.filters.http.aws_request_signing
 typed_config:
@@ -79,6 +118,96 @@ aws_request_signing:
   - prefix: x-forwarded
   - exact: x-amzn-trace-id
 stat_prefix: some-prefix
+)EOF";
+
+// Example certificates generated for test cases - 100 year expiration
+std::string server_root_cert_rsa_pem = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIFZzCCA0+gAwIBAgIUUDBf/hk/8LUQstasvM05ipfkQcQwDQYJKoZIhvcNAQEL
+BQAwQjELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UE
+CgwTRGVmYXVsdCBDb21wYW55IEx0ZDAgFw0yNTA1MTcwMjI1MDlaGA8yMTI1MDQy
+MzAyMjUwOVowQjELMAkGA1UEBhMCWFgxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEc
+MBoGA1UECgwTRGVmYXVsdCBDb21wYW55IEx0ZDCCAiIwDQYJKoZIhvcNAQEBBQAD
+ggIPADCCAgoCggIBAN2mXm3KC0yiIMtGJsQ9MWS7CPeFbvVhhAlfLKkHpTKWL6dD
+nQ8xpIUPyKzOqqWGj+pkoVUDnbXEjBVFESdlGo4M50ubJ+d9/WOb9IeHQTZWjTyK
+8VzRdA057y13NtDjclmu4ScjGxYRfLiN0oZl/YxAzFUK8FeYejpi/aWSwfLU2CnK
+0YgArgm0P6tDDQja2Mj/H84xzG/CKuAIZmG5TNikgemuwlPhkx0uLEoP0zumeiDq
+HQa78qRtyJlh84pDNqEH+UCxuKR/Mcy4WmLd4Ra/TqANvCUMhbJubHgibHZa4ZLz
+YaiMbPV3CAFZtmZY82oCDBLqxWyX2O6LfJXQKZHKgRrbWgzafPhdQ1tjHXBoMFE0
+Mwi0APGoqJlFbfUqAbCiWXYNPfmnsR49ctefnQ23hZaF8MdUI8Cz24ua+UFNLh2f
+JCQzb2yLOCNEMjY8L6VnCNGUyfcB7uqkpFNldBLj17xErDXBlNS2ARpouECK/VGQ
+LpDdl7ZiAEKAYX52TVCDmqAnc4eIAXVIDjB19NdwS0LwSLn4g+A0kPtsxhWHEvLv
+/M4aZPDLfYWgiG+Y5kD2fELsh5EDwIA0/CIpJz2GujgvUqPigOUqZ/1Uh/Tk+Tl/
+k6xmCiENnHM9YtsnDsxgkGW9nnF+As8v3I0zuixOtuA5B3XkPHDLU2KcmbZLAgMB
+AAGjUzBRMB0GA1UdDgQWBBQipLm+Isi5gDvOQXYKYVErC2OHVzAfBgNVHSMEGDAW
+gBQipLm+Isi5gDvOQXYKYVErC2OHVzAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3
+DQEBCwUAA4ICAQDTAUdAYdjvZaUfMxWHdd7tLYJpnB9bOa2DTEcWRE6nPa6pMnAe
+ilW/6INJyu2mx+AkJgj9LRkt2NrhbKyFsuRI4xXv2aUBesdmBep1VNGvaTtpEHLk
+zCl+44pdC/VOJy4yKnwgScno+WrW1UwngNBK7ZGFqwv2zQxiz5YJo4btraPjvO4o
+orExqCKN6/Z0pE7rxDqlp9dZCKOPhFXff7EqEfCjZ2pL6wxS9EritlNW8q1v/nPV
+YxSOtx4A1/ps48yo6LGyHlOOpNyIAXt11Ert0YZM29YBrIMl0mhVtdnKpio3fqh5
+/qdJo9qa3ohkBG2ks2FdHirJh6aSprwjus4dJvOgzmx4o7cfLIWQgKMtdCACHw2T
+14BFDYYZMMAoahCi3obW7NKmH7edp1Fig4CRnwjBMkBld7XmL4X1x5fXodRyUG7V
+1h5zUVuYHSPqUKNXNgyKwzfAXGd5hVDlyxUp46itdZ3zk6RCROZooa4y3Znoe4d0
+vAMHGhD/7ZqV9bc0ZfItIHlmERrhOKaDsdwAbf14PSWt2bD0fTVa8erElgGB9kgL
+IID8F7S+eEeSBcKQU5ayDMYp61s5XoDLMQ4HnozelK6Jx1q8iVf8TuqbWtnIIImP
+2Rk1s46j2pk8H1NjFZBi4FgC3rvCFf8opPrCDyKCEysvr3u/8ZXGCThn8g==
+-----END CERTIFICATE-----
+)EOF";
+
+std::string server_root_private_key_rsa_pem = R"EOF(
+-----BEGIN PRIVATE KEY-----
+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
+ZW8j9fw47vqG9oCPqG2CHOIlN+IxBGM=
+-----END PRIVATE KEY-----
 )EOF";
 
 using Headers = std::vector<std::pair<const std::string, const std::string>>;
@@ -276,9 +405,9 @@ public:
         }));
   }
 
-  void dnsSetup() {
+  void dnsSetup(std::string hostname) {
     ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
-    expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
+    expectResolve(Network::DnsLookupFamily::V4Only, hostname);
   }
 
   void addStandardFilter(bool downstream = true) {
@@ -338,7 +467,7 @@ public:
 TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
 
   // Web Identity Credentials only
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -356,7 +485,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandard) {
 TEST_F(InitializeFilterTest, TestWithOneClusterCustomWebIdentity) {
 
   // Web Identity Credentials only
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   addCustomCredentialChainFilter();
@@ -370,7 +499,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterCustomWebIdentity) {
 TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
 
   // Web Identity Credentials only
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -388,7 +517,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterStandardUpstream) {
 TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
 
   // Instance Profile Credentials only
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     *bootstrap.mutable_static_resources()->add_clusters() =
@@ -415,7 +544,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersUpstreamCheckForSingletonIMDS) {
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -430,7 +559,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -446,7 +575,7 @@ TEST_F(InitializeFilterTest, TestWithOneClusterRouteLevelAndStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -467,7 +596,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -484,6 +613,41 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevel) {
   test_server_->waitForCounterGe("aws.metadata_credentials_provider.sts_token_service_internal-ap-"
                                  "southeast-2.credential_refreshes_performed",
                                  1, std::chrono::seconds(10));
+}
+
+TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCluster) {
+  dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
+  // RolesAnywhere credentials only
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  auto cert_env = std::string("CERT");
+  TestEnvironment::setEnvVar(cert_env, server_root_cert_rsa_pem, 1);
+  auto pkey_env = std::string("PKEY");
+  TestEnvironment::setEnvVar(pkey_env, server_root_private_key_rsa_pem, 1);
+
+  addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE);
+  initialize();
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
+                                 "amazonaws_com.credential_refreshes_performed",
+                                 1);
+}
+
+TEST_F(InitializeFilterTest, TestWithIAMRolesAnywhereCustom) {
+  dnsSetup("rolesanywhere.ap-southeast-2.amazonaws.com");
+  // RolesAnywhere credentials only
+  TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
+  TestEnvironment::setEnvVar("AWS_ROLE_SESSION_NAME", "role-session-name", 1);
+  auto cert_env = std::string("CERT");
+  TestEnvironment::setEnvVar(cert_env, server_root_cert_rsa_pem, 1);
+  auto pkey_env = std::string("PKEY");
+  TestEnvironment::setEnvVar(pkey_env, server_root_private_key_rsa_pem, 1);
+  // Set system time for these tests to ensure certs do not expire
+
+  addPerRouteFilter(AWS_REQUEST_SIGNING_CONFIG_SIGV4_ROLES_ANYWHERE_CUSTOM);
+  initialize();
+  test_server_->waitForCounterGe("aws.metadata_credentials_provider.rolesanywhere_ap-southeast-2_"
+                                 "amazonaws_com.credential_refreshes_performed",
+                                 1);
 }
 
 TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
@@ -601,7 +765,7 @@ TEST_F(InitializeFilterTest, TestWithMultipleWebidentityRouteLevel) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials and Container Credentials
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
@@ -622,7 +786,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandard) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials, Container Credentials and Instance Profile Credentials
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
@@ -639,7 +803,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersStandardInstanceProfile) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials, Container Credentials and Instance Profile Credentials
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
@@ -656,7 +820,7 @@ TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelInstanceProfile) {
 }
 
 TEST_F(InitializeFilterTest, TestWithTwoClustersRouteLevelAndStandardInstanceProfile) {
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
   // Web Identity Credentials, Container Credentials and Instance Profile Credentials
   TestEnvironment::setEnvVar("AWS_WEB_IDENTITY_TOKEN_FILE", "/path/to/web_token", 1);
   TestEnvironment::setEnvVar("AWS_ROLE_ARN", "aws:iam::123456789012:role/arn", 1);
@@ -695,9 +859,9 @@ public:
         }));
   }
 
-  void dnsSetup() {
+  void dnsSetup(std::string hostname) {
     ON_CALL(dns_resolver_factory_, createDnsResolver(_, _, _)).WillByDefault(Return(dns_resolver_));
-    expectResolve(Network::DnsLookupFamily::V4Only, "sts.ap-southeast-2.amazonaws.com");
+    expectResolve(Network::DnsLookupFamily::V4Only, hostname);
   }
 
   NiceMock<MockLogicalDnsClusterFactory> logical_dns_cluster_factory_;
@@ -726,7 +890,7 @@ public:
 TEST_F(CdsInteractionTest, CDSUpdateDoesNotRemoveOurClusters) {
 
   // STS cluster requires dns mocking
-  dnsSetup();
+  dnsSetup("sts.ap-southeast-2.amazonaws.com");
 
   // Web Identity Credentials only
   TestEnvironment::setEnvVar("AWS_EC2_METADATA_DISABLED", "true", 1);
