@@ -94,7 +94,13 @@ std::vector<uint8_t> generateClientHelloWithoutExtensions(uint16_t tls_max_versi
   return client_hello;
 }
 
-std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja3_fingerprint) {
+// Forward declaration for helper
+std::vector<uint8_t> buildClientHelloMessage(const std::vector<uint8_t>& ciphers,
+                                             const std::vector<uint8_t>& extensions,
+                                             uint16_t tls_version);
+
+std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja3_fingerprint,
+                                                           size_t target_size) {
   // fingerprint should have this format:
   //  SSLVersion,Cipher,SSLExtension,EllipticCurve,EllipticCurvePointFormat
   // Example:
@@ -220,9 +226,34 @@ std::vector<uint8_t> generateClientHelloFromJA3Fingerprint(const std::string& ja
     }
   }
 
-  // client hello message
-  std::vector<uint8_t> clienthello = {// client version
-                                      static_cast<uint8_t>((tls_version & 0xff00) >> 8),
+  // Build initial clienthello message
+  std::vector<uint8_t> clienthello_message =
+      buildClientHelloMessage(ciphers, extensions, tls_version);
+
+  // Add dummy extension if needed
+  size_t dummy_payload_size = 0;
+  if (clienthello_message.size() < target_size) {
+    dummy_payload_size = target_size - clienthello_message.size() - 4;
+    if (dummy_payload_size > 0xFFFF) {
+      dummy_payload_size = 0xFFFF;
+    }
+    uint16_t dummy_ext_id = 0xFFFE;
+    extensions.push_back((dummy_ext_id & 0xff00) >> 8);
+    extensions.push_back(dummy_ext_id & 0xff);
+    extensions.push_back((dummy_payload_size & 0xff00) >> 8);
+    extensions.push_back(dummy_payload_size & 0xff);
+    extensions.insert(extensions.end(), dummy_payload_size, 0x00);
+    clienthello_message = buildClientHelloMessage(ciphers, extensions, tls_version);
+  }
+
+  return clienthello_message;
+}
+
+// Helper function to build the clienthello message
+std::vector<uint8_t> buildClientHelloMessage(const std::vector<uint8_t>& ciphers,
+                                             const std::vector<uint8_t>& extensions,
+                                             uint16_t tls_version) {
+  std::vector<uint8_t> clienthello = {static_cast<uint8_t>((tls_version & 0xff00) >> 8),
                                       static_cast<uint8_t>(tls_version & 0xff),
                                       // client random (32 bytes)
                                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
