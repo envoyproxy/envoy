@@ -354,7 +354,8 @@ public:
   }
 
   void requestLoadStatsResponse(const std::vector<std::string>& clusters,
-                                bool send_all_clusters = false) {
+                                bool send_all_clusters = false,
+                                bool report_endpoint_granularity = false) {
     envoy::service::load_stats::v3::LoadStatsResponse loadstats_response;
     loadstats_response.mutable_load_reporting_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(load_report_interval_ms_));
@@ -364,6 +365,7 @@ public:
     if (send_all_clusters) {
       loadstats_response.set_send_all_clusters(true);
     }
+    loadstats_response.set_report_endpoint_granularity(report_endpoint_granularity);
     loadstats_stream_->sendGrpcMessage(loadstats_response);
     // Wait until the request has been received by Envoy.
     test_server_->waitForCounterGe("load_reporter.requests", ++load_requests_);
@@ -904,6 +906,51 @@ TEST_P(LoadStatsIntegrationTest, SuccessWithCustomMetricsNotSent) {
   // On slow machines, more than one load stats response may be pushed while we are simulating load.
   EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+  cleanupLoadStatsConnection();
+}
+
+// Validate basic endpoint-level load stats reporting with successful and failing requests.
+TEST_P(LoadStatsIntegrationTest, EndpointLevelStatsReportingSuccessAndFailure) {
+  initialize();
+
+  waitForLoadStatsStream();
+  ASSERT_TRUE(waitForLoadStatsRequest({}));
+  loadstats_stream_->startGrpcStream();
+
+  // Tell Envoy to report for cluster_0 and enable endpoint granularity.
+  requestLoadStatsResponse({"cluster_0"}, false /*send_all_clusters*/,
+                           true /*report_endpoint_granularity*/);
+
+  // Configure cluster_0 with one endpoint (service_upstream_[0], which is fake_upstreams_[1])
+  // in the "winter" locality.
+  updateClusterLoadAssignment({{0}}, {}, {}, {});
+  test_server_->waitForGaugeEq("cluster.cluster_0.membership_total", 1);
+
+  sendAndReceiveUpstream(0, 200, false /*send_orca_load_report*/);
+  sendAndReceiveUpstream(0, 503, false /*send_orca_load_report*/);
+
+  // Construct the expected UpstreamLocalityStats with one UpstreamEndpointStats.
+  // Total: 1 success, 1 error, 2 issued.
+  envoy::config::endpoint::v3::UpstreamLocalityStats uls =
+      localityStats("winter", 1 /*success*/, 1 /*error*/, 0 /*active*/, 2 /*issued*/);
+
+  auto* eps = uls.add_upstream_endpoint_stats();
+
+  const auto& endpoint_address = fake_upstreams_[1]->localAddress();
+  eps->mutable_address()->mutable_socket_address()->set_address(
+      endpoint_address->ip()->addressAsString());
+  eps->mutable_address()->mutable_socket_address()->set_port_value(endpoint_address->ip()->port());
+  eps->set_total_successful_requests(1);
+  eps->set_total_error_requests(1);
+  eps->set_total_issued_requests(2);
+
+  std::vector<envoy::config::endpoint::v3::UpstreamLocalityStats> expected_uls_vector = {uls};
+  ASSERT_TRUE(waitForLoadStatsRequest(expected_uls_vector));
+
+  EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_EQ(2, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
   cleanupLoadStatsConnection();
 }
 
