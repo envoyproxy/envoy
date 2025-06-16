@@ -767,17 +767,23 @@ public:
 
   // Return EMPTY vectors to avoid validation errors
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
-  subjectAltNameMatchers() const override { return empty_matchers_; }
+  subjectAltNameMatchers() const override {
+    return empty_matchers_;
+  }
   const std::vector<std::string>& verifyCertificateHashList() const override { return empty_strs_; }
   const std::vector<std::string>& verifyCertificateSpkiList() const override { return empty_strs_; }
 
   bool allowExpiredCertificate() const override { return false; }
-  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::TrustChainVerification
-  trustChainVerification() const override {
-    return envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::ACCEPT_UNTRUSTED;
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+      TrustChainVerification
+      trustChainVerification() const override {
+    return envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+        ACCEPT_UNTRUSTED;
   }
   const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
-  customValidatorConfig() const override { return custom_config_; }
+  customValidatorConfig() const override {
+    return custom_config_;
+  }
   Api::Api& api() const override { return *api_; }
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
   absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
