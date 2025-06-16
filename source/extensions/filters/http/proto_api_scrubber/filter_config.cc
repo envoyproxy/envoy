@@ -94,22 +94,22 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
 absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
     Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source) {
   Envoy::Protobuf::FileDescriptorSet descriptor_set;
-  auto pool = std::make_unique<Envoy::Protobuf::DescriptorPool>();
 
   switch (data_source.specifier_case()) {
   case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
     auto file_or_error = api.fileSystem().fileReadToEnd(data_source.filename());
-    if (!file_or_error.status().ok() || !descriptor_set.ParseFromString(file_or_error.value())) {
-      std::cout << "File_or_Error_Status: " << file_or_error.status() << std::endl;
-      std::cout << "File_or_Error_Status message: " << file_or_error.status().message()
-                << std::endl;
+    if (!file_or_error.status().ok()) {
+      return absl::InvalidArgumentError(fmt::format(
+          "{} Unable to read from file `{}`", kConfigInitializationError, data_source.filename()));
+    }
+
+    if (!descriptor_set.ParseFromString(file_or_error.value())) {
       return absl::InvalidArgumentError(
           fmt::format("{} Unable to parse proto descriptor from file `{}`",
                       kConfigInitializationError, data_source.filename()));
     }
     break;
   }
-
   case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
     if (!descriptor_set.ParseFromString(data_source.inline_bytes())) {
       return absl::InvalidArgumentError(
@@ -118,16 +118,18 @@ absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
     }
     break;
   }
-
-  default: {
+  default:
     return absl::InvalidArgumentError(
         fmt::format("{} Unsupported DataSource case `{}` for configuring `descriptor_set`",
                     kConfigInitializationError, static_cast<int>(data_source.specifier_case())));
   }
-  }
 
+  auto pool = std::make_unique<Envoy::Protobuf::DescriptorPool>();
   for (const auto& file : descriptor_set.file()) {
-    pool->BuildFile(file);
+    if (pool->BuildFile(file) == nullptr) {
+      return absl::InvalidArgumentError(
+          fmt::format("{} Unable to build proto descriptor.", kConfigInitializationError));
+    }
   }
 
   descriptor_pool_ = std::move(pool);
