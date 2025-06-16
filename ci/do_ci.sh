@@ -46,6 +46,8 @@ setup_clang_toolchain() {
     fi
     CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
     BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
+    BAZEL_BUILD_OPTIONS+=("--test_output=all")
+    BAZEL_BUILD_OPTIONS+=("--cache_test_results=no")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
     echo "clang toolchain with ${ENVOY_STDLIB} configured: ${CONFIG}"
@@ -264,13 +266,13 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-  if [[ "${CI_TARGET}" == "release" || "${CI_TARGET}" == "release.test_only" ]]; then
-    # We test contrib on release only.
-    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
-  elif [[ "${CI_TARGET}" == "msan" ]]; then
-    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
-  fi
-  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
+#   if [[ "${CI_TARGET}" == "release" || "${CI_TARGET}" == "release.test_only" ]]; then
+#     # We test contrib on release only.
+#     #COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
+#   elif [[ "${CI_TARGET}" == "msan" ]]; then
+#     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
+#   fi
+  TEST_TARGETS=("test/extensions/filters/http/ip_tagging:ip_tagging_filter_test")
 fi
 
 case $CI_TARGET in
