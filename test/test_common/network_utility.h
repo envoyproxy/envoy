@@ -195,7 +195,7 @@ public:
 
   absl::string_view name() const override { return "EmptyFilterChain"; }
 
-  bool addedByDiscovery() const override { return false; }
+  bool addedViaApi() const override { return false; }
 
 private:
   const DownstreamTransportSocketFactoryPtr transport_socket_factory_;

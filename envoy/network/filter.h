@@ -610,7 +610,7 @@ public:
   /**
    * @return true if this filter chain configuration was discovered by FCDS.
    */
-  virtual bool addedByDiscovery() const PURE;
+  virtual bool addedViaApi() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

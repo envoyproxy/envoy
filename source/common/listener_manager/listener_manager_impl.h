@@ -378,13 +378,13 @@ public:
   absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator,
-                   bool added_by_fcds) const override;
+                   bool added_via_api) const override;
 
 private:
   absl::StatusOr<Network::DrainableFilterChainSharedPtr> buildFilterChainInternal(
       const envoy::config::listener::v3::FilterChain& filter_chain,
       Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
-      bool added_by_fcds) const;
+      bool added_via_api) const;
 
   ListenerImpl& listener_;
   ProtobufMessage::ValidationVisitor& validator_;
