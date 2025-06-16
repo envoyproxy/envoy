@@ -102,7 +102,7 @@ message IPTagging {
     // See :ref:`watched_directory <envoy_v3_api_msg_config.core.v3.DataSource>` for more information about the ``watched_directory`` field.
     config.core.v3.DataSource ip_tags_datasource = 1;
 
-    // When :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_file_provider.ip_tags_datasource>` is configured
+    // When :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagsFileProvider.ip_tags_datasource>` is configured
     // the ip tags will be reloaded from file every ``ip_tags_refresh_rate`` milliseconds.
     // Defaults to 0, in this case no refresh will be attempted.
     google.protobuf.Duration ip_tags_refresh_rate = 2 [(validate.rules).duration = {gt {}}];
@@ -113,7 +113,7 @@ message IPTagging {
 
   // The set of IP tags for the filter.
   // Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
-  // or :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags_file_provider.ip_tags_datasource>`
+  // or :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagsFileProvider.ip_tags_datasource>`
   // can be set for the Ip Tagging filter.
   repeated IPTag ip_tags = 4;
 
