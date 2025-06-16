@@ -961,7 +961,7 @@ public:
     };
     const std::string& routeName() const override { return parent_->routeName(); }
 
-  protected:
+  private:
     const RouteEntryAndRoute* parent_;
 
     // If a DynamicRouteEntry instance is created and returned to the caller directly, then keep an
