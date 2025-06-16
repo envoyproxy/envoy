@@ -54,7 +54,7 @@ class Config {
 public:
   Config(Stats::Scope& scope,
          const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
-         uint32_t max_client_hello_size = SSL3_RT_MAX_PLAIN_LENGTH);
+         uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
 
   const TlsInspectorStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
@@ -63,7 +63,7 @@ public:
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
   uint32_t initialReadBufferSize() const { return initial_read_buffer_size_; }
 
-  static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
+  static constexpr size_t TLS_MAX_CLIENT_HELLO = SSL3_RT_MAX_PLAIN_LENGTH;
   static const unsigned TLS_MIN_SUPPORTED_VERSION;
   static const unsigned TLS_MAX_SUPPORTED_VERSION;
 

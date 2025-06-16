@@ -122,9 +122,9 @@ INSTANTIATE_TEST_SUITE_P(TlsProtocolVersions, TlsInspectorTest,
 // Test that an exception is thrown for an invalid value for max_client_hello_size
 TEST_P(TlsInspectorTest, MaxClientHelloSize) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
-  EXPECT_THROW_WITH_MESSAGE(Config(*store_.rootScope(), proto_config, SSL3_RT_MAX_PLAIN_LENGTH + 1),
-                            EnvoyException,
-                            "max_client_hello_size of 16385 is greater than maximum of 16384.");
+  EXPECT_THROW_WITH_MESSAGE(
+      Config(*store_.rootScope(), proto_config, Config::TLS_MAX_CLIENT_HELLO + 1), EnvoyException,
+      "max_client_hello_size of 16385 is greater than maximum of 16384.");
 }
 
 // Test that a ClientHello with an SNI value causes the correct name notification.
@@ -262,7 +262,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
       "769,47-53-5-10-49161-49162-49171-49172-50-56-19-4,0-10-11,23-24-25,0", 17000);
-  ASSERT(client_hello.size() > SSL3_RT_MAX_PLAIN_LENGTH);
+  ASSERT(client_hello.size() > Config::TLS_MAX_CLIENT_HELLO);
 
   filter_ = std::make_unique<Filter>(cfg_);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());

@@ -23,7 +23,6 @@
 #include "absl/strings/str_join.h"
 #include "openssl/md5.h"
 #include "openssl/ssl.h"
-#include "openssl/ssl3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -64,9 +63,9 @@ Config::Config(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
                                                    max_client_hello_size),
                    max_client_hello_size)) {
-  if (max_client_hello_size_ > SSL3_RT_MAX_PLAIN_LENGTH) {
+  if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
-                                     max_client_hello_size_, size_t(SSL3_RT_MAX_PLAIN_LENGTH)));
+                                     max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
   }
 
   SSL_CTX_set_min_proto_version(ssl_ctx_.get(), TLS_MIN_SUPPORTED_VERSION);
