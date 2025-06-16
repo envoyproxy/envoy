@@ -57,6 +57,10 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
         }
         return absl::nullopt;
       }));
+  ON_CALL(*this, hasCluster(_))
+      .WillByDefault(Invoke([this](const std::string& cluster_name) -> bool {
+        return active_clusters_.find(cluster_name) != active_clusters_.end();
+      }));
 }
 
 void MockClusterManager::initializeThreadLocalClusters(
