@@ -12,6 +12,7 @@
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "openssl/ssl.h"
+#include "openssl/ssl3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -53,7 +54,7 @@ class Config {
 public:
   Config(Stats::Scope& scope,
          const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
-         uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
+         uint32_t max_client_hello_size = SSL3_RT_MAX_PLAIN_LENGTH);
 
   const TlsInspectorStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();

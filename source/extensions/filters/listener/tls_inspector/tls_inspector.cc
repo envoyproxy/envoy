@@ -23,6 +23,7 @@
 #include "absl/strings/str_join.h"
 #include "openssl/md5.h"
 #include "openssl/ssl.h"
+#include "openssl/ssl3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -63,9 +64,9 @@ Config::Config(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
                                                    max_client_hello_size),
                    max_client_hello_size)) {
-  if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
+  if (max_client_hello_size_ > SSL3_RT_MAX_PLAIN_LENGTH) {
     throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
-                                     max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
+                                     max_client_hello_size_, size_t(SSL3_RT_MAX_PLAIN_LENGTH)));
   }
 
   SSL_CTX_set_min_proto_version(ssl_ctx_.get(), TLS_MIN_SUPPORTED_VERSION);
@@ -214,6 +215,12 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
         }
         cb_->socket().setDetectedTransportProtocol("tls");
       } else {
+        if (read_ == maxConfigReadBytes()) {
+          // We've hit the specified size limit. This is an unreasonably large ClientHello;
+          // indicate failure.
+          config_->stats().client_hello_too_large_.inc();
+          return ParseState::Error;
+        }
         config_->stats().tls_not_found_.inc();
       }
       return ParseState::Done;
