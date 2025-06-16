@@ -369,9 +369,34 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
   }
 
   {
-    // Invalid descriptors from inline bytes.
+    // Invalid descriptor format (non-binary) from inline bytes.
     ProtoApiScrubberConfig config;
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() = "123";
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("Error encountered during config initialization. Unable to "
+                                   "parse proto descriptor from inline bytes"));
+  }
+
+  {
+    // Invalid descriptor format but invalid descriptor (eg, duplicate message definition) from
+    // inline bytes.
+    Protobuf::FileDescriptorProto file_proto;
+    file_proto.set_name("test_file.proto");
+    file_proto.set_package("test_package");
+    file_proto.set_syntax("proto3");
+
+    // Add duplicate message types to make the descriptor invalid.
+    file_proto.add_message_type()->set_name("TestMessage");
+    file_proto.add_message_type()->set_name("TestMessage");
+
+    std::string invalid_binary_descriptor;
+    file_proto.SerializeToString(&invalid_binary_descriptor);
+
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        invalid_binary_descriptor;
     filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_THAT(filter_config.status().message(),
