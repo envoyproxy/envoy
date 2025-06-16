@@ -343,6 +343,26 @@ ip_tags_file_provider:
       "INVALID_ARGUMENT: Only one of ip_tags or ip_tags_file_provider can be configured.");
 }
 
+TEST_F(IpTaggingFilterTest, EmptyDatasourceConfigured) {
+  const std::string config_yaml = R"EOF(
+request_type: internal
+ip_tags_file_provider:
+  ip_tags_datasource:
+)EOF";
+  initializeFilter(config_yaml, "INVALID_ARGUMENT: ip_tags_file_provider requires a valid "
+                                "ip_tags_datasource to be configured.");
+}
+
+TEST_F(IpTaggingFilterTest, EmptyFilenameInDatasourceConfigured) {
+  const std::string config_yaml = R"EOF(
+request_type: internal
+ip_tags_file_provider:
+  ip_tags_datasource:
+    filename:
+)EOF";
+  initializeFilter(config_yaml, "INVALID_ARGUMENT: Cannot load tags from empty file path.");
+}
+
 TEST_F(IpTaggingFilterTest, UnsupportedFormatForIpTagsFile) {
   const std::string config_yaml = R"EOF(
 request_type: internal

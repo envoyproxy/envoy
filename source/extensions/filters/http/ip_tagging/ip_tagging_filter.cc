@@ -24,15 +24,15 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     : ip_tags_path_(ip_tags_datasource.filename()), tags_loader_(tags_loader),
       time_source_(api.timeSource()),
       ip_tags_refresh_interval_ms_(std::chrono::milliseconds(ip_tags_refresh_interval_ms)),
+      needs_refresh_(ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0) &&
+                             ip_tags_datasource.has_watched_directory()
+                         ? true
+                         : false),
       reload_success_cb_(reload_success_cb), reload_error_cb_(reload_error_cb), owner_(owner) {
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (ip_tags_datasource.filename().empty()) {
     creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
     return;
-  }
-  if (ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0) &&
-      ip_tags_datasource.has_watched_directory()) {
-    needs_refresh_ = true;
   }
   auto tags_or_error = tags_loader_.loadTags(ip_tags_datasource, main_dispatcher, tls);
   creation_status = tags_or_error.status();

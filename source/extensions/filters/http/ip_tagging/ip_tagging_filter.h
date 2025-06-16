@@ -101,10 +101,10 @@ public:
 private:
   const std::string ip_tags_path_;
   IpTagsLoader& tags_loader_;
-  bool needs_refresh_{false};
   TimeSource& time_source_;
   MonotonicTime last_reloaded_time_;
   const std::chrono::milliseconds ip_tags_refresh_interval_ms_;
+  const bool needs_refresh_;
   IpTagsReloadSuccessCb reload_success_cb_;
   IpTagsReloadErrorCb reload_error_cb_;
   mutable absl::Mutex ip_tags_mutex_;
