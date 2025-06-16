@@ -177,6 +177,8 @@ public:
   const std::string PROXY_PROTOCOL_PREFIX = "envoy.proxy_protocol_prefix";
   // Stats prefix for Google GRPC client connections (used by ADS).
   const std::string GOOGLE_GRPC_CLIENT_PREFIX = "envoy.google_grpc_client_prefix";
+  // TLS certificate.
+  const std::string TLS_CERTIFICATE = "envoy.tls_certificate";
 
   // Mapping from the names above to their respective regex strings.
   const std::vector<std::pair<std::string, std::string>> name_regex_pairs_;

@@ -54,7 +54,8 @@ public:
     ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source));
 
     // Initialize SPIFFEValidator with mocked context and stats
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+                                                   *store_.rootScope());
   }
 
   std::string compactJson(const std::string& json_string) {
@@ -105,7 +106,8 @@ public:
           }));
     }
 
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+                                                   *store_.rootScope());
   }
 
   void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_); }
@@ -256,8 +258,9 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 
 TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
   initialize();
+  Stats::TestUtil::TestStore store;
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-            validator().initializeSslContexts({}, false).value());
+            validator().initializeSslContexts({}, false, *store.rootScope()).value());
 }
 
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {

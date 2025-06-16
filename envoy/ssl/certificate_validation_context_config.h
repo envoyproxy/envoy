@@ -36,6 +36,11 @@ public:
   virtual const std::string& caCertPath() const PURE;
 
   /**
+   * @return the name of the CA certificate.
+   */
+  virtual const std::string& caCertName() const PURE;
+
+  /**
    * @return The CRL to check if a cert is revoked.
    */
   virtual const std::string& certificateRevocationList() const PURE;

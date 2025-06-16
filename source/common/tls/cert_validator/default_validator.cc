@@ -56,7 +56,8 @@ DefaultCertValidator::DefaultCertValidator(
 };
 
 absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                                                bool provides_certificates) {
+                                                                bool provides_certificates,
+                                                                Stats::Scope& scope) {
 
   int verify_mode = SSL_VERIFY_NONE;
   int verify_mode_validation_context = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
@@ -196,6 +197,8 @@ absl::StatusOr<int> DefaultCertValidator::initializeSslContexts(std::vector<SSL_
       verify_mode = verify_mode_validation_context;
     }
   }
+
+  initializeCertExpirationStats(scope);
 
   return verify_mode;
 }
@@ -590,6 +593,16 @@ Envoy::Ssl::CertificateDetailsPtr DefaultCertValidator::getCaCertInformation() c
   return Utility::certificateDetails(ca_cert_.get(), getCaFileName(), context_.timeSource());
 }
 
+void DefaultCertValidator::initializeCertExpirationStats(Stats::Scope& scope) {
+  // Early return if no config
+  if (config_ == nullptr) {
+    return;
+  }
+
+  Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(scope, config_->caCertName());
+  expiration_gauge.set(Utility::getExpirationUnixTime(ca_cert_.get()).count());
+}
+
 absl::optional<uint32_t> DefaultCertValidator::daysUntilFirstCertExpires() const {
   return Utility::getDaysUntilExpiration(ca_cert_.get(), context_.timeSource());
 }
@@ -598,7 +611,8 @@ class DefaultCertValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
+                      Server::Configuration::CommonFactoryContext& context,
+                      Stats::Scope& /*scope*/) override {
     return std::make_unique<DefaultCertValidator>(config, stats, context);
   }
 
