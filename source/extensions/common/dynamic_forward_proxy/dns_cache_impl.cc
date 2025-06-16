@@ -93,7 +93,8 @@ absl::StatusOr<Network::DnsResolverSharedPtr> DnsCacheImpl::selectDnsResolver(
   Network::DnsResolverFactory* dns_resolver_factory;
 
   if (!config.use_tcp_for_dns_lookups() && !config.has_typed_dns_resolver_config() &&
-      !config.has_dns_resolution_config()) {
+      !config.has_dns_resolution_config() &&
+      context.api().bootstrap().has_typed_dns_resolver_config()) {
     typed_dns_resolver_config = context.api().bootstrap().typed_dns_resolver_config();
     dns_resolver_factory =
         &Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
