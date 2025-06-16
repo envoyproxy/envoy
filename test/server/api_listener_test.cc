@@ -190,7 +190,7 @@ api_listener:
   api_listener.reset();
 }
 
-// Ensure unimplmemented functions return an ENVOY_BUG for coverage.
+// Ensure unimplemented functions return an ENVOY_BUG for coverage.
 TEST_F(ApiListenerTest, UnimplementedFuctionsTriggerEnvoyBug) {
   const std::string yaml = R"EOF(
 name: test_api_listener
