@@ -91,7 +91,7 @@ A filter may create a derived/child class of ``DelegatingRoute`` to override spe
 (for example, the route’s timeout value or the route entry’s cluster name) while preserving
 the rest of the properties/behavior of the base route that the ``DelegatingRoute`` wraps around.
 Then, ``setRoute`` can be invoked to manually set the cached route to this ``DelegatingRoute``
-instance. An example of such a derived class can be found in :repo:`ExampleDerivedDelegatingRoute
+instance. An example of such a derived class can be found in :repo:`ExampleDerivedDelegatingRouteEntry
 <test/test_common/delegating_route_utility.h>`.
 
 If no other filters in the chain modify the cached route selection (for example, a common operation
