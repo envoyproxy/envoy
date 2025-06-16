@@ -115,6 +115,7 @@ public:
   // Getter.
   SPIFFEValidator& validator() { return *validator_; }
   SslStats& stats() { return stats_; }
+  Stats::TestUtil::TestStore& store() { return store_; }
 
   // Setter.
   void setAllowExpiredCertificate(bool val) { allow_expired_certificate_ = val; }
@@ -1072,6 +1073,24 @@ typed_config:
     EXPECT_EQ(1, stats().fail_verify_san_.value());
     stats().fail_verify_san_.reset();
   }
+}
+
+TEST_F(TestSPIFFEValidator, SpiffeCaExpirationMetrics) {
+  initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF"));
+
+  std::string expected_metric_name = "ssl.certificate.TEST_CA_CERT_NAME_0.expiration_unix_time_seconds";
+
+  auto gauge_opt = store().findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->get().value(), 1787339642);
 }
 
 } // namespace Tls

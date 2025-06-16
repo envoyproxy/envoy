@@ -2616,6 +2616,77 @@ TEST_F(CertificateNamingTest, CACertificateInlineNaming) {
             server_context_config->certificateValidationContext()->caCertName());
 }
 
+class CertificateExpirationMetricsTest : public SslCertsTest {
+public:
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+};
+
+TEST_F(CertificateExpirationMetricsTest, ServerCertificateExpirationMetrics) {
+  const std::string yaml = R"EOF(
+common_tls_context:
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  Stats::TestUtil::TestStore store;
+  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+
+  auto tls_certs = server_context_config->tlsCertificates();
+  ASSERT_EQ(1, tls_certs.size());
+  std::string actual_cert_name = tls_certs[0].get().certificateName();
+
+  absl::Status creation_status = absl::OkStatus();
+  TestContextImpl context(*store.rootScope(), *server_context_config, server_factory_context_,
+                          creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  std::string expected_metric_name = absl::StrCat("ssl.certificate.", actual_cert_name,
+                                                  ".expiration_unix_time_seconds");
+
+  auto gauge_opt = store.findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+}
+
+TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
+  const std::string yaml = R"EOF(
+common_tls_context:
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  Stats::TestUtil::TestStore store;
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  auto tls_certs = client_context_config->tlsCertificates();
+  ASSERT_EQ(1, tls_certs.size());
+  std::string actual_cert_name = tls_certs[0].get().certificateName();
+
+  absl::Status creation_status = absl::OkStatus();
+  TestContextImpl context(*store.rootScope(), *client_context_config, server_factory_context_,
+                          creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  std::string expected_metric_name = absl::StrCat("ssl.certificate.", actual_cert_name,
+                                                  ".expiration_unix_time_seconds");
+
+  auto gauge_opt = store.findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
