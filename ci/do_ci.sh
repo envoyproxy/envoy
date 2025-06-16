@@ -48,7 +48,6 @@ setup_clang_toolchain() {
     BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
     BAZEL_BUILD_OPTIONS+=("--test_output=all")
     BAZEL_BUILD_OPTIONS+=("--cache_test_results=no")
-    BAZEL_BUILD_OPTIONS+=("--test_arg='-l trace'")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
     echo "clang toolchain with ${ENVOY_STDLIB} configured: ${CONFIG}"
