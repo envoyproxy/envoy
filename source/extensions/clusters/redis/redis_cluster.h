@@ -90,6 +90,7 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
+  ~RedisCluster();
   static absl::StatusOr<std::unique_ptr<RedisCluster>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
          const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
