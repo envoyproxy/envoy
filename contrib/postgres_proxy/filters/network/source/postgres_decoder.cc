@@ -268,6 +268,8 @@ Decoder::Result DecoderImpl::onDataInit(Buffer::Instance& data, bool) {
       // Stay in InitState. After switch to SSL, another init packet will be sent.
     }
   } else {
+    callbacks_->verifyDownstreamSSL();
+
     ENVOY_LOG(debug, "Detected version {}.{} of Postgres", code >> 16, code & 0x0000FFFF);
     if (callbacks_->shouldEncryptUpstream()) {
       // Copy the received initial request.
