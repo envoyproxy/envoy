@@ -22,7 +22,7 @@ routing PRs, questions, etc. to the right place.
   * Docs, tooling, CI, containers and sandbox examples
 * Ryan Hamilton ([RyanTheOptimist](https://github.com/ryantheoptimist)) (rch@google.com)
   * HTTP/3, upstream connection management, Envoy Mobile.
-* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@live.com)
+* Baiping Wang ([wbpcode](https://github.com/wbpcode)) (wbphub@gmail.com)
   * Upstream, LB, tracing, logging, performance, and generic/dubbo proxy.
 
 # Maintainers
@@ -125,7 +125,6 @@ matter expert reviews. Feel free to loop them in as needed.
   * External dependencies, Envoy's supply chain and documentation.
 * Cerek Hillen ([crockeo](https://github.com/crockeo)) (chillen@lyft.com)
   * Python and C++ platform bindings.
-
 
 # Emeritus code owners
 
