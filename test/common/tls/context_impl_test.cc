@@ -2635,7 +2635,8 @@ common_tls_context:
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
 
   Stats::TestUtil::TestStore store;
-  auto server_context_config = *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
 
   auto tls_certs = server_context_config->tlsCertificates();
   ASSERT_EQ(1, tls_certs.size());
@@ -2646,8 +2647,8 @@ common_tls_context:
                           creation_status);
   ASSERT_TRUE(creation_status.ok());
 
-  std::string expected_metric_name = absl::StrCat("ssl.certificate.", actual_cert_name,
-                                                  ".expiration_unix_time_seconds");
+  std::string expected_metric_name =
+      absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
@@ -2679,8 +2680,8 @@ common_tls_context:
                           creation_status);
   ASSERT_TRUE(creation_status.ok());
 
-  std::string expected_metric_name = absl::StrCat("ssl.certificate.", actual_cert_name,
-                                                  ".expiration_unix_time_seconds");
+  std::string expected_metric_name =
+      absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
 
   auto gauge_opt = store.findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());

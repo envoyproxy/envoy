@@ -1086,7 +1086,8 @@ typed_config:
         filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
   )EOF"));
 
-  std::string expected_metric_name = "ssl.certificate.TEST_CA_CERT_NAME_0.expiration_unix_time_seconds";
+  std::string expected_metric_name =
+      "ssl.certificate.TEST_CA_CERT_NAME_0.expiration_unix_time_seconds";
 
   auto gauge_opt = store().findGaugeByString(expected_metric_name);
   EXPECT_TRUE(gauge_opt.has_value());
