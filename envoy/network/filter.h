@@ -606,6 +606,11 @@ public:
    * @return the name of this filter chain.
    */
   virtual absl::string_view name() const PURE;
+
+  /**
+   * @return true if this filter chain configuration was discovered by FCDS.
+   */
+  virtual bool addedByDiscovery() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
