@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.upstreams.http.v3;
 
+import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
@@ -174,4 +175,23 @@ message HttpProtocolOptions {
   // [#not-implemented-hide:]
   // [#extension-category: envoy.http.header_validators]
   config.core.v3.TypedExtensionConfig header_validation_config = 7;
+
+  message HttpEvents {
+    // Matcher for response headers.
+    config.common.matcher.v3.MatchPredicate match = 1 [(validate.rules).message = {required: true}];
+  }
+
+  message LocallyOriginatedEvents {
+    // If enabled, locally originated events will be reported to outlier detection extensions.
+    // Defaults to true.
+    bool enable = 1;
+  }
+
+  message OutlierDetection {
+    HttpEvents http_events = 1;
+
+    LocallyOriginatedEvents locally_originated_events = 2;
+  }
+
+  OutlierDetection outlier_detection = 8;
 }

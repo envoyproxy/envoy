@@ -171,8 +171,10 @@ message OutlierDetection {
   google.protobuf.BoolValue successful_active_health_check_uneject_host = 23;
 
   // Set of host's passive extension monitors.
+  // This can be a single monitor or a set of monitors bound under a parent OR or AND logical
+  // structure.
   // [#extension-category: envoy.outlier_detection_monitors]
-  repeated core.v3.TypedExtensionConfig monitors = 24;
+  core.v3.TypedExtensionConfig monitors = 24;
 
   // If enabled, at least one host is ejected regardless of the value of :ref:`max_ejection_percent<envoy_v3_api_field_config.cluster.v3.OutlierDetection.max_ejection_percent>`.
   // Defaults to false.

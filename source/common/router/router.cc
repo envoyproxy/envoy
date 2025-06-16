@@ -126,45 +126,6 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                                                    upstream_http_filter_factories_),
                              creation_status);
   }
-
-  // Build outlier detection config
-  if (config.has_outlier_detection()) {
-    // Pre-allocate space for http matchers, to avoid moving them when
-    // std::vector grows. Moving matchers will cause a problem related to how
-    // matchers are build internally.
-    outlier_detection_http_events_.reserve(config.outlier_detection().http_events().size());
-    absl::flat_hash_set<absl::string_view> http_destinations;
-    for (auto const& event : config.outlier_detection().http_events()) {
-      std::vector<Extensions::Common::Matcher::MatcherPtr> matcher;
-      std::vector<std::string> send_to;
-      for (const auto& destination : event.send_to()) {
-        send_to.push_back(destination.monitor_name());
-        // Also store it in flat_hash_set. This is temporarily needed to cross
-        // reference when constructing destinations for locally originated
-        // events.
-        http_destinations.insert(destination.monitor_name());
-      }
-
-      outlier_detection_http_events_.emplace_back(std::move(matcher), std::move(send_to));
-      // Once built matcher cannot be std::moved. This limitation comes from how
-      // it builds internally references. That is why it is build after placing it in
-      // outlier_detection_http_events_.
-      buildMatcher(event.match(), outlier_detection_http_events_.back().first, factory_context_);
-    }
-
-    if (config.outlier_detection().has_locally_originated_events()) {
-      const auto& event = config.outlier_detection().locally_originated_events();
-      std::vector<std::string> send_to;
-      for (const auto& destination : event.send_to()) {
-        // Check if the same destination is already in http_events.
-        // If so, some locally originated events must be suppressed.
-        outlier_detection_locally_originated_events_.emplace_back(
-            destination.monitor_name(),
-            http_destinations.contains(absl::string_view(destination.monitor_name())));
-        ;
-      }
-    }
-  }
 }
 
 // Express percentage as [0, TimeoutPrecisionFactor] because stats do not accept floating point
@@ -1368,15 +1329,10 @@ void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
                                     absl::optional<uint64_t> code) {
   host.outlierDetector().putResult(result, code);
 
-  // Iterate over all monitors where locally originated events should be sent.
-  for (const auto& monitor : config_->outlier_detection_locally_originated_events_) {
-    if (result == Upstream::Outlier::Result::LocalOriginConnectSuccess) {
-      if (!monitor.second) {
-        host.outlierDetector().reportResult(monitor.first, false);
-      }
-    } else {
-      host.outlierDetector().reportResult(monitor.first, true);
-    }
+  // Forward to outlier detection extensions
+  auto outlier = cluster_->processLocallyOriginatedEventForOutlierDetection(result);
+  if (outlier.has_value()) {
+    host.outlierDetector().reportResult(outlier.value());
   }
 }
 
@@ -1699,25 +1655,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   } else {
     upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(response_code);
 
-    // std::vector<std::pair<std::vector<Extensions::Common::Matcher::MatcherPtr>,
-    // std::vector<std::string>>> outlier_detection_http_events_;
-    //  Iterate over all matchers and send to destinations
-    for (const auto& event : config_->outlier_detection_http_events_) {
-      // TODO (cpakulski): put statuses to Filter and only reset it.
-      Extensions::Common::Matcher::Matcher::MatchStatusVector statuses;
-
-      statuses.reserve(event.first.size());
-      statuses = Extensions::Common::Matcher::Matcher::MatchStatusVector(event.first.size());
-      event.first[0]->onNewStream(statuses);
-
-      // Run matchers.
-      event.first[0]->onHttpResponseHeaders(*headers, statuses);
-      bool matches = event.first[0]->matchStatus(statuses).matches_;
-
-      // Now send the matching result to all destinations.
-      for (const auto& monitor : event.second) {
-        upstream_request.upstreamHost()->outlierDetector().reportResult(monitor, matches);
-      }
+    auto outlier = cluster_->processHttpForOutlierDetection(*headers);
+    if (outlier.has_value()) {
+      upstream_request.upstreamHost()->outlierDetector().reportResult(outlier.value());
     }
   }
 

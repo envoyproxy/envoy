@@ -127,7 +127,7 @@ public:
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return 0; }
   void putHttpResponseCode(uint64_t) override {}
-  void reportResult(absl::string_view, bool) override {}
+  void reportResult(bool) override {}
   void putResult(Outlier::Result, absl::optional<uint64_t>) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
@@ -1043,6 +1043,10 @@ public:
   Http::Http2::CodecStats& http2CodecStats() const override;
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
+
+  absl::optional<bool> processHttpForOutlierDetection(Http::ResponseHeaderMap&) const override;
+  absl::optional<bool>
+      processLocallyOriginatedEventForOutlierDetection(Outlier::Result) const override;
 
   OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const override {

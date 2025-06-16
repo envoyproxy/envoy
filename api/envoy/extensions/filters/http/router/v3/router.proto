@@ -3,9 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.router.v3;
 
 import "envoy/config/accesslog/v3/accesslog.proto";
-import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
-import "envoy/extensions/outlier_detection_monitors/common/v3/monitor_base.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -25,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Router :ref:`configuration overview <config_http_filters_router>`.
 // [#extension: envoy.filters.http.router]
 
-// [#next-free-field: 11]
+// [#next-free-field: 10]
 message Router {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.router.v2.Router";
@@ -45,24 +43,6 @@ message Router {
     // The interval must be at least 1 millisecond.
     google.protobuf.Duration upstream_log_flush_interval = 2
         [(validate.rules).duration = {gte {nanos: 1000000}}];
-  }
-
-  message HttpEvents {
-    repeated outlier_detection_monitors.common.v3.DestinationMonitor send_to = 1
-        [(validate.rules).repeated = {min_items: 1}];
-
-    config.common.matcher.v3.MatchPredicate match = 2 [(validate.rules).message = {required: true}];
-  }
-
-  message LocallyOriginatedEvents {
-    repeated outlier_detection_monitors.common.v3.DestinationMonitor send_to = 1
-        [(validate.rules).repeated = {min_items: 1}];
-  }
-
-  message OutlierDetection {
-    repeated HttpEvents http_events = 1;
-
-    LocallyOriginatedEvents locally_originated_events = 2;
   }
 
   // Whether the router generates dynamic cluster statistics. Defaults to
@@ -154,6 +134,4 @@ message Router {
   // upstream HTTP filters will count as a final response if hedging is configured.
   // [#extension-category: envoy.filters.http.upstream]
   repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
-
-  OutlierDetection outlier_detection = 10;
 }

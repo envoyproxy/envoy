@@ -8,9 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/annotations:pkg",
         "//envoy/config/accesslog/v3:pkg",
-        "//envoy/config/common/matcher/v3:pkg",
         "//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
-        "//envoy/extensions/outlier_detection_monitors/common/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
     ],
 )

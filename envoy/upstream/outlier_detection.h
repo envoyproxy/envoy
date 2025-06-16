@@ -111,7 +111,7 @@ public:
    */
   virtual void putResult(Result result, absl::optional<uint64_t> code) PURE;
 
-  virtual void reportResult(absl::string_view monitor_name, bool error) PURE;
+  virtual void reportResult(bool error) PURE;
 
   /**
    * Wrapper around putResult with 2 params when mapping to HTTP code is not

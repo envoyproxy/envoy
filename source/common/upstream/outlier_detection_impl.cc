@@ -191,10 +191,9 @@ void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> 
   put_result_func_(this, result, code);
 }
 
-void DetectorHostMonitorImpl::reportResult(absl::string_view monitor_name, bool error) {
-  auto monitor = monitors_set_.monitors_.find(monitor_name);
-  if (monitor != monitors_set_.monitors_.end()) {
-    monitor->second->reportResult(error);
+void DetectorHostMonitorImpl::reportResult(bool error) {
+  if (extension_monitor_ != nullptr) {
+    extension_monitor_->reportResult(error);
   }
 }
 
@@ -283,35 +282,30 @@ DetectorConfig::DetectorConfig(const envoy::config::cluster::v3::OutlierDetectio
       successful_active_health_check_uneject_host_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, successful_active_health_check_uneject_host, true)) {
 
-  if (config.monitors().empty()) {
-    return;
-  }
-
   // The following loop passes extensions' configs to factory's validators.
   // After checking the validity of each config, the factory returns callback function
   // which is stored and executed later on, when outlier extensions are created for
   // each host in the cluster.
   ExtMonitorFactoryContext context(validation_visitor);
-  for (const auto& monitor_config : config.monitors()) {
-    auto& factory = Config::Utility::getAndCheckFactory<ExtMonitorFactory>(monitor_config);
-    auto config =
-        Config::Utility::translateToFactoryConfig(monitor_config, validation_visitor, factory);
-    auto extension_create_fn =
-        factory.getCreateMonitorCallback(monitor_config.name(), *config, context);
-    monitor_create_fns_.push_back(extension_create_fn);
+  if (config.has_monitors()) {
+    auto& factory = Config::Utility::getAndCheckFactory<ExtMonitorFactory>(config.monitors());
+    auto monitor_config =
+        Config::Utility::translateToFactoryConfig(config.monitors(), validation_visitor, factory);
+    monitor_create_fn_ =
+        factory.getCreateMonitorCallback(config.monitors().name(), *monitor_config, context);
   }
 }
 
-void DetectorConfig::createMonitorExtensions(ExtMonitorsSet& ext_set,
+/* TODO(cpakulski): we can return std::unique_ptr here */
+void DetectorConfig::createMonitorExtensions(ExtMonitorPtr& ext_set,
                                              ExtMonitor::ExtMonitorCallback callback) {
 
   // Create each extension by calling a callback function created by factory when the
   // config was evaluated.
-  for (const auto& create_fn : monitor_create_fns_) {
-    auto extension = create_fn();
-    ASSERT(extension != nullptr);
+  if (monitor_create_fn_ != nullptr) {
+    auto extension = monitor_create_fn_();
     extension->setExtMonitorCallback(callback);
-    ext_set.addMonitor(std::move(extension));
+    ext_set = std::move(extension);
   }
 }
 
@@ -402,7 +396,7 @@ void DetectorImpl::addHostMonitor(HostSharedPtr host) {
   ASSERT(host_monitors_.count(host) == 0);
   DetectorHostMonitorImpl* monitor = new DetectorHostMonitorImpl(shared_from_this(), host);
 
-  config_.createMonitorExtensions(monitor->getExtensionMonitors(),
+  config_.createMonitorExtensions(monitor->getExtensionMonitor(),
                                   monitor->getOnFailedExtensioMonitorCallback());
 
   host_monitors_[host] = monitor;
@@ -442,8 +436,9 @@ void DetectorImpl::unejectHost(HostSharedPtr host) {
   host_monitors_[host]->resetConsecutiveLocalOriginFailure();
   host_monitors_[host]->uneject(time_source_.monotonicTime());
 
-  host_monitors_[host]->getExtensionMonitors().forEach(
-      [](const ExtMonitorPtr& monitor) { monitor->reset(); });
+  if (host_monitors_[host]->getExtensionMonitor() != nullptr) {
+    host_monitors_[host]->getExtensionMonitor()->reset();
+  }
 
   runCallbacks(host);
 

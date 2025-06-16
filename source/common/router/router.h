@@ -45,7 +45,6 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
-#include "source/extensions/common/matcher/matcher.h"
 
 namespace Envoy {
 namespace Router {
@@ -292,11 +291,6 @@ public:
   Stats::StatName empty_stat_name_;
   std::unique_ptr<Server::Configuration::UpstreamFactoryContext> upstream_ctx_;
   Http::FilterChainUtility::FilterFactoriesList upstream_http_filter_factories_;
-
-  std::vector<
-      std::pair<std::vector<Extensions::Common::Matcher::MatcherPtr>, std::vector<std::string>>>
-      outlier_detection_http_events_;
-  std::vector<std::pair<std::string, bool>> outlier_detection_locally_originated_events_;
 
 private:
   ShadowWriterPtr shadow_writer_;

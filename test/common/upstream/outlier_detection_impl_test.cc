@@ -2812,7 +2812,7 @@ TEST(OutlierUtility, SRThreshold) {
 TEST_F(OutlierDetectorImplTest, ExtensionsBasicCall) {
   const std::string yaml = R"EOF(
     monitors:
-    - name: "5xx-monitor"
+      name: "5xx-monitor"
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.outlier_detection_monitors.consecutive_errors.v3.ConsecutiveErrors
         threshold: 3

@@ -138,7 +138,7 @@ public:
   uint32_t numEjections() override { return num_ejections_; }
   void putHttpResponseCode(uint64_t response_code) override;
   void putResult(Result result, absl::optional<uint64_t> code) override;
-  void reportResult(absl::string_view monitor_name, bool error) override;
+  void reportResult(bool error) override;
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override {
@@ -176,7 +176,7 @@ public:
   void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
   std::chrono::milliseconds getJitter() const { return jitter_; }
 
-  ExtMonitorsSet& getExtensionMonitors() { return monitors_set_; }
+  ExtMonitorPtr& getExtensionMonitor() { return extension_monitor_; }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
@@ -213,7 +213,8 @@ private:
       put_result_func_;
 
   // Set of extension monitors.
-  ExtMonitorsSet monitors_set_;
+  ExtMonitorPtr extension_monitor_;
+  // ExtMonitorsSet monitors_set_;
 };
 
 /**
@@ -327,7 +328,7 @@ public:
   bool successfulActiveHealthCheckUnejectHost() const {
     return successful_active_health_check_uneject_host_;
   }
-  void createMonitorExtensions(ExtMonitorsSet& ext_set, ExtMonitor::ExtMonitorCallback callback);
+  void createMonitorExtensions(ExtMonitorPtr& ext_set, ExtMonitor::ExtMonitorCallback callback);
 
 private:
   const uint64_t interval_ms_;
@@ -379,7 +380,7 @@ private:
 
   // Set of functions creating extensions. They are called when a new host is created and needs
   // outlier detection monitors. Monitors configs are validated when this set is created.
-  absl::InlinedVector<ExtMonitorCreateFn, 3> monitor_create_fns_;
+  ExtMonitorCreateFn monitor_create_fn_;
 };
 
 /**

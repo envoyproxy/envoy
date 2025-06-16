@@ -12,6 +12,73 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+class RouterOutlierDetectionProcessTest
+    : public RouterTestBase,
+      public ::testing::WithParamInterface<std::tuple<std::optional<bool>, uint32_t, bool>> {
+public:
+  RouterOutlierDetectionProcessTest() : RouterTestBase(config) {
+    EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
+  }
+  const envoy::extensions::filters::http::router::v3::Router config;
+};
+
+TEST_P(RouterOutlierDetectionProcessTest, HttpAndLocallyOriginatedEvents) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "300"}});
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, processHttpForOutlierDetection(_))
+      .WillOnce(Return(std::get<0>(GetParam())));
+  //.WillOnce(Return(absl::optional<bool>(true)));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              reportResult(std::get<2>(GetParam())))
+      .Times(std::get<1>(GetParam()));
+
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+
+#ifdef EBANLE_THIS
+TEST_P(RouterOutlierDetectionProcessTest, LocallyOriginatedEvents) {
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "300"}});
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_,
+              processLocallyOriginatedHttpForOutlierDetection(_))
+      .WillOnce(Return(std::get<0>(GetParam())));
+  //.WillOnce(Return(absl::optional<bool>(true)));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
+              reportResult(_, std::get<2>(GetParam())))
+      .Times(std::get<1>(GetParam()));
+
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
+}
+#endif
+
+INSTANTIATE_TEST_SUITE_P(RouterOutlierDetectionTestSuite, RouterOutlierDetectionProcessTest,
+                         ::testing::Values(std::make_tuple(absl::nullopt, 0, false),
+                                           std::make_tuple(absl::optional<bool>(false), 1, false),
+                                           std::make_tuple(absl::optional<bool>(true), 1, true)));
+
+#if 0
 // Various part of router's outlier detection config.
 // The final config is built by combining those
 // pieces based on test parameters.
@@ -248,6 +315,7 @@ TEST_P(RouterOutlierDetectionProcessTest, LocallyOriginatedOnlyEvents) {
 
 INSTANTIATE_TEST_SUITE_P(RouterOutlierDetectionTestSuite, RouterOutlierDetectionProcessTest,
                          ::testing::ValuesIn(test_values));
+#endif
 } // namespace
 } // namespace Router
 } // namespace Envoy
