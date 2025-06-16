@@ -128,8 +128,8 @@ absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
   for (const auto& file : descriptor_set.file()) {
     if (pool->BuildFile(file) == nullptr) {
       return absl::InvalidArgumentError(
-          fmt::format("{} Error occurred while trying to build proto descriptors.",
-                      kConfigInitializationError));
+          fmt::format("{} Error occurred in file `{}` while trying to build proto descriptors.",
+                      kConfigInitializationError, file.name()));
     }
   }
 

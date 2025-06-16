@@ -405,6 +405,41 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
   }
 
   {
+    // Invalid descriptor format but invalid descriptor (eg, duplicate message definition in two
+    // separate files) from inline bytes.
+    Envoy::Protobuf::FileDescriptorSet descriptor_set;
+
+    Protobuf::FileDescriptorProto file1_proto;
+    file1_proto.set_name("test_file1.proto");
+    file1_proto.set_package("test_package");
+    file1_proto.set_syntax("proto3");
+    file1_proto.add_message_type()->set_name("TestMessage");
+
+    Protobuf::FileDescriptorProto file2_proto;
+    file2_proto.set_name("test_file2.proto");
+    file2_proto.set_package("test_package");
+    file2_proto.set_syntax("proto3");
+    // Duplicate definition - TestMessage is already defined in test_file1.proto
+    file2_proto.add_message_type()->set_name("TestMessage");
+
+    descriptor_set.add_file()->CopyFrom(file1_proto);
+    descriptor_set.add_file()->CopyFrom(file2_proto);
+
+    std::string invalid_binary_descriptor;
+    descriptor_set.SerializeToString(&invalid_binary_descriptor);
+
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        invalid_binary_descriptor;
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        filter_config.status().message(),
+        testing::HasSubstr("Error encountered during config initialization. Error occurred in file "
+                           "`test_file2.proto` while trying to build proto descriptors."));
+  }
+
+  {
     // Valid descriptors from inline bytes.
     ProtoApiScrubberConfig config;
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
