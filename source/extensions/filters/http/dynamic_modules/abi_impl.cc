@@ -836,7 +836,7 @@ envoy_dynamic_module_type_http_filter_scheduler_module_ptr
 envoy_dynamic_module_callback_http_filter_scheduler_new(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  return new DynamicModuleHttpFilterScheduler(filter->shared_from_this(),
+  return new DynamicModuleHttpFilterScheduler(filter->weak_from_this(),
                                               filter->decoder_callbacks_->dispatcher());
 }
 
