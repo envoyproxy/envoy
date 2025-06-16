@@ -392,6 +392,20 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
   }
 
   {
+    // Non-existent file path.
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
+        TestEnvironment::runfilesPath("path/to/non-existent-file.descriptor");
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr(
+                    "Error encountered during config initialization. Unable to read from file"));
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("path/to/non-existent-file.descriptor"));
+  }
+
+  {
     // Invalid descriptors from file.
     ProtoApiScrubberConfig config;
     *config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
@@ -401,6 +415,8 @@ TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
     EXPECT_THAT(filter_config.status().message(),
                 testing::HasSubstr("Error encountered during config initialization. Unable to "
                                    "parse proto descriptor from file"));
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("test/config/integration/certs/upstreamcacert.pem"));
   }
 
   {
