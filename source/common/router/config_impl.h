@@ -972,9 +972,7 @@ public:
     // avoid possible circular reference. For example, the WeightedClusterEntry (derived from
     // DynamicRouteEntry) will be member of the RouteEntryImplBase, so the owner_ should be nullptr.
     const RouteConstSharedPtr owner_;
-    // The dynamic route entry will not be accessed cross thread and it is safe to mark this be
-    // mutable.
-    mutable std::string cluster_name_;
+    const std::string cluster_name_;
   };
 
   /**
