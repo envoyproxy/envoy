@@ -13,7 +13,7 @@ public:
   LuaClusterSpecifierPluginFactoryConfig() = default;
   Envoy::Router::ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
-                               Server::Configuration::CommonFactoryContext&) override;
+                               Server::Configuration::ServerFactoryContext&) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<LuaClusterSpecifierConfigProto>();

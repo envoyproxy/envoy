@@ -80,6 +80,17 @@ public:
   joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
 
   /**
+   * Get the IAM Roles Anywhere Service endpoint for a given region:
+   * rolesanywhere.<region>.amazonaws.com See:
+   * https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-sign-process.html#authentication-task1
+   * @param trust_anchor_arn The configured roles anywhere trust anchor arn for the region to be
+   * extracted from
+   * @return an sts endpoint url.
+   */
+
+  static std::string getRolesAnywhereEndpoint(const std::string& trust_anchor_arn);
+
+  /**
    * Get the Security Token Service endpoint for a given region: sts.<region>.amazonaws.com
    * See: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region
    * @param region An AWS region.

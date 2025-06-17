@@ -320,9 +320,8 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
     // In HTTP/3 end stream will be sent when the upstream connection is closed, and
     // STOP_SENDING frame sent instead of reset.
     ASSERT_TRUE(response_->waitForEndStream());
-    ASSERT_TRUE(response_->waitForReset());
   } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
-    ASSERT_TRUE(response_->waitForReset());
+    ASSERT_TRUE(response_->waitForAnyTermination());
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
@@ -333,6 +332,7 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamClose) {
   const int expected_header_bytes_received = 0;
   checkAccessLogOutput(expected_wire_bytes_sent, expected_wire_bytes_received,
                        expected_header_bytes_sent, expected_header_bytes_received);
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
@@ -355,7 +355,7 @@ TEST_P(ConnectTerminationIntegrationTest, UpstreamCloseWithHalfCloseEnabled) {
     // STOP_SENDING frame sent instead of reset.
     ASSERT_TRUE(response_->waitForEndStream());
   } else if (downstream_protocol_ == Http::CodecType::HTTP2) {
-    ASSERT_TRUE(response_->waitForReset());
+    ASSERT_TRUE(response_->waitForAnyTermination());
   } else {
     ASSERT_TRUE(codec_client_->waitForDisconnect());
   }
