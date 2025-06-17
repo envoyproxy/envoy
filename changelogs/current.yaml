@@ -224,5 +224,10 @@ new_features:
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from
     network filters, such as the Proxy Protocol, etc.
+- area: tls
+  change: |
+    Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
+    They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
+    and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
 
 deprecated:
