@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //                      - string_value: m
 //                      - string_value: n
 //
-// The following ``MetadataMatcher`` is matched as the path [a, b, c] will retrieve a string value "pro"
+// The following ``MetadataMatcher`` is matched as the path ``[a, b, c]`` will retrieve a string value ``pro``
 // from the ``Metadata`` which is matched to the specified prefix match.
 //
 // .. code-block:: yaml
