@@ -92,8 +92,10 @@ absl::StatusOr<Network::DnsResolverSharedPtr> DnsCacheImpl::selectDnsResolver(
   envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
   Network::DnsResolverFactory* dns_resolver_factory;
 
-  if (!config.use_tcp_for_dns_lookups() && !config.has_typed_dns_resolver_config() &&
-      !config.has_dns_resolution_config() &&
+  // If DnsCacheConfig doesn't have any DNS related configuration, and the
+  // the default DNS resolver, i.e, the typed_dns_resolver_config in bootstrap
+  // configuration, is not empty, use it.
+  if (!config.has_typed_dns_resolver_config() && !config.has_dns_resolution_config() &&
       context.api().bootstrap().has_typed_dns_resolver_config()) {
     typed_dns_resolver_config = context.api().bootstrap().typed_dns_resolver_config();
     dns_resolver_factory =
