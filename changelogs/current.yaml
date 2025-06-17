@@ -228,5 +228,8 @@ new_features:
   change: |
     Implementation of `IAM Roles Anywhere support <https://docs.aws.amazon.com/rolesanywhere/latest/userguide/introduction.html>`_ in the
     AWS common components, providing this capability to the AWS Lambda and AWS Request Signing extensions.
+- area: redis
+  change: |
+    ``redis_proxy`` filter now supports AWS IAM Authentication.
 
 deprecated:

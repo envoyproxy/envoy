@@ -289,6 +289,11 @@ public:
     return absl::nullopt;
   }
 
+  bool hasCluster(const std::string& cluster_name) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);
+  }
+
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 
