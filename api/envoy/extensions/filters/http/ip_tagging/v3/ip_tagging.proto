@@ -114,7 +114,7 @@ message IPTagging {
   // The set of IP tags for the filter.
   // Only one of :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>`
   // or :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagsFileProvider.ip_tags_datasource>`
-  // can be set for the Ip Tagging filter.
+  // can be set for the IP Tagging filter.
   repeated IPTag ip_tags = 4;
 
   // Specify to which header the tags will be written.
