@@ -87,7 +87,7 @@ build:sanitizer --linkopt -ldl
 
 # Common flags for Clang
 build:clang --action_env=BAZEL_COMPILER=clang
-build:clang --linkopt=-fuse-ld=lld
+build:clang --linkopt=-fuse-ld=ld
 build:clang --action_env=CC=clang --host_action_env=CC=clang
 build:clang --action_env=CXX=clang++ --host_action_env=CXX=clang++
 build:clang --incompatible_enable_cc_toolchain_resolution=false
@@ -151,7 +151,7 @@ build:asan --copt -fno-optimize-sibling-calls
 # Clang ASAN/UBSAN
 build:clang-asan-common --config=clang
 build:clang-asan-common --config=asan
-build:clang-asan-common --linkopt -fuse-ld=lld
+build:clang-asan-common --linkopt -fuse-ld=ld
 build:clang-asan-common --linkopt --rtlib=compiler-rt
 build:clang-asan-common --linkopt --unwindlib=libgcc
 
@@ -185,7 +185,7 @@ build:clang-tsan --config=sanitizer
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
 build:clang-tsan --linkopt -fsanitize=thread
-build:clang-tsan --linkopt -fuse-ld=lld
+build:clang-tsan --linkopt -fuse-ld=ld
 build:clang-tsan --copt -DTHREAD_SANITIZER=1
 build:clang-tsan --build_tag_filters=-no_san,-no_tsan
 build:clang-tsan --test_tag_filters=-no_san,-no_tsan
@@ -206,7 +206,7 @@ build:clang-msan --test_tag_filters=-no_san
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
-build:clang-msan --linkopt -fuse-ld=lld
+build:clang-msan --linkopt -fuse-ld=ld
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 build:clang-msan --copt -DMEMORY_SANITIZER=1
 build:clang-msan --test_env=MSAN_SYMBOLIZER_PATH
@@ -304,9 +304,11 @@ build:rbe-toolchain-arm64-clang-libc++ --action_env=CC=clang --action_env=CXX=cl
 build:rbe-toolchain-arm64-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-arm64-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-arm64-clang-libc++ --define force_libcpp=enabled
+build:rbe-toolchain-arm64-clang-libc++ --test_arg="-l trace"
+build:rbe-toolchain-arm64-clang-libc++ --test_output=all
 
 build:rbe-toolchain-asan --config=clang-asan
-build:rbe-toolchain-asan --linkopt -fuse-ld=lld
+build:rbe-toolchain-asan --linkopt -fuse-ld=ld
 build:rbe-toolchain-asan --action_env=ENVOY_UBSAN_VPTR=1
 build:rbe-toolchain-asan --copt=-fsanitize=vptr,function
 build:rbe-toolchain-asan --linkopt=-fsanitize=vptr,function
