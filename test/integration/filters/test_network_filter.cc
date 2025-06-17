@@ -87,13 +87,10 @@ public:
   }
 
   Network::FilterStatus onNewConnection() override {
-    if (direct_response_.empty()) {
-      return Network::FilterStatus::Continue;
+    if (!direct_response_.empty()) {
+      Buffer::OwnedImpl data(direct_response_);
+      read_callbacks_->connection().write(data, false);
     }
-
-    auto& connection = read_callbacks_->connection();
-    Buffer::OwnedImpl data(direct_response_);
-    connection.write(data, false);
 
     return Network::FilterStatus::Continue;
   }
