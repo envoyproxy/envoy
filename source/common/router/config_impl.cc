@@ -42,6 +42,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/matcher_visitor.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -60,11 +61,11 @@ namespace Envoy {
 namespace Router {
 class RouteCreator {
 public:
-  static absl::StatusOr<RouteEntryImplBaseConstSharedPtr> createAndValidateRoute(
-      const envoy::config::route::v3::Route& route_config, const CommonVirtualHostSharedPtr& vhost,
-      Server::Configuration::ServerFactoryContext& factory_context,
-      ProtobufMessage::ValidationVisitor& validator,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters) {
+  static absl::StatusOr<RouteEntryImplBaseConstSharedPtr>
+  createAndValidateRoute(const envoy::config::route::v3::Route& route_config,
+                         const CommonVirtualHostSharedPtr& vhost,
+                         Server::Configuration::ServerFactoryContext& factory_context,
+                         ProtobufMessage::ValidationVisitor& validator, bool validate_clusters) {
 
     absl::Status creation_status = absl::OkStatus();
     RouteEntryImplBaseConstSharedPtr route;
@@ -101,12 +102,14 @@ public:
     }
     RETURN_IF_NOT_OK(creation_status);
 
-    if (validation_clusters.has_value()) {
-      RETURN_IF_NOT_OK(route->validateClusters(*validation_clusters));
+    if (validate_clusters) {
+      const Upstream::ClusterManager& cluster_manager = factory_context.clusterManager();
+      RETURN_IF_NOT_OK(route->validateClusters(cluster_manager));
       for (const auto& shadow_policy : route->shadowPolicies()) {
         if (!shadow_policy->cluster().empty()) {
           ASSERT(shadow_policy->clusterHeader().get().empty());
-          if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
+          // if (!validation_clusters->hasCluster(shadow_policy->cluster())) {
+          if (!cluster_manager.hasCluster(shadow_policy->cluster())) {
             return absl::InvalidArgumentError(
                 fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
           }
@@ -135,30 +138,6 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
   dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
                                 src.headers_to_remove.end());
 }
-
-class RouteActionValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
-public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view type_url) override {
-    static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        createReflectableMessage(
-            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
-            ->GetDescriptor()
-            ->full_name());
-    static std::string filter_state_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        createReflectableMessage(envoy::extensions::matching::common_inputs::network::v3::
-                                     FilterStateInput::default_instance())
-            ->GetDescriptor()
-            ->full_name());
-    if (type_url == request_header_input_name || type_url == filter_state_input_name) {
-      return absl::OkStatus();
-    }
-
-    return absl::InvalidArgumentError(
-        fmt::format("Route table can only match on request headers, saw {}", type_url));
-  }
-};
 
 absl::Status validateWeightedClusterSpecifier(
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
@@ -1520,8 +1499,8 @@ RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMa
   return nullptr;
 }
 
-absl::Status RouteEntryImplBase::validateClusters(
-    const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const {
+absl::Status
+RouteEntryImplBase::validateClusters(const Upstream::ClusterManager& cluster_manager) const {
   if (isDirectResponse()) {
     return absl::OkStatus();
   }
@@ -1533,14 +1512,14 @@ absl::Status RouteEntryImplBase::validateClusters(
   // In the future we might decide to also have a config option that turns off checks for static
   // route tables. This would enable the all CDS with static route table case.
   if (!cluster_name_.empty()) {
-    if (!cluster_info_maps.hasCluster(cluster_name_)) {
+    if (!cluster_manager.hasCluster(cluster_name_)) {
       return absl::InvalidArgumentError(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   } else if (weighted_clusters_config_ != nullptr) {
     for (const WeightedClusterEntrySharedPtr& cluster :
          weighted_clusters_config_->weighted_clusters_) {
       if (!cluster->clusterName().empty()) {
-        if (!cluster_info_maps.hasCluster(cluster->clusterName())) {
+        if (!cluster_manager.hasCluster(cluster->clusterName())) {
           return absl::InvalidArgumentError(
               fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
         }
@@ -2018,13 +1997,11 @@ CommonVirtualHostImpl::create(const envoy::config::route::v3::VirtualHost& virtu
   return ret;
 }
 
-VirtualHostImpl::VirtualHostImpl(
-    const envoy::config::route::v3::VirtualHost& virtual_host,
-    const CommonConfigSharedPtr& global_route_config,
-    Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-    ProtobufMessage::ValidationVisitor& validator,
-    const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
-    absl::Status& creation_status) {
+VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
+                                 const CommonConfigSharedPtr& global_route_config,
+                                 Server::Configuration::ServerFactoryContext& factory_context,
+                                 Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validator,
+                                 bool validate_clusters, absl::Status& creation_status) {
 
   auto host_or_error = CommonVirtualHostImpl::create(virtual_host, global_route_config,
                                                      factory_context, scope, validator);
@@ -2063,7 +2040,7 @@ VirtualHostImpl::VirtualHostImpl(
   } else {
     for (const auto& route : virtual_host.routes()) {
       auto route_or_error = RouteCreator::createAndValidateRoute(
-          route, shared_virtual_host_, factory_context, validator, validation_clusters);
+          route, shared_virtual_host_, factory_context, validator, validate_clusters);
       SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
       routes_.emplace_back(route_or_error.value());
     }
@@ -2204,14 +2181,10 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
     : vhost_scope_(factory_context.scope().scopeFromStatName(
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()) {
-  absl::optional<Upstream::ClusterManager::ClusterInfoMaps> validation_clusters;
-  if (validate_clusters) {
-    validation_clusters = factory_context.clusterManager().clusters();
-  }
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
     VirtualHostSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
         virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
-        validation_clusters, creation_status);
+        validate_clusters, creation_status);
     SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
     for (const std::string& domain_name : virtual_host_config.domains()) {
       const Http::LowerCaseString lower_case_domain_name(domain_name);
@@ -2591,7 +2564,7 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
                                                                                validation_visitor);
   auto route = THROW_OR_RETURN_VALUE(
       RouteCreator::createAndValidateRoute(route_config, context.vhost, context.factory_context,
-                                           validation_visitor, absl::nullopt),
+                                           validation_visitor, false),
       RouteEntryImplBaseConstSharedPtr);
 
   return [route]() { return std::make_unique<RouteMatchAction>(route); };
@@ -2609,7 +2582,7 @@ Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
   for (const auto& route : route_config.routes()) {
     routes.emplace_back(THROW_OR_RETURN_VALUE(
         RouteCreator::createAndValidateRoute(route, context.vhost, context.factory_context,
-                                             validation_visitor, absl::nullopt),
+                                             validation_visitor, false),
         RouteEntryImplBaseConstSharedPtr));
   }
   return [routes]() { return std::make_unique<RouteListMatchAction>(routes); };

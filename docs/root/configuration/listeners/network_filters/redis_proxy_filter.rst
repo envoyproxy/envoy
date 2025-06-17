@@ -141,3 +141,59 @@ As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy s
         name: dns_cache_for_redis
         dns_lookup_family: V4_ONLY
         max_hosts: 100
+
+
+.. _config_network_filters_redis_proxy_aws_iam:
+
+AWS IAM Authentication
+----------------------
+
+The redis proxy filter supports authentication with AWS IAM credentials, to ElastiCache and MemoryDB instances. To configure AWS IAM Authentication,
+additional fields are provided in the cluster redis settings.
+If `region` is not specified, the region will be deduced using the region provider chain as described in  :ref:`config_http_filters_aws_request_signing_region`.
+`cache_name` is required and is set to the name of your cache. Both `auth_usernam` and `cache_name` are used when calculating the IAM authentication token.
+`auth_password` is not used in AWS IAM configuration and the password value is automatically calculated by envoy.
+In your upstream cluster, the `auth_username` field must be configured with the user that has been added to your cache, as per
+`Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_. Different upstreams may use different usernames and different
+cache names, credentials will be generated correctly based on the cluster the traffic is destined to.
+The `service_name` should be `elasticache` for an Amazon ElastiCache cache in valkey or Redis OSS mode, or `memorydb` for an Amazon MemoryDB cluster. The `service_name`
+matches the service which is added to the IAM Policy for the associated IAM principal being used to make the connection. For example, `service_name: memorydb` matches
+an AWS IAM Policy containing the Action `memorydb:Connect`, and that policy must be attached to the IAM principal being used by envoy.
+
+.. code-block:: yaml
+
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.redis_proxy
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: egress_redis
+          settings:
+            op_timeout: 5s
+          prefix_routes:
+            catch_all_route:
+              cluster: redis_cluster
+  clusters:
+  - name: redis_cluster
+    connect_timeout: 1s
+    type: strict_dns
+    load_assignment:
+      cluster_name: redis_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: testcache-7dh4z9.serverless.apse2.cache.amazonaws.com
+                port_value: 6379
+    typed_extension_protocol_options:
+      envoy.filters.network.redis_proxy:
+        "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+        auth_username:
+          inline_string: test
+        aws_iam:
+          region: ap-southeast-2
+          service_name: elasticache
+          cache_name: testcache
+          expiration_time: 900s
+
