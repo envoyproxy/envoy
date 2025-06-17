@@ -217,7 +217,7 @@ build:clang-msan --copt -fno-optimize-sibling-calls
 # Clang with libc++
 build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:libc++ --action_env=lldFLAGS=-stdlib=libc++
+build:libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
@@ -294,7 +294,7 @@ build:rbe-toolchain-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolchains/co
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
 build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:rbe-toolchain-clang-libc++ --action_env=lldFLAGS=-stdlib=libc++
+build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
 build:rbe-toolchain-arm64-clang-libc++ --config=rbe-toolchain
@@ -304,7 +304,7 @@ build:rbe-toolchain-arm64-clang-libc++ --crosstool_top=@envoy//bazel/rbe/toolcha
 build:rbe-toolchain-arm64-clang-libc++ --extra_toolchains=@envoy//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:cc-toolchain-arm64
 build:rbe-toolchain-arm64-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++
 build:rbe-toolchain-arm64-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
-build:rbe-toolchain-arm64-clang-libc++ --action_env=lldFLAGS=-stdlib=libc++
+build:rbe-toolchain-arm64-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-arm64-clang-libc++ --define force_libcpp=enabled
 build:rbe-toolchain-arm64-clang-libc++ --test_arg="-l trace"
 build:rbe-toolchain-arm64-clang-libc++ --test_output=all
