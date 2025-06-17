@@ -1,10 +1,9 @@
 #include <string>
 #include <vector>
 
-#include "gtest/gtest.h"
-
 #include "absl/synchronization/notification.h"
 #include "envoy/http/protocol.h"
+#include "gtest/gtest.h"
 #include "library/cc/engine.h"
 #include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
