@@ -43,13 +43,9 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   ip_tags_reload_timer_ = ip_tags_reload_dispatcher_->createTimer([this]() -> void {
     ENVOY_LOG(debug, "Trying to update ip tags in background");
     auto new_tags_or_error = tags_loader_.refreshTags();
-    ENVOY_LOG(debug, "Refresh tags done");
     if (new_tags_or_error.status().ok()) {
-      ENVOY_LOG(debug, "Updating ip tags");
       updateIpTags(new_tags_or_error.value());
-      ENVOY_LOG(debug, "Invoking callbacks");
       reload_success_cb_();
-      ENVOY_LOG(debug, "After Invoking callbacks");
     } else {
       ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
                 new_tags_or_error.status().message());
@@ -147,16 +143,12 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   if (data_source_provider_) {
-    ENVOY_LOG(debug, "data_source_provider_ ok");
     IpTagFileProto ip_tags_proto;
     auto new_data = data_source_provider_->data();
-    ENVOY_LOG(debug, "Got data from data_source_provider");
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       TRY_NEEDS_AUDIT {
-        ENVOY_LOG(debug, "Loading from yaml");
         MessageUtil::loadFromYaml(new_data, ip_tags_proto, validation_visitor_,
                                   true /*is_custom_thread*/);
-        ENVOY_LOG(debug, "Loading from yaml done");
       }
       END_TRY catch (EnvoyException& ex) {
         return absl::InvalidArgumentError(
@@ -179,7 +171,6 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
     const Protobuf::RepeatedPtrField<
         envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags) {
-  ENVOY_LOG(debug, "Parsing ip tags as proto");
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(ip_tags.size());
   for (const auto& ip_tag : ip_tags) {
@@ -199,7 +190,6 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
     stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
-  ENVOY_LOG(debug, "Parsing ip tags as proto done");
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
 

@@ -355,6 +355,20 @@ ip_tags_file_provider:
                                 "ip_tags_datasource to be configured.");
 }
 
+TEST_F(IpTaggingFilterTest, EmptyIpTagsFile) {
+  const std::string config_yaml = R"EOF(
+request_type: internal
+ip_tags_file_provider:
+  ip_tags_datasource:
+    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/empty_file.yaml"
+)EOF";
+  std::string file = TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/empty_file.yaml");
+  initializeFilter(
+      config_yaml,
+      absl::StrCat("INVALID_ARGUMENT: unable to create data source 'file ", file, " is empty'"));
+}
+
 TEST_F(IpTaggingFilterTest, EmptyFilenameInDatasourceConfigured) {
   const std::string config_yaml = R"EOF(
 request_type: internal
