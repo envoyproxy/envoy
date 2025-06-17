@@ -63,7 +63,7 @@ jobs:
 
     - name: Free disk space
       if: ${{ env.BUILD_TARGETS != '' }}
-      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.16
+      uses: envoyproxy/toolshed/gh-actions/diskspace@actions-v0.3.17
 
     - name: Initialize CodeQL
       if: ${{ env.BUILD_TARGETS != '' }}
@@ -100,7 +100,7 @@ jobs:
            --discard_analysis_cache \
            --nouse_action_cache \
            --features="-layering_check" \
-           --config=clang-libc++ \
+           --config=clang \
            --config=ci \
            $BUILD_TARGETS
        echo -e "Built targets...\n$BUILD_TARGETS"

@@ -38,7 +38,7 @@ public:
   FakeClusterSpecifierPluginFactoryConfig() = default;
   ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
-                               Server::Configuration::CommonFactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     const auto& typed_config = dynamic_cast<const ProtobufWkt::Struct&>(config);
     return std::make_shared<FakeClusterSpecifierPlugin>(
         typed_config.fields().at("name").string_value());

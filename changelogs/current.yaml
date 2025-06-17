@@ -20,6 +20,11 @@ behavior_changes:
   change: |
     Envoy will automatically raise the soft limit on the file descriptors to the hard limit. This behavior
     can be reverted using the runtime guard ``envoy_restart_features_raise_file_limits``.
+- area: build
+  change: |
+    Removed the clang-libstdc++ toolchain setup as this is no longer used or tested by the project.
+    Consolidated clang and gcc toolchains which can be used with ``--config=clang`` or ``--config=gcc``.
+    These use libc++ and libstdc++ respectively.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -219,5 +224,14 @@ new_features:
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from
     network filters, such as the Proxy Protocol, etc.
+- area: redis
+  change: |
+    ``redis_proxy`` filter now supports AWS IAM Authentication.
+- area: router
+  change: |
+    Added matcher based router cluster specifier plugin to support selecting cluster dynamically based on a matcher tree.
+    See
+    :ref:`matcher cluster specifier plugin <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`
+    for more details.
 
 deprecated:

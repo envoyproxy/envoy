@@ -1110,15 +1110,16 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
 absl::StatusOr<Network::DrainableFilterChainSharedPtr>
 ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    FilterChainFactoryContextCreator& context_creator) const {
-  return buildFilterChainInternal(filter_chain,
-                                  context_creator.createFilterChainFactoryContext(&filter_chain));
+    FilterChainFactoryContextCreator& context_creator, bool added_via_api) const {
+  return buildFilterChainInternal(
+      filter_chain, context_creator.createFilterChainFactoryContext(&filter_chain), added_via_api);
 }
 
 absl::StatusOr<Network::DrainableFilterChainSharedPtr>
 ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const {
+    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
+    bool added_via_api) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -1177,7 +1178,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
       std::move(factory_or_error.value()), std::move(*factory_list_or_error),
       std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
-      filter_chain.name());
+      filter_chain.name(), added_via_api);
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;

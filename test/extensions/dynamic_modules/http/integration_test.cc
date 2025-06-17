@@ -352,4 +352,51 @@ TEST_P(DynamicModulesIntegrationTest, HttpCalloutsOK) {
   EXPECT_EQ("local_response_body", response->body());
 }
 
+TEST_P(DynamicModulesIntegrationTest, Scheduler) {
+  initializeFilter("http_filter_scheduler");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
+  initializeFilter("fake_external_cache");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Non existent cache key should return 200 OK with body.
+  {
+    auto headers = default_request_headers_;
+    headers.addCopy(Http::LowerCaseString("cacahe-key"), "non-existent");
+    auto encoder_decoder = codec_client_->startRequest(headers, true);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_TRUE(response->body().empty());
+  }
+  // Existing cache key should return 200 OK with body and shouldn't reach the upstream.
+  {
+    auto headers = default_request_headers_;
+    headers.addCopy(Http::LowerCaseString("cacahe-key"), "existing");
+    auto encoder_decoder = codec_client_->startRequest(headers, true);
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("yes",
+              response->headers().get(Http::LowerCaseString("cached"))[0]->value().getStringView());
+    EXPECT_EQ("cached_response_body", response->body());
+  }
+}
+
 } // namespace Envoy
