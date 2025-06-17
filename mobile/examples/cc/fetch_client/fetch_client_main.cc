@@ -14,6 +14,8 @@
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
 
+// These are required by the version library in "source/common/version/version.h".
+// TODO(fortuna): set default values in the version library instead.
 const char build_scm_revision[] = "0";
 const char build_scm_status[] = "test";
 
