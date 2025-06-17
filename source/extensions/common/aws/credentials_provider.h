@@ -191,7 +191,9 @@ public:
   }
 
   void add(const CredentialsProviderSharedPtr& credentials_provider) {
-    providers_.emplace_back(credentials_provider);
+    if (credentials_provider != nullptr) {
+      providers_.emplace_back(credentials_provider);
+    }
   }
 
   // Store a callback if credentials are pending from a credential provider, to be called when
