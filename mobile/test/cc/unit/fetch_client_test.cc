@@ -1,8 +1,11 @@
 #include <string>
 #include <vector>
 
-#include "absl/synchronization/notification.h"
 #include "envoy/http/protocol.h"
+
+#include "source/common/http/utility.h"
+
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 #include "library/cc/engine.h"
 #include "library/cc/engine_builder.h"
@@ -10,7 +13,6 @@
 #include "library/cc/stream_client.h"
 #include "library/cc/stream_prototype.h"
 #include "library/common/http/header_utility.h"
-#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Platform {
