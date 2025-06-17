@@ -1,7 +1,10 @@
 #include <iostream>
 
-#include "absl/synchronization/notification.h"
 #include "envoy/http/protocol.h"
+
+#include "source/common/http/utility.h"
+
+#include "absl/synchronization/notification.h"
 #include "library/cc/engine.h"
 #include "library/cc/engine_builder.h"
 #include "library/cc/stream.h"
@@ -9,7 +12,6 @@
 #include "library/cc/stream_prototype.h"
 #include "library/common/engine_types.h"
 #include "library/common/http/header_utility.h"
-#include "source/common/http/utility.h"
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
