@@ -264,13 +264,13 @@ if [[ $# -ge 1 ]]; then
 else
   # Coverage test will add QUICHE tests by itself.
   COVERAGE_TEST_TARGETS=("//test/...")
-#   if [[ "${CI_TARGET}" == "release" || "${CI_TARGET}" == "release.test_only" ]]; then
-#     # We test contrib on release only.
-#     #COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
-#   elif [[ "${CI_TARGET}" == "msan" ]]; then
-#     COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
-#   fi
-  TEST_TARGETS=("test/extensions/filters/http/ip_tagging:ip_tagging_filter_test")
+  if [[ "${CI_TARGET}" == "release" || "${CI_TARGET}" == "release.test_only" ]]; then
+    # We test contrib on release only.
+    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "//contrib/...")
+  elif [[ "${CI_TARGET}" == "msan" ]]; then
+    COVERAGE_TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "-//test/extensions/...")
+  fi
+  TEST_TARGETS=("${COVERAGE_TEST_TARGETS[@]}" "@com_github_google_quiche//:ci_tests")
 fi
 
 case $CI_TARGET in
