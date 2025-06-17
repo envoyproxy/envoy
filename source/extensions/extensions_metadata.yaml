@@ -1195,6 +1195,13 @@ envoy.router.cluster_specifier_plugin.lua:
   status: alpha
   type_urls:
   - envoy.extensions.router.cluster_specifiers.lua.v3.LuaConfig
+envoy.router.cluster_specifier_plugin.matcher:
+  categories:
+  - envoy.router.cluster_specifier_plugin
+  security_posture: robust_to_untrusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier
 envoy.stat_sinks.dog_statsd:
   categories:
   - envoy.stats_sinks

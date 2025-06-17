@@ -227,5 +227,11 @@ new_features:
 - area: redis
   change: |
     ``redis_proxy`` filter now supports AWS IAM Authentication.
+- area: router
+  change: |
+    Added matcher based router cluster specifier plugin to support selecting cluster dynamically based on a matcher tree.
+    See
+    :ref:`matcher cluster specifier plugin <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`
+    for more details.
 
 deprecated:

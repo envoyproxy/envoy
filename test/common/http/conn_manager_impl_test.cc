@@ -1081,7 +1081,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
 
   // RouteConstSharedPtr of DelegatingRoute for foo
   // Initialization separate from declaration to be in scope for both decoder_filters_
-  std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> foo_route_override(nullptr);
+  std::shared_ptr<const Router::ExampleDerivedDelegatingRouteEntry> foo_route_override(nullptr);
 
   // Route config mock
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
@@ -1102,7 +1102,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
 
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
         // StreamFilterCallbacks to manually override the cached route for the current request.
-        foo_route_override = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+        foo_route_override = std::make_shared<Router::ExampleDerivedDelegatingRouteEntry>(
             decoder_filters_[0]->callbacks_->route(), foo_cluster_name);
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(foo_route_override);
 
@@ -1172,13 +1172,13 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
       .WillRepeatedly(ReturnRef(default_cluster_name));
 
   // DelegatingRoute: foo
-  std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> delegating_route_foo(nullptr);
+  std::shared_ptr<const Router::ExampleDerivedDelegatingRouteEntry> delegating_route_foo(nullptr);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
         // StreamFilterCallbacks to manually override the cached route for the current request.
-        delegating_route_foo = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+        delegating_route_foo = std::make_shared<Router::ExampleDerivedDelegatingRouteEntry>(
             default_route, foo_cluster_name);
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(delegating_route_foo);
 

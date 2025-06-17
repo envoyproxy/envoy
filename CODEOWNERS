@@ -376,8 +376,9 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/http/injected_credentials/generic @zhaohuabing @kyessenov
 /*/extensions/http/injected_credentials/oauth2 @vikaschoudhary16 @wbpcode
 
-# Lua cluster specifier
+# Cluster specifier
 /*/extensions/router/cluster_specifiers/lua @StarryVae @wbpcode
+/*/extensions/router/cluster_specifiers/matcher @wbpcode @agrawroh
 
 # Intentionally exempt (treated as core code)
 /*/extensions/filters/common @UNOWNED @UNOWNED

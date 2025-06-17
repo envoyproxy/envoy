@@ -42,6 +42,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/matcher_visitor.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
@@ -137,30 +138,6 @@ void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms&
   dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
                                 src.headers_to_remove.end());
 }
-
-class RouteActionValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
-public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view type_url) override {
-    static std::string request_header_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        createReflectableMessage(
-            envoy::type::matcher::v3::HttpRequestHeaderMatchInput::default_instance())
-            ->GetDescriptor()
-            ->full_name());
-    static std::string filter_state_input_name = TypeUtil::descriptorFullNameToTypeUrl(
-        createReflectableMessage(envoy::extensions::matching::common_inputs::network::v3::
-                                     FilterStateInput::default_instance())
-            ->GetDescriptor()
-            ->full_name());
-    if (type_url == request_header_input_name || type_url == filter_state_input_name) {
-      return absl::OkStatus();
-    }
-
-    return absl::InvalidArgumentError(
-        fmt::format("Route table can only match on request headers, saw {}", type_url));
-  }
-};
 
 absl::Status validateWeightedClusterSpecifier(
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
