@@ -19,7 +19,7 @@
 
 using testing::InvokeWithoutArgs;
 using testing::Return;
-// using testing::StartsWith;
+using testing::StartsWith;
 
 namespace Envoy {
 namespace Extensions {
