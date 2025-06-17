@@ -170,6 +170,8 @@ public:
   }
 
   std::chrono::seconds getCacheDuration() { return provider_->getCacheDuration(); }
+  void refresh() { return provider_->refresh(); }
+  X509Credentials getCredentials() { return provider_->getCredentials(); }
 
   std::unique_ptr<IAMRolesAnywhereX509CredentialsProvider> provider_;
 };
