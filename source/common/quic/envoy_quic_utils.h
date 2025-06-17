@@ -60,7 +60,7 @@ public:
   virtual void startHeaderBlock() = 0;
   virtual Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view name, absl::string_view header_value) = 0;
-  // Returns true if all required pseudoheaders and no extra pseudoheaders are
+  // Returns true if all required pseud-oheaders and no extra pseudo-headers are
   // present for the given header type.
   virtual bool finishHeaderBlock(bool is_trailing_headers) = 0;
 };
