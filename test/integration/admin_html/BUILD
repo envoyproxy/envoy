@@ -18,7 +18,7 @@ envoy_cc_test_binary(
         "//source/common/formatter:formatter_extension_lib",
         "//source/exe:envoy_main_common_with_core_extensions_lib",
         "//source/exe:platform_impl_lib",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/static:static_cluster_lib",
         "//source/server/admin:admin_html_util",
         "@com_google_absl//absl/debugging:symbolize",
