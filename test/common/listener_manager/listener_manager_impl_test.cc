@@ -865,7 +865,7 @@ address:
   socket_address:
     address: 127.0.0.1
     port_value: 0
-target_network_namespace_filepath: "{}"
+    network_namespace_filepath: "{}"
 filter_chains:
 - filters:
   - name: envoy.filters.network.tcp_proxy
