@@ -32,7 +32,7 @@ using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
  * This class is responsible for loading and parsing of ip tags (both inline and file based)
  * as well as for periodic refresh of ip tags (file based).
  */
-class IpTagsLoader {
+class IpTagsLoader : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                Stats::StatNameSetPtr& stat_name_set);
