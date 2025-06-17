@@ -50,6 +50,17 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
   // TODO(mattklein123): Add support for warming clusters when needed.
 
   ON_CALL(*this, clusters()).WillByDefault(Return(info_map));
+  ON_CALL(*this, getActiveCluster(_))
+      .WillByDefault(Invoke([this](absl::string_view cluster_name) -> OptRef<const Cluster> {
+        if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+          return *it->second;
+        }
+        return absl::nullopt;
+      }));
+  ON_CALL(*this, hasCluster(_))
+      .WillByDefault(Invoke([this](const std::string& cluster_name) -> bool {
+        return active_clusters_.find(cluster_name) != active_clusters_.end();
+      }));
 }
 
 void MockClusterManager::initializeThreadLocalClusters(

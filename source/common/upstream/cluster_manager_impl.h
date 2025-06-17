@@ -280,6 +280,20 @@ public:
     return clusters_maps;
   }
 
+  OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    if (const auto& it = active_clusters_.find(std::string(cluster_name));
+        it != active_clusters_.end()) {
+      return OptRef<const Cluster>(*it->second->cluster_);
+    }
+    return absl::nullopt;
+  }
+
+  bool hasCluster(const std::string& cluster_name) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);
+  }
+
   const ClusterSet& primaryClusters() override { return primary_clusters_; }
   ThreadLocalCluster* getThreadLocalCluster(absl::string_view cluster) override;
 

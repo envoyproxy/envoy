@@ -1,11 +1,10 @@
-FROM gcr.io/envoy-ci/envoy-build:da50dd3bef0bb014d82d6ecf24292ac28b24fae3@sha256:d52027bb1d50056bff403762e417191f3baae5bc1e540a80188596ce308790e7
+FROM gcr.io/envoy-ci/envoy-build:f4a881a1205e8e6db1a57162faf3df7aed88eae8@sha256:95d7afdea0f0f8881e88fa5e581db4f50907d0745ac8d90e00357ac1a316abe5
 
 ARG USERNAME=vscode
 ARG USER_UID=501
 ARG USER_GID=$USER_UID
 
 ENV BUILD_DIR=/build
-ENV ENVOY_STDLIB=libc++
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update \

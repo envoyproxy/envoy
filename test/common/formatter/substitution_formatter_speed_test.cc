@@ -12,7 +12,7 @@ namespace Envoy {
 namespace {
 
 std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter() {
-  ProtobufWkt::Struct JsonLogFormat;
+  ProtobufWkt::Struct struct_format;
   const std::string format_yaml = R"EOF(
     remote_address: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
     start_time: '%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%'
@@ -25,8 +25,8 @@ std::unique_ptr<Envoy::Formatter::JsonFormatterImpl> makeJsonFormatter() {
     referer: '%REQ(REFERER)%'
     user-agent: '%REQ(USER-AGENT)%'
   )EOF";
-  TestUtility::loadFromYaml(format_yaml, JsonLogFormat);
-  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(JsonLogFormat, false);
+  TestUtility::loadFromYaml(format_yaml, struct_format);
+  return std::make_unique<Envoy::Formatter::JsonFormatterImpl>(struct_format, false);
 }
 
 std::unique_ptr<Envoy::TestStreamInfo> makeStreamInfo(TimeSource& time_source) {
@@ -76,6 +76,39 @@ static void BM_AccessLogFormatter(benchmark::State& state) {
   benchmark::DoNotOptimize(output_bytes);
 }
 BENCHMARK(BM_AccessLogFormatter);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_AccessLogFormatterTextMockJson(benchmark::State& state) {
+  testing::NiceMock<MockTimeSystem> time_system;
+
+  std::unique_ptr<Envoy::TestStreamInfo> stream_info = makeStreamInfo(time_system);
+  ProtobufWkt::Struct struct_format;
+  const std::string format_yaml = R"EOF(
+    remote_address: '%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%'
+    start_time: '%START_TIME(%Y/%m/%dT%H:%M:%S%z %s)%'
+    method: '%REQ(:METHOD)%'
+    url: '%REQ(X-FORWARDED-PROTO)%://%REQ(:AUTHORITY)%%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%'
+    protocol: '%PROTOCOL%'
+    response_code: '%RESPONSE_CODE%'
+    bytes_sent: '%BYTES_SENT%'
+    duration: '%DURATION%'
+    referer: '%REQ(REFERER)%'
+    user-agent: '%REQ(USER-AGENT)%'
+  )EOF";
+  TestUtility::loadFromYaml(format_yaml, struct_format);
+
+  const std::string LogFormat = MessageUtil::getJsonStringFromMessageOrError(struct_format);
+
+  std::unique_ptr<Envoy::Formatter::FormatterImpl> formatter =
+      *Envoy::Formatter::FormatterImpl::create(LogFormat, false);
+
+  size_t output_bytes = 0;
+  for (auto _ : state) { // NOLINT: Silences warning about dead store
+    output_bytes += formatter->formatWithContext({}, *stream_info).length();
+  }
+  benchmark::DoNotOptimize(output_bytes);
+}
+BENCHMARK(BM_AccessLogFormatterTextMockJson);
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_JsonAccessLogFormatter(benchmark::State& state) {

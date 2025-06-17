@@ -811,11 +811,6 @@ TEST_P(MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
   expected_metadata_keys.insert("metadata");
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    // HTTP/3 Sends "end stream" in an empty DATA frame which results in the test filter
-    // adding the "data" metadata header.
-    expected_metadata_keys.insert("data");
-  }
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
 
   // Sends a headers only request with metadata. An empty data frame carries end_stream.
@@ -927,11 +922,6 @@ void MetadataIntegrationTest::verifyHeadersOnlyTest() {
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
   expected_metadata_keys.insert("metadata");
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    // HTTP/3 Sends "end stream" in an empty DATA frame which results in the test filter
-    // adding the "data" metadata header.
-    expected_metadata_keys.insert("data");
-  }
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
 
   // Verifies zero length data received, and end_stream is true.
@@ -3441,7 +3431,7 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
   // Close upstream, check cleanup.
   fake_upstreams_[0].reset();
 
-  ASSERT_TRUE(response_decoder->waitForReset());
+  ASSERT_TRUE(response_decoder->waitForAnyTermination());
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
   test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);

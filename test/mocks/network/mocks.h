@@ -334,6 +334,7 @@ public:
   MOCK_METHOD(const NetworkFilterFactoriesList&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(bool, addedViaApi, (), (const));
 };
 
 class MockFilterChainInfo : public FilterChainInfo {
@@ -612,6 +613,7 @@ public:
   MOCK_METHOD(const sockaddr*, sockAddr, (), (const));
   MOCK_METHOD(socklen_t, sockAddrLen, (), (const));
   MOCK_METHOD(absl::string_view, addressType, (), (const));
+  MOCK_METHOD(absl::optional<std::string>, networkNamespace, (), (const));
 
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }
