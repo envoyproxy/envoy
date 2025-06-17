@@ -323,6 +323,17 @@ func (c *httpCApiImpl) HttpRemoveTrailer(s unsafe.Pointer, key string) {
 	handleCApiStatus(res)
 }
 
+func (c *httpCApiImpl) HttpSetUpstreamOverrideHost(s unsafe.Pointer, host string, strict bool) error {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpSetUpstreamOverrideHost(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(host)), C.int(len(host)), C.bool(strict))
+	handleCApiStatus(res)
+	if res != C.CAPIOK {
+		return capiStatusToErr(res)
+	}
+
+	return nil
+}
+
 func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer, refresh bool) {
 	req := (*httpRequest)(r)
 	res := C.envoyGoFilterHttpClearRouteCache(unsafe.Pointer(req.req), C.bool(refresh))
@@ -477,17 +488,6 @@ func (c *httpCApiImpl) HttpGetStringSecret(r unsafe.Pointer, key string) (string
 		return "", false
 	}
 	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))), true
-}
-
-func (c *httpCApiImpl) HttpSetUpstreamOverrideHost(s unsafe.Pointer, host string, strict bool) error {
-	state := (*processState)(s)
-	res := C.envoyGoFilterHttpSetUpstreamOverrideHost(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(host)), C.int(len(host)), C.bool(strict))
-	handleCApiStatus(res)
-	if res != C.CAPIOK {
-		return capiStatusToErr(res)
-	}
-
-	return nil
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {

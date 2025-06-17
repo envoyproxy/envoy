@@ -301,6 +301,7 @@ public:
   CAPIStatus setTrailer(ProcessorState& state, absl::string_view key, absl::string_view value,
                         headerAction act);
   CAPIStatus removeTrailer(ProcessorState& state, absl::string_view key);
+  CAPIStatus setUpstreamOverrideHost(ProcessorState& state, absl::string_view host, bool strict);
 
   CAPIStatus getStringValue(int id, uint64_t* value_data, int* value_len);
   CAPIStatus getIntegerValue(int id, uint64_t* value);
@@ -313,8 +314,6 @@ public:
   CAPIStatus getStringProperty(absl::string_view path, uint64_t* value_data, int* value_len,
                                GoInt32* rc);
   CAPIStatus getSecret(absl::string_view key, uint64_t* value_data, int* value_len);
-
-  CAPIStatus setUpstreamOverrideHost(ProcessorState& state, absl::string_view host, bool strict);
 
   bool isProcessingInGo() {
     return decoding_state_.isProcessingInGo() || encoding_state_.isProcessingInGo();

@@ -866,7 +866,19 @@ typed_config:
 
   void testUpstreamOverrideHost(const std::string expected_status_code,
                                 const std::string expected_upstream_host, std::string path,
-                                bool strict, bool bad_host, bool invalid_host) {
+                                bool strict, bool bad_host, bool invalid_host, bool retry = false) {
+    if (retry) {
+      config_helper_.addConfigModifier(
+      [](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+
+        auto* retry_policy = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route()->mutable_retry_policy();
+        retry_policy->set_retry_on("5xx");
+        retry_policy->mutable_num_retries()->set_value(2);
+      });   
+    }
+    
     initializeBasicFilter(BASIC);
 
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
@@ -1826,6 +1838,13 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
   testUpstreamOverrideHost(
       "503", "", "/test?upstreamOverrideHost=200.0.0.1:8080&upstreamOverrideHostStrict=true", true,
       false, true);
+}
+
+// Set a invalid IP address with strict mode and retry
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) {
+  testUpstreamOverrideHost(
+      "503", "", "/test?upstreamOverrideHost=200.0.0.1:8080&upstreamOverrideHostStrict=true", true,
+      false, true, true);
 }
 
 } // namespace Envoy
