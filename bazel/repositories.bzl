@@ -221,11 +221,7 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
-    external_http_archive(
-        "aspect_bazel_lib",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:aspect.patch"],
-    )
+    external_http_archive("aspect_bazel_lib")
 
     _com_github_fdio_vpp_vcl()
 
@@ -975,4 +971,11 @@ def _com_github_maxmind_libmaxminddb():
     external_http_archive(
         name = "com_github_maxmind_libmaxminddb",
         build_file_content = BUILD_ALL_CONTENT,
+    )
+
+def yq_bzl():
+    external_http_archive(
+        name = "yq_bzl",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:yq_external.patch"],
     )
