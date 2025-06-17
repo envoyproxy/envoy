@@ -45,9 +45,7 @@ setup_clang_toolchain() {
         CONFIG_PARTS+=("libc++")
     fi
     CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
-    BAZEL_BUILD_OPTIONS+=("--test_output=all")
-    BAZEL_BUILD_OPTIONS+=("--cache_test_results=no")
-    BAZEL_BUILD_OPTIONS+=("--verbose_failures")
+    BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
     echo "clang toolchain with ${ENVOY_STDLIB} configured: ${CONFIG}"
