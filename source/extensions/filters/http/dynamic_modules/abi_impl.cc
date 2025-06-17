@@ -917,6 +917,39 @@ envoy_dynamic_module_callback_http_filter_http_callout(
   return filter->sendHttpCallout(callout_id, cluster_name_view, std::move(message),
                                  timeout_milliseconds);
 }
+
+envoy_dynamic_module_type_http_filter_scheduler_module_ptr
+envoy_dynamic_module_callback_http_filter_scheduler_new(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  return new DynamicModuleHttpFilterScheduler(filter->weak_from_this(),
+                                              filter->decoder_callbacks_->dispatcher());
+}
+
+void envoy_dynamic_module_callback_http_filter_scheduler_delete(
+    envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr) {
+  delete static_cast<DynamicModuleHttpFilterScheduler*>(scheduler_module_ptr);
+}
+
+void envoy_dynamic_module_callback_http_filter_scheduler_commit(
+    envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr,
+    uint64_t event_id) {
+  DynamicModuleHttpFilterScheduler* scheduler =
+      static_cast<DynamicModuleHttpFilterScheduler*>(scheduler_module_ptr);
+  scheduler->commit(event_id);
+}
+
+void envoy_dynamic_module_callback_http_filter_continue_decoding(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  filter->continueDecoding();
+}
+
+void envoy_dynamic_module_callback_http_filter_continue_encoding(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
+  DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  filter->continueEncoding();
+}
 }
 } // namespace HttpFilters
 } // namespace DynamicModules
