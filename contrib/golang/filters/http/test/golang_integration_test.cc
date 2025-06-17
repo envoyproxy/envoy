@@ -869,16 +869,18 @@ typed_config:
                                 bool strict, bool bad_host, bool invalid_host, bool retry = false) {
     if (retry) {
       config_helper_.addConfigModifier(
-      [](
-          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-              hcm) {
-
-        auto* retry_policy = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route()->mutable_retry_policy();
-        retry_policy->set_retry_on("5xx");
-        retry_policy->mutable_num_retries()->set_value(2);
-      });   
+          [](envoy::extensions::filters::network::http_connection_manager::v3::
+                 HttpConnectionManager& hcm) {
+            auto* retry_policy = hcm.mutable_route_config()
+                                     ->mutable_virtual_hosts(0)
+                                     ->mutable_routes(0)
+                                     ->mutable_route()
+                                     ->mutable_retry_policy();
+            retry_policy->set_retry_on("5xx");
+            retry_policy->mutable_num_retries()->set_value(2);
+          });
     }
-    
+
     initializeBasicFilter(BASIC);
 
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
