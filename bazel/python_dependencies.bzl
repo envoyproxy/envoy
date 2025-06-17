@@ -9,6 +9,7 @@ def envoy_python_dependencies():
         name = "base_pip3",
         python_interpreter_target = "@python3_12_host//:python",
         requirements_lock = "@envoy//tools/base:requirements.txt",
+        experimental_index_url = "https://pypi.org/simple",
         extra_pip_args = ["--require-hashes"],
     )
 
@@ -16,6 +17,7 @@ def envoy_python_dependencies():
         name = "dev_pip3",
         python_interpreter_target = "@python3_12_host//:python",
         requirements_lock = "@envoy//tools/dev:requirements.txt",
+        experimental_index_url = "https://pypi.org/simple",
         extra_pip_args = ["--require-hashes"],
     )
 
@@ -23,10 +25,11 @@ def envoy_python_dependencies():
         name = "fuzzing_pip3",
         python_interpreter_target = "@python3_12_host//:python",
         requirements_lock = "@rules_fuzzing//fuzzing:requirements.txt",
+        experimental_index_url = "https://pypi.org/simple",
         extra_pip_args = ["--require-hashes"],
     )
 
     system_python(
         name = "system_python",
-        minimum_python_version = "3.7",
+        minimum_python_version = "3.9",
     )

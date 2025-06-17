@@ -16,6 +16,8 @@ common --noenable_bzlmod
 fetch --color=yes
 run --color=yes
 
+common --@rules_python//python/config_settings:pip_whl_glibc_version=2.28
+
 build --color=yes
 build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
