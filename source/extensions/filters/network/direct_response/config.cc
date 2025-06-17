@@ -27,15 +27,13 @@ private:
   absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::direct_response::v3::Config& config,
       Server::Configuration::FactoryContext& context) override {
-    bool keep_open_after_response = config.keep_open_after_response();
     absl::StatusOr<std::string> content_or =
         Config::DataSource::read(config.response(), true, context.serverFactoryContext().api());
     RETURN_IF_NOT_OK_REF(content_or.status());
-    return [keep_open_after_response, content = std::move(content_or.value())](
-               Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(
-          std::make_shared<DirectResponseFilter>(content, keep_open_after_response));
-    };
+    return
+        [content = std::move(content_or.value())](Network::FilterManager& filter_manager) -> void {
+          filter_manager.addReadFilter(std::make_shared<DirectResponseFilter>(content));
+        };
   }
 
   bool isTerminalFilterByProtoTyped(

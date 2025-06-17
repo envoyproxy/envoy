@@ -15,12 +15,10 @@ namespace DirectResponse {
  */
 class DirectResponseFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  DirectResponseFilter(const std::string& response, bool keep_open_after_response)
-      : response_(response), keep_open_after_response_(keep_open_after_response) {}
+  DirectResponseFilter(const std::string& response) : response_(response) {}
 
   // Network::ReadFilter
-  Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-    data.drain(data.length());
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
     return Network::FilterStatus::Continue;
   }
   Network::FilterStatus onNewConnection() override;
@@ -31,7 +29,6 @@ public:
 
 private:
   const std::string response_;
-  const bool keep_open_after_response_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 

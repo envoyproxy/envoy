@@ -220,10 +220,6 @@ new_features:
     to the API Key Auth filter, which allows forwarding the authenticated client identity
     using a custom header, and also offers the option to remove the API key from the request
     before forwarding.
-- area: network direct_response filter
-  change: |
-    Added :ref:`keep_open_after_response <envoy_v3_api_field_extensions.filters.network.direct_response.v3.Config.keep_open_after_response>`
-    to the network ``direct_response`` filter, which allows the filter to keep the connection open after sending the response.
 - area: lua
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from

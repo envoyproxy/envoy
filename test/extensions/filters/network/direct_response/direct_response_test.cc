@@ -18,9 +18,9 @@ namespace DirectResponse {
 
 class DirectResponseFilterTest : public testing::Test {
 public:
-  void initialize(const std::string& response, bool keep_open_after_response = false) {
+  void initialize(const std::string& response) {
     EXPECT_CALL(read_filter_callbacks_.connection_, enableHalfClose(true));
-    filter_ = std::make_shared<DirectResponseFilter>(response, keep_open_after_response);
+    filter_ = std::make_shared<DirectResponseFilter>(response);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
   }
   std::shared_ptr<DirectResponseFilter> filter_;
@@ -48,40 +48,12 @@ TEST_F(DirectResponseFilterTest, OnNewConnectionEmptyResponse) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
 
-TEST_F(DirectResponseFilterTest, OnNewConnectionKeepOpen) {
-  initialize("hello", true);
-  Buffer::OwnedImpl response("hello");
-  EXPECT_CALL(read_filter_callbacks_.connection_, write(BufferEqual(&response), false));
-  EXPECT_CALL(read_filter_callbacks_.connection_, close(_)).Times(0);
-  EXPECT_CALL(read_filter_callbacks_.connection_.stream_info_,
-              setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().DirectResponse));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
-}
-
-TEST_F(DirectResponseFilterTest, OnNewConnectionKeepOpenEmptyResponse) {
-  initialize("", true);
-  EXPECT_CALL(read_filter_callbacks_.connection_, write(_, _)).Times(0);
-  EXPECT_CALL(read_filter_callbacks_.connection_, close(_)).Times(0);
-  EXPECT_CALL(read_filter_callbacks_.connection_.stream_info_,
-              setResponseCodeDetails(StreamInfo::ResponseCodeDetails::get().DirectResponse));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
-}
-
 // Test the filter's onData()
 TEST_F(DirectResponseFilterTest, OnData) {
   initialize("hello");
   Buffer::OwnedImpl data("data");
   EXPECT_CALL(read_filter_callbacks_.connection_, write(_, _)).Times(0);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
-}
-
-TEST_F(DirectResponseFilterTest, OnDataKeepOpen) {
-  initialize("hello", true);
-  Buffer::OwnedImpl data("incoming data");
-
-  // Data should still be drained even when keeping connection open
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
-  EXPECT_EQ(0, data.length());
 }
 
 } // namespace DirectResponse
