@@ -70,7 +70,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //          string_match:
 //            exact: m
 //
-// An example use of ``MetadataMatcher`` is specifying additional metadata in envoy.filters.http.rbac to
+// An example use of ``MetadataMatcher`` is specifying additional metadata in ``envoy.filters.http.rbac`` to
 // enforce access control based on dynamic metadata in a request. See :ref:`Permission
 // <envoy_v3_api_msg_config.rbac.v3.Permission>` and :ref:`Principal
 // <envoy_v3_api_msg_config.rbac.v3.Principal>`.
