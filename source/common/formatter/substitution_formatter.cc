@@ -383,22 +383,21 @@ std::string FormatterImpl::formatWithContext(const Context& context,
 }
 
 void stringValueToLogLine(const JsonFormatterImpl::Formatters& formatters, const Context& context,
-                          const StreamInfo::StreamInfo& info, JsonStringSerializer& serializer,
-                          bool omit_empty_values) {
-
-  serializer.addRawString(Json::Constants::DoubleQuote); // Start the JSON string.
+                          const StreamInfo::StreamInfo& info, std::string& log_line,
+                          std::string& sanitize, bool omit_empty_values) {
+  log_line.push_back('"'); // Start the JSON string.
   for (const JsonFormatterImpl::Formatter& formatter : formatters) {
     const absl::optional<std::string> value = formatter->formatWithContext(context, info);
     if (!value.has_value()) {
       // Add the empty value. This needn't be sanitized.
-      serializer.addRawString(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueStringView);
+      log_line.append(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueStringView);
       continue;
     }
     // Sanitize the string value and add it to the buffer. The string value will not be quoted
     // since we handle the quoting by ourselves at the outer level.
-    serializer.addSanitized({}, value.value(), {});
+    log_line.append(Json::sanitize(sanitize, value.value()));
   }
-  serializer.addRawString(Json::Constants::DoubleQuote); // End the JSON string.
+  log_line.push_back('"'); // End the JSON string.
 }
 
 JsonFormatterImpl::JsonFormatterImpl(const ProtobufWkt::Struct& struct_format,
@@ -419,14 +418,14 @@ std::string JsonFormatterImpl::formatWithContext(const Context& context,
                                                  const StreamInfo::StreamInfo& info) const {
   std::string log_line;
   log_line.reserve(2048);
-  JsonStringSerializer serializer(log_line); // Helper to serialize the value to log line.
+  std::string sanitize; // Helper to serialize the value to log line.
 
   for (const ParsedFormatElement& element : parsed_elements_) {
     // 1. Handle the raw string element.
     if (absl::holds_alternative<std::string>(element)) {
       // The raw string element will be added to the buffer directly.
       // It is sanitized when loading the configuration.
-      serializer.addRawString(absl::get<std::string>(element));
+      log_line.append(absl::get<std::string>(element));
       continue;
     }
 
@@ -436,11 +435,11 @@ std::string JsonFormatterImpl::formatWithContext(const Context& context,
 
     if (formatters.size() != 1) {
       // 2. Handle the formatter element with multiple or zero providers.
-      stringValueToLogLine(formatters, context, info, serializer, omit_empty_values_);
+      stringValueToLogLine(formatters, context, info, log_line, sanitize, omit_empty_values_);
     } else {
       // 3. Handle the formatter element with a single provider and value
       //    type needs to be kept.
-      auto value = formatters[0]->formatValueWithContext(context, info);
+      const auto value = formatters[0]->formatValueWithContext(context, info);
       Json::Utility::appendValueToString(value, log_line);
     }
   }

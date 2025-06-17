@@ -391,13 +391,11 @@ private:
  */
 class VirtualHostImpl : Logger::Loggable<Logger::Id::router> {
 public:
-  VirtualHostImpl(
-      const envoy::config::route::v3::VirtualHost& virtual_host,
-      const CommonConfigSharedPtr& global_route_config,
-      Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-      ProtobufMessage::ValidationVisitor& validator,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
-      absl::Status& creation_status);
+  VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
+                  const CommonConfigSharedPtr& global_route_config,
+                  Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+                  ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
+                  absl::Status& creation_status);
 
   RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
                                           const Http::RequestHeaderMap& headers,
@@ -669,8 +667,7 @@ public:
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
-  absl::Status
-  validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
+  absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
