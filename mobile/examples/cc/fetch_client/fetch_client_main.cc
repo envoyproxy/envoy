@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
   engine_running.WaitForNotification();
 
   // Iterate over the input URLs, reusing the engine.
-  for (const auto url_string : urls) {
+  for (const auto& url_string : urls) {
     Envoy::Http::Utility::Url url;
     if (!url.initialize(url_string, /*is_connect_request=*/false)) {
       std::cerr << "Unable to parse url: '" << url_string << "'\n";
