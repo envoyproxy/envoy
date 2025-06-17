@@ -22,13 +22,18 @@
 #include "source/extensions/filters/common/ratelimit/stat_names.h"
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 
+#include "absl/container/inlined_vector.h"
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitFilter {
 
+using RateLimitDescriptorVector = absl::InlinedVector<Envoy::RateLimit::Descriptor, 4>;
+
 /**
- * Type of requests the filter should apply to.
+ * The type of requests the filter should apply to.
  */
 enum class FilterRequestType { Internal, External, Both };
 
@@ -61,27 +66,23 @@ public:
         http_context_(http_context), stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
-        filter_enabled_(
-            config.has_filter_enabled()
-                ? absl::optional<Envoy::Runtime::FractionalPercent>(
-                      Envoy::Runtime::FractionalPercent(config.filter_enabled(), runtime_))
-                : absl::nullopt),
-        filter_enforced_(
-            config.has_filter_enforced()
-                ? absl::optional<Envoy::Runtime::FractionalPercent>(
-                      Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
-                : absl::nullopt) {
-    absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
-        Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
+        filter_enabled_(config.has_filter_enabled() ? absl::optional(Runtime::FractionalPercent(
+                                                          config.filter_enabled(), runtime_))
+                                                    : absl::nullopt),
+        filter_enforced_(config.has_filter_enforced() ? absl::optional(Runtime::FractionalPercent(
+                                                            config.filter_enforced(), runtime_))
+                                                      : absl::nullopt) {
+    StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
+        Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
     response_headers_parser_ = std::move(response_headers_parser_or_.value());
   }
 
-  const std::string& domain() const { return domain_; }
+  absl::string_view domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
-  Runtime::Loader& runtime() { return runtime_; }
-  Stats::Scope& scope() { return scope_; }
+  Runtime::Loader& runtime() const { return runtime_; }
+  Stats::Scope& scope() const { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
   bool failureModeAllow() const { return !failure_mode_deny_; }
   bool enableXRateLimitHeaders() const { return enable_x_ratelimit_headers_; }
@@ -89,24 +90,24 @@ public:
   const absl::optional<Grpc::Status::GrpcStatus> rateLimitedGrpcStatus() const {
     return rate_limited_grpc_status_;
   }
-  Http::Context& httpContext() { return http_context_; }
+  Http::Context& httpContext() const { return http_context_; }
   Filters::Common::RateLimit::StatNames& statNames() { return stat_names_; }
-  Http::Code rateLimitedStatus() { return rate_limited_status_; }
+  Http::Code rateLimitedStatus() const { return rate_limited_status_; }
   const Router::HeaderParser& responseHeadersParser() const { return *response_headers_parser_; }
   Http::Code statusOnError() const { return status_on_error_; }
   bool enabled() const;
   bool enforced() const;
 
 private:
-  static FilterRequestType stringToType(const std::string& request_type) {
+  static FilterRequestType stringToType(absl::string_view request_type) {
     if (request_type == "internal") {
       return FilterRequestType::Internal;
-    } else if (request_type == "external") {
-      return FilterRequestType::External;
-    } else {
-      ASSERT(request_type == "both");
-      return FilterRequestType::Both;
     }
+    if (request_type == "external") {
+      return FilterRequestType::External;
+    }
+    ASSERT(request_type == "both");
+    return FilterRequestType::Both;
   }
 
   static Http::Code toErrorCode(uint64_t status) {
@@ -140,8 +141,8 @@ private:
   const Http::Code rate_limited_status_;
   Router::HeaderParserPtr response_headers_parser_;
   const Http::Code status_on_error_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
+  const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+  const absl::optional<Runtime::FractionalPercent> filter_enforced_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -171,20 +172,20 @@ public:
   void populateDescriptors(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo& info,
                            Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
-                           bool on_stream_done) const {
+                           const bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
     rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
                                             on_stream_done);
   }
 
-  std::string domain() const { return domain_; }
+  absl::string_view domain() const { return domain_; }
 
 private:
   const LocalInfo::LocalInfo& local_info_;
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
   const std::string domain_;
-  std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
+  std::unique_ptr<Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
 };
 
 using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;
@@ -227,19 +228,19 @@ public:
 
 private:
   void initiateCall(const Http::RequestHeaderMap& headers);
-  void populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+  void populateRateLimitDescriptors(RateLimitDescriptorVector& descriptors,
                                     const Http::RequestHeaderMap& headers, bool on_stream_done);
   void populateRateLimitDescriptorsForPolicy(const Router::RateLimitPolicy& rate_limit_policy,
                                              std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                              const Http::RequestHeaderMap& headers,
                                              bool on_stream_done);
   void populateResponseHeaders(Http::HeaderMap& response_headers, bool from_local_reply);
-  void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
-  double getHitAddend();
+  void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add) const;
+  double getHitAddend() const;
   void initializeVirtualHostRateLimitOption(const Router::RouteEntry* route_entry);
-  std::string getDomain();
+  std::string getDomain() const;
 
-  Http::Context& httpContext() { return config_->httpContext(); }
+  Http::Context& httpContext() const { return config_->httpContext(); }
 
   enum class State { NotStarted, Calling, Complete, Responded };
 
@@ -249,7 +250,7 @@ private:
   State state_{State::NotStarted};
   VhRateLimitOptions vh_rate_limits_{};
   Upstream::ClusterInfoConstSharedPtr cluster_;
-  Router::RouteConstSharedPtr route_ = nullptr;
+  Router::RouteConstSharedPtr route_{nullptr};
   const FilterConfigPerRoute* route_config_ = nullptr;
   bool initiating_call_{};
   Http::ResponseHeaderMapPtr response_headers_to_add_;
