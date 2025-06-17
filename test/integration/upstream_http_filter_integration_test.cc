@@ -80,9 +80,7 @@ public:
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
-    if (disabled) {
-      filter_config.set_disabled(true);
-    }
+    filter_config.set_disabled(disabled);
     filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
