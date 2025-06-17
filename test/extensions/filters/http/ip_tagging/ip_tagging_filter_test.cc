@@ -266,11 +266,11 @@ ip_tags_file_provider:
 
 } // namespace
 
-class IpTaggingFilterTest : public Event::TestUsingSimulatedTime,
-                            public ::testing::TestWithParam<std::string> {
+class IpTaggingFilterTest : public ::testing::TestWithParam<std::string> {
 public:
   IpTaggingFilterTest()
-      : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher("test_thread")) {
+      : scope_(stats_.rootScope()), api_(Api::createApiForTest(stats_, time_system_)),
+        dispatcher_(api_->allocateDispatcher("test_thread")) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ip_tagging.http_filter_enabled", 100))
         .WillByDefault(Return(true));
   }
@@ -280,8 +280,8 @@ public:
     envoy::extensions::filters::http::ip_tagging::v3::IPTagging config;
     TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), config);
     auto config_or =
-        IpTaggingFilterConfig::create(config, "prefix.", *singleton_manager_, *stats_.rootScope(),
-                                      runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
+        IpTaggingFilterConfig::create(config, "prefix.", *singleton_manager_, *scope_, runtime_,
+                                      *api_, tls_, *dispatcher_, validation_visitor_);
     if (expected_error.has_value()) {
       EXPECT_FALSE(config_or.ok());
       EXPECT_EQ(expected_error.value(), absl::StrCat(config_or.status()));
@@ -301,10 +301,12 @@ public:
 
   std::unique_ptr<Singleton::ManagerImpl> singleton_manager_ =
       std::make_unique<Singleton::ManagerImpl>();
+  Envoy::Stats::TestUtil::TestStore stats_;
+  Stats::ScopeSharedPtr scope_;
+  Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
   std::unique_ptr<IpTaggingFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
@@ -392,17 +394,17 @@ TEST_F(IpTaggingFilterTest, ReusesIpTagsProviderInstanceForSameFilePath) {
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
                             proto_config1);
-  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result = IpTaggingFilterConfig::create(
-      proto_config1, "prefix.", *singleton_manager_, *stats_.rootScope(), runtime_, *api_, tls_,
-      *dispatcher_, validation_visitor_);
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
+      IpTaggingFilterConfig::create(proto_config1, "prefix.", *singleton_manager_, *scope_,
+                                    runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
   EXPECT_TRUE(config1_result.ok());
   auto config1 = config1_result.value();
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
                             proto_config2);
-  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result = IpTaggingFilterConfig::create(
-      proto_config2, "prefix.", *singleton_manager_, *stats_.rootScope(), runtime_, *api_, tls_,
-      *dispatcher_, validation_visitor_);
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
+      IpTaggingFilterConfig::create(proto_config2, "prefix.", *singleton_manager_, *scope_,
+                                    runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
   EXPECT_TRUE(config2_result.ok());
   auto config2 = config2_result.value();
   auto ip_tags_registry1 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config1);
@@ -419,17 +421,17 @@ TEST_F(IpTaggingFilterTest, DifferentIpTagsProviderInstanceForDifferentFilePath)
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(internal_request_with_json_file_config),
                             proto_config1);
-  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result = IpTaggingFilterConfig::create(
-      proto_config1, "prefix.", *singleton_manager_, *stats_.rootScope(), runtime_, *api_, tls_,
-      *dispatcher_, validation_visitor_);
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config1_result =
+      IpTaggingFilterConfig::create(proto_config1, "prefix.", *singleton_manager_, *scope_,
+                                    runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
   EXPECT_TRUE(config1_result.ok());
   auto config1 = config1_result.value();
   envoy::extensions::filters::http::ip_tagging::v3::IPTagging proto_config2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(external_request_with_json_file_config),
                             proto_config2);
-  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result = IpTaggingFilterConfig::create(
-      proto_config2, "prefix.", *singleton_manager_, *stats_.rootScope(), runtime_, *api_, tls_,
-      *dispatcher_, validation_visitor_);
+  absl::StatusOr<IpTaggingFilterConfigSharedPtr> config2_result =
+      IpTaggingFilterConfig::create(proto_config2, "prefix.", *singleton_manager_, *scope_,
+                                    runtime_, *api_, tls_, *dispatcher_, validation_visitor_);
   EXPECT_TRUE(config2_result.ok());
   auto config2 = config2_result.value();
   auto ip_tags_registry1 = IpTaggingFilterConfigPeer::ipTagsRegistry(*config1);
@@ -456,11 +458,11 @@ TEST_P(InternalRequestIpTaggingFilterTest, InternalRequest) {
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
@@ -485,9 +487,6 @@ TEST_P(ExternalRequestIpTaggingFilterTest, ExternalRequest) {
   EXPECT_EQ(FilterRequestType::EXTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers;
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit"));
-
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -495,6 +494,9 @@ TEST_P(ExternalRequestIpTaggingFilterTest, ExternalRequest) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("external_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.external_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
@@ -519,10 +521,6 @@ TEST_P(BothRequestIpTaggingFilterTest, BothRequest) {
   EXPECT_EQ(FilterRequestType::BOTH, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total")).Times(2);
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.external_request.hit"));
-
   Network::Address::InstanceConstSharedPtr remote_address =
       Network::Utility::parseInternetAddressNoThrow("1.2.3.5");
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -538,6 +536,10 @@ TEST_P(BothRequestIpTaggingFilterTest, BothRequest) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("external_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.external_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 2);
 }
 
 INSTANTIATE_TEST_CASE_P(BothRequest, BothRequestIpTaggingFilterTest,
@@ -557,11 +559,11 @@ TEST_P(NoHitsIpTaggingFilterTest, NoHits) {
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.no_hit"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.no_hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
@@ -758,11 +760,11 @@ TEST_P(NestedPrefixesFilterTest, NestedPrefixes) {
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.duplicate_request.hit"));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.duplicate_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
 
   // There is no guarantee for the order tags are returned by the LC-Trie.
   const std::string header_tag_data = request_headers.get_(Http::Headers::get().EnvoyIpTags.get());
@@ -854,7 +856,7 @@ INSTANTIATE_TEST_CASE_P(ClearRouteCache, ClearRouteCacheTest,
                                              internal_request_with_yaml_file_config}));
 
 TEST_F(IpTaggingFilterTest, InternalRequestWithReload) {
-  simTime().advanceTimeWait(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
 
@@ -892,7 +894,7 @@ ip_tags:
  )EOF",
       true);
   initializeFilter(yaml);
-  simTime().advanceTimeWait(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
@@ -902,12 +904,11 @@ ip_tags:
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.ip_tags_reload_success"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
@@ -920,7 +921,7 @@ ip_tags:
 
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  simTime().advanceTimeWait(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(
@@ -934,15 +935,22 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  simTime().advanceTimeWait(std::chrono::seconds(6));
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_, "prefix.ip_tagging.ip_tags_reload_success", 1UL,
+                                            time_system_));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.ip_tags_reload_error").value(), 0);
+
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_updated_request.hit"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
   request_headers = {{"x-envoy-internal", "true"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_updated_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_updated_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 2);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   request_trailers = Http::TestRequestTrailerMapImpl{};
@@ -955,7 +963,7 @@ ip_tags:
 }
 
 TEST_F(IpTaggingFilterTest, InternalRequestWithFailedReloadUsesOldData) {
-  simTime().advanceTimeWait(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
 
@@ -990,7 +998,7 @@ ip_tags
  )EOF",
       true);
   initializeFilter(yaml);
-  simTime().advanceTimeWait(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   EXPECT_EQ(FilterRequestType::INTERNAL, config_->requestType());
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-internal", "true"}};
@@ -1000,12 +1008,11 @@ ip_tags
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.ip_tags_reload_error"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
-
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 1);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   Http::TestRequestTrailerMapImpl request_trailers;
@@ -1018,7 +1025,7 @@ ip_tags
 
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  simTime().advanceTimeWait(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
 
   // Update the symlink to point to the new file.
   TestEnvironment::renameFile(
@@ -1033,16 +1040,19 @@ ip_tags
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  simTime().advanceTimeWait(std::chrono::seconds(6));
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_, "prefix.ip_tagging.ip_tags_reload_error", 1UL,
+                                            time_system_));
 
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
 
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
-  EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
   request_headers = {{"x-envoy-internal", "true"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
   EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 2);
+  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 2);
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
   request_trailers = Http::TestRequestTrailerMapImpl{};
@@ -1055,7 +1065,7 @@ ip_tags
 }
 
 TEST_F(IpTaggingFilterTest, IpTagsReloadedInFlightRequestsNotAffected) {
-  simTime().advanceTimeWait(std::chrono::seconds(1));
+  time_system_.advanceTimeWait(std::chrono::seconds(1));
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
 
@@ -1108,12 +1118,11 @@ ip_tags:
     filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         remote_address);
 
-    EXPECT_CALL(stats_, counter("prefix.ip_tagging.ip_tags_reload_success"));
-    EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_request.hit"));
-    EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
-
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
     EXPECT_EQ("internal_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+    EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_request.hit").value(), 1);
+    EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 1);
 
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
     Http::TestRequestTrailerMapImpl request_trailers;
@@ -1122,11 +1131,13 @@ ip_tags:
     filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         remote_address);
 
-    EXPECT_CALL(stats_, counter("prefix.ip_tagging.internal_updated_request.hit"));
-    EXPECT_CALL(stats_, counter("prefix.ip_tagging.total"));
     request_headers = {{"x-envoy-internal", "true"}};
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
     EXPECT_EQ("internal_updated_request", request_headers.get_(Http::Headers::get().EnvoyIpTags));
+
+    EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.internal_updated_request.hit").value(),
+              1);
+    EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.total").value(), 2);
 
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
     request_trailers = Http::TestRequestTrailerMapImpl{};
@@ -1148,7 +1159,10 @@ ip_tags:
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  simTime().advanceTimeWait(std::chrono::seconds(6));
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+
+  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_, "prefix.ip_tagging.ip_tags_reload_success", 1UL,
+                                            time_system_));
 
   IpTaggingFilterPeer::synchronizer(filter_).signal(sync_point_name);
   t0.join();

@@ -222,8 +222,6 @@ build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a
 build:libc++ --action_env=BAZEL_LINKOPTS=-lm:-pthread
 build:libc++ --define force_libcpp=enabled
-build:libc++ --test_arg="-l trace"
-build:libc++ --test_output=all
 build:clang-libc++ --config=libc++
 build:clang-libc++ --action_env=ARFLAGS=r
 build:arm64-clang-libc++ --config=clang-libc++
@@ -306,8 +304,6 @@ build:rbe-toolchain-arm64-clang-libc++ --action_env=CC=clang --action_env=CXX=cl
 build:rbe-toolchain-arm64-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-arm64-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-arm64-clang-libc++ --define force_libcpp=enabled
-build:rbe-toolchain-arm64-clang-libc++ --test_arg="-l trace"
-build:rbe-toolchain-arm64-clang-libc++ --test_output=all
 
 build:rbe-toolchain-asan --config=clang-asan
 build:rbe-toolchain-asan --linkopt -fuse-ld=lld
