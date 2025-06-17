@@ -224,5 +224,14 @@ new_features:
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``connectionStreamInfo()`` which could be used to access the typed metadata from
     network filters, such as the Proxy Protocol, etc.
+- area: redis
+  change: |
+    ``redis_proxy`` filter now supports AWS IAM Authentication.
+- area: router
+  change: |
+    Added matcher based router cluster specifier plugin to support selecting cluster dynamically based on a matcher tree.
+    See
+    :ref:`matcher cluster specifier plugin <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`
+    for more details.
 
 deprecated:
