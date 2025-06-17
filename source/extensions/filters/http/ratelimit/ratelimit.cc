@@ -26,7 +26,7 @@ class HitsAddendObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
   std::string name() const override { return std::string(HitsAddendFilterStateKey); }
   std::unique_ptr<StreamInfo::FilterState::Object>
-  createFromBytes(const absl::string_view data) const override {
+  createFromBytes(absl::string_view data) const override {
     uint32_t hits_addend = 0;
     if (absl::SimpleAtoi(data, &hits_addend)) {
       return std::make_unique<StreamInfo::UInt32AccessorImpl>(hits_addend);
@@ -361,11 +361,11 @@ void Filter::initializeVirtualHostRateLimitOption(const Router::RouteEntry* rout
   }
 }
 
-std::string Filter::getDomain() const {
+const std::string& Filter::getDomain() const {
   if (route_config_ != nullptr && !route_config_->domain().empty()) {
-    return std::string(route_config_->domain());
+    return route_config_->domain();
   }
-  return std::string(config_->domain());
+  return config_->domain();
 }
 
 void OnStreamDoneCallBack::complete(Filters::Common::RateLimit::LimitStatus,

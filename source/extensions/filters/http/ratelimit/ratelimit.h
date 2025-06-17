@@ -78,7 +78,7 @@ public:
     response_headers_parser_ = std::move(response_headers_parser_or_.value());
   }
 
-  absl::string_view domain() const { return domain_; }
+  const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
   Runtime::Loader& runtime() const { return runtime_; }
@@ -178,7 +178,7 @@ public:
                                             on_stream_done);
   }
 
-  absl::string_view domain() const { return domain_; }
+  const std::string& domain() const { return domain_; }
 
 private:
   const LocalInfo::LocalInfo& local_info_;
@@ -238,7 +238,7 @@ private:
   void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add) const;
   double getHitAddend() const;
   void initializeVirtualHostRateLimitOption(const Router::RouteEntry* route_entry);
-  std::string getDomain() const;
+  const std::string& getDomain() const;
 
   Http::Context& httpContext() const { return config_->httpContext(); }
 
