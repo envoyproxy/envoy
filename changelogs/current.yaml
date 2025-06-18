@@ -241,5 +241,10 @@ new_features:
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``streamInfo()`` which could be used to access the typed metadata from
     HTTP filters, such as the Set Metadata filter, etc.
+- area: quic
+  change: |
+    Added QUIC protocol option :ref:`enable_blackhold_avoidance_via_flowlables
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.enable_blackhold_avoidance_via_flowlables>` to make the
+    server use IPv6 flow labels to attempt to avoid network black holes.
 
 deprecated:

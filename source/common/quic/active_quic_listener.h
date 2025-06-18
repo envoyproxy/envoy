@@ -34,6 +34,7 @@ public:
                      Network::SocketSharedPtr&& listen_socket,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config,
                      bool kernel_worker_routing,
+                     bool enable_black_hole_avoidance_via_flow_label,
                      const envoy::config::core::v3::RuntimeFeatureFlag& enabled,
                      QuicStatNames& quic_stat_names,
                      uint32_t packets_to_read_to_connection_count_ratio,
@@ -87,6 +88,7 @@ private:
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
   const bool kernel_worker_routing_;
+  const bool enable_black_hole_avoidance_via_flow_label_;
   absl::optional<Runtime::FeatureFlag> enabled_{};
   Network::UdpPacketWriter* udp_packet_writer_;
 
@@ -134,6 +136,7 @@ protected:
       Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
       Network::SocketSharedPtr&& listen_socket, Network::ListenerConfig& listener_config,
       const quic::QuicConfig& quic_config, bool kernel_worker_routing,
+      bool enable_black_hole_avoidance_via_flow_label,
       const envoy::config::core::v3::RuntimeFeatureFlag& enabled, QuicStatNames& quic_stat_names,
       uint32_t packets_to_read_to_connection_count_ratio,
       EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
@@ -158,6 +161,7 @@ private:
   const Network::Socket::OptionsSharedPtr options_{std::make_shared<Network::Socket::Options>()};
   QuicConnectionIdWorkerSelector worker_selector_;
   bool kernel_worker_routing_{};
+  bool enable_black_hole_avoidance_via_flow_label_{};
   Server::Configuration::ListenerFactoryContext& context_;
   bool reject_new_connections_{};
 

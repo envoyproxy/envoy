@@ -59,7 +59,9 @@ public:
       quic::QuicVersionManager* version_manager,
       std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
       std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-      uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
+      uint8_t expected_server_connection_id_length,
+      bool enable_black_hole_avoidance_via_flow_label,
+      Network::ConnectionHandler& connection_handler,
       Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
       Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
       Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
@@ -109,6 +111,7 @@ private:
   QuicDispatcherStats quic_stats_;
   QuicConnectionStats connection_stats_;
   bool current_packet_dispatch_success_;
+  bool enable_black_hole_avoidance_via_flow_label_;
   EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory_;
 };
 
