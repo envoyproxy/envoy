@@ -214,7 +214,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
         }
         cb_->socket().setDetectedTransportProtocol("tls");
       } else {
-        if (read_ == maxConfigReadBytes()) {
+        if (read_ >= maxConfigReadBytes()) {
           // We've hit the specified size limit. This is an unreasonably large ClientHello;
           // indicate failure.
           config_->stats().client_hello_too_large_.inc();

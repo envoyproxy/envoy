@@ -265,7 +265,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   ASSERT(client_hello.size() > Config::TLS_MAX_CLIENT_HELLO);
 
   filter_ = std::make_unique<Filter>(cfg_);
-  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(0);
   EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
   EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
   EXPECT_CALL(dispatcher_,
