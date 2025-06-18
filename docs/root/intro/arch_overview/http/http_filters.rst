@@ -100,7 +100,7 @@ selection makes its way to the router filter which finalizes the upstream cluste
 will be forwarded to.
 
 In addition to updating the route ``setRoute()`` and ``clearRouteCache()``, downstream HTTP filters could also refresh the
-cluster by invoking ``refreshRouteCluster()`` if the cluster specifier of route supports it. Now only
+cluster by invoking ``refreshRouteCluster()`` if the cluster specifier of route supports it. At this point only
 the :ref:`matcher based cluster specifier <config_http_cluster_specifier_matcher>` support the
 ``refreshRouteCluster()`` callback.
 
