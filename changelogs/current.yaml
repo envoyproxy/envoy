@@ -243,8 +243,8 @@ new_features:
     HTTP filters, such as the Set Metadata filter, etc.
 - area: quic
   change: |
-    Added QUIC protocol option :ref:`enable_blackhold_avoidance_via_flowlables
-    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.enable_blackhold_avoidance_via_flowlables>` to make the
+    Added QUIC protocol option :ref:`enable_black_hole_avoidance_via_flow_label
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.enable_black_hole_avoidance_via_flow_label>` to make the
     server use IPv6 flow labels to attempt to avoid network black holes.
 
 deprecated:

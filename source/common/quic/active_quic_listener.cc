@@ -291,6 +291,7 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
     quic_config_.SetDisableConnectionMigration();
   }
   convertQuicConfig(config.quic_protocol_options(), quic_config_);
+  enable_black_hole_avoidance_via_flow_label_ = config.enable_black_hole_avoidance_via_flow_label();
 
   // Initialize crypto stream factory.
   envoy::config::core::v3::TypedExtensionConfig crypto_stream_config;

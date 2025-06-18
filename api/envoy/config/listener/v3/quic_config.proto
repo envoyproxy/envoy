@@ -102,5 +102,5 @@ message QuicProtocolOptions {
 
   // If true, QUIC connections created by this lister will change IPv6 flow lable
   // to attempt to avoid network blackholes.
-  bool enable_blackhold_avoidance_via_flowlables = 14;
+  bool enable_black_hole_avoidance_via_flow_label = 14;
 }
