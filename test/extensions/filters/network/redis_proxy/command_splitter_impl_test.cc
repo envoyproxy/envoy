@@ -552,6 +552,22 @@ TEST_F(RedisSingleServerRequestTest, EvalWrongNumberOfArgs) {
             splitter_.makeRequest(std::move(request2), callbacks_, dispatcher_, stream_info_));
 };
 
+TEST_F(RedisSingleServerRequestTest, SelectWrongNumberOfArgs) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"select", "1", "2"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "wrong number of arguments for 'select' command";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+};
+
 TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
   InSequence s;
 
@@ -570,38 +586,6 @@ TEST_F(RedisSingleServerRequestTest, EvalNoUpstream) {
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.total").value());
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.eval.error").value());
-};
-
-TEST_F(RedisSingleServerRequestTest, Select) {
-  InSequence s;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"select", "1"});
-
-  Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::SimpleString);
-  response.asString() = Response::get().OK;
-
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
-};
-
-TEST_F(RedisSingleServerRequestTest, SelectInvalid) {
-  InSequence s;
-
-  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
-  makeBulkStringArray(*request, {"select", "1", "2"});
-
-  Common::Redis::RespValue response;
-  response.type(Common::Redis::RespType::Error);
-  response.asString() = RedisProxy::CommandSplitter::Response::get().InvalidRequest;
-
-  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
-  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
-  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-  EXPECT_EQ(nullptr, handle_);
 };
 
 TEST_F(RedisSingleServerRequestTest, Hello) {
@@ -1876,6 +1860,105 @@ TEST_P(InfoHandlerTest, InfoNoArgumentAddsDefault) {
 }
 
 INSTANTIATE_TEST_SUITE_P(InfoHandlerTest, InfoHandlerTest, testing::Values("info"));
+
+class SelectHandlerTest : public FragmentedRequestCommandHandlerTest,
+                          public testing::WithParamInterface<std::string> {
+public:
+  void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
+             bool mirrored = false) {
+    std::vector<std::string> request_strings = {"select", "0"};
+    makeRequestToShard(shard_size, request_strings, null_handle_indexes, mirrored);
+  }
+
+  Common::Redis::RespValuePtr response() {
+    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::SimpleString);
+    response->asString() = "OK";
+    return response;
+  }
+};
+
+TEST_P(SelectHandlerTest, Normal) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::SimpleString);
+  expected_response.asString() = "OK";
+  pool_callbacks_[1]->onResponse(response());
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(response());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+};
+
+TEST_F(SelectHandlerTest, SelectInvalid) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"select"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR wrong number of arguments for 'select' command";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+};
+
+TEST_F(SelectHandlerTest, WrongNumberOfArguments) {
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"select", "0", "extra_arg"});
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "wrong number of arguments for 'select' command";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.select.error").value());
+}
+
+TEST_P(SelectHandlerTest, NoUpstreamHost) {
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "no upstream host";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setup(0, {});
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+}
+
+TEST_P(SelectHandlerTest, SingleShardErrorResponse) {
+  InSequence s;
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_error;
+  expected_error.type(Common::Redis::RespType::Error);
+  expected_error.asString() = "finished with 1 error(s) from select";
+
+  pool_callbacks_[1]->onResponse(response());
+
+  Common::Redis::RespValuePtr error_resp = Common::Redis::Utility::makeError("some error");
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_error)));
+  pool_callbacks_[0]->onResponse(std::move(error_resp));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+}
+
+INSTANTIATE_TEST_SUITE_P(SelectHandlerTest, SelectHandlerTest, testing::Values("select"));
 } // namespace CommandSplitter
 } // namespace RedisProxy
 } // namespace NetworkFilters

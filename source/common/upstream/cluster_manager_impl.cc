@@ -498,7 +498,7 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0);
+        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
     RETURN_IF_NOT_OK_REF(factory_or_error.status());
     absl::StatusOr<Grpc::RawAsyncClientPtr> client_or_error =
         factory_or_error.value()->createUncachedRawAsyncClient();
