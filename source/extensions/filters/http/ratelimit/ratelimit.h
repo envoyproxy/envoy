@@ -71,11 +71,11 @@ public:
                 ? absl::optional<Envoy::Runtime::FractionalPercent>(
                       Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
                 : absl::nullopt),
-        failure_mode_deny_runtime_(
-            config.has_failure_mode_deny_runtime()
-                ? absl::optional<Envoy::Runtime::FractionalPercent>(
-                      Envoy::Runtime::FractionalPercent(config.failure_mode_deny_runtime(), runtime_))
-                : absl::nullopt) {
+        failure_mode_deny_runtime_(config.has_failure_mode_deny_runtime()
+                                       ? absl::optional<Envoy::Runtime::FractionalPercent>(
+                                             Envoy::Runtime::FractionalPercent(
+                                                 config.failure_mode_deny_runtime(), runtime_))
+                                       : absl::nullopt) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
