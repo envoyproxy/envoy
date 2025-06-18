@@ -71,10 +71,10 @@ public:
                 ? absl::optional<Envoy::Runtime::FractionalPercent>(
                       Envoy::Runtime::FractionalPercent(config.filter_enforced(), runtime_))
                 : absl::nullopt),
-        failure_mode_deny_runtime_(config.has_failure_mode_deny_runtime()
+        failure_mode_deny_percent_(config.has_failure_mode_deny_percent()
                                        ? absl::optional<Envoy::Runtime::FractionalPercent>(
                                              Envoy::Runtime::FractionalPercent(
-                                                 config.failure_mode_deny_runtime(), runtime_))
+                                                 config.failure_mode_deny_percent(), runtime_))
                                        : absl::nullopt) {
     absl::StatusOr<Router::HeaderParserPtr> response_headers_parser_or_ =
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
@@ -89,8 +89,8 @@ public:
   Stats::Scope& scope() { return scope_; }
   FilterRequestType requestType() const { return request_type_; }
   bool failureModeAllow() const {
-    if (failure_mode_deny_runtime_.has_value()) {
-      return !failure_mode_deny_runtime_->enabled();
+    if (failure_mode_deny_percent_.has_value()) {
+      return !failure_mode_deny_percent_->enabled();
     }
     return !failure_mode_deny_;
   }
@@ -152,7 +152,7 @@ private:
   const Http::Code status_on_error_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
-  const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_runtime_;
+  const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

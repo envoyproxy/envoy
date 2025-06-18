@@ -158,7 +158,7 @@ message RateLimit {
   // .. code-block:: yaml
   //
   //   failure_mode_deny: true
-  //   failure_mode_deny_runtime:
+  //   failure_mode_deny_percent:
   //     default_value:
   //       numerator: 50
   //       denominator: HUNDRED
@@ -166,7 +166,7 @@ message RateLimit {
   //
   // This means that when the rate limit service is unavailable, 50% of requests will be denied
   // (fail closed) and 50% will be allowed (fail open).
-  config.core.v3.RuntimeFractionalPercent failure_mode_deny_runtime = 16;
+  config.core.v3.RuntimeFractionalPercent failure_mode_deny_percent = 16;
 }
 
 message RateLimitPerRoute {

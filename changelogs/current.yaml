@@ -243,7 +243,7 @@ new_features:
     HTTP filters, such as the Set Metadata filter, etc.
 - area: ratelimit
   change: |
-    Added a new ``failure_mode_deny_runtime`` field of type ``Envoy::Runtime::FractionalPercent`` attached to the rate limit filter
+    Added a new ``failure_mode_deny_percent`` field of type ``Envoy::Runtime::FractionalPercent`` attached to the rate limit filter
     to configure the failure mode for rate limit service errors in runtime.
     It acts as an override for the existing ``failure_mode_deny`` field in the filter config.
 

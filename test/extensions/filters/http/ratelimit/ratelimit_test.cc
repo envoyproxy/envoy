@@ -156,7 +156,7 @@ public:
       envoy_grpc:
         cluster_name: ratelimit
       timeout: 0.25s
-  failure_mode_deny_runtime:
+  failure_mode_deny_percent:
     runtime_key: test.ratelimit.failure_mode_deny_percent
     default_value:
       numerator: 0
@@ -170,7 +170,7 @@ public:
       envoy_grpc:
         cluster_name: ratelimit
       timeout: 0.25s
-  failure_mode_deny_runtime:
+  failure_mode_deny_percent:
     runtime_key: test.ratelimit.failure_mode_deny_percent
     default_value:
       numerator: 100
@@ -2027,7 +2027,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAndOnStreamDone) {
                                nullptr);
 }
 
-TEST_F(HttpRateLimitFilterTest, FailureModeRuntimeZeroPercentFailsOpen) {
+TEST_F(HttpRateLimitFilterTest, FailureModeZeroPercentFailsOpen) {
 
   EXPECT_CALL(
       factory_context_.runtime_loader_.snapshot_,
@@ -2063,7 +2063,7 @@ TEST_F(HttpRateLimitFilterTest, FailureModeRuntimeZeroPercentFailsOpen) {
                     .value());
 }
 
-TEST_F(HttpRateLimitFilterTest, FailureModeRuntimeHundredPercentFailsClose) {
+TEST_F(HttpRateLimitFilterTest, FailureModeHundredPercentFailsClose) {
 
   EXPECT_CALL(
       factory_context_.runtime_loader_.snapshot_,
