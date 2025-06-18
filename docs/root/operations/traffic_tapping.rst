@@ -91,11 +91,8 @@ To customize the prefix used in these statistics, configure the :ref:`stats_pref
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  streamed_init_submit, Counter, The total count of submissions triggered by streamed init events
-  streamed_read_submit, Counter, The total count of submissions triggered by streamed read events
-  streamed_write_submit, Counter, The total count of submissions triggered by streamed write events
-  streamed_close_submit, Counter, The total count of submissions triggered by streamed close events
-  buffered_close_submit, Counter, The total count of submissions triggered by buffered close events
+  streamed_submit, Counter, The total count of submissions triggered by streamed trace events
+  buffered_submit, Counter, The total count of submissions triggered by buffered trace events
 
 PCAP generation
 ---------------

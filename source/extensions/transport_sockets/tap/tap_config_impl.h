@@ -46,8 +46,8 @@ private:
     trace->mutable_socket_streamed_trace_segment()->set_trace_id(connection_.id());
     return trace;
   }
-  void pegReadWriteSubmitCounter(const bool onStreaming, const bool isRead);
-  void pegCloseSubmitCounter(const bool isStreaming);
+  void pegSubmitCounter(const bool isStreaming);
+  bool shouldSendStreamedMsgByConfiguredSize() const;
   void handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
                                                  const uint32_t totalBytes, const bool isRead,
                                                  const bool isEndStream);

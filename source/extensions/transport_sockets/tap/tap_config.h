@@ -16,11 +16,8 @@ namespace Tap {
  * All stats for the tap filter. @see stats_macros.h
  */
 #define ALL_TRANSPORT_TAP_STATS(COUNTER)                                                           \
-  COUNTER(streamed_init_submit)                                                                    \
-  COUNTER(streamed_read_submit)                                                                    \
-  COUNTER(streamed_write_submit)                                                                   \
-  COUNTER(streamed_close_submit)                                                                   \
-  COUNTER(buffered_close_submit)
+  COUNTER(streamed_submit)                                                                         \
+  COUNTER(buffered_submit)
 
 /**
  * Wrapper struct for tap filter stats. @see stats_macros.h

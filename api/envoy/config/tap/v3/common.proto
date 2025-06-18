@@ -183,12 +183,10 @@ message OutputConfig {
   // <config_http_filters_tap_streaming>` documentation for more information.
   bool streaming = 4;
 
-  // For streamed tapping, tapped messages are sent on each read/write event,
-  // even for small payloads (e.g., 9 bytes, the minimum HTTP/2 frame size).
-  // To improve performance under high traffic, use min_streamed_sent_bytes
-  // to control when tapped messages are sent based on a configured size threshold.
-  // If specified, the minimum allowed value for min_streamed_sent_bytes is 9 bytes.
-  // This setting is only applicable when stream tracing is enabled.
+  // Tapped messages will be sent on each read/write event for streamed tapping by default.
+  // But this behavior could be controlled by setting this field.
+  // If set then the tapped messages will be send once the threshold is reached.
+  // This could be used to avoid high frequent sending.
   google.protobuf.UInt32Value min_streamed_sent_bytes = 5;
 }
 

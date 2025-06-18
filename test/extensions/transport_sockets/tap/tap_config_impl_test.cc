@@ -46,7 +46,6 @@ public:
               (const));
   MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
   MOCK_METHOD(bool, streaming, (), (const));
-  MOCK_METHOD(bool, shouldSendStreamedMsgByConfiguredSize, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, (), (const));
 };
 
@@ -71,17 +70,14 @@ public:
           statuses[0].might_change_status_ = false;
         }));
     EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(streaming));
-    EXPECT_CALL(*config_, shouldSendStreamedMsgByConfiguredSize()).WillRepeatedly(Return(false));
     EXPECT_CALL(*config_, maxBufferedRxBytes()).WillRepeatedly(Return(1024));
     EXPECT_CALL(*config_, maxBufferedTxBytes()).WillRepeatedly(Return(1024));
     EXPECT_CALL(*config_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
     time_system_.setSystemTime(std::chrono::seconds(0));
     if (send_streamed_msg_on_configured_size_) {
-      EXPECT_CALL(*config_, shouldSendStreamedMsgByConfiguredSize()).WillRepeatedly(Return(true));
       EXPECT_CALL(*config_, minStreamedSentBytes())
           .WillRepeatedly(Return(default_min_buffered_bytes_));
     } else {
-      EXPECT_CALL(*config_, shouldSendStreamedMsgByConfiguredSize()).WillRepeatedly(Return(false));
       EXPECT_CALL(*config_, minStreamedSentBytes()).WillRepeatedly(Return(0));
     }
     // Only for streaming trace
@@ -120,7 +116,6 @@ public:
 
 // Verify the full streaming flow.
 TEST_F(PerSocketTapperImplTest, StreamingFlow) {
-  std::cout << "enter StreamingFlow" << std::endl;
   EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
                                   R"EOF(
 socket_streamed_trace_segment:
@@ -377,7 +372,7 @@ socket_streamed_trace_segment:
 }
 
 // Verify the full streaming flow for submiting tapped message on all cases
-// When send_streamed_msg_on_configured_size_ is True
+// When send_streamed_msg_on_configured_size_ is True.
 TEST_F(PerSocketTapperImplTest, StreamingFlowWhenSendStreamedMsgIsTrue) {
   // Keep the original value.
   bool local_output_conn_info_per_event = output_conn_info_per_event_;
@@ -389,7 +384,7 @@ TEST_F(PerSocketTapperImplTest, StreamingFlowWhenSendStreamedMsgIsTrue) {
   bool local_default_min_buffered_bytes = default_min_buffered_bytes_;
   default_min_buffered_bytes_ = 15;
 
-  // Submit when the transport socket is created
+  // Submit when the transport socket is created.
   EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
                                   R"EOF(
 socket_streamed_trace_segment:
@@ -414,19 +409,20 @@ socket_streamed_trace_segment:
 socket_streamed_trace_segment:
   trace_id: 1
   events:
-  - timestamp: 1970-01-01T00:00:00Z
-    read:
-      data:
-        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
+    events:
+    - timestamp: 1970-01-01T00:00:00Z
+      read:
+        data:
+          as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
 
@@ -436,20 +432,21 @@ socket_streamed_trace_segment:
 socket_streamed_trace_segment:
   trace_id: 1
   events:
-  - timestamp: 1970-01-01T00:00:01Z
-    write:
-      data:
-        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
-      end_stream: true
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
+    events:
+    - timestamp: 1970-01-01T00:00:01Z
+      write:
+        data:
+          as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
+        end_stream: true
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(1));
   tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
@@ -461,17 +458,18 @@ socket_streamed_trace_segment:
 socket_streamed_trace_segment:
   trace_id: 1
   events:
-  - timestamp: 1970-01-01T00:00:02Z
-    closed: {}
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
+    events:
+    - timestamp: 1970-01-01T00:00:02Z
+      closed: {}
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -521,32 +519,33 @@ socket_streamed_trace_segment:
 socket_streamed_trace_segment:
   trace_id: 1
   events:
-  - timestamp: 1970-01-01T00:00:00Z
-    read:
-      data:
-        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
-  - timestamp: 1970-01-01T00:00:01Z
-    read:
-      data:
-        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
+    events:
+    - timestamp: 1970-01-01T00:00:00Z
+      read:
+        data:
+          as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
+    - timestamp: 1970-01-01T00:00:01Z
+      read:
+        data:
+          as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uUmVhZCBzdWJtaXQ=
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
 )EOF")));
   tapper_->onRead(Buffer::OwnedImpl("Test transport socket tap buffered data onRead submit"), 53);
   time_system_.setSystemTime(std::chrono::seconds(1));
@@ -558,17 +557,18 @@ socket_streamed_trace_segment:
 socket_streamed_trace_segment:
   trace_id: 1
   events:
-  - timestamp: 1970-01-01T00:00:02Z
-    closed: {}
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
+    events:
+    - timestamp: 1970-01-01T00:00:02Z
+      closed: {}
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);
@@ -618,34 +618,35 @@ socket_streamed_trace_segment:
 socket_streamed_trace_segment:
   trace_id: 1
   events:
-  - timestamp: 1970-01-01T00:00:00Z
-    write:
-      data:
-        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
-      end_stream: true
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
-  - timestamp: 1970-01-01T00:00:01Z
-    write:
-      data:
-        as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
-      end_stream: true
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
+    events:
+    - timestamp: 1970-01-01T00:00:00Z
+      write:
+        data:
+          as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
+        end_stream: true
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
+    - timestamp: 1970-01-01T00:00:01Z
+      write:
+        data:
+          as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
+        end_stream: true
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
 )EOF")));
   tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
                    true);
@@ -659,17 +660,18 @@ socket_streamed_trace_segment:
 socket_streamed_trace_segment:
   trace_id: 1
   events:
-  - timestamp: 1970-01-01T00:00:02Z
-    closed: {}
-    connection:
-      local_address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 1000
-      remote_address:
-        socket_address:
-          address: 10.0.0.3
-          port_value: 50000
+    events:
+    - timestamp: 1970-01-01T00:00:02Z
+      closed: {}
+      connection:
+        local_address:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 1000
+        remote_address:
+          socket_address:
+            address: 10.0.0.3
+            port_value: 50000
 )EOF")));
   time_system_.setSystemTime(std::chrono::seconds(2));
   tapper_->closeSocket(Network::ConnectionEvent::RemoteClose);

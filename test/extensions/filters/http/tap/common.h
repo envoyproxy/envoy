@@ -36,7 +36,6 @@ public:
               (const));
   MOCK_METHOD(const Extensions::Common::Tap::Matcher&, rootMatcher, (), (const));
   MOCK_METHOD(bool, streaming, (), (const));
-  MOCK_METHOD(bool, shouldSendStreamedMsgByConfiguredSize, (), (const));
   MOCK_METHOD(TimeSource&, timeSource, (), (const));
 };
 

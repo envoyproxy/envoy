@@ -159,11 +159,6 @@ public:
   virtual uint32_t minStreamedSentBytes() const PURE;
 
   /**
-   * Return whether streamed msg should be sent by configured size
-   */
-  virtual bool shouldSendStreamedMsgByConfiguredSize() const PURE;
-
-  /**
    * Return a new match status vector that is correctly sized for the number of matchers that are in
    * the configuration.
    */

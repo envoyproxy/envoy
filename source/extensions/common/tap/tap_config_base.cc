@@ -68,7 +68,6 @@ TapConfigBaseImpl::TapConfigBaseImpl(const envoy::config::tap::v3::TapConfig& pr
     min_streamed_sent_bytes_ =
         std::max(proto_config.output_config().min_streamed_sent_bytes().value(),
                  DefaultMinStreamedSentBytes);
-    should_send_streamed_msg_by_configured_size_ = true;
   }
 
   switch (sink_type_) {

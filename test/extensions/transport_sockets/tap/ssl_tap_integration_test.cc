@@ -364,13 +364,10 @@ TEST_P(SslTapIntegrationTest, RequestWithStreamingDownstreamTapPegCounter) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_init_submit", 1);
-  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_read_submit", 1);
-  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_write_submit", 1);
-  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_close_submit", 1);
+  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.streamed_submit", 1);
   test_server_.reset();
 
-  // restore the value
+  // Restore the value.
   upstream_tap_ = local_upstream_tap;
   streaming_tap_ = local_streaming_tap_;
   pegging_counter_ = local_pegging_counter;
@@ -398,10 +395,10 @@ TEST_P(SslTapIntegrationTest, RequestWithBuffedDownstreamTapPegCounter) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.buffered_close_submit", 1);
+  test_server_->waitForCounterGe("transport.tap.tranTapPrefix.buffered_submit", 1);
   test_server_.reset();
 
-  // restore the value
+  // Restore the value.
   upstream_tap_ = local_upstream_tap;
   streaming_tap_ = local_streaming_tap_;
   pegging_counter_ = local_pegging_counter;
