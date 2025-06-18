@@ -144,16 +144,14 @@ public:
   }
 
   void startHeaderBlock() override {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.do_not_validate_http3_pseudo_headers")) {
+    if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.validate_http3_pseudo_headers")) {
       return;
     }
     header_validator_.StartHeaderBlock();
   }
 
   bool finishHeaderBlock(bool is_trailing_headers) override {
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.restart_features.do_not_validate_http3_pseudo_headers")) {
+    if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.validate_http3_pseudo_headers")) {
       return true;
     }
     if (is_trailing_headers) {

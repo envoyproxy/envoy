@@ -99,7 +99,7 @@ bug_fixes:
 
 - area: http3
   change: |
-    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.do_not_validate_http3_pseudo_headers`` to false.
+    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
