@@ -2,6 +2,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/lua/lua.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -239,6 +240,60 @@ void ProtobufConverterUtils::pushLuaArrayFromRepeatedField(
     }
     lua_rawset(state, -3);
   }
+}
+
+int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
+    lua_State* state, const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_metadata_map) {
+
+  // Get filter name from Lua argument
+  const absl::string_view filter_name = getStringViewFromLuaString(state, 2);
+
+  // Look up the typed metadata by filter name
+  const auto it = typed_metadata_map.find(std::string(filter_name));
+  if (it == typed_metadata_map.end()) {
+    // Return nil if the filter name is not found
+    lua_pushnil(state);
+    return 1;
+  }
+
+  // The typed metadata is stored as a ProtobufWkt::Any
+  const ProtobufWkt::Any& any_message = it->second;
+
+  // Extract the type name from the type URL
+  const std::string& type_url = any_message.type_url();
+  const size_t pos = type_url.find_last_of('/');
+  if (pos == std::string::npos || pos >= type_url.length() - 1) {
+    lua_pushnil(state);
+    return 1;
+  }
+  const absl::string_view type_name = absl::string_view(type_url).substr(pos + 1);
+
+  // Get the descriptor pool to find the message type
+  const auto* descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(std::string(type_name));
+
+  if (descriptor == nullptr) {
+    lua_pushnil(state);
+    return 1;
+  }
+
+  // Create a dynamic message and unpack the Any into it
+  Protobuf::DynamicMessageFactory factory;
+  const Protobuf::Message* prototype = factory.GetPrototype(descriptor);
+  if (prototype == nullptr) {
+    lua_pushnil(state);
+    return 1;
+  }
+
+  std::unique_ptr<Protobuf::Message> dynamic_message(prototype->New());
+  if (!any_message.UnpackTo(dynamic_message.get())) {
+    lua_pushnil(state);
+    return 1;
+  }
+
+  // Convert the unpacked message to Lua table
+  pushLuaTableFromMessage(state, *dynamic_message);
+  return 1;
 }
 
 } // namespace Lua
