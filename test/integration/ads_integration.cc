@@ -28,7 +28,7 @@ AdsIntegrationTest::AdsIntegrationTest()
                                          ? "GRPC"
                                          : "DELTA_GRPC")) {}
 
-AdsIntegrationTest::AdsIntegrationTest(const std::string config)
+AdsIntegrationTest::AdsIntegrationTest(const std::string& config)
     : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
                                     (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
