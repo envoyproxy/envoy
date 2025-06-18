@@ -2,9 +2,11 @@ syntax = "proto3";
 
 package envoy.extensions.upstreams.http.v3;
 
+import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
+import "envoy/type/v3/http_status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -174,4 +176,16 @@ message HttpProtocolOptions {
   // [#not-implemented-hide:]
   // [#extension-category: envoy.http.header_validators]
   config.core.v3.TypedExtensionConfig header_validation_config = 7;
+
+  message HttpEvents {
+    // Matcher for response headers.
+    config.common.matcher.v3.MatchPredicate match = 1 [(validate.rules).message = {required: true}];
+
+    // Code which should be reported to the outlier detection if response headers matched the matcher.
+    envoy.type.v3.StatusCode map_to = 2 [(validate.rules).enum = {defined_only: true}];
+  }
+
+  // List of matchers for response headers along with codes to be reported to outlier detection.
+  // The first matcher which returns matching success is applied.
+  repeated HttpEvents outlier_detection = 8;
 }
