@@ -191,8 +191,10 @@ absl::StatusOr<SubscriptionPtr> XdsManagerImpl::subscribeToSingleton(
   // If the resource name is not xDS-TP based, use the old subscription way.
   if (!XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
     if (!config.has_value()) {
-      return absl::InvalidArgumentError("Given subscrption must either have an xDS-TP based "
-                                        "resource or a config must be provided.");
+      return absl::InvalidArgumentError(
+          fmt::format("Given subscrption to resource {} must either have an xDS-TP based "
+                      "resource or a config must be provided.",
+                      resource_name));
     }
     return subscription_factory_->subscriptionFromConfigSource(*config, type_url, scope, callbacks,
                                                                resource_decoder, options);

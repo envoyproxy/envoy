@@ -24,6 +24,7 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
@@ -119,6 +120,25 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
       "Missing config source specifier in envoy::config::core::v3::ConfigSource");
+}
+
+// Exercise the path of subscription creation when no factory exists.
+TEST_F(SubscriptionFactoryTest, NoFactoryForSubscription) {
+  // Temporarily remove the config mux factories.
+  auto saved_factories = Registry::FactoryRegistry<ConfigSubscriptionFactory>::factories();
+  Registry::FactoryRegistry<ConfigSubscriptionFactory>::factories().clear();
+  Registry::InjectFactory<ConfigSubscriptionFactory>::resetTypeMappings();
+
+  envoy::config::core::v3::ConfigSource config;
+  // Validate subscriptionFromConfigSource.
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        subscriptionFromConfigSource(config), EnvoyException,
+        "Missing config source specifier in envoy::config::core::v3::ConfigSource");
+  }
+  // Restore the mux factories.
+  Registry::FactoryRegistry<ConfigSubscriptionFactory>::factories() = saved_factories;
+  Registry::InjectFactory<ConfigSubscriptionFactory>::resetTypeMappings();
 }
 
 // The API type AGGREGATED_GRPC is not supported at the moment. Validate that an
