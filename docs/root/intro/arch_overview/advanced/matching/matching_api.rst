@@ -86,7 +86,7 @@ are available in some contexts:
 
 .. _extension_envoy.matching.custom_matchers.domain_matcher:
 
-* :ref:`Trie-based server name matcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` applies to network inputs.
+* :ref:`Trie-based server name matcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` applies to network and HTTP inputs.
 
 * `Common Expression Language <https://github.com/google/cel-spec>`_ (CEL) based matching:
 

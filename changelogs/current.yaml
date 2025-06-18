@@ -243,6 +243,6 @@ new_features:
     HTTP filters, such as the Set Metadata filter, etc.
 - area: matcher
   change: |
-    added support for ``xds.type.matcher.v3.ServerNameMatcher`` trie-based matching.
+    added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
 
 deprecated:

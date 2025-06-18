@@ -648,6 +648,118 @@ on_no_match:
   }
 }
 
+// Test that when a more specific match (like "*.example.com") fails its inner condition,
+// we should fall back to less specific matches (like "*.com" or "*") rather than giving
+// up entirely.
+TEST_F(DomainMatcherTest, BacktrackingWhenInnerConditionsFail) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: domain_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
+      domain_matchers:
+      - domains:
+        - "api.example.com"
+        on_match:
+          matcher:
+            matcher_tree:
+              input:
+                name: nested_input
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
+              exact_match_map:
+                map:
+                  "fail_condition":
+                    action:
+                      name: test_action
+                      typed_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: exact_inner_match
+      - domains:
+        - "*.example.com"
+        on_match:
+          matcher:
+            matcher_tree:
+              input:
+                name: nested_input
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.BoolValue
+              exact_match_map:
+                map:
+                  "fail_condition":
+                    action:
+                      name: test_action
+                      typed_config:
+                        "@type": type.googleapis.com/google.protobuf.StringValue
+                        value: wildcard_specific_inner_match
+      - domains:
+        - "*.com"
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: wildcard_broad_match
+      - domains:
+        - "*"
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: global_wildcard_match
+on_no_match:
+  action:
+    name: test_action
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: no_match
+  )EOF";
+  loadConfig(yaml);
+
+  // Test successful exact match with inner condition success
+  {
+    auto domain_input = TestDataInputStringFactory("api.example.com");
+    auto nested_input = TestDataInputBoolFactory("fail_condition");
+    validateMatch("exact_inner_match");
+  }
+
+  // Test backtracking: exact match fails inner condition, falls back to wildcard match
+  {
+    auto domain_input = TestDataInputStringFactory("api.example.com");
+    auto nested_input =
+        TestDataInputBoolFactory("different_condition"); // This will cause exact match to fail
+    validateMatch("wildcard_broad_match");               // Should backtrack to *.com
+  }
+
+  // Test backtracking: wildcard specific match fails, falls back to broader wildcard
+  {
+    auto domain_input = TestDataInputStringFactory("test.example.com");
+    auto nested_input =
+        TestDataInputBoolFactory("different_condition"); // This will cause *.example.com to fail
+    validateMatch("wildcard_broad_match");               // Should backtrack to *.com
+  }
+
+  // Test backtracking: all specific matches fail, falls back to global wildcard
+  {
+    auto domain_input = TestDataInputStringFactory("test.other.org");
+    auto nested_input = TestDataInputBoolFactory("any_condition");
+    validateMatch("global_wildcard_match"); // Should backtrack to *
+  }
+
+  // Test successful wildcard specific match with inner condition success
+  {
+    auto domain_input = TestDataInputStringFactory("staging.example.com");
+    auto nested_input = TestDataInputBoolFactory("fail_condition");
+    validateMatch("wildcard_specific_inner_match");
+  }
+}
+
 TEST(DomainMatcherIntegrationTest, HttpMatchingData) {
   const std::string yaml = R"EOF(
 matcher_tree:

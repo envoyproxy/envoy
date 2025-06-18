@@ -45,7 +45,6 @@ envoy_cc_test(
 envoy_cc_test(
     name = "domain_matcher_test",
     srcs = ["domain_matcher_test.cc"],
-    rbe_pool = "6gig",
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/common/network:address_lib",

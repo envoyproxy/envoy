@@ -69,28 +69,65 @@ public:
       return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
     }
 
-    // Find best match using ServerNameMatcher specification algorithm
-    const auto best_match = findBestMatch(domain);
-    if (best_match) {
-      return MatchTree<DataType>::handleRecursionAndSkips(*best_match, data, skipped_match_cb);
+    // Get all candidates.
+    const auto candidates = findAllMatchCandidates(domain);
+
+    // Try candidates in order of priority with backtracking.
+    bool first_candidate = true;
+    for (const auto& candidate : candidates) {
+      // Track skipped results to detect keep_matching behavior.
+      size_t initial_skipped_count = 0;
+      SkippedMatchCb tracking_skipped_cb = nullptr;
+
+      if (skipped_match_cb && first_candidate) {
+        tracking_skipped_cb = [&initial_skipped_count, skipped_match_cb](
+                                  const ::Envoy::Matcher::ActionFactoryCb& action_cb) {
+          initial_skipped_count++;
+          skipped_match_cb(action_cb);
+        };
+      } else {
+        tracking_skipped_cb = skipped_match_cb;
+      }
+
+      MatchResult processed_match =
+          MatchTree<DataType>::handleRecursionAndSkips(*candidate, data, tracking_skipped_cb);
+
+      if (processed_match.isMatch() || processed_match.isInsufficientData()) {
+        return processed_match;
+      }
+
+      // If the first candidate (most specific match) returns NoMatch and adds skipped results,
+      // this indicates ``keep_matching`` behavior.
+      // Domain matcher cannot provide additional matches for the same domain, so we should
+      // stop here rather than trying less specific patterns.
+      if (first_candidate && processed_match.isNoMatch() && initial_skipped_count > 0) {
+        return processed_match;
+      }
+
+      first_candidate = false;
+      // No-match isn't definitive, so continue checking candidates for backtracking.
     }
 
     return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
 
 private:
-  // Try exact match first, then wildcards from longest to shortest suffix.
-  std::shared_ptr<OnMatch<DataType>> findBestMatch(absl::string_view domain) const {
+  // Find all match candidates in priority order for backtracking and return candidates ordered
+  // by ServerNameMatcher specification:
+  // Exact first, then wildcards from longest to shortest suffix, finally global wildcard.
+  std::vector<std::shared_ptr<OnMatch<DataType>>>
+  findAllMatchCandidates(absl::string_view domain) const {
+    std::vector<std::shared_ptr<OnMatch<DataType>>> candidates;
+
     // 1. Try exact match first (highest priority).
     const auto exact_it = exact_matches_.find(std::string(domain));
     if (exact_it != exact_matches_.end()) {
-      return exact_it->second.on_match_;
+      candidates.push_back(exact_it->second.on_match_);
     }
 
-    // 2. Try wildcard matches from longest suffix to shortest.
-    // For "www.example.com", try "*.example.com", then "*.com".
-    std::shared_ptr<OnMatch<DataType>> best_wildcard_match;
-    size_t best_wildcard_index = SIZE_MAX;
+    // 2. Collect wildcard matches from longest suffix to shortest.
+    // For "www.example.com", collect "*.example.com", then "*.com".
+    std::vector<std::pair<std::shared_ptr<OnMatch<DataType>>, size_t>> wildcard_candidates;
 
     size_t dot_pos = domain.find('.');
     while (dot_pos != absl::string_view::npos) {
@@ -99,22 +136,28 @@ private:
 
       const auto wildcard_it = wildcard_matches_.find(wildcard_pattern);
       if (wildcard_it != wildcard_matches_.end()) {
-        // Use declaration order for tie-breaking (earlier wins).
-        if (!best_wildcard_match || wildcard_it->second.declaration_index_ < best_wildcard_index) {
-          best_wildcard_match = wildcard_it->second.on_match_;
-          best_wildcard_index = wildcard_it->second.declaration_index_;
-        }
+        wildcard_candidates.emplace_back(wildcard_it->second.on_match_,
+                                         wildcard_it->second.declaration_index_);
       }
 
       dot_pos = domain.find('.', dot_pos + 1);
     }
 
-    if (best_wildcard_match) {
-      return best_wildcard_match;
+    // Sort wildcards by declaration order for tie-breaking (earlier declared wins).
+    std::sort(wildcard_candidates.begin(), wildcard_candidates.end(),
+              [](const auto& a, const auto& b) { return a.second < b.second; });
+
+    // Add sorted wildcard candidates to the main candidates list.
+    for (const auto& wildcard_candidate : wildcard_candidates) {
+      candidates.push_back(wildcard_candidate.first);
     }
 
-    // 3. Finally try global wildcard "*" (lowest priority).
-    return global_wildcard_match_;
+    // 3. Finally add global wildcard "*" (lowest priority).
+    if (global_wildcard_match_) {
+      candidates.push_back(global_wildcard_match_);
+    }
+
+    return candidates;
   }
 
   const DataInputPtr<DataType> data_input_;
