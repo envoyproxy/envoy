@@ -340,7 +340,7 @@ public:
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
+  virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
 
   /**
    * Returns true iff the given cluster name is known in the cluster-manager
