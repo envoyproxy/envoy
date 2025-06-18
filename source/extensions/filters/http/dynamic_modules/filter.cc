@@ -43,6 +43,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap& hea
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       config_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   in_continue_ = status == envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
+  request_headers_ = nullptr;
   return static_cast<FilterHeadersStatus>(status);
 };
 
@@ -66,6 +67,7 @@ FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap& 
       config_->on_http_filter_request_trailers_(thisAsVoidPtr(), in_module_filter_);
   in_continue_ =
       status == envoy_dynamic_module_type_on_http_filter_request_trailers_status_Continue;
+  request_trailers_ = nullptr;
   return static_cast<FilterTrailersStatus>(status);
 }
 
@@ -91,6 +93,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap& he
       config_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   in_continue_ =
       status == envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue;
+  response_headers_ = nullptr;
   return static_cast<FilterHeadersStatus>(status);
 };
 
@@ -120,6 +123,7 @@ FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&
       config_->on_http_filter_response_trailers_(thisAsVoidPtr(), in_module_filter_);
   in_continue_ =
       status == envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue;
+  response_trailers_ = nullptr;
   return static_cast<FilterTrailersStatus>(status);
 };
 

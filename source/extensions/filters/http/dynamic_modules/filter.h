@@ -60,6 +60,10 @@ public:
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
 
+  // They are only valid during the decodeHeaders/decodeTrailers/encodeHeaders/encodeTrailers
+  // callbacks. Usually, requestHeaders(), requestTrailers(), responseHeaders(), and
+  // responseTrailers() should be used instead. They are public only for testing purpose at the ABI
+  // level.
   RequestHeaderMap* request_headers_ = nullptr;
   RequestTrailerMap* request_trailers_ = nullptr;
   ResponseHeaderMap* response_headers_ = nullptr;
@@ -82,6 +86,58 @@ public:
     } else {
       return nullptr;
     }
+  }
+
+  RequestHeaderMapOptRef requestHeaders() {
+    if (request_headers_) {
+      return *request_headers_;
+    }
+    if (decoder_callbacks_) {
+      auto header = decoder_callbacks_->requestHeaders();
+      if (header.has_value()) {
+        return header;
+      }
+    }
+    return absl::nullopt;
+  }
+
+  RequestTrailerMapOptRef requestTrailers() {
+    if (request_trailers_) {
+      return *request_trailers_;
+    }
+    if (decoder_callbacks_) {
+      auto trailers = decoder_callbacks_->requestTrailers();
+      if (trailers.has_value()) {
+        return trailers;
+      }
+    }
+    return absl::nullopt;
+  }
+
+  ResponseHeaderMapOptRef responseHeaders() {
+    if (response_headers_) {
+      return *response_headers_;
+    }
+    if (encoder_callbacks_) {
+      auto headers = encoder_callbacks_->responseHeaders();
+      if (headers.has_value()) {
+        return headers;
+      }
+    }
+    return absl::nullopt;
+  }
+
+  ResponseTrailerMapOptRef responseTrailers() {
+    if (response_trailers_) {
+      return *response_trailers_;
+    }
+    if (encoder_callbacks_) {
+      auto trailers = encoder_callbacks_->responseTrailers();
+      if (trailers.has_value()) {
+        return trailers;
+      }
+    }
+    return absl::nullopt;
   }
 
   /**

@@ -609,6 +609,47 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
             "router config");
 }
 
+TEST(HttpFilter, HeaderMapGetter) {
+  DynamicModuleHttpFilter filter(nullptr);
+
+  EXPECT_EQ(absl::nullopt, filter.requestHeaders());
+  EXPECT_EQ(absl::nullopt, filter.requestTrailers());
+  EXPECT_EQ(absl::nullopt, filter.responseHeaders());
+  EXPECT_EQ(absl::nullopt, filter.responseTrailers());
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, requestHeaders()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(decoder_callbacks, requestTrailers()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(encoder_callbacks, responseHeaders()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(encoder_callbacks, responseTrailers()).WillOnce(testing::Return(absl::nullopt));
+
+  EXPECT_EQ(absl::nullopt, filter.requestHeaders());
+  EXPECT_EQ(absl::nullopt, filter.requestTrailers());
+  EXPECT_EQ(absl::nullopt, filter.responseHeaders());
+  EXPECT_EQ(absl::nullopt, filter.responseTrailers());
+
+  TestRequestHeaderMapImpl request_headers{{}};
+  TestResponseHeaderMapImpl response_headers{{}};
+  TestRequestTrailerMapImpl request_trailers{{}};
+  TestResponseTrailerMapImpl response_trailers{{}};
+  EXPECT_CALL(decoder_callbacks, requestHeaders())
+      .WillOnce(testing::Return(makeOptRef<Http::RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks, requestTrailers())
+      .WillOnce(testing::Return(makeOptRef<Http::RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks, responseHeaders())
+      .WillOnce(testing::Return(makeOptRef<Http::ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks, responseTrailers())
+      .WillOnce(testing::Return(makeOptRef<Http::ResponseTrailerMap>(response_trailers)));
+  EXPECT_EQ(request_headers, filter.requestHeaders().value());
+  EXPECT_EQ(request_trailers, filter.requestTrailers().value());
+  EXPECT_EQ(response_headers, filter.responseHeaders().value());
+  EXPECT_EQ(response_trailers, filter.responseTrailers().value());
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

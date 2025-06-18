@@ -749,6 +749,7 @@ TEST(ABIImpl, GetAttributes) {
   uint64_t result_number = 0;
 
   // envoy_dynamic_module_type_attribute_id_RequestPath with null headers map, should return false.
+  EXPECT_CALL(callbacks, requestHeaders()).WillOnce(testing::Return(absl::nullopt));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_str_ptr,
       &result_str_length));
