@@ -22,14 +22,21 @@ using testing::AssertionResult;
 namespace Envoy {
 
 AdsIntegrationTest::AdsIntegrationTest()
-    : AdsIntegrationTest(
+    : HttpIntegrationTest(
+          Http::CodecType::HTTP2, ipVersion(),
           ConfigHelper::adsBootstrap((sotwOrDelta() == Grpc::SotwOrDelta::Sotw) ||
                                              (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw)
                                          ? "GRPC"
-                                         : "DELTA_GRPC")) {}
+                                         : "DELTA_GRPC")) {
+  commonInitialize();
+}
 
 AdsIntegrationTest::AdsIntegrationTest(const std::string& config)
     : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion(), config) {
+  commonInitialize();
+}
+
+void AdsIntegrationTest::commonInitialize() {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.unified_mux",
                                     (sotwOrDelta() == Grpc::SotwOrDelta::UnifiedSotw ||
                                      sotwOrDelta() == Grpc::SotwOrDelta::UnifiedDelta)
