@@ -27,6 +27,8 @@ void DynamicModuleHttpFilter::destroy() {
   }
   config_->on_http_filter_destroy_(in_module_filter_);
   in_module_filter_ = nullptr;
+  decoder_callbacks_ = nullptr;
+  encoder_callbacks_ = nullptr;
   for (auto& callout : http_callouts_) {
     if (callout.second->request_) {
       callout.second->request_->cancel();
@@ -40,6 +42,7 @@ FilterHeadersStatus DynamicModuleHttpFilter::decodeHeaders(RequestHeaderMap& hea
   request_headers_ = &headers;
   const envoy_dynamic_module_type_on_http_filter_request_headers_status status =
       config_->on_http_filter_request_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
+  in_continue_ = status == envoy_dynamic_module_type_on_http_filter_request_headers_status_Continue;
   return static_cast<FilterHeadersStatus>(status);
 };
 
@@ -53,6 +56,7 @@ FilterDataStatus DynamicModuleHttpFilter::decodeData(Buffer::Instance& chunk, bo
   const envoy_dynamic_module_type_on_http_filter_request_body_status status =
       config_->on_http_filter_request_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   current_request_body_ = nullptr;
+  in_continue_ = status == envoy_dynamic_module_type_on_http_filter_request_body_status_Continue;
   return static_cast<FilterDataStatus>(status);
 };
 
@@ -60,16 +64,20 @@ FilterTrailersStatus DynamicModuleHttpFilter::decodeTrailers(RequestTrailerMap& 
   request_trailers_ = &trailers;
   const envoy_dynamic_module_type_on_http_filter_request_trailers_status status =
       config_->on_http_filter_request_trailers_(thisAsVoidPtr(), in_module_filter_);
+  in_continue_ =
+      status == envoy_dynamic_module_type_on_http_filter_request_trailers_status_Continue;
   return static_cast<FilterTrailersStatus>(status);
 }
 
 FilterMetadataStatus DynamicModuleHttpFilter::decodeMetadata(MetadataMap&) {
+  in_continue_ = true;
   return FilterMetadataStatus::Continue;
 }
 
 void DynamicModuleHttpFilter::decodeComplete() {}
 
 Filter1xxHeadersStatus DynamicModuleHttpFilter::encode1xxHeaders(ResponseHeaderMap&) {
+  in_continue_ = true;
   return Filter1xxHeadersStatus::Continue;
 }
 
@@ -81,6 +89,8 @@ FilterHeadersStatus DynamicModuleHttpFilter::encodeHeaders(ResponseHeaderMap& he
   response_headers_ = &headers;
   const envoy_dynamic_module_type_on_http_filter_response_headers_status status =
       config_->on_http_filter_response_headers_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
+  in_continue_ =
+      status == envoy_dynamic_module_type_on_http_filter_response_headers_status_Continue;
   return static_cast<FilterHeadersStatus>(status);
 };
 
@@ -97,6 +107,7 @@ FilterDataStatus DynamicModuleHttpFilter::encodeData(Buffer::Instance& chunk, bo
   const envoy_dynamic_module_type_on_http_filter_response_body_status status =
       config_->on_http_filter_response_body_(thisAsVoidPtr(), in_module_filter_, end_of_stream);
   current_response_body_ = nullptr;
+  in_continue_ = status == envoy_dynamic_module_type_on_http_filter_response_body_status_Continue;
   return static_cast<FilterDataStatus>(status);
 };
 
@@ -107,10 +118,13 @@ FilterTrailersStatus DynamicModuleHttpFilter::encodeTrailers(ResponseTrailerMap&
   response_trailers_ = &trailers;
   const envoy_dynamic_module_type_on_http_filter_response_trailers_status status =
       config_->on_http_filter_response_trailers_(thisAsVoidPtr(), in_module_filter_);
+  in_continue_ =
+      status == envoy_dynamic_module_type_on_http_filter_response_trailers_status_Continue;
   return static_cast<FilterTrailersStatus>(status);
 };
 
 FilterMetadataStatus DynamicModuleHttpFilter::encodeMetadata(MetadataMap&) {
+  in_continue_ = true;
   return FilterMetadataStatus::Continue;
 }
 
@@ -214,6 +228,27 @@ void DynamicModuleHttpFilter::HttpCalloutCallback::onFailure(
 
   // Clean up the callout.
   filter->http_callouts_.erase(callout_id);
+}
+
+void DynamicModuleHttpFilter::onScheduled(uint64_t event_id) {
+  // By the time this event is invoked, the filter might be destroyed.
+  if (in_module_filter_) {
+    config_->on_http_filter_scheduled_(thisAsVoidPtr(), in_module_filter_, event_id);
+  }
+}
+
+void DynamicModuleHttpFilter::continueDecoding() {
+  if (decoder_callbacks_ && !in_continue_) {
+    decoder_callbacks_->continueDecoding();
+    in_continue_ = true;
+  }
+}
+
+void DynamicModuleHttpFilter::continueEncoding() {
+  if (encoder_callbacks_ && !in_continue_) {
+    encoder_callbacks_->continueEncoding();
+    in_continue_ = true;
+  }
 }
 
 } // namespace HttpFilters
