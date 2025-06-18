@@ -2034,16 +2034,17 @@ TEST_F(HttpRateLimitFilterTest, FailureModeRuntimeZeroPercentFailsOpen) {
       featureEnabled(absl::string_view("test.ratelimit.failure_mode_deny_percent"),
                      testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0))))
       .WillOnce(testing::Return(false));
-  
+
   setUpTest(failure_mode_runtime_zero_percent_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
-      .WillOnce(WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -2051,12 +2052,11 @@ TEST_F(HttpRateLimitFilterTest, FailureModeRuntimeZeroPercentFailsOpen) {
   EXPECT_CALL(filter_callbacks_, continueDecoding());
 
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
-                              nullptr, "", nullptr);
+                               nullptr, "", nullptr);
 
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
-                    ->statsScope()
-                    .counterFromStatName(ratelimit_error_)
-                    .value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_error_).value());
   EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromStatName(ratelimit_failure_mode_allowed_)
@@ -2070,16 +2070,17 @@ TEST_F(HttpRateLimitFilterTest, FailureModeRuntimeHundredPercentFailsClose) {
       featureEnabled(absl::string_view("test.ratelimit.failure_mode_deny_percent"),
                      testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(100))))
       .WillOnce(testing::Return(true));
-  
+
   setUpTest(failure_mode_runtime_hundred_percent_config_);
   InSequence s;
 
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
   EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
-      .WillOnce(WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-        request_callbacks_ = &callbacks;
-      })));
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
@@ -2094,12 +2095,11 @@ TEST_F(HttpRateLimitFilterTest, FailureModeRuntimeHundredPercentFailsClose) {
       }));
 
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr,
-                              nullptr, "", nullptr);
+                               nullptr, "", nullptr);
 
-  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
-                    ->statsScope()
-                    .counterFromStatName(ratelimit_error_)
-                    .value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(ratelimit_error_).value());
   EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
                     ->statsScope()
                     .counterFromStatName(ratelimit_failure_mode_allowed_)
