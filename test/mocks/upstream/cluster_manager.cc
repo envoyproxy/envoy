@@ -32,6 +32,7 @@ MockClusterManager::MockClusterManager()
                     OptRef<xds::core::v3::ResourceLocator>,
                     ProtobufMessage::ValidationVisitor&) { return MockOdCdsApiHandle::create(); }));
   ON_CALL(*this, addOrUpdateCluster(_, _, _)).WillByDefault(Return(false));
+  ON_CALL(*this, hasActiveClusters()).WillByDefault(Return(false));
 }
 
 MockClusterManager::~MockClusterManager() = default;
@@ -61,6 +62,7 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
       .WillByDefault(Invoke([this](const std::string& cluster_name) -> bool {
         return active_clusters_.find(cluster_name) != active_clusters_.end();
       }));
+  ON_CALL(*this, hasActiveClusters()).WillByDefault(Return(!active_cluster_names.empty()));
 }
 
 void MockClusterManager::initializeThreadLocalClusters(
