@@ -423,14 +423,10 @@ FilterConfig::FilterConfig(
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
-      csrf_token_expires_in_(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config,
-                                          csrf_token_expires_in,
-                                          DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
-      code_verifier_token_expires_in_(
-          PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config,
-                                          code_verifier_token_expires_in,
-                                          DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
+      csrf_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, csrf_token_expires_in,
+                                                             DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
+      code_verifier_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+          proto_config, code_verifier_token_expires_in, DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -803,8 +799,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
     // Generate a CSRF token to prevent CSRF attacks.
     csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
 
-    const std::chrono::seconds csrf_token_expires_in =
-        config_->getCsrfTokenExpiresIn();
+    const std::chrono::seconds csrf_token_expires_in = config_->getCsrfTokenExpiresIn();
     std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
 
     std::string same_site = getSameSiteString(config_->nonceCookieSettings().same_site_);

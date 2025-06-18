@@ -163,9 +163,7 @@ public:
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
   }
-  std::chrono::seconds getCsrfTokenExpiresIn() const {
-    return csrf_token_expires_in_;
-  }
+  std::chrono::seconds getCsrfTokenExpiresIn() const { return csrf_token_expires_in_; }
   std::chrono::seconds getCodeVerifierTokenExpiresIn() const {
     return code_verifier_token_expires_in_;
   }

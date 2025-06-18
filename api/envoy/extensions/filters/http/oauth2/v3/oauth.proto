@@ -246,7 +246,7 @@ message OAuth2Config {
   // Optional expiration time for the CSRF protection token cookie.
   // The CSRF token prevents cross-site request forgery attacks during the OAuth2 flow.
   // If not specified, defaults to ``600s`` (10 minutes), which should provide sufficient time
-  // for users to complete the OAuth2 authorization flow. 
+  // for users to complete the OAuth2 authorization flow.
   google.protobuf.Duration csrf_token_expires_in = 24;
 
   // Optional expiration time for the code verifier cookie.

@@ -458,11 +458,11 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
 
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
@@ -532,11 +532,11 @@ TEST_F(OAuth2Test, CustomCsrfTokenExpiresIn) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           std::to_string(custom_csrf_token_expires_in) + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN +
+           ";path=/;Max-Age=" + std::to_string(custom_csrf_token_expires_in) + ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -599,8 +599,8 @@ TEST_F(OAuth2Test, CustomCodeVerifierTokenExpiresIn) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
            std::to_string(custom_code_verifier_token_expires_in) + ";secure;HttpOnly"},
@@ -659,11 +659,11 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -719,11 +719,11 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -982,11 +982,11 @@ TEST_F(OAuth2Test, SetBearerToken) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().Cookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1055,11 +1055,11 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1089,11 +1089,11 @@ TEST_F(OAuth2Test, OAuthErrorNonOAuthHttpCallback) {
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().Cookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
       {Http::Headers::get().Scheme.get(), "https"},
@@ -1186,11 +1186,11 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthentication) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().Cookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1219,11 +1219,11 @@ TEST_F(OAuth2Test, OAuthCallbackWithInvalidCodeVerifierCookie) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().Cookie.get(),
-       "CodeVerifier=" + invalid_encrypted_code_verifier + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + invalid_encrypted_code_verifier +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1249,8 +1249,8 @@ TEST_F(OAuth2Test, OAuthCallbackWithoutCodeVerifierCookie) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + TEST_ENCODED_STATE},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1280,8 +1280,8 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationNoCsrfToken) {
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_without_csrf_token},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1314,8 +1314,8 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTokenWithoutDot) 
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_csrf_token},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + invalid_csrf_token_cookie + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + invalid_csrf_token_cookie +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1348,8 +1348,8 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationInvalidCsrfTokenInvalidHmac)
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_oauth?code=123&state=" + state_with_invalid_csrf_token},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + invalid_csrf_token_cookie + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + invalid_csrf_token_cookie +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1385,8 +1385,8 @@ TEST_F(OAuth2Test, OAuthCallbackStartsAuthenticationMalformedState) {
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=" + state_with_invalid_csrf_token_json},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
       {Http::Headers::get().Scheme.get(), "https"},
       {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
@@ -1425,11 +1425,11 @@ TEST_F(OAuth2Test, RedirectToOAuthServerWithInvalidCSRFToken) {
   Http::TestResponseHeaderMapImpl response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1947,11 +1947,11 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -1983,11 +1983,11 @@ TEST_F(OAuth2Test, OAuthTestFullFlowPostWithSpecialCharactersForJson) {
   // This represents the callback request from the authorization server.
   Http::TestRequestHeaderMapImpl second_request_headers{
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().Cookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Path.get(),
        "/_oauth?code=123&state=" + test_encoded_state_with_special_characters},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -2731,11 +2731,11 @@ TEST_F(OAuth2Test, OAuthTestFullFlowWithUseRefreshToken) {
   Http::TestResponseHeaderMapImpl first_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -2922,11 +2922,11 @@ TEST_F(OAuth2Test, OAuthTestRefreshAccessTokenFail) {
   Http::TestResponseHeaderMapImpl redirect_response_headers{
       {Http::Headers::get().Status.get(), "302"},
       {Http::Headers::get().SetCookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
-       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER +
+           ";path=/;Max-Age=" + TEST_DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN + ";secure;HttpOnly"},
       {Http::Headers::get().Location.get(),
        "https://auth.example.com/oauth/"
        "authorize/?client_id=" +
@@ -3476,8 +3476,8 @@ TEST_F(OAuth2Test, CookiesDeletedWhenTokensCleared) {
       {Http::Headers::get().Cookie.get(),
        "RefreshToken=some-refresh-token;path=/;Max-Age=604800;secure;HttpOnly;SameSite=Lax"},
       {Http::Headers::get().Cookie.get(),
-       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" +
-           TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN + ";secure;HttpOnly;SameSite=Strict"},
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=" + TEST_DEFAULT_CSRF_TOKEN_EXPIRES_IN +
+           ";secure;HttpOnly;SameSite=Strict"},
   };
 
   EXPECT_CALL(*validator_, setParams(_, _));
