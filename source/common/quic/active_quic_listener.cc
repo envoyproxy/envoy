@@ -95,8 +95,9 @@ ActiveQuicListener::ActiveQuicListener(
   }
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
-      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, enable_black_hole_avoidance_via_flow_label_, parent, *config_, stats_,
-      per_worker_stats_, dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
+      std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength,
+      enable_black_hole_avoidance_via_flow_label_, parent, *config_, stats_, per_worker_stats_,
+      dispatcher, listen_socket_, quic_stat_names, crypto_server_stream_factory_,
       *connection_id_generator_, debug_visitor_factory);
 
   // Create udp_packet_writer
@@ -426,9 +427,9 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
 
   return createActiveQuicListener(
       runtime, worker_index, concurrency_, dispatcher, parent, std::move(listen_socket_ptr), config,
-      quic_config_, kernel_worker_routing_, enable_black_hole_avoidance_via_flow_label_, enabled_, quic_stat_names_,
-      packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
-      proof_source_factory_.value(),
+      quic_config_, kernel_worker_routing_, enable_black_hole_avoidance_via_flow_label_, enabled_,
+      quic_stat_names_, packets_to_read_to_connection_count_ratio_,
+      crypto_server_stream_factory_.value(), proof_source_factory_.value(),
       quic_cid_generator_factory_->createQuicConnectionIdGenerator(worker_index));
 }
 Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -445,7 +446,8 @@ ActiveQuicListenerFactory::createActiveQuicListener(
     QuicConnectionIdGeneratorPtr&& cid_generator) {
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
-      listener_config, quic_config, kernel_worker_routing, enable_black_hole_avoidance_via_flow_label, enabled, quic_stat_names,
+      listener_config, quic_config, kernel_worker_routing,
+      enable_black_hole_avoidance_via_flow_label, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
       std::move(cid_generator), worker_selector_,
       makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_);
