@@ -86,13 +86,13 @@ void IpTagsProvider::updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(
   tags_ = new_tags;
 }
 
-std::shared_ptr<IpTagsProvider> IpTagsRegistrySingleton::getOrCreateProvider(
+absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
     const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
     uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
     IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
-    Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton,
-    absl::Status& creation_status) {
+    Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
   std::shared_ptr<IpTagsProvider> ip_tags_provider;
+  absl::Status creation_status = absl::OkStatus();
   const uint64_t key = std::hash<std::string>()(ip_tags_datasource.filename());
   absl::MutexLock lock(&mu_);
   auto it = ip_tags_registry_.find(key);
@@ -110,6 +110,9 @@ std::shared_ptr<IpTagsProvider> IpTagsRegistrySingleton::getOrCreateProvider(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
         reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
     ip_tags_registry_[key] = ip_tags_provider;
+  }
+  if (!creation_status.ok()) {
+    return creation_status;
   }
   return ip_tags_provider;
 }
@@ -257,12 +260,16 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     }
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
-    provider_ = ip_tags_registry_->getOrCreateProvider(
+    auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
         ip_tags_refresh_interval_ms, [this]() { incIpTagsReloadSuccess(); },
-        [this]() { incIpTagsReloadError(); }, api, tls, dispatcher, ip_tags_registry_,
-        creation_status);
-    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+        [this]() { incIpTagsReloadError(); }, api, tls, dispatcher, ip_tags_registry_);
+    if (provider_or_error.status().ok()) {
+      provider_ = provider_or_error.value();
+    } else {
+      creation_status = provider_or_error.status();
+      return;
+    }
     if (provider_ && provider_->ipTags()) {
       trie_ = provider_->ipTags();
     } else {
