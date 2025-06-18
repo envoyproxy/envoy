@@ -1211,7 +1211,6 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
-  const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const std::chrono::milliseconds timeout_;
   const OptionalTimeouts optional_timeouts_;

@@ -45,6 +45,7 @@ envoy_cc_library(
         ":retry_state_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
+        ":header_cluster_specifier_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
@@ -508,5 +509,15 @@ envoy_cc_library(
     deps = [
         "//envoy/router:router_interface",
         "//source/common/config:metadata_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_cluster_specifier_lib",
+    srcs = ["header_cluster_specifier.cc"],
+    hdrs = ["header_cluster_specifier.h"],
+    deps = [
+        "//envoy/router:cluster_specifier_plugin_interface",
+        ":delegating_route_lib",
     ],
 )
