@@ -89,6 +89,7 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
     // MessageConverter uses an empty StreamMessage to denote the end.
     if (stream_message->message() == nullptr) {
       // Expect end_stream=true when the MessageConverter signals an stream end.
+      std::cout << "Entered stream_message->message() == null\n";
       ASSERT(end_stream);
 
       // Expect message_data->isFinalMessage()=true when the MessageConverter signals an stream end.
