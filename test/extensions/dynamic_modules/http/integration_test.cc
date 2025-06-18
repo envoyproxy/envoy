@@ -383,7 +383,6 @@ TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
                          .get(Http::LowerCaseString("on-scheduled"))[0]
                          ->value()
                          .getStringView());
-    // Check that the cache key is set in the request trailers.
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());

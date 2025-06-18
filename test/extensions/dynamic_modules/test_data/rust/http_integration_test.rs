@@ -647,12 +647,10 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
       0 => {
         // Ensure that it is possible to set response headers on the generic scheduled event.
         envoy_filter.set_request_header("on-scheduled", b"req");
-        // This means the cache key was not found, so we continue decoding.
         envoy_filter.continue_decoding();
       },
       // Event from the on_scheduled when the cache key was found.
       1 => {
-        // This means the cache key was found, so we continue encoding.
         let result = self.rx.take().unwrap().recv().unwrap();
         envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()));
       },
@@ -660,7 +658,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
       2 => {
         // Ensure that it is possible to set response headers on the generic scheduled event.
         envoy_filter.set_response_header("on-scheduled", b"res");
-        // This means the cache key was not found, so we continue encoding.
         envoy_filter.continue_encoding();
       },
       _ => unreachable!(),
