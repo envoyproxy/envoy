@@ -510,6 +510,23 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   codec_client_->close();
 }
 
+// Test to ensure code coverage of the flag codepath.
+TEST_P(QuicHttpIntegrationTest, DoNotValidatePseudoHeaders) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.do_not_validate_http3_pseudo_headers", "true");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  codec_client_->close();
+}
+
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
 
