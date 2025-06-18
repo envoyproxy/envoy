@@ -284,7 +284,7 @@ public:
                                       *api_, tls_, *dispatcher_, validation_visitor_);
     if (expected_error.has_value()) {
       EXPECT_FALSE(config_or.ok());
-      EXPECT_EQ(expected_error.value(), absl::StrCat(config_or.status()));
+      EXPECT_TRUE(absl::StrContains(absl::StrCat(config_or.status()), expected_error.value()));
       return;
     }
     EXPECT_TRUE(config_or.ok());
@@ -388,6 +388,28 @@ ip_tags_file_provider:
 )EOF";
   initializeFilter(config_yaml, "INVALID_ARGUMENT: Unsupported file format, unable to parse ip "
                                 "tags from file /test/tags.csv");
+}
+
+TEST_F(IpTaggingFilterTest, InvalidYamlFile) {
+  const std::string config_yaml = R"EOF(
+ request_type: internal
+ ip_tags_file_provider:
+  ip_tags_datasource:
+    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.yaml"
+ )EOF";
+  initializeFilter(config_yaml, "INVALID_ARGUMENT: failed to parse ip tags file as yaml: Unable to "
+                                "convert YAML as JSON: ip_tags");
+}
+
+TEST_F(IpTaggingFilterTest, InvalidJsonFile) {
+  const std::string config_yaml = R"EOF(
+ request_type: internal
+ ip_tags_file_provider:
+  ip_tags_datasource:
+    filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.json"
+ )EOF";
+  initializeFilter(config_yaml, "INVALID_ARGUMENT: invalid JSON in "
+                                "envoy.extensions.filters.http.ip_tagging.v3.IPTagging.IPTagFile");
 }
 
 TEST_F(IpTaggingFilterTest, InvalidCidr) {
