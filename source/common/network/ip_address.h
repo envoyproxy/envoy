@@ -14,7 +14,8 @@ public:
       : Address::InstanceAccessor(address) {}
 
   absl::optional<std::string> serializeAsString() const override {
-    return getIp() ? absl::make_optional(getIp()->asString()) : absl::nullopt;
+    const auto ip = getIp();
+    return ip ? absl::make_optional(ip->asString()) : absl::nullopt;
   }
   static const std::string& key();
 };

@@ -19,8 +19,8 @@ The following lists the filter state object keys used by the Envoy extensions:
   names as a constructor.
 
 ``envoy.network.ip``
-  Shared Filter State object that can be used to create an IP address.
-  Accepts an `IP` string as a constructor.
+  Shared Filter State object used to create an IP address.
+  Accepts both `IPv4`` and `IPv6` string as a constructor.
 
 ``envoy.tcp_proxy.cluster``
   :ref:`TCP proxy <config_network_filters_tcp_proxy>` dynamic cluster name selection on a per-connection basis. Accepts
