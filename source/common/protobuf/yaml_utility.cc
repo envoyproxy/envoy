@@ -113,6 +113,20 @@ void jsonConvertInternal(const Protobuf::Message& source,
   MessageUtil::loadFromJson(json, dest, validation_visitor);
 }
 
+absl::Status jsonConvertInternalNoThrow(const Protobuf::Message& source,
+                                        ProtobufMessage::ValidationVisitor& validation_visitor,
+                                        Protobuf::Message& dest) {
+  absl::Status conversion_status = absl::OkStatus();
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  std::string json;
+  conversion_status = Protobuf::util::MessageToJsonString(source, &json, json_options);
+  if (conversion_status.ok()) {
+    MessageUtil::loadFromJson(json, dest, validation_visitor);
+  }
+  return conversion_status;
+}
+
 } // namespace
 
 void MessageUtil::loadFromJson(absl::string_view json, Protobuf::Message& message,
@@ -171,15 +185,46 @@ void MessageUtil::loadFromJson(absl::string_view json, ProtobufWkt::Struct& mess
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               bool is_custom_thread) {
-  ProtobufWkt::Value value = ValueUtil::loadFromYaml(yaml, is_custom_thread);
+                               ProtobufMessage::ValidationVisitor& validation_visitor) {
+  ProtobufWkt::Value value = ValueUtil::loadFromYaml(yaml);
   if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
       value.kind_case() == ProtobufWkt::Value::kListValue) {
     jsonConvertInternal(value, validation_visitor, message);
     return;
   }
   throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
+}
+
+absl::Status
+MessageUtil::loadFromYamlNoThrow(const std::string& yaml, Protobuf::Message& message,
+                                 ProtobufMessage::ValidationVisitor& validation_visitor) {
+  absl::Status load_status = absl::OkStatus();
+  ProtobufWkt::Value value;
+  TRY_NEEDS_AUDIT { value = parseYamlNode(YAML::Load(yaml)); }
+  END_TRY
+  catch (YAML::ParserException& e) {
+    load_status = absl::InvalidArgumentError(fmt::format("Failed to parse yaml: {}", e.what()));
+  }
+  catch (YAML::BadConversion& e) {
+    load_status =
+        absl::InvalidArgumentError(fmt::format("Failed to convert to yaml: {}", e.what()));
+  }
+  catch (std::exception& e) {
+    // There is a potentially wide space of exceptions thrown by the YAML parser,
+    // and enumerating them all may be difficult. Envoy doesn't work well with
+    // unhandled exceptions, so we capture them and record the exception name in
+    // the status.
+    load_status =
+        absl::InvalidArgumentError(fmt::format("Unexpected YAML exception: {}", e.what()));
+  }
+  if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
+      value.kind_case() == ProtobufWkt::Value::kListValue) {
+    load_status = jsonConvertInternalNoThrow(value, validation_visitor, message);
+  } else {
+    load_status =
+        absl::InvalidArgumentError(fmt::format("Unable to convert YAML as JSON: {}", yaml));
+  }
+  return load_status;
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,
@@ -278,40 +323,21 @@ bool MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt:
   return false;
 }
 
-ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml, bool is_custom_thread) {
-  // If this is a custom (not main, worker or test) thread, skip macro validation.
-  if (is_custom_thread) {
-    TRY_NEEDS_AUDIT { return parseYamlNode(YAML::Load(yaml)); }
-    END_TRY
-    catch (YAML::ParserException& e) {
-      throw EnvoyException(e.what());
-    }
-    catch (YAML::BadConversion& e) {
-      throw EnvoyException(e.what());
-    }
-    catch (std::exception& e) {
-      // There is a potentially wide space of exceptions thrown by the YAML parser,
-      // and enumerating them all may be difficult. Envoy doesn't work well with
-      // unhandled exceptions, so we capture them and record the exception name in
-      // the Envoy Exception text.
-      throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
-    }
-  } else {
-    TRY_ASSERT_MAIN_THREAD { return parseYamlNode(YAML::Load(yaml)); }
-    END_TRY
-    catch (YAML::ParserException& e) {
-      throw EnvoyException(e.what());
-    }
-    catch (YAML::BadConversion& e) {
-      throw EnvoyException(e.what());
-    }
-    catch (std::exception& e) {
-      // There is a potentially wide space of exceptions thrown by the YAML parser,
-      // and enumerating them all may be difficult. Envoy doesn't work well with
-      // unhandled exceptions, so we capture them and record the exception name in
-      // the Envoy Exception text.
-      throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
-    }
+ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {
+  TRY_ASSERT_MAIN_THREAD { return parseYamlNode(YAML::Load(yaml)); }
+  END_TRY
+  catch (YAML::ParserException& e) {
+    throw EnvoyException(e.what());
+  }
+  catch (YAML::BadConversion& e) {
+    throw EnvoyException(e.what());
+  }
+  catch (std::exception& e) {
+    // There is a potentially wide space of exceptions thrown by the YAML parser,
+    // and enumerating them all may be difficult. Envoy doesn't work well with
+    // unhandled exceptions, so we capture them and record the exception name in
+    // the Envoy Exception text.
+    throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
   }
 }
 

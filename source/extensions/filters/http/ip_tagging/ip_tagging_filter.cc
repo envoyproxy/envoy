@@ -146,13 +146,10 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
     IpTagFileProto ip_tags_proto;
     auto new_data = data_source_provider_->data();
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
-      TRY_NEEDS_AUDIT {
-        MessageUtil::loadFromYaml(new_data, ip_tags_proto, validation_visitor_,
-                                  true /*is_custom_thread*/);
-      }
-      END_TRY catch (EnvoyException& ex) {
-        return absl::InvalidArgumentError(
-            fmt::format("failed to parse ip tags file as yaml: {}", ex.what()));
+      auto load_status =
+          MessageUtil::loadFromYamlNoThrow(new_data, ip_tags_proto, validation_visitor_);
+      if (!load_status.ok()) {
+        return load_status;
       }
     } else if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Json)) {
       bool has_unknown_field;

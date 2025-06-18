@@ -397,8 +397,7 @@ TEST_F(IpTaggingFilterTest, InvalidYamlFile) {
   ip_tags_datasource:
     filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.yaml"
  )EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: failed to parse ip tags file as yaml: Unable to "
-                                "convert YAML as JSON: ip_tags");
+  initializeFilter(config_yaml, "INVALID_ARGUMENT: Unable to convert YAML as JSON: ip_tags");
 }
 
 TEST_F(IpTaggingFilterTest, InvalidJsonFile) {
