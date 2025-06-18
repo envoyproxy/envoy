@@ -408,8 +408,7 @@ TEST_F(IpTaggingFilterTest, InvalidJsonFile) {
   ip_tags_datasource:
     filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/invalid_tags.json"
  )EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: invalid JSON in "
-                                "envoy.extensions.filters.http.ip_tagging.v3.IPTagging.IPTagFile");
+  initializeFilter(config_yaml, "INVALID_ARGUMENT: invalid JSON");
 }
 
 TEST_F(IpTaggingFilterTest, InvalidCidr) {
