@@ -219,6 +219,7 @@ type DecoderFilterCallbacks interface {
 	// 3. When set invalid host, strict mode with retry, when first request with invalid host failed 503, the second request will retry with the valid host, then the second request will succeed and finally return 200.
 	//
 	// The function takes two arguments:
+	//
 	// host (string): The upstream host address to use for the request. This must be a valid IP address(with port); otherwise, the
 	// C++ side will throw an error.
 	//
