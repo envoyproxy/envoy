@@ -51,7 +51,7 @@ protected:
         : dns_name_(dns_name), dns_lookup_family_(dns_lookup_family), callback_(callback) {}
 
     void cancel(CancelReason) override {
-      ENVOY_LOG(debug, "cancelling query [{}]", dns_name_);
+      ENVOY_LOG(trace, "cancelling query [{}]", dns_name_);
       absl::MutexLock lock(&mutex_);
       cancelled_ = true;
     }
