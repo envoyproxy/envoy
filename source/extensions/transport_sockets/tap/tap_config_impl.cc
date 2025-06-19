@@ -94,8 +94,8 @@ void PerSocketTapperImpl::initStreamingEvent(envoy::data::tap::v3::SocketEvent& 
   }
 }
 
-void PerSocketTapperImpl::pegSubmitCounter(const bool isStreaming) {
-  if (isStreaming) {
+void PerSocketTapperImpl::pegSubmitCounter(const bool is_streaming) {
+  if (is_streaming) {
     stats_.streamed_submit_.inc();
   } else {
     stats_.buffered_submit_.inc();
@@ -107,23 +107,23 @@ bool PerSocketTapperImpl::shouldSendStreamedMsgByConfiguredSize() const {
 }
 
 void PerSocketTapperImpl::handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
-                                                                    const uint32_t totalBytes,
-                                                                    const bool isRead,
-                                                                    const bool isEndStream) {
+                                                                    const uint32_t total_bytes,
+                                                                    const bool is_read,
+                                                                    const bool is_end_stream) {
   makeStreamedTraceIfNeeded();
   auto& event =
       *streamed_trace_->mutable_socket_streamed_trace_segment()->mutable_events()->add_events();
   initStreamingEvent(event);
   uint32_t buffer_start_offset = 0;
-  if (isRead) {
-    buffer_start_offset = data.length() - totalBytes;
-    TapCommon::Utility::addBufferToProtoBytes(*event.mutable_read()->mutable_data(), totalBytes,
-                                              data, buffer_start_offset, totalBytes);
+  if (is_read) {
+    buffer_start_offset = data.length() - total_bytes;
+    TapCommon::Utility::addBufferToProtoBytes(*event.mutable_read()->mutable_data(), total_bytes,
+                                              data, buffer_start_offset, total_bytes);
     current_streamed_rx_tx_bytes_ += event.read().data().as_bytes().size();
   } else {
-    event.mutable_write()->set_end_stream(isEndStream);
-    TapCommon::Utility::addBufferToProtoBytes(*event.mutable_write()->mutable_data(), totalBytes,
-                                              data, buffer_start_offset, totalBytes);
+    event.mutable_write()->set_end_stream(is_end_stream);
+    TapCommon::Utility::addBufferToProtoBytes(*event.mutable_write()->mutable_data(), total_bytes,
+                                              data, buffer_start_offset, total_bytes);
     current_streamed_rx_tx_bytes_ += event.write().data().as_bytes().size();
   }
 
