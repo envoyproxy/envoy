@@ -781,38 +781,32 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
   case envoy_dynamic_module_type_attribute_id_RequestUrlPath: {
     RequestHeaderMapOptRef headers = filter->requestHeaders();
     if (headers.has_value()) {
-      const auto values = headers->get(Envoy::Http::Headers::get().Path);
-      if (!values.empty()) {
-        const absl::string_view path = headers->getPathValue();
-        size_t query_offset = path.find('?');
-        if (query_offset == absl::string_view::npos) {
-          *result = const_cast<char*>(path.data());
-          *result_length = path.size();
-        } else {
-          const auto url_path = path.substr(0, query_offset);
-          *result = const_cast<char*>(url_path.data());
-          *result_length = url_path.length();
-        }
-        ok = true;
+      const absl::string_view path = headers->getPathValue();
+      size_t query_offset = path.find('?');
+      if (query_offset == absl::string_view::npos) {
+        *result = const_cast<char*>(path.data());
+        *result_length = path.size();
+      } else {
+        const auto url_path = path.substr(0, query_offset);
+        *result = const_cast<char*>(url_path.data());
+        *result_length = url_path.length();
       }
+      ok = true;
     }
     break;
   }
   case envoy_dynamic_module_type_attribute_id_RequestQuery: {
     RequestHeaderMapOptRef headers = filter->requestHeaders();
     if (headers.has_value()) {
-      const auto values = headers->get(Envoy::Http::Headers::get().Path);
-      if (!values.empty()) {
-        const absl::string_view path = headers->getPathValue();
-        size_t query_offset = path.find('?');
-        if (query_offset != absl::string_view::npos) {
-          auto query = path.substr(query_offset + 1);
-          const auto fragment_offset = query.find('#');
-          query = query.substr(0, fragment_offset);
-          *result = const_cast<char*>(query.data());
-          *result_length = query.length();
-          ok = true;
-        }
+      const absl::string_view path = headers->getPathValue();
+      size_t query_offset = path.find('?');
+      if (query_offset != absl::string_view::npos) {
+        auto query = path.substr(query_offset + 1);
+        const auto fragment_offset = query.find('#');
+        query = query.substr(0, fragment_offset);
+        *result = const_cast<char*>(query.data());
+        *result_length = query.length();
+        ok = true;
       }
     }
     break;
