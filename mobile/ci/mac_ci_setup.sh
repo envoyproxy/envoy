@@ -12,7 +12,7 @@ set -e
 export HOMEBREW_NO_AUTO_UPDATE=1
 RETRY_ATTEMPTS=10
 RETRY_INTERVAL=3
-XCODE_VERSION=15.3
+XCODE_VERSION=16.1
 
 function retry () {
     local returns=1 i=1
