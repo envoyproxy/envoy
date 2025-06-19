@@ -379,9 +379,16 @@ TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
     auto response = std::move(encoder_decoder.second);
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, true);
+    EXPECT_EQ("req", upstream_request_->headers()
+                         .get(Http::LowerCaseString("on-scheduled"))[0]
+                         ->value()
+                         .getStringView());
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ(
+        "res",
+        response->headers().get(Http::LowerCaseString("on-scheduled"))[0]->value().getStringView());
     EXPECT_TRUE(response->body().empty());
   }
   // Existing cache key should return 200 OK with body and shouldn't reach the upstream.
