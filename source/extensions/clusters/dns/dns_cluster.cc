@@ -165,11 +165,8 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       // Strict DNS clusters must ensure that the priority for all localities
       // are set to zero when using zone-aware routing. Zone-aware routing only
       // works for localities with priority zero (the highest).
-      const auto validation = validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
-      if (!validation.ok()) {
-        creation_status = validation;
-        return;
-      }
+      SET_AND_RETURN_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint),
+                               creation_status);
     }
   }
 
@@ -260,10 +257,10 @@ bool DnsClusterImpl::ResolveTarget::isSuccessfulResponse(
   }
 }
 
-StatusOr<DnsClusterImpl::ResolveTarget::NewHosts>
+absl::StatusOr<DnsClusterImpl::ResolveTarget::ParsedHosts>
 DnsClusterImpl::ResolveTarget::createLogicalDnsHosts(
     const std::list<Network::DnsResponse>& response) {
-  NewHosts result;
+  ParsedHosts result;
   const auto& addrinfo = response.front().addrInfo();
   Network::Address::InstanceConstSharedPtr new_address =
       Network::Utility::getAddressWithPort(*(addrinfo.address_), port_);
@@ -280,10 +277,10 @@ DnsClusterImpl::ResolveTarget::createLogicalDnsHosts(
   return result;
 }
 
-StatusOr<DnsClusterImpl::ResolveTarget::NewHosts>
+absl::StatusOr<DnsClusterImpl::ResolveTarget::ParsedHosts>
 DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
     const std::list<Network::DnsResponse>& response) {
-  NewHosts result;
+  ParsedHosts result;
   for (const auto& resp : response) {
     const auto& addrinfo = resp.addrInfo();
     // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
@@ -316,7 +313,7 @@ DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
 }
 
 void DnsClusterImpl::ResolveTarget::updateLogicalDnsHosts(
-    const std::list<Network::DnsResponse>& response, const NewHosts& new_hosts) {
+    const std::list<Network::DnsResponse>& response, const ParsedHosts& new_hosts) {
   Network::Address::InstanceConstSharedPtr primary_address =
       Network::Utility::getAddressWithPort(*(response.front().addrInfo().address_), port_);
   auto all_addresses = DnsUtils::generateAddressList(response, port_);
@@ -326,21 +323,16 @@ void DnsClusterImpl::ResolveTarget::updateLogicalDnsHosts(
     logic_dns_cached_address_ = primary_address;
     logic_dns_cached_address_list_ = std::move(all_addresses);
     ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
-    const auto previous_hosts = hosts_;
-    if (!hosts_.empty()) {
-      hosts_[0] = new_hosts.hosts[0];
-    } else {
-      hosts_.push_back(new_hosts.hosts[0]);
-    }
+    const auto previous_hosts = std::move(hosts_);
+    hosts_ = std::move(new_hosts.hosts);
     // For logical DNS, we remove the unique logical host, and add the new one.
     parent_.updateAllHosts(new_hosts.hosts, previous_hosts, locality_lb_endpoints_.priority());
+  } else {
+    parent_.info_->configUpdateStats().update_no_rebuild_.inc();
   }
-  // Note that we don't increment the update_no_rebuild_ counter when
-  // there's no change in the host for logical DNS. This keeps compatibility
-  // with the previous split implementation of logical and strict DNS.
 }
 
-void DnsClusterImpl::ResolveTarget::updateStrictDnsHosts(const NewHosts& new_hosts) {
+void DnsClusterImpl::ResolveTarget::updateStrictDnsHosts(const ParsedHosts& new_hosts) {
   HostVector hosts_added;
   HostVector hosts_removed;
   if (parent_.updateDynamicHostList(new_hosts.hosts, hosts_, hosts_added, hosts_removed, all_hosts_,
@@ -380,7 +372,7 @@ void DnsClusterImpl::ResolveTarget::startResolve() {
         if (isSuccessfulResponse(response, status)) {
           parent_.info_->configUpdateStats().update_success_.inc();
 
-          StatusOr<NewHosts> new_hosts_or_error;
+          absl::StatusOr<ParsedHosts> new_hosts_or_error;
 
           if (parent_.all_addresses_in_single_endpoint_) {
             new_hosts_or_error = createLogicalDnsHosts(response);

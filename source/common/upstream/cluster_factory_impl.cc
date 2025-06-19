@@ -113,11 +113,8 @@ absl::StatusOr<Network::DnsResolverSharedPtr> ClusterFactoryImplBase::selectDnsR
     Network::DnsResolverFactory& dns_resolver_factory =
         Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
     auto& server_context = context.serverFactoryContext();
-    auto dns_resolver_or_error = dns_resolver_factory.createDnsResolver(
-        server_context.mainThreadDispatcher(), server_context.api(), typed_dns_resolver_config);
-    if (dns_resolver_or_error.ok()) {
-      return dns_resolver_or_error;
-    }
+    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
+                                                  server_context.api(), typed_dns_resolver_config);
   }
   return context.dnsResolver();
 }

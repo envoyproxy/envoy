@@ -57,16 +57,18 @@ private:
     bool isSuccessfulResponse(const std::list<Network::DnsResponse>& response,
                               const Network::DnsResolver::ResolutionStatus& status);
 
-    struct NewHosts {
+    struct ParsedHosts {
       HostVector hosts;
       std::chrono::seconds ttl_refresh_rate = std::chrono::seconds::max();
       absl::flat_hash_set<std::string> host_addresses;
     };
-    StatusOr<NewHosts> createLogicalDnsHosts(const std::list<Network::DnsResponse>& response);
-    StatusOr<NewHosts> createStrictDnsHosts(const std::list<Network::DnsResponse>& response);
+    absl::StatusOr<ParsedHosts>
+    createLogicalDnsHosts(const std::list<Network::DnsResponse>& response);
+    absl::StatusOr<ParsedHosts>
+    createStrictDnsHosts(const std::list<Network::DnsResponse>& response);
     void updateLogicalDnsHosts(const std::list<Network::DnsResponse>& response,
-                               const NewHosts& new_hosts);
-    void updateStrictDnsHosts(const NewHosts& new_hosts);
+                               const ParsedHosts& new_hosts);
+    void updateStrictDnsHosts(const ParsedHosts& new_hosts);
 
     DnsClusterImpl& parent_;
     Network::ActiveDnsQuery* active_query_{};
@@ -91,9 +93,7 @@ private:
     // We cache those values here to avoid fetching them from the logical hosts, as that requires
     // synchronization mechanisms.
     Network::Address::InstanceConstSharedPtr logic_dns_cached_address_;
-    ;
     std::vector<Network::Address::InstanceConstSharedPtr> logic_dns_cached_address_list_;
-    ;
   };
 
   using ResolveTargetPtr = std::unique_ptr<ResolveTarget>;
