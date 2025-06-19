@@ -213,11 +213,13 @@ type DecoderFilterCallbacks interface {
 	// Sets an upstream address override for the request. When the overridden host exists in the host list of the routed cluster
 	// and can be selected directly, the load balancer bypasses its algorithm and routes traffic directly to the specified host.
 	//
-	// The strict flag determines whether the HTTP request must strictly use the overridden destination.
-	// When the destination is unavailable/not-found, if strict is set to true, Envoy responds with a 503 Service Unavailable error;
-	// if strict is set to false, Envoy will fall back to its load balancing mechanism.
+	// host (string): The upstream host address to use for the request. This must be a valid IP address(with port); otherwise, the
+	// C++ side will throw an error.
 	//
-	// Notice: host must be a valid IP address(with port).
+	// strict (boolean): Determines whether the HTTP request must be strictly routed to the requested
+	// destination. When set to ``true``, if the requested destination is unavailable/not-found, Envoy will return a 503 status code.
+	// The default value is ``false``, which allows Envoy to fall back to its load balancing mechanism. In this case, if the
+	// requested destination is not found, the request will be routed according to the load balancing algorithm.
 	SetUpstreamOverrideHost(host string, strict bool) error
 }
 

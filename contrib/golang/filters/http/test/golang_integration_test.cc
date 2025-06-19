@@ -866,7 +866,8 @@ typed_config:
 
   void testUpstreamOverrideHost(const std::string expected_status_code,
                                 const std::string expected_upstream_host, std::string path,
-                                bool strict, bool bad_host, bool invalid_host, bool retry = false) {
+                                bool strict, bool bad_host, const std::string add_endpoint = "",
+                                bool retry = false) {
     if (retry) {
       config_helper_.addConfigModifier(
           [](envoy::extensions::filters::network::http_connection_manager::v3::
@@ -876,8 +877,25 @@ typed_config:
                                      ->mutable_routes(0)
                                      ->mutable_route()
                                      ->mutable_retry_policy();
-            retry_policy->set_retry_on("5xx");
+            retry_policy->set_retry_on("connect-failure");
             retry_policy->mutable_num_retries()->set_value(2);
+            retry_policy->mutable_per_try_timeout()->set_seconds(1);
+          });
+    }
+
+    if (strict) {
+      config_helper_.addConfigModifier(
+          [add_endpoint](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+            auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+            ASSERT(cluster_0->name() == "cluster_0");
+            auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+
+            auto* address = endpoint->add_lb_endpoints()
+                                ->mutable_endpoint()
+                                ->mutable_address()
+                                ->mutable_socket_address();
+            address->set_address(add_endpoint);
+            address->set_port_value(8080);
           });
     }
 
@@ -893,14 +911,14 @@ typed_config:
 
     if (!bad_host) {
       codec_client_->sendData(request_encoder, "helloworld", true);
-      if (!(invalid_host && strict)) {
-        waitForNextUpstreamRequest();
+      if (expected_status_code == "200") {
+        waitForNextUpstreamRequest(0, std::chrono::milliseconds(100000));
         Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
         upstream_request_->encodeHeaders(response_headers, true);
       }
     }
 
-    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->waitForEndStream(std::chrono::milliseconds(100000)));
 
     EXPECT_EQ(expected_status_code, response->headers().getStatusValue());
     if (expected_upstream_host != "") {
@@ -1820,33 +1838,54 @@ TEST_P(GolangIntegrationTest, MissingSecretGoRoutine) {
 // Set a valid IP address
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost) {
   const std::string host = GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
-  testUpstreamOverrideHost("200", host, "/test?upstreamOverrideHost=" + host, false, false, false);
+  testUpstreamOverrideHost("200", host, "/test?upstreamOverrideHost=" + host, false, false);
 }
 
 // Set a non-IP address,
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_BadHost) {
-  testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost", false, true, false);
+  testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost", false, true);
 }
 
 // Set a invalid IP address
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost) {
-  const std::string host = GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
-  testUpstreamOverrideHost("200", host, "/test?upstreamOverrideHost=200.0.0.1:8080", false, false,
-                           true);
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string add_endpoint =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+  testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host, false,
+                           false, add_endpoint);
 }
 
 // Set a invalid IP address with strict mode
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string add_endpoint =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+
   testUpstreamOverrideHost(
-      "503", "", "/test?upstreamOverrideHost=200.0.0.1:8080&upstreamOverrideHostStrict=true", true,
-      false, true);
+      "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
+      true, false, add_endpoint);
 }
 
-// Set a invalid IP address with strict mode and retry
+// Set a invalid IP address with strict mode and retry. when first request with invalid host failed,
+// the second request will retry with the valid host 503, then the second request will succeed and
+// finally return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) {
-  testUpstreamOverrideHost(
-      "503", "", "/test?upstreamOverrideHost=200.0.0.1:8080&upstreamOverrideHostStrict=true", true,
-      false, true, true);
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string add_endpoint =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+  testUpstreamOverrideHost("200", expected_host,
+                           "/test?upstreamOverrideHost=" + url_host +
+                               "&upstreamOverrideHostStrict=true",
+                           true, false, add_endpoint, true);
 }
 
 } // namespace Envoy
