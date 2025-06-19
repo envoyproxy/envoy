@@ -1636,9 +1636,12 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   } else {
     // Check cluster's http_protocol_options if different code should be reported to
     // outlier detector.
-    absl::optional<uint64_t> new_code = cluster_->processHttpForOutlierDetection(*headers);
-    if (new_code.has_value()) {
-      put_result_code = new_code.value();
+    absl::optional<bool> matched = cluster_->processHttpForOutlierDetection(*headers);
+    if (matched.has_value()) {
+      // Outlier detector distinguishes only two values:
+      // Anything >= 500 is error.
+      // Anything < 500 is success.
+      put_result_code = matched.value() ? 500 : 200;
     }
   }
 

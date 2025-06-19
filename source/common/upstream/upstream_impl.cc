@@ -1573,7 +1573,7 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
-absl::optional<uint64_t>
+absl::optional<bool>
 ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers) const {
   for (const auto& http_event : http_protocol_options_->outlier_detection_http_events_matcher_) {
     Extensions::Common::Matcher::Matcher::MatchStatusVector statuses;
@@ -1585,7 +1585,7 @@ ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers
     // Run matchers.
     http_event.first[0]->onHttpResponseHeaders(headers, statuses);
     if (http_event.first[0]->matchStatus(statuses).matches_) {
-      return absl::optional<uint64_t>(http_event.second);
+      return absl::optional<bool>(!http_event.second);
     }
   }
 

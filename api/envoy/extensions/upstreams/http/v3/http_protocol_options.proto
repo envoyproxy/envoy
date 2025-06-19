@@ -181,8 +181,8 @@ message HttpProtocolOptions {
     // Matcher for response headers.
     config.common.matcher.v3.MatchPredicate match = 1 [(validate.rules).message = {required: true}];
 
-    // Code which should be reported to the outlier detection if response headers matched the matcher.
-    envoy.type.v3.StatusCode map_to = 2 [(validate.rules).enum = {defined_only: true}];
+    // Determines if matching indicate error or non-error. Defaults to false (error).
+    bool success_on_match = 2;
   }
 
   // List of matchers for response headers along with codes to be reported to outlier detection.

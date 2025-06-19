@@ -1013,7 +1013,7 @@ public:
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
-  virtual absl::optional<uint64_t>
+  virtual absl::optional<bool>
   processHttpForOutlierDetection(Http::ResponseHeaderMap& reponse) const PURE;
 
   /**

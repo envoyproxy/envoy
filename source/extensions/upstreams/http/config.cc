@@ -240,7 +240,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
   // Build outlier detection config
   for (const auto& http_event : options.outlier_detection()) {
     outlier_detection_http_events_matcher_.emplace_back(std::make_pair(
-        std::vector<Extensions::Common::Matcher::MatcherPtr>(), http_event.map_to()));
+        std::vector<Extensions::Common::Matcher::MatcherPtr>(), http_event.success_on_match()));
     buildMatcher(http_event.match(), outlier_detection_http_events_matcher_.back().first,
                  server_context);
   }
