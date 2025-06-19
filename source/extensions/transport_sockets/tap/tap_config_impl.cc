@@ -29,9 +29,6 @@ PerSocketTapperImpl::PerSocketTapperImpl(
     fillConnectionInfo(*trace->mutable_socket_streamed_trace_segment()->mutable_connection());
     sink_handle_->submitTrace(std::move(trace));
     pegSubmitCounter(true);
-    // Don't consider whether sending streamed tapped message per configured size here
-    // because it has no any read/write event so far, and please check more below in
-    // closeSocket(), onRead() and onCLose() when shouldSendStreamedMsgByConfiguredSize() is true.
   }
 }
 
@@ -106,11 +103,7 @@ void PerSocketTapperImpl::pegSubmitCounter(const bool isStreaming) {
 }
 
 bool PerSocketTapperImpl::shouldSendStreamedMsgByConfiguredSize() const {
-  if (config_->minStreamedSentBytes() > 0) {
-    return true;
-  } else {
-    return false;
-  }
+  return config_->minStreamedSentBytes() > 0;
 }
 
 void PerSocketTapperImpl::handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
@@ -205,13 +198,13 @@ void PerSocketTapperImpl::onWrite(const Buffer::Instance& data, uint32_t bytes_w
     makeBufferedTraceIfNeeded();
     auto& event = *buffered_trace_->mutable_socket_buffered_trace()->add_events();
     initEvent(event);
-    event.mutable_write()->set_end_stream(end_stream);
     ASSERT(tx_bytes_buffered_ <= config_->maxBufferedTxBytes());
     buffered_trace_->mutable_socket_buffered_trace()->set_write_truncated(
         TapCommon::Utility::addBufferToProtoBytes(
             *event.mutable_write()->mutable_data(),
             config_->maxBufferedTxBytes() - tx_bytes_buffered_, data, 0, bytes_written));
     tx_bytes_buffered_ += event.write().data().as_bytes().size();
+    event.mutable_write()->set_end_stream(end_stream);
   }
 }
 
