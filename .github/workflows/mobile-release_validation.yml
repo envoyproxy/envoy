@@ -67,7 +67,7 @@ jobs:
         - run: |
             xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj \
                        -scheme EnvoySwiftPMExample \
-                       -destination platform="iOS Simulator,name=iPhone 15 Pro Max,OS=17.4" \
+                       -destination platform="iOS Simulator,name=iPhone 16 Pro Max,OS=18.1" \
                        -allowProvisioningUpdates
           shell: bash
           name: Build app
