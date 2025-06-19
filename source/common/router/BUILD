@@ -38,6 +38,7 @@ envoy_cc_library(
     deps = [
         ":config_utility_lib",
         ":context_lib",
+        ":header_cluster_specifier_lib",
         ":header_parser_lib",
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
@@ -45,7 +46,6 @@ envoy_cc_library(
         ":retry_state_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
-        ":header_cluster_specifier_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
@@ -517,7 +517,7 @@ envoy_cc_library(
     srcs = ["header_cluster_specifier.cc"],
     hdrs = ["header_cluster_specifier.h"],
     deps = [
-        "//envoy/router:cluster_specifier_plugin_interface",
         ":delegating_route_lib",
+        "//envoy/router:cluster_specifier_plugin_interface",
     ],
 )
