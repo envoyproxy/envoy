@@ -164,6 +164,23 @@ TEST_F(ProtoApiScrubberRequestRejectedTests, BufferLimitedExceeded) {
             filter_->decodeData(*request_data, true));
 }
 
+TEST_F(ProtoApiScrubberRequestRejectedTests, NotEnoughData) {
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, false));
+
+  Envoy::Buffer::OwnedImpl empty;
+
+  EXPECT_CALL(mock_decoder_callbacks_,
+              sendLocalReply(Http::Code::BadRequest,
+                             "did not receive enough data to form a message.", Eq(nullptr),
+                             Eq(Envoy::Grpc::Status::InvalidArgument),
+                             "proto_api_scrubber_INVALID_ARGUMENT{REQUEST_OUT_OF_DATA}"));
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::StopIterationNoBuffer, filter_->decodeData(empty, true));
+}
+
 // Following tests validate that the request passes through the filter without any modification.
 using ProtoApiScrubberPassThroughTest = ProtoApiScrubberFilterTest;
 

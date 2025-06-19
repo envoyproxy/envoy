@@ -25,6 +25,7 @@ using ::Envoy::Grpc::Utility;
 
 const char kRcDetailFilterProtoApiScrubber[] = "proto_api_scrubber";
 const char kRcDetailErrorRequestBufferConversion[] = "REQUEST_BUFFER_CONVERSION_FAIL";
+const char kRcDetailErrorRequestOutOfData[] = "REQUEST_OUT_OF_DATA";
 
 std::string formatError(absl::string_view filter_name, absl::string_view error_type,
                         absl::string_view error_detail) {
@@ -89,7 +90,6 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
     // MessageConverter uses an empty StreamMessage to denote the end.
     if (stream_message->message() == nullptr) {
       // Expect end_stream=true when the MessageConverter signals an stream end.
-      std::cout << "Entered stream_message->message() == null\n";
       ASSERT(end_stream);
 
       // Expect message_data->isFinalMessage()=true when the MessageConverter signals an stream end.
@@ -103,11 +103,24 @@ Http::FilterDataStatus ProtoApiScrubberFilter::decodeData(Buffer::Instance& data
       continue;
     }
 
+    // Atleast one fully formed gRPC message received.
+    fully_formed_grpc_messages_received_ = true;
+
     auto buf_convert_status =
         request_msg_converter_->convertBackToBuffer(std::move(stream_message));
     RELEASE_ASSERT(buf_convert_status.ok(), "failed to convert message back to envoy buffer");
 
     data.move(*buf_convert_status.value());
+  }
+
+  // Reject the request if scrubbing is required but could not buffer up any messages.
+  if (!fully_formed_grpc_messages_received_) {
+    rejectRequest(Status::WellKnownGrpcStatus::InvalidArgument,
+                  "did not receive enough data to form a message.",
+                  formatError(kRcDetailFilterProtoApiScrubber,
+                              absl::StatusCodeToString(absl::StatusCode::kInvalidArgument),
+                              kRcDetailErrorRequestOutOfData));
+    return Envoy::Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
   ENVOY_STREAM_LOG(trace, "Scrubbing completed successfully.", *decoder_callbacks_);
