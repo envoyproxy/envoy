@@ -1872,9 +1872,9 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
       true, false, add_endpoint);
 }
 
-// Set a invalid IP address with strict mode and retry. when first request with invalid host failed,
-// the second request will retry with the valid host 503, then the second request will succeed and
-// finally return 200.
+// Set a invalid IP address with strict mode and retry.
+// when first request with invalid host failed 503, the second request will retry with the valid
+// host, then the second request will succeed and finally return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) {
   const std::string expected_host =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
