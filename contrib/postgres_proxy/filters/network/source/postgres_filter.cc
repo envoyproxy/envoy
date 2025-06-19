@@ -295,17 +295,17 @@ void PostgresFilter::verifyDownstreamSSL() {
   if (config_->downstream_ssl_ ==
           envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy::REQUIRE &&
       (!switched_to_tls_)) {
-    ENVOY_LOG(debug, "postgres_proxy: closing connection because downstream ssl is required but no "
-                     "ssl negotiation indicated.");
+    ENVOY_LOG(debug, "postgres_proxy: closing connection because downstream ssl is required but "
+                     "downstream client did not start SSL handshake.");
     closeConn();
   }
 }
 
 void PostgresFilter::closeConn() {
-  Buffer::OwnedImpl rbac_error_response =
-      encoder_->buildErrorResponse("FATAL", "connection denied by envoy: downstream ssl required.",
-                                   "28000" // return invalid_authorization_specification
-      );
+  Buffer::OwnedImpl rbac_error_response = encoder_->buildErrorResponse(
+      "FATAL", "connection denied by Envoy proxy: downstream ssl required.",
+      "28000" // return invalid_authorization_specification
+  );
 
   // send error response to downstream client
   write_callbacks_->injectWriteDataToFilterChain(rbac_error_response, false);
