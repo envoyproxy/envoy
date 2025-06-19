@@ -107,7 +107,7 @@ message SocketAddress {
   //    results in a validation error if set for endpoint addresses.
   //
   // .. note::
-  //    Setting this parameter requires the dataplane to run with the ``CAP_NET_ADMIN`` capability.
+  //    Setting this parameter requires the data plane to run with the ``CAP_NET_ADMIN`` capability.
   //
   // .. attention::
   //     Network namespaces are only configurable on Linux. Otherwise, this field has no effect.
