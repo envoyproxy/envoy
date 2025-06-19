@@ -783,7 +783,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     if (headers.has_value()) {
       const auto values = headers->get(Envoy::Http::Headers::get().Path);
       if (!values.empty()) {
-        const auto& path = values[0]->value().getStringView();
+        const absl::string_view path = headers->getPathValue();
         size_t query_offset = path.find('?');
         if (query_offset == absl::string_view::npos) {
           *result = const_cast<char*>(path.data());
@@ -803,7 +803,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     if (headers.has_value()) {
       const auto values = headers->get(Envoy::Http::Headers::get().Path);
       if (!values.empty()) {
-        const auto& path = values[0]->value().getStringView();
+        const absl::string_view path = headers->getPathValue();
         size_t query_offset = path.find('?');
         if (query_offset != absl::string_view::npos) {
           auto query = path.substr(query_offset + 1);
