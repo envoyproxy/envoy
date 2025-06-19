@@ -40,6 +40,8 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
 class MockServerHeaderValidator : public HeaderValidator {
 public:
   ~MockServerHeaderValidator() override = default;
+  MOCK_METHOD(void, startHeaderBlock, ());
+  MOCK_METHOD(bool, finishHeaderBlock, (bool is_trailing_headers));
   MOCK_METHOD(Http::HeaderUtility::HeaderValidationResult, validateHeader,
               (absl::string_view header_name, absl::string_view header_value));
 };
@@ -59,6 +61,8 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   NiceMock<MockServerHeaderValidator> validator;
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
+  EXPECT_CALL(validator, startHeaderBlock());
+  EXPECT_CALL(validator, finishHeaderBlock(true)).WillOnce(Return(true));
   auto envoy_headers = http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
       headers_block, 60, 100, validator, details, rst);
   // Envoy header block is 3 headers larger because QUICHE header block does coalescing.
@@ -87,6 +91,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   quic_headers.OnHeader("key1", "value2");
   quic_headers.OnHeader("key-to-drop", "");
   quic_headers.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(validator, startHeaderBlock());
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly([](absl::string_view header_name, absl::string_view) {
         if (header_name == "key-to-drop") {
@@ -94,6 +99,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
         }
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
+  EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
   auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
       quic_headers, validator, 60, 100, details, rst);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
@@ -105,6 +111,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   quic_headers2.OnHeader(":scheme", "https");
   quic_headers2.OnHeader("invalid_key", "");
   quic_headers2.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(validator, startHeaderBlock());
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly([](absl::string_view header_name, absl::string_view) {
         if (header_name == "invalid_key") {
@@ -118,23 +125,29 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
 }
 
 TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
-  quiche::HttpHeaderBlock headers_block;
-  headers_block[":authority"] = "www.google.com";
-  headers_block[":path"] = "/index.hml";
-  headers_block[":scheme"] = "https";
-  headers_block["foo"] = std::string("bar\0eep\0baz", 11);
+  quic::QuicHeaderList quic_headers;
+  quic_headers.OnHeader(":authority", "www.google.com");
+  quic_headers.OnHeader(":path", "/index.hml");
+  quic_headers.OnHeader(":scheme", "https");
+  quic_headers.OnHeader("foo1", "bar");
+  quic_headers.OnHeader("foo2", "bar");
+  quic_headers.OnHeader("foo3", "bar");
+  quic_headers.OnHeaderBlockEnd(0, 0);
   absl::string_view details;
-  // 6 headers are allowed.
   NiceMock<MockServerHeaderValidator> validator;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
-  EXPECT_NE(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 60, 6, validator, details, rst));
+  EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
+  // 6 headers are allowed.
+  EXPECT_NE(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 6, details, rst));
   // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
-  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 60, 5, validator, details, rst));
-  EXPECT_EQ("http3.too_many_trailers", details);
-  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 60, 4, validator, details, rst));
+  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 5, details, rst));
+  EXPECT_EQ("http3.too_many_headers", details);
+  EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 4, details, rst));
+  EXPECT_EQ("http3.too_many_headers", details);
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
 
@@ -147,13 +160,18 @@ TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
   absl::string_view details;
   NiceMock<MockServerHeaderValidator> validator;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
+  EXPECT_CALL(validator, finishHeaderBlock(true)).WillOnce(Return(true));
+  // 6 headers are allowed.
   EXPECT_NE(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 60, 6, validator, details, rst));
+  // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 60, 2, validator, details, rst));
+                         headers_block, 60, 5, validator, details, rst));
   EXPECT_EQ("http3.too_many_trailers", details);
+  EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 60, 2, validator, details, rst));
+                         headers_block, 60, 4, validator, details, rst));
+  EXPECT_EQ("http3.too_many_trailers", details);
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
 
@@ -164,6 +182,7 @@ TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
   headers_block[":scheme"] = "https";
   absl::string_view details;
   NiceMock<MockServerHeaderValidator> validator;
+  EXPECT_CALL(validator, startHeaderBlock());
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly(Return(Http::HeaderUtility::HeaderValidationResult::REJECT));
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
@@ -228,10 +247,12 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");
   quic_headers.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(validator, startHeaderBlock());
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly([](absl::string_view, absl::string_view) {
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
+  EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
   // Request header map test.
   auto request_header = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
       quic_headers, validator, 60, 100, details, rst);
@@ -239,6 +260,8 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   EXPECT_EQ(request_header->maxHeadersKb(), 60);
 
   // Response header map test.
+  EXPECT_CALL(validator, startHeaderBlock());
+  EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
   auto response_header = quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
       quic_headers, validator, 60, 100, details, rst);
   EXPECT_EQ(response_header->maxHeadersCount(), 100);
@@ -250,12 +273,16 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   headers_block[":scheme"] = "https";
 
   // Request trailer map test.
+  EXPECT_CALL(validator, startHeaderBlock());
+  EXPECT_CALL(validator, finishHeaderBlock(true)).WillOnce(Return(true));
   auto request_trailer = http2HeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
       headers_block, 60, 100, validator, details, rst);
   EXPECT_EQ(request_trailer->maxHeadersCount(), 100);
   EXPECT_EQ(request_trailer->maxHeadersKb(), 60);
 
   // Response trailer map test.
+  EXPECT_CALL(validator, startHeaderBlock());
+  EXPECT_CALL(validator, finishHeaderBlock(true)).WillOnce(Return(true));
   auto response_trailer = http2HeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
       headers_block, 60, 100, validator, details, rst);
   EXPECT_EQ(response_trailer->maxHeadersCount(), 100);
