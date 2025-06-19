@@ -710,7 +710,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         route.route().cluster_specifier_plugin());
     SET_AND_RETURN_IF_NOT_OK(plugin_or_error.status(), creation_status);
     cluster_specifier_plugin_ = std::move(plugin_or_error.value());
-  } else if (route.route().has_cluster_specifier_plugin()) {
+  } else if (route.route().has_cluster_header()) {
     cluster_specifier_plugin_ =
         std::make_shared<HeaderClusterSpecifierPlugin>(route.route().cluster_header());
   }
