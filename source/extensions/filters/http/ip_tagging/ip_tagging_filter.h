@@ -37,6 +37,8 @@ public:
   IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                Stats::StatNameSetPtr& stat_name_set);
 
+  ~IpTagsLoader();
+
   /**
    * Loads file based ip tags from a data source and parses them into a trie structure.
    * @param ip_tags_datasource file based data source to load ip tags from.
