@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // The overall extension config discovery service works as follows:
 //
-// * A filter (:ref:`Downstream Network <envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`,
+// #. A filter (:ref:`Downstream Network <envoy_v3_api_field_config.listener.v3.Filter.config_discovery>`,
 //   :ref:`Upstream Network <envoy_v3_api_field_config.cluster.v3.Filter.config_discovery>`,
 //   :ref:`Listener <envoy_v3_api_field_config.listener.v3.ListenerFilter.config_discovery>`,
 //   :ref:`UDP Session <envoy_v3_api_field_extensions.filters.udp.udp_proxy.v3.UdpProxyConfig.SessionFilter.config_discovery>`,
