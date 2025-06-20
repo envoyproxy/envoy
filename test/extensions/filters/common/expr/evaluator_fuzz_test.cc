@@ -8,6 +8,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "cel/expr/syntax.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -39,8 +40,18 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
   auto response_trailers = Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(input.trailers());
 
   try {
-    // Create the CEL expression.
-    Expr::ExpressionPtr expr = Expr::createExpression(*builder, input.expression());
+    // Create the CEL expression with boundary conversion.
+    std::string serialized;
+    if (!input.expression().SerializeToString(&serialized)) {
+      ENVOY_LOG_MISC(debug, "Failed to serialize expression");
+      return;
+    }
+    cel::expr::Expr new_expr;
+    if (!new_expr.ParseFromString(serialized)) {
+      ENVOY_LOG_MISC(debug, "Failed to convert expression to new format");
+      return;
+    }
+    Expr::ExpressionPtr expr = Expr::createExpression(*builder, new_expr);
 
     // Evaluate the CEL expression.
     Protobuf::Arena arena;

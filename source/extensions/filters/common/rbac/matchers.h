@@ -14,6 +14,8 @@
 #include "source/extensions/filters/common/rbac/matcher_interface.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
 
+#include "cel/expr/syntax.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -187,7 +189,20 @@ public:
                 ProtobufMessage::ValidationVisitor& validation_visitor,
                 Server::Configuration::CommonFactoryContext& context)
       : permissions_(policy.permissions(), validation_visitor, context),
-        principals_(policy.principals(), context), condition_(policy.condition()) {
+        principals_(policy.principals(), context), condition_([&policy]() {
+          if (policy.has_condition()) {
+            std::string serialized;
+            if (!policy.condition().SerializeToString(&serialized)) {
+              throw EnvoyException("Failed to serialize RBAC policy condition");
+            }
+            cel::expr::Expr new_expr;
+            if (!new_expr.ParseFromString(serialized)) {
+              throw EnvoyException("Failed to convert RBAC policy condition to new format");
+            }
+            return new_expr;
+          }
+          return cel::expr::Expr{};
+        }()) {
     if (policy.has_condition()) {
       expr_ = Expr::createExpression(*builder, condition_);
     }
@@ -199,7 +214,7 @@ public:
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
-  const google::api::expr::v1alpha1::Expr condition_;
+  const cel::expr::Expr condition_;
   Expr::ExpressionPtr expr_;
 };
 
