@@ -309,6 +309,13 @@ IpTaggingFilter::~IpTaggingFilter() = default;
 void IpTaggingFilter::onDestroy() {}
 
 Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Defensive checks to prevent crashes during cascade failures
+  if (!config_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+  if (!callbacks_) {
+    return Http::FilterHeadersStatus::Continue;
+  }
 
   const bool is_internal_request = headers.EnvoyInternalRequest() &&
                                    (headers.EnvoyInternalRequest()->value() ==
@@ -320,8 +327,18 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
     return Http::FilterHeadersStatus::Continue;
   }
 
-  std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
+  // Additional safety check for stream info chain
+  auto* stream_info_ptr = &callbacks_->streamInfo();
+  if (!stream_info_ptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  auto remote_address = stream_info_ptr->downstreamAddressProvider().remoteAddress();
+  if (!remote_address) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  std::vector<std::string> tags = config_->trie().getData(remote_address);
 
   // Used for testing.
   synchronizer_.syncPoint("_trie_lookup_complete");
@@ -356,6 +373,11 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
                                 const std::vector<std::string>& tags) {
   using HeaderAction = IpTaggingFilterConfig::HeaderAction;
 
+  // Defensive check to prevent crashes during cascade failures
+  if (!config_ || !callbacks_) {
+    return;
+  }
+
   OptRef<const Http::LowerCaseString> header_name = config_->ipTagHeader();
 
   if (tags.empty()) {
@@ -364,7 +386,9 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
     if (header_name.has_value() && maybe_sanitize) {
       if (headers.remove(header_name.value()) != 0) {
         // We must clear the route cache in case it held a decision based on the now-removed header.
-        callbacks_->downstreamCallbacks()->clearRouteCache();
+        if (callbacks_->downstreamCallbacks()) {
+          callbacks_->downstreamCallbacks()->clearRouteCache();
+        }
       }
     }
     return;
@@ -389,7 +413,9 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
   }
 
   // We must clear the route cache so it can match on the updated value of the header.
-  callbacks_->downstreamCallbacks()->clearRouteCache();
+  if (callbacks_->downstreamCallbacks()) {
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+  }
 }
 
 } // namespace IpTagging
