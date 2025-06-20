@@ -61,17 +61,12 @@ minor_behavior_changes:
    will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
 - area: tracing
   change: |
-<<<<<<< HEAD
-    Add :ref:`max_buffer_size <envoy_v3_api_field_tracing.opentelemetry.v3.OpenTelemetryTracerConfig.max_buffer_size>`
-    to the OpenTelemetry tracer config. This limits the number of spans that can be buffered before flushing.
+    Add :ref:`max_cache_size <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.max_cache_size>`
+    to the OpenTelemetry tracer config. This limits the number of spans that can be cached before flushing.
 - area: aws
   change: |
     :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
     providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
-=======
-    Add :ref:`max_cache_size <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.max_cache_size>`
-    to the OpenTelemetry tracer config. This limits the number of spans that can be cached before flushing.
->>>>>>> 1744d0b07d (fix(tracing): resolve OpenTelemetry max_cache_size field inconsistencies - Fix field name mismatch from max_buffer_size() to max_cache_size(), add proper wrapper type handling with default value of 1024, update constructor signature, correct changelog field name, and remove incorrect runtime mock call in test)
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
