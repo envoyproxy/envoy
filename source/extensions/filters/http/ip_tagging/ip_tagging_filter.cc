@@ -288,26 +288,78 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
     const Protobuf::RepeatedPtrField<
         envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags) {
+  ENVOY_LOG(warn, "12345 test - parseIpTagsAsProto called with {} ip_tags", ip_tags.size());
+
+  if (ip_tags.size() > 10000) {
+    ENVOY_LOG(warn, "12345 test - WARNING: Large number of IP tags ({}), this may cause memory issues", ip_tags.size());
+  }
+
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
   tag_data.reserve(ip_tags.size());
+
+  int processed_count = 0;
   for (const auto& ip_tag : ip_tags) {
-    std::vector<Network::Address::CidrRange> cidr_set;
-    cidr_set.reserve(ip_tag.ip_list().size());
-    for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
-      absl::StatusOr<Network::Address::CidrRange> cidr_or_error =
-          Network::Address::CidrRange::create(entry);
-      if (cidr_or_error.status().ok()) {
-        cidr_set.emplace_back(std::move(cidr_or_error.value()));
-      } else {
-        return absl::InvalidArgumentError(
-            fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
-                        entry.address_prefix(), entry.prefix_len().value()));
+    try {
+      ENVOY_LOG(warn, "12345 test - Processing IP tag #{}: '{}' with {} CIDR ranges",
+                processed_count + 1, ip_tag.ip_tag_name(), ip_tag.ip_list().size());
+
+      std::vector<Network::Address::CidrRange> cidr_set;
+      cidr_set.reserve(ip_tag.ip_list().size());
+
+      int cidr_count = 0;
+      for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
+        try {
+          absl::StatusOr<Network::Address::CidrRange> cidr_or_error =
+              Network::Address::CidrRange::create(entry);
+          if (cidr_or_error.status().ok()) {
+            cidr_set.emplace_back(std::move(cidr_or_error.value()));
+            cidr_count++;
+          } else {
+            ENVOY_LOG(warn, "12345 test - Invalid CIDR in tag '{}': {}/{}",
+                      ip_tag.ip_tag_name(), entry.address_prefix(), entry.prefix_len().value());
+            return absl::InvalidArgumentError(
+                fmt::format("invalid ip/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
+                            entry.address_prefix(), entry.prefix_len().value()));
+          }
+        } catch (const std::exception& e) {
+          ENVOY_LOG(warn, "12345 test - Exception processing CIDR in tag '{}': {}",
+                    ip_tag.ip_tag_name(), e.what());
+          return absl::InternalError(fmt::format("Exception processing CIDR: {}", e.what()));
+        }
       }
+
+      ENVOY_LOG(warn, "12345 test - Successfully processed {} CIDRs for tag '{}'",
+                cidr_count, ip_tag.ip_tag_name());
+
+      tag_data.emplace_back(ip_tag.ip_tag_name(), std::move(cidr_set));
+      stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
+
+      processed_count++;
+
+      // Log progress for large datasets
+      if (processed_count % 100 == 0) {
+        ENVOY_LOG(warn, "12345 test - Progress: processed {}/{} IP tags", processed_count, ip_tags.size());
+      }
+
+    } catch (const std::exception& e) {
+      ENVOY_LOG(warn, "12345 test - Exception processing IP tag #{}: {}", processed_count + 1, e.what());
+      return absl::InternalError(fmt::format("Exception processing IP tag: {}", e.what()));
     }
-    tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
-  return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
+
+  ENVOY_LOG(warn, "12345 test - Successfully processed all {} IP tags, creating LcTrie", processed_count);
+
+  try {
+    auto result = std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
+    ENVOY_LOG(warn, "12345 test - LcTrie created successfully");
+    return result;
+  } catch (const std::exception& e) {
+    ENVOY_LOG(warn, "12345 test - Exception creating LcTrie: {}", e.what());
+    return absl::InternalError(fmt::format("Exception creating LcTrie: {}", e.what()));
+  } catch (...) {
+    ENVOY_LOG(warn, "12345 test - Unknown exception creating LcTrie");
+    return absl::InternalError("Unknown exception creating LcTrie");
+  }
 }
 
 SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
