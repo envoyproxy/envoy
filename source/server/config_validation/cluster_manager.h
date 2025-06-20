@@ -24,19 +24,18 @@ public:
       Server::Configuration::ServerFactoryContext& server_context, Stats::Store& stats,
       ThreadLocal::Instance& tls, Http::Context& http_context,
       LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
-      Secret::SecretManager& secret_manager, Quic::QuicStatNames& quic_stat_names,
-      Server::Instance& server)
+      Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
       : ProdClusterManagerFactory(server_context, stats, tls, http_context, dns_resolver_fn,
-                                  ssl_context_manager, secret_manager, quic_stat_names, server) {}
+                                  ssl_context_manager, quic_stat_names, server) {}
 
   absl::StatusOr<ClusterManagerPtr>
   clusterManagerFromProto(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
 
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
-  CdsApiPtr createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-                      const xds::core::v3::ResourceLocator* cds_resources_locator,
-                      ClusterManager& cm) override;
+  absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
+                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
+                                      ClusterManager& cm) override;
 };
 
 /**

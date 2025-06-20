@@ -1,12 +1,8 @@
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
-#include "envoy/config/core/v3/base.pb.h"
-#include "envoy/config/core/v3/http_uri.pb.h"
-
 #include "source/common/common/enum_to_int.h"
-#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -106,7 +102,11 @@ public:
         });
 
     auto messagePtr = std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headersPtr));
-
+    // Add body if it exists, used when IAM Roles Anywhere exchanges X509 credentials for temporary
+    // credentials
+    if (message.body().length()) {
+      messagePtr->body().add(message.body());
+    }
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(std::chrono::milliseconds(TIMEOUT))
                        .setParentSpan(parent_span)
@@ -132,7 +132,8 @@ public:
     ASSERT(receiver_);
     complete_ = true;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
-    if (status_code == enumToInt(Http::Code::OK)) {
+    if (status_code == enumToInt(Http::Code::OK) ||
+        (status_code == enumToInt(Http::Code::Created))) {
       ENVOY_LOG(debug, "{}: fetch AWS Metadata [cluster = {}]: success", __func__, cluster_name_);
       if (response->body().length() != 0) {
         const auto body = response->bodyAsString();

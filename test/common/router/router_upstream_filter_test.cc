@@ -88,8 +88,10 @@ public:
         locality())
         .WillByDefault(ReturnRef(upstream_locality_));
     ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, chooseHost(_))
-        .WillByDefault(Return(
-            context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_));
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_};
+        }));
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
         ->setLocalAddress(host_address_);
     router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
@@ -128,7 +130,7 @@ public:
 
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                     .host_->outlier_detector_,
-                putHttpResponseCode(200));
+                putResult(_, absl::optional<uint64_t>(200)));
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), true);
     return headers;

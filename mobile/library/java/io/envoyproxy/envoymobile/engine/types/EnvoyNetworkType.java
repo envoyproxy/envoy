@@ -5,6 +5,10 @@ public enum EnvoyNetworkType {
   GENERIC(1),
   WLAN(2),
   WWAN(4),
+  WWAN_2G(8),
+  WWAN_3G(16),
+  WWAN_4G(32),
+  WWAN_5G(64),
   ;
 
   private final int value;

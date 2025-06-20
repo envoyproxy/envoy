@@ -164,6 +164,25 @@ private:
 };
 
 /**
+ * Action for query parameters rate limiting.
+ */
+class QueryParametersAction : public RateLimit::DescriptorProducer {
+public:
+  QueryParametersAction(const envoy::config::route::v3::RateLimit::Action::QueryParameters& action);
+
+  // Ratelimit::DescriptorProducer
+  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                          const std::string& local_service_cluster,
+                          const Http::RequestHeaderMap& headers,
+                          const StreamInfo::StreamInfo& info) const override;
+
+private:
+  const std::string query_param_name_;
+  const std::string descriptor_key_;
+  const bool skip_if_absent_;
+};
+
+/**
  * Action for header value match rate limiting.
  */
 class HeaderValueMatchAction : public RateLimit::DescriptorProducer {
@@ -256,12 +275,14 @@ public:
                                 const std::string& local_service_cluster,
                                 const Http::RequestHeaderMap&,
                                 const StreamInfo::StreamInfo& info) const override;
+  bool applyOnStreamDone() const override { return apply_on_stream_done_; }
 
 private:
   const std::string disable_key_;
-  uint64_t stage_;
+  const uint64_t stage_;
   std::vector<RateLimit::DescriptorProducerPtr> actions_;
   absl::optional<RateLimitOverrideActionPtr> limit_override_ = absl::nullopt;
+  const bool apply_on_stream_done_ = false;
 };
 
 /**
@@ -269,7 +290,6 @@ private:
  */
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
-  RateLimitPolicyImpl();
   RateLimitPolicyImpl(
       const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
       Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status);
@@ -280,15 +300,28 @@ public:
   bool empty() const override { return rate_limit_entries_.empty(); }
 
 private:
-  std::vector<std::unique_ptr<RateLimitPolicyEntry>> rate_limit_entries_;
-  std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
+  const std::vector<RateLimitPolicyEntryImpl> rate_limit_entries_;
+  const std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
       rate_limit_entries_reference_;
-  // The maximum stage number supported. This value should match the maximum stage number in
-  // Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA and
-  // Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
-  static const uint64_t MAX_STAGE_NUMBER;
 };
-using DefaultRateLimitPolicy = ConstSingleton<RateLimitPolicyImpl>;
+
+/**
+ * An implementation of a default rate limit policy that is empty.
+ */
+class DefaultRateLimitPolicyImpl : public RateLimitPolicy {
+public:
+  // Router::RateLimitPolicy
+  const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&
+  getApplicableRateLimit(uint64_t) const override {
+    return empty_vector_;
+  }
+  bool empty() const override { return true; }
+
+private:
+  // An empty vector that will be returned for any getApplicableRateLimit() invocation.
+  const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> empty_vector_;
+};
+using DefaultRateLimitPolicy = ConstSingleton<DefaultRateLimitPolicyImpl>;
 
 } // namespace Router
 } // namespace Envoy

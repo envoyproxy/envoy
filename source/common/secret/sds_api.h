@@ -69,7 +69,7 @@ protected:
   // Creates new secrets.
   virtual void setSecret(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
   // Refresh secrets, e.g. re-resolve symlinks in secret paths.
-  virtual void resolveSecret(const FileContentMap& /*files*/){};
+  virtual void resolveSecret(const FileContentMap& /*files*/) {};
   virtual void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
   Common::CallbackManager<> update_callback_manager_;
 
@@ -133,7 +133,7 @@ using GenericSecretSdsApiSharedPtr = std::shared_ptr<GenericSecretSdsApi>;
 class TlsCertificateSdsApi : public SdsApi, public TlsCertificateConfigProvider {
 public:
   static TlsCertificateSdsApiSharedPtr
-  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+  create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
          const std::string& sds_config_name, std::function<void()> destructor_cb);
 
@@ -184,7 +184,7 @@ class CertificateValidationContextSdsApi : public SdsApi,
                                            public CertificateValidationContextConfigProvider {
 public:
   static CertificateValidationContextSdsApiSharedPtr
-  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+  create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
          const std::string& sds_config_name, std::function<void()> destructor_cb);
   CertificateValidationContextSdsApi(const envoy::config::core::v3::ConfigSource& sds_config,
@@ -240,7 +240,7 @@ private:
 class TlsSessionTicketKeysSdsApi : public SdsApi, public TlsSessionTicketKeysConfigProvider {
 public:
   static TlsSessionTicketKeysSdsApiSharedPtr
-  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+  create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
          const std::string& sds_config_name, std::function<void()> destructor_cb);
 
@@ -292,7 +292,7 @@ private:
 class GenericSecretSdsApi : public SdsApi, public GenericSecretConfigProvider {
 public:
   static GenericSecretSdsApiSharedPtr
-  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+  create(Server::Configuration::ServerFactoryContext& server_context,
          const envoy::config::core::v3::ConfigSource& sds_config,
          const std::string& sds_config_name, std::function<void()> destructor_cb);
 

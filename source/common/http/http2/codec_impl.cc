@@ -498,6 +498,7 @@ void ConnectionImpl::StreamImpl::decodeData() {
         stream_manager_.decodeAsChunks() &&
         pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
 
+    StreamDecoder* stream_decoder = decoder();
     if (decode_data_in_chunk) {
       Buffer::OwnedImpl chunk_buffer;
       // TODO(kbaichoo): Consider implementing an approximate move for chunking.
@@ -508,7 +509,9 @@ void ConnectionImpl::StreamImpl::decodeData() {
       stream_manager_.body_buffered_ = true;
       ASSERT(pending_recv_data_->length() > 0);
 
-      decoder().decodeData(chunk_buffer, sendEndStream());
+      if (stream_decoder) {
+        stream_decoder->decodeData(chunk_buffer, sendEndStream());
+      }
       already_drained_data = true;
 
       if (!buffersOverrun()) {
@@ -516,7 +519,9 @@ void ConnectionImpl::StreamImpl::decodeData() {
       }
     } else {
       // Send the entire buffer through.
-      decoder().decodeData(*pending_recv_data_, sendEndStream());
+      if (stream_decoder) {
+        stream_decoder->decodeData(*pending_recv_data_, sendEndStream());
+      }
     }
   }
 
@@ -597,7 +602,11 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
 #endif
-  request_decoder_->decodeHeaders(std::move(headers), sendEndStream());
+  RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
+  ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
+  if (request_decoder) {
+    request_decoder->decodeHeaders(std::move(headers), sendEndStream());
+  }
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
@@ -608,8 +617,12 @@ void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
   // Consume any buffered trailers.
   stream_manager_.trailers_buffered_ = false;
 
-  request_decoder_->decodeTrailers(
-      std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
+  ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
+  if (request_decoder) {
+    request_decoder->decodeTrailers(
+        std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  }
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -650,7 +663,7 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
 
 void ConnectionImpl::ClientStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ == -1);
-  stream_id_ = parent_.adapter_->SubmitRequest(buildHeaders(headers), nullptr, end_stream, base());
+  stream_id_ = parent_.adapter_->SubmitRequest(buildHeaders(headers), end_stream, base());
   ASSERT(stream_id_ > 0);
 }
 
@@ -670,7 +683,7 @@ void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
 
 void ConnectionImpl::ServerStreamImpl::submitHeaders(const HeaderMap& headers, bool end_stream) {
   ASSERT(stream_id_ != -1);
-  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers), nullptr, end_stream);
+  parent_.adapter_->SubmitResponse(stream_id_, buildHeaders(headers), end_stream);
 }
 
 Status ConnectionImpl::ServerStreamImpl::onBeginHeaders() {
@@ -816,7 +829,7 @@ MetadataDecoder& ConnectionImpl::StreamImpl::getMetadataDecoder() {
     auto cb = [this](MetadataMapPtr&& metadata_map_ptr) {
       this->onMetadataDecoded(std::move(metadata_map_ptr));
     };
-    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb);
+    metadata_decoder_ = std::make_unique<MetadataDecoder>(cb, parent_.max_metadata_size_);
   }
   return *metadata_decoder_;
 }
@@ -827,7 +840,10 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
     ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", parent_.connection_);
     parent_.stats_.metadata_empty_frames_.inc();
   } else {
-    decoder().decodeMetadata(std::move(metadata_map_ptr));
+    StreamDecoder* stream_decoder = decoder();
+    if (stream_decoder) {
+      stream_decoder->decodeMetadata(std::move(metadata_map_ptr));
+    }
   }
 }
 
@@ -1226,6 +1242,13 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
   case OGHTTP2_RST_STREAM_FRAME_TYPE: {
     ENVOY_CONN_LOG(debug, "sent reset code={}", connection_, error_code);
     stats_.tx_reset_.inc();
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events") &&
+        stream != nullptr && !stream->local_end_stream_sent_) {
+      // The RST_STREAM may preempt further DATA frames, and serves as the
+      // notification of the end of the stream.
+      stream->onResetEncoded(error_code);
+      stream->local_end_stream_sent_ = true;
+    }
     break;
   }
 
@@ -1793,8 +1816,8 @@ bool ConnectionImpl::Http2Visitor::OnBeginDataForStream(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(debug, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return true;
 }
@@ -1810,8 +1833,8 @@ bool ConnectionImpl::Http2Visitor::OnDataPaddingLength(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return true;
 }
@@ -1829,8 +1852,8 @@ bool ConnectionImpl::Http2Visitor::OnDataForStream(Http2StreamId stream_id,
                                              padding_length_);
     return 0 == connection_->setAndCheckCodecCallbackStatus(std::move(status));
   }
-  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, end_stream: {}",
-                 connection_->connection_, remaining_data_payload_,
+  ENVOY_CONN_LOG(trace, "Http2Visitor: remaining data payload: {}, stream_id: {}, end_stream: {}",
+                 connection_->connection_, remaining_data_payload_, stream_id,
                  bool(current_frame_.flags & FLAG_END_STREAM));
   return result == 0;
 }
@@ -1857,7 +1880,7 @@ bool ConnectionImpl::Http2Visitor::OnCloseStream(Http2StreamId stream_id,
                                                  Http2ErrorCode error_code) {
   Status status = connection_->onStreamClose(stream_id, static_cast<uint32_t>(error_code));
   if (stream_close_listener_) {
-    ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for {}",
+    ENVOY_CONN_LOG(trace, "Http2Visitor invoking stream close listener for stream {}",
                    connection_->connection_, stream_id);
     stream_close_listener_(stream_id);
   }
@@ -2132,6 +2155,8 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
   http2_session_factory.init(base(), http2_options);
   allow_metadata_ = http2_options.allow_metadata();
+  max_metadata_size_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, max_metadata_size, 1024 * 1024);
   idle_session_requires_ping_interval_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
       http2_options.connection_keepalive(), connection_idle_interval, 0));
 }
@@ -2216,6 +2241,8 @@ ServerConnectionImpl::ServerConnectionImpl(
 #endif
   sendSettings(http2_options, false);
   allow_metadata_ = http2_options.allow_metadata();
+  max_metadata_size_ =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(http2_options, max_metadata_size, 1024 * 1024);
 }
 
 Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {

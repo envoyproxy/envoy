@@ -146,6 +146,11 @@ public:
                                           const Options& options,
                                           ProtobufMessage::ValidationVisitor& validation_visitor,
                                           Api::Api& api);
+
+  /**
+   * Raises soft file limit to the hard limit.
+   */
+  static void raiseFileLimits();
 };
 
 /**
@@ -178,6 +183,7 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Config::XdsManager& xdsManager() override { return server_.xdsManager(); }
   Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
     return server_.httpServerPropertiesCacheManager();
   }
@@ -208,22 +214,15 @@ public:
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   OverloadManager& nullOverloadManager() override { return server_.nullOverloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
+  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
-  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
-  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    // Server has two message validation visitors, one for static and
-    // other for dynamic configuration. Choose the dynamic validation
-    // visitor if server's init manager indicates that the server is
-    // in the Initialized state, as this state is engaged right after
-    // the static configuration (e.g., bootstrap) has been completed.
-    return initManager().state() == Init::Manager::State::Initialized
-               ? server_.messageValidationContext().dynamicValidationVisitor()
-               : server_.messageValidationContext().staticValidationVisitor();
+    return server_.messageValidationVisitor();
   }
 
 private:
@@ -317,6 +316,14 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Server has two message validation visitors, one for static and
+    // other for dynamic configuration. Choose the dynamic validation
+    // visitor if server main dispatch loop started, as if all configuration
+    // after main dispatch loop started should be dynamic.
+    return main_dispatch_loop_started_.load() ? validation_context_.dynamicValidationVisitor()
+                                              : validation_context_.staticValidationVisitor();
+  }
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
@@ -350,8 +357,7 @@ private:
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(
-      Stage stage, std::function<void()> completion_cb = [] {});
+  void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
@@ -372,6 +378,7 @@ private:
   bool shutdown_{false};
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
+  std::atomic<bool> main_dispatch_loop_started_{false};
   TimeSource& time_source_;
   // Delete local_info_ as late as possible as some members below may reference it during their
   // destruction.

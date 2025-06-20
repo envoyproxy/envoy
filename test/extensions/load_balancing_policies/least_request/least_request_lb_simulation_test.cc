@@ -82,14 +82,18 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
   ClusterLbStats lb_stats{stat_names, *stats_store.rootScope()};
   NiceMock<Runtime::MockLoader> runtime;
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
   LeastRequestLoadBalancer lb_{
-      priority_set, nullptr, lb_stats, runtime, random, common_config, least_request_lb_config,
+      priority_set,
+      nullptr,
+      lb_stats,
+      runtime,
+      random,
+      50,
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest(),
       *time_source};
 
   for (uint64_t i = 0; i < num_requests; i++) {
-    host_hits[lb_.chooseHost(nullptr)]++;
+    host_hits[lb_.chooseHost(nullptr).host]++;
   }
 
   std::vector<double> observed_pcts;

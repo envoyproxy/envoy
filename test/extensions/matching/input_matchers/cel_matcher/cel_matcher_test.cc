@@ -34,6 +34,8 @@ using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::TestResponseTrailerMapImpl;
+using ::Envoy::Matcher::HasNoMatch;
+using ::Envoy::Matcher::HasStringAction;
 
 enum class ExpressionType {
   CheckedExpression = 0,
@@ -63,19 +65,32 @@ public:
 
   Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
   buildMatcherTree(const std::string& cel_expr_config,
-                   ExpressionType expr_type = ExpressionType::CheckedExpression) {
+                   ExpressionType expr_type = ExpressionType::CheckedExpression,
+                   bool use_cel = false) {
     xds::type::matcher::v3::CelMatcher cel_matcher;
     switch (expr_type) {
     case ExpressionType::CheckedExpression: {
-      google::api::expr::v1alpha1::CheckedExpr checked_expr;
-      Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
-      cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+      if (use_cel) {
+        ::cel::expr::CheckedExpr checked_expr;
+        Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+        cel_matcher.mutable_expr_match()->mutable_cel_expr_checked()->MergeFrom(checked_expr);
+      } else {
+        google::api::expr::v1alpha1::CheckedExpr checked_expr;
+        Protobuf::TextFormat::ParseFromString(cel_expr_config, &checked_expr);
+        cel_matcher.mutable_expr_match()->mutable_checked_expr()->MergeFrom(checked_expr);
+      }
       break;
     }
     case ExpressionType::ParsedExpression: {
-      google::api::expr::v1alpha1::ParsedExpr parsed_expr;
-      Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
-      cel_matcher.mutable_expr_match()->mutable_parsed_expr()->MergeFrom(parsed_expr);
+      if (use_cel) {
+        ::cel::expr::ParsedExpr parsed_expr;
+        Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
+        cel_matcher.mutable_expr_match()->mutable_cel_expr_parsed()->MergeFrom(parsed_expr);
+      } else {
+        google::api::expr::v1alpha1::ParsedExpr parsed_expr;
+        Protobuf::TextFormat::ParseFromString(cel_expr_config, &parsed_expr);
+        cel_matcher.mutable_expr_match()->mutable_parsed_expr()->MergeFrom(parsed_expr);
+      }
       break;
     }
     case ExpressionType::NoExpression:
@@ -164,11 +179,8 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderMatched) {
   buildCustomHeader({{"authenticated_user", "staging"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  const auto result = matcher_tree->match(data_);
   // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
@@ -179,10 +191,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
   buildCustomHeader({{"authenticated_user", "NOT_MATCHED"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 
   // Build header with request header key field mismatched case.
   TestRequestHeaderMapImpl request_headers_2 = default_headers_;
@@ -190,10 +199,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
   Envoy::Http::Matching::HttpMatchingDataImpl data_2 =
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   data_2.onRequestHeaders(request_headers_2);
-  const auto result_2 = matcher_tree->match(data_2);
-  // The match was completed, no match found.
-  EXPECT_EQ(result_2.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result_2.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_2), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
@@ -203,11 +209,7 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
@@ -218,10 +220,7 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRouteMetadataMatched) {
@@ -231,11 +230,7 @@ TEST_F(CelMatcherTest, CelMatcherRouteMetadataMatched) {
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamRouteMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
@@ -246,10 +241,7 @@ TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherDynamicMetadataMatched) {
@@ -259,11 +251,7 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataMatched) {
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(
       absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
@@ -273,10 +261,7 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
   auto matcher_tree = buildMatcherTree(
       absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
@@ -290,11 +275,7 @@ TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       TypedDynamicMetadataCelString, kFilterNamespace, "path", "/foo/bar/baz.fads"));
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatched) {
@@ -304,11 +285,18 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatched) {
   buildCustomHeader({{":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
+}
+
+TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathMatchedUseCelExpr) {
+  auto matcher_tree =
+      buildMatcherTree(RequestPathCelExprString, ExpressionType::CheckedExpression, true);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
@@ -319,10 +307,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
   buildCustomHeader({{":path", "/bar"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseHeaderMatched) {
@@ -334,11 +319,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseHeaderMatched) {
   response_headers.addCopy(LowerCaseString("content-length"), "3");
   data_.onResponseHeaders(response_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseHeaderNotMatched) {
@@ -347,10 +328,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseHeaderNotMatched) {
   TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
   data_.onResponseHeaders(response_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseTrailerMatched) {
@@ -359,11 +337,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseTrailerMatched) {
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseTrailerNotMatched) {
@@ -372,10 +346,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseTrailerNotMatched) {
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked_not_matched"}};
   data_.onResponseTrailers(response_trailers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathMatched) {
@@ -385,11 +356,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathMatched) {
   buildCustomHeader({{"user", "staging"}, {":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathNotMatched) {
@@ -399,10 +366,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathNotMatched) {
   buildCustomHeader({{"user", "prod"}, {":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathMatched) {
@@ -412,11 +376,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathMatched) {
   buildCustomHeader({{"user", "prod"}, {":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathNotMatched) {
@@ -426,10 +386,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathNotMatched) {
   buildCustomHeader({{"user", "prod"}, {":path", "/bar"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestResponseMatched) {
@@ -445,11 +402,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseMatched) {
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatched) {
@@ -465,10 +418,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatched) {
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestResponseMatchedWithParsedExpr) {
@@ -485,11 +435,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseMatchedWithParsedExpr) {
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was complete, match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_TRUE(result.on_match_.has_value());
-  EXPECT_NE(result.on_match_->action_cb_, nullptr);
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExpr) {
@@ -506,10 +452,24 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExpr) {
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
   data_.onResponseTrailers(response_trailers);
 
-  const auto result = matcher_tree->match(data_);
-  // The match was completed, no match found.
-  EXPECT_EQ(result.match_state_, Matcher::MatchState::MatchComplete);
-  EXPECT_EQ(result.on_match_, absl::nullopt);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+}
+
+TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExprUseCel) {
+  auto matcher_tree =
+      buildMatcherTree(RequestAndResponseCelString, ExpressionType::ParsedExpression, true);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{"user", "staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
+  data_.onResponseHeaders(response_headers);
+
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
+  data_.onResponseTrailers(response_trailers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, NoCelExpression) {

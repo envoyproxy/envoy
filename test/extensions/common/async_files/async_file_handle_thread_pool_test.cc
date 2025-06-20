@@ -29,6 +29,7 @@ using StatusHelpers::IsOkAndHolds;
 using StatusHelpers::StatusIs;
 using ::testing::_;
 using ::testing::Eq;
+using ::testing::Pointee;
 using ::testing::Return;
 using ::testing::StrictMock;
 
@@ -298,6 +299,29 @@ TEST_F(AsyncFileHandleTest, OpenExistingReadWriteCanReadAndWrite) {
   close(handle);
 }
 
+TEST_F(AsyncFileHandleTest, TruncateReducesFileSize) {
+  AsyncFileHandle handle = createAnonymousFile();
+  absl::StatusOr<size_t> write_status;
+  Buffer::OwnedImpl buf("hello world");
+  EXPECT_OK(handle->write(dispatcher_.get(), buf, 0, [&](absl::StatusOr<size_t> result) {
+    write_status = std::move(result);
+  }));
+  resolveFileActions();
+  EXPECT_THAT(write_status, IsOkAndHolds(11U));
+  absl::Status truncate_status = absl::UnknownError("");
+  EXPECT_OK(handle->truncate(dispatcher_.get(), 5,
+                             [&](absl::Status result) { truncate_status = std::move(result); }));
+  resolveFileActions();
+  EXPECT_OK(truncate_status);
+  absl::StatusOr<Buffer::InstancePtr> read_result;
+  EXPECT_OK(handle->read(dispatcher_.get(), 0, 11, [&](absl::StatusOr<Buffer::InstancePtr> result) {
+    read_result = std::move(result);
+  }));
+  resolveFileActions();
+  EXPECT_THAT(read_result, IsOkAndHolds(Pointee(BufferStringEqual("hello"))));
+  close(handle);
+}
+
 TEST_F(AsyncFileHandleTest, DuplicateCreatesIndependentHandle) {
   auto handle = createAnonymousFile();
   absl::StatusOr<AsyncFileHandle> duplicate_status;
@@ -357,6 +381,18 @@ TEST_F(AsyncFileHandleWithMockPosixTest, PartialWriteRetries) {
   }));
   resolveFileActions();
   EXPECT_THAT(write_status, IsOkAndHolds(5U));
+  close(handle);
+}
+
+TEST_F(AsyncFileHandleWithMockPosixTest, TruncateReturnsErrorOnTruncatingToLargerThanFile) {
+  AsyncFileHandle handle = createAnonymousFile();
+  absl::Status truncate_status;
+  EXPECT_CALL(mock_posix_file_operations_, ftruncate(_, _))
+      .WillOnce(Return(Api::SysCallIntResult{-1, EBADF}));
+  EXPECT_OK(handle->truncate(dispatcher_.get(), 5,
+                             [&](absl::Status result) { truncate_status = std::move(result); }));
+  resolveFileActions();
+  EXPECT_EQ(absl::StatusCode::kFailedPrecondition, truncate_status.code()) << truncate_status;
   close(handle);
 }
 

@@ -302,7 +302,7 @@ all subsequent requests from the client must set the
 nonce received from the server on that stream. This allows servers to determine which response a
 given request is associated with, which avoids various race conditions in the SotW protocol
 variants. Note that the nonce is valid only in the context of an individual xDS stream; it does
-not survive stream restarts.
+not survive stream restarts. In the aggregated protocol variant, the nonce is tracked separately for each resource type.
 
 Only the first request on a stream is guaranteed to carry the node identifier.
 The subsequent discovery requests on the same stream may carry an empty node

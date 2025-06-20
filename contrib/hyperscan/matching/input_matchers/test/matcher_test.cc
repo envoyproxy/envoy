@@ -17,7 +17,7 @@ namespace InputMatchers {
 namespace Hyperscan {
 
 // Verify that we do not get TSAN or other errors when creating scratch in
-// multithreading.
+// multi-threading.
 TEST(ThreadLocalTest, RaceScratchCreation) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
 

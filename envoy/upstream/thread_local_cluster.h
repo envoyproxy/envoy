@@ -104,7 +104,7 @@ public:
    * @return host the next host selected by the load balancer or null if no host
    * is available.
    */
-  virtual HostConstSharedPtr chooseHost(LoadBalancerContext* context) PURE;
+  virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced HTTP connection pool for a cluster. This is *per-thread* so that

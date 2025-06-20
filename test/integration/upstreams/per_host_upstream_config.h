@@ -95,13 +95,12 @@ class PerHostGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
   std::string name() const override { return "envoy.filters.connection_pools.http.per_host"; }
   std::string category() const override { return "envoy.upstreams"; }
-  Router::GenericConnPoolPtr
-  createGenericConnPool(Upstream::HostConstSharedPtr host,
-                        Upstream::ThreadLocalCluster& thread_local_cluster,
-                        Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        Upstream::ResourcePriority priority,
-                        absl::optional<Envoy::Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx) const override {
+  Router::GenericConnPoolPtr createGenericConnPool(
+      Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+      Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
+      Upstream::ResourcePriority priority,
+      absl::optional<Envoy::Http::Protocol> downstream_protocol, Upstream::LoadBalancerContext* ctx,
+      const Protobuf::Message&) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       // This example factory doesn't support terminating CONNECT/CONNECT-UDP stream.
       return nullptr;

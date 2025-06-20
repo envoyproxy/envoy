@@ -538,7 +538,7 @@ public:
   /**
    * @return true if the trace span should be sampled.
    */
-  virtual bool traceSampled() const PURE;
+  virtual absl::optional<bool> traceSampled() const PURE;
 
   /**
    * @return true if host name should be suffixed with "-shadow".
@@ -639,6 +639,11 @@ public:
    * @return const CorsPolicy* the CORS policy for this virtual host.
    */
   virtual const CorsPolicy* corsPolicy() const PURE;
+
+  /**
+   * @return const std::string& the name of the virtual host.
+   */
+  virtual const std::string& name() const PURE;
 
   /**
    * @return the stat-name of the virtual host.
@@ -897,23 +902,6 @@ public:
   virtual const std::string& clusterName() const PURE;
 
   /**
-   * Returns the final host value for the request, taking into account route-level mutations.
-   *
-   * The value returned is computed with the following logic in order:
-   *
-   * 1. If a host rewrite is configured for the route, it returns that value.
-   * 2. If a host rewrite header is specified, it attempts to use the value from that header.
-   * 3. If a host rewrite path regex is configured, it applies the regex to the request path and
-   *    returns the result.
-   * 4. If none of the above apply, it returns the original host value from the request headers.
-   *
-   * @param headers The constant reference to the request headers.
-   * @note This function will not attempt to restore the port in the host value. If port information
-   *       is required, it should be handled separately.
-   */
-  virtual const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const PURE;
-
-  /**
    * Returns the HTTP status code to use when configured cluster is not found.
    * @return Http::Code to use when configured cluster is not found.
    */
@@ -941,11 +929,12 @@ public:
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
    * @param stream_info holds additional information about the request.
-   * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
+   * @param keep_original_host_or_path insert x-envoy-original-path header if path rewritten,
+   *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                                       const StreamInfo::StreamInfo& stream_info,
-                                      bool insert_envoy_original_path) const PURE;
+                                      bool keep_original_host_or_path) const PURE;
 
   /**
    * Returns the request header transforms that would be applied if finalizeRequestHeaders were
@@ -1138,6 +1127,12 @@ public:
    * @return EarlyDataPolicy& the configured early data option.
    */
   virtual const EarlyDataPolicy& earlyDataPolicy() const PURE;
+
+  /**
+   * Refresh the target cluster of the route with the request attributes if possible.
+   */
+  virtual void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**
@@ -1279,6 +1274,7 @@ public:
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 class RouteEntryAndRoute : public RouteEntry, public Route {};
+using RouteEntryAndRouteConstSharedPtr = std::shared_ptr<const RouteEntryAndRoute>;
 
 /**
  * RouteCallback, returns one of these enums to the route matcher to indicate
@@ -1604,7 +1600,7 @@ public:
       Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
       GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
       Upstream::ResourcePriority priority, absl::optional<Http::Protocol> downstream_protocol,
-      Upstream::LoadBalancerContext* ctx) const PURE;
+      Upstream::LoadBalancerContext* ctx, const Protobuf::Message& config) const PURE;
 };
 
 using GenericConnPoolFactoryPtr = std::unique_ptr<GenericConnPoolFactory>;

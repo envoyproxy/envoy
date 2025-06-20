@@ -126,6 +126,7 @@ UpstreamRequest::UpstreamRequest(RouterFilterInterface& parent,
 
   stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info_.route_ = parent_.callbacks()->route();
+  stream_info_.upstreamInfo()->setUpstreamHost(upstream_host);
   parent_.callbacks()->streamInfo().setUpstreamInfo(stream_info_.upstreamInfo());
 
   stream_info_.healthCheck(parent_.callbacks()->streamInfo().healthCheck());
@@ -214,10 +215,12 @@ void UpstreamRequest::cleanUp() {
   if (req_resp_stats_opt.has_value() && parent_.downstreamHeaders()) {
     auto& req_resp_stats = req_resp_stats_opt->get();
     req_resp_stats.upstream_rq_headers_size_.recordValue(parent_.downstreamHeaders()->byteSize());
+    req_resp_stats.upstream_rq_headers_count_.recordValue(parent_.downstreamHeaders()->size());
     req_resp_stats.upstream_rq_body_size_.recordValue(stream_info_.bytesSent());
 
     if (response_headers_size_.has_value()) {
       req_resp_stats.upstream_rs_headers_size_.recordValue(response_headers_size_.value());
+      req_resp_stats.upstream_rs_headers_count_.recordValue(response_headers_count_.value());
       req_resp_stats.upstream_rs_body_size_.recordValue(stream_info_.bytesReceived());
     }
   }
@@ -254,7 +257,7 @@ void UpstreamRequest::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
   ScopeTrackerScopeState scope(&parent_.callbacks()->scope(), parent_.callbacks()->dispatcher());
 
   ASSERT(Http::HeaderUtility::isSpecial1xx(*headers));
-  addResponseHeadersSize(headers->byteSize());
+  addResponseHeadersStat(headers->byteSize(), headers->size());
   maybeHandleDeferredReadDisable();
   parent_.onUpstream1xxHeaders(std::move(headers), *this);
 }
@@ -269,7 +272,7 @@ void UpstreamRequest::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool e
 
   resetPerTryIdleTimer();
 
-  addResponseHeadersSize(headers->byteSize());
+  addResponseHeadersStat(headers->byteSize(), headers->size());
 
   // We drop unsupported 1xx on the floor here. 101 upgrade headers need to be passed to the client
   // as part of the final response. Most 1xx headers are handled in onUpstream1xxHeaders.
@@ -388,9 +391,7 @@ void UpstreamRequest::acceptHeadersFromRouter(bool end_stream) {
     // If this is a websocket upgrade request, pause the request until the upstream sends
     // the 101 Switching Protocols response code. Using the else logic here to obey CONNECT
     // method which is expecting 2xx response.
-  } else if ((Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.check_switch_protocol_websocket_handshake")) &&
-             Http::Utility::isWebSocketUpgradeRequest(*headers)) {
+  } else if (Http::Utility::isWebSocketUpgradeRequest(*headers)) {
     paused_for_websocket_ = true;
   }
 
@@ -594,8 +595,6 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  onUpstreamHostSelected(host, true);
-
   if (protocol) {
     stream_info_.protocol(protocol.value());
   } else {
@@ -625,6 +624,11 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   upstream_info.setUpstreamLocalAddress(address_provider.localAddress());
   upstream_info.setUpstreamRemoteAddress(address_provider.remoteAddress());
   upstream_info.setUpstreamSslConnection(info.downstreamAddressProvider().sslConnection());
+
+  // Invoke the onUpstreamHostSelected after setting ssl_connection_info_ in upstream_info.
+  // This is because the onUpstreamHostSelected callback may need to access the ssl_connection_info
+  // to determine the scheme of the upstream connection.
+  onUpstreamHostSelected(host, true);
 
   if (info.downstreamAddressProvider().connectionID().has_value()) {
     upstream_info.setUpstreamConnectionId(info.downstreamAddressProvider().connectionID().value());
@@ -669,7 +673,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   const auto* route_entry = route().routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
-                                   route_entry->appendXfh());
+                                   route_entry->appendXfh(),
+                                   !parent_.config().suppress_envoy_headers_);
   }
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());

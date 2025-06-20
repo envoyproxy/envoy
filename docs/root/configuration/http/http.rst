@@ -8,3 +8,4 @@ HTTP
   http_filters/http_filters
   caches/caches
   cluster_specifier/cluster_specifier
+  tcp_bridge/tcp_bridge

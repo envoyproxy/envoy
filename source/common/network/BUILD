@@ -205,6 +205,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ip_address_lib",
+    srcs = ["ip_address.cc"],
+    hdrs = ["ip_address.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/network:address_interface",
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "io_socket_error_lib",
     srcs = ["io_socket_error_impl.cc"],
     hdrs = ["io_socket_error_impl.h"],
@@ -247,13 +259,29 @@ envoy_cc_library(
         "io_socket_handle_impl.cc",
         "socket_interface_impl.cc",
         "win32_socket_handle_impl.cc",
-    ],
+    ] + select({
+        "//bazel:android": [],
+        "//bazel:liburing_enabled": [
+            "io_uring_socket_handle_impl.cc",
+        ],
+        "//conditions:default": [],
+    }),
     hdrs = [
         "io_socket_handle_base_impl.h",
         "io_socket_handle_impl.h",
         "socket_interface_impl.h",
         "win32_socket_handle_impl.h",
-    ],
+    ] + select({
+        "//bazel:android": [],
+        "//bazel:liburing_enabled": [
+            "io_uring_socket_handle_impl.h",
+        ],
+        "//conditions:default": [],
+    }),
+    defines = select({
+        "//bazel:liburing_enabled": ["ENVOY_ENABLE_IO_URING=1"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":address_lib",
         ":io_socket_error_lib",
@@ -265,36 +293,13 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
-        "@com_github_google_quiche//:quic_core_lru_cache_lib",
         "@com_github_google_quiche//:quic_platform_socket_address",
         "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
-    ],
-    alwayslink = LEGACY_ALWAYSLINK,
-)
-
-envoy_cc_library(
-    name = "io_uring_socket_lib",
-    srcs =
-        [] + select({
-            "//bazel:android": [],
-            "//bazel:linux": [
-                "io_uring_socket_handle_impl.cc",
-            ],
-            "//conditions:default": [],
-        }),
-    hdrs = [
     ] + select({
         "//bazel:android": [],
-        "//bazel:linux": [
-            "io_uring_socket_handle_impl.h",
-        ],
-        "//conditions:default": [],
-    }),
-    deps = [
-        ":default_socket_interface_lib",
-    ] + select({
-        "//bazel:linux": [
+        "//bazel:liburing_enabled": [
             "//source/common/io:io_uring_impl_lib",
+            "//source/common/io:io_uring_worker_factory_impl_lib",
             "//source/common/io:io_uring_worker_lib",
         ],
         "//conditions:default": [],
@@ -432,6 +437,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
+        "//source/common/memory:aligned_allocator_lib",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
@@ -496,6 +502,7 @@ envoy_cc_library(
         ":default_socket_interface_lib",
         ":socket_lib",
         ":socket_option_lib",
+        "//envoy/api:os_sys_calls_interface",
         "//envoy/network:connection_interface",
         "//envoy/network:listener_interface",
         "//envoy/stats:stats_interface",
@@ -503,6 +510,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
+        "//source/common/common:fmt_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

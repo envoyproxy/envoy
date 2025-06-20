@@ -1,8 +1,12 @@
+#include <chrono>
 #include <cstdlib>
 
 #include "source/extensions/resource_monitors/cpu_utilization/cpu_stats_reader.h"
 #include "source/extensions/resource_monitors/cpu_utilization/linux_cpu_stats_reader.h"
+#include "source/server/resource_monitor_config_impl.h"
 
+#include "test/mocks/event/mocks.h"
+#include "test/mocks/server/options.h"
 #include "test/test_common/environment.h"
 
 #include "absl/types/optional.h"
@@ -83,6 +87,111 @@ cpu1 1883161 620 375962 1448133 5963 0 85914 10 0 0
   EXPECT_FALSE(cpu_times.is_valid);
   EXPECT_EQ(cpu_times.work_time, 0);
   EXPECT_EQ(cpu_times.total_time, 0);
+}
+
+class LinuxContainerCpuStatsReaderTest : public testing::Test {
+public:
+  LinuxContainerCpuStatsReaderTest()
+      : api_(Api::createApiForTest()),
+        context_(dispatcher_, options_, *api_, ProtobufMessage::getStrictValidationVisitor()),
+        cpu_allocated_path_(TestEnvironment::temporaryPath("cgroup_cpu_allocated_stats")),
+        cpu_times_path_(TestEnvironment::temporaryPath("cgroup_cpu_times_stats")) {
+    // We populate the files that LinuxContainerStatsReader tries to read with some default
+    // sane values, so the tests don't need to populate the files they don't actually care
+    // about keeping the test cases focused on what they actually want to test.
+    setCpuAllocated("2000\n");
+    setCpuTimes("1000\n");
+  }
+
+  TimeSource& timeSource() { return context_.api().timeSource(); }
+
+  const std::string& cpuAllocatedPath() const { return cpu_allocated_path_; }
+  void setCpuAllocated(const std::string& contents) {
+    AtomicFileUpdater cpu_allocated(cpuAllocatedPath());
+    cpu_allocated.update(contents);
+  }
+
+  const std::string& cpuTimesPath() const { return cpu_times_path_; }
+  void setCpuTimes(const std::string& contents) {
+    AtomicFileUpdater cpu_times(cpuTimesPath());
+    cpu_times.update(contents);
+  }
+
+private:
+  Event::MockDispatcher dispatcher_;
+  Api::ApiPtr api_;
+  Server::MockOptions options_;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context_;
+  std::string cpu_allocated_path_;
+  std::string cpu_times_path_;
+};
+
+TEST_F(LinuxContainerCpuStatsReaderTest, ReadsCgroupContainerStats) {
+  TimeSource& test_time_source = timeSource();
+  setCpuAllocated("2000\n");
+  setCpuTimes("1000\n");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+
+  const uint64_t current_monotonic_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                              test_time_source.monotonicTime().time_since_epoch())
+                                              .count();
+  const int64_t time_diff_ns = current_monotonic_time - envoy_container_stats.total_time;
+
+  EXPECT_EQ(envoy_container_stats.work_time, 500);
+  EXPECT_GT(time_diff_ns, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuAllocated) {
+  TimeSource& test_time_source = timeSource();
+  const std::string temp_path_cpu_allocated =
+      TestEnvironment::temporaryPath("container_cpu_times_not_exists");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, temp_path_cpu_allocated,
+                                                      cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, CannotReadFileCpuTimes) {
+  TimeSource& test_time_source = timeSource();
+  const std::string temp_path_cpu_times =
+      TestEnvironment::temporaryPath("container_cpu_times_not_exists");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      temp_path_cpu_times);
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuAllocatedLine) {
+  TimeSource& test_time_source = timeSource();
+  setCpuAllocated("notanumb3r\n");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
+}
+
+TEST_F(LinuxContainerCpuStatsReaderTest, UnexpectedFormatCpuTimesLine) {
+  TimeSource& test_time_source = timeSource();
+  setCpuTimes("notanumb3r\n");
+
+  LinuxContainerCpuStatsReader container_stats_reader(test_time_source, cpuAllocatedPath(),
+                                                      cpuTimesPath());
+  CpuTimes envoy_container_stats = container_stats_reader.getCpuTimes();
+  EXPECT_FALSE(envoy_container_stats.is_valid);
+  EXPECT_EQ(envoy_container_stats.work_time, 0);
+  EXPECT_EQ(envoy_container_stats.total_time, 0);
 }
 
 } // namespace

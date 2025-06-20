@@ -47,7 +47,7 @@ jobs:
         - target: docker-arm64
           arch: arm64
           cache-suffix: -arm64
-          runs-on: github-arm64-2c-8gb
+          runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
 
   bazel:
     permissions:
@@ -73,14 +73,16 @@ jobs:
         include:
         - name: Bazel (x64/cache)
           bazel-extra: >-
-            --config=remote-clang-libc++
+            --config=remote-clang
             --config=remote-envoy-engflow
         - name: Bazel (arm64/cache)
           arch: arm64
-          runs-on: github-arm64-2c-8gb
+          runs-on: ${{ vars.ENVOY_ARM_VM || 'ubuntu-24.04-arm' }}
           bazel-extra: >-
-             --config=clang-libc++
+             --config=remote-arm64-clang
              --config=common-envoy-engflow
              --config=cache-envoy-engflow
           targets: >-
             //test/...
+            //contrib/...
+            //source/...

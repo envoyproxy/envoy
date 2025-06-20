@@ -34,10 +34,9 @@ class IpTaggingFilterConfig {
 public:
   using HeaderAction =
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IpTagHeader::HeaderAction;
-
-  IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
-                        const std::string& stat_prefix, Stats::Scope& scope,
-                        Runtime::Loader& runtime);
+  static absl::StatusOr<std::shared_ptr<IpTaggingFilterConfig>>
+  create(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+         const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
@@ -58,6 +57,10 @@ public:
   void incTotal() { incCounter(total_); }
 
 private:
+  IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
+                        const std::string& stat_prefix, Stats::Scope& scope,
+                        Runtime::Loader& runtime, absl::Status& creation_status);
+
   static FilterRequestType requestTypeEnum(
       envoy::extensions::filters::http::ip_tagging::v3::IPTagging::RequestType request_type) {
     switch (request_type) {

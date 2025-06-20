@@ -7,8 +7,6 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/test_runtime.h"
 
-#include "conn_manager_impl_test_base.h"
-
 using testing::_;
 using testing::An;
 using testing::AnyNumber;
@@ -1083,7 +1081,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
 
   // RouteConstSharedPtr of DelegatingRoute for foo
   // Initialization separate from declaration to be in scope for both decoder_filters_
-  std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> foo_route_override(nullptr);
+  std::shared_ptr<const Router::ExampleDerivedDelegatingRouteEntry> foo_route_override(nullptr);
 
   // Route config mock
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
@@ -1104,7 +1102,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
 
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
         // StreamFilterCallbacks to manually override the cached route for the current request.
-        foo_route_override = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+        foo_route_override = std::make_shared<Router::ExampleDerivedDelegatingRouteEntry>(
             decoder_filters_[0]->callbacks_->route(), foo_cluster_name);
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(foo_route_override);
 
@@ -1174,13 +1172,13 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
       .WillRepeatedly(ReturnRef(default_cluster_name));
 
   // DelegatingRoute: foo
-  std::shared_ptr<const Router::ExampleDerivedDelegatingRoute> delegating_route_foo(nullptr);
+  std::shared_ptr<const Router::ExampleDerivedDelegatingRouteEntry> delegating_route_foo(nullptr);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         // Instantiate a DelegatingRoute child class object and invoke setRoute from
         // StreamFilterCallbacks to manually override the cached route for the current request.
-        delegating_route_foo = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+        delegating_route_foo = std::make_shared<Router::ExampleDerivedDelegatingRouteEntry>(
             default_route, foo_cluster_name);
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(delegating_route_foo);
 
@@ -2715,87 +2713,6 @@ TEST_F(HttpConnectionManagerImplTest, TestPeriodicAccessLogging) {
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
 }
 
-class StreamErrorOnInvalidHttpMessageTest : public HttpConnectionManagerImplTest {
-public:
-  void sendInvalidRequestAndVerifyConnectionState(bool stream_error_on_invalid_http_message,
-                                                  bool send_complete_request = true) {
-    setup();
-
-    EXPECT_CALL(*codec_, dispatch(_))
-        .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
-          decoder_ = &conn_manager_->newStream(response_encoder_);
-
-          // These request headers are missing the necessary ":host"
-          RequestHeaderMapPtr headers{
-              new TestRequestHeaderMapImpl{{":method", "GET"}, {":path", "/"}}};
-          decoder_->decodeHeaders(std::move(headers), send_complete_request);
-          data.drain(0);
-          return Http::okStatus();
-        }));
-
-    auto* filter = new MockStreamFilter();
-    EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
-          auto factory = createStreamFilterFactoryCb(StreamFilterSharedPtr{filter});
-          manager.applyFilterFactoryCb({}, factory);
-          return true;
-        }));
-    EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
-    EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
-
-    // codec stream error
-    EXPECT_CALL(response_encoder_, streamErrorOnInvalidHttpMessage())
-        .WillOnce(Return(stream_error_on_invalid_http_message));
-    EXPECT_CALL(*filter, encodeComplete());
-    EXPECT_CALL(*filter, encodeHeaders(_, true));
-    if (!stream_error_on_invalid_http_message) {
-      EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(AnyNumber());
-      if (send_complete_request) {
-        // The request is complete, so we should not flush close.
-        EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite))
-            .Times(AnyNumber());
-      } else {
-        // If the request isn't complete, avoid a FIN/RST race with delay close.
-        EXPECT_CALL(filter_callbacks_.connection_,
-                    close(Network::ConnectionCloseType::FlushWriteAndDelay))
-            .Times(AnyNumber());
-      }
-    }
-    EXPECT_CALL(response_encoder_, encodeHeaders(_, true))
-        .WillOnce(Invoke([&](const ResponseHeaderMap& headers, bool) -> void {
-          EXPECT_EQ("400", headers.getStatusValue());
-          EXPECT_EQ("missing_host_header",
-                    filter->decoder_callbacks_->streamInfo().responseCodeDetails().value());
-          if (!stream_error_on_invalid_http_message) {
-            EXPECT_NE(nullptr, headers.Connection());
-            EXPECT_EQ("close", headers.getConnectionValue());
-          } else {
-            EXPECT_EQ(nullptr, headers.Connection());
-          }
-        }));
-
-    EXPECT_CALL(*filter, onStreamComplete());
-    EXPECT_CALL(*filter, onDestroy());
-
-    Buffer::OwnedImpl fake_input;
-    conn_manager_->onData(fake_input, false);
-  }
-};
-
-TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionTerminatedIfCodecStreamErrorIsFalse) {
-  sendInvalidRequestAndVerifyConnectionState(false);
-}
-
-TEST_F(StreamErrorOnInvalidHttpMessageTest,
-       ConnectionTerminatedWithDelayIfCodecStreamErrorIsFalse) {
-  // Same as above, only with an incomplete request.
-  sendInvalidRequestAndVerifyConnectionState(false, false);
-}
-
-TEST_F(StreamErrorOnInvalidHttpMessageTest, ConnectionOpenIfCodecStreamErrorIsTrue) {
-  sendInvalidRequestAndVerifyConnectionState(true);
-}
-
 TEST_F(HttpConnectionManagerImplTest, TestAccessLogSsl) {
   setup(SetupOpts().setSsl(true));
 
@@ -4069,7 +3986,7 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
 
   // Store the basic request encoder during filter chain setup.
   auto* filter = new MockStreamFilter();
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
 
   EXPECT_CALL(*filter, decodeHeaders(_, false))
       .WillRepeatedly(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
@@ -4201,7 +4118,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainCloseRaceWithClose) {
   conn_manager_->onData(fake_input, false);
 
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
@@ -4305,7 +4222,7 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "300"}}};
   Event::MockTimer* drain_timer = setUpTimer();
   EXPECT_CALL(*drain_timer, enableTimer(_, _));
-  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+  EXPECT_CALL(drain_close_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
   EXPECT_CALL(*codec_, shutdownNotice());
   filter->callbacks_->streamInfo().setResponseCodeDetails("");
   filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
@@ -4530,45 +4447,6 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterAccessLogBeforeConfigAccessLog) 
           // On the first call it is expected that there is no response code.
           EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
           EXPECT_TRUE(stream_info.responseCode());
-        }));
-  }
-
-  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
-  decoder_filters_[0]->callbacks_->streamInfo().setResponseCodeDetails("");
-  decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
-}
-
-TEST_F(HttpConnectionManagerImplTest, TestFilterAccessLogBeforeConfigAccessLogFeatureFalse) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.filter_access_loggers_first", "false"}});
-  log_handler_ = std::make_shared<NiceMock<AccessLog::MockInstance>>(); // filter log handler
-  std::shared_ptr<AccessLog::MockInstance> handler(
-      new NiceMock<AccessLog::MockInstance>()); // config log handler
-  access_logs_ = {handler};
-  setup();
-  setupFilterChain(1, 0);
-
-  EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
-      .WillOnce(Return(FilterHeadersStatus::StopIteration));
-  startRequest();
-
-  {
-    InSequence s; // Create an InSequence object to enforce order
-
-    EXPECT_CALL(*handler, log(_, _))
-        .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                            const StreamInfo::StreamInfo& stream_info) {
-          // First call to log() is made when a new HTTP request has been received
-          // On the first call it is expected that there is no response code.
-          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-          EXPECT_TRUE(stream_info.responseCode());
-        }));
-
-    EXPECT_CALL(*log_handler_, log(_, _))
-        .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
-                            const StreamInfo::StreamInfo& stream_info) {
-          EXPECT_EQ(AccessLog::AccessLogType::DownstreamEnd, log_context.accessLogType());
-          EXPECT_FALSE(stream_info.hasAnyResponseFlag());
         }));
   }
 

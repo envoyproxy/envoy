@@ -11,15 +11,11 @@ class MaglevTester : public BaseTester {
 public:
   MaglevTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
       : BaseTester(num_hosts, weighted_subset_percent, weight) {
-    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(
-        priority_set_, stats_, stats_scope_, runtime_, random_,
-        config_.has_value()
-            ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(config_.value())
-            : absl::nullopt,
-        common_config_);
+    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_scope_, runtime_,
+                                                      random_, 50, config_);
   }
 
-  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
+  envoy::extensions::load_balancing_policies::maglev::v3::Maglev config_;
   std::unique_ptr<MaglevLoadBalancer> maglev_lb_;
 };
 
@@ -41,7 +37,7 @@ void benchmarkMaglevLoadBalancerChooseHost(::benchmark::State& state) {
     // comparing different hashing algorithms.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
-      hit_counter[lb->chooseHost(&context)->address()->asString()] += 1;
+      hit_counter[lb->chooseHost(&context).host->address()->asString()] += 1;
     }
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.
@@ -93,7 +89,7 @@ void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
-      hosts.push_back(lb->chooseHost(&context));
+      hosts.push_back(lb->chooseHost(&context).host);
     }
 
     MaglevTester tester2(num_hosts - hosts_to_lose);
@@ -102,7 +98,7 @@ void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
-      hosts2.push_back(lb->chooseHost(&context));
+      hosts2.push_back(lb->chooseHost(&context).host);
     }
 
     ASSERT(hosts.size() == hosts2.size());
@@ -140,7 +136,7 @@ void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
-      hosts.push_back(lb->chooseHost(&context));
+      hosts.push_back(lb->chooseHost(&context).host);
     }
 
     MaglevTester tester2(num_hosts, weighted_subset_percent, after_weight);
@@ -149,7 +145,7 @@ void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
       context.hash_key_ = hashInt(i);
-      hosts2.push_back(lb->chooseHost(&context));
+      hosts2.push_back(lb->chooseHost(&context).host);
     }
 
     ASSERT(hosts.size() == hosts2.size());

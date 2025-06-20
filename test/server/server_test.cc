@@ -22,6 +22,7 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
@@ -36,6 +37,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -158,6 +160,59 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
   }));
   c.inc();
   InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimits) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 512;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, const struct rlimit* rlim) {
+        EXPECT_EQ(1024, rlim->rlim_cur);
+        EXPECT_EQ(1024, rlim->rlim_max);
+        return Api::SysCallIntResult{0, 0};
+      }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsAlreadyMaxed) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 1024;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsReadError) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _)).WillOnce(Invoke([&](int, struct rlimit*) {
+    return Api::SysCallIntResult{-1, 0};
+  }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsWriteError) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 512;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, const struct rlimit*) { return Api::SysCallIntResult{-1, 0}; }));
+  InstanceUtil::raiseFileLimits();
 }
 
 class RunHelperTest : public testing::Test {
@@ -534,13 +589,6 @@ TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
   server_thread->join();
 }
 
-// Validate the the Envoy FIPS compilation flags are consistent with the FIPS
-// mode of the underlying BoringSSL build.
-TEST_P(ServerInstanceImplTest, ValidateFIPSModeConsistency) {
-  bool isFIPS = (FIPS_mode() != 0);
-  EXPECT_EQ(isFIPS, VersionInfo::sslFipsCompliant());
-}
-
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
   auto server_thread = startTestServer("test/server/test_data/server/node_bootstrap.yaml", false);
   server_->dispatcher().post([&] { server_->shutdown(); });
@@ -703,18 +751,20 @@ TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
   // infinite drainClose spin-loop (mimicing high traffic) is running before we
   // initiate the drain sequence.
   auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
-    bool closed = drain_manager.drainClose();
+    bool closed = drain_manager.drainClose(Network::DrainDirection::All);
     drain_closes_started.Notify();
     while (!closed) {
-      closed = drain_manager.drainClose();
+      closed = drain_manager.drainClose(Network::DrainDirection::All);
     }
   });
   drain_closes_started.WaitForNotification();
 
   // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
   // wait for that to complete.
-  server_->dispatcher().post(
-      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+  server_->dispatcher().post([&] {
+    drain_manager.startDrainSequence(Network::DrainDirection::All,
+                                     [&drain_complete]() { drain_complete.Notify(); });
+  });
 
   drain_complete.WaitForNotification();
   drain_thread->join();
@@ -1357,6 +1407,20 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
       "non-empty");
 }
 
+TEST_P(ServerInstanceImplTest, ServerContextSingleton) {
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+
+  EXPECT_EQ(&server_->serverFactoryContext(),
+            Configuration::ServerFactoryContextInstance::getExisting());
+  server_ = nullptr;
+  EXPECT_EQ(nullptr, Configuration::ServerFactoryContextInstance::getExisting());
+}
+
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
 // This is a regression test for when we used to crash.
 TEST_P(ServerInstanceImplTest, StdExceptionThrowInConstructor) {
@@ -1457,6 +1521,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
               // call to cluster manager, to make sure it is not nullptr.
               ctx.clusterManager().clusters();
             }));
+            EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
             return mock_extension;
           }));
 

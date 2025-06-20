@@ -39,10 +39,9 @@ LocalResponsePolicy::LocalResponsePolicy(
   // by this PR and will be fixed in the future.
   Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
   if (config.has_body_format()) {
-    formatter_ =
-        THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
-                                  config.body_format(), generic_context),
-                              Formatter::FormatterBasePtr<Formatter::HttpFormatterContext>);
+    formatter_ = THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+                                           config.body_format(), generic_context),
+                                       Formatter::FormatterPtr);
   }
 }
 

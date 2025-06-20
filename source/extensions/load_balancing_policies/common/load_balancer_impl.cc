@@ -26,6 +26,8 @@ namespace Upstream {
 namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
+static const std::string RuntimeForceLocalZoneMinSize =
+    "upstream.zone_routing.force_local_zone.min_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
 
 // Returns true if the weights of all the hosts in the HostVector are equal.
@@ -60,36 +62,6 @@ std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
   }
 
   return {first_available_priority, total_load};
-}
-
-absl::optional<envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig>
-LoadBalancerConfigHelper::localityLbConfigFromCommonLbConfig(
-    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config) {
-
-  if (common_config.has_locality_weighted_lb_config()) {
-    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
-    locality_lb_config.mutable_locality_weighted_lb_config();
-    return locality_lb_config;
-  } else if (common_config.has_zone_aware_lb_config()) {
-    envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig locality_lb_config;
-    auto& zone_aware_lb_config = *locality_lb_config.mutable_zone_aware_lb_config();
-
-    const auto& legacy_zone_aware_lb_config = common_config.zone_aware_lb_config();
-    if (legacy_zone_aware_lb_config.has_routing_enabled()) {
-      *zone_aware_lb_config.mutable_routing_enabled() =
-          legacy_zone_aware_lb_config.routing_enabled();
-    }
-    if (legacy_zone_aware_lb_config.has_min_cluster_size()) {
-      *zone_aware_lb_config.mutable_min_cluster_size() =
-          legacy_zone_aware_lb_config.min_cluster_size();
-    }
-    zone_aware_lb_config.set_fail_traffic_on_panic(
-        legacy_zone_aware_lb_config.fail_traffic_on_panic());
-
-    return locality_lb_config;
-  }
-
-  return {};
 }
 
 std::pair<uint32_t, LoadBalancerBase::HostAvailability>
@@ -398,6 +370,21 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context, uint64_t hash) con
           priority_and_source.second};
 }
 
+uint64_t LoadBalancerBase::random(bool peeking) {
+  if (peeking) {
+    stashed_random_.push_back(random_.random());
+    return stashed_random_.back();
+  } else {
+    if (!stashed_random_.empty()) {
+      auto random = stashed_random_.front();
+      stashed_random_.pop_front();
+      return random;
+    } else {
+      return random_.random();
+    }
+  }
+}
+
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterLbStats& stats,
     Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
@@ -408,6 +395,24 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                             ? PROTOBUF_GET_WRAPPED_OR_DEFAULT(
                                   locality_config->zone_aware_lb_config(), min_cluster_size, 6U)
                             : 6U),
+      force_local_zone_min_size_([&]() -> absl::optional<uint32_t> {
+        // Check runtime value first
+        if (auto rt = runtime_.snapshot().getInteger(RuntimeForceLocalZoneMinSize, 0); rt > 0) {
+          return static_cast<uint32_t>(rt);
+        }
+
+        // ForceLocalZone proto field supersedes deprecated ForceLocalityDirectRouting
+        if (locality_config.has_value()) {
+          if (locality_config->zone_aware_lb_config().has_force_local_zone()) {
+            return PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                locality_config->zone_aware_lb_config().force_local_zone(), min_size, 1U);
+          }
+          if (locality_config->zone_aware_lb_config().force_locality_direct_routing()) {
+            return 1U;
+          }
+        }
+        return absl::nullopt;
+      }()),
       routing_enabled_(locality_config.has_value()
                            ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
                                  locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
@@ -480,13 +485,19 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   auto locality_percentages =
       calculateLocalityPercentages(localHostsPerLocality, upstreamHostsPerLocality);
 
-  // If we have lower percent of hosts in the local cluster in the same locality,
-  // we can push all of the requests directly to upstream cluster in the same locality.
-  if (upstreamHostsPerLocality.hasLocalLocality() &&
-      locality_percentages[0].upstream_percentage > 0 &&
-      locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) {
-    state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
-    return;
+  if (upstreamHostsPerLocality.hasLocalLocality()) {
+    // If we have lower percent of hosts in the local cluster in the same locality,
+    // we can push all of the requests directly to upstream cluster in the same locality.
+    if ((locality_percentages[0].upstream_percentage > 0 &&
+         locality_percentages[0].upstream_percentage >= locality_percentages[0].local_percentage) ||
+        // When force_local_zone is enabled, always use LocalityDirect routing if there are enough
+        // healthy upstreams in the local locality as determined by force_local_zone_min_size is
+        // met.
+        (force_local_zone_min_size_.has_value() &&
+         upstreamHostsPerLocality.get()[0].size() >= *force_local_zone_min_size_)) {
+      state.locality_routing_state_ = LocalityRoutingState::LocalityDirect;
+      return;
+    }
   }
 
   state.locality_routing_state_ = LocalityRoutingState::LocalityResidual;
@@ -557,8 +568,9 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   }
 
   // Do not perform locality routing if there are too few local localities for zone routing to have
-  // an effect.
-  if (localHostSet().hostsPerLocality().get().size() < 2) {
+  // an effect. Skipped when ForceLocalZone is enabled.
+  if (!force_local_zone_min_size_.has_value() &&
+      localHostSet().hostsPerLocality().get().size() < 2) {
     return true;
   }
 
@@ -585,7 +597,7 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
-HostConstSharedPtr ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
+HostSelectionResponse ZoneAwareLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host;
 
   const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;

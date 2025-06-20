@@ -18,7 +18,6 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
-#include "source/common/common/cleanup.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
@@ -120,6 +119,8 @@ StatusOr<sockaddr_in> parseV4Address(const std::string& ip_address, uint16_t por
 
 StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t port) {
   // Parse IPv6 with optional scope using getaddrinfo().
+  // While inet_pton() would be faster and simpler, it does not support IPv6
+  // addresses that specify a scope, e.g. `::%eth0` to listen on only one interface.
   struct addrinfo hints;
   memset(&hints, 0, sizeof(hints));
   struct addrinfo* res = nullptr;
@@ -133,37 +134,57 @@ StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t po
   // we consume only the first element (if the call succeeds).
   hints.ai_socktype = SOCK_DGRAM;
   hints.ai_protocol = IPPROTO_UDP;
-  const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getaddrinfo(
-      ip_address.c_str(), /*service=*/nullptr, &hints, &res);
+
+  // We want to use the interface of OsSysCalls for this for the
+  // platform-independence, but we don't want to use the common
+  // OsSysCallsSingleton.
+  //
+  // The problem with using OsSysCallsSingleton is that we likely
+  // want to override getaddrinfo() for DNS lookups in tests, but
+  // typically that override would resolve a name to e.g.
+  // the address from resolveUrl("tcp://[::1]:80") - but resolveUrl
+  // calls parseV6Address, which calls getaddrinfo(), so if we use
+  // the mock *here* then mocking DNS causes infinite recursion.
+  //
+  // We don't ever need to mock *this* getaddrinfo() call, because
+  // it's only used to parse numeric IP addresses, per `ai_flags`,
+  // so it should be deterministic resolution; there's no need to
+  // mock it to test failure cases.
+  static Api::OsSysCallsImpl os_sys_calls;
+
+  const Api::SysCallIntResult rc =
+      os_sys_calls.getaddrinfo(ip_address.c_str(), /*service=*/nullptr, &hints, &res);
   if (rc.return_value_ != 0) {
     return absl::FailedPreconditionError(fmt::format("getaddrinfo error: {}", rc.return_value_));
   }
   sockaddr_in6 sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
-  freeaddrinfo(res);
+  os_sys_calls.freeaddrinfo(res);
   sa6.sin6_port = htons(port);
   return sa6;
 }
 
 } // namespace
 
-Address::InstanceConstSharedPtr Utility::parseInternetAddressNoThrow(const std::string& ip_address,
-                                                                     uint16_t port, bool v6only) {
+Address::InstanceConstSharedPtr
+Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port, bool v6only,
+                                     absl::optional<std::string> network_namespace) {
   StatusOr<sockaddr_in> sa4 = parseV4Address(ip_address, port);
   if (sa4.ok()) {
-    return instanceOrNull(
-        Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4.value()));
+    return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
+        &sa4.value(), nullptr, network_namespace));
   }
 
   StatusOr<sockaddr_in6> sa6 = parseV6Address(ip_address, port);
   if (sa6.ok()) {
-    return instanceOrNull(
-        Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sa6, v6only));
+    return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
+        *sa6, v6only, nullptr, network_namespace));
   }
   return nullptr;
 }
 
 Address::InstanceConstSharedPtr
-Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only) {
+Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool v6only,
+                                            absl::optional<std::string> network_namespace) {
   if (ip_address.empty()) {
     return nullptr;
   }
@@ -181,8 +202,8 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
     }
     StatusOr<sockaddr_in6> sa6 = parseV6Address(ip_str, port64);
     if (sa6.ok()) {
-      return instanceOrNull(
-          Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(*sa6, v6only));
+      return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
+          *sa6, v6only, nullptr, network_namespace));
     }
     return nullptr;
   }
@@ -551,7 +572,7 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                             Address::InstanceConstSharedPtr peer_addess,
                             Address::InstanceConstSharedPtr local_address,
                             UdpPacketProcessor& udp_packet_processor, MonotonicTime receive_time,
-                            uint8_t tos, Buffer::RawSlice saved_cmsg) {
+                            uint8_t tos, Buffer::OwnedImpl saved_cmsg) {
   ENVOY_BUG(peer_addess != nullptr,
             fmt::format("Unable to get remote address on the socket bound to local address: {}.",
                         (local_address == nullptr ? "unknown" : local_address->asString())));
@@ -564,7 +585,7 @@ void passPayloadToProcessor(uint64_t bytes_read, Buffer::InstancePtr buffer,
                         (local_address == nullptr ? "unknown" : local_address->asString()),
                         bytes_read));
   udp_packet_processor.processPacket(std::move(local_address), std::move(peer_addess),
-                                     std::move(buffer), receive_time, tos, saved_cmsg);
+                                     std::move(buffer), receive_time, tos, std::move(saved_cmsg));
 }
 
 Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
@@ -603,10 +624,10 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
     if (num_packets_read != nullptr) {
       *num_packets_read += 1;
     }
-    passPayloadToProcessor(result.return_value_, std::move(buffer),
-                           std::move(output.msg_[0].peer_address_),
-                           std::move(output.msg_[0].local_address_), udp_packet_processor,
-                           receive_time, output.msg_[0].tos_, output.msg_[0].saved_cmsg_);
+    passPayloadToProcessor(
+        result.return_value_, std::move(buffer), std::move(output.msg_[0].peer_address_),
+        std::move(output.msg_[0].local_address_), udp_packet_processor, receive_time,
+        output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
     return result;
   }
 
@@ -622,7 +643,7 @@ Api::IoCallUint64Result readFromSocketRecvGro(IoHandle& handle,
     }
     passPayloadToProcessor(bytes_to_copy, std::move(sub_buffer), output.msg_[0].peer_address_,
                            output.msg_[0].local_address_, udp_packet_processor, receive_time,
-                           output.msg_[0].tos_, output.msg_[0].saved_cmsg_);
+                           output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
   }
 
   return result;
@@ -688,7 +709,7 @@ readFromSocketRecvMmsg(IoHandle& handle, const Address::Instance& local_address,
     }
     passPayloadToProcessor(msg_len, std::move(buffers[i].buffer_), output.msg_[i].peer_address_,
                            output.msg_[i].local_address_, udp_packet_processor, receive_time,
-                           output.msg_[i].tos_, output.msg_[i].saved_cmsg_);
+                           output.msg_[i].tos_, std::move(output.msg_[i].saved_cmsg_));
   }
   return result;
 }
@@ -721,7 +742,7 @@ Api::IoCallUint64Result readFromSocketRecvMsg(IoHandle& handle,
   passPayloadToProcessor(result.return_value_, std::move(buffer),
                          std::move(output.msg_[0].peer_address_),
                          std::move(output.msg_[0].local_address_), udp_packet_processor,
-                         receive_time, output.msg_[0].tos_, output.msg_[0].saved_cmsg_);
+                         receive_time, output.msg_[0].tos_, std::move(output.msg_[0].saved_cmsg_));
   return result;
 }
 

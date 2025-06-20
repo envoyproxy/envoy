@@ -11,6 +11,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/scaled_range_timer_manager.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
@@ -98,14 +99,12 @@ ConnectionManagerImpl::generateListenerStats(const std::string& prefix, Stats::S
   return {CONN_MAN_LISTENER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
-ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfigSharedPtr config,
-                                             const Network::DrainDecision& drain_close,
-                                             Random::RandomGenerator& random_generator,
-                                             Http::Context& http_context, Runtime::Loader& runtime,
-                                             const LocalInfo::LocalInfo& local_info,
-                                             Upstream::ClusterManager& cluster_manager,
-                                             Server::OverloadManager& overload_manager,
-                                             TimeSource& time_source)
+ConnectionManagerImpl::ConnectionManagerImpl(
+    ConnectionManagerConfigSharedPtr config, const Network::DrainDecision& drain_close,
+    Random::RandomGenerator& random_generator, Http::Context& http_context,
+    Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
+    Upstream::ClusterManager& cluster_manager, Server::OverloadManager& overload_manager,
+    TimeSource& time_source, envoy::config::core::v3::TrafficDirection direction)
     : config_(std::move(config)), stats_(config_->stats()),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
           stats_.named_.downstream_cx_length_ms_, time_source)),
@@ -128,6 +127,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfigSharedPtr co
                                      /*proxy_status_config=*/config_->proxyStatusConfig())),
       max_requests_during_dispatch_(
           runtime_.snapshot().getInteger(ConnectionManagerImpl::MaxRequestsPerIoCycle, UINT32_MAX)),
+      direction_(direction),
       allow_upstream_half_close_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.allow_multiplexed_upstream_half_close")) {
   ENVOY_LOG_ONCE_IF(
@@ -933,21 +933,10 @@ void ConnectionManagerImpl::ActiveStream::log(AccessLog::AccessLogType type) {
       request_headers_.get(), response_headers_.get(), response_trailers_.get(), {}, type,
       active_span_.get()};
 
-  const bool filter_access_loggers_first =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.filter_access_loggers_first");
-
-  if (!filter_access_loggers_first) {
-    for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
-      access_logger->log(log_context, filter_manager_.streamInfo());
-    }
-  }
-
   filter_manager_.log(log_context);
 
-  if (filter_access_loggers_first) {
-    for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
-      access_logger->log(log_context, filter_manager_.streamInfo());
-    }
+  for (const auto& access_logger : connection_manager_.config_->accessLogs()) {
+    access_logger->log(log_context, filter_manager_.streamInfo());
   }
 }
 
@@ -1017,7 +1006,7 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
   uint64_t response_code = Utility::getResponseStatus(headers);
   filter_manager_.streamInfo().setResponseCode(response_code);
 
-  if (filter_manager_.streamInfo().health_check_request_) {
+  if (filter_manager_.streamInfo().healthCheck()) {
     return;
   }
 
@@ -1588,12 +1577,13 @@ void ConnectionManagerImpl::ActiveStream::snapScopedRouteConfig() {
 void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() { refreshCachedRoute(nullptr); }
 
 void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
-  if (!filter_manager_.streamInfo().route() ||
-      !filter_manager_.streamInfo().route()->routeEntry() || !request_headers_) {
+  if (!hasCachedRoute() || !request_headers_) {
     return;
   }
-  const auto& route = filter_manager_.streamInfo().route()->routeEntry();
-
+  const Router::RouteEntry* route = cached_route_.value()->routeEntry();
+  if (route == nullptr) {
+    return;
+  }
   auto grpc_timeout = Grpc::Common::getGrpcTimeout(*request_headers_);
   std::chrono::milliseconds timeout;
   bool disable_timer = false;
@@ -1695,7 +1685,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
     }
   }
 
-  setRoute(route);
+  setRoute(std::move(route));
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
@@ -1799,10 +1789,19 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
 
+  // If we're an inbound listener, then we should drain even if the drain direction is inbound only.
+  // If not, then we only drain if the drain direction is all.
+  Network::DrainDirection drain_scope =
+      connection_manager_.direction_ == envoy::config::core::v3::TrafficDirection::INBOUND
+          ? Network::DrainDirection::InboundOnly
+          : Network::DrainDirection::All;
+
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
-  // header block.
+  // header block. Only drain if the drain direction is not inbound only or the connection is
+  // inbound.
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
-      (connection_manager_.drain_close_.drainClose() || drain_connection_due_to_overload)) {
+      (connection_manager_.drain_close_.drainClose(drain_scope) ||
+       drain_connection_due_to_overload)) {
 
     // This doesn't really do anything for HTTP/1.1 other then give the connection another boost
     // of time to race with incoming requests. For HTTP/2 connections, send a GOAWAY frame to
@@ -2183,6 +2182,27 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
   if (tracing_custom_tags_) {
     tracing_custom_tags_->clear();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {
+  // If there is no cached route, or route cache is frozen, or the request headers are not
+  // available, then do not refresh the route cluster.
+  if (!hasCachedRoute() || routeCacheBlocked() || request_headers_ == nullptr) {
+    return;
+  }
+  if (const auto* entry = (*cached_route_)->routeEntry(); entry != nullptr) {
+    // Refresh the cluster if possible.
+    entry->refreshRouteCluster(*request_headers_, filter_manager_.streamInfo());
+
+    // Refresh the cached cluster info is necessary.
+    if (!cached_cluster_info_.has_value() || cached_cluster_info_.value() == nullptr ||
+        (*cached_cluster_info_)->name() != entry->clusterName()) {
+      auto* cluster =
+          connection_manager_.cluster_manager_.getThreadLocalCluster(entry->clusterName());
+      cached_cluster_info_ = (nullptr == cluster) ? nullptr : cluster->info();
+      filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
+    }
   }
 }
 

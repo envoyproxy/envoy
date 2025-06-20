@@ -37,12 +37,11 @@ public:
   addStaticProvider(std::function<RouteConfigProviderPtr()> create_static_provider);
 
   template <class RdsConfig>
-  RouteConfigProviderSharedPtr
-  addDynamicProvider(const RdsConfig& rds, const std::string& route_config_name,
-                     Init::Manager& init_manager,
-                     std::function<std::pair<RouteConfigProviderSharedPtr, const Init::Target*>(
-                         uint64_t manager_identifier)>
-                         create_dynamic_provider) {
+  RouteConfigProviderSharedPtr addDynamicProvider(
+      const RdsConfig& rds, const std::string& route_config_name, Init::Manager& init_manager,
+      std::function<absl::StatusOr<std::pair<RouteConfigProviderSharedPtr, const Init::Target*>>(
+          uint64_t manager_identifier)>
+          create_dynamic_provider) {
 
     uint64_t manager_identifier;
 
@@ -67,7 +66,8 @@ public:
     if (existing_provider) {
       return existing_provider;
     }
-    auto new_provider = create_dynamic_provider(manager_identifier);
+    using PtrPair = std::pair<RouteConfigProviderSharedPtr, const Init::Target*>;
+    auto new_provider = THROW_OR_RETURN_VALUE(create_dynamic_provider(manager_identifier), PtrPair);
     init_manager.add(*new_provider.second);
     dynamic_route_config_providers_.insert({manager_identifier, new_provider});
     return new_provider.first;

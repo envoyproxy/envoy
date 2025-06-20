@@ -2,7 +2,6 @@
 
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -15,7 +14,6 @@ namespace Lua {
 using testing::InSequence;
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 
 class LuaClusterSpecifierPluginTest : public testing::Test {
 public:
@@ -68,6 +66,7 @@ public:
   )EOF";
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::unique_ptr<LuaClusterSpecifierPlugin> plugin_;
   LuaClusterSpecifierConfigSharedPtr config_;
 };
@@ -79,7 +78,7 @@ TEST_F(LuaClusterSpecifierPluginTest, NormalLuaCode) {
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "fake"}};
-    auto route = plugin_->route(mock_route, headers);
+    auto route = plugin_->route(mock_route, headers, stream_info_);
     EXPECT_EQ("fake_service", route->routeEntry()->clusterName());
     // Force the runtime to gc and destroy all the userdata.
     config_->perLuaCodeSetup()->runtimeGC();
@@ -87,7 +86,7 @@ TEST_F(LuaClusterSpecifierPluginTest, NormalLuaCode) {
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "header_value"}};
-    auto route = plugin_->route(mock_route, headers);
+    auto route = plugin_->route(mock_route, headers, stream_info_);
     EXPECT_EQ("web_service", route->routeEntry()->clusterName());
     // Force the runtime to gc and destroy all the userdata.
     config_->perLuaCodeSetup()->runtimeGC();
@@ -101,7 +100,7 @@ TEST_F(LuaClusterSpecifierPluginTest, ErrorLuaCode) {
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "fake"}};
-    auto route = plugin_->route(mock_route, headers);
+    auto route = plugin_->route(mock_route, headers, stream_info_);
     EXPECT_EQ("default_service", route->routeEntry()->clusterName());
     // Force the runtime to gc and destroy all the userdata.
     config_->perLuaCodeSetup()->runtimeGC();
@@ -109,7 +108,7 @@ TEST_F(LuaClusterSpecifierPluginTest, ErrorLuaCode) {
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "header_value"}};
-    auto route = plugin_->route(mock_route, headers);
+    auto route = plugin_->route(mock_route, headers, stream_info_);
     EXPECT_EQ("default_service", route->routeEntry()->clusterName());
     // Force the runtime to gc and destroy all the userdata.
     config_->perLuaCodeSetup()->runtimeGC();
@@ -123,7 +122,7 @@ TEST_F(LuaClusterSpecifierPluginTest, ReturnTypeNotStringLuaCode) {
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "fake"}};
-    auto route = plugin_->route(mock_route, headers);
+    auto route = plugin_->route(mock_route, headers, stream_info_);
     EXPECT_EQ("fake_service", route->routeEntry()->clusterName());
     // Force the runtime to gc and destroy all the userdata.
     config_->perLuaCodeSetup()->runtimeGC();
@@ -131,7 +130,7 @@ TEST_F(LuaClusterSpecifierPluginTest, ReturnTypeNotStringLuaCode) {
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"header_key", "header_value"}};
-    auto route = plugin_->route(mock_route, headers);
+    auto route = plugin_->route(mock_route, headers, stream_info_);
     EXPECT_EQ("default_service", route->routeEntry()->clusterName());
     // Force the runtime to gc and destroy all the userdata.
     config_->perLuaCodeSetup()->runtimeGC();
@@ -142,26 +141,6 @@ TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfig) {
   setUpTest(normal_lua_config_yaml_);
   InSequence s;
   EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).Times(0);
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
-
-  config_.reset();
-  plugin_.reset();
-
-  LuaClusterSpecifierConfigProto proto_config{};
-  TestUtility::loadFromYaml(normal_lua_config_yaml_, proto_config);
-  config_ = std::make_shared<LuaClusterSpecifierConfig>(proto_config, server_factory_context_);
-  config_.reset();
-}
-
-TEST_F(LuaClusterSpecifierPluginTest, DestructLuaClusterSpecifierConfigDisableRuntime) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.restart_features.allow_slot_destroy_on_worker_threads", "false"}});
-
-  setUpTest(normal_lua_config_yaml_);
-  InSequence s;
-  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(false));
-  EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
-  EXPECT_CALL(server_factory_context_.dispatcher_, isThreadSafe()).WillOnce(Return(true));
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_)).Times(0);
 
   config_.reset();
@@ -188,7 +167,7 @@ TEST_F(LuaClusterSpecifierPluginTest, GetClustersBadArg) {
 
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
-  auto route = plugin_->route(mock_route, headers);
+  auto route = plugin_->route(mock_route, headers, stream_info_);
   EXPECT_EQ("default_service", route->routeEntry()->clusterName());
 }
 
@@ -213,7 +192,7 @@ TEST_F(LuaClusterSpecifierPluginTest, GetClustersMissing) {
 
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
-  auto route = plugin_->route(mock_route, headers);
+  auto route = plugin_->route(mock_route, headers, stream_info_);
   EXPECT_EQ("nil", route->routeEntry()->clusterName());
 }
 
@@ -263,7 +242,7 @@ TEST_F(LuaClusterSpecifierPluginTest, ClusterMethods) {
 
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
-  auto route = plugin_->route(mock_route, headers);
+  auto route = plugin_->route(mock_route, headers, stream_info_);
   EXPECT_EQ("pass", route->routeEntry()->clusterName());
 
   // Force the runtime to gc and destroy all the userdata.
@@ -300,7 +279,7 @@ TEST_F(LuaClusterSpecifierPluginTest, ClusterRef) {
 
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   Http::TestRequestHeaderMapImpl headers{{":path", "/"}};
-  auto route = plugin_->route(mock_route, headers);
+  auto route = plugin_->route(mock_route, headers, stream_info_);
   EXPECT_EQ("pass", route->routeEntry()->clusterName());
 
   // Force the runtime to gc and destroy all the userdata.
@@ -331,7 +310,7 @@ TEST_F(LuaClusterSpecifierPluginTest, Logging) {
                                                          {"warn", "log test"},
                                                          {"error", "log test"},
                                                          {"critical", "log test"}}),
-                             { plugin_->route(mock_route, headers); });
+                             { plugin_->route(mock_route, headers, stream_info_); });
 }
 
 } // namespace Lua

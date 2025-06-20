@@ -27,8 +27,6 @@ public:
     return ClusterUpdateCallbacksHandlePtr{addThreadLocalClusterUpdateCallbacks_(callbacks)};
   }
 
-  ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
-
   void initializeClusters(const std::vector<std::string>& active_cluster_names,
                           const std::vector<std::string>& warming_cluster_names);
 
@@ -45,6 +43,9 @@ public:
   MOCK_METHOD(absl::Status, initializeSecondaryClusters,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(ClusterInfoMaps, clusters, (), (const));
+  MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (const std::string& cluster_name), (const));
+  MOCK_METHOD(bool, hasCluster, (const std::string& cluster_name), (const));
+  MOCK_METHOD(bool, hasActiveClusters, (), (const));
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));
@@ -85,7 +86,7 @@ public:
               (const std::string& cluster, DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(void, drainConnections, (DrainConnectionsHostPredicate predicate));
   MOCK_METHOD(absl::Status, checkActiveStaticCluster, (const std::string& cluster));
-  MOCK_METHOD(OdCdsApiHandlePtr, allocateOdCdsApi,
+  MOCK_METHOD(absl::StatusOr<OdCdsApiHandlePtr>, allocateOdCdsApi,
               (OdCdsCreationFunction creation_function,
                const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
@@ -107,7 +108,6 @@ public:
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Grpc::MockAsyncClientManager> async_client_manager_;
   absl::optional<std::string> local_cluster_name_;
-  NiceMock<MockClusterManagerFactory> cluster_manager_factory_;
   NiceMock<Config::MockSubscriptionFactory> subscription_factory_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> active_clusters_;
   absl::flat_hash_map<std::string, std::unique_ptr<MockCluster>> warming_clusters_;

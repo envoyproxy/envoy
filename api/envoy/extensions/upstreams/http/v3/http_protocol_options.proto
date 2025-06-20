@@ -140,7 +140,6 @@ message HttpProtocolOptions {
     option (validate.required) = true;
 
     // To explicitly configure either HTTP/1 or HTTP/2 (but not both!) use ``explicit_http_config``.
-    // If the ``explicit_http_config`` is empty, HTTP/1.1 is used.
     ExplicitHttpConfig explicit_http_config = 3;
 
     // This allows switching on protocol based on what protocol the downstream
@@ -151,10 +150,11 @@ message HttpProtocolOptions {
     AutoHttpConfig auto_config = 5;
   }
 
+  // Optional HTTP filters for the upstream HTTP filter chain.
+  //
   // .. note::
   //   Upstream HTTP filters are currently in alpha.
   //
-  // Optional HTTP filters for the upstream HTTP filter chain.
   //
   // These filters will be applied for all HTTP streams which flow through this
   // cluster. Unlike downstream HTTP filters, they will *not* be applied to terminated CONNECT requests.

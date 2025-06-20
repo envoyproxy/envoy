@@ -12,8 +12,8 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher)
-    : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
-                                POOL_COUNTER_PREFIX(scope, "load_reporter."))},
+    : cm_(cluster_manager),
+      stats_{ALL_LOAD_REPORTER_STATS(POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
@@ -65,12 +65,12 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   auto all_clusters = cm_.clusters();
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
-    auto it = all_clusters.active_clusters_.find(cluster_name);
-    if (it == all_clusters.active_clusters_.end()) {
+    OptRef<const Upstream::Cluster> active_cluster = cm_.getActiveCluster(cluster_name);
+    if (!active_cluster.has_value()) {
       ENVOY_LOG(debug, "Cluster {} does not exist", cluster_name);
       continue;
     }
-    auto& cluster = it->second.get();
+    const Upstream::Cluster& cluster = active_cluster.value();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
     if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
@@ -107,7 +107,12 @@ void LoadStatsReporter::sendLoadStatsRequest() {
             }
           }
         }
-        if (rq_success + rq_error + rq_active != 0) {
+        bool should_send_locality_stats = rq_success + rq_error + rq_active != 0;
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.report_load_with_rq_issued")) {
+          should_send_locality_stats = rq_issued != 0;
+        }
+        if (should_send_locality_stats) {
           auto* locality_stats = cluster_stats->add_upstream_locality_stats();
           locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
           locality_stats->set_priority(host_set->priority());

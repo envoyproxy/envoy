@@ -12,12 +12,12 @@ namespace HttpFilters {
 namespace ApiKeyAuth {
 
 class ApiKeyAuthFilterFactory
-    : public Common::FactoryBase<ApiKeyAuthProto, ApiKeyAuthPerRouteProto> {
+    : public Common::ExceptionFreeFactoryBase<ApiKeyAuthProto, ApiKeyAuthPerRouteProto> {
 public:
-  ApiKeyAuthFilterFactory() : FactoryBase("envoy.filters.http.api_key_auth") {}
+  ApiKeyAuthFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.api_key_auth") {}
 
 private:
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProtoTyped(const ApiKeyAuthProto& config, const std::string& stats_prefix,
                                     Server::Configuration::FactoryContext& context) override;
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

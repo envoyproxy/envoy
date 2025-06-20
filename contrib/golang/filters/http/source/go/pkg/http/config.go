@@ -105,14 +105,21 @@ func envoyGoFilterDestroyHttpPluginConfig(id uint64, needDelay int) {
 		// 2. while B envoy worker thread may update the merged_config_id_ in getMergedConfigId, that will delete the id.
 		// so, we delay deleting the id in the Go side.
 		time.AfterFunc(delayDeleteTime, func() {
-			configCache.Delete(id)
+			destroyConfig(id)
 		})
 	} else {
 		// there is no race for non-merged config.
-		configCache.Delete(id)
+		destroyConfig(id)
 	}
 	if asanTestEnabled {
 		forceGCFinalizer()
+	}
+}
+
+func destroyConfig(id uint64) {
+	c, _ := configCache.LoadAndDelete(id)
+	if conf, ok := c.(api.Config); ok {
+		conf.Destroy()
 	}
 }
 

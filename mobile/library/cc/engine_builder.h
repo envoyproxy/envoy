@@ -7,6 +7,7 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/socket_option.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -40,8 +41,11 @@ public:
   EngineBuilder& addDnsRefreshSeconds(int dns_refresh_seconds);
   EngineBuilder& addDnsFailureRefreshSeconds(int base, int max);
   EngineBuilder& addDnsQueryTimeoutSeconds(int dns_query_timeout_seconds);
+  EngineBuilder& setDisableDnsRefreshOnFailure(bool disable_dns_refresh_on_failure);
+  EngineBuilder& setDisableDnsRefreshOnNetworkChange(bool disable_dns_refresh_on_network_change);
   EngineBuilder& addDnsMinRefreshSeconds(int dns_min_refresh_seconds);
   EngineBuilder& setDnsNumRetries(uint32_t dns_num_retries);
+  EngineBuilder& setGetaddrinfoNumThreads(uint32_t num_threads);
   EngineBuilder& addMaxConnectionsPerHost(int max_connections_per_host);
   EngineBuilder& addH2ConnectionKeepaliveIdleIntervalMilliseconds(
       int h2_connection_keepalive_idle_interval_milliseconds);
@@ -73,6 +77,9 @@ public:
   EngineBuilder& enablePlatformCertificatesValidation(bool platform_certificates_validation_on);
 
   EngineBuilder& enableDnsCache(bool dns_cache_on, int save_interval_seconds = 1);
+  // Set additional socket options on the upstream cluster outbound sockets.
+  EngineBuilder& setAdditionalSocketOptions(
+      const std::vector<envoy::config::core::v3::SocketOption>& socket_options);
   // Adds the hostnames that should be pre-resolved by DNS prior to the first request issued for
   // that host. When invoked, any previous preresolve hostname entries get cleared and only the ones
   // provided in the hostnames argument get set.
@@ -108,6 +115,9 @@ public:
   // Sets the QUIC connection keepalive initial interval in nanoseconds
   EngineBuilder& setKeepAliveInitialIntervalMilliseconds(int keepalive_initial_interval_ms);
 
+  // Sets the maximum number of concurrent streams on a multiplexed connection (HTTP/2 or HTTP/3).
+  EngineBuilder& setMaxConcurrentStreams(int max_concurrent_streams);
+
 #if defined(__APPLE__)
   // Right now, this API is only used by Apple (iOS) to register the Apple proxy resolver API for
   // use in reading and using the system proxy settings.
@@ -118,10 +128,6 @@ public:
   // value will be used.
   EngineBuilder& respectSystemProxySettings(bool value, int refresh_interval_secs = 10);
   EngineBuilder& setIosNetworkServiceType(int ios_network_service_type);
-#else
-  // Only android supports c_ares
-  EngineBuilder& setUseCares(bool use_cares);
-  EngineBuilder& addCaresFallbackResolver(std::string host, int port);
 #endif
 
   // This is separated from build() for the sake of testability
@@ -151,10 +157,13 @@ private:
   int dns_refresh_seconds_ = 60;
   int dns_failure_refresh_seconds_base_ = 2;
   int dns_failure_refresh_seconds_max_ = 10;
-  int dns_query_timeout_seconds_ = 5;
-  absl::optional<uint32_t> dns_num_retries_ = absl::nullopt;
+  int dns_query_timeout_seconds_ = 120;
+  bool disable_dns_refresh_on_failure_{false};
+  bool disable_dns_refresh_on_network_change_{false};
+  absl::optional<uint32_t> dns_num_retries_ = 3;
+  uint32_t getaddrinfo_num_threads_ = 1;
   int h2_connection_keepalive_idle_interval_milliseconds_ = 100000000;
-  int h2_connection_keepalive_timeout_seconds_ = 10;
+  int h2_connection_keepalive_timeout_seconds_ = 15;
   std::string app_version_ = "unspecified";
   std::string app_id_ = "unspecified";
   std::string device_os_ = "unspecified";
@@ -175,18 +184,13 @@ private:
   bool enforce_trust_chain_verification_ = true;
   std::string upstream_tls_sni_;
   bool enable_http3_ = true;
-#if !defined(__APPLE__)
-  bool use_cares_ = false;
-  std::vector<std::pair<std::string, int>> cares_fallback_resolvers_;
-#endif
   std::string http3_connection_options_ = "";
   std::string http3_client_connection_options_ = "";
   std::vector<std::pair<std::string, int>> quic_hints_;
   std::vector<std::string> quic_suffixes_;
   int num_timeouts_to_trigger_port_migration_ = 0;
 #if defined(__APPLE__)
-  // TODO(abeyad): once stable, consider setting the default to true.
-  bool respect_system_proxy_settings_ = false;
+  bool respect_system_proxy_settings_ = true;
   int proxy_settings_refresh_interval_secs_ = 10;
   int ios_network_service_type_ = 0;
 #endif
@@ -195,6 +199,7 @@ private:
 
   std::vector<NativeFilterConfig> native_filter_chain_;
   std::vector<std::pair<std::string /* host */, uint32_t /* port */>> dns_preresolve_hostnames_;
+  std::vector<envoy::config::core::v3::SocketOption> socket_options_;
 
   std::vector<std::pair<std::string, bool>> runtime_guards_;
   std::vector<std::pair<std::string, bool>> restart_runtime_guards_;
@@ -211,9 +216,10 @@ private:
   // https://source.chromium.org/chromium/chromium/src/+/main:net/quic/quic_context.cc;l=21-22;drc=6849bf6b37e96bd1c38a5f77f7deaa28b53779c4;bpv=1;bpt=1
   const uint32_t initial_stream_window_size_ = 6 * 1024 * 1024;      // 6MB
   const uint32_t initial_connection_window_size_ = 15 * 1024 * 1024; // 15MB
-  int quic_connection_idle_timeout_seconds_ = 30;
+  int quic_connection_idle_timeout_seconds_ = 60;
 
   int keepalive_initial_interval_ms_ = 0;
+  int max_concurrent_streams_ = 0;
 };
 
 using EngineBuilderSharedPtr = std::shared_ptr<EngineBuilder>;

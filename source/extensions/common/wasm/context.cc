@@ -1315,13 +1315,19 @@ WasmResult Context::getMetric(uint32_t metric_id, uint64_t* result_uint64_ptr) {
 Context::~Context() {
   // Cancel any outstanding requests.
   for (auto& p : http_request_) {
-    p.second.request_->cancel();
+    if (p.second.request_ != nullptr) {
+      p.second.request_->cancel();
+    }
   }
   for (auto& p : grpc_call_request_) {
-    p.second.request_->cancel();
+    if (p.second.request_ != nullptr) {
+      p.second.request_->cancel();
+    }
   }
   for (auto& p : grpc_stream_) {
-    p.second.stream_->resetStream();
+    if (p.second.stream_ != nullptr) {
+      p.second.stream_->resetStream();
+    }
   }
 }
 

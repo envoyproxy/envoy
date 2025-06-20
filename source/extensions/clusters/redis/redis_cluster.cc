@@ -327,9 +327,11 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
-    client->client_ = client_factory_.create(host, dispatcher_, shared_from_this(),
-                                             redis_command_stats_, parent_.info()->statsScope(),
-                                             parent_.auth_username_, parent_.auth_password_, false);
+    // absl::nullopt here disables AWS IAM authentication in redis client which is not supported by
+    // redis cluster implementation
+    client->client_ = client_factory_.create(
+        host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
+        parent_.auth_username_, parent_.auth_password_, false, absl::nullopt, absl::nullopt);
     client->client_->addConnectionCallbacks(*client);
   }
   ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
@@ -387,6 +389,13 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
               resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
               return;
             }
+            // A successful query can return an empty response.
+            if (response.empty()) {
+              ENVOY_LOG(error, "DNS resolution for primary slot address {} returned no results",
+                        slot.primary_hostname_);
+              resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+              return;
+            }
             // Primary slot address resolved
             slot.setPrimary(Network::Utility::getAddressWithPort(
                 *response.front().addrInfo().address_, slot.primary_port_));
@@ -437,6 +446,10 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
           // We log a warn message.
           if (status != Network::DnsResolver::ResolutionStatus::Completed) {
             ENVOY_LOG(warn, "Unable to resolve cluster replica address {}", replica.first);
+          } else if (response.empty()) {
+            // A successful query can return an empty response.
+            ENVOY_LOG(warn, "DNS resolution for cluster replica address {} returned no results",
+                      replica.first);
           } else {
             // Replica resolved
             slot.addReplica(Network::Utility::getAddressWithPort(

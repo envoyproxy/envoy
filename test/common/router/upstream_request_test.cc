@@ -34,6 +34,7 @@ public:
   void initialize() {
     auto conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
     conn_pool_ = conn_pool.get();
+    ON_CALL(*conn_pool_, host()).WillByDefault(Return(host_));
     upstream_request_ =
         std::make_unique<UpstreamRequest>(router_filter_interface_, std::move(conn_pool), false,
                                           true, false /*enable_tcp_tunneling*/);
@@ -52,6 +53,8 @@ public:
   NiceMock<MockRouterFilterInterface> router_filter_interface_;
   std::unique_ptr<Router::FilterConfig> router_config_; // must outlive `UpstreamRequest`
   std::unique_ptr<UpstreamRequest> upstream_request_;
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      new NiceMock<Upstream::MockHostDescription>()};
 };
 
 // UpstreamRequest is responsible processing for passing 101 upgrade headers to onUpstreamHeaders.
@@ -236,6 +239,11 @@ TEST_F(UpstreamRequestTest, DumpsStateWithoutAllocatingMemory) {
 TEST_F(UpstreamRequestTest, TestSetStreamInfoFields) {
   initialize();
   EXPECT_EQ(upstream_request_->streamInfo().route(), router_filter_interface_.callbacks_.route());
+}
+
+TEST_F(UpstreamRequestTest, TestSetStreamInfoHost) {
+  initialize();
+  EXPECT_EQ(upstream_request_->streamInfo().upstreamInfo()->upstreamHost(), host_);
 }
 
 } // namespace

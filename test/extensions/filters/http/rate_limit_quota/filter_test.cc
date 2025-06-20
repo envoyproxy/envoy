@@ -65,6 +65,11 @@ public:
     TestUtility::loadFromYaml(std::string(GoogleGrpcConfig), config_);
   }
 
+  void addMatcherConfig(xds::type::matcher::v3::Matcher& matcher) {
+    config_.mutable_bucket_matchers()->MergeFrom(matcher);
+    match_tree_ = matcher_factory_.create(matcher)();
+  }
+
   void addMatcherConfig(MatcherConfigType config_type) {
     // Add the matcher configuration.
     xds::type::matcher::v3::Matcher matcher;
@@ -96,7 +101,7 @@ public:
 
     // Empty matcher config will not have the bucket matcher configured.
     if (config_type != MatcherConfigType::Empty) {
-      config_.mutable_bucket_matchers()->MergeFrom(matcher);
+      addMatcherConfig(matcher);
     }
   }
 
@@ -106,8 +111,9 @@ public:
         Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
     mock_local_client_ = new MockRateLimitClient();
-    filter_ = std::make_unique<RateLimitQuotaFilter>(
-        filter_config_, context_, absl::WrapUnique(mock_local_client_), config_with_hash_key);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
+                                                     absl::WrapUnique(mock_local_client_),
+                                                     config_with_hash_key, match_tree_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }
@@ -163,11 +169,18 @@ public:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<MockFactoryContext> context_;
+  RateLimitOnMatchActionContext action_context_ = {};
+  RateLimitQuotaValidationVisitor visitor_ = {};
+  Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext>
+      matcher_factory_ =
+          Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext>(
+              action_context_, context_.serverFactoryContext(), visitor_);
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
 
   MockRateLimitClient* mock_local_client_ = nullptr;
   FilterConfigConstSharedPtr filter_config_;
   FilterConfig config_;
+  Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree_ = nullptr;
   std::unique_ptr<RateLimitQuotaFilter> filter_;
   Http::TestRequestHeaderMapImpl default_headers_{
       {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}};
@@ -391,6 +404,7 @@ TEST_F(FilterTest, RequestMatchingSucceededWithCelMatcher) {
   Protobuf::TextFormat::ParseFromString(on_match_str, &on_match);
   inner_matcher->mutable_on_match()->MergeFrom(on_match);
   config_.mutable_bucket_matchers()->MergeFrom(matcher);
+  addMatcherConfig(matcher);
   createFilter();
   // Define the key value pairs that is used to build the bucket_id dynamically
   // via `custom_value` in the config.
@@ -412,6 +426,35 @@ BucketId bucketIdFromMap(const absl::flat_hash_map<std::string, std::string>& bu
     bucket_id.mutable_bucket()->insert({k, v});
   }
   return bucket_id;
+}
+
+TEST_F(FilterTest, DecodeHeaderWithValidOnNoMatchDenyWithSettings) {
+  addMatcherConfig(MatcherConfigType::ValidOnNoMatchConfig);
+  createFilter();
+  constructMismatchedRequestHeader();
+
+  absl::flat_hash_map<std::string, std::string> expected_bucket_ids({
+      {"on_no_match_name", "on_no_match_value"},
+      {"on_no_match_name_2", "on_no_match_value_2"},
+  });
+  BucketId bucket_id = bucketIdFromMap(expected_bucket_ids);
+  size_t bucket_id_hash = MessageUtil::hash(bucket_id);
+  BucketAction no_assignment_action;
+  no_assignment_action.mutable_quota_assignment_action()
+      ->mutable_rate_limit_strategy()
+      ->set_blanket_rule(RateLimitStrategy::DENY_ALL);
+  *no_assignment_action.mutable_bucket_id() = bucket_id;
+
+  // Default behavior is set to deny with custom settings in the bucket
+  // matcher's `no_assignment_behavior` & `deny_response_settings`.
+  EXPECT_CALL(*mock_local_client_, getBucket(bucket_id_hash)).WillOnce(Return(nullptr));
+  EXPECT_CALL(*mock_local_client_, createBucket(ProtoEqIgnoreRepeatedFieldOrdering(bucket_id),
+                                                bucket_id_hash, ProtoEq(no_assignment_action), _,
+                                                std::chrono::milliseconds::zero(), false))
+      .WillOnce(Return());
+
+  Http::FilterHeadersStatus status = filter_->decodeHeaders(default_headers_, false);
+  EXPECT_EQ(status, Envoy::Http::FilterHeadersStatus::StopIteration);
 }
 
 TEST_F(FilterTest, DecodeHeadersWithoutCachedAssignment) {

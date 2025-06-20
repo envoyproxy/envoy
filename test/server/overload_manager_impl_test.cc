@@ -94,7 +94,7 @@ private:
 
 class FakeProactiveResourceMonitor : public ProactiveResourceMonitor {
 public:
-  FakeProactiveResourceMonitor(uint64_t max) : max_(max), current_(0){};
+  FakeProactiveResourceMonitor(uint64_t max) : max_(max), current_(0) {};
 
   bool tryAllocateResource(int64_t increment) override {
     int64_t new_val = (current_ += increment);

@@ -116,7 +116,7 @@ To support memory leaks detection, tests are built with gperftools dependencies 
 
 ### Enabling Memory Profiling in Tests
 Use `HeapProfilerStart()`, `HeapProfilerStop()`, and `HeapProfilerDump()` to start, stop, and persist
-memory dumps, respectively. Please see [above](#adding-tcmalloc_dep-to-envoy) for more details.
+memory dumps, respectively. Please see [above](#add-tcmalloc_dep-dependency-to-envoy_cc_library-rules) for more details.
 
 ### Bazel Configuration
 By default, bazel executes tests in a sandbox, which will be deleted together with memory dumps

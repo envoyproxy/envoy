@@ -14,6 +14,7 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
@@ -30,7 +31,6 @@
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #endif
 
-#include "source/server/api_listener_impl.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/drain_manager_impl.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
@@ -72,7 +72,7 @@ envoy::admin::v3::ListenersConfigDump::DynamicListener* getOrCreateDynamicListen
 void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
-  state.mutable_listener()->PackFrom(listener.config());
+  listener.dumpListenerConfig(*state.mutable_listener());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 } // namespace
@@ -283,6 +283,36 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
     Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
     const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
     const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
+
+#if defined(__linux__)
+  auto netns = address->networkNamespace();
+  if (netns.has_value()) {
+    auto fn = [&]() -> absl::StatusOr<Network::SocketSharedPtr> {
+      return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                        worker_index);
+    };
+
+    auto result = Network::Utility::execInNetworkNamespace(fn, netns.value().c_str());
+
+    // We have a nested absl::StatusOr type, so if there were no issues with changing the namespace,
+    // we want to return the inner absl::StatusOr.
+    if (result->ok()) {
+      return result->value();
+    }
+
+    // The result was not ok, so we want to return the outer status.
+    return result.status();
+  }
+#endif
+
+  return createListenSocketInternal(address, socket_type, options, bind_type, creation_options,
+                                    worker_index);
+}
+
+absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createListenSocketInternal(
+    Network::Address::InstanceConstSharedPtr address, Network::Socket::Type socket_type,
+    const Network::Socket::OptionsSharedPtr& options, BindType bind_type,
+    const Network::SocketCreationOptions& creation_options, uint32_t worker_index) {
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
@@ -342,7 +372,7 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
 
 DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
     envoy::config::listener::v3::Listener::DrainType drain_type) {
-  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
+  return DrainManagerPtr{new DrainManagerImpl(server_, drain_type, server_.dispatcher())};
 }
 
 DrainingFilterChainsManager::DrainingFilterChainsManager(ListenerImplPtr&& draining_listener,
@@ -362,7 +392,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
     factory_ = std::make_unique<ProdListenerComponentFactory>(server);
   }
   if (server.admin().has_value()) {
-    config_tracker_entry_ = server.admin()->getConfigTracker().add(
+    listeners_config_tracker_entry_ = server.admin()->getConfigTracker().add(
         "listeners", [this](const Matchers::StringMatcher& name_matcher) {
           return dumpListenerConfigs(name_matcher);
         });
@@ -384,12 +414,12 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   absl::flat_hash_map<std::string, DynamicListener*> listener_map;
 
   for (const auto& listener : active_listeners_) {
-    if (!name_matcher.match(listener->config().name())) {
+    if (!name_matcher.match(listener->configName())) {
       continue;
     }
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
-      static_listener.mutable_listener()->PackFrom(listener->config());
+      listener->dumpListenerConfig(*static_listener.mutable_listener());
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
       continue;
@@ -411,7 +441,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   }
 
   for (const auto& listener : warming_listeners_) {
-    if (!name_matcher.match(listener->config().name())) {
+    if (!name_matcher.match(listener->configName())) {
       continue;
     }
     DynamicListener* dynamic_listener =
@@ -421,7 +451,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
   }
 
   for (const auto& draining_listener : draining_listeners_) {
-    if (!name_matcher.match(draining_listener.listener_->config().name())) {
+    if (!name_matcher.match(draining_listener.listener_->configName())) {
       continue;
     }
     const auto& listener = draining_listener.listener_;
@@ -431,7 +461,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
     fillState(*dump_listener, *listener);
   }
 
-  for (const auto& [error_name, error_state] : error_state_tracker_) {
+  for (const auto& [error_name, error_state] : lds_error_state_tracker_) {
     DynamicListener* dynamic_listener =
         getOrCreateDynamicListener(error_name, *config_dump, listener_map);
 
@@ -441,7 +471,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
 
   // Dump errors not associated with named listeners.
   for (const auto& error : overall_error_state_) {
-    config_dump->add_dynamic_listeners()->mutable_error_state()->CopyFrom(*error);
+    config_dump->add_dynamic_listeners()->mutable_error_state()->CopyFrom(error);
   }
 
   return config_dump;
@@ -473,7 +503,14 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
           name));
     }
     if (!api_listener_ && !added_via_api) {
-      auto listener_or_error = HttpApiListener::create(config, server_, config.name());
+      auto* api_listener_factory =
+          Registry::FactoryRegistry<Server::ApiListenerFactory>::getFactory(
+              "envoy.http_api_listener");
+      if (api_listener_factory == nullptr) {
+        return absl::InvalidArgumentError(fmt::format(
+            "error adding listener named '{}': missing the API listener extension", name));
+      }
+      auto listener_or_error = api_listener_factory->create(config, server_, config.name());
       RETURN_IF_NOT_OK_REF(listener_or_error.status());
       api_listener_ = std::move(listener_or_error.value());
       return true;
@@ -490,7 +527,7 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
         fmt::format("error adding listener named '{}': address is necessary", name));
   }
 
-  auto it = error_state_tracker_.find(name);
+  auto it = lds_error_state_tracker_.find(name);
   absl::StatusOr<bool> add_or_update_status;
   TRY_ASSERT_MAIN_THREAD {
     add_or_update_status = addOrUpdateListenerInternal(config, version_info, added_via_api, name);
@@ -498,8 +535,8 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
   END_TRY
   CATCH(const EnvoyException& e, { add_or_update_status = absl::InvalidArgumentError(e.what()); })
   if (!add_or_update_status.status().ok()) {
-    if (it == error_state_tracker_.end()) {
-      it = error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
+    if (it == lds_error_state_tracker_.end()) {
+      it = lds_error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
     }
     TimestampUtil::systemClockToTimestamp(server_.api().timeSource().systemTime(),
                                           *(it->second->mutable_last_update_attempt()));
@@ -512,21 +549,12 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
 absl::Status
 ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                                                    const ListenerImpl& existing_listener) {
-  bool same_socket_options = true;
   if (new_listener.reusePort() != existing_listener.reusePort()) {
     return absl::InvalidArgumentError(fmt::format(
         "Listener {}: reuse port cannot be changed during an update", new_listener.name()));
   }
 
-  same_socket_options = existing_listener.socketOptionsEqual(new_listener);
-  if (!same_socket_options && new_listener.reusePort() == false) {
-    return absl::InvalidArgumentError(
-        fmt::format("Listener {}: doesn't support update any socket options "
-                    "when the reuse port isn't enabled",
-                    new_listener.name()));
-  }
-
-  if (!(existing_listener.hasCompatibleAddress(new_listener) && same_socket_options)) {
+  if (!existing_listener.hasCompatibleAddress(new_listener)) {
     RETURN_IF_NOT_OK(setNewOrDrainingSocketFactory(new_listener.name(), new_listener));
   } else {
     RETURN_IF_NOT_OK(new_listener.cloneSocketFactoryFrom(existing_listener));
@@ -556,7 +584,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // removed.
   if (existing_warming_listener != warming_listeners_.end() &&
       existing_active_listener != active_listeners_.end() &&
-      (*existing_active_listener)->blockUpdate(hash)) {
+      (*existing_active_listener)->blockLdsUpdate(hash)) {
     warming_listeners_.erase(existing_warming_listener);
     updateWarmingActiveGauges();
     stats_.listener_modified_.inc();
@@ -566,9 +594,9 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   // Do a quick blocked update check before going further. This check needs to be done against both
   // warming and active.
   if ((existing_warming_listener != warming_listeners_.end() &&
-       (*existing_warming_listener)->blockUpdate(hash)) ||
+       (*existing_warming_listener)->blockLdsUpdate(hash)) ||
       (existing_active_listener != active_listeners_.end() &&
-       (*existing_active_listener)->blockUpdate(hash))) {
+       (*existing_active_listener)->blockLdsUpdate(hash))) {
     ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
   }
@@ -639,9 +667,21 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   return true;
 }
 
-bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& list,
+bool ListenerManagerImpl::hasListenerWithDuplicatedAddress(const ListenerList& listener_list,
                                                            const ListenerImpl& listener) {
-  for (const auto& existing_listener : list) {
+  // This is new listener or new version of existing listener but with different addresses
+  // or different socket options.
+  // Check if the listener has duplicated address with existing listeners.
+
+  for (const auto& existing_listener : listener_list) {
+    if (listener.reusePort() && existing_listener->name() == listener.name()) {
+      // If reuse port is enabled, we can skip the check between different versions of the
+      // same listener as they can create their own sockets anyway.
+      // If reuse port is disabled, the duplicated addresses check is necessary to to avoid
+      // attempting to bind to the same address when creating new sockets for the listener.
+      continue;
+    }
+
     if (existing_listener->hasDuplicatedAddress(listener)) {
       return true;
     }
@@ -671,25 +711,26 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
-  draining_it->listener_->localDrainManager().startDrainSequence([this, draining_it]() -> void {
-    draining_it->listener_->debugLog("removing draining listener");
-    for (const auto& worker : workers_) {
-      // Once the drain time has completed via the drain manager's timer, we tell the workers
-      // to remove the listener.
-      worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
-        // The remove listener completion is called on the worker thread. We post back to the
-        // main thread to avoid locking. This makes sure that we don't destroy the listener
-        // while filters might still be using its context (stats, etc.).
-        server_.dispatcher().post([this, draining_it]() -> void {
-          if (--draining_it->workers_pending_removal_ == 0) {
-            draining_it->listener_->debugLog("draining listener removal complete");
-            draining_listeners_.erase(draining_it);
-            stats_.total_listeners_draining_.set(draining_listeners_.size());
-          }
-        });
+  draining_it->listener_->localDrainManager().startDrainSequence(
+      Network::DrainDirection::All, [this, draining_it]() -> void {
+        draining_it->listener_->debugLog("removing draining listener");
+        for (const auto& worker : workers_) {
+          // Once the drain time has completed via the drain manager's timer, we tell the workers
+          // to remove the listener.
+          worker->removeListener(*draining_it->listener_, [this, draining_it]() -> void {
+            // The remove listener completion is called on the worker thread. We post back to the
+            // main thread to avoid locking. This makes sure that we don't destroy the listener
+            // while filters might still be using its context (stats, etc.).
+            server_.dispatcher().post([this, draining_it]() -> void {
+              if (--draining_it->workers_pending_removal_ == 0) {
+                draining_it->listener_->debugLog("draining listener removal complete");
+                draining_listeners_.erase(draining_it);
+                stats_.total_listeners_draining_.set(draining_listeners_.size());
+              }
+            });
+          });
+        }
       });
-    }
-  });
 
   updateWarmingActiveGauges();
 }
@@ -1029,10 +1070,17 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type,
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
       stopListener(listener, options, [this, listener_tag]() {
-        stats_.listener_stopped_.inc();
-        for (auto& listener : active_listeners_) {
-          if (listener->listenerTag() == listener_tag) {
-            maybeCloseSocketsForListener(*listener);
+        // Only stop the listener if we don't have a record of its tag.
+        // This prevents us from double incrementing if listeners are stopped twice.
+        // This can happen if the admin endpoint is triggered for inbound_only and then
+        // all. We perform the check in the callback to ensure it's done on the main thread
+        if (stopped_listener_tags_.find(listener_tag) == stopped_listener_tags_.end()) {
+          stats_.listener_stopped_.inc();
+          stopped_listener_tags_.insert(listener_tag);
+          for (auto& listener : active_listeners_) {
+            if (listener->listenerTag() == listener_tag) {
+              maybeCloseSocketsForListener(*listener);
+            }
           }
         }
       });
@@ -1062,15 +1110,16 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
 absl::StatusOr<Network::DrainableFilterChainSharedPtr>
 ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    FilterChainFactoryContextCreator& context_creator) const {
-  return buildFilterChainInternal(filter_chain,
-                                  context_creator.createFilterChainFactoryContext(&filter_chain));
+    FilterChainFactoryContextCreator& context_creator, bool added_via_api) const {
+  return buildFilterChainInternal(
+      filter_chain, context_creator.createFilterChainFactoryContext(&filter_chain), added_via_api);
 }
 
 absl::StatusOr<Network::DrainableFilterChainSharedPtr>
 ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const {
+    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
+    bool added_via_api) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -1129,7 +1178,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
       std::move(factory_or_error.value()), std::move(*factory_list_or_error),
       std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
-      filter_chain.name());
+      filter_chain.name(), added_via_api);
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;
@@ -1140,7 +1189,9 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
   if (hasListenerWithDuplicatedAddress(warming_listeners_, listener) ||
       hasListenerWithDuplicatedAddress(active_listeners_, listener)) {
     const std::string message =
-        fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener",
+        fmt::format("error adding listener: '{}' has duplicate address '{}' as existing listener, "
+                    "to check if the listener has duplicated addresses with other listeners or "
+                    "'enable_reuse_port' is set to 'false' for the listener",
                     name, absl::StrJoin(listener.addresses(), ",", Network::AddressStrFormatter()));
     ENVOY_LOG(warn, "{}", message);
     return absl::InvalidArgumentError(message);
@@ -1180,6 +1231,9 @@ absl::Status ListenerManagerImpl::setNewOrDrainingSocketFactory(const std::strin
     }
   }
 
+  // TODO(wbpcode): if we cannot clone the socket factory from the draining listener, we should
+  // check the duplicated addresses again the draining listeners to avoid the creation failure
+  // of the sockets.
   if (draining_listener_ptr != nullptr) {
     RETURN_IF_NOT_OK(listener.cloneSocketFactoryFrom(*draining_listener_ptr));
   } else {

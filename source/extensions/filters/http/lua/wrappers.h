@@ -269,12 +269,15 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"protocol", static_luaProtocol},
             {"dynamicMetadata", static_luaDynamicMetadata},
+            {"dynamicTypedMetadata", static_luaDynamicTypedMetadata},
             {"downstreamDirectLocalAddress", static_luaDownstreamDirectLocalAddress},
             {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
             {"downstreamRemoteAddress", static_luaDownstreamRemoteAddress},
             {"downstreamSslConnection", static_luaDownstreamSslConnection},
-            {"requestedServerName", static_luaRequestedServerName}};
+            {"requestedServerName", static_luaRequestedServerName},
+            {"routeName", static_luaRouteName},
+            {"virtualClusterName", static_luaVirtualClusterName}};
   }
 
 private:
@@ -289,6 +292,12 @@ private:
    * @return DynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicMetadata);
+
+  /**
+   * Get reference to stream info typed metadata object.
+   * @return typed metadata wrapped as a Lua table.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicTypedMetadata);
 
   /**
    * Get reference to stream info downstreamSslConnection.
@@ -328,6 +337,18 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRequestedServerName);
 
+  /**
+   * Get the name of the route matched by the filter chain
+   * @return matched route name or an empty string if no route was matched
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaRouteName);
+
+  /**
+   * Get the name of the virtual cluster that gets matched (if any)
+   * @return matched virtual cluster or an empty string if no virtual cluster was matched
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaVirtualClusterName);
+
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {
     dynamic_metadata_wrapper_.reset();
@@ -351,7 +372,8 @@ public:
   ConnectionStreamInfoWrapper(const StreamInfo::StreamInfo& connection_stream_info)
       : connection_stream_info_{connection_stream_info} {}
   static ExportedFunctions exportedFunctions() {
-    return {{"dynamicMetadata", static_luaConnectionDynamicMetadata}};
+    return {{"dynamicMetadata", static_luaConnectionDynamicMetadata},
+            {"dynamicTypedMetadata", static_luaConnectionDynamicTypedMetadata}};
   }
 
 private:
@@ -360,6 +382,12 @@ private:
    * @return ConnectionDynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
   DECLARE_LUA_FUNCTION(ConnectionStreamInfoWrapper, luaConnectionDynamicMetadata);
+
+  /**
+   * Get reference to stream info typed metadata object.
+   * @return typed metadata wrapped as a Lua table.
+   */
+  DECLARE_LUA_FUNCTION(ConnectionStreamInfoWrapper, luaConnectionDynamicTypedMetadata);
 
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override { connection_dynamic_metadata_wrapper_.reset(); }

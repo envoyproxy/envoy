@@ -466,7 +466,9 @@ message ExtAuthzPerRoute {
 
     // Disable the ext auth filter for this particular vhost or route.
     // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
+    // If the filter is disabled by default and this is set to false, the filter will be enabled
+    // for this vhost or route.
+    bool disabled = 1;
 
     // Check request settings for this route.
     CheckSettings check_settings = 2 [(validate.rules).message = {required: true}];

@@ -121,7 +121,8 @@ DynatraceSampler::DynatraceSampler(
   timer_->enableTimer(SAMPLING_UPDATE_TIMER_DURATION);
 }
 
-SamplingResult DynatraceSampler::shouldSample(const absl::optional<SpanContext> parent_context,
+SamplingResult DynatraceSampler::shouldSample(const StreamInfo::StreamInfo&,
+                                              const absl::optional<SpanContext> parent_context,
                                               const std::string& trace_id,
                                               const std::string& /*name*/, OTelSpanKind /*kind*/,
                                               OptRef<const Tracing::TraceContext> trace_context,

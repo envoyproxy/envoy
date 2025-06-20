@@ -162,6 +162,13 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 #define ENVOY_IP_PKTINFO IP_PKTINFO
 #endif
 
+#ifdef IP_BIND_ADDRESS_NO_PORT
+#define ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT                                                       \
+  ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, IP_BIND_ADDRESS_NO_PORT)
+#else
+#define ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT Network::SocketOptionName()
+#endif
+
 #define ENVOY_SELF_IP_ADDR ENVOY_MAKE_SOCKET_OPTION_NAME(IPPROTO_IP, ENVOY_IP_PKTINFO)
 
 // Both Linux and FreeBSD use IPV6_RECVPKTINFO for both sending source address and
@@ -284,6 +291,11 @@ public:
   virtual absl::string_view ja3Hash() const PURE;
 
   /**
+   * @return ja4 fingerprint hash of the downstream connection, if any.
+   */
+  virtual absl::string_view ja4Hash() const PURE;
+
+  /**
    * @return roundTripTime of the connection
    */
   virtual const absl::optional<std::chrono::milliseconds>& roundTripTime() const PURE;
@@ -358,6 +370,11 @@ public:
    * @param JA3 fingerprint.
    */
   virtual void setJA3Hash(const absl::string_view ja3_hash) PURE;
+
+  /**
+   * @param JA4 fingerprint.
+   */
+  virtual void setJA4Hash(const absl::string_view ja4_hash) PURE;
 
   /**
    * @param  milliseconds of round trip time of previous connection

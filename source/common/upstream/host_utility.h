@@ -26,17 +26,20 @@ public:
   // A utility function to create override host status from lb config.
   static HostStatusSet createOverrideHostStatus(const CommonLbConfigProto& common_config);
 
-  // A utility function to select override host from host map according to load balancer context.
-  static HostConstSharedPtr selectOverrideHost(const HostMap* host_map, HostStatusSet status,
-                                               LoadBalancerContext* context);
+  /**
+   * A utility function to select override host from host map according to load balancer context.
+   *
+   * @return pair<HostConstSharedPtr, bool> the first element is the selected host and the second
+   *         element is a boolean indicating whether the host should be selected strictly or not.
+   */
+  static std::pair<HostConstSharedPtr, bool>
+  selectOverrideHost(const HostMap* host_map, HostStatusSet status, LoadBalancerContext* context);
 
   // Iterate over all per-endpoint metrics, for clusters with `per_endpoint_stats` enabled.
   static void
   forEachHostMetric(const ClusterManager& cluster_manager,
                     const std::function<void(Stats::PrimitiveCounterSnapshot&& metric)>& counter_cb,
                     const std::function<void(Stats::PrimitiveGaugeSnapshot&& metric)>& gauge_cb);
-
-  static bool allowLBChooseHost(LoadBalancerContext* context);
 };
 
 } // namespace Upstream

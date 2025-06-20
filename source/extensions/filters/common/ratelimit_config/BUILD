@@ -14,6 +14,8 @@ envoy_cc_library(
     hdrs = ["ratelimit_config.h"],
     deps = [
         "//envoy/ratelimit:ratelimit_interface",
+        "//source/common/formatter:formatter_extension_lib",
+        "//source/common/formatter:substitution_formatter_lib",
         "//source/common/router:router_ratelimit_lib",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",

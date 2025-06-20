@@ -50,6 +50,17 @@ absl::Status verifyProcessingModeConfig(
         "then the response_trailer_mode has to be set to SEND");
   }
 
+  // Do not support fail open for FULL_DUPLEX_STREAMED body mode.
+  if (((processing_mode.request_body_mode() ==
+        envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED) ||
+       (processing_mode.response_body_mode() ==
+        envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::FULL_DUPLEX_STREAMED)) &&
+      config.failure_mode_allow()) {
+    return absl::InvalidArgumentError(
+        "If the ext_proc filter has either the request_body_mode or the response_body_mode set "
+        "to FULL_DUPLEX_STREAMED, then the failure_mode_allow has to be left as false");
+  }
+
   return absl::OkStatus();
 }
 
@@ -94,8 +105,8 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
   if (proto_config.has_grpc_service()) {
     return [filter_config = std::move(filter_config), &context,
             dual_info](Http::FilterChainFactoryCallbacks& callbacks) {
-      auto client = std::make_unique<ExternalProcessorClientImpl>(
-          context.clusterManager().grpcAsyncClientManager(), dual_info.scope);
+      auto client = createExternalProcessorClient(context.clusterManager().grpcAsyncClientManager(),
+                                                  dual_info.scope);
       callbacks.addStreamFilter(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});
     };
@@ -139,7 +150,7 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoWithServerContextTyp
   if (proto_config.has_grpc_service()) {
     return [filter_config = std::move(filter_config),
             &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
-      auto client = std::make_unique<ExternalProcessorClientImpl>(
+      auto client = createExternalProcessorClient(
           server_context.clusterManager().grpcAsyncClientManager(), server_context.scope());
       callbacks.addStreamFilter(
           Http::StreamFilterSharedPtr{std::make_shared<Filter>(filter_config, std::move(client))});

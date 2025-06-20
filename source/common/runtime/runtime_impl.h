@@ -88,8 +88,7 @@ public:
 
   const EntryMap& values() const;
 
-  static Entry createEntry(const ProtobufWkt::Value& value, absl::string_view raw_string,
-                           const char*& error_message);
+  static Entry createEntry(const ProtobufWkt::Value& value, absl::string_view raw_string);
   static void addEntry(Snapshot::EntryMap& values, const std::string& key,
                        const ProtobufWkt::Value& value, absl::string_view raw_string = "");
 
@@ -224,7 +223,7 @@ public:
 
   // Runtime::Loader
   absl::Status initialize(Upstream::ClusterManager& cm) override;
-  const Snapshot& snapshot() override;
+  const Snapshot& snapshot() const override;
   SnapshotConstSharedPtr threadsafeSnapshot() override;
   absl::Status mergeValues(const absl::node_hash_map<std::string, std::string>& values) override;
   void startRtdsSubscriptions(ReadyCallback on_done) override;

@@ -73,7 +73,13 @@ public interface EnvoyEngine {
   void onDefaultNetworkChanged(int network);
 
   /**
-   * A callback into the Envoy Engine when the default network type was changed.
+   * A more modern callback into the Envoy Engine when the default network type was changed.
+   * TODO(renjietang): Deprecate onDefaultNetworkChanged
+   */
+  void onDefaultNetworkChangeEvent(int network);
+
+  /**
+   * A callback into the Envoy Engine when the default network was changed.
    * @param net_id NetID of device's current default connected network.
    */
   void onDefaultNetworkChangedV2(EnvoyConnectionType network_type, long net_id);

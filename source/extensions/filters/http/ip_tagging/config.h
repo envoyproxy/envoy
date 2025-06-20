@@ -13,13 +13,13 @@ namespace IpTagging {
 /**
  * Config registration for the router filter. @see NamedHttpFilterConfigFactory.
  */
-class IpTaggingFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::ip_tagging::v3::IPTagging> {
+class IpTaggingFilterFactory : public Common::ExceptionFreeFactoryBase<
+                                   envoy::extensions::filters::http::ip_tagging::v3::IPTagging> {
 public:
-  IpTaggingFilterFactory() : FactoryBase("envoy.filters.http.ip_tagging") {}
+  IpTaggingFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.ip_tagging") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

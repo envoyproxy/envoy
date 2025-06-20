@@ -78,7 +78,9 @@ enum class GolangStatus {
   StopNoBuffer,
 };
 
-class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
+class ProcessorState : public processState,
+                       public Logger::Loggable<Logger::Id::golang>,
+                       NonCopyable {
 public:
   explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
     req = r;
@@ -215,6 +217,10 @@ public:
   void addData(Buffer::Instance& data, bool is_streaming) override {
     ENVOY_LOG(debug, "golang filter addData when decoding, is_streaming: {}", is_streaming);
     decoder_callbacks_->addDecodedData(data, is_streaming);
+  }
+
+  void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) {
+    decoder_callbacks_->setUpstreamOverrideHost(host_and_strict);
   }
 
 private:

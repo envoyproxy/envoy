@@ -61,6 +61,7 @@ public:
   bool usePost() const override { return use_post_; };
   const std::string& postPath() const override { return post_path_; }
   Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; };
+  const BackOffStrategyPtr& backoffStrategy() const override { return backoff_strategy_; };
   uint32_t maxConnectAttempts() const override { return max_connect_attempts_; };
   bool bufferEnabled() const override { return buffer_enabled_; };
   uint32_t maxBufferedDatagrams() const override { return max_buffered_datagrams_; };
@@ -100,6 +101,7 @@ private:
   bool use_post_;
   std::string post_path_;
   const uint32_t max_connect_attempts_;
+  BackOffStrategyPtr backoff_strategy_;
   bool buffer_enabled_;
   uint32_t max_buffered_datagrams_;
   uint64_t max_buffered_bytes_;

@@ -1,0 +1,61 @@
+static_resources:
+  listeners:
+  - name: listener_0
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 10000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: local_service
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                route:
+                  weighted_clusters:
+                    clusters:
+                    - name: lambda_egress_gateway
+                      weight: 42
+                      typed_per_filter_config:
+                        envoy.filters.http.aws_lambda:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.aws_lambda.v3.PerRouteConfig
+                          invoke_config:
+                            arn: "arn:aws:lambda:us-west-1:987654321:function:hello_envoy"
+                            payload_passthrough: false
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+  - name: lambda_egress_gateway
+    type: LOGICAL_DNS
+    dns_lookup_family: V4_ONLY
+    lb_policy: ROUND_ROBIN
+    metadata:
+      filter_metadata:
+        com.amazonaws.lambda:
+          egress_gateway: true
+    load_assignment:
+      cluster_name: lambda_egress_gateway
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: lambda.us-west-2.amazonaws.com
+                port_value: 443
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        sni: "*.amazonaws.com"

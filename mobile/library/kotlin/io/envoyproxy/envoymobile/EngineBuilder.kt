@@ -1,6 +1,5 @@
 package io.envoyproxy.envoymobile
 
-import android.util.Pair
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
@@ -27,6 +26,8 @@ open class EngineBuilder() {
   }
   private var logLevel = LogLevel.INFO
   private var connectTimeoutSeconds = 10
+  private var disableDnsRefreshOnFailure = false
+  private var disableDnsRefreshOnNetworkChange = false
   private var dnsRefreshSeconds = 60
   private var dnsFailureRefreshSecondsBase = 2
   private var dnsFailureRefreshSecondsMax = 10
@@ -39,8 +40,6 @@ open class EngineBuilder() {
   private var dnsNumRetries: Int? = null
   private var enableDrainPostDnsRefresh = false
   internal var enableHttp3 = true
-  internal var useCares = false
-  internal var caresFallbackResolvers = mutableListOf<Pair<String, Int>>()
   private var http3ConnectionOptions = ""
   private var http3ClientConnectionOptions = ""
   private var quicHints = mutableMapOf<String, Int>()
@@ -85,6 +84,20 @@ open class EngineBuilder() {
    */
   fun addConnectTimeoutSeconds(connectTimeoutSeconds: Int): EngineBuilder {
     this.connectTimeoutSeconds = connectTimeoutSeconds
+    return this
+  }
+
+  /** Disables DNS refresh on failure. */
+  fun setDisableDnsRefreshOnFailure(disableDnsRefreshOnFailure: Boolean): EngineBuilder {
+    this.disableDnsRefreshOnFailure = disableDnsRefreshOnFailure
+    return this
+  }
+
+  /** Disables DNS refresh on network change. */
+  fun setDisableDnsRefreshOnNetworkChange(
+    disableDnsRefreshOnNetworkChange: Boolean
+  ): EngineBuilder {
+    this.disableDnsRefreshOnNetworkChange = disableDnsRefreshOnNetworkChange
     return this
   }
 
@@ -206,29 +219,6 @@ open class EngineBuilder() {
    */
   fun enableHttp3(enableHttp3: Boolean): EngineBuilder {
     this.enableHttp3 = enableHttp3
-    return this
-  }
-
-  /**
-   * Specify whether to use c_ares for dns resolution. Defaults to false.
-   *
-   * @param useCares whether or not to use c_ares
-   * @return This builder.
-   */
-  fun useCares(useCares: Boolean): EngineBuilder {
-    this.useCares = useCares
-    return this
-  }
-
-  /**
-   * Add fallback resolver to c_ares.
-   *
-   * @param host ip address string
-   * @param port port for the resolver
-   * @return This builder.
-   */
-  fun addCaresFallbackResolver(host: String, port: Int): EngineBuilder {
-    this.caresFallbackResolvers.add(Pair(host, port))
     return this
   }
 
@@ -540,6 +530,8 @@ open class EngineBuilder() {
     val engineConfiguration =
       EnvoyConfiguration(
         connectTimeoutSeconds,
+        disableDnsRefreshOnFailure,
+        disableDnsRefreshOnNetworkChange,
         dnsRefreshSeconds,
         dnsFailureRefreshSecondsBase,
         dnsFailureRefreshSecondsMax,
@@ -551,7 +543,6 @@ open class EngineBuilder() {
         dnsNumRetries ?: -1,
         enableDrainPostDnsRefresh,
         enableHttp3,
-        useCares,
         http3ConnectionOptions,
         http3ClientConnectionOptions,
         quicHints,
@@ -576,7 +567,6 @@ open class EngineBuilder() {
         runtimeGuards,
         enablePlatformCertificatesValidation,
         upstreamTlsSni,
-        caresFallbackResolvers,
         h3ConnectionKeepaliveInitialIntervalMilliseconds,
       )
 

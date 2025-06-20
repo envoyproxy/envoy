@@ -44,6 +44,8 @@ class MockEnvoyEngine : EnvoyEngine {
 
   override fun onDefaultNetworkChanged(network: Int) = Unit
 
+  override fun onDefaultNetworkChangeEvent(network: Int) = Unit
+
   override fun onDefaultNetworkChangedV2(network_type: EnvoyConnectionType, net_id: Long) = Unit
 
   override fun onNetworkDisconnect(net_id: Long) = Unit

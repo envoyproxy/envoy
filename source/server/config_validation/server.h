@@ -71,6 +71,8 @@ public:
                      Filesystem::Instance& file_system,
                      const ProcessContextOptRef& process_context = absl::nullopt);
 
+  ~ValidationInstance() override;
+
   // Server::Instance
   void run() override { PANIC("not implemented"); }
   OptRef<Admin> admin() override {
@@ -78,6 +80,7 @@ public:
   }
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override { return *config_.clusterManager(); }
+  Config::XdsManager& xdsManager() override { return *xds_manager_; }
   const Upstream::ClusterManager& clusterManager() const override {
     return *config_.clusterManager();
   }
@@ -120,6 +123,9 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_context_.staticValidationVisitor();
+  }
   bool enableReusePortDefault() override { return true; }
 
   Configuration::StatsConfig& statsConfig() override { return config_.statsConfig(); }
@@ -133,7 +139,6 @@ public:
     http_context_.setDefaultTracingConfig(tracing_config);
   }
   void setSinkPredicates(std::unique_ptr<Stats::SinkPredicates>&&) override {}
-  Config::XdsManager& xdsManager() override { return *xds_manager_; }
 
   // Server::WorkerFactory
   WorkerPtr createWorker(uint32_t, OverloadManager&, OverloadManager&,
@@ -185,8 +190,8 @@ private:
   LocalInfo::LocalInfoPtr local_info_;
   AccessLog::AccessLogManagerImpl access_log_manager_;
   std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
-  std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   Config::XdsManagerPtr xds_manager_;
+  std::unique_ptr<Upstream::ValidationClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;

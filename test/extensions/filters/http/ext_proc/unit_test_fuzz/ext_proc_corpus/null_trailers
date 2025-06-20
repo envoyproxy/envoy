@@ -1,0 +1,25 @@
+config {
+  grpc_service {
+    envoy_grpc {
+      cluster_name: "##"
+      skip_envoy_headers: true
+    }
+  }
+  failure_mode_allow: true
+  stat_prefix: "Y"
+  disable_clear_route_cache: true
+  allow_mode_override: true
+  disable_immediate_response: true
+}
+request {
+}
+response {
+  response_trailers {
+    header_mutation {
+    }
+  }
+  mode_override {
+    request_body_mode: BUFFERED_PARTIAL
+    response_body_mode: FULL_DUPLEX_STREAMED
+  }
+}

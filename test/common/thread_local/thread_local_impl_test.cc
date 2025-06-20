@@ -395,47 +395,5 @@ TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorker) {
   tls.shutdownThread();
 }
 
-TEST(ThreadLocalInstanceImplDispatcherTest, DestroySlotOnWorkerButDisableRuntimeFeature) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.restart_features.allow_slot_destroy_on_worker_threads", "false"}});
-
-  InstanceImpl tls;
-
-  Api::ApiPtr api = Api::createApiForTest();
-  Event::MockDispatcher main_dispatcher{"test_main_thread"};
-  Event::DispatcherPtr thread_dispatcher(api->allocateDispatcher("test_worker_thread"));
-
-  tls.registerThread(main_dispatcher, true);
-  tls.registerThread(*thread_dispatcher, false);
-
-  // Verify we have the expected dispatcher for the main thread.
-  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
-
-  auto slot = TypedSlot<>::makeUnique(tls);
-
-  Thread::ThreadPtr thread = Thread::threadFactoryForTest().createThread(
-      [&main_dispatcher, &thread_dispatcher, &tls, &slot]() {
-        // Ensure that the dispatcher update in tls posted during the above registerThread happens.
-        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-        // Verify we have the expected dispatcher for the new thread thread.
-        EXPECT_EQ(thread_dispatcher.get(), &tls.dispatcher());
-
-        // Skip the asserts in the thread.
-        Thread::SkipAsserts skip;
-        // Destroy the slot on worker thread will not call post() of main dispatcher.
-        EXPECT_CALL(main_dispatcher, post(_)).Times(0);
-        slot.reset();
-
-        thread_dispatcher->run(Event::Dispatcher::RunType::NonBlock);
-      });
-  thread->join();
-
-  // Verify we still have the expected dispatcher for the main thread.
-  EXPECT_EQ(&main_dispatcher, &tls.dispatcher());
-
-  tls.shutdownGlobalThreading();
-  tls.shutdownThread();
-}
-
 } // namespace ThreadLocal
 } // namespace Envoy

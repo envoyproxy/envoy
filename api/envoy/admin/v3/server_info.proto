@@ -59,7 +59,7 @@ message ServerInfo {
   config.core.v3.Node node = 7;
 }
 
-// [#next-free-field: 41]
+// [#next-free-field: 42]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -124,6 +124,9 @@ message CommandLineOptions {
 
   // See :option:`--ignore-unknown-dynamic-fields` for details.
   bool ignore_unknown_dynamic_fields = 30;
+
+  // See :option:`--skip-deprecated-logs` for details.
+  bool skip_deprecated_logs = 41;
 
   // See :option:`--admin-address-path` for details.
   string admin_address_path = 6;

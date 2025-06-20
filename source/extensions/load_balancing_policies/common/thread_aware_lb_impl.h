@@ -32,7 +32,7 @@ public:
   class HashingLoadBalancer {
   public:
     virtual ~HashingLoadBalancer() = default;
-    virtual HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const PURE;
+    virtual HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const PURE;
     const absl::string_view hashKey(HostConstSharedPtr host, bool use_hostname) const {
       const ProtobufWkt::Value& val = Config::Metadata::metadataValue(
           host->metadata().get(), Config::MetadataFilters::get().ENVOY_LB,
@@ -67,7 +67,7 @@ public:
       ASSERT(hashing_lb_ptr_ != nullptr);
       ASSERT(hash_balance_factor > 0);
     }
-    HostConstSharedPtr chooseHost(uint64_t hash, uint32_t attempt) const override;
+    HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
   protected:
     virtual double hostOverloadFactor(const Host& host, double weight) const;
@@ -91,7 +91,7 @@ public:
   absl::Status initialize() override;
 
   // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext*) override { return nullptr; }
+  HostSelectionResponse chooseHost(LoadBalancerContext*) override { return {nullptr}; }
   // Preconnect not implemented for hash based load balancing
   HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
   // Pool selection not implemented.
@@ -126,7 +126,7 @@ private:
         : stats_(stats), random_(random) {}
 
     // Upstream::LoadBalancer
-    HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+    HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
     // Preconnect not implemented for hash based load balancing
     HostConstSharedPtr peekAnotherHost(LoadBalancerContext*) override { return nullptr; }
     absl::optional<Upstream::SelectedPoolAndConnection>

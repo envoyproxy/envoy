@@ -118,7 +118,7 @@ void BuildQueryParamString(const nlohmann::json& object,
       value = object.dump();
     }
     absl::StrAppend(query_string, query_string->empty() ? "" : "&", prefix, "=",
-                    Envoy::Http::Utility::PercentEncoding::urlEncodeQueryParameter(value));
+                    Envoy::Http::Utility::PercentEncoding::urlEncode(value));
     return;
   }
 

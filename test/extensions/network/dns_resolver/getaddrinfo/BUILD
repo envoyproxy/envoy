@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/mocks/api:api_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/extensions/network/dns_resolver/getaddrinfo/v3:pkg_cc_proto",
     ],

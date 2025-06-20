@@ -14,6 +14,9 @@ namespace Regex {
  */
 class CompiledMatcher : public Matchers::StringMatcher {
 public:
+  // To avoid hiding other implementations of match.
+  using Matchers::StringMatcher::match;
+
   /**
    * Replaces all non-overlapping occurrences of the pattern in "value" with
    * "substitution". The "substitution" string can make references to
@@ -22,6 +25,11 @@ public:
    */
   virtual std::string replaceAll(absl::string_view value,
                                  absl::string_view substitution) const PURE;
+
+  /**
+   * Returns the pattern of the Regex matcher.
+   */
+  virtual const std::string& pattern() const PURE;
 };
 
 using CompiledMatcherPtr = std::unique_ptr<const CompiledMatcher>;

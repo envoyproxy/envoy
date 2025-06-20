@@ -27,7 +27,6 @@ public:
   ~MockDetectorHostMonitor() override;
 
   MOCK_METHOD(uint32_t, numEjections, ());
-  MOCK_METHOD(void, putHttpResponseCode, (uint64_t code));
   MOCK_METHOD(void, putResult, (Result result, absl::optional<uint64_t> code));
   MOCK_METHOD(void, putResponseTime, (std::chrono::milliseconds time));
   MOCK_METHOD(const absl::optional<MonotonicTime>&, lastEjectionTime, ());
@@ -115,6 +114,8 @@ public:
               (const Network::Address::InstanceConstSharedPtr& dest_address,
                const envoy::config::core::v3::Metadata* metadata),
               (const));
+  MOCK_METHOD(void, setLbPolicyData, (HostLbPolicyDataPtr lb_policy_data));
+  MOCK_METHOD(OptRef<HostLbPolicyData>, lbPolicyData, (), (const));
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -124,6 +125,7 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   HostStats stats_;
   LoadMetricStatsImpl load_metric_stats_;
+  HostLbPolicyDataPtr lb_policy_data_;
   envoy::config::core::v3::Locality locality_;
   mutable Stats::TestUtil::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;

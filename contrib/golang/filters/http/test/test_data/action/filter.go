@@ -1,4 +1,4 @@
-package main
+package action
 
 import (
 	"net/url"

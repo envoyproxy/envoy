@@ -14,6 +14,9 @@
 namespace Envoy {
 namespace Ssl {
 
+// This is forward declared to avoid needing to forward declare `GENERAL_NAME` from BoringSSL.
+class SanMatcher;
+
 /**
  * Base connection interface for all SSL connections.
  */
@@ -120,6 +123,13 @@ public:
    *         encoding fails.
    **/
   virtual const std::string& urlEncodedPemEncodedPeerCertificateChain() const PURE;
+
+  /**
+   * @return bool whether the provided matcher matches a SAN in the peer certificate.
+   * @note This method takes a matcher, instead of returning the SANs, to avoid putting
+   *       BoringSSL types into interfaces.
+   */
+  virtual bool peerCertificateSanMatches(const SanMatcher& matcher) const PURE;
 
   /**
    * @return absl::Span<const std::string> the DNS entries in the SAN field of the peer certificate.

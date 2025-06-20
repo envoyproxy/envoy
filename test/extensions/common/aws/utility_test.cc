@@ -2,7 +2,6 @@
 
 #include "source/extensions/common/aws/utility.h"
 
-#include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -66,10 +65,10 @@ TEST(UtilityTest, TestProfileResolver) {
   auto file_path = TestEnvironment::writeStringToFileForTest(
       credential_file, CREDENTIALS_FILE_CONTENTS, true, false);
 
-  Utility::resolveProfileElements(file_path, "default", elements);
+  Utility::resolveProfileElementsFromFile(file_path, "default", elements);
   it = elements.find("AWS_ACCESS_KEY_ID");
   EXPECT_EQ(it->second, "default_access_key");
-  Utility::resolveProfileElements(file_path, "profile4", elements);
+  Utility::resolveProfileElementsFromFile(file_path, "profile4", elements);
   it = elements.find("AWS_ACCESS_KEY_ID");
   EXPECT_EQ(it->second, "profile4_access_key");
 }
@@ -165,17 +164,13 @@ TEST(UtilityTest, CanonicalizeHeadersDropExcludedMatchers) {
   for (auto& str : exact_matches) {
     envoy::type::matcher::v3::StringMatcher config;
     config.set_exact(str);
-    exclusion_list.emplace_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config, context));
+    exclusion_list.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
   }
   std::vector<std::string> prefixes = {"x-envoy"};
   for (auto& match_str : prefixes) {
     envoy::type::matcher::v3::StringMatcher config;
     config.set_prefix(match_str);
-    exclusion_list.emplace_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            config, context));
+    exclusion_list.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(config, context));
   }
   const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
   EXPECT_THAT(map,
@@ -189,13 +184,21 @@ TEST(UtilityTest, MinimalCanonicalRequest) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
+}
 
+TEST(UtilityTest, CanonicalRequestNoPathDontNormalizeURI) {
+  std::map<std::string, std::string> headers;
+  const auto request =
+      Utility::createCanonicalRequest("GET", "", headers, "content-hash", false, false);
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
+}
 
-
-content-hash)",
-            request);
+TEST(UtilityTest, CanonicalRequestNoPathNormalizeURI) {
+  std::map<std::string, std::string> headers;
+  const auto request =
+      Utility::createCanonicalRequest("GET", "", headers, "content-hash", true, false);
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
 }
 
 TEST(UtilityTest, CanonicalRequestWithQueryString) {
@@ -203,13 +206,7 @@ TEST(UtilityTest, CanonicalRequestWithQueryString) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "?query", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
-query=
-
-
-content-hash)",
-            request);
+  EXPECT_EQ("GET\n/\nquery=\n\n\ncontent-hash", request);
 }
 
 TEST(UtilityTest, CanonicalRequestWithHeaders) {
@@ -221,16 +218,10 @@ TEST(UtilityTest, CanonicalRequestWithHeaders) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
-
-header1:value1
-header2:value2
-header3:value3
-
-header1;header2;header3
-content-hash)",
-            request);
+  EXPECT_EQ(
+      "GET\n/"
+      "\n\nheader1:value1\nheader2:value2\nheader3:value3\n\nheader1;header2;header3\ncontent-hash",
+      request);
 }
 
 TEST(UtilityTest, normalizePathReturnSlash) {
@@ -562,6 +553,29 @@ TEST(UtilityTest, CheckNormalization) {
   service = "lambda";
   should_normalize = Utility::shouldNormalizeUriPath(service);
   EXPECT_TRUE(should_normalize);
+}
+
+TEST(UtilityTest, RolesAnywhereEndpoint) {
+  std::string arn = "junkarn";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere-fips.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#endif
+  arn = "arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/"
+        "8d105284-f0a7-4939-a7e6-8df768ea535f";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+
+#endif
+  arn = "arn:aws:rolesanywhere:eu-west-1:randomjunk";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#endif
 }
 
 } // namespace

@@ -1,6 +1,7 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load(
     "//test/extensions/filters/network/common/fuzz:config.bzl",
     "READFILTER_FUZZ_FILTERS",

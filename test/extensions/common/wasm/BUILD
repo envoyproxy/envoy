@@ -34,6 +34,7 @@ envoy_cc_test(
 
 envoy_cc_test(
     name = "wasm_test",
+    size = "large",
     srcs = ["wasm_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/common/wasm/test_data:bad_signature_cpp.wasm",
@@ -41,7 +42,7 @@ envoy_cc_test(
         "//test/extensions/common/wasm/test_data:test_cpp.wasm",
         "//test/extensions/common/wasm/test_data:test_restriction_cpp.wasm",
     ]),
-    rbe_pool = "2core",
+    rbe_pool = "4core",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/common:base64_lib",
@@ -51,7 +52,6 @@ envoy_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/extensions/common/wasm:wasm_lib",
-        "//source/extensions/network/dns_resolver/cares:config",
         "//test/extensions/common/wasm:wasm_runtime",
         "//test/extensions/common/wasm/test_data:test_context_cpp_plugin",
         "//test/extensions/common/wasm/test_data:test_cpp_plugin",

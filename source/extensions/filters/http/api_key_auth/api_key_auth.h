@@ -34,6 +34,7 @@ using ApiKeyAuthProto = envoy::extensions::filters::http::api_key_auth::v3::ApiK
 using ApiKeyAuthPerRouteProto =
     envoy::extensions::filters::http::api_key_auth::v3::ApiKeyAuthPerRoute;
 using KeySourceProto = envoy::extensions::filters::http::api_key_auth::v3::KeySource;
+using ForwardingProto = envoy::extensions::filters::http::api_key_auth::v3::Forwarding;
 
 // Credentials is a map of API key to client ID.
 using Credentials = absl::flat_hash_map<std::string, std::string>;
@@ -43,7 +44,8 @@ using Credentials = absl::flat_hash_map<std::string, std::string>;
  */
 class KeySources {
 public:
-  KeySources(const Protobuf::RepeatedPtrField<KeySourceProto>& proto_config);
+  KeySources(const Protobuf::RepeatedPtrField<KeySourceProto>& proto_config,
+             absl::Status& creation_status);
 
   /**
    * To get the API key from the incoming request.
@@ -56,6 +58,12 @@ public:
   absl::string_view getKey(const Http::RequestHeaderMap& headers, std::string& buffer) const;
 
   /**
+   * To remove the API key from the request.
+   * @param headers the incoming request headers.
+   */
+  void removeKey(Http::RequestHeaderMap& headers) const;
+
+  /**
    * To check if the sources are empty.
    */
   bool empty() const { return key_sources_.empty(); }
@@ -63,8 +71,10 @@ public:
 private:
   class Source {
   public:
-    Source(absl::string_view header, absl::string_view query, absl::string_view cookie);
+    Source(absl::string_view header, absl::string_view query, absl::string_view cookie,
+           absl::Status& creation_status);
     absl::string_view getKey(const Http::RequestHeaderMap& headers, std::string& buffer) const;
+    void removeKey(Http::RequestHeaderMap& headers) const;
 
   private:
     absl::variant<Http::LowerCaseString, std::string> source_{""};
@@ -75,18 +85,38 @@ private:
 };
 
 /**
+ * Configuration for forwarding client identity upstream and optionally hiding the API key.
+ */
+class Forwarding {
+public:
+  Forwarding(const ForwardingProto& proto_config);
+
+  const Http::LowerCaseString& headerName() const { return header_name_; }
+  bool hideCredentials() const { return hide_credentials_; }
+
+private:
+  Http::LowerCaseString header_name_{""};
+  bool hide_credentials_{false};
+};
+
+/**
  * The parsed configuration for API key auth. This class is shared by the filter configuration
  * and the route configuration.
  */
 struct ApiKeyAuthConfig {
 public:
   template <class ProtoType>
-  ApiKeyAuthConfig(const ProtoType& proto_config) : key_sources_(proto_config.key_sources()) {
-    credentials_.reserve(proto_config.credentials().size());
+  ApiKeyAuthConfig(const ProtoType& proto_config, absl::Status& creation_status)
+      : key_sources_(proto_config.key_sources(), creation_status),
+        forwarding_(proto_config.forwarding()) {
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
 
+    credentials_.reserve(proto_config.credentials().size());
     for (const auto& credential : proto_config.credentials()) {
       if (credentials_.contains(credential.key())) {
-        throw EnvoyException("Duplicate API key.");
+        creation_status = absl::InvalidArgumentError(
+            fmt::format("Duplicated credential key: '{}'", credential.key()));
+        return;
       }
       credentials_[credential.key()] = credential.client();
     }
@@ -107,14 +137,22 @@ public:
                                  : OptRef<const Credentials>{};
   }
 
+  /**
+   * To get the optional reference of the client forwarding configuration.
+   */
+  OptRef<const Forwarding> forwarding() const {
+    return forwarding_.has_value() ? makeOptRef(*forwarding_) : OptRef<const Forwarding>{};
+  }
+
 private:
   const KeySources key_sources_;
   Credentials credentials_;
+  absl::optional<Forwarding> forwarding_;
 };
 
 class RouteConfig : public Router::RouteSpecificFilterConfig {
 public:
-  RouteConfig(const ApiKeyAuthPerRouteProto& proto_config);
+  RouteConfig(const ApiKeyAuthPerRouteProto& proto_config, absl::Status& creation_status);
 
   /**
    * To get the optional reference of the credentials. If this returns an valid reference, then
@@ -137,6 +175,12 @@ public:
     return allowed_clients_.empty() || allowed_clients_.contains(client);
   }
 
+  /**
+   * To get the optional reference of the forwarding configuration. If this returns a valid
+   * reference, then it will will override the default configuration.
+   */
+  OptRef<const Forwarding> forwarding() const { return override_config_.forwarding(); }
+
 private:
   const ApiKeyAuthConfig override_config_;
   const absl::flat_hash_set<std::string> allowed_clients_;
@@ -151,7 +195,7 @@ struct AuthResult {
 class FilterConfig {
 public:
   FilterConfig(const ApiKeyAuthProto& proto_config, Stats::Scope& scope,
-               const std::string& stats_prefix);
+               const std::string& stats_prefix, absl::Status& creation_status);
 
   /**
    * To get the optional reference of the default credentials.
@@ -162,6 +206,11 @@ public:
    * To get the optional reference of the default key sources.
    */
   OptRef<const KeySources> keySources() const { return default_config_.keySources(); }
+
+  /**
+   * To get the optional reference of the forwarding configuration.
+   */
+  OptRef<const Forwarding> forwarding() const { return default_config_.forwarding(); }
 
   /**
    * To get the stats of the filter.

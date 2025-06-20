@@ -268,6 +268,7 @@ envoy_cc_test_library(
         "//source/extensions/access_loggers/common:file_access_log_lib",
         "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
         "//source/extensions/request_id/uuid:config",
+        "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/http:early_header_mutation_mock",
@@ -292,12 +293,30 @@ envoy_cc_test(
         # Split to avoid compiler OOM, especially on ASAN.
         "conn_manager_impl_test.cc",
         "conn_manager_impl_test_2.cc",
+        "conn_manager_impl_test_3.cc",
     ],
     rbe_pool = "2core",
+    shard_count = 5,
     deps = [
         ":conn_manager_impl_test_base_lib",
         ":custom_header_extension_lib",
         "//envoy/network:proxy_protocol_options_lib",
+        "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
+        "//test/server:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "conn_manager_misc_test",
+    srcs = ["conn_manager_misc_test.cc"],
+    rbe_pool = "2core",
+    shard_count = 5,
+    deps = [
+        ":conn_manager_impl_test_base_lib",
+        ":custom_header_extension_lib",
+        "//envoy/network:proxy_protocol_options_lib",
+        "//test/extensions/filters/network/common/fuzz/utils:network_filter_fuzzer_fakes_lib",
+        "//test/server:utility_lib",
     ],
 )
 
@@ -454,6 +473,7 @@ envoy_cc_test(
         "//source/common/http:utility_lib",
         "//source/common/network:address_lib",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
@@ -506,6 +526,7 @@ envoy_cc_test(
         "//test/mocks/network:connection_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:test_runtime_lib",
     ],
@@ -528,7 +549,8 @@ envoy_cc_test(
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:test_runtime_lib",
         "//source/common/quic:quic_client_factory_lib",

@@ -235,7 +235,7 @@ public:
   const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
     return early_header_mutations_;
   }
-  uint64_t maxRequestsPerConnection() const override { return 0; }
+  uint32_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
@@ -482,7 +482,7 @@ public:
       break;
     }
     case test::common::http::RequestAction::kContinueDecoding: {
-      if (!decoding_done_ &&
+      if (!decoding_done_ && state != StreamState::Closed &&
           (header_status_ == FilterHeadersStatus::StopAllIterationAndBuffer ||
            header_status_ == FilterHeadersStatus::StopAllIterationAndWatermark ||
            header_status_ == FilterHeadersStatus::StopIteration) &&
@@ -637,7 +637,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0"));
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, http_context, runtime, local_info,
-                                     cluster_manager, overload_manager, config->time_system_);
+                                     cluster_manager, overload_manager, config->time_system_,
+                                     envoy::config::core::v3::TrafficDirection::UNSPECIFIED);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;

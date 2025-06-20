@@ -130,11 +130,9 @@ TEST(Factory, PerRouteConfigNoLimits) {
   TestUtility::loadFromYaml(config_yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_THROW(factory
-                   .createRouteSpecificFilterConfig(*proto_config, context,
-                                                    ProtobufMessage::getNullValidationVisitor())
-                   .value(),
-               EnvoyException);
+  const auto result = factory.createRouteSpecificFilterConfig(
+      *proto_config, context, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_EQ(result.status().message(), "limit must be set for per route filter config");
 }
 } // namespace BandwidthLimitFilter
 } // namespace HttpFilters

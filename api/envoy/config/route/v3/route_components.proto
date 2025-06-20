@@ -5,6 +5,7 @@ package envoy.config.route.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/type/matcher/v3/filter_state.proto";
 import "envoy/type/matcher/v3/metadata.proto";
 import "envoy/type/matcher/v3/regex.proto";
 import "envoy/type/matcher/v3/string.proto";
@@ -500,6 +501,8 @@ message WeightedCluster {
 // Configuration for a cluster specifier plugin.
 message ClusterSpecifierPlugin {
   // The name of the plugin and its opaque configuration.
+  //
+  // [#extension-category: envoy.router.cluster_specifier_plugin]
   core.v3.TypedExtensionConfig extension = 1 [(validate.rules).message = {required: true}];
 
   // If is_optional is not set or is set to false and the plugin defined by this message is not a
@@ -510,7 +513,7 @@ message ClusterSpecifierPlugin {
   bool is_optional = 2;
 }
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message RouteMatch {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
@@ -661,6 +664,12 @@ message RouteMatch {
   // If the number of specified dynamic metadata matchers is nonzero, they all must match the
   // dynamic metadata for a match to occur.
   repeated type.matcher.v3.MetadataMatcher dynamic_metadata = 13;
+
+  // Specifies a set of filter state matchers on which the route should match.
+  // The router will check the filter state against all the specified filter state matchers.
+  // If the number of specified filter state matchers is nonzero, they all must match the
+  // filter state for a match to occur.
+  repeated type.matcher.v3.FilterStateMatcher filter_state = 16;
 }
 
 // Cors policy configuration.
@@ -815,7 +824,10 @@ message RouteAction {
     // value, the request will be mirrored.
     core.v3.RuntimeFractionalPercent runtime_fraction = 3;
 
-    // Determines if the trace span should be sampled. Defaults to true.
+    // Specifies whether the trace span for the shadow request should be sampled. If this field is not explicitly set,
+    // the shadow request will inherit the sampling decision of its parent span. This ensures consistency with the trace
+    // sampling policy of the original request and prevents oversampling, especially in scenarios where runtime sampling
+    // is disabled.
     google.protobuf.BoolValue trace_sampled = 4;
 
     // Disables appending the ``-shadow`` suffix to the shadowed ``Host`` header. Defaults to ``false``.
@@ -1149,12 +1161,21 @@ message RouteAction {
   // [#extension-category: envoy.path.rewrite]
   core.v3.TypedExtensionConfig path_rewrite_policy = 41;
 
+  // If one of the host rewrite specifiers is set and the
+  // :ref:`suppress_envoy_headers
+  // <envoy_v3_api_field_extensions.filters.http.router.v3.Router.suppress_envoy_headers>` flag is not
+  // set to true, the router filter will place the original host header value before
+  // rewriting into the :ref:`x-envoy-original-host
+  // <config_http_filters_router_x-envoy-original-host>` header.
+  //
+  // And if the
+  // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
+  // is set to true, the original host value will also be appended to the
+  // :ref:`config_http_conn_man_headers_x-forwarded-host` header.
+  //
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
-    // this value. Using this option will append the
-    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
-    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
-    // is set.
+    // this value.
     string host_rewrite_literal = 6
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
 
@@ -1164,18 +1185,12 @@ message RouteAction {
     // type ``strict_dns`` or ``logical_dns``,
     // or when :ref:`hostname <envoy_v3_api_field_config.endpoint.v3.Endpoint.hostname>`
     // field is not empty. Setting this to true with other cluster types
-    // has no effect. Using this option will append the
-    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
-    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
-    // is set.
+    // has no effect.
     google.protobuf.BoolValue auto_host_rewrite = 7;
 
     // Indicates that during forwarding, the host header will be swapped with the content of given
     // downstream or :ref:`custom <config_http_conn_man_headers_custom_request_headers>` header.
-    // If header value is empty, host header is left intact. Using this option will append the
-    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
-    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
-    // is set.
+    // If header value is empty, host header is left intact.
     //
     // .. attention::
     //
@@ -1191,10 +1206,6 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // the result of the regex substitution executed on path value with query and fragment removed.
     // This is useful for transitioning variable content between path segment and subdomain.
-    // Using this option will append the
-    // :ref:`config_http_conn_man_headers_x-forwarded-host` header if
-    // :ref:`append_x_forwarded_host <envoy_v3_api_field_config.route.v3.RouteAction.append_x_forwarded_host>`
-    // is set.
     //
     // For example with the following config:
     //
@@ -1868,10 +1879,11 @@ message VirtualCluster {
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 // Also applies to Local rate limiting :ref:`using descriptors <config_http_filters_local_rate_limit_descriptors>`.
+// [#next-free-field: 7]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
-  // [#next-free-field: 12]
+  // [#next-free-field: 13]
   message Action {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
@@ -1928,9 +1940,48 @@ message RateLimit {
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_len: 1}];
 
-      // If set to true, Envoy skips the descriptor while calling rate limiting service
-      // when header is not present in the request. By default it skips calling the
-      // rate limiting service if this header is not present in the request.
+      // Controls the behavior when the specified header is not present in the request.
+      //
+      // If set to ``false`` (default):
+      //
+      // * Envoy does **NOT** call the rate limiting service for this descriptor.
+      // * Useful if the header is optional and you prefer to skip rate limiting when it's absent.
+      //
+      // If set to ``true``:
+      //
+      // * Envoy calls the rate limiting service but omits this descriptor if the header is missing.
+      // * Useful if you want Envoy to enforce rate limiting even when the header is not present.
+      //
+      bool skip_if_absent = 3;
+    }
+
+    // The following descriptor entry is appended when a query parameter contains a key that matches the
+    // ``query_parameter_name``:
+    //
+    // .. code-block:: cpp
+    //
+    //   ("<descriptor_key>", "<query_parameter_value_queried_from_query_parameter>")
+    message QueryParameters {
+      // The name of the query parameter to use for rate limiting. Value of this query parameter is used to populate
+      // the value of the descriptor entry for the descriptor_key.
+      string query_parameter_name = 1 [(validate.rules).string = {min_len: 1}];
+
+      // The key to use when creating the rate limit descriptor entry. his descriptor key will be used to identify the
+      // rate limit rule in the rate limiting service.
+      string descriptor_key = 2 [(validate.rules).string = {min_len: 1}];
+
+      // Controls the behavior when the specified query parameter is not present in the request.
+      //
+      // If set to ``false`` (default):
+      //
+      // * Envoy does **NOT** call the rate limiting service for this descriptor.
+      // * Useful if the query parameter is optional and you prefer to skip rate limiting when it's absent.
+      //
+      // If set to ``true``:
+      //
+      // * Envoy calls the rate limiting service but omits this descriptor if the query parameter is missing.
+      // * Useful if you want Envoy to enforce rate limiting even when the query parameter is not present.
+      //
       bool skip_if_absent = 3;
     }
 
@@ -2065,9 +2116,19 @@ message RateLimit {
       // Source of metadata
       Source source = 4 [(validate.rules).enum = {defined_only: true}];
 
-      // If set to true, Envoy skips the descriptor while calling rate limiting service
-      // when ``metadata_key`` is empty and ``default_value`` is not set. By default it skips calling the
-      // rate limiting service in that case.
+      // Controls the behavior when the specified ``metadata_key`` is empty and ``default_value`` is not set.
+      //
+      // If set to ``false`` (default):
+      //
+      // * Envoy does **NOT** call the rate limiting service for this descriptor.
+      // * Useful if the metadata is optional and you prefer to skip rate limiting when it's absent.
+      //
+      // If set to ``true``:
+      //
+      // * Envoy calls the rate limiting service but omits this descriptor if the ``metadata_key`` is empty and
+      //   ``default_value`` is missing.
+      // * Useful if you want Envoy to enforce rate limiting even when the metadata is not present.
+      //
       bool skip_if_absent = 5;
     }
 
@@ -2109,6 +2170,9 @@ message RateLimit {
 
       // Rate limit on request headers.
       RequestHeaders request_headers = 3;
+
+      // Rate limit on query parameters.
+      QueryParameters query_parameters = 12;
 
       // Rate limit on remote address.
       RemoteAddress remote_address = 4;
@@ -2168,6 +2232,33 @@ message RateLimit {
     }
   }
 
+  message HitsAddend {
+    // Fixed number of hits to add to the rate limit descriptor.
+    //
+    // One of the ``number`` or ``format`` fields should be set but not both.
+    google.protobuf.UInt64Value number = 1 [(validate.rules).uint64 = {lte: 1000000000}];
+
+    // Substitution format string to extract the number of hits to add to the rate limit descriptor.
+    // The same :ref:`format specifier <config_access_log_format>` as used for
+    // :ref:`HTTP access logging <config_access_log>` applies here.
+    //
+    // .. note::
+    //
+    //   The format string must contains only single valid substitution field. If the format string
+    //   not meets the requirement, the configuration will be rejected.
+    //
+    //   The substitution field should generates a non-negative number or string representation of
+    //   a non-negative number. The value of the non-negative number should be less than or equal
+    //   to 1000000000 like the ``number`` field. If the output of the substitution field not meet
+    //   the requirement, this will be treated as an error and the current descriptor will be ignored.
+    //
+    // For example, the ``%BYTES_RECEIVED%`` format string will be replaced with the number of bytes
+    // received in the request.
+    //
+    // One of the ``number`` or ``format`` fields should be set but not both.
+    string format = 2 [(validate.rules).string = {prefix: "%" suffix: "%" ignore_empty: true}];
+  }
+
   // Refers to the stage set in the filter. The rate limit configuration only
   // applies to filters with the same stage number. The default stage number is
   // 0.
@@ -2175,9 +2266,19 @@ message RateLimit {
   // .. note::
   //
   //   The filter supports a range of 0 - 10 inclusively for stage numbers.
+  //
+  // .. note::
+  //   This is not supported if the rate limit action is configured in the ``typed_per_filter_config`` like
+  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
+  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`, etc.
   google.protobuf.UInt32Value stage = 1 [(validate.rules).uint32 = {lte: 10}];
 
   // The key to be set in runtime to disable this rate limit configuration.
+  //
+  // .. note::
+  //   This is not supported if the rate limit action is configured in the ``typed_per_filter_config`` like
+  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
+  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`, etc.
   string disable_key = 2;
 
   // A list of actions that are to be applied for this rate limit configuration.
@@ -2192,7 +2293,38 @@ message RateLimit {
   // rate limit configuration. If the override value is invalid or cannot be resolved
   // from metadata, no override is provided. See :ref:`rate limit override
   // <config_http_filters_rate_limit_rate_limit_override>` for more information.
+  //
+  // .. note::
+  //   This is not supported if the rate limit action is configured in the ``typed_per_filter_config`` like
+  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
+  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`, etc.
   Override limit = 4;
+
+  // An optional hits addend to be appended to the descriptor produced by this rate limit
+  // configuration.
+  //
+  // .. note::
+  //   This is only supported if the rate limit action is configured in the ``typed_per_filter_config`` like
+  //   :ref:`VirtualHost.typed_per_filter_config<envoy_v3_api_field_config.route.v3.VirtualHost.typed_per_filter_config>` or
+  //   :ref:`Route.typed_per_filter_config<envoy_v3_api_field_config.route.v3.Route.typed_per_filter_config>`, etc.
+  HitsAddend hits_addend = 5;
+
+  // If true, the rate limit request will be applied when the stream completes. The default value is false.
+  // This is useful when the rate limit budget needs to reflect the response context that is not available
+  // on the request path.
+  //
+  // For example, let's say the upstream service calculates the usage statistics and returns them in the response body
+  // and we want to utilize these numbers to apply the rate limit action for the subsequent requests.
+  // Combined with another filter that can set the desired addend based on the response (e.g. Lua filter),
+  // this can be used to subtract the usage statistics from the rate limit budget.
+  //
+  // A rate limit applied on the stream completion is "fire-and-forget" by nature, and rate limit is not enforced by this config.
+  // In other words, the current request won't be blocked when this is true, but the budget will be updated for the subsequent
+  // requests based on the action with this field set to true. Users should ensure that the rate limit is enforced by the actions
+  // applied on the request path, i.e. the ones with this field set to false.
+  //
+  // Currently, this is only supported by the HTTP global rate filter.
+  bool apply_on_stream_done = 6;
 }
 
 // .. attention::

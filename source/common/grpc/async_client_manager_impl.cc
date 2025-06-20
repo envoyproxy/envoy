@@ -76,8 +76,8 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(
 #endif
 }
 
-RawAsyncClientPtr AsyncClientFactoryImpl::createUncachedRawAsyncClient() {
-  return std::make_unique<AsyncClientImpl>(cm_, config_, time_source_);
+absl::StatusOr<RawAsyncClientPtr> AsyncClientFactoryImpl::createUncachedRawAsyncClient() {
+  return AsyncClientImpl::create(cm_, config_, time_source_);
 }
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
@@ -123,7 +123,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
   }
 }
 
-RawAsyncClientPtr GoogleAsyncClientFactoryImpl::createUncachedRawAsyncClient() {
+absl::StatusOr<RawAsyncClientPtr> GoogleAsyncClientFactoryImpl::createUncachedRawAsyncClient() {
 #ifdef ENVOY_GOOGLE_GRPC
   GoogleGenericStubFactory stub_factory;
   return std::make_unique<GoogleAsyncClientImpl>(
@@ -168,7 +168,9 @@ absl::StatusOr<RawAsyncClientSharedPtr> AsyncClientManagerImpl::getOrCreateRawAs
   auto factory_or_error =
       factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check);
   RETURN_IF_NOT_OK_REF(factory_or_error.status());
-  client = factory_or_error.value()->createUncachedRawAsyncClient();
+  auto client_or_error = factory_or_error.value()->createUncachedRawAsyncClient();
+  RETURN_IF_NOT_OK_REF(client_or_error.status());
+  client = std::move(*client_or_error);
   raw_async_client_cache_->setCache(config_with_hash_key, client);
   return client;
 }
@@ -184,7 +186,9 @@ AsyncClientManagerImpl::getOrCreateRawAsyncClientWithHashKey(
   auto factory_or_error =
       factoryForGrpcService(config_with_hash_key.config(), scope, skip_cluster_check);
   RETURN_IF_NOT_OK_REF(factory_or_error.status());
-  client = factory_or_error.value()->createUncachedRawAsyncClient();
+  auto client_or_error = factory_or_error.value()->createUncachedRawAsyncClient();
+  RETURN_IF_NOT_OK_REF(client_or_error.status());
+  client = std::move(*client_or_error);
   raw_async_client_cache_->setCache(config_with_hash_key, client);
   return client;
 }

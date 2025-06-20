@@ -164,8 +164,7 @@ public:
     bool keylog_multiple_ips_{false};
     std::string keylog_path_;
     Network::Address::IpVersion ip_version_{Network::Address::IpVersion::v4};
-    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>
-        san_matchers_{};
+    std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> san_matchers_;
     std::string tls_cert_selector_yaml_{""};
     bool client_with_intermediate_cert_{false};
     bool trust_root_only_{false};
@@ -207,7 +206,8 @@ public:
                                            bool multiple_addresses = false);
 
   // A string for a tls inspector listener filter which can be used with addListenerFilter()
-  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false);
+  static std::string tlsInspectorFilter(bool enable_ja3_fingerprinting = false,
+                                        bool enable_ja4_fingerprinting = false);
 
   // A string for the test inspector filter.
   static std::string testInspectorFilter();
@@ -280,8 +280,9 @@ public:
                                                              const std::string& address,
                                                              const std::string& stat_prefix);
 
-  static envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
-                                                                       const std::string& cluster);
+  static envoy::config::route::v3::RouteConfiguration
+  buildRouteConfig(const std::string& name, const std::string& cluster,
+                   bool header_mutations = false);
 
   // Builds a standard Endpoint suitable for population by finalize().
   static envoy::config::endpoint::v3::Endpoint buildEndpoint(const std::string& address);
@@ -294,6 +295,9 @@ public:
 
   // Called by finalize to set up the ports.
   void setPorts(const std::vector<uint32_t>& ports, bool override_port_zero = false);
+
+  // Switch from a default of round robin to async round robin.
+  void setAsyncLb(bool hang = false);
 
   // Set source_address in the bootstrap bind config.
   void setSourceAddress(const std::string& address_string);
@@ -324,7 +328,7 @@ public:
   void disableDelayClose();
 
   // Set the max_requests_per_connection for downstream through the HttpConnectionManager.
-  void setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection);
+  void setDownstreamMaxRequestsPerConnection(uint32_t max_requests_per_connection);
 
   envoy::config::route::v3::VirtualHost createVirtualHost(const char* host, const char* route = "/",
                                                           const char* cluster = "cluster_0");
@@ -465,6 +469,8 @@ public:
   static void setProtocolOptions(envoy::config::cluster::v3::Cluster& cluster,
                                  HttpProtocolOptions& protocol_options);
   static void setHttp2(envoy::config::cluster::v3::Cluster& cluster);
+  static void setHttp2WithMaxConcurrentStreams(envoy::config::cluster::v3::Cluster& cluster,
+                                               uint32_t max_concurrent_streams);
 
   // Populate and return a Http3ProtocolOptions instance based on http2_options.
   static envoy::config::core::v3::Http3ProtocolOptions

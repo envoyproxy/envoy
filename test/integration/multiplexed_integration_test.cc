@@ -811,11 +811,6 @@ TEST_P(MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
   expected_metadata_keys.insert("metadata");
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    // HTTP/3 Sends "end stream" in an empty DATA frame which results in the test filter
-    // adding the "data" metadata header.
-    expected_metadata_keys.insert("data");
-  }
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
 
   // Sends a headers only request with metadata. An empty data frame carries end_stream.
@@ -927,11 +922,6 @@ void MetadataIntegrationTest::verifyHeadersOnlyTest() {
   // Verifies a headers metadata added.
   std::set<std::string> expected_metadata_keys = {"headers"};
   expected_metadata_keys.insert("metadata");
-  if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    // HTTP/3 Sends "end stream" in an empty DATA frame which results in the test filter
-    // adding the "data" metadata header.
-    expected_metadata_keys.insert("data");
-  }
   verifyExpectedMetadata(upstream_request_->metadataMap(), expected_metadata_keys);
 
   // Verifies zero length data received, and end_stream is true.
@@ -1491,6 +1481,10 @@ TEST_P(MultiplexedIntegrationTest, IdleTimeoutWithSimultaneousRequests) {
 
 // Test request mirroring / shadowing with an HTTP/2 downstream and a request with a body.
 TEST_P(MultiplexedIntegrationTest, RequestMirrorWithBody) {
+  // Request mirroring does not handle async load balancing unless a body buffer
+  // is configured.
+  async_lb_ = false;
+
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void {
@@ -1535,6 +1529,40 @@ TEST_P(MultiplexedIntegrationTest, RequestMirrorWithBody) {
   // Cleanup.
   ASSERT_TRUE(fake_upstream_connection2->close());
   ASSERT_TRUE(fake_upstream_connection2->waitForDisconnect());
+}
+
+// Make sure that with async lb, things fail cleanly.
+TEST_P(MultiplexedIntegrationTest, RequestMirrorFailDueToAsyncLb) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_0");
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send request with body.
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                                                        {":path", "/test/long/url"},
+                                                                        {":scheme", "http"},
+                                                                        {":authority", "host"}},
+                                         "hello");
+
+  // Wait for the first request as well as the shadow.
+  waitForNextUpstreamRequest();
+
+  // Make sure both requests have a body. Also check the shadow for the shadow headers.
+  EXPECT_EQ("hello", upstream_request_->body().toString());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
 // Interleave two requests and responses and make sure the HTTP2 stack handles this correctly.
@@ -1842,6 +1870,7 @@ public:
 };
 
 MultiplexedRingHashIntegrationTest::MultiplexedRingHashIntegrationTest() {
+  async_lb_ = false; // Use ring hash.
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster->clear_load_assignment();
@@ -2306,9 +2335,6 @@ TEST_P(Http2FrameIntegrationTest, AdjustUpstreamSettingsMaxStreams) {
 }
 
 TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
-
   beginSession();
   FakeRawConnectionPtr fake_upstream_connection;
 
@@ -2339,9 +2365,6 @@ TEST_P(Http2FrameIntegrationTest, UpstreamSettingsMaxStreamsAfterGoAway) {
 }
 
 TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
-
   beginSession();
   FakeRawConnectionPtr fake_upstream_connection;
 
@@ -2368,65 +2391,8 @@ TEST_P(Http2FrameIntegrationTest, UpstreamGoAway) {
   tcp_client_->close();
 }
 
-TEST_P(Http2FrameIntegrationTest, UpstreamGoAwayLegacy) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "false");
-
-  beginSession();
-  FakeRawConnectionPtr fake_upstream_connection;
-
-  const uint32_t client_stream_idx = 1;
-  // Start a request and wait for it to reach the upstream.
-  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
-  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-
-  const Http2Frame rst_stream =
-      Http2Frame::makeResetStreamFrame(client_stream_idx, Http2Frame::ErrorCode::FlowControlError);
-  const Http2Frame go_away_frame =
-      Http2Frame::makeEmptyGoAwayFrame(12345, Http2Frame::ErrorCode::NoError);
-  ASSERT_TRUE(fake_upstream_connection->write(
-      absl::StrCat(std::string(rst_stream), std::string(go_away_frame))));
-  ASSERT_TRUE(fake_upstream_connection->close());
-
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_close_notify", 1);
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
-
-  // Cleanup.
-  tcp_client_->close();
-}
-
 // Test that sending an invalid frame results in `upstream_cx_protocol_error`.
 TEST_P(Http2FrameIntegrationTest, UpstreamProtocolError) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "true");
-
-  beginSession();
-  FakeRawConnectionPtr fake_upstream_connection;
-
-  const uint32_t client_stream_idx = 1;
-  // Start a request and wait for it to reach the upstream.
-  sendFrame(Http2Frame::makePostRequest(client_stream_idx, "host", "/path/to/long/url"));
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-  const Http2Frame settings_frame = Http2Frame::makeEmptySettingsFrame();
-  ASSERT_TRUE(fake_upstream_connection->write(std::string(settings_frame)));
-  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 1);
-
-  ASSERT_TRUE(fake_upstream_connection->write("abcdefg this is not a valid h2 frame"));
-
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_protocol_error", 1);
-
-  // Cleanup.
-  tcp_client_->close();
-}
-
-// Test that sending an invalid frame results in `upstream_cx_protocol_error`.
-TEST_P(Http2FrameIntegrationTest, UpstreamProtocolErrorLegacy) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.http2_no_protocol_error_upon_clean_close", "false");
-
   beginSession();
   FakeRawConnectionPtr fake_upstream_connection;
 
@@ -2885,6 +2851,7 @@ TEST_P(Http2FrameIntegrationTest, SendGoAwayNotTriggerredByDecodingFilter) {
   FakeStreamPtr upstream_request;
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request));
   ASSERT_TRUE(upstream_request->waitForEndStream(*dispatcher_));
+  cleanupUpstreamAndDownstream();
   tcp_client_->close();
 }
 
@@ -3464,7 +3431,7 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
   // Close upstream, check cleanup.
   fake_upstreams_[0].reset();
 
-  ASSERT_TRUE(response_decoder->waitForReset());
+  ASSERT_TRUE(response_decoder->waitForAnyTermination());
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_active", 0);
   test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
   test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);

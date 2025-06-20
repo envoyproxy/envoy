@@ -49,8 +49,7 @@ jobs:
         //test/cc/...
       command: ../test/run_envoy_bazel_coverage.sh
       request: ${{ needs.load.outputs.request }}
-      source:
-        export COVERAGE_THRESHOLD=76
+      source: |
         export BAZEL_BUILD_OPTION_LIST=--config=mobile-remote-ci-linux-coverage
       steps-post: |
         - name: Package coverage
@@ -58,6 +57,13 @@ jobs:
           run: |
             cd mobile
             tar -czf coverage.tar.gz generated/coverage
+      # TODO(phlax): This is a highly undesirable workaround - remove once
+      #   https://github.com/bazelbuild/bazel/issues/23247 is resolved/available
+      steps-pre: |
+        - name: Inject bazel version
+          shell: bash
+          run: |
+            echo "7.1.2" > .bazelversion
       target: mobile-coverage
       timeout-minutes: 120
       upload-name: coverage.tar.gz

@@ -5,6 +5,8 @@ package envoy.extensions.common.ratelimit.v3;
 import "envoy/type/v3/ratelimit_unit.proto";
 import "envoy/type/v3/token_bucket.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -101,8 +103,10 @@ message RateLimitDescriptor {
     // Descriptor key.
     string key = 1 [(validate.rules).string = {min_len: 1}];
 
-    // Descriptor value.
-    string value = 2 [(validate.rules).string = {min_len: 1}];
+    // Descriptor value. Blank value is treated as wildcard to create dynamic token buckets for each unique value.
+    // Blank Values as wild card is currently supported only with envoy server instance level HTTP local rate limiting
+    // and will not work if HTTP local rate limiting is enabled per connection level.
+    string value = 2 [(validate.rules).string = {min_len: 0}];
   }
 
   // Override rate limit to apply to this descriptor instead of the limit
@@ -121,8 +125,19 @@ message RateLimitDescriptor {
 
   // Optional rate limit override to supply to the ratelimit service.
   RateLimitOverride limit = 2;
+
+  // Optional hits_addend for the rate limit descriptor. If set the value will override the
+  // request level hits_addend.
+  google.protobuf.UInt64Value hits_addend = 3;
 }
 
+// Configuration used to enable local rate limiting.
+//
+// .. note::
+//   The ``LocalRateLimitDescriptor`` is used to configure a local rate limit rule with a token
+//   bucket algorithm. The ``RateLimitDescriptor`` is used to represent a list of symbols that
+//   are used to match against the rate limit rule.
+//
 message LocalRateLimitDescriptor {
   // Descriptor entries.
   repeated v3.RateLimitDescriptor.Entry entries = 1 [(validate.rules).repeated = {min_items: 1}];

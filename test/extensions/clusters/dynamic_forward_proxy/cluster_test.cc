@@ -20,6 +20,7 @@
 #include "test/mocks/upstream/load_balancer_context.h"
 #include "test/mocks/upstream/priority_set.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 
 using testing::AtLeast;
@@ -105,7 +106,7 @@ public:
 
     // Allow touch() to still be strict.
     EXPECT_CALL(*host_map_[host], address()).Times(AtLeast(0));
-    EXPECT_CALL(*host_map_[host], addressList()).Times(AtLeast(0));
+    EXPECT_CALL(*host_map_[host], addressList(_)).Times(AtLeast(0));
     EXPECT_CALL(*host_map_[host], isIpAddress()).Times(AtLeast(0));
     EXPECT_CALL(*host_map_[host], resolvedHost()).Times(AtLeast(0));
   }
@@ -241,10 +242,10 @@ TEST_F(ClusterTest, BasicFlow) {
   makeTestHost("host1:0", "1.2.3.4");
   InSequence s;
 
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("")).host);
 
   // Verify no host LB cases.
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("foo")).host);
   EXPECT_EQ(nullptr, lb_->peekAnotherHost(setHostAndReturnContext("foo")));
 
   // LB will immediately resolve host1.
@@ -255,7 +256,7 @@ TEST_F(ClusterTest, BasicFlow) {
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
   // After changing the address, LB will immediately resolve the new address with a refresh.
   updateTestHostAddress("host1:0", "2.3.4.5");
@@ -265,13 +266,13 @@ TEST_F(ClusterTest, BasicFlow) {
             cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->address()->asString());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("2.3.4.5:0",
-            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
   // Remove the host, LB will immediately fail to find the host in the map.
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(0), SizeIs(1)));
   update_callbacks_->onDnsHostRemove("host1:0");
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
 }
 
 // Outlier detection
@@ -285,35 +286,35 @@ TEST_F(ClusterTest, OutlierDetection) {
   EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host2:0", host_map_["host2:0"]).ok());
   EXPECT_CALL(*host_map_["host2:0"], touch());
   EXPECT_EQ("5.6.7.8:0",
-            lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host2:0")).host->address()->asString());
 
   // Fail outlier check for host1
   setOutlierFailed("host1:0");
-  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")));
+  EXPECT_EQ(nullptr, lb_->chooseHost(setHostAndReturnContext("host1:0")).host);
   // "host2:0" should not be affected
   EXPECT_CALL(*host_map_["host2:0"], touch());
   EXPECT_EQ("5.6.7.8:0",
-            lb_->chooseHost(setHostAndReturnContext("host2:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host2:0")).host->address()->asString());
 
   // Clear outlier check failure for host1, it should be available again
   clearOutlierFailed("host1:0");
   EXPECT_CALL(*host_map_["host1:0"], touch());
   EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setHostAndReturnContext("host1:0"))->address()->asString());
+            lb_->chooseHost(setHostAndReturnContext("host1:0")).host->address()->asString());
 }
 
 // Various invalid LB context permutations in case the cluster is used outside of HTTP.
 TEST_F(ClusterTest, InvalidLbContext) {
   initialize(default_yaml_config_, false);
   ON_CALL(lb_context_, downstreamHeaders()).WillByDefault(Return(nullptr));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_));
-  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&lb_context_).host);
+  EXPECT_EQ(nullptr, lb_->chooseHost(nullptr).host);
 }
 
 TEST_F(ClusterTest, FilterStateHostOverride) {
@@ -323,8 +324,9 @@ TEST_F(ClusterTest, FilterStateHostOverride) {
   EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(1), SizeIs(0)));
   EXPECT_TRUE(update_callbacks_->onDnsHostAddOrUpdate("host1:0", host_map_["host1:0"]).ok());
   EXPECT_CALL(*host_map_["host1:0"], touch());
-  EXPECT_EQ("1.2.3.4:0",
-            lb_->chooseHost(setFilterStateHostAndReturnContext("host1:0"))->address()->asString());
+  EXPECT_EQ(
+      "1.2.3.4:0",
+      lb_->chooseHost(setFilterStateHostAndReturnContext("host1:0")).host->address()->asString());
 }
 
 // Verify cluster attaches to a populated cache.
@@ -647,6 +649,14 @@ TEST_F(ClusterTest, LoadBalancer_SelectPoolNoSSSL) {
 }
 
 class ClusterFactoryTest : public testing::Test {
+public:
+  ClusterFactoryTest()
+      : registered_dns_factory_(dns_resolver_factory_),
+        dns_resolver_(new Network::MockDnsResolver()) {
+    EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+        .WillRepeatedly(Return(dns_resolver_));
+  }
+
 protected:
   void createCluster(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
@@ -673,6 +683,9 @@ private:
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Upstream::ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver_;
 };
 
 TEST_F(ClusterFactoryTest, InvalidUpstreamHttpProtocolOptions) {

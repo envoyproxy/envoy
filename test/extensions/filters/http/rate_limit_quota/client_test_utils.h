@@ -119,7 +119,7 @@ public:
   }
 
   inline static Event::MockTimer* assertMockTimer(Event::Timer* timer) {
-    if (!timer)
+    if (timer == nullptr)
       return nullptr;
     return dynamic_cast<Event::MockTimer*>(timer);
   }

@@ -59,7 +59,10 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 class ConfigTest {
 public:
   ConfigTest(OptionsImplBase& options)
-      : api_(Api::createApiForTest(time_system_)), options_(options) {
+      : api_(Api::createApiForTest(time_system_)),
+        ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()), options_(options) {
+    ON_CALL(server_.server_factory_context_->xds_manager_, adsMux())
+        .WillByDefault(Return(ads_mux_));
     ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -124,7 +127,7 @@ public:
         *server_.server_factory_context_, server_.stats(), server_.threadLocal(),
         server_.httpContext(),
         [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-        ssl_context_manager_, server_.secretManager(), server_.quic_stat_names_, server_);
+        ssl_context_manager_, server_.quic_stat_names_, server_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -169,6 +172,7 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Server::MockInstance> server_;
   Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;

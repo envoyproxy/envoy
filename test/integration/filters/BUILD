@@ -3,6 +3,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -17,6 +18,11 @@ envoy_proto_library(
 envoy_proto_library(
     name = "add_header_filter_proto",
     srcs = ["add_header_filter.proto"],
+)
+
+envoy_proto_library(
+    name = "async_upstream_filter_proto",
+    srcs = ["async_upstream_filter.proto"],
 )
 
 envoy_proto_library(
@@ -73,6 +79,20 @@ envoy_cc_test_library(
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
     ],
     alwayslink = 1,
+)
+
+envoy_cc_test_library(
+    name = "async_upstream_filter_lib",
+    srcs = ["async_upstream_filter.cc"],
+    deps = [
+        ":async_upstream_filter_proto_cc_proto",
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+    ],
 )
 
 envoy_cc_test_library(
@@ -361,6 +381,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "refresh_route_cluster_filter_lib",
+    srcs = [
+        "refresh_route_cluster_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "eds_ready_filter_config_lib",
     srcs = [
         "eds_ready_filter.cc",
@@ -450,17 +485,16 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "pause_filter_for_quic_lib",
-    srcs = [
+    srcs = envoy_select_enable_http3([
         "pause_filter_for_quic.cc",
-    ],
-    tags = ["nofips"],
-    deps = [
+    ]),
+    deps = envoy_select_enable_http3([
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
+    ]),
 )
 
 envoy_cc_test_library(

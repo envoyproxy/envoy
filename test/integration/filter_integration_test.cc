@@ -489,6 +489,9 @@ TEST_P(FilterIntegrationTest, FaultyFilterWithConnect) {
 // Test hitting the decoder buffer filter with too many request bytes to buffer. Ensure the
 // connection manager sends a 413.
 TEST_P(FilterIntegrationTest, HittingDecoderFilterLimit) {
+  // The StopAllIteration with async host resolution messes with the expectations of this test.
+  async_lb_ = false;
+
   prependFilter("{ name: encoder-decoder-buffer-filter }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
@@ -677,6 +680,8 @@ name: passthrough-filter
 // Tests StopAllIterationAndWatermark. decode-headers-return-stop-all-filter sets buffer
 // limit to 100. Verifies data pause when limit is reached, and resume after iteration continues.
 TEST_P(FilterIntegrationTest, TestDecodeHeadersReturnsStopAllWatermark) {
+  // The StopAllIteration with async host resolution messes with the expectations of this test.
+  async_lb_ = false;
   prependFilter(R"EOF(
 name: decode-headers-return-stop-all-filter
 )EOF");
@@ -1094,6 +1099,9 @@ TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeData) {
 // filter chain iteration was restarted. It is very similar to the test case above but some filter
 // manager's internal state is slightly different.
 TEST_P(FilterIntegrationTest, OverflowDecoderBufferFromDecodeDataContinueIteration) {
+  // The StopAllIteration with async host resolution messes with the expectations of this test.
+  async_lb_ = false;
+
   config_helper_.setBufferLimits(64 * 1024, 64 * 1024);
   prependFilter(R"EOF(
   name: crash-filter
@@ -1502,6 +1510,8 @@ TEST_P(FilterIntegrationTest, NonTerminalEncodingFilterWithCompleteRequestAndIde
 }
 
 void FilterIntegrationTest::testFilterAddsDataAndTrailersToHeaderOnlyRequest() {
+  async_lb_ = false;
+
   // When an upstream filter adds body to the header only request the result observed by
   // the upstream server is unpredictable. Sending of the added body races with the
   // downstream FM closing the request, as it observed end_stream in both directions.

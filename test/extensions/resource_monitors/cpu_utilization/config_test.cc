@@ -15,13 +15,36 @@ namespace ResourceMonitors {
 namespace CpuUtilizationMonitor {
 namespace {
 
-TEST(CpuUtilizationMonitorFactoryTest, CreateMonitor) {
+TEST(CpuUtilizationMonitorFactoryTest, CreateMonitorDefault) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.cpu_utilization");
   EXPECT_NE(factory, nullptr);
 
   envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  EXPECT_EQ(config.mode(),
+            envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::HOST);
+  Event::MockDispatcher dispatcher;
+  Api::ApiPtr api = Api::createApiForTest();
+  Server::MockOptions options;
+  Server::Configuration::ResourceMonitorFactoryContextImpl context(
+      dispatcher, options, *api, ProtobufMessage::getStrictValidationVisitor());
+  auto monitor = factory->createResourceMonitor(config, context);
+  EXPECT_NE(monitor, nullptr);
+}
+
+TEST(CpuUtilizationMonitorFactoryTest, CreateContainerCPUMonitor) {
+  auto factory =
+      Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
+          "envoy.resource_monitors.cpu_utilization");
+  EXPECT_NE(factory, nullptr);
+
+  envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig config;
+  config.set_mode(
+      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
+  EXPECT_EQ(
+      config.mode(),
+      envoy::extensions::resource_monitors::cpu_utilization::v3::CpuUtilizationConfig::CONTAINER);
   Event::MockDispatcher dispatcher;
   Api::ApiPtr api = Api::createApiForTest();
   Server::MockOptions options;

@@ -82,8 +82,6 @@ class EnvoyConfigurationTest {
     dnsNumRetries: Int? = 3,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
-    enableCares: Boolean = false,
-    caresFallbackResolvers: MutableList<Pair<String, Int>> = mutableListOf(Pair("1.2.3.4", 88)),
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
@@ -115,9 +113,13 @@ class EnvoyConfigurationTest {
     enablePlatformCertificatesValidation: Boolean = false,
     upstreamTlsSni: String = "",
     h3ConnectionKeepaliveInitialIntervalMilliseconds: Int = 0,
+    disableDnsRefreshOnFailure: Boolean = false,
+    disableDnsRefreshOnNetworkChange: Boolean = false,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
+      disableDnsRefreshOnFailure,
+      disableDnsRefreshOnNetworkChange,
       dnsRefreshSeconds,
       dnsFailureRefreshSecondsBase,
       dnsFailureRefreshSecondsMax,
@@ -129,7 +131,6 @@ class EnvoyConfigurationTest {
       dnsNumRetries ?: -1,
       enableDrainPostDnsRefresh,
       enableHttp3,
-      enableCares,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
@@ -154,7 +155,6 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
-      caresFallbackResolvers,
       h3ConnectionKeepaliveInitialIntervalMilliseconds,
     )
   }
@@ -222,7 +222,7 @@ class EnvoyConfigurationTest {
     val resolvedTemplate2 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createBootstrap also doesn't change filter order.
-    // This may leak memory as the boostrap isn't used.
+    // This may leak memory as the bootstrap isn't used.
     envoyConfiguration.createBootstrap()
     val resolvedTemplate3 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
@@ -236,7 +236,6 @@ class EnvoyConfigurationTest {
       enableDNSCache = true,
       dnsCacheSaveIntervalSeconds = 101,
       enableHttp3 = false,
-      enableCares = true,
       enableGzipDecompression = false,
       enableBrotliDecompression = true,
       enableSocketTagging = true,
@@ -246,7 +245,8 @@ class EnvoyConfigurationTest {
       filterChain = mutableListOf(),
       runtimeGuards = mapOf("test_feature_false" to true),
       trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED,
-      h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
+      h3ConnectionKeepaliveInitialIntervalMilliseconds = 200,
+      disableDnsRefreshOnFailure = true,
     )
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
@@ -256,11 +256,6 @@ class EnvoyConfigurationTest {
 
     // enableDrainPostDnsRefresh = true
     assertThat(resolvedTemplate).contains("enable_drain_post_dns_refresh: true")
-
-    // enableCares = true
-    assertThat(resolvedTemplate).contains("envoy.network.dns_resolver.cares")
-    assertThat(resolvedTemplate).contains("address: \"1.2.3.4\"");
-    assertThat(resolvedTemplate).contains("port_value: 88");
 
     // UDP GRO enabled by default
     assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
@@ -295,6 +290,7 @@ class EnvoyConfigurationTest {
     val resolvedTemplate1 = TestJni.createProtoString(envoyConfiguration1)
     // h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
     assertThat(resolvedTemplate1).contains("connection_keepalive { initial_interval { nanos: 200000000 }")
+    assertThat(resolvedTemplate).contains("disable_dns_refresh_on_failure: true")
   }
 
   @Test

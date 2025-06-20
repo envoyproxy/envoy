@@ -77,6 +77,7 @@ void JniHelper::finalize() {
   for (const auto& [_, clazz] : jclass_cache_map) {
     env->DeleteGlobalRef(clazz);
   }
+  java_vm_cache_ = nullptr;
 }
 
 void JniHelper::addToCache(absl::string_view class_name, const std::vector<Method>& methods,

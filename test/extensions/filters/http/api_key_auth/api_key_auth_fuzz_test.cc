@@ -42,14 +42,13 @@ DEFINE_PROTO_FUZZER(const ApiKeyAuthFuzzInput& input) {
     return route_config.get();
   }));
 
-  std::shared_ptr<FilterConfig> filter_config;
+  absl::Status filter_config_creation_status = absl::OkStatus();
+  std::shared_ptr<FilterConfig> filter_config = std::make_shared<FilterConfig>(
+      input.filter_config(), mock_factory_ctx.scope_, "stats.", filter_config_creation_status);
 
-  try {
-    filter_config =
-        std::make_shared<FilterConfig>(input.filter_config(), mock_factory_ctx.scope_, "stats.");
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException during filter config construction: {}", e.what());
-    return;
+  if (!filter_config_creation_status.ok()) {
+    ENVOY_LOG_MISC(debug, "EnvoyException during filter config construction: {}",
+                   filter_config_creation_status.message());
   }
 
   // Simulate multiple calls to execute jwt_cache and jwks_cache codes

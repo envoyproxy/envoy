@@ -24,7 +24,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "api_listener_interface",
     hdrs = ["api_listener.h"],
-    deps = ["//envoy/http:api_listener_interface"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/http:api_listener_interface",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -52,7 +56,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "drain_manager_interface",
     hdrs = ["drain_manager.h"],
-    deps = ["//envoy/network:drain_decision_interface"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/network:drain_decision_interface",
+        "//envoy/thread_local:thread_local_object",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -173,6 +182,7 @@ envoy_cc_library(
         "//envoy/api:api_interface",
         "//envoy/config:typed_config_interface",
         "//envoy/config:typed_metadata_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/grpc:context_interface",
         "//envoy/http:codes_interface",
         "//envoy/http:context_interface",
@@ -191,6 +201,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
+        "//source/common/singleton:threadsafe_singleton",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

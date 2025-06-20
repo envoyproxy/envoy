@@ -578,10 +578,7 @@ TEST_P(ProtocolsBufferWatermarksTest, ResettingStreamUnregistersAccount) {
       ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
     } else {
       ASSERT_TRUE(response1->waitForReset());
-      EXPECT_EQ(response1->resetReason(),
-                (std::get<0>(GetParam()).downstream_protocol == Http::CodecType::HTTP2
-                     ? Http::StreamResetReason::RemoteReset
-                     : Http::StreamResetReason::OverloadManager));
+      EXPECT_EQ(response1->resetReason(), Http::StreamResetReason::RemoteReset);
     }
 
     // Wait for the upstream request to receive the reset to avoid a race when
@@ -1603,7 +1600,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProces
   initialize();
 
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedData(),
-               "Crashing as request body over 1000!.*"
+               "(?s)Crashing as request body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping current stream.*"
                "ConnectionImpl::StreamImpl.*ConnectionImpl");
 }
@@ -1613,7 +1610,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),
-               "Crashing as response body over 1000!.*"
+               "(?s)Crashing as response body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"
                "ConnectionImpl::StreamImpl.*ConnectionImpl");
 }

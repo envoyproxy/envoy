@@ -21,6 +21,24 @@ private:
 
 } // namespace
 
+constexpr uint32_t kThreadCap = 10;
+
+GetAddrInfoDnsResolver::GetAddrInfoDnsResolver(
+    const envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig&
+        config,
+    Event::Dispatcher& dispatcher, Api::Api& api)
+    : config_(config), dispatcher_(dispatcher), api_(api) {
+  uint32_t num_threads =
+      config_.has_num_resolver_threads() ? config_.num_resolver_threads().value() : 1;
+  num_threads = std::min(num_threads, kThreadCap);
+  ENVOY_LOG(debug, "Starting getaddrinfo resolver with {} threads", num_threads);
+  resolver_threads_.reserve(num_threads);
+  for (uint32_t i = 0; i < num_threads; i++) {
+    resolver_threads_.emplace_back(
+        api_.threadFactory().createThread([this] { resolveThreadRoutine(); }));
+  }
+}
+
 GetAddrInfoDnsResolver::~GetAddrInfoDnsResolver() {
   {
     absl::MutexLock guard(&mutex_);
@@ -28,15 +46,19 @@ GetAddrInfoDnsResolver::~GetAddrInfoDnsResolver() {
     pending_queries_.clear();
   }
 
-  resolver_thread_->join();
+  for (auto& thread : resolver_threads_) {
+    thread->join();
+  }
+  ENVOY_LOG(debug, "All getaddrinfo resolver threads joined");
 }
 
 ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
                                                 DnsLookupFamily dns_lookup_family,
                                                 ResolveCb callback) {
   ENVOY_LOG(debug, "adding new query [{}] to pending queries", dns_name);
-  auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, callback);
-  ActiveDnsQuery* active_query;
+  auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, std::move(callback));
+  new_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted));
+  ActiveDnsQuery* active_query = new_query.get();
   {
     absl::MutexLock guard(&mutex_);
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
@@ -46,9 +68,7 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
     } else {
       pending_queries_.push_back({std::move(new_query), absl::nullopt});
     }
-    active_query = pending_queries_.back().pending_query_.get();
   }
-  active_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted));
   return active_query;
 }
 
@@ -124,8 +144,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
   while (true) {
     std::unique_ptr<PendingQuery> next_query;
     absl::optional<uint32_t> num_retries;
-    const bool treat_nodata_noname_as_success =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dns_nodata_noname_is_success");
     {
       absl::MutexLock guard(&mutex_);
       auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_) {
@@ -145,7 +163,8 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       }
     }
 
-    ENVOY_LOG(debug, "popped pending query [{}]", next_query->dns_name_);
+    ENVOY_LOG(debug, "Thread ({}) popped pending query [{}]",
+              api_.threadFactory().currentThreadId().getId(), next_query->dns_name_);
 
     // For mock testing make sure the getaddrinfo() response is freed prior to the post.
     std::pair<ResolutionStatus, std::list<DnsResponse>> response;
@@ -154,7 +173,9 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Starting));
       addrinfo hints;
       memset(&hints, 0, sizeof(hints));
-      hints.ai_flags = AI_ADDRCONFIG;
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_no_ai_flags")) {
+        hints.ai_flags = AI_ADDRCONFIG;
+      }
       hints.ai_family = AF_UNSPEC;
       // If we don't specify a socket type, every address will appear twice, once
       // for SOCK_STREAM and one for SOCK_DGRAM. Since we do not return the family
@@ -168,9 +189,6 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Success));
         response = processResponse(*next_query, addrinfo_wrapper.get());
       } else if (rc.return_value_ == EAI_AGAIN) {
-        if (num_retries.has_value()) {
-          (*num_retries)--;
-        }
         if (!num_retries.has_value()) {
           ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
           next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
@@ -180,6 +198,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
           }
           continue;
         }
+        (*num_retries)--;
         if (*num_retries > 0) {
           ENVOY_LOG(debug, "retrying query [{}], num_retries: {}", next_query->dns_name_,
                     *num_retries);
@@ -194,17 +213,16 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
                   *num_retries);
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::DoneRetrying));
         response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
-      } else if (treat_nodata_noname_as_success &&
-                 (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA)) {
-        // Treat NONAME and NODATA as DNS records with no results.
-        // NODATA and NONAME are typically not transient failures, so we don't expect success if
-        // the DNS query is retried.
-        // NOTE: this is also how the c-ares resolver treats NONAME and NODATA:
+      } else if (rc.return_value_ == EAI_NONAME || rc.return_value_ == EAI_NODATA) {
+        // Treat NONAME and NODATA as DNS records with no results and a failure.
+        // Experiments on Android have shown that treating NONAME and NODATA as success leads to
+        // many more net.dns and connection-level failures.
+        // NOTE: this differs from how the c-ares resolver treats NONAME and NODATA:
         // https://github.com/envoyproxy/envoy/blob/099d85925b32ce8bf06e241ee433375a0a3d751b/source/extensions/network/dns_resolver/cares/dns_impl.h#L109-L111.
         ENVOY_LOG(debug, "getaddrinfo for host={} has no results rc={}", next_query->dns_name_,
                   gai_strerror(rc.return_value_));
         next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NoResult));
-        response = std::make_pair(ResolutionStatus::Completed, std::list<DnsResponse>());
+        response = std::make_pair(ResolutionStatus::Failure, std::list<DnsResponse>());
       } else {
         ENVOY_LOG(debug, "getaddrinfo failed for host={} with rc={} errno={}",
                   next_query->dns_name_, gai_strerror(rc.return_value_), errorDetails(rc.errno_));

@@ -32,7 +32,10 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/protobuf/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_connection_factory.h"
+#endif
 #include "source/common/router/route_provider_manager.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
@@ -307,12 +310,11 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoAndHopByHo
     Server::OverloadManager& overload_manager = context.listenerInfo().shouldBypassOverloadManager()
                                                     ? server_context.nullOverloadManager()
                                                     : server_context.overloadManager();
-
     auto hcm = std::make_shared<Http::ConnectionManagerImpl>(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource());
+        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
     if (!clear_hop_by_hop_headers) {
       hcm->setClearHopByHopResponseHeaders(false);
     }
@@ -368,8 +370,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
-          config.http_protocol_options(), context.messageValidationVisitor(),
-          config.stream_error_on_invalid_http_message(),
+          config.http_protocol_options(), context.serverFactoryContext(),
+          context.messageValidationVisitor(), config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb,
@@ -417,7 +419,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       merge_slashes_(config.merge_slashes()),
       headers_with_underscores_action_(
           config.common_http_protocol_options().headers_with_underscores_action()),
-      local_reply_(LocalReply::Factory::create(config.local_reply_config(), context)),
       path_with_escaped_slashes_action_(getPathWithEscapedSlashesAction(config, context)),
       strip_trailing_host_dot_(config.strip_trailing_host_dot()),
       max_requests_per_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -434,6 +435,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (!creation_status.ok()) {
     return;
   }
+  auto local_reply_or_error = LocalReply::Factory::create(config.local_reply_config(), context);
+  SET_AND_RETURN_IF_NOT_OK(local_reply_or_error.status(), creation_status);
+  local_reply_ = std::move(*local_reply_or_error);
 
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(
       config.http2_protocol_options(), config.has_stream_error_on_invalid_http_message(),
@@ -771,6 +775,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
         overload_manager);
   case CodecType::HTTP3:
+#ifdef ENVOY_ENABLE_QUIC
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
         .createQuicHttpServerConnectionImpl(
@@ -778,6 +783,11 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
             Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
             http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
             headersWithUnderscoresAction());
+#else
+    // Should be blocked by configuration checking at an earlier point.
+    PANIC("unexpected");
+#endif
+    break;
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(),
@@ -895,7 +905,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         filter_config, context.drainDecision(), server_context.api().randomGenerator(),
         server_context.httpContext(), server_context.runtime(), server_context.localInfo(),
         server_context.clusterManager(), overload_manager,
-        server_context.mainThreadDispatcher().timeSource());
+        server_context.mainThreadDispatcher().timeSource(), context.listenerInfo().direction());
     if (!clear_hop_by_hop_headers) {
       conn_manager->setClearHopByHopResponseHeaders(false);
     }
