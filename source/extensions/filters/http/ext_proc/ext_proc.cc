@@ -313,8 +313,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
       untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
-      failure_mode_allow_(config.has_overrides() &&
-                                  config.overrides().has_failure_mode_allow()
+      failure_mode_allow_(config.has_overrides()
                               ? absl::optional<bool>(config.overrides().failure_mode_allow())
                               : absl::nullopt) {}
 
