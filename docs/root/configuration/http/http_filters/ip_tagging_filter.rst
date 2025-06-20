@@ -22,11 +22,101 @@ described in the paper `IP-address lookup using
 LC-tries <https://www.csc.kth.se/~snilsson/publications/IP-address-lookup-using-LC-tries/text.pdf>`_ by S. Nilsson and
 G. Karlsson.
 
+IP tags can either be provided directly using the :ref:`ip_tags <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.ip_tags>` API field or
+can be loaded from file if :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagsFileProvider.ip_tags_datasource>` API field is configured.
+For file based IP tags YAML and JSON file formats are supported.
+IP tags will be dynamically reloaded if ``watched_directory`` is configured for :ref:`ip_tags_datasource <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagsFileProvider.ip_tags_datasource>`
+and :ref:`ip_tags_refresh_rate <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagsFileProvider.ip_tags_refresh_rate>` is set to value greater than zero.
 
 Configuration
 -------------
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ip_tagging.v3.IPTagging>`
+
+An example configuration of the filter with inline ip tags may look like the following:
+
+.. code-block:: yaml
+
+    http_filters:
+    - name: ip_tagging
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+        request_type: both
+        ip_tags:
+        - ip_tag_name: external_request
+          ip_list:
+            - {address_prefix: 1.2.3.4, prefix_len: 32}
+
+Below is an example configuration of the filter with the file based ip tags in yaml format:
+
+.. code-block:: yaml
+
+    http_filters:
+    - name: ip_tagging
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+        request_type: both
+        ip_tags_file_provider:
+          ip_tags_refresh_rate: 5s
+          ip_tags_datasource:
+            filename: "/geoip/ip-tags.yaml"
+            watched_directory:
+              path: "/geoip/"
+
+Where the *ip-tags.yaml* file would have the following content:
+
+.. code-block:: yaml
+
+    ip_tags:
+    - ip_tag_name: external_request
+      ip_list:
+      - {address_prefix: 1.2.3.4, prefix_len: 32}
+    - ip_tag_name: internal_request
+      ip_list:
+      - {address_prefix: 1.2.3.5, prefix_len: 32}
+
+And here is an example configuration of the filter with the file based IP tags in JSON format:
+
+.. code-block:: yaml
+
+    http_filters:
+    - name: ip_tagging
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
+        request_type: both
+        ip_tags_file_provider:
+          ip_tags_refresh_rate: 5s
+          ip_tags_datasource:
+            filename: "/geoip/ip-tags.json"
+            watched_directory:
+              path: "/geoip/"
+
+Where the ``ip-tags.json`` file would have the following content:
+
+.. code-block:: json
+
+  {
+  "ip_tags": [
+      {
+      "ip_tag_name": "external_request",
+      "ip_list": [
+          {
+          "address_prefix": "1.2.3.4",
+          "prefix_len": 32
+          }
+      ]
+      },
+      {
+          "ip_tag_name": "internal_request",
+          "ip_list": [
+              {
+              "address_prefix": "1.2.3.5",
+              "prefix_len": 32
+              }
+          ]
+          }
+  ]
+  }
 
 Statistics
 ----------
@@ -41,6 +131,8 @@ the owning HTTP connection manager.
         <tag_name>.hit, Counter, Total number of requests that have the ``<tag_name>`` applied to it
         no_hit, Counter, Total number of requests with no applicable IP tags
         total, Counter, Total number of requests the IP Tagging Filter operated on
+        reload_success, Counter, Total number of successful reloads of IP tags file
+        reload_error, Counter, Total number of failed reloads of IP tags file
 
 Runtime
 -------
