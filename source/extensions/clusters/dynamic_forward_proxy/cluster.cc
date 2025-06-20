@@ -75,8 +75,9 @@ Cluster::Cluster(
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       orig_cluster_config_(cluster),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
-      cm_(context.clusterManager()), max_sub_clusters_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                         config.sub_clusters_config(), max_sub_clusters, 1024)),
+      time_source_(context.serverFactoryContext().timeSource()), cm_(context.clusterManager()),
+      max_sub_clusters_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.sub_clusters_config(), max_sub_clusters, 1024)),
       sub_cluster_ttl_(
           PROTOBUF_GET_MS_OR_DEFAULT(config.sub_clusters_config(), sub_cluster_ttl, 300000)),
       sub_cluster_lb_policy_(config.sub_clusters_config().lb_policy()),
@@ -297,7 +298,7 @@ absl::Status Cluster::addOrUpdateHost(
     ENVOY_LOG(debug, "adding new dfproxy cluster host '{}'", host);
     auto host_or_error = Upstream::LogicalHost::create(
         info(), std::string{host}, host_info->address(), host_info->addressList(/*filtered=*/true),
-        dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr, time_source_);
+        dummy_locality_lb_endpoint_, dummy_lb_endpoint_, nullptr);
     RETURN_IF_NOT_OK_REF(host_or_error.status());
 
     emplaced_host =
