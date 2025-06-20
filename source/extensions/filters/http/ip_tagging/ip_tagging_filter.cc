@@ -38,31 +38,39 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   creation_status = tags_or_error.status();
   if (tags_or_error.status().ok()) {
     tags_ = tags_or_error.value();
+  } else {
+    // Initialize tags_ to empty trie to prevent null pointer dereference
+    tags_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(
+        std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>{});
   }
-  ip_tags_reload_dispatcher_ = api.allocateDispatcher("ip_tags_reload_routine");
-  ip_tags_reload_timer_ = ip_tags_reload_dispatcher_->createTimer([this]() -> void {
-    ENVOY_LOG(debug, "Trying to update ip tags in background");
-    auto new_tags_or_error = tags_loader_.refreshTags();
-    if (new_tags_or_error.status().ok()) {
-      updateIpTags(new_tags_or_error.value());
-      reload_success_cb_();
-    } else {
-      ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
-                new_tags_or_error.status().message());
-      reload_error_cb_();
-    }
-    ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
-  });
+  
+  // Only create thread if we have valid tags
+  if (creation_status.ok()) {
+    ip_tags_reload_dispatcher_ = api.allocateDispatcher("ip_tags_reload_routine");
+    ip_tags_reload_timer_ = ip_tags_reload_dispatcher_->createTimer([this]() -> void {
+      ENVOY_LOG(debug, "Trying to update ip tags in background");
+      auto new_tags_or_error = tags_loader_.refreshTags();
+      if (new_tags_or_error.status().ok()) {
+        updateIpTags(new_tags_or_error.value());
+        reload_success_cb_();
+      } else {
+        ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
+                  new_tags_or_error.status().message());
+        reload_error_cb_();
+      }
+      ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
+    });
 
-  ip_tags_reload_thread_ = api.threadFactory().createThread(
-      [this]() -> void {
-        ENVOY_LOG(debug, "Started ip_tags_reload_routine");
-        if (ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0)) {
-          ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
-        }
-        ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-      },
-      Thread::Options{std::string("ip_tags_reload_routine")});
+    ip_tags_reload_thread_ = api.threadFactory().createThread(
+        [this]() -> void {
+          ENVOY_LOG(debug, "Started ip_tags_reload_routine");
+          if (ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0)) {
+            ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
+          }
+          ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+        },
+        Thread::Options{std::string("ip_tags_reload_routine")});
+  }
 }
 
 IpTagsProvider::~IpTagsProvider() {

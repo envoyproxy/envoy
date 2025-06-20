@@ -169,10 +169,18 @@ public:
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const {
     if (provider_) {
-      return *(provider_->ipTags());
-    } else {
+      auto ip_tags = provider_->ipTags();
+      if (ip_tags) {
+        return *ip_tags;
+      }
+    }
+    if (trie_) {
       return *trie_;
     }
+    // Return a reference to an empty trie to avoid segfault
+    static const Network::LcTrie::LcTrie<std::string> empty_trie{
+        std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>{}};
+    return empty_trie;
   }
 
   OptRef<const Http::LowerCaseString> ipTagHeader() const {
