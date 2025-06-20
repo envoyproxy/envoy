@@ -1222,10 +1222,10 @@ TEST_P(GolangIntegrationTest, Async_DataBuffer_DecodeHeader) {
 // buffer all data in decode data phase with sync mode.
 TEST_P(GolangIntegrationTest, DataBuffer_DecodeData) { testBasic("/test?databuffer=decode-data"); }
 
-// // buffer all data in decode data phase with async mode.
-// TEST_P(GolangIntegrationTest, Async_DataBuffer_DecodeData) {
-//   testBasic("/test?async=1&databuffer=decode-data");
-// }
+// buffer all data in decode data phase with async mode.
+TEST_P(GolangIntegrationTest, Async_DataBuffer_DecodeData) {
+  testBasic("/test?async=1&databuffer=decode-data");
+}
 
 // Go send local reply in decode header phase.
 TEST_P(GolangIntegrationTest, LocalReply_DecodeHeader) {
