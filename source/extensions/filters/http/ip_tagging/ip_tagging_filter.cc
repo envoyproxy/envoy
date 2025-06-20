@@ -158,6 +158,9 @@ IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& va
 absl::StatusOr<LcTrieSharedPtr>
 IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                        Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls) {
+  (void)main_dispatcher;
+  (void)tls;
+
   ENVOY_LOG(warn, "12345 test - loadTags called with filename: '{}'", ip_tags_datasource.filename());
 
   if (!ip_tags_datasource.filename().empty()) {
