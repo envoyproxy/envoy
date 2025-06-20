@@ -101,10 +101,14 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
       exporter = std::make_unique<OpenTelemetryHttpTraceExporter>(
           factory_context.clusterManager(), opentelemetry_config.http_service());
     }
+    // Get the max cache size from config, with default value of 1024 if not specified
+    uint64_t max_cache_size = opentelemetry_config.has_max_cache_size() 
+        ? opentelemetry_config.max_cache_size().value() 
+        : 1024;
     TracerPtr tracer = std::make_unique<Tracer>(
         std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
         factory_context.runtime(), dispatcher, tracing_stats_, resource_ptr, sampler,
-        opentelemetry_config.max_cache_size());
+        max_cache_size);
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }
