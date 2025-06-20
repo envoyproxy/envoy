@@ -55,10 +55,15 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
 
       ENVOY_LOG(debug, "Trying to update ip tags in background");
       try {
+        ENVOY_LOG(warn, "12345 test - Timer callback: calling refreshTags");
         auto new_tags_or_error = tags_loader_.refreshTags();
+        ENVOY_LOG(warn, "12345 test - Timer callback: refreshTags returned");
         if (new_tags_or_error.status().ok()) {
+          ENVOY_LOG(warn, "12345 test - Timer callback: refreshTags succeeded, calling updateIpTags");
           updateIpTags(new_tags_or_error.value());
+          ENVOY_LOG(warn, "12345 test - Timer callback: updateIpTags completed, calling success callback");
           reload_success_cb_();
+          ENVOY_LOG(warn, "12345 test - Timer callback: success callback completed");
         } else {
           ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
                     new_tags_or_error.status().message());
@@ -106,8 +111,11 @@ LcTrieSharedPtr IpTagsProvider::ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
 }
 
 void IpTagsProvider::updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
+  ENVOY_LOG(warn, "12345 test - updateIpTags called");
   absl::MutexLock lock(&ip_tags_mutex_);
+  ENVOY_LOG(warn, "12345 test - updateIpTags acquired mutex lock");
   tags_ = new_tags;
+  ENVOY_LOG(warn, "12345 test - updateIpTags assigned new tags, exiting");
 }
 
 absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
@@ -275,7 +283,20 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
       }
     }
     ENVOY_LOG(warn, "12345 test - File loaded successfully, parsing IP tags");
-    return parseIpTagsAsProto(ip_tags_proto.ip_tags());
+
+    ENVOY_LOG(warn, "12345 test - About to call parseIpTagsAsProto");
+    auto parse_result = parseIpTagsAsProto(ip_tags_proto.ip_tags());
+    ENVOY_LOG(warn, "12345 test - parseIpTagsAsProto returned, checking status");
+
+    if (!parse_result.status().ok()) {
+      ENVOY_LOG(warn, "12345 test - parseIpTagsAsProto failed: {}", parse_result.status().message());
+      return parse_result.status();
+    }
+
+    ENVOY_LOG(warn, "12345 test - parseIpTagsAsProto succeeded, about to return result");
+    auto result = std::move(parse_result.value());
+    ENVOY_LOG(warn, "12345 test - Moved result, returning from refreshTags");
+    return result;
   } catch (const std::exception& e) {
     ENVOY_LOG(warn, "12345 test - Exception during tag refresh: {}", e.what());
     return absl::InternalError(absl::StrCat("Exception during tag refresh: ", e.what()));
