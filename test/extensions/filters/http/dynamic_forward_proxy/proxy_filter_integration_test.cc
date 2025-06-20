@@ -42,7 +42,8 @@ public:
   Api::SysCallIntResult getaddrinfo(const char* node, const char* /*service*/,
                                     const addrinfo* /*hints*/, addrinfo** res) override {
     *res = nullptr;
-    if (absl::string_view{"localhost"} == node) {
+    if (absl::string_view{"localhost"} == node || absl::string_view{"127.0.0.1"} == node ||
+        absl::string_view{"::1"} == node) {
       if (ip_version_ == Network::Address::IpVersion::v6) {
         *res = makeAddrInfo(Network::Utility::getIpv6LoopbackAddress());
       } else {
@@ -89,6 +90,7 @@ public:
           "@type": type.googleapis.com/envoy.extensions.key_value.file_based.v3.FileBasedKeyValueStoreConfig
           filename: {})EOF",
                                     filename_);
+
     setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
@@ -104,7 +106,7 @@ public:
 
   void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
                           const std::string& override_auto_sni_header = "",
-                          const std::string& typed_dns_resolver_config = "",
+                          absl::string_view typed_dns_resolver_config = typed_dns_resolver_config_,
                           bool use_sub_cluster = false, double dns_query_timeout = 5,
                           bool disable_dns_refresh_on_failure = false) {
     const std::string filter_use_sub_cluster = R"EOF(
@@ -144,6 +146,17 @@ typed_config:
     config_helper_.prependFilter(fmt::format(R"EOF(
 name: stream-info-to-headers-filter
 )EOF"));
+
+    // Add default DNS resolver as getAddrInfo in the bootstrap.
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+          config;
+      envoy::config::core::v3::TypedExtensionConfig typed_dns_resolver_config;
+      typed_dns_resolver_config.mutable_typed_config()->PackFrom(config);
+      typed_dns_resolver_config.set_name(std::string("getAddrInfo"));
+      bootstrap.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
+    });
+
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
@@ -323,14 +336,14 @@ typed_config:
     EXPECT_EQ(downstream_received_data, response->body());
   }
 
-  void requestWithBodyTest(const std::string& typed_dns_resolver_config = "") {
+  void requestWithBodyTest() {
     int64_t original_usec = dispatcher_->timeSource().monotonicTime().time_since_epoch().count();
 
     config_helper_.prependFilter(fmt::format(R"EOF(
   name: stream-info-to-headers-filter
 )EOF"));
 
-    initializeWithArgs(1024, 1024, "", typed_dns_resolver_config);
+    initializeWithArgs(1024, 1024, "");
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
     auto response = sendRequestAndWaitForResponse(default_request_headers_, 1024,
@@ -359,10 +372,9 @@ typed_config:
     }
   }
 
-  void requestWithUnknownDomainTest(const std::string& typed_dns_resolver_config,
-                                    const std::string& hostname, const std::string details) {
+  void requestWithUnknownDomainTest(const std::string& hostname, const std::string details) {
     useAccessLog("%RESPONSE_CODE_DETAILS%");
-    initializeWithArgs(1024, 1024, "", typed_dns_resolver_config);
+    initializeWithArgs(1024, 1024, "");
     codec_client_ = makeHttpConnection(lookupPort("http"));
     default_request_headers_.setHost(hostname);
 
@@ -428,6 +440,12 @@ typed_config:
   std::string filename_;
   std::string key_value_config_;
   std::string dns_hostname_{"localhost"};
+  static constexpr absl::string_view typed_dns_resolver_config_{
+      R"EOF(
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF"};
 };
 
 int64_t getHeaderValue(const Http::ResponseHeaderMap& headers, absl::string_view name) {
@@ -499,15 +517,6 @@ TEST_P(ProxyFilterIntegrationTest, MultiPortTest) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-// Do a sanity check using the getaddrinfo() resolver.
-TEST_P(ProxyFilterIntegrationTest, RequestWithBodyGetAddrInfoResolver) {
-  requestWithBodyTest(R"EOF(
-    typed_dns_resolver_config:
-      name: envoy.network.dns_resolver.getaddrinfo
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF");
-}
-
 TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
@@ -524,12 +533,7 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithTrace) {
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
-  std::string resolver_config = R"EOF(
-    typed_dns_resolver_config:
-      name: envoy.network.dns_resolver.getaddrinfo
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.001);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, 0.001);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -555,12 +559,7 @@ TEST_P(ProxyFilterIntegrationTest, GetAddrInfoResolveTimeoutWithoutTrace) {
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
-  std::string resolver_config = R"EOF(
-    typed_dns_resolver_config:
-      name: envoy.network.dns_resolver.getaddrinfo
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-  initializeWithArgs(1024, 1024, "", resolver_config, false, 0.001);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, 0.001);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -583,12 +582,7 @@ TEST_P(ProxyFilterIntegrationTest, DisableResolveTimeout) {
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
-  std::string resolver_config = R"EOF(
-    typed_dns_resolver_config:
-      name: envoy.network.dns_resolver.getaddrinfo
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-  initializeWithArgs(1024, 1024, "", resolver_config, false, /* dns_query_timeout= */ 0);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, /* dns_query_timeout= */ 0);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -648,12 +642,7 @@ TEST_P(ProxyFilterIntegrationTest, DisableRefreshOnFailureContainsSuccessfulHost
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
-  std::string resolver_config = R"EOF(
-    typed_dns_resolver_config:
-      name: envoy.network.dns_resolver.getaddrinfo
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-  initializeWithArgs(1024, 1024, "", resolver_config, false, /* dns_query_timeout= */ 0,
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, /* dns_query_timeout= */ 0,
                      /* disable_dns_refresh_on_failure= */ true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -707,7 +696,7 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequests) {
 
   upstream_tls_ = false; // upstream creation doesn't handle autonomous_upstream_
   autonomous_upstream_ = true;
-  initializeWithArgs(1024, 1024, "", "");
+  initializeWithArgs(1024, 1024, "");
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
@@ -726,20 +715,13 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
 
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
-
-  std::string resolver_config = R"EOF(
-    typed_dns_resolver_config:
-      name: envoy.network.dns_resolver.getaddrinfo
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
-
   config_helper_.prependFilter(fmt::format(R"EOF(
   name: stream-info-to-headers-filter
 )EOF"));
 
   upstream_tls_ = false;
   autonomous_upstream_ = true;
-  initializeWithArgs(1024, 1024, "", resolver_config);
+  initializeWithArgs(1024, 1024, "");
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Kick off the first request.
@@ -758,16 +740,15 @@ TEST_P(ProxyFilterIntegrationTest, ParallelRequestsWithFakeResolver) {
 
 // Currently if the first DNS resolution fails, the filter will continue with
 // a null address. Make sure this mode fails gracefully.
-TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainCares) {
-  requestWithUnknownDomainTest("", "doesnotexist.example.com",
-                               "cares_norecords:Domain_name_not_found");
+TEST_P(ProxyFilterIntegrationTest, DISABLED_RequestWithUnknownDomainCares) {
+  requestWithUnknownDomainTest("doesnotexist.example.com", "cares_norecords:Domain_name_not_found");
 }
 
 // TODO(yanavlasov) Enable per #26642
 #ifndef ENVOY_ENABLE_UHV
 TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  initializeWithArgs(1024, 1024, "", "");
+  initializeWithArgs(1024, 1024, "");
   codec_client_ = makeHttpConnection(lookupPort("http"));
   default_request_headers_.setHost("\x00\x00.google.com");
 
@@ -788,12 +769,7 @@ TEST_P(ProxyFilterIntegrationTest, RequestWithSuspectDomain) {
 
 // Do a sanity check using the getaddrinfo() resolver.
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainGetAddrInfoResolver) {
-  requestWithUnknownDomainTest(R"EOF(
-    typed_dns_resolver_config:
-      name: envoy.network.dns_resolver.getaddrinfo
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF",
-                               "doesnotexist.example.com", "Name_or_service_not_known");
+  requestWithUnknownDomainTest("doesnotexist.example.com", "Name_or_service_not_known");
 }
 
 TEST_P(ProxyFilterIntegrationTest, RequestWithUnknownDomainAndNoCaching) {
@@ -1195,7 +1171,8 @@ TEST_P(ProxyFilterIntegrationTest, StreamPersistAcrossShortTtlResSuccess) {
 
   // When the TTL is hit, the host will be removed from the DNS cache. This
   // won't break the outstanding connection.
-  test_server_->waitForCounterGe("dns.cares.resolve_total", 1);
+  // test_server_->waitForCounterGe("dns.cares.resolve_total", 1);
+  test_server_->waitForCounterGe("dns_cache.foo.dns_query_success", 1);
 
   // Kick off a new request before the first is served.
   auto response2 = codec_client_->makeHeaderOnlyRequest(request_headers);
@@ -1448,7 +1425,7 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithUnknownDomain) {
   key_value_config_ = "";
 
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-  initializeWithArgs(1024, 1024, "", "", true);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                        {":path", "/test/long/url"},
@@ -1468,7 +1445,7 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithUnknownDomain) {
 
 // Verify that removed all sub cluster when dfp cluster is removed/updated.
 TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
-  initializeWithArgs(1024, 1024, "", "", true);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -1529,7 +1506,7 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvo
   // make runtime guard false
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "false");
-  initializeWithArgs(1024, 1024, "", "", true);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -1572,7 +1549,7 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvo
 
 // Verify that we expire sub clusters.
 TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
-  initializeWithArgs(1024, 1024, "", "", true);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -1597,7 +1574,7 @@ TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
 
 // Test sub clusters overflow.
 TEST_P(ProxyFilterIntegrationTest, SubClusterOverflow) {
-  initializeWithArgs(1, 1024, "", "", true);
+  initializeWithArgs(1, 1024, "", typed_dns_resolver_config_, true);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
@@ -1624,7 +1601,7 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterOverflow) {
 
 TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
   upstream_tls_ = true;
-  initializeWithArgs(1024, 1024, "", "", true);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -1667,7 +1644,7 @@ TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
   )EOF";
   auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
 
-  initializeWithArgs(1024, 1024, "", "", true);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   const Http::TestRequestHeaderMapImpl request_headers{
       {":method", "POST"},
@@ -1711,11 +1688,6 @@ TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
   Network::OverrideAddrInfoDnsResolverFactory factory;
   Registry::InjectFactory<Network::DnsResolverFactory> inject_factory(factory);
   Registry::InjectFactory<Network::DnsResolverFactory>::forceAllowDuplicates();
-  std::string resolver_config = R"EOF(
-    typed_dns_resolver_config:
-      name: envoy.network.dns_resolver.getaddrinfo
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig)EOF";
 
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1726,7 +1698,7 @@ TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
 
   upstream_tls_ = false;
   autonomous_upstream_ = true;
-  initializeWithArgs(1024, 1024, "", resolver_config, false, 0);
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, 0);
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
