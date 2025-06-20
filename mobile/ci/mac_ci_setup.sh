@@ -48,7 +48,7 @@ brew cleanup --prune=all
 # Remove broken symlinks.
 brew cleanup --prune-prefix
 
-DEPS="automake cmake coreutils libtool ninja"
+DEPS="automake coreutils libtool"
 for DEP in ${DEPS}
 do
     install "${DEP}"
