@@ -48,17 +48,33 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   if (creation_status.ok()) {
     ip_tags_reload_dispatcher_ = api.allocateDispatcher("ip_tags_reload_routine");
     ip_tags_reload_timer_ = ip_tags_reload_dispatcher_->createTimer([this]() -> void {
+      // Safety check: Ensure provider is still valid during callback
+      if (!ip_tags_reload_timer_ || !ip_tags_reload_dispatcher_) {
+        return;
+      }
+
       ENVOY_LOG(debug, "Trying to update ip tags in background");
-      auto new_tags_or_error = tags_loader_.refreshTags();
-      if (new_tags_or_error.status().ok()) {
-        updateIpTags(new_tags_or_error.value());
-        reload_success_cb_();
-      } else {
-        ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
-                  new_tags_or_error.status().message());
+      try {
+        auto new_tags_or_error = tags_loader_.refreshTags();
+        if (new_tags_or_error.status().ok()) {
+          updateIpTags(new_tags_or_error.value());
+          reload_success_cb_();
+        } else {
+          ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
+                    new_tags_or_error.status().message());
+          reload_error_cb_();
+        }
+        // Only re-enable timer if we're still valid
+        if (ip_tags_reload_timer_) {
+          ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
+        }
+      } catch (const std::exception& e) {
+        ENVOY_LOG(debug, "Exception during background IP tag reload: {}", e.what());
+        reload_error_cb_();
+      } catch (...) {
+        ENVOY_LOG(debug, "Unknown exception during background IP tag reload");
         reload_error_cb_();
       }
-      ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
     });
 
     ip_tags_reload_thread_ = api.threadFactory().createThread(
@@ -155,9 +171,22 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
-  if (data_source_provider_) {
+  if (!data_source_provider_) {
+    return absl::InvalidArgumentError("Unable to load tags from empty datasource");
+  }
+
+  try {
     IpTagFileProto ip_tags_proto;
-    auto new_data = data_source_provider_->data();
+    // Defensive check: Safely access data source provider data
+    std::string new_data;
+    try {
+      new_data = data_source_provider_->data();
+    } catch (const std::exception& e) {
+      return absl::InternalError(absl::StrCat("Failed to access data source: ", e.what()));
+    } catch (...) {
+      return absl::InternalError("Failed to access data source: unknown exception");
+    }
+
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       auto load_status =
           MessageUtil::loadFromYamlNoThrow(new_data, ip_tags_proto, validation_visitor_);
@@ -173,8 +202,10 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
       }
     }
     return parseIpTagsAsProto(ip_tags_proto.ip_tags());
-  } else {
-    return absl::InvalidArgumentError("Unable to load tags from empty datasource");
+  } catch (const std::exception& e) {
+    return absl::InternalError(absl::StrCat("Exception during tag refresh: ", e.what()));
+  } catch (...) {
+    return absl::InternalError("Unknown exception during tag refresh");
   }
 }
 
