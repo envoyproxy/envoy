@@ -151,58 +151,58 @@ absl::StatusOr<LcTrieSharedPtr>
 IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                        Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls) {
   ENVOY_LOG(warn, "12345 test - loadTags called with filename: '{}'", ip_tags_datasource.filename());
-  
+
   if (!ip_tags_datasource.filename().empty()) {
     std::string filename = ip_tags_datasource.filename();
     ENVOY_LOG(warn, "12345 test - Processing non-empty filename: '{}'", filename);
-    
+
     // Handle path normalization - the issue might be with absolute vs relative paths
     if (filename.starts_with("/") && filename.size() > 1) {
       // Remove leading slash for relative path interpretation
       std::string relative_path = filename.substr(1);
       ENVOY_LOG(warn, "12345 test - Converting absolute path '{}' to relative path '{}'", filename, relative_path);
-      
+
       // Create a modified datasource with the relative path
       envoy::config::core::v3::DataSource modified_datasource = ip_tags_datasource;
       modified_datasource.set_filename(relative_path);
-      
+
       ENVOY_LOG(warn, "12345 test - Attempting with relative path: '{}'", relative_path);
       auto provider_or_error = Config::DataSource::DataSourceProvider::create(
           modified_datasource, main_dispatcher, tls, api_, false, 0);
-      
+
       if (provider_or_error.status().ok()) {
         ENVOY_LOG(warn, "12345 test - SUCCESS: DataSource provider created with relative path: '{}'", relative_path);
         data_source_provider_ = std::move(provider_or_error.value());
         ip_tags_path_ = relative_path;
         return refreshTags();
       } else {
-        ENVOY_LOG(warn, "12345 test - FAILED with relative path '{}': {}, trying absolute path", 
+        ENVOY_LOG(warn, "12345 test - FAILED with relative path '{}': {}, trying absolute path",
                   relative_path, provider_or_error.status().message());
         // Fall through to try with original absolute path
       }
     }
-    
+
     if (!absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml) &&
         !absl::EndsWith(filename, MessageUtil::FileExtensions::get().Json)) {
       ENVOY_LOG(warn, "12345 test - Unsupported file format for: '{}'", filename);
       return absl::InvalidArgumentError(
           "Unsupported file format, unable to parse ip tags from file " + filename);
     }
-    
+
     ENVOY_LOG(warn, "12345 test - Creating DataSource provider for: '{}'", filename);
     auto provider_or_error = Config::DataSource::DataSourceProvider::create(
         ip_tags_datasource, main_dispatcher, tls, api_, false, 0);
     if (!provider_or_error.status().ok()) {
-      ENVOY_LOG(warn, "12345 test - DataSource provider creation FAILED for '{}': {}", 
+      ENVOY_LOG(warn, "12345 test - DataSource provider creation FAILED for '{}': {}",
                 filename, provider_or_error.status().message());
       return absl::InvalidArgumentError(
           fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
     }
-    
+
     ENVOY_LOG(warn, "12345 test - DataSource provider created successfully for: '{}'", filename);
     data_source_provider_ = std::move(provider_or_error.value());
     ip_tags_path_ = filename;
-    
+
     ENVOY_LOG(warn, "12345 test - Calling refreshTags for: '{}'", ip_tags_path_);
     return refreshTags();
   }
@@ -212,7 +212,7 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   ENVOY_LOG(warn, "12345 test - refreshTags called for path: '{}'", ip_tags_path_);
-  
+
   if (!data_source_provider_) {
     ENVOY_LOG(warn, "12345 test - data_source_provider_ is NULL, returning error");
     return absl::InvalidArgumentError("Unable to load tags from empty datasource");
@@ -221,18 +221,38 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   ENVOY_LOG(warn, "12345 test - data_source_provider_ is valid, entering try block");
   try {
     IpTagFileProto ip_tags_proto;
-    // Defensive check: Safely access data source provider data
+
+    // CRITICAL FIX: The segfault happens because background threads don't have TLS registered
+    // Instead of calling data_source_provider_->data() which accesses TLS unsafely,
+    // we need to read the file directly using the API
+    ENVOY_LOG(warn, "12345 test - Using direct file read instead of TLS-based data access");
+
     std::string new_data;
-    ENVOY_LOG(warn, "12345 test - About to call data_source_provider_->data()");
     try {
-      new_data = data_source_provider_->data();
-      ENVOY_LOG(warn, "12345 test - Successfully got data from provider, size: {}", new_data.size());
+      // Read file directly using the API instead of going through TLS
+      auto file_data_or_error = Config::DataSource::read(
+          [this]() -> envoy::config::core::v3::DataSource {
+            envoy::config::core::v3::DataSource ds;
+            ds.set_filename(ip_tags_path_);
+            return ds;
+          }(),
+          true, // allow_empty
+          api_
+      );
+
+      if (file_data_or_error.status().ok()) {
+        new_data = std::move(file_data_or_error.value());
+        ENVOY_LOG(warn, "12345 test - Successfully read file directly, size: {}", new_data.size());
+      } else {
+        ENVOY_LOG(warn, "12345 test - Direct file read failed: {}", file_data_or_error.status().message());
+        return absl::InternalError(absl::StrCat("Failed to read file directly: ", file_data_or_error.status().message()));
+      }
     } catch (const std::exception& e) {
-      ENVOY_LOG(warn, "12345 test - Exception in data_source_provider_->data(): {}", e.what());
-      return absl::InternalError(absl::StrCat("Failed to access data source: ", e.what()));
+      ENVOY_LOG(warn, "12345 test - Exception in direct file read: {}", e.what());
+      return absl::InternalError(absl::StrCat("Failed to read file: ", e.what()));
     } catch (...) {
-      ENVOY_LOG(warn, "12345 test - Unknown exception in data_source_provider_->data()");
-      return absl::InternalError("Failed to access data source: unknown exception");
+      ENVOY_LOG(warn, "12345 test - Unknown exception in direct file read");
+      return absl::InternalError("Failed to read file: unknown exception");
     }
 
     ENVOY_LOG(warn, "12345 test - Processing file format for path: '{}'", ip_tags_path_);
