@@ -150,61 +150,117 @@ IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& va
 absl::StatusOr<LcTrieSharedPtr>
 IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                        Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls) {
+  ENVOY_LOG(warn, "12345 test - loadTags called with filename: '{}'", ip_tags_datasource.filename());
+  
   if (!ip_tags_datasource.filename().empty()) {
-    if (!absl::EndsWith(ip_tags_datasource.filename(), MessageUtil::FileExtensions::get().Yaml) &&
-        !absl::EndsWith(ip_tags_datasource.filename(), MessageUtil::FileExtensions::get().Json)) {
-      return absl::InvalidArgumentError(
-          "Unsupported file format, unable to parse ip tags from file " +
-          ip_tags_datasource.filename());
+    std::string filename = ip_tags_datasource.filename();
+    ENVOY_LOG(warn, "12345 test - Processing non-empty filename: '{}'", filename);
+    
+    // Handle path normalization - the issue might be with absolute vs relative paths
+    if (filename.starts_with("/") && filename.size() > 1) {
+      // Remove leading slash for relative path interpretation
+      std::string relative_path = filename.substr(1);
+      ENVOY_LOG(warn, "12345 test - Converting absolute path '{}' to relative path '{}'", filename, relative_path);
+      
+      // Create a modified datasource with the relative path
+      envoy::config::core::v3::DataSource modified_datasource = ip_tags_datasource;
+      modified_datasource.set_filename(relative_path);
+      
+      ENVOY_LOG(warn, "12345 test - Attempting with relative path: '{}'", relative_path);
+      auto provider_or_error = Config::DataSource::DataSourceProvider::create(
+          modified_datasource, main_dispatcher, tls, api_, false, 0);
+      
+      if (provider_or_error.status().ok()) {
+        ENVOY_LOG(warn, "12345 test - SUCCESS: DataSource provider created with relative path: '{}'", relative_path);
+        data_source_provider_ = std::move(provider_or_error.value());
+        ip_tags_path_ = relative_path;
+        return refreshTags();
+      } else {
+        ENVOY_LOG(warn, "12345 test - FAILED with relative path '{}': {}, trying absolute path", 
+                  relative_path, provider_or_error.status().message());
+        // Fall through to try with original absolute path
+      }
     }
+    
+    if (!absl::EndsWith(filename, MessageUtil::FileExtensions::get().Yaml) &&
+        !absl::EndsWith(filename, MessageUtil::FileExtensions::get().Json)) {
+      ENVOY_LOG(warn, "12345 test - Unsupported file format for: '{}'", filename);
+      return absl::InvalidArgumentError(
+          "Unsupported file format, unable to parse ip tags from file " + filename);
+    }
+    
+    ENVOY_LOG(warn, "12345 test - Creating DataSource provider for: '{}'", filename);
     auto provider_or_error = Config::DataSource::DataSourceProvider::create(
         ip_tags_datasource, main_dispatcher, tls, api_, false, 0);
     if (!provider_or_error.status().ok()) {
+      ENVOY_LOG(warn, "12345 test - DataSource provider creation FAILED for '{}': {}", 
+                filename, provider_or_error.status().message());
       return absl::InvalidArgumentError(
           fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
     }
+    
+    ENVOY_LOG(warn, "12345 test - DataSource provider created successfully for: '{}'", filename);
     data_source_provider_ = std::move(provider_or_error.value());
-    ip_tags_path_ = ip_tags_datasource.filename();
+    ip_tags_path_ = filename;
+    
+    ENVOY_LOG(warn, "12345 test - Calling refreshTags for: '{}'", ip_tags_path_);
     return refreshTags();
   }
+  ENVOY_LOG(warn, "12345 test - Empty filename in datasource");
   return absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
+  ENVOY_LOG(warn, "12345 test - refreshTags called for path: '{}'", ip_tags_path_);
+  
   if (!data_source_provider_) {
+    ENVOY_LOG(warn, "12345 test - data_source_provider_ is NULL, returning error");
     return absl::InvalidArgumentError("Unable to load tags from empty datasource");
   }
 
+  ENVOY_LOG(warn, "12345 test - data_source_provider_ is valid, entering try block");
   try {
     IpTagFileProto ip_tags_proto;
     // Defensive check: Safely access data source provider data
     std::string new_data;
+    ENVOY_LOG(warn, "12345 test - About to call data_source_provider_->data()");
     try {
       new_data = data_source_provider_->data();
+      ENVOY_LOG(warn, "12345 test - Successfully got data from provider, size: {}", new_data.size());
     } catch (const std::exception& e) {
+      ENVOY_LOG(warn, "12345 test - Exception in data_source_provider_->data(): {}", e.what());
       return absl::InternalError(absl::StrCat("Failed to access data source: ", e.what()));
     } catch (...) {
+      ENVOY_LOG(warn, "12345 test - Unknown exception in data_source_provider_->data()");
       return absl::InternalError("Failed to access data source: unknown exception");
     }
 
+    ENVOY_LOG(warn, "12345 test - Processing file format for path: '{}'", ip_tags_path_);
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
+      ENVOY_LOG(warn, "12345 test - Loading YAML file");
       auto load_status =
           MessageUtil::loadFromYamlNoThrow(new_data, ip_tags_proto, validation_visitor_);
       if (!load_status.ok()) {
+        ENVOY_LOG(warn, "12345 test - YAML load failed: {}", load_status.message());
         return load_status;
       }
     } else if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Json)) {
+      ENVOY_LOG(warn, "12345 test - Loading JSON file");
       bool has_unknown_field;
       auto load_status =
           MessageUtil::loadFromJsonNoThrow(new_data, ip_tags_proto, has_unknown_field);
       if (!load_status.ok()) {
+        ENVOY_LOG(warn, "12345 test - JSON load failed: {}", load_status.message());
         return load_status;
       }
     }
+    ENVOY_LOG(warn, "12345 test - File loaded successfully, parsing IP tags");
     return parseIpTagsAsProto(ip_tags_proto.ip_tags());
   } catch (const std::exception& e) {
+    ENVOY_LOG(warn, "12345 test - Exception during tag refresh: {}", e.what());
     return absl::InternalError(absl::StrCat("Exception during tag refresh: ", e.what()));
   } catch (...) {
+    ENVOY_LOG(warn, "12345 test - Unknown exception during tag refresh");
     return absl::InternalError("Unknown exception during tag refresh");
   }
 }
