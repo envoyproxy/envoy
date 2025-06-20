@@ -87,3 +87,39 @@ template <> struct formatter<Envoy::Http::MetadataMap> {
 template <> struct formatter<::Envoy::Http::MetadataMapVector> : fmt::ostream_formatter {};
 
 } // namespace fmt
+
+namespace std {
+
+// Specialize printing Envoy::Http::MetadataMap as we need to escape possible
+// invalid utf8 string contained in MetadataMap.
+template <> struct formatter<Envoy::Http::MetadataMap, char> {
+  template <typename ParseContext>
+  FMT_CONSTEXPR auto parse(ParseContext& ctx) -> decltype(ctx.begin()) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Http::MetadataMap& map,
+              FormatContext& ctx) const -> decltype(ctx.out()) {
+    std::ostringstream out;
+    out << map;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+template <> struct formatter<::Envoy::Http::MetadataMapVector, char> {
+  template <typename ParseContext>
+  FMT_CONSTEXPR auto parse(ParseContext& ctx) -> decltype(ctx.begin()) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Http::MetadataMapVector& map,
+              FormatContext& ctx) const -> decltype(ctx.out()) {
+    std::ostringstream out;
+    out << map;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+} // namespace std

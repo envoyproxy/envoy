@@ -1340,3 +1340,22 @@ template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_vie
 };
 
 } // namespace fmt
+
+namespace std {
+
+// fmt formatter class for Host
+template <> struct formatter<Envoy::Upstream::Host, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <typename FormatContext>
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) const -> decltype(ctx.out()) {
+    absl::string_view out = !host.hostname().empty() ? host.hostname()
+                            : host.address()         ? host.address()->asStringView()
+                                                     : "<empty>";
+    return std::formatter<absl::string_view>().format(out, ctx);
+  }
+};
+
+} // namespace std
