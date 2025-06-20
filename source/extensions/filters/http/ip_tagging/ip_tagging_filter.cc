@@ -40,10 +40,12 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     tags_ = tags_or_error.value();
   } else {
     // Initialize tags_ to empty trie to prevent null pointer dereference
+    ENVOY_LOG(warn, "Failed to load IP tags from file {}: {}. Using empty trie.",
+              ip_tags_datasource.filename(), tags_or_error.status().message());
     tags_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(
         std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>{});
   }
-  
+
   // Only create thread if we have valid tags
   if (creation_status.ok()) {
     ip_tags_reload_dispatcher_ = api.allocateDispatcher("ip_tags_reload_routine");
@@ -280,10 +282,19 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       creation_status = provider_or_error.status();
       return;
     }
-    if (provider_ && provider_->ipTags()) {
-      trie_ = provider_->ipTags();
+    if (provider_) {
+      auto initial_tags = provider_->ipTags();
+      if (initial_tags) {
+        trie_ = initial_tags;
+      } else {
+        ENVOY_LOG(warn, "Provider returned null IP tags, using empty trie");
+        trie_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(
+            std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>{});
+      }
     } else {
-      creation_status = absl::InvalidArgumentError("Failed to get ip tags from provider");
+      ENVOY_LOG(warn, "Failed to create IP tags provider, using empty trie");
+      trie_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(
+          std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>>{});
     }
     stat_name_set_->rememberBuiltin("ip_tags_reload_success");
     stat_name_set_->rememberBuiltin("ip_tags_reload_error");
