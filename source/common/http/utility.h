@@ -609,8 +609,8 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCal
  *
  * @param callbacks The stream filter callbacks to check for route configs.
  *
- * @return The all available per route config. The returned pointers are guaranteed to be non-null
- * and their lifetime is the same as the matched route.
+ * @return all the available per route config in ascending order of specificity (i.e., route table
+ * first, then virtual host, then per route).
  */
 template <class ConfigType>
 absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4>
