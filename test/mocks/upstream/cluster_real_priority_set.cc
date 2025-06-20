@@ -2,7 +2,7 @@
 
 namespace Envoy {
 namespace Upstream {
-MockClusterRealPrioritySet::MockClusterRealPrioritySet() = default;
+MockClusterRealPrioritySet::MockClusterRealPrioritySet() : priority_set_(info_->statsScope()) {}
 
 MockClusterRealPrioritySet::~MockClusterRealPrioritySet() = default;
 } // namespace Upstream

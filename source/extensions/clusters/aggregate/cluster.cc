@@ -57,7 +57,8 @@ void AggregateClusterLoadBalancer::addMemberUpdateCallbackForCluster(
 
 PriorityContextPtr
 AggregateClusterLoadBalancer::linearizePrioritySet(OptRef<const std::string> excluded_cluster) {
-  PriorityContextPtr priority_context = std::make_unique<PriorityContext>();
+  Stats::Scope& stats_scope = parent_info_->statsScope();
+  PriorityContextPtr priority_context = std::make_unique<PriorityContext>(stats_scope);
   uint32_t next_priority_after_linearizing = 0;
 
   // Linearize the priority set. e.g. for clusters [C_0, C_1, C_2] referred in aggregate cluster
@@ -163,7 +164,7 @@ AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalance
 
   const auto priority_pair =
       choosePriority(random_.random(), priority_loads->healthy_priority_load_,
-                     priority_loads->degraded_priority_load_);
+                     priority_loads->degraded_priority_load_, priority_set_);
 
   AggregateLoadBalancerContext aggregate_context(
       context, priority_pair.second,
