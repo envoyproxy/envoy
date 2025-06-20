@@ -455,11 +455,9 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     // We use a temporary approach by making them no-ops to prevent the segfault
     auto safe_success_cb = []() {
       // No-op to prevent segfault - stats will be handled elsewhere if needed
-      ENVOY_LOG(debug, "IP tags reload succeeded (safe callback)");
     };
     auto safe_error_cb = []() {
       // No-op to prevent segfault - stats will be handled elsewhere if needed
-      ENVOY_LOG(debug, "IP tags reload failed (safe callback)");
     };
 
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
