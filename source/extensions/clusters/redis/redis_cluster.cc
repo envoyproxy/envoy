@@ -78,8 +78,10 @@ RedisCluster::RedisCluster(
           context.serverFactoryContext().api().timeSource())),
       registration_handle_(refresh_manager_->registerCluster(
           cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
-          failure_refresh_threshold_, host_degraded_refresh_threshold_, [&]() {
-            redis_discovery_session_->resolve_timer_->enableTimer(std::chrono::milliseconds(0));
+          failure_refresh_threshold_, host_degraded_refresh_threshold_, [this]() {
+            if (redis_discovery_session_ && redis_discovery_session_->resolve_timer_) {
+              redis_discovery_session_->resolve_timer_->enableTimer(std::chrono::milliseconds(0));
+            }
           })) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
@@ -87,6 +89,37 @@ RedisCluster::RedisCluster(
       const auto& host = lb_endpoint.endpoint().address();
       dns_discovery_resolve_targets_.emplace_back(new DnsDiscoveryResolveTarget(
           *this, host.socket_address().address(), host.socket_address().port_value()));
+    }
+  }
+}
+
+RedisCluster::~RedisCluster() {
+  // This destructor is critical to prevent use-after-free during destruction.
+  // The order of cleanup is important to avoid callbacks accessing destroyed objects.
+  
+  // 1. Cancel any active DNS queries first to prevent callbacks during destruction
+  for (const auto& target : dns_discovery_resolve_targets_) {
+    if (target->active_query_) {
+      target->active_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
+      target->active_query_ = nullptr;
+    }
+    // Also disable any pending timers in DNS resolve targets
+    if (target->resolve_timer_ && target->resolve_timer_->enabled()) {
+      target->resolve_timer_->disableTimer();
+    }
+  }
+  
+  // 2. Clean up the discovery session to prevent timer/request callbacks
+  if (redis_discovery_session_) {
+    // Cancel current request to prevent response callbacks
+    if (redis_discovery_session_->current_request_) {
+      redis_discovery_session_->current_request_->cancel();
+      redis_discovery_session_->current_request_ = nullptr;
+    }
+    // Disable timer to prevent timer callbacks
+    if (redis_discovery_session_->resolve_timer_ && 
+        redis_discovery_session_->resolve_timer_->enabled()) {
+      redis_discovery_session_->resolve_timer_->disableTimer();
     }
   }
 }
@@ -201,7 +234,7 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
     active_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   }
   // Disable timer for mock tests.
-  if (resolve_timer_) {
+  if (resolve_timer_ && resolve_timer_->enabled()) {
     resolve_timer_->disableTimer();
   }
 }
