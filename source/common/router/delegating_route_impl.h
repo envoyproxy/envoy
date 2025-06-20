@@ -125,6 +125,8 @@ public:
   const ConnectConfigOptRef connectConfig() const override;
   const EarlyDataPolicy& earlyDataPolicy() const override;
   const RouteStatsContextOptRef routeStatsContext() const override;
+  void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   const RouteEntry* base_route_entry_{};

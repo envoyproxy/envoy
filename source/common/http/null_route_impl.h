@@ -208,6 +208,8 @@ protected:
   bool includeAttemptCountInResponse() const override { return false; }
   const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
   const Router::EarlyDataPolicy& earlyDataPolicy() const override { return *early_data_policy_; }
+  void refreshRouteCluster(const Http::RequestHeaderMap&,
+                           const StreamInfo::StreamInfo&) const override {}
 
   const Router::MetadataMatchCriteria* metadata_match_;
   std::unique_ptr<const HashPolicyImpl> hash_policy_;

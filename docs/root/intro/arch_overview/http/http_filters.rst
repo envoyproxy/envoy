@@ -99,6 +99,16 @@ that filters do is ``clearRouteCache()``, and ``setRoute`` will not survive that
 selection makes its way to the router filter which finalizes the upstream cluster that the request
 will be forwarded to.
 
+In addition to updating the route ``setRoute()`` and ``clearRouteCache()``, downstream HTTP filters could also refresh the
+cluster by invoking ``refreshRouteCluster()`` if the cluster specifier of route supports it. At this point only
+the :ref:`matcher based cluster specifier <config_http_cluster_specifier_matcher>` support the
+``refreshRouteCluster()`` callback.
+
+This callabck will not update the cached route but only refresh the target cluster name. This is
+suggested to replace ``clearRouteCache()`` if you only want to determine the target cluster based on
+the latest request attributes that have been updated by the filters and do not want to configure
+multiple similar routes at the route table.
+
 .. _arch_overview_http_filters_per_filter_config:
 
 Route specific config

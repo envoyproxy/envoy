@@ -237,6 +237,11 @@ new_features:
     See
     :ref:`matcher cluster specifier plugin <envoy_v3_api_msg_extensions.router.cluster_specifiers.matcher.v3.MatcherClusterSpecifier>`
     for more details.
+- area: router
+  change: |
+    Added new ``refreshRouteCluster()`` method to stream filter callbacks to support refreshing the route cluster and
+    need not to update the route cache. See :ref:`http route mutation <arch_overview_http_filters_route_mutation>` for
+    more details.
 - area: lua
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``streamInfo()`` which could be used to access the typed metadata from
