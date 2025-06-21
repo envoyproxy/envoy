@@ -373,13 +373,13 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithMaxCacheSize) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .WillRepeatedly(Return(10));
 
-  // Create first span - should be cached
+  // Create first span - should be cached (1/2)
   Tracing::SpanPtr span1 = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span1.get(), nullptr);
   span1->finishSpan();
 
-  // Create second span - should be cached (max_cache_size = 2)
+  // Create second span - should be cached (2/2, at max capacity)
   Tracing::SpanPtr span2 = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span2.get(), nullptr);
