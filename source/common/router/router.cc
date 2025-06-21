@@ -1626,16 +1626,27 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // handle the case when an error grpc-status is sent as a trailer.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   uint64_t grpc_to_http_status = 0;
+  uint64_t put_result_code = response_code;
   if (grpc_request_) {
     grpc_status = Grpc::Common::getGrpcStatus(*headers);
     if (grpc_status.has_value()) {
       grpc_to_http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+      put_result_code = grpc_to_http_status;
+    }
+  } else {
+    // Check cluster's http_protocol_options if different code should be reported to
+    // outlier detector.
+    absl::optional<bool> matched = cluster_->processHttpForOutlierDetection(*headers);
+    if (matched.has_value()) {
+      // Outlier detector distinguishes only two values:
+      // Anything >= 500 is error.
+      // Anything < 500 is success.
+      put_result_code = matched.value() ? 500 : 200;
     }
   }
 
   maybeProcessOrcaLoadReport(*headers, upstream_request);
 
-  const uint64_t put_result_code = grpc_status.has_value() ? grpc_to_http_status : response_code;
   upstream_request.upstreamHost()->outlierDetector().putResult(
       put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
                              : Upstream::Outlier::Result::ExtOriginRequestSuccess,
