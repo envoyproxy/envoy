@@ -22,6 +22,16 @@ MockSubscriptionFactory::MockSubscriptionFactory() {
         callbacks_ = &callbacks;
         return ret;
       }));
+  ON_CALL(*this, subscriptionOverAdsGrpcMux(_, _, _, _, _, _, _))
+      .WillByDefault(Invoke([this](GrpcMuxSharedPtr&, const envoy::config::core::v3::ConfigSource&,
+                                   absl::string_view, Stats::Scope&,
+                                   SubscriptionCallbacks& callbacks, OpaqueResourceDecoderSharedPtr,
+                                   const SubscriptionOptions&) -> SubscriptionPtr {
+        auto ret = std::make_unique<NiceMock<MockSubscription>>();
+        subscription_ = ret.get();
+        callbacks_ = &callbacks;
+        return ret;
+      }));
   ON_CALL(*this, collectionSubscriptionFromUrl(_, _, _, _, _, _))
       .WillByDefault(
           Invoke([this](const xds::core::v3::ResourceLocator&,
