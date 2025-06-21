@@ -562,6 +562,12 @@ DnsResolverImpl::AddrInfoPendingResolution::availableInterfaces() {
     return {true, true};
   }
 
+  if (!parent_.filter_unroutable_families_) {
+    // Do not fetch interfaces from system if we are not going to use that information
+    // later.
+    return {true, true};
+  }
+
   Api::InterfaceAddressVector interface_addresses{};
   const Api::SysCallIntResult rc = Api::OsSysCallsSingleton::get().getifaddrs(interface_addresses);
   if (rc.return_value_ != 0) {
