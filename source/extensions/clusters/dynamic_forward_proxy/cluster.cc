@@ -75,7 +75,8 @@ Cluster::Cluster(
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       orig_cluster_config_(cluster),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
-      time_source_(context.serverFactoryContext().timeSource()), cm_(context.clusterManager()),
+      time_source_(context.serverFactoryContext().timeSource()),
+      cm_(context.serverFactoryContext().clusterManager()),
       max_sub_clusters_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.sub_clusters_config(), max_sub_clusters, 1024)),
       sub_cluster_ttl_(
@@ -549,7 +550,7 @@ ClusterFactory::createClusterWithConfig(
     Upstream::ClusterFactoryContext& context) {
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactoryImpl cache_manager_factory(
-      context.serverFactoryContext(), context.messageValidationVisitor());
+      context.serverFactoryContext(), context.serverFactoryContext().messageValidationVisitor());
 
   envoy::config::cluster::v3::Cluster cluster_config = cluster;
   if (!cluster_config.has_upstream_http_protocol_options()) {

@@ -128,9 +128,8 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
 
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, server_context_.cluster_manager_,
-        [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-        ssl_context_manager_, std::move(outlier_event_logger), false);
+        server_context_, [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
+        std::move(outlier_event_logger), false);
 
     envoy::extensions::clusters::redis::v3::RedisClusterConfig config;
     THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
@@ -163,9 +162,8 @@ protected:
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;
     NiceMock<Envoy::Api::MockApi> api;
     Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, server_context_.cluster_manager_,
-        [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-        ssl_context_manager_, std::move(outlier_event_logger), false);
+        server_context_, [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
+        std::move(outlier_event_logger), false);
 
     RedisClusterFactory factory = RedisClusterFactory();
     auto status =
@@ -690,7 +688,6 @@ protected:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
 
-  Ssl::MockContextManager ssl_context_manager_;
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   Event::MockTimer* resolve_timer_;

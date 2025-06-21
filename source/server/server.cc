@@ -794,9 +794,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
                                                           *local_info_, validation_context_, *this);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), stats_store_, thread_local_, http_context_,
+      serverFactoryContext(),
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, quic_stat_names_, *this);
+      quic_stat_names_);
 
   // Now that the worker thread are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {

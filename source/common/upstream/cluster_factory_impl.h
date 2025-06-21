@@ -53,26 +53,15 @@ public:
   using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
 
   ClusterFactoryContextImpl(Server::Configuration::ServerFactoryContext& server_context,
-                            ClusterManager& cm, LazyCreateDnsResolver dns_resolver_fn,
-                            Ssl::ContextManager& ssl_context_manager,
+                            LazyCreateDnsResolver dns_resolver_fn,
                             Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api)
-      : server_context_(server_context), cluster_manager_(cm), dns_resolver_fn_(dns_resolver_fn),
-        ssl_context_manager_(ssl_context_manager),
-        outlier_event_logger_(std::move(outlier_event_logger)),
-        validation_visitor_(
-            added_via_api ? server_context.messageValidationContext().dynamicValidationVisitor()
-                          : server_context.messageValidationContext().staticValidationVisitor()),
-        added_via_api_(added_via_api) {}
+      : server_context_(server_context), dns_resolver_fn_(dns_resolver_fn),
+        outlier_event_logger_(std::move(outlier_event_logger)), added_via_api_(added_via_api) {}
 
   // ClusterFactoryContext
   Server::Configuration::ServerFactoryContext& serverFactoryContext() override {
     return server_context_;
   }
-  ClusterManager& clusterManager() override { return cluster_manager_; }
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    return validation_visitor_;
-  }
-  Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
   Network::DnsResolverSharedPtr dnsResolver() override {
     if (!dns_resolver_) {
       dns_resolver_ = dns_resolver_fn_();
@@ -84,12 +73,9 @@ public:
 
 private:
   Server::Configuration::ServerFactoryContext& server_context_;
-  ClusterManager& cluster_manager_;
   Network::DnsResolverSharedPtr dns_resolver_;
   LazyCreateDnsResolver dns_resolver_fn_;
-  Ssl::ContextManager& ssl_context_manager_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool added_via_api_;
 };
 
@@ -106,9 +92,9 @@ public:
    */
   static absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
-         Server::Configuration::ServerFactoryContext& server_context, ClusterManager& cm,
-         LazyCreateDnsResolver dns_resolver_fn, Ssl::ContextManager& ssl_context_manager,
-         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
+         Server::Configuration::ServerFactoryContext& server_context,
+         LazyCreateDnsResolver dns_resolver_fn, Outlier::EventLoggerSharedPtr outlier_event_logger,
+         bool added_via_api);
 
   /**
    * Create a dns resolver to be used by the cluster.
@@ -165,11 +151,13 @@ private:
                     ClusterFactoryContext& context) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
-        cluster.cluster_type().typed_config(), context.messageValidationVisitor(), *config));
-    return createClusterWithConfig(cluster,
-                                   MessageUtil::downcastAndValidate<const ConfigProto&>(
-                                       *config, context.messageValidationVisitor()),
-                                   context);
+        cluster.cluster_type().typed_config(),
+        context.serverFactoryContext().messageValidationVisitor(), *config));
+    return createClusterWithConfig(
+        cluster,
+        MessageUtil::downcastAndValidate<const ConfigProto&>(
+            *config, context.serverFactoryContext().messageValidationVisitor()),
+        context);
   }
 
   virtual absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>

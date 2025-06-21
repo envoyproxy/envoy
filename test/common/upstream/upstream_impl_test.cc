@@ -89,10 +89,9 @@ protected:
     envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
 
     ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver; };
-    auto status_or_cluster = ClusterFactoryImplBase::create(
-        cluster_config, factory_context.serverFactoryContext(),
-        factory_context.serverFactoryContext().clusterManager(), resolver_fn,
-        factory_context.sslContextManager(), nullptr, factory_context.addedViaApi());
+    auto status_or_cluster =
+        ClusterFactoryImplBase::create(cluster_config, factory_context.serverFactoryContext(),
+                                       resolver_fn, nullptr, factory_context.addedViaApi());
 
     if (!status_or_cluster.ok()) {
       return status_or_cluster.status();
@@ -105,8 +104,6 @@ protected:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_ = Api::createApiForTest(stats_, random_);
   NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
-
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
 };
 
 namespace {
@@ -213,9 +210,8 @@ public:
 
     EXPECT_CALL(runtime_.snapshot_, getInteger(_, _)).WillRepeatedly(Return(numerator));
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     if (numerator <= 100) {
       auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
       EXPECT_EQ(drop_ratio, cluster->dropOverload().value());
@@ -261,9 +257,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
       }));
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
 
   cluster->initialize([&]() -> absl::Status {
@@ -293,9 +288,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
               denominator: MILLION
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
   EXPECT_EQ(0.000035f, cluster->dropOverload().value());
   EXPECT_EQ("test", cluster->dropCategory());
@@ -320,9 +314,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
               denominator: TEN_THOUSAND
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
   EXPECT_EQ(0.1f, cluster->dropOverload().value());
   EXPECT_EQ("foo", cluster->dropCategory());
@@ -348,9 +341,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_EQ(
       createStrictDnsCluster(cluster_config, factory_context, dns_resolver).status().message(),
       "Cluster drop_overloads config denominator setting is invalid : 4. Valid range 0~2.");
@@ -376,9 +368,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_EQ(
       createStrictDnsCluster(cluster_config, factory_context, dns_resolver).status().message(),
       "Cluster drop_overloads config is invalid. drop_ratio=2(Numerator 200 / Denominator 100). "
@@ -407,9 +398,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_EQ(
       createStrictDnsCluster(cluster_config, factory_context, dns_resolver).status().message(),
       "Cluster drop_overloads config has 2 categories. Envoy only support one.");
@@ -452,9 +442,8 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
   EXPECT_CALL(initialized, ready());
@@ -488,9 +477,8 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
@@ -535,9 +523,8 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -619,9 +606,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -788,9 +774,8 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -848,9 +833,8 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -930,9 +914,8 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -1047,9 +1030,8 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -1291,9 +1273,8 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -1409,9 +1390,8 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   EXPECT_THROW_WITH_MESSAGE(
       auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
@@ -1442,9 +1422,8 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -1493,9 +1472,8 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig) {
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_,
-      [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, ssl_context_manager_,
-      nullptr, false);
+      server_context_, [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, nullptr,
+      false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -1536,9 +1514,8 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_,
-      [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, ssl_context_manager_,
-      nullptr, false);
+      server_context_, [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, nullptr,
+      false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -1585,9 +1562,8 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfigTypedDnsResolverConfig) {
 
   // No `dns_resolver_fn` so test segfaults if trying to use default Dns resolver rather than
   // creating one from the function>
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, nullptr);
 }
@@ -1614,9 +1590,8 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -1665,9 +1640,8 @@ TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
                     port_value: 11001
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_THROW_WITH_MESSAGE(
       auto x = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
       EnvoyException, "Invalid duration: Expected positive duration: seconds: -1\n");
@@ -1695,9 +1669,8 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
@@ -1736,9 +1709,8 @@ TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
                     port_value: 11001
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
   cluster->initialize([] { return absl::OkStatus(); });
 
@@ -1797,9 +1769,8 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   EXPECT_THROW_WITH_REGEX(
       auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
@@ -2282,9 +2253,8 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2319,9 +2289,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2354,9 +2323,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostname) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2388,9 +2356,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2440,9 +2407,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2484,9 +2450,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2529,9 +2494,8 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   NiceMock<MockClusterManager> cm;
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2560,9 +2524,8 @@ TEST_F(StaticClusterImplTest, AltStatName) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2589,9 +2552,8 @@ TEST_F(StaticClusterImplTest, RingHash) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2626,9 +2588,8 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2669,9 +2630,8 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -2713,9 +2673,8 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
@@ -2769,9 +2728,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
@@ -2913,9 +2871,8 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
@@ -2975,9 +2932,8 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -3027,9 +2983,8 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
       {
         envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-        Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-            server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_,
-            nullptr, false);
+        Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr,
+                                                                   nullptr, false);
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
       },
       EnvoyException);
@@ -3064,9 +3019,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -3099,9 +3053,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_THROW_WITH_MESSAGE(
       {
@@ -3140,9 +3093,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_NO_THROW({
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
@@ -3179,9 +3131,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFi
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_THROW_WITH_MESSAGE(
       {
@@ -3225,9 +3176,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_THROW_WITH_MESSAGE(
       {
@@ -3256,9 +3206,8 @@ TEST_F(StaticClusterImplTest, EmptyLbSubsetConfig) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   auto cluster = createCluster(cluster_config, factory_context);
 
@@ -3296,9 +3245,8 @@ TEST_F(StaticClusterImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) 
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_THROW_WITH_MESSAGE(
       {
@@ -3340,9 +3288,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -3379,9 +3326,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
   cluster->initialize([] { return absl::OkStatus(); });
 
@@ -3406,9 +3352,8 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
                                 createCluster(cluster_config, factory_context);
                             , EnvoyException,
@@ -3432,9 +3377,8 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   cluster->initialize([] { return absl::OkStatus(); });
@@ -3452,9 +3396,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
         "1.2.3.5");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
@@ -3475,9 +3418,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("2001::1");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3500,9 +3442,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         "1.2.3.5");
     server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3523,9 +3464,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("1.2.3.6");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3549,9 +3489,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("2001::2");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3570,9 +3509,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("1.2.3.6");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
                                   createCluster(config, factory_context),
@@ -3592,9 +3530,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("2001::1");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3609,9 +3546,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
   {
     // Verify source address from cluster config is used when present.
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3634,9 +3570,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::2");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3655,9 +3590,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("2001::1");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3674,9 +3608,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         "1.2.3.5");
     config.mutable_upstream_bind_config()->clear_extra_source_addresses();
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3694,9 +3627,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
         "2001::1");
     config.mutable_upstream_bind_config()->clear_extra_source_addresses();
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3725,9 +3657,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3745,9 +3676,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig()
         .add_additional_source_addresses()
         ->set_address("2001::1");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3769,9 +3699,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
         "1.2.3.5");
     server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3790,9 +3719,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig()
         .add_additional_source_addresses()
         ->set_address("1.2.3.6");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3813,9 +3741,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig()
         .add_additional_source_addresses()
         ->set_address("2001::2");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
                                   createCluster(config, factory_context),
@@ -3834,9 +3761,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig()
         .add_additional_source_addresses()
         ->set_address("2001::1");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3856,9 +3782,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         "2001::1");
     config.mutable_upstream_bind_config()->add_additional_source_addresses()->set_address(
         "2001::2");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3873,9 +3798,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
         "1.2.3.5");
     config.mutable_upstream_bind_config()->clear_additional_source_addresses();
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3902,9 +3826,8 @@ TEST_F(StaticClusterImplTest, LedsUnsupported) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_THROW_WITH_MESSAGE(
       std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context),
       EnvoyException,
@@ -3935,9 +3858,8 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
       ->mutable_address()
       ->set_address("1.2.3.6");
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
@@ -3971,9 +3893,8 @@ TEST_F(StaticClusterImplTest, HappyEyeballsConfig) {
         first_address_family_count: 1
   )EOF";
   auto cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
   cluster->initialize([] { return absl::OkStatus(); });
   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig expected_config;
@@ -4013,9 +3934,8 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
 
   EXPECT_TRUE(cluster->info()->features() &
@@ -4221,8 +4141,7 @@ public:
     cluster_config_ = parseClusterFromV3Yaml(yaml);
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, [&]() { return dns_resolver_; },
-        ssl_context_manager_, nullptr, false);
+        server_context_, [this]() { return dns_resolver_; }, nullptr, false);
 
     StrictDnsClusterFactory factory{};
     auto status_or_cluster = factory.create(cluster_config_, factory_context);
@@ -4244,7 +4163,6 @@ public:
   Api::ApiPtr api_ = Api::createApiForTest(stats_, random_);
   NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
 
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
 
   ReadyWatcher initialized_;
@@ -6471,9 +6389,8 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(cluster_yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
   cluster->initialize([] { return absl::OkStatus(); });
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());

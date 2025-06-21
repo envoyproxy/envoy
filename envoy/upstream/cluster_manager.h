@@ -622,7 +622,7 @@ public:
    * Allocate a cluster from configuration proto.
    */
   virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
   /**
