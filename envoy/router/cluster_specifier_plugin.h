@@ -20,6 +20,17 @@ public:
   virtual ~ClusterSpecifierPlugin() = default;
 
   /**
+   * Validate if the clusters are valid in the cluster manager. This
+   * is optional.
+   *
+   * @param cm cluster manager.
+   * @return absl::Status status.
+   */
+  virtual absl::Status validateClusters(const Upstream::ClusterManager&) const {
+    return absl::OkStatus();
+  }
+
+  /**
    * Create route from related route entry and request headers.
    *
    * @param parent related route.

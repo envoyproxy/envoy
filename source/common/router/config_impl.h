@@ -30,6 +30,7 @@
 #include "source/common/matcher/matcher.h"
 #include "source/common/router/config_utility.h"
 #include "source/common/router/header_parser.h"
+#include "source/common/router/per_filter_config.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
@@ -78,40 +79,6 @@ public:
 
   // By default, matchers do not support null Path headers.
   virtual bool supportsPathlessHeaders() const { return false; }
-};
-
-class PerFilterConfigs : public Logger::Loggable<Logger::Id::http> {
-public:
-  static absl::StatusOr<std::unique_ptr<PerFilterConfigs>>
-  create(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-         Server::Configuration::ServerFactoryContext& factory_context,
-         ProtobufMessage::ValidationVisitor& validator);
-
-  struct FilterConfig {
-    RouteSpecificFilterConfigConstSharedPtr config_;
-    bool disabled_{};
-  };
-
-  const RouteSpecificFilterConfig* get(absl::string_view name) const;
-
-  /**
-   * @return true if the filter is explicitly disabled for this route or virtual host, false
-   * if the filter is explicitly enabled. If the filter is not explicitly enabled or disabled,
-   * returns absl::nullopt.
-   */
-  absl::optional<bool> disabled(absl::string_view name) const;
-
-private:
-  PerFilterConfigs(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-                   Server::Configuration::ServerFactoryContext& factory_context,
-                   ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status);
-
-  absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr>
-  createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
-                                  bool is_optional,
-                                  Server::Configuration::ServerFactoryContext& factory_context,
-                                  ProtobufMessage::ValidationVisitor& validator);
-  absl::flat_hash_map<std::string, FilterConfig> configs_;
 };
 
 class RouteEntryImplBase;
@@ -978,118 +945,6 @@ public:
     const std::string cluster_name_;
   };
 
-  /**
-   * Route entry implementation for weighted clusters. The RouteEntryImplBase object holds
-   * one or more weighted cluster objects, where each object has a back pointer to the parent
-   * RouteEntryImplBase object. Almost all functions in this class forward calls back to the
-   * parent, with the exception of clusterName, routeEntry, and metadataMatchCriteria.
-   */
-  class WeightedClusterEntry : public DynamicRouteEntry {
-  public:
-    static absl::StatusOr<std::unique_ptr<WeightedClusterEntry>>
-    create(const RouteEntryImplBase* parent, const std::string& rutime_key,
-           Server::Configuration::ServerFactoryContext& factory_context,
-           ProtobufMessage::ValidationVisitor& validator,
-           const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
-
-    uint64_t clusterWeight(Runtime::Loader& loader) const {
-      return loader.snapshot().getInteger(runtime_key_, cluster_weight_);
-    }
-
-    const MetadataMatchCriteria* metadataMatchCriteria() const override {
-      if (cluster_metadata_match_criteria_) {
-        return cluster_metadata_match_criteria_.get();
-      }
-      return DynamicRouteEntry::metadataMatchCriteria();
-    }
-
-    const HeaderParser& requestHeaderParser() const {
-      if (request_headers_parser_ != nullptr) {
-        return *request_headers_parser_;
-      }
-      return HeaderParser::defaultParser();
-    }
-    const HeaderParser& responseHeaderParser() const {
-      if (response_headers_parser_ != nullptr) {
-        return *response_headers_parser_;
-      }
-      return HeaderParser::defaultParser();
-    }
-
-    void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
-                                const StreamInfo::StreamInfo& stream_info,
-                                bool insert_envoy_original_path) const override {
-      requestHeaderParser().evaluateHeaders(headers, stream_info);
-      if (!host_rewrite_.empty()) {
-        headers.setHost(host_rewrite_);
-      }
-      DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
-    }
-    Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
-                                                   bool do_formatting = true) const override;
-    void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
-                                 const StreamInfo::StreamInfo& stream_info) const override {
-      const Http::RequestHeaderMap& request_headers =
-          stream_info.getRequestHeaders() == nullptr
-              ? *Http::StaticEmptyHeaders::get().request_headers
-              : *stream_info.getRequestHeaders();
-      responseHeaderParser().evaluateHeaders(headers, {&request_headers, &headers}, stream_info);
-      DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
-    }
-    Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
-                                                    bool do_formatting = true) const override;
-
-    absl::optional<bool> filterDisabled(absl::string_view config_name) const override {
-      absl::optional<bool> result = per_filter_configs_->disabled(config_name);
-      if (result.has_value()) {
-        return result.value();
-      }
-      return DynamicRouteEntry::filterDisabled(config_name);
-    }
-    const RouteSpecificFilterConfig*
-    mostSpecificPerFilterConfig(absl::string_view name) const override {
-      auto* config = per_filter_configs_->get(name);
-      return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
-    }
-    RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
-
-    const Http::LowerCaseString& clusterHeaderName() const { return cluster_header_name_; }
-
-  private:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
-                         Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator,
-                         const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster);
-
-    const std::string runtime_key_;
-    const uint64_t cluster_weight_;
-    MetadataMatchCriteriaConstPtr cluster_metadata_match_criteria_;
-    HeaderParserPtr request_headers_parser_;
-    HeaderParserPtr response_headers_parser_;
-    std::unique_ptr<PerFilterConfigs> per_filter_configs_;
-    const std::string host_rewrite_;
-    const Http::LowerCaseString cluster_header_name_;
-  };
-
-  using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
-  // Container for route config elements that pertain to weighted clusters.
-  // We keep them in a separate data structure to avoid memory overhead for the routes that do not
-  // use weighted clusters.
-  struct WeightedClustersConfig {
-    WeightedClustersConfig(const std::vector<WeightedClusterEntrySharedPtr>&& weighted_clusters,
-                           uint64_t total_cluster_weight,
-                           const std::string& random_value_header_name,
-                           const std::string& runtime_key_prefix)
-        : weighted_clusters_(std::move(weighted_clusters)),
-          total_cluster_weight_(total_cluster_weight),
-          random_value_header_name_(random_value_header_name),
-          runtime_key_prefix_(runtime_key_prefix) {}
-    const std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
-    const uint64_t total_cluster_weight_;
-    const std::string random_value_header_name_;
-    const std::string runtime_key_prefix_;
-  };
-
 protected:
   const std::string prefix_rewrite_;
   Regex::CompiledMatcherPtr regex_rewrite_;
@@ -1230,7 +1085,6 @@ private:
   std::vector<ShadowPolicyPtr> shadow_policies_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;
-  std::unique_ptr<const WeightedClustersConfig> weighted_clusters_config_;
 
   UpgradeMap upgrade_map_;
   std::unique_ptr<const Http::HashPolicyImpl> hash_policy_;
