@@ -174,7 +174,7 @@ getHeaderParsers(const HeaderParser* global_route_config_header_parser,
 class NullClusterSpecifierPlugin : public ClusterSpecifierPlugin {
 public:
   RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr, const Http::RequestHeaderMap&,
-                            const StreamInfo::StreamInfo&) const override {
+                            const StreamInfo::StreamInfo&, uint64_t) const override {
     return nullptr;
   }
 };
