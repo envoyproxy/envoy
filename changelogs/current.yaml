@@ -253,5 +253,8 @@ new_features:
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``streamInfo()`` which could be used to access the typed metadata from
     HTTP filters, such as the Set Metadata filter, etc.
+- area: matcher
+  change: |
+    added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
 
 deprecated:

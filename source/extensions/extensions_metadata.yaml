@@ -1700,6 +1700,14 @@ envoy.matching.inputs.subject:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.ssl.v3.SubjectInput
+envoy.matching.custom_matchers.domain_matcher:
+  categories:
+  - envoy.matching.http.custom_matchers
+  - envoy.matching.network.custom_matchers
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - xds.type.matcher.v3.ServerNameMatcher
 envoy.matching.custom_matchers.trie_matcher:
   categories:
   - envoy.matching.http.custom_matchers
