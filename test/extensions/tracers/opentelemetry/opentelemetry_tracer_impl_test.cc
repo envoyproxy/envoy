@@ -396,8 +396,9 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithMaxCacheSize) {
       .WillOnce(Return(1));
 
   // Create another span to trigger flush
-  Tracing::SpanPtr trigger_span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                                                     operation_name_, {Tracing::Reason::Sampling, true});
+  Tracing::SpanPtr trigger_span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::Sampling, true});
   EXPECT_NE(trigger_span.get(), nullptr);
 
   // Should only see 2 spans exported (third span was discarded)

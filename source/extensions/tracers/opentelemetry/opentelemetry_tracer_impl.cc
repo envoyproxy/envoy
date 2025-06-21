@@ -105,11 +105,12 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           factory_context.clusterManager(), opentelemetry_config.http_service());
     }
     // Get the max cache size from config
-    uint64_t max_cache_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config.max_cache_size(), value, DEFAULT_MAX_CACHE_SIZE);
-    TracerPtr tracer = std::make_unique<Tracer>(
-        std::move(exporter), factory_context.timeSource(), factory_context.api().randomGenerator(),
-        factory_context.runtime(), dispatcher, tracing_stats_, resource_ptr, sampler,
-        max_cache_size);
+    uint64_t max_cache_size = PROTOBUF_GET_WRAPPED_OR_DEFAULT(opentelemetry_config.max_cache_size(),
+                                                              value, DEFAULT_MAX_CACHE_SIZE);
+    TracerPtr tracer =
+        std::make_unique<Tracer>(std::move(exporter), factory_context.timeSource(),
+                                 factory_context.api().randomGenerator(), factory_context.runtime(),
+                                 dispatcher, tracing_stats_, resource_ptr, sampler, max_cache_size);
     return std::make_shared<TlsTracer>(std::move(tracer));
   });
 }
