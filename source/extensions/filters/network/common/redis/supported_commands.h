@@ -123,6 +123,11 @@ struct SupportedCommands {
   static const std::string& info() { CONSTRUCT_ON_FIRST_USE(std::string, "info"); }
 
   /**
+   * @return role command
+   */
+  static const std::string& role() { CONSTRUCT_ON_FIRST_USE(std::string, "role"); }
+
+  /**
    * @return commands which alters the state of redis
    */
   static const absl::flat_hash_set<std::string>& writeCommands() {
