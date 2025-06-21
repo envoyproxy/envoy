@@ -57,9 +57,8 @@ protected:
     }
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> status_or_cluster;
 
     envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
@@ -68,11 +67,12 @@ protected:
           std::make_unique<envoy::extensions::clusters::dns::v3::DnsCluster>();
       ASSERT_TRUE(Config::Utility::translateOpaqueConfig(
                       cluster_config.cluster_type().typed_config(),
-                      factory_context.messageValidationVisitor(), *dns_cluster_msg)
+                      factory_context.serverFactoryContext().messageValidationVisitor(),
+                      *dns_cluster_msg)
                       .ok());
       dns_cluster =
           MessageUtil::downcastAndValidate<const envoy::extensions::clusters::dns::v3::DnsCluster&>(
-              *dns_cluster_msg, factory_context.messageValidationVisitor());
+              *dns_cluster_msg, factory_context.serverFactoryContext().messageValidationVisitor());
     } else {
       createDnsClusterFromLegacyFields(cluster_config, dns_cluster);
     }
@@ -98,9 +98,8 @@ protected:
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver_; };
-    auto status_or_cluster = ClusterFactoryImplBase::create(
-        cluster_config, server_context_, server_context_.cluster_manager_, resolver_fn,
-        ssl_context_manager_, nullptr, false);
+    auto status_or_cluster = ClusterFactoryImplBase::create(cluster_config, server_context_,
+                                                            resolver_fn, nullptr, false);
     if (status_or_cluster.ok()) {
       cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
       priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -261,7 +260,6 @@ protected:
   Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
-  Ssl::MockContextManager ssl_context_manager_;
 
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};

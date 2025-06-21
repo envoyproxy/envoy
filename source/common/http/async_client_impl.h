@@ -61,7 +61,7 @@ class AsyncRequestSharedImpl;
 
 class AsyncClientImpl final : public AsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Store& stats_store,
+  AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster, Stats::Scope& root_scope,
                   Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
                   Server::Configuration::CommonFactoryContext& factory_context,
                   Router::ShadowWriterPtr&& shadow_writer, Http::Context& http_context,

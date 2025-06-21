@@ -16,7 +16,7 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
                  Upstream::ClusterFactoryContext& context, absl::Status& creation_status)
     : Upstream::ClusterImplBase(cluster, context, creation_status),
-      cluster_manager_(context.clusterManager()),
+      cluster_manager_(context.serverFactoryContext().clusterManager()),
       runtime_(context.serverFactoryContext().runtime()),
       random_(context.serverFactoryContext().api().randomGenerator()),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}

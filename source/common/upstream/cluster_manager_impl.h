@@ -53,15 +53,11 @@ public:
   using LazyCreateDnsResolver = std::function<Network::DnsResolverSharedPtr()>;
 
   ProdClusterManagerFactory(Server::Configuration::ServerFactoryContext& context,
-                            Stats::Store& stats, ThreadLocal::Instance& tls,
-                            Http::Context& http_context, LazyCreateDnsResolver dns_resolver_fn,
-                            Ssl::ContextManager& ssl_context_manager,
-                            Quic::QuicStatNames& quic_stat_names, Server::Instance& server)
-      : context_(context), stats_(stats), tls_(tls), http_context_(http_context),
-        dns_resolver_fn_(dns_resolver_fn), ssl_context_manager_(ssl_context_manager),
-        quic_stat_names_(quic_stat_names),
-        alternate_protocols_cache_manager_(context.httpServerPropertiesCacheManager()),
-        server_(server) {}
+                            LazyCreateDnsResolver dns_resolver_fn,
+                            Quic::QuicStatNames& quic_stat_names)
+      : context_(context), root_scope_(*context.scope().store().rootScope()),
+        dns_resolver_fn_(dns_resolver_fn), quic_stat_names_(quic_stat_names),
+        alternate_protocols_cache_manager_(context.httpServerPropertiesCacheManager()) {}
 
   // Upstream::ClusterManagerFactory
   absl::StatusOr<ClusterManagerPtr>
@@ -84,7 +80,7 @@ public:
                       ClusterConnectivityState& state,
                       absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) override;
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                       const xds::core::v3::ResourceLocator* cds_resources_locator,
@@ -92,15 +88,10 @@ public:
 
 protected:
   Server::Configuration::ServerFactoryContext& context_;
-  Stats::Store& stats_;
-  ThreadLocal::Instance& tls_;
-  Http::Context& http_context_;
-
+  Stats::Scope& root_scope_;
   LazyCreateDnsResolver dns_resolver_fn_;
-  Ssl::ContextManager& ssl_context_manager_;
   Quic::QuicStatNames& quic_stat_names_;
   Http::HttpServerPropertiesCacheManager& alternate_protocols_cache_manager_;
-  Server::Instance& server_;
 };
 
 // For friend declaration in ClusterManagerInitHelper.
@@ -283,7 +274,7 @@ public:
   OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
-      return OptRef<const Cluster>(*it->second->cluster_);
+      return *it->second->cluster_;
     }
     return absl::nullopt;
   }
@@ -398,14 +389,8 @@ protected:
   // clusterManagerFromProto() static method. The init() method must be called after construction.
   ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                      ClusterManagerFactory& factory,
-                     Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-                     ThreadLocal::Instance& tls, Runtime::Loader& runtime,
-                     const LocalInfo::LocalInfo& local_info,
-                     AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, OptRef<Server::Admin> admin,
-                     Api::Api& api, Http::Context& http_context, Grpc::Context& grpc_context,
-                     Router::Context& router_context, Server::Instance& server,
-                     Config::XdsManager& xds_manager, absl::Status& creation_status);
+                     Server::Configuration::ServerFactoryContext& context,
+                     absl::Status& creation_status);
 
   virtual void postThreadLocalRemoveHosts(const Cluster& cluster, const HostVector& hosts_removed);
 
@@ -922,10 +907,10 @@ private:
 
   bool deferralIsSupportedForCluster(const ClusterInfoConstSharedPtr& info) const;
 
-  Server::Instance& server_;
+  Server::Configuration::ServerFactoryContext& context_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
-  Stats::Store& stats_;
+  Stats::Scope& root_scope_;
   ThreadLocal::TypedSlot<ThreadLocalClusterManagerImpl> tls_;
   // Contains information about ongoing on-demand cluster discoveries.
   ClusterCreationsMap pending_cluster_creations_;

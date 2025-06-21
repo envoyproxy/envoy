@@ -21,7 +21,7 @@ namespace Http {
 const absl::string_view AsyncClientImpl::ResponseBufferLimit = "http.async_response_buffer_limit";
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
-                                 Stats::Store& stats_store, Event::Dispatcher& dispatcher,
+                                 Stats::Scope& root_scope, Event::Dispatcher& dispatcher,
                                  Upstream::ClusterManager& cm,
                                  Server::Configuration::CommonFactoryContext& factory_context,
                                  Router::ShadowWriterPtr&& shadow_writer,
@@ -29,10 +29,10 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
     : factory_context_(factory_context), cluster_(cluster),
       config_(std::make_shared<Router::FilterConfig>(
           factory_context, http_context.asyncClientStatPrefix(), factory_context.localInfo(),
-          *stats_store.rootScope(), cm, factory_context.runtime(),
-          factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
-          false, false, false, Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(),
-          http_context, router_context)),
+          root_scope, cm, factory_context.runtime(), factory_context.api().randomGenerator(),
+          std::move(shadow_writer), true, false, false, false, false, false,
+          Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(), http_context,
+          router_context)),
       dispatcher_(dispatcher), runtime_(factory_context.runtime()),
       local_reply_(LocalReply::Factory::createDefault()) {}
 
