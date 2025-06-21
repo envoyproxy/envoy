@@ -3669,7 +3669,7 @@ virtual_hosts:
 
   auto mock_route = std::make_shared<NiceMock<MockRoute>>();
 
-  EXPECT_CALL(*mock_cluster_specifier_plugin, route(_, _, _)).WillOnce(Return(mock_route));
+  EXPECT_CALL(*mock_cluster_specifier_plugin, route(_, _, _, _)).WillOnce(Return(mock_route));
 
   EXPECT_EQ(mock_route.get(), config.route(genHeaders("some_cluster", "/foo", "GET"), 0).get());
 }
@@ -3799,10 +3799,10 @@ virtual_hosts:
 
   auto mock_route = std::make_shared<NiceMock<MockRoute>>();
 
-  EXPECT_CALL(*mock_cluster_specifier_plugin_2, route(_, _, _)).WillOnce(Return(mock_route));
+  EXPECT_CALL(*mock_cluster_specifier_plugin_2, route(_, _, _, _)).WillOnce(Return(mock_route));
   EXPECT_EQ(mock_route.get(), config.route(genHeaders("some_cluster", "/foo", "GET"), 0).get());
 
-  EXPECT_CALL(*mock_cluster_specifier_plugin_3, route(_, _, _)).WillOnce(Return(mock_route));
+  EXPECT_CALL(*mock_cluster_specifier_plugin_3, route(_, _, _, _)).WillOnce(Return(mock_route));
   EXPECT_EQ(mock_route.get(), config.route(genHeaders("some_cluster", "/bar", "GET"), 0).get());
 }
 
@@ -5025,7 +5025,8 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"backoff"}, {});
-  TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true, creation_status_);
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "retry_policy.max_interval must greater than or equal to the base_interval");
 }

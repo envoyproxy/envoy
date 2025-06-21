@@ -56,7 +56,7 @@ private:
 Envoy::Router::RouteConstSharedPtr
 MatcherClusterSpecifierPlugin::route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
                                      const Http::RequestHeaderMap& headers,
-                                     const StreamInfo::StreamInfo& stream_info) const {
+                                     const StreamInfo::StreamInfo& stream_info, uint64_t) const {
   auto matcher_route = std::make_shared<MatcherRouteEntry>(parent, match_tree_);
   matcher_route->refreshRouteCluster(headers, stream_info);
   return matcher_route;

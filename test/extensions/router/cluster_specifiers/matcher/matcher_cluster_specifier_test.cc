@@ -116,19 +116,19 @@ TEST_F(MatcherClusterSpecifierPluginTest, NormalConfigTest) {
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "staging"}};
-    auto route = plugin_->route(mock_route, headers, stream_info_);
+    auto route = plugin_->route(mock_route, headers, stream_info_, 0);
     EXPECT_EQ("staging-cluster", route->routeEntry()->clusterName());
   }
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "prod"}};
-    auto route = plugin_->route(mock_route, headers, stream_info_);
+    auto route = plugin_->route(mock_route, headers, stream_info_, 0);
     EXPECT_EQ("prod-cluster", route->routeEntry()->clusterName());
   }
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "not-exist"}};
-    auto route = plugin_->route(mock_route, headers, stream_info_);
+    auto route = plugin_->route(mock_route, headers, stream_info_, 0);
     EXPECT_EQ("default-cluster", route->routeEntry()->clusterName());
   }
 }
@@ -139,13 +139,13 @@ TEST_F(MatcherClusterSpecifierPluginTest, NormalConfigWithoutDefaultCluster) {
   auto mock_route = std::make_shared<NiceMock<Envoy::Router::MockRoute>>();
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "staging"}};
-    auto route = plugin_->route(mock_route, headers, stream_info_);
+    auto route = plugin_->route(mock_route, headers, stream_info_, 0);
     EXPECT_EQ("staging-cluster", route->routeEntry()->clusterName());
   }
 
   {
     Http::TestRequestHeaderMapImpl headers{{":path", "/"}, {"env", "not-exist"}};
-    auto route = plugin_->route(mock_route, headers, stream_info_);
+    auto route = plugin_->route(mock_route, headers, stream_info_, 0);
     EXPECT_EQ("", route->routeEntry()->clusterName());
   }
 }

@@ -739,7 +739,7 @@ public:
 
   MOCK_METHOD(RouteConstSharedPtr, route,
               (RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo& stream_info),
+               const StreamInfo::StreamInfo& stream_info, uint64_t random),
               (const));
 };
 

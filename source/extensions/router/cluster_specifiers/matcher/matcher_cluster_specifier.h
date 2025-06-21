@@ -58,10 +58,10 @@ public:
   MatcherClusterSpecifierPlugin(
       Envoy::Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree)
       : match_tree_(match_tree) {}
-  Envoy::Router::RouteConstSharedPtr
-  route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
-        const Http::RequestHeaderMap& headers,
-        const StreamInfo::StreamInfo& stream_info) const override;
+  Envoy::Router::RouteConstSharedPtr route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
+                                           const Http::RequestHeaderMap& headers,
+                                           const StreamInfo::StreamInfo& stream_info,
+                                           uint64_t) const override;
 
 private:
   Envoy::Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree_;

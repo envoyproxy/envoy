@@ -10,7 +10,8 @@ HeaderClusterSpecifierPlugin::HeaderClusterSpecifierPlugin(absl::string_view clu
 
 RouteConstSharedPtr HeaderClusterSpecifierPlugin::route(RouteEntryAndRouteConstSharedPtr parent,
                                                         const Http::RequestHeaderMap& headers,
-                                                        const StreamInfo::StreamInfo&) const {
+                                                        const StreamInfo::StreamInfo&,
+                                                        uint64_t) const {
 
   const auto entry = headers.get(cluster_header_);
   absl::string_view cluster_name;

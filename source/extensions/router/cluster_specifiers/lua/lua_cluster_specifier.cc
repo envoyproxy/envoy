@@ -1,6 +1,7 @@
 #include "source/extensions/router/cluster_specifiers/lua/lua_cluster_specifier.h"
 
-#include "source/common/router/config_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/router/delegating_route_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -123,10 +124,10 @@ std::string LuaClusterSpecifierPlugin::startLua(const Http::HeaderMap& headers) 
 Envoy::Router::RouteConstSharedPtr
 LuaClusterSpecifierPlugin::route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
                                  const Http::RequestHeaderMap& headers,
-                                 const StreamInfo::StreamInfo&) const {
-  return std::make_shared<Envoy::Router::RouteEntryImplBase::DynamicRouteEntry>(std::move(parent),
-                                                                                startLua(headers));
+                                 const StreamInfo::StreamInfo&, uint64_t) const {
+  return std::make_shared<Envoy::Router::DynamicRouteEntry>(std::move(parent), startLua(headers));
 }
+
 } // namespace Lua
 } // namespace Router
 } // namespace Extensions

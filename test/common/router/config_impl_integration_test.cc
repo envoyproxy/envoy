@@ -25,8 +25,8 @@ public:
     FakeClusterSpecifierPlugin(absl::string_view cluster) : cluster_name_(cluster) {}
 
     RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
-                              const Http::RequestHeaderMap&,
-                              const StreamInfo::StreamInfo&) const override {
+                              const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+                              uint64_t) const override {
       ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
       return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
           dynamic_cast<const RouteEntryImplBase*>(parent.get()), parent, cluster_name_);
