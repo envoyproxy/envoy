@@ -5025,7 +5025,8 @@ virtual_hosts:
 )EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"backoff"}, {});
-  TestConfigImpl(parseRouteConfigurationFromYaml(yaml), factory_context_, true, creation_status_);
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
   EXPECT_EQ(creation_status_.message(),
             "retry_policy.max_interval must greater than or equal to the base_interval");
 }

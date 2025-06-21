@@ -1390,7 +1390,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
       // TODO(wbpcode): make the weighted clusters an implementation of the
       // cluster specifier plugin.
       ASSERT(cluster_specifier_plugin_ != nullptr);
-      return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info);
+      return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info,
+                                              random_value);
     }
   }
   return pickWeightedCluster(headers, random_value);
