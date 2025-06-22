@@ -4,8 +4,6 @@ package envoy.extensions.http.injected_credentials.generic.v3;
 
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
 
-import "xds/annotations/v3/status.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
