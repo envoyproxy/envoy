@@ -353,7 +353,7 @@ typedef enum {
   // connection.uri_san_peer_certificate
   envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate,
   // connection.sha256_peer_certificate_digest
-  envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificate,
+  envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest,
   // connection.transport_failure_reason
   envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason,
   // connection.termination_details

@@ -914,7 +914,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
         },
         result, result_length);
   }
-  case envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificate: {
+  case envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest: {
     const auto connection = filter->connection();
     if (connection) {
       const auto ssl = connection->ssl();
