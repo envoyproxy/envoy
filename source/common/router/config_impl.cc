@@ -640,6 +640,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     cluster_specifier_plugin_ = std::make_shared<WeightedClusterSpecifierPlugin>(
         route.route().weighted_clusters(), metadata_match_criteria_.get(), route_name_,
         factory_context, validator, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   } else if (route.route().has_inline_cluster_specifier_plugin()) {
     auto plugin_or_error = getClusterSpecifierPluginByTheProto(
         route.route().inline_cluster_specifier_plugin(), validator, factory_context);
