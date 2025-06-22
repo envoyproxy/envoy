@@ -20,8 +20,7 @@ struct WeightedClustersConfigEntry {
 public:
   static absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>>
   create(const ClusterWeightProto& cluster, const MetadataMatchCriteria* parent_metadata_match,
-         std::string&& runtime_key, Server::Configuration::ServerFactoryContext& factory_context,
-         ProtobufMessage::ValidationVisitor& validator);
+         std::string&& runtime_key, Server::Configuration::ServerFactoryContext& context);
 
   uint64_t clusterWeight(Runtime::Loader& loader) const {
     return loader.snapshot().getInteger(runtime_key_, cluster_weight_);
@@ -34,8 +33,7 @@ private:
   WeightedClustersConfigEntry(const ClusterWeightProto& cluster,
                               const MetadataMatchCriteria* parent_metadata_match,
                               std::string&& runtime_key,
-                              Server::Configuration::ServerFactoryContext& factory_context,
-                              ProtobufMessage::ValidationVisitor& validator);
+                              Server::Configuration::ServerFactoryContext& context);
 
   const std::string runtime_key_;
   const uint64_t cluster_weight_;
@@ -58,7 +56,6 @@ public:
                                  const MetadataMatchCriteria* parent_metadata_match,
                                  absl::string_view route_name,
                                  Server::Configuration::ServerFactoryContext& context,
-                                 ProtobufMessage::ValidationVisitor& validator,
                                  absl::Status& creation_status);
 
   RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,

@@ -18,23 +18,22 @@ absl::Status validateWeightedClusterSpecifier(const ClusterWeightProto& cluster)
 
 absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>> WeightedClustersConfigEntry::create(
     const ClusterWeightProto& cluster, const MetadataMatchCriteria* parent_metadata_match,
-    std::string&& runtime_key, Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator) {
+    std::string&& runtime_key, Server::Configuration::ServerFactoryContext& context) {
   RETURN_IF_NOT_OK(validateWeightedClusterSpecifier(cluster));
   return std::unique_ptr<WeightedClustersConfigEntry>(new WeightedClustersConfigEntry(
-      cluster, parent_metadata_match, std::move(runtime_key), factory_context, validator));
+      cluster, parent_metadata_match, std::move(runtime_key), context));
 }
 
 WeightedClustersConfigEntry::WeightedClustersConfigEntry(
     const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster,
     const MetadataMatchCriteria* parent_metadata_match, std::string&& runtime_key,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator)
+    Server::Configuration::ServerFactoryContext& context)
     : runtime_key_(std::move(runtime_key)),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
-      per_filter_configs_(THROW_OR_RETURN_VALUE(
-          PerFilterConfigs::create(cluster.typed_per_filter_config(), factory_context, validator),
-          std::unique_ptr<PerFilterConfigs>)),
+      per_filter_configs_(
+          THROW_OR_RETURN_VALUE(PerFilterConfigs::create(cluster.typed_per_filter_config(), context,
+                                                         context.messageValidationVisitor()),
+                                std::unique_ptr<PerFilterConfigs>)),
       host_rewrite_(cluster.host_rewrite_literal()),
       cluster_header_name_(cluster.cluster_header()) {
   if (!cluster.request_headers_to_add().empty() || !cluster.request_headers_to_remove().empty()) {
@@ -68,8 +67,7 @@ WeightedClustersConfigEntry::WeightedClustersConfigEntry(
 WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
     const WeightedClusterProto& weighted_clusters,
     const MetadataMatchCriteria* parent_metadata_match, absl::string_view route_name,
-    Server::Configuration::ServerFactoryContext& context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
     : loader_(context.runtime()), random_value_header_(weighted_clusters.header_name()),
       runtime_key_prefix_(weighted_clusters.runtime_key_prefix()) {
 
@@ -78,11 +76,11 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
   weighted_clusters_.reserve(weighted_clusters.clusters().size());
 
   for (const ClusterWeightProto& cluster : weighted_clusters.clusters()) {
-    auto cluster_entry = THROW_OR_RETURN_VALUE(
-        WeightedClustersConfigEntry::create(cluster, parent_metadata_match,
-                                            absl::StrCat(runtime_key_prefix, ".", cluster.name()),
-                                            context, validator),
-        std::shared_ptr<WeightedClustersConfigEntry>);
+    auto cluster_entry =
+        THROW_OR_RETURN_VALUE(WeightedClustersConfigEntry::create(
+                                  cluster, parent_metadata_match,
+                                  absl::StrCat(runtime_key_prefix, ".", cluster.name()), context),
+                              std::shared_ptr<WeightedClustersConfigEntry>);
     weighted_clusters_.emplace_back(std::move(cluster_entry));
     total_cluster_weight_ += weighted_clusters_.back()->clusterWeight(loader_);
     if (total_cluster_weight_ > std::numeric_limits<uint32_t>::max()) {

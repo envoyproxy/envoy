@@ -109,6 +109,7 @@ envoy_cc_library(
     hdrs = ["per_filter_config.h"],
     deps = [
         "//envoy/server:factory_context_interface",
+        "//envoy/server:filter_config_interface",
         "@com_google_absl//absl/container:flat_hash_map",
     ],
 )
