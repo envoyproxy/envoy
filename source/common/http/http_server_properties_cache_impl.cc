@@ -174,10 +174,20 @@ void HttpServerPropertiesCacheImpl::setSrtt(const Origin& origin, std::chrono::m
 
 std::chrono::microseconds HttpServerPropertiesCacheImpl::getSrtt(const Origin& origin) const {
   auto entry_it = protocols_.find(origin);
-  if (entry_it == protocols_.end()) {
-    return std::chrono::microseconds(0);
+  if (entry_it != protocols_.end()) {
+    return entry_it->second.srtt;
   }
-  return entry_it->second.srtt;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.use_canonical_suffix_for_srtt")) {
+    absl::optional<Origin> canonical = getCanonicalOrigin(origin.hostname_);
+    if (canonical.has_value()) {
+      entry_it = protocols_.find(*canonical);
+      if (entry_it != protocols_.end()) {
+        return entry_it->second.srtt;
+      }
+    }
+  }
+  return std::chrono::microseconds(0);
 }
 
 void HttpServerPropertiesCacheImpl::setConcurrentStreams(const Origin& origin,
@@ -210,6 +220,10 @@ HttpServerPropertiesCacheImpl::setPropertiesImpl(const Origin& origin,
       ENVOY_LOG_MISC(trace, "Too many alternate protocols: {}, truncating", protocols.size());
       protocols.erase(protocols.begin() + max_protocols, protocols.end());
     }
+  } else if (origin_data.srtt.count() > 0 &&
+             Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.use_canonical_suffix_for_srtt")) {
+    maybeSetCanonicalOrigin(origin);
   }
   auto entry_it = protocols_.find(origin);
   if (entry_it != protocols_.end()) {
