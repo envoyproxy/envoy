@@ -1,10 +1,11 @@
+#include <functional>
+
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/dynamic_modules/abi.h"
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
-#include <functional>
 
 namespace Envoy {
 namespace Extensions {
@@ -51,10 +52,12 @@ bool headerAsAttribute(HeadersMapOptConstRef map, const Envoy::Http::LowerCaseSt
   return size > 0;
 }
 
-bool getFirstSanEntry(OptRef<const Network::Connection> connection,
-                      std::function<absl::Span<const std::string>(const Ssl::ConnectionInfoConstSharedPtr)> get_san_func,
-                      envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
-                      size_t* result_buffer_length_ptr) {
+bool getFirstSanEntry(
+    OptRef<const Network::Connection> connection,
+    std::function<absl::Span<const std::string>(const Ssl::ConnectionInfoConstSharedPtr)>
+        get_san_func,
+    envoy_dynamic_module_type_buffer_envoy_ptr* result_buffer_ptr,
+    size_t* result_buffer_length_ptr) {
   if (!connection.has_value() || !connection->ssl()) {
     return false;
   }
@@ -66,7 +69,7 @@ bool getFirstSanEntry(OptRef<const Network::Connection> connection,
   const auto& first_entry = sans[0];
   *result_buffer_ptr = const_cast<char*>(first_entry.data());
   *result_buffer_length_ptr = first_entry.size();
-  return true;  
+  return true;
 }
 
 size_t envoy_dynamic_module_callback_http_get_request_header(
@@ -880,32 +883,36 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     break;
   }
   case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate: {
-    return getFirstSanEntry(filter->connection(), 
-                [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
-                  return ssl->dnsSansLocalCertificate();
-                },
-                result, result_length);    
+    return getFirstSanEntry(
+        filter->connection(),
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
+          return ssl->dnsSansLocalCertificate();
+        },
+        result, result_length);
   }
   case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate: {
-    return getFirstSanEntry(filter->connection(), 
-                [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
-                  return ssl->dnsSansPeerCertificate();
-                },
-                result, result_length);
+    return getFirstSanEntry(
+        filter->connection(),
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
+          return ssl->dnsSansPeerCertificate();
+        },
+        result, result_length);
   }
   case envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate: {
-    return getFirstSanEntry(filter->connection(), 
-                [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
-                  return ssl->uriSanLocalCertificate();
-                },
-                result, result_length);
+    return getFirstSanEntry(
+        filter->connection(),
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
+          return ssl->uriSanLocalCertificate();
+        },
+        result, result_length);
   }
   case envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate: {
-    return getFirstSanEntry(filter->connection(), 
-                [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
-                  return ssl->uriSanPeerCertificate();
-                },
-                result, result_length);
+    return getFirstSanEntry(
+        filter->connection(),
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
+          return ssl->uriSanPeerCertificate();
+        },
+        result, result_length);
   }
   case envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificate: {
     const auto connection = filter->connection();
@@ -989,7 +996,7 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
       ok = true;
     }
     break;
-  }  
+  }
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Unsupported attribute ID {} as int", static_cast<int64_t>(attribute_id));

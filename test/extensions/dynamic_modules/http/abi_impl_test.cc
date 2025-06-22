@@ -1,12 +1,13 @@
+#include <memory>
+#include <string>
+
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
-#include <memory>
-#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -907,19 +908,21 @@ TEST(ABIImpl, GetAttributes) {
 
   // test TLS connection attributes
   const Network::MockConnection connection;
-  EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+  EXPECT_CALL(callbacks, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
   EXPECT_CALL(connection, ssl()).WillRepeatedly(testing::Return(nullptr));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
-  &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
-  &result_str_ptr, &result_str_length));
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result_str_ptr,
+      &result_str_length));
 
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(testing::Return(ssl));
   const std::string tls_version = "TLSv1.2";
   EXPECT_CALL(*ssl, tlsVersion()).WillRepeatedly(testing::ReturnRef(tls_version));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
-  &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
-  &result_str_ptr, &result_str_length));
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result_str_ptr,
+      &result_str_length));
   EXPECT_EQ(result_str_length, tls_version.size());
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), tls_version);
 
