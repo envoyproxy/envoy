@@ -385,7 +385,8 @@ void HttpServerPropertiesCacheImpl::resetStatus() {
   }
 }
 
-absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) {
+absl::string_view
+HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string_view hostname) const {
   for (const std::string& suffix : canonical_suffixes_) {
     if (absl::EndsWith(hostname, suffix)) {
       return suffix;
@@ -395,7 +396,7 @@ absl::string_view HttpServerPropertiesCacheImpl::getCanonicalSuffix(absl::string
 }
 
 absl::optional<HttpServerPropertiesCache::Origin>
-HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) {
+HttpServerPropertiesCacheImpl::getCanonicalOrigin(absl::string_view hostname) const {
   absl::string_view suffix = getCanonicalSuffix(hostname);
   if (suffix.empty()) {
     return {};
