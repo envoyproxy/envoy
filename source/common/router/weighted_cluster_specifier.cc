@@ -311,7 +311,7 @@ absl::Status
 WeightedClusterSpecifierPlugin::validateClusters(const Upstream::ClusterManager& cm) const {
   for (const auto& cluster : weighted_clusters_) {
     if (cluster->cluster_name_.empty() || cm.hasCluster(cluster->cluster_name_)) {
-      continue; // Only check the explict cluster name and ignore the cluster header name.
+      continue; // Only check the explicit cluster name and ignore the cluster header name.
     }
     return absl::InvalidArgumentError(
         fmt::format("route: unknown weighted cluster '{}'", cluster->cluster_name_));

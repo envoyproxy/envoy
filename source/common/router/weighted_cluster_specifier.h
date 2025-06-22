@@ -1,10 +1,11 @@
 #pragma once
 
-#include "source/common/router/per_filter_config.h"
-#include "source/common/router/metadatamatchcriteria_impl.h"
-#include "source/common/router/header_parser.h"
-#include "source/common/router/delegating_route_impl.h"
 #include "envoy/router/cluster_specifier_plugin.h"
+
+#include "source/common/router/delegating_route_impl.h"
+#include "source/common/router/header_parser.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/router/per_filter_config.h"
 
 namespace Envoy {
 namespace Router {
