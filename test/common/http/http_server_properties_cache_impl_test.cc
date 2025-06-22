@@ -534,19 +534,20 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixSrtt) {
   suffixes_.push_back(suffix);
   initialize();
 
-  const std::chrono::microseconds set_srtt(42);
-  protocols_->setSrtt(origin1, set_srtt);
-  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt);
-  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt);
-  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt);
-  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt);
+  std::chrono::microseconds set_srtt1(42);
+  protocols_->setSrtt(origin1, set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt1);
+  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt1);
 
-  set_srtt = std::chrono::microseconds(422);
-  protocols_->setSrtt(origin2, set_srtt);
-  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt);
-  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt);
-  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt);
-  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt);
+  std::chrono::microseconds set_srtt2(422);
+  protocols_->setSrtt(origin2, set_srtt2);
+  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt2);
+  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt2);
+  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt1);
+  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt2);
 }
 
 TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCanonicalSuffix) {
