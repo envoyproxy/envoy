@@ -7,13 +7,13 @@ namespace Envoy {
 namespace Router {
 
 absl::Status validateWeightedClusterSpecifier(const ClusterWeightProto& cluster) {
-  if (!cluster.name().empty() && !cluster.cluster_header().empty()) {
-    return absl::InvalidArgumentError("Only one of name or cluster_header can be specified");
-  } else if (cluster.name().empty() && cluster.cluster_header().empty()) {
-    return absl::InvalidArgumentError(
-        "At least one of name or cluster_header need to be specified");
+  if (cluster.name().empty() != cluster.name().empty()) {
+    return absl::OkStatus();
   }
-  return absl::OkStatus();
+  const auto error = cluster.name().empty()
+                         ? "At least one of name or cluster_header need to be specified"
+                         : "Only one of name or cluster_header can be specified";
+  return absl::InvalidArgumentError(error);
 }
 
 absl::StatusOr<std::shared_ptr<WeightedClustersConfigEntry>> WeightedClustersConfigEntry::create(
@@ -129,19 +129,6 @@ public:
     return DynamicRouteEntry::metadataMatchCriteria();
   }
 
-  const HeaderParser& requestHeaderParser() const {
-    if (config_->request_headers_parser_ != nullptr) {
-      return *config_->request_headers_parser_;
-    }
-    return HeaderParser::defaultParser();
-  }
-  const HeaderParser& responseHeaderParser() const {
-    if (config_->response_headers_parser_ != nullptr) {
-      return *config_->response_headers_parser_;
-    }
-    return HeaderParser::defaultParser();
-  }
-
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override {
@@ -184,7 +171,7 @@ public:
   }
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(absl::string_view name) const override {
-    auto* config = config_->per_filter_configs_->get(name);
+    const auto* config = config_->per_filter_configs_->get(name);
     return config ? config : DynamicRouteEntry::mostSpecificPerFilterConfig(name);
   }
   RouteSpecificFilterConfigs perFilterConfigs(absl::string_view filter_name) const override {
@@ -197,6 +184,19 @@ public:
   }
 
 private:
+  const HeaderParser& requestHeaderParser() const {
+    if (config_->request_headers_parser_ != nullptr) {
+      return *config_->request_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
+  const HeaderParser& responseHeaderParser() const {
+    if (config_->response_headers_parser_ != nullptr) {
+      return *config_->response_headers_parser_;
+    }
+    return HeaderParser::defaultParser();
+  }
+
   WeightedClustersConfigEntryConstSharedPtr config_;
 };
 
@@ -310,12 +310,11 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteCons
 absl::Status
 WeightedClusterSpecifierPlugin::validateClusters(const Upstream::ClusterManager& cm) const {
   for (const auto& cluster : weighted_clusters_) {
-    if (!cluster->cluster_name_.empty()) {
-      if (!cm.hasCluster(cluster->cluster_name_)) {
-        return absl::InvalidArgumentError(
-            fmt::format("route: unknown weighted cluster '{}'", cluster->cluster_name_));
-      }
+    if (cluster->cluster_name_.empty() || cm.hasCluster(cluster->cluster_name_)) {
+      continue; // Only check the explict cluster name and ignore the cluster header name.
     }
+    return absl::InvalidArgumentError(
+        fmt::format("route: unknown weighted cluster '{}'", cluster->cluster_name_));
   }
   return absl::OkStatus();
 }

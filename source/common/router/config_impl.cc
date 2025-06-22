@@ -1326,8 +1326,6 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
   if (!cluster_name_.empty() || isDirectResponse()) {
     return shared_from_this();
   } else {
-    // TODO(wbpcode): make the weighted clusters an implementation of the
-    // cluster specifier plugin.
     ASSERT(cluster_specifier_plugin_ != nullptr);
     return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info, random_value);
   }
@@ -1344,6 +1342,7 @@ RouteEntryImplBase::validateClusters(const Upstream::ClusterManager& cluster_man
       return absl::InvalidArgumentError(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
   }
+
   ASSERT(cluster_specifier_plugin_ != nullptr);
   return cluster_specifier_plugin_->validateClusters(cluster_manager);
 }
