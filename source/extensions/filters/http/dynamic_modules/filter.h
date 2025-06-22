@@ -3,6 +3,8 @@
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
+#include <cstddef>
+#include <optional>
 
 namespace Envoy {
 namespace Extensions {
@@ -127,6 +129,17 @@ public:
       return stream_info->upstreamInfo().get();
     }
     return nullptr;
+  }
+
+  /**
+  * Helper to get the connection information
+  */
+  OptRef<const Network::Connection> connection() {
+    auto cb = callbacks();
+    if (cb == nullptr) {
+      return {};
+    }
+    return cb->connection();
   }
 
   /**
