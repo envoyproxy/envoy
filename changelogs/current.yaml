@@ -156,6 +156,10 @@ new_features:
     from upstream server. See :ref:`mode
     <envoy_v3_api_msg_extensions.http.stateful_session.envelope.v3.EnvelopeSessionState>`
     for more details.
+- area: transport tap
+  change: |
+    Add counter in transport tap for streaming and buffer trace.
+    streamed trace can sent tapped message based on configured size.
 - area: load_balancing
   change: |
     Added Override Host Load Balancing policy. See

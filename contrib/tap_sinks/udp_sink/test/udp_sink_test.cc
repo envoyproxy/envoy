@@ -93,10 +93,8 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
 
   Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
       Extensions::Common::Tap::makeTraceWrapper();
-  // case1 format PROTO_BINARY
-  local_handle->submitTrace(std::move(local_buffered_trace),
-                            envoy::config::tap::v3::OutputSink::PROTO_BINARY);
-  // case2 format PROTO_BINARY_LENGTH_DELIMITED
+
+  // case for format PROTO_BINARY_LENGTH_DELIMITED
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::PROTO_BINARY_LENGTH_DELIMITED);
 }
@@ -211,6 +209,32 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkforProtoText) {
       Extensions::Common::Tap::makeTraceWrapper();
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::PROTO_TEXT);
+}
+
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkforProtoBinary) {
+  // Construct UdpTapSink object.
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+  UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
+      std::make_unique<MockUdpPacketWriterNew>(true);
+  loc_udp_tap_sink.replaceOrigUdpPacketWriter(std::move(local_UdpPacketWriter));
+
+  // Create UdpTapSinkHandle.
+  TapCommon::PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
+  // Case 1: the return of SerializeToArray() is true.
+  Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
+      Extensions::Common::Tap::makeTraceWrapper();
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::PROTO_BINARY);
+
+  // Case 2 the return of SerializeToArray() is false.
+  // Google Test doesn't support mocking this kind of case with its current capabilities.
 }
 
 } // namespace UDP
