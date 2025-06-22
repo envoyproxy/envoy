@@ -13,8 +13,10 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
+#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -29,12 +31,10 @@
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-// TODO: sort these
-#include "source/common/upstream/upstream_impl.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -106,7 +106,11 @@ protected:
         cluster_config, server_context_, server_context_.cluster_manager_, resolver_fn,
         ssl_context_manager_, nullptr, false);
     if (status_or_cluster.ok()) {
-      cluster_ = std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+        cluster_ = std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
+      } else {
+        cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
+      }
       priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
           [&](uint32_t, const HostVector&, const HostVector&) {
             membership_updated_.ready();
@@ -279,6 +283,7 @@ protected:
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   std::shared_ptr<ClusterImplBase> cluster_;
+  TestScopedRuntime scoped_runtime_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Common::CallbackHandlePtr priority_update_cb_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -286,35 +291,39 @@ protected:
 
 namespace {
 using LogicalDnsConfigTuple =
-    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>;
+    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>, std::string>;
 std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
   std::vector<LogicalDnsConfigTuple> dns_config;
   {
     std::string family_yaml("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: v4_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: v6_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
     std::list<std::string> dns_response{"::1", "::2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: auto
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"::1"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
   }
   return dns_config;
 }
@@ -329,6 +338,8 @@ INSTANTIATE_TEST_SUITE_P(DnsParam, LogicalDnsParamTest,
 // constructor, we have the expected host state and initialization callback
 // invocation.
 TEST_P(LogicalDnsParamTest, ImmediateResolve) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+
   const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -365,7 +376,15 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
       HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 }
 
-TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+class LogicalDnsImplementationsTest : public LogicalDnsClusterTest,
+                            public testing::WithParamInterface<const char*> {};
+
+INSTANTIATE_TEST_SUITE_P(DnsImplementations, LogicalDnsImplementationsTest,
+                         testing::ValuesIn({ "true", "false" }));
+
+TEST_P(LogicalDnsImplementationsTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -413,7 +432,9 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "", {});
 }
 
-TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
+TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRate) {
+  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -455,7 +476,7 @@ TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
-TEST_F(LogicalDnsClusterTest, BadConfig) {
+TEST_P(LogicalDnsImplementationsTest, BadConfig) {
   const std::string multiple_hosts_yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -480,7 +501,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_hosts_yaml).message(),
-      "Logical DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_hosts_cluster_type_yaml = R"EOF(
   name: name
@@ -515,7 +536,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_hosts_cluster_type_yaml).message(),
-      "Logical DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_lb_endpoints_yaml = R"EOF(
     name: name
@@ -546,7 +567,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_lb_endpoints_yaml).message(),
-      "Logical DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_lb_endpoints_cluster_type_yaml = R"EOF(
     name: name
@@ -581,7 +602,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_lb_endpoints_cluster_type_yaml).message(),
-      "Logical DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_endpoints_yaml = R"EOF(
     name: name
@@ -614,7 +635,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_endpoints_yaml).message(),
-      "Logical DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string multiple_endpoints_cluster_type_yaml = R"EOF(
     name: name
@@ -650,7 +671,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 
   EXPECT_EQ(
       factorySetupFromV3Yaml(multiple_endpoints_cluster_type_yaml).message(),
-      "Logical DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+      "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
 
   const std::string custom_resolver_yaml = R"EOF(
     name: name
@@ -674,7 +695,7 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
     )EOF";
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_yaml).message(),
-            "DNS clusters must NOT have a custom resolver name set");
+            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 
   const std::string custom_resolver_cluster_type_yaml = R"EOF(
     name: name
@@ -702,11 +723,11 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
     )EOF";
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_cluster_type_yaml).message(),
-            "DNS clusters must NOT have a custom resolver name set");
+            "LOGICAL_DNS clusters must NOT have a custom resolver name set");
 }
 
 // Test using both types of names in the cluster type.
-TEST_F(LogicalDnsClusterTest, UseDnsExtension) {
+TEST_P(LogicalDnsImplementationsTest, UseDnsExtension) {
   const std::string config = R"EOF(
   name: name
   cluster_type:
@@ -743,7 +764,7 @@ TEST_F(LogicalDnsClusterTest, UseDnsExtension) {
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 
-TEST_F(LogicalDnsClusterTest, TypedConfigBackcompat) {
+TEST_P(LogicalDnsImplementationsTest, TypedConfigBackcompat) {
   const std::string config = R"EOF(
   name: name
   cluster_type:
@@ -777,7 +798,7 @@ TEST_F(LogicalDnsClusterTest, TypedConfigBackcompat) {
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 
-TEST_F(LogicalDnsClusterTest, Basic) {
+TEST_P(LogicalDnsImplementationsTest, Basic) {
   const std::string basic_yaml_hosts = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -830,7 +851,7 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 443, 8000);
 }
 
-TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
+TEST_P(LogicalDnsImplementationsTest, DontWaitForDNSOnInit) {
   const std::string config = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -864,7 +885,7 @@ TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 }
 
-TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
+TEST_P(LogicalDnsImplementationsTest, DNSRefreshHasJitter) {
   const std::string config = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -904,7 +925,7 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 
-TEST_F(LogicalDnsClusterTest, NegativeDnsJitter) {
+TEST_P(LogicalDnsImplementationsTest, NegativeDnsJitter) {
   const std::string yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -924,7 +945,7 @@ TEST_F(LogicalDnsClusterTest, NegativeDnsJitter) {
                             "Invalid duration: Expected positive duration: seconds: -1\n");
 }
 
-TEST_F(LogicalDnsClusterTest, ExtremeJitter) {
+TEST_P(LogicalDnsImplementationsTest, ExtremeJitter) {
   // When random returns large values, they were being reinterpreted as very negative values causing
   // negative refresh rates.
   const std::string jitter_yaml = R"EOF(
@@ -964,7 +985,7 @@ TEST_F(LogicalDnsClusterTest, ExtremeJitter) {
 // This test makes sure that the logical DNS cluster updates not only the
 // primary address of a host, but also the following addresses returned by
 // the DNS response. This is important for Happy Eyeballs.
-TEST_F(LogicalDnsClusterTest, LogicalDnsUpdatesEntireAddressList) {
+TEST_P(LogicalDnsImplementationsTest, LogicalDnsUpdatesEntireAddressList) {
   const std::string config = R"EOF(
   name: name
   cluster_type:
@@ -1016,7 +1037,9 @@ TEST_F(LogicalDnsClusterTest, LogicalDnsUpdatesEntireAddressList) {
   expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
   resolve_timer_->invokeCallback();
 
-  EXPECT_CALL(membership_updated_, ready());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+    EXPECT_CALL(membership_updated_, ready());
+  }
 
   dns_callback_(
       Network::DnsResolver::ResolutionStatus::Completed, "",

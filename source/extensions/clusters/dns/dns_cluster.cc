@@ -1,5 +1,11 @@
 #include "source/extensions/clusters/dns/dns_cluster.h"
 
+// The purpose of these two headers is purely for beackward compatibility.
+// Never create new dependencies to symbols declared in these headers!
+#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
+#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
+
+
 #include <chrono>
 
 #include "envoy/common/exception.h"
@@ -26,8 +32,17 @@ DnsClusterFactory::createClusterWithConfig(
   RETURN_IF_NOT_OK(dns_resolver_or_error.status());
 
   absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
-  cluster_or_error =
-      DnsClusterImpl::create(cluster, proto_config, context, std::move(*dns_resolver_or_error));
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+    cluster_or_error =
+        DnsClusterImpl::create(cluster, proto_config, context, std::move(*dns_resolver_or_error));
+  } else if (proto_config.all_addresses_in_single_endpoint()) {
+    cluster_or_error = LogicalDnsCluster::create(cluster, proto_config, context,
+                                                 std::move(*dns_resolver_or_error));
+  } else {
+    cluster_or_error = StrictDnsClusterImpl::create(cluster, proto_config, context,
+                                                    std::move(*dns_resolver_or_error));
+  }
 
   RETURN_IF_NOT_OK(cluster_or_error.status());
   return std::make_pair(ClusterImplBaseSharedPtr(std::move(*cluster_or_error)), nullptr);
@@ -53,8 +68,17 @@ public:
     typed_config.set_all_addresses_in_single_endpoint(set_all_addresses_in_single_endpoint_);
 
     absl::StatusOr<std::unique_ptr<ClusterImplBase>> cluster_or_error;
-    cluster_or_error =
-        DnsClusterImpl::create(cluster, typed_config, context, std::move(*dns_resolver_or_error));
+
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+      cluster_or_error =
+          DnsClusterImpl::create(cluster, typed_config, context, std::move(*dns_resolver_or_error));
+    } else if (set_all_addresses_in_single_endpoint_) {
+      cluster_or_error = LogicalDnsCluster::create(cluster, typed_config, context,
+                                                   std::move(*dns_resolver_or_error));
+    } else {
+      cluster_or_error = StrictDnsClusterImpl::create(cluster, typed_config, context,
+                                                      std::move(*dns_resolver_or_error));
+    }
 
     RETURN_IF_NOT_OK(cluster_or_error.status());
     return std::make_pair(ClusterImplBaseSharedPtr(std::move(*cluster_or_error)), nullptr);
@@ -65,7 +89,7 @@ private:
 };
 
 /**
- * LogicalDNSFactory: making it back compatible with ClusterFactoryImplBase
+ * LogicalDNSFactory: making it back compatible with ClusterFactoryImplBase.
  */
 
 class LogicalDNSFactory : public LegacyDnsClusterFactory {
@@ -152,11 +176,11 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
       if (cluster.has_load_assignment()) {
         creation_status =
-            absl::InvalidArgumentError("Logical DNS clusters must have a single "
+            absl::InvalidArgumentError("LOGICAL_DNS clusters must have a single "
                                        "locality_lb_endpoint and a single lb_endpoint");
       } else {
         creation_status =
-            absl::InvalidArgumentError("Logical DNS clusters must have at least a single host");
+            absl::InvalidArgumentError("LOGICAL_DNS clusters must have at least a single host");
       }
       return;
     }

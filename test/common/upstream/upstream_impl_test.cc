@@ -29,6 +29,7 @@
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
+//#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -82,7 +83,7 @@ protected:
     return std::dynamic_pointer_cast<StaticClusterImpl>(status_or_cluster->first);
   }
 
-  absl::StatusOr<std::shared_ptr<DnsClusterImpl>>
+  absl::StatusOr<std::shared_ptr<ClusterImplBase>>
   createStrictDnsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
                          ClusterFactoryContext& factory_context,
                          std::shared_ptr<Network::DnsResolver> dns_resolver) {
@@ -97,7 +98,7 @@ protected:
     if (!status_or_cluster.ok()) {
       return status_or_cluster.status();
     }
-    return (std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first));
+    return (std::dynamic_pointer_cast<ClusterImplBase>(status_or_cluster->first));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -156,35 +157,39 @@ struct ResolverData {
 };
 
 using StrictDnsConfigTuple =
-    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>;
+    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>, std::string>;
 std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
   std::vector<StrictDnsConfigTuple> dns_config;
   {
     std::string family_yaml("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: v4_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: v6_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
     std::list<std::string> dns_response{"::1", "::2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: auto
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
   }
   return dns_config;
 }
@@ -193,6 +198,8 @@ class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple>,
                            public UpstreamImplTestBase {
 public:
   void dropOverloadRuntimeTest(uint64_t numerator, float drop_ratio) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
     auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
     ReadyWatcher initialized;
     const std::string yaml = R"EOF(
@@ -233,6 +240,8 @@ INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
                          testing::ValuesIn(generateStrictDnsParams()));
 
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -275,6 +284,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -302,6 +313,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -329,6 +342,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -357,6 +372,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -386,6 +403,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -1413,11 +1432,17 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
       server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
       false);
 
-  auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
-  EXPECT_FALSE(cluster_or_error.ok());
-  EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(cluster_or_error.status().message(),
-            "DNS clusters must NOT have a custom resolver name set");
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+    auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+    EXPECT_FALSE(cluster_or_error.ok());
+    EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_EQ(cluster_or_error.status().message(),
+              "DNS clusters must NOT have a custom resolver name set");
+  } else {
+    EXPECT_THROW_WITH_MESSAGE(
+        auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
+        EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
+  }
 }
 
 TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
