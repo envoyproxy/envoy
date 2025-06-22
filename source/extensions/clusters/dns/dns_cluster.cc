@@ -5,7 +5,6 @@
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 
-
 #include <chrono>
 
 #include "envoy/common/exception.h"

@@ -29,7 +29,8 @@
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
-//#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
+
+// #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -199,7 +200,8 @@ class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple>,
 public:
   void dropOverloadRuntimeTest(uint64_t numerator, float drop_ratio) {
     TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
     auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
     ReadyWatcher initialized;
     const std::string yaml = R"EOF(
@@ -241,7 +243,8 @@ INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
 
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -285,7 +288,8 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -314,7 +318,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -343,7 +348,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -373,7 +379,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -404,7 +411,8 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(

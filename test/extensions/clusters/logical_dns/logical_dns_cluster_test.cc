@@ -30,8 +30,8 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/test_common/utility.h"
 #include "test/test_common/test_runtime.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -106,7 +106,8 @@ protected:
         cluster_config, server_context_, server_context_.cluster_manager_, resolver_fn,
         ssl_context_manager_, nullptr, false);
     if (status_or_cluster.ok()) {
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_new_dns_implementation")) {
         cluster_ = std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
       } else {
         cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
@@ -338,7 +339,8 @@ INSTANTIATE_TEST_SUITE_P(DnsParam, LogicalDnsParamTest,
 // constructor, we have the expected host state and initialization callback
 // invocation.
 TEST_P(LogicalDnsParamTest, ImmediateResolve) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
 
   const std::string yaml = R"EOF(
   name: name
@@ -377,13 +379,14 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
 }
 
 class LogicalDnsImplementationsTest : public LogicalDnsClusterTest,
-                            public testing::WithParamInterface<const char*> {};
+                                      public testing::WithParamInterface<const char*> {};
 
 INSTANTIATE_TEST_SUITE_P(DnsImplementations, LogicalDnsImplementationsTest,
-                         testing::ValuesIn({ "true", "false" }));
+                         testing::ValuesIn({"true", "false"}));
 
 TEST_P(LogicalDnsImplementationsTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
 
   const std::string yaml = R"EOF(
   name: name
@@ -433,7 +436,8 @@ TEST_P(LogicalDnsImplementationsTest, FailureRefreshRateBackoffResetsWhenSuccess
 }
 
 TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRate) {
-  scoped_runtime_.mergeValues({{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
 
   const std::string yaml = R"EOF(
   name: name
