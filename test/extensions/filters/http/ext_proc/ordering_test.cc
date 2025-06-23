@@ -237,9 +237,7 @@ class FastFailOrderingTest : public OrderingTest {
 
 // A call with a totally crazy response
 TEST_F(OrderingTest, TotallyInvalidResponse) {
-  initialize([](ExternalProcessor& cfg) {
-    cfg.set_failure_mode_allow(true);
-  });
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -583,9 +581,7 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
-  initialize([](ExternalProcessor& cfg) {
-    cfg.set_failure_mode_allow(true);
-  });
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -602,9 +598,7 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
-  initialize([](ExternalProcessor& cfg) {
-    cfg.set_failure_mode_allow(true);
-  });
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -652,9 +646,7 @@ TEST_F(OrderingTest, IncorrectRequestBodyReply) {
 // Receive a request headers reply in response to the response
 // headers message -- should continue without error.
 TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
- initialize([](ExternalProcessor& cfg) {
-    cfg.set_failure_mode_allow(true);
- });
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
