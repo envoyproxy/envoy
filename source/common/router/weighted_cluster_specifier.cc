@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Router {
 
 absl::Status validateWeightedClusterSpecifier(const ClusterWeightProto& cluster) {
-  if (cluster.name().empty() != cluster.name().empty()) {
+  if (cluster.name().empty() != cluster.cluster_header().empty()) {
     return absl::OkStatus();
   }
   const auto error = cluster.name().empty()
@@ -34,7 +34,7 @@ WeightedClustersConfigEntry::WeightedClustersConfigEntry(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(cluster.typed_per_filter_config(), context,
                                                          context.messageValidationVisitor()),
                                 std::unique_ptr<PerFilterConfigs>)),
-      host_rewrite_(cluster.host_rewrite_literal()),
+      host_rewrite_(cluster.host_rewrite_literal()), cluster_name_(cluster.name()),
       cluster_header_name_(cluster.cluster_header()) {
   if (!cluster.request_headers_to_add().empty() || !cluster.request_headers_to_remove().empty()) {
     request_headers_parser_ =
