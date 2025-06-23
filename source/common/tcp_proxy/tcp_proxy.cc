@@ -458,13 +458,9 @@ void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onUpstreamData(Buffer::Instance& data, bool end_stream) {
-  // When TCP proxy filter is still in place, writing to downstream.
   if (parent_) {
     parent_->onUpstreamData(data, end_stream);
   } else {
-    // Drainer takes over, and just consume data.
-    // For debugging sake, worth adding to accesslog but may not be available since whole filter is gone.
-    // TODO: check that.
     drainer_->onData(data, end_stream);
   }
 }

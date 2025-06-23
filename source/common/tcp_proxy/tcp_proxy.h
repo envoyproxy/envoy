@@ -677,11 +677,11 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
-  // Whether proxy has sent any data to the downstream.
+  // Whether filter has sent any data to the downstream.
   bool first_downstream_tx_byte_sent_{false};
-  // Whether proxy has sent any data to the upstream.
+  // Whether filter has sent any data to the upstream.
   bool first_upstream_tx_byte_sent_{false};
-  // Whether proxy has received any data from the upstream.
+  // Whether filter has received any data from the upstream.
   bool first_upstream_rx_byte_received_{false};
 
   // Stores the ReceiveBeforeConnect filter state value which can be set by preceding

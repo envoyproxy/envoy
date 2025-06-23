@@ -152,7 +152,6 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::firstUpstreamTxByteSent(
   return duration(timing.value().get().first_upstream_tx_byte_sent_, stream_info_);
 }
 
-// Envoy handles the substraction here.
 absl::optional<std::chrono::nanoseconds> TimingUtility::lastUpstreamTxByteSent() {
   OptRef<const UpstreamTiming> timing = getUpstreamTiming(stream_info_);
   if (!timing) {
