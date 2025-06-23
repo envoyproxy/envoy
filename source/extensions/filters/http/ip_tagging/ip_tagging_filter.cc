@@ -30,7 +30,7 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
                          : false),
       reload_success_cb_(reload_success_cb), reload_error_cb_(reload_error_cb), owner_(owner) {
   ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider constructor starting - file: {}, refresh_interval: {}ms",
-            ip_tags_path_, ip_tags_refresh_interval_ms.count());
+            ip_tags_path_, ip_tags_refresh_interval_ms);
 
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (ip_tags_datasource.filename().empty()) {
@@ -143,33 +143,33 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
     IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
-  ENVOY_LOG(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() starting for file: {}",
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() starting for file: {}",
             ip_tags_datasource.filename());
 
   std::shared_ptr<IpTagsProvider> ip_tags_provider;
   absl::Status creation_status = absl::OkStatus();
   const uint64_t key = std::hash<std::string>()(ip_tags_datasource.filename());
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() file key: {}", key);
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() file key: {}", key);
 
   absl::MutexLock lock(&mu_);
-  ENVOY_LOG(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() acquired registry lock");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() acquired registry lock");
 
   auto it = ip_tags_registry_.find(key);
   if (it != ip_tags_registry_.end()) {
-    ENVOY_LOG(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() found existing entry");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() found existing entry");
     if (std::shared_ptr<IpTagsProvider> provider = it->second.lock()) {
-      ENVOY_LOG(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() reusing existing provider");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() reusing existing provider");
       ip_tags_provider = provider;
     } else {
-      ENVOY_LOG(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() existing provider expired, creating new one");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() existing provider expired, creating new one");
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
           reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
       ip_tags_registry_[key] = ip_tags_provider;
     }
   } else {
-    ENVOY_LOG(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() creating new provider");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() creating new provider");
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
         reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
@@ -177,12 +177,12 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   }
 
   if (!creation_status.ok()) {
-    ENVOY_LOG(error, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() provider creation failed: {}",
+    ENVOY_LOG_MISC(error, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() provider creation failed: {}",
               creation_status.message());
     return creation_status;
   }
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() completed successfully");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTagsRegistrySingleton::getOrCreateProvider() completed successfully");
   return ip_tags_provider;
 }
 
@@ -507,68 +507,68 @@ void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
 }
 
 IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter constructor completed, config ptr: {}",
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter constructor completed, config ptr: {}",
             static_cast<void*>(config_.get()));
 }
 
 IpTaggingFilter::~IpTaggingFilter() {
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter destructor starting");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter destructor starting");
   // Destructor is default, but adding logging for completeness
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter destructor completed");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter destructor completed");
 }
 
 void IpTaggingFilter::onDestroy() {
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::onDestroy() called");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::onDestroy() called");
 }
 
 Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() starting");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() starting");
 
   const bool is_internal_request = headers.EnvoyInternalRequest() &&
                                    (headers.EnvoyInternalRequest()->value() ==
                                     Http::Headers::get().EnvoyInternalRequestValues.True.c_str());
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() is_internal_request: {}", is_internal_request);
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() is_internal_request: {}", is_internal_request);
 
   if ((is_internal_request && config_->requestType() == FilterRequestType::EXTERNAL) ||
       (!is_internal_request && config_->requestType() == FilterRequestType::INTERNAL) ||
       !config_->runtime().snapshot().featureEnabled("ip_tagging.http_filter_enabled", 100)) {
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() skipping due to request type or feature flag");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() skipping due to request type or feature flag");
     return Http::FilterHeadersStatus::Continue;
   }
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() getting remote address");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() getting remote address");
   const auto& remote_address = callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() remote address: {}", remote_address->asString());
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() remote address: {}", remote_address->asString());
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() looking up tags in trie");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() looking up tags in trie");
   std::vector<std::string> tags = config_->trie().getData(remote_address);
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() found {} tags", tags.size());
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() found {} tags", tags.size());
 
   // Used for testing.
   synchronizer_.syncPoint("_trie_lookup_complete");
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() applying tags to headers");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() applying tags to headers");
   applyTags(headers, tags);
 
   if (!tags.empty()) {
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() incrementing hit counters for tags");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() incrementing hit counters for tags");
     // For a large number(ex > 1000) of tags, stats cardinality will be an issue.
     // If there are use cases with a large set of tags, a way to opt into these stats
     // should be exposed and other observability options like logging tags need to be implemented.
     for (const std::string& tag : tags) {
-      ENVOY_LOG(trace, "[ip_tagging] IpTaggingFilter::decodeHeaders() incrementing hit for tag: {}", tag);
+      ENVOY_LOG_MISC(trace, "[ip_tagging] IpTaggingFilter::decodeHeaders() incrementing hit for tag: {}", tag);
       config_->incHit(tag);
     }
   } else {
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() no tags found, incrementing no_hit");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() no tags found, incrementing no_hit");
     config_->incNoHit();
   }
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() incrementing total counter");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() incrementing total counter");
   config_->incTotal();
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() completed successfully");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::decodeHeaders() completed successfully");
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -581,27 +581,27 @@ Http::FilterTrailersStatus IpTaggingFilter::decodeTrailers(Http::RequestTrailerM
 }
 
 void IpTaggingFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::setDecoderFilterCallbacks() called, callbacks ptr: {}",
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::setDecoderFilterCallbacks() called, callbacks ptr: {}",
             static_cast<void*>(&callbacks));
   callbacks_ = &callbacks;
 }
 
 void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
                                 const std::vector<std::string>& tags) {
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() starting with {} tags", tags.size());
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() starting with {} tags", tags.size());
 
   using HeaderAction = IpTaggingFilterConfig::HeaderAction;
 
   OptRef<const Http::LowerCaseString> header_name = config_->ipTagHeader();
 
   if (tags.empty()) {
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() no tags to apply");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() no tags to apply");
     bool maybe_sanitize =
         config_->ipTagHeaderAction() == HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE;
     if (header_name.has_value() && maybe_sanitize) {
-      ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() sanitizing header: {}", header_name.value().get());
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() sanitizing header: {}", header_name.value().get());
       if (headers.remove(header_name.value()) != 0) {
-        ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() header removed, clearing route cache");
+        ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() header removed, clearing route cache");
         // We must clear the route cache in case it held a decision based on the now-removed header.
         callbacks_->downstreamCallbacks()->clearRouteCache();
       }
@@ -610,34 +610,34 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
   }
 
   const std::string tags_join = absl::StrJoin(tags, ",");
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() joined tags: {}", tags_join);
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() joined tags: {}", tags_join);
 
   if (!header_name.has_value()) {
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() appending to x-envoy-ip-tags header");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() appending to x-envoy-ip-tags header");
     // The x-envoy-ip-tags header was cleared at the start of the filter chain.
     // We only do append here, so that if multiple ip-tagging filters are run sequentially,
     // the behaviour will be backwards compatible.
     headers.appendEnvoyIpTags(tags_join, ",");
   } else {
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() applying to custom header: {}", header_name.value().get());
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() applying to custom header: {}", header_name.value().get());
     switch (config_->ipTagHeaderAction()) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case HeaderAction::IPTagging_IpTagHeader_HeaderAction_SANITIZE:
-      ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() sanitizing and setting header");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() sanitizing and setting header");
       headers.setCopy(header_name.value(), tags_join);
       break;
     case HeaderAction::IPTagging_IpTagHeader_HeaderAction_APPEND_IF_EXISTS_OR_ADD:
-      ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() appending to existing header");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() appending to existing header");
       headers.appendCopy(header_name.value(), tags_join);
       break;
     }
   }
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() clearing route cache");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() clearing route cache");
   // We must clear the route cache so it can match on the updated value of the header.
   callbacks_->downstreamCallbacks()->clearRouteCache();
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilter::applyTags() completed successfully");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilter::applyTags() completed successfully");
 }
 
 } // namespace IpTagging
