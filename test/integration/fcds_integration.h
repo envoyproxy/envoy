@@ -472,6 +472,10 @@ public:
   }
 
   void expectConfigDump(std::vector<ExpectedListenerDump> config) {
+#ifndef ENVOY_ADMIN_FUNCTIONALITY
+    return;
+#endif
+
     expectListenerConfigDump(config);
   }
 
