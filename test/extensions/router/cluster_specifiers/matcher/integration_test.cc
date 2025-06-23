@@ -16,8 +16,15 @@ namespace {
 class IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                         public HttpIntegrationTest {
 public:
-  IntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {
+  IntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void setupTest(bool refresh_filter = false) {
     autonomous_upstream_ = true;
+
+    if (refresh_filter) {
+      config_helper_.prependFilter("{ name: refresh-route-cluster }");
+    }
+
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
@@ -86,6 +93,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(IntegrationTest, HeaderMatcher) {
+  setupTest();
+
   Http::TestRequestHeaderMapImpl hit_non_exist_default_cluster{
       {":method", "GET"},
       {":path", "/"},
@@ -109,6 +118,45 @@ TEST_P(IntegrationTest, HeaderMatcher) {
     ASSERT_TRUE(response->waitForEndStream());
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  }
+}
+
+TEST_P(IntegrationTest, HeaderMatcherWithRefreshRouteCluster) {
+  setupTest(true);
+
+  Http::TestRequestHeaderMapImpl hit_non_exist_default_cluster{
+      {":method", "GET"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "example.com"},
+  };
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  {
+    // The initial request will hit the non-exist-default-cluster. Then the refresh-route-cluster
+    // filter will insert 'env: prod' header to headers and refresh the route cluster and will
+    // hit the prod-cluster.
+    auto response = codec_client_->makeHeaderOnlyRequest(hit_non_exist_default_cluster);
+    ASSERT_TRUE(response->waitForEndStream());
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+    EXPECT_EQ("non-exist-default-cluster", response->headers()
+                                               .get(Http::LowerCaseString("initial-cluster"))[0]
+                                               ->value()
+                                               .getStringView());
+    EXPECT_EQ("false", response->headers()
+                           .get(Http::LowerCaseString("has-initial-cluster-info"))[0]
+                           ->value()
+                           .getStringView());
+
+    EXPECT_EQ("prod-cluster", response->headers()
+                                  .get(Http::LowerCaseString("refreshed-cluster"))[0]
+                                  ->value()
+                                  .getStringView());
+    EXPECT_EQ("true", response->headers()
+                          .get(Http::LowerCaseString("has-refreshed-cluster-info"))[0]
+                          ->value()
+                          .getStringView());
   }
 }
 
