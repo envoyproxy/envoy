@@ -34,7 +34,7 @@ public class MainActivity extends Activity {
   private static final String TAG = "MainActivity";
   private static final String REQUEST_HANDLER_THREAD_NAME = "hello_envoy_java";
   private static final String ENVOY_SERVER_HEADER = "server";
-  private static final String REQUEST_AUTHORITY = "localhost:10000";
+  private static final String REQUEST_AUTHORITY = "api.lyft.com";
   private static final String REQUEST_PATH = "/ping";
   private static final String REQUEST_SCHEME_HTTP = "http";
   private static final String REQUEST_SCHEME_HTTPS = "https";
