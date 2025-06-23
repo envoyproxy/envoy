@@ -35,33 +35,21 @@ Configuration
 
 An example configuration of the filter with inline ip tags may look like the following:
 
-.. code-block:: yaml
-
-    http_filters:
-    - name: ip_tagging
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
-        request_type: both
-        ip_tags:
-        - ip_tag_name: external_request
-          ip_list:
-            - {address_prefix: 1.2.3.4, prefix_len: 32}
+.. literalinclude:: _include/ip-tagging-filter.yaml
+    :language: yaml
+    :lines: 13-21
+    :lineno-start: 13
+    :linenos:
+    :caption: :download:`ip-tagging-filter.yaml <_include/ip-tagging-filter.yaml>`
 
 Below is an example configuration of the filter with the file based ip tags in yaml format:
 
-.. code-block:: yaml
-
-    http_filters:
-    - name: ip_tagging
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
-        request_type: both
-        ip_tags_file_provider:
-          ip_tags_refresh_rate: 5s
-          ip_tags_datasource:
-            filename: "/geoip/ip-tags.yaml"
-            watched_directory:
-              path: "/geoip/"
+.. literalinclude:: _include/ip-tagging-filter.yaml
+    :language: yaml
+    :lines: 44-54
+    :lineno-start: 44
+    :linenos:
+    :caption: :download:`ip-tagging-filter.yaml <_include/ip-tagging-filter.yaml>`
 
 Where the *ip-tags.yaml* file would have the following content:
 
@@ -77,19 +65,12 @@ Where the *ip-tags.yaml* file would have the following content:
 
 And here is an example configuration of the filter with the file based IP tags in JSON format:
 
-.. code-block:: yaml
-
-    http_filters:
-    - name: ip_tagging
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
-        request_type: both
-        ip_tags_file_provider:
-          ip_tags_refresh_rate: 5s
-          ip_tags_datasource:
-            filename: "/geoip/ip-tags.json"
-            watched_directory:
-              path: "/geoip/"
+.. literalinclude:: _include/ip-tagging-filter.yaml
+    :language: yaml
+    :lines: 77-87
+    :lineno-start: 77
+    :linenos:
+    :caption: :download:`ip-tagging-filter.yaml <_include/ip-tagging-filter.yaml>`
 
 Where the ``ip-tags.json`` file would have the following content:
 
