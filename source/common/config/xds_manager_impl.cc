@@ -184,7 +184,7 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
   return absl::OkStatus();
 }
 
-absl::StatusOr<SubscriptionPtr> XdsManagerImpl::subscribeToSingleton(
+absl::StatusOr<SubscriptionPtr> XdsManagerImpl::subscribeToSingletonResource(
     absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
     absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
@@ -226,11 +226,11 @@ absl::StatusOr<SubscriptionPtr> XdsManagerImpl::subscribeToSingleton(
   AuthorityData* matched_authority = nullptr;
   // Find the right authority from the config_sources authorities by iterating over the bootstrap
   // defined authorities.
-  for (auto it = authorities_.begin(); (it != authorities_.end()) && (matched_authority == nullptr);
-       ++it) {
+  for (auto it = authorities_.begin(); (it != authorities_.end()); ++it) {
     if (it->authority_names_.contains(resource_urn.authority())) {
       // Found the correct authority to use, subscribe using its mux.
       matched_authority = &(*it);
+      break;
     }
   }
   // No valid authority found, fallback to use the default_config_source (if defined).

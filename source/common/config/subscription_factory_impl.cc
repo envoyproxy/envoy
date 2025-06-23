@@ -29,7 +29,6 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
   RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo(type_url, local_info_));
-  SubscriptionStats stats = Utility::generateStats(scope);
 
   std::string subscription_type = "";
   ConfigSubscriptionFactory::SubscriptionData data{local_info_,
@@ -47,7 +46,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
                                                    resource_decoder,
                                                    options,
                                                    absl::nullopt,
-                                                   stats,
+                                                   Utility::generateStats(scope),
                                                    cm_.adsMux()};
 
   switch (config.config_source_specifier_case()) {
@@ -135,7 +134,6 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
     absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
   RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo(type_url, local_info_));
-  SubscriptionStats stats = Utility::generateStats(scope);
 
   ConfigSubscriptionFactory::SubscriptionData data{local_info_,
                                                    dispatcher_,
@@ -152,7 +150,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpc
                                                    resource_decoder,
                                                    options,
                                                    absl::nullopt,
-                                                   stats,
+                                                   Utility::generateStats(scope),
                                                    ads_grpc_mux};
   static constexpr absl::string_view subscription_type = "envoy.config_subscription.ads";
   ConfigSubscriptionFactory* factory =
@@ -170,7 +168,6 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionF
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder) {
-  SubscriptionStats stats = Utility::generateStats(scope);
   SubscriptionOptions options;
   envoy::config::core::v3::ConfigSource factory_config = config;
   ConfigSubscriptionFactory::SubscriptionData data{local_info_,
@@ -188,7 +185,7 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionF
                                                    resource_decoder,
                                                    options,
                                                    {collection_locator},
-                                                   stats,
+                                                   Utility::generateStats(scope),
                                                    cm_.adsMux()};
   switch (collection_locator.scheme()) {
   case xds::core::v3::ResourceLocator::FILE: {

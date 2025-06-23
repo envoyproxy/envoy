@@ -17,7 +17,7 @@ public:
   MOCK_METHOD(absl::Status, initialize,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
                Upstream::ClusterManager* cm));
-  MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscribeToSingleton,
+  MOCK_METHOD(absl::StatusOr<SubscriptionPtr>, subscribeToSingletonResource,
               (absl::string_view resource_name,
                OptRef<const envoy::config::core::v3::ConfigSource> config,
                absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,

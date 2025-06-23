@@ -23,7 +23,7 @@ public:
                           Upstream::ClusterManager* cm) override;
   absl::Status
   initializeAdsConnections(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
-  absl::StatusOr<SubscriptionPtr> subscribeToSingleton(
+  absl::StatusOr<SubscriptionPtr> subscribeToSingletonResource(
       absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
       absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;

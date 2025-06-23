@@ -65,7 +65,7 @@ public:
    * @return SubscriptionPtr subscription object corresponding for config and type_url or error
    * status.
    */
-  virtual absl::StatusOr<SubscriptionPtr> subscribeToSingleton(
+  virtual absl::StatusOr<SubscriptionPtr> subscribeToSingletonResource(
       absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
       absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
