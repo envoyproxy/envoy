@@ -272,7 +272,7 @@ void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
-IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {};
+IpTaggingFilter::IpTaggingFilter(IpTaggingFilterConfigSharedPtr config) : config_(config) {}
 
 IpTaggingFilter::~IpTaggingFilter() = default;
 
