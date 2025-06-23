@@ -239,12 +239,12 @@ TEST_P(FcdsIntegrationTest, ListenerWithFcdsWithEcds) {
   sendFcdsResponse(filter_chains_v1_, filter_chain);
   expectListenersModified(1);
 
-  FakeStreamPtr ecds_stream = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream));
+  ecds_stream_ = waitForNewEcdsStream();
+  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream_));
 
   auto direct_response = "pong_from_listener_0_filter_chain_0_ecds_response";
   auto extension_config = extensionConfig(ecds_filter_name, direct_response);
-  sendExtensionResponse(extension_config, ecds_stream, "ecds_v1");
+  sendExtensionResponse(extension_config, ecds_stream_, "ecds_v1");
   expectExtensionReloadStats(ecds_filter_name, 1);
   expectFilterChainUpdateStats(l0_name_, 1, 1);
   expectListenersUpdateStats(1, 1, 1);
@@ -329,8 +329,8 @@ TEST_P(FcdsIntegrationTest, NoWarmingFcdsUpdateDuringServerInitialization) {
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
 
-  FakeStreamPtr ecds_stream = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream));
+  ecds_stream_ = waitForNewEcdsStream();
+  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream_));
 
   expectInitializing();
 
@@ -346,7 +346,7 @@ TEST_P(FcdsIntegrationTest, NoWarmingFcdsUpdateDuringServerInitialization) {
 
   auto ecds_filter_response = "pong_from_listener_0_static_filter_chain_0_ecds_response";
   auto extension_config = extensionConfig(ecds_filter_name, ecds_filter_response);
-  sendExtensionResponse(extension_config, ecds_stream, "ecds_v1");
+  sendExtensionResponse(extension_config, ecds_stream_, "ecds_v1");
   expectExtensionReloadStats(ecds_filter_name, 1);
   expectListenersUpdateStats(1, 1, 1);
   expectConfigDump(listeners_v1_, filter_chains_v1_, listener);
@@ -368,8 +368,8 @@ TEST_P(FcdsIntegrationTest, TwoFcdsUpdatesWhileInitializingDependencies) {
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
 
-  FakeStreamPtr ecds_stream = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream));
+  ecds_stream_ = waitForNewEcdsStream();
+  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream_));
 
   expectInitializing();
 
@@ -381,8 +381,8 @@ TEST_P(FcdsIntegrationTest, TwoFcdsUpdatesWhileInitializingDependencies) {
   expectFilterChainUpdateStats(l0_name_, 1, 1);
   expectConfigDump(listeners_v1_, filter_chains_v1_, listener, true);
 
-  FakeStreamPtr ecds_stream_2 = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name_2, ecds_stream_2));
+  ecds_stream_2_ = waitForNewEcdsStream();
+  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name_2, ecds_stream_2_));
 
   expectInitializing();
 
@@ -399,12 +399,12 @@ TEST_P(FcdsIntegrationTest, TwoFcdsUpdatesWhileInitializingDependencies) {
 
   auto ecds_direct_response = "pong_from_listener_0_static_filter_chain_0_ecds_response";
   auto extension_config = extensionConfig(ecds_filter_name, ecds_direct_response);
-  sendExtensionResponse(extension_config, ecds_stream, "ecds_v1");
+  sendExtensionResponse(extension_config, ecds_stream_, "ecds_v1");
   expectExtensionReloadStats(ecds_filter_name, 1);
 
   auto ecds_direct_response2 = "pong_from_listener_0_filter_chain_0_ecds_response";
   auto extension_config_2 = extensionConfig(ecds_filter_name_2, ecds_direct_response2);
-  sendExtensionResponse(extension_config_2, ecds_stream_2, "ecds_v1");
+  sendExtensionResponse(extension_config_2, ecds_stream_2_, "ecds_v1");
   expectExtensionReloadStats(ecds_filter_name_2, 1);
   expectListenersUpdateStats(1, 1, 1);
   expectConfigDump(listeners_v1_, filter_chains_v2_, listener);
@@ -437,8 +437,8 @@ TEST_P(FcdsIntegrationTest, FcdsUpdateWhilePreviousFcdsUpdatesAreInitializing) {
   expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener},
                     ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener, true}});
 
-  FakeStreamPtr ecds_stream = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream));
+  ecds_stream_ = waitForNewEcdsStream();
+  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream_));
 
   sendDataVerifyResponse(l0_port_, default_response, ip_2_);
 
@@ -451,8 +451,8 @@ TEST_P(FcdsIntegrationTest, FcdsUpdateWhilePreviousFcdsUpdatesAreInitializing) {
   expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v2_, listener},
                     ExpectedListenerDump{listeners_v1_, filter_chains_v2_, listener, true}});
 
-  FakeStreamPtr ecds_stream_2 = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name_2, ecds_stream_2));
+  ecds_stream_2_ = waitForNewEcdsStream();
+  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name_2, ecds_stream_2_));
 
   sendDataVerifyResponse(l0_port_, default_response, ip_2_);
   sendDataVerifyResponse(l0_port_, default_response, ip_3_);
@@ -473,7 +473,7 @@ TEST_P(FcdsIntegrationTest, FcdsUpdateWhilePreviousFcdsUpdatesAreInitializing) {
 
   auto ecds_direct_response_1 = "pong_from_listener_0_filter_chain_0_ecds_response";
   auto extension_config = extensionConfig(ecds_filter_name, ecds_direct_response_1);
-  sendExtensionResponse(extension_config, ecds_stream, "ecds_v1");
+  sendExtensionResponse(extension_config, ecds_stream_, "ecds_v1");
   expectExtensionReloadStats(ecds_filter_name, 1);
   expectListenersUpdateStats(1, 1, 1);
   expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener},
@@ -485,7 +485,7 @@ TEST_P(FcdsIntegrationTest, FcdsUpdateWhilePreviousFcdsUpdatesAreInitializing) {
 
   auto ecds_direct_response_2 = "pong_from_listener_0_filter_chain_0_ecds_response";
   auto extension_config_2 = extensionConfig(ecds_filter_name_2, ecds_direct_response_2);
-  sendExtensionResponse(extension_config_2, ecds_stream_2, "ecds_v1");
+  sendExtensionResponse(extension_config_2, ecds_stream_2_, "ecds_v1");
   expectExtensionReloadStats(ecds_filter_name_2, 1);
   expectListenersUpdateStats(1, 1, 2);
   expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener}});
@@ -857,8 +857,8 @@ TEST_P(FcdsIntegrationTest, RemoveInitializingFilterChainDuringServerInitializat
   expectFilterChainUpdateStats(l0_name_, 1, 1);
   expectConfigDump(listeners_v1_, filter_chains_v1_, listener, true);
 
-  FakeStreamPtr ecds_stream = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream));
+  ecds_stream_ = waitForNewEcdsStream();
+  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream_));
 
   sendFcdsResponse(filter_chains_v2_, noFilterChains(), {xdstpResource(l0_name_, fc0_name_)});
   expectListenersModified(2);
@@ -891,8 +891,8 @@ TEST_P(FcdsIntegrationTest, RemoveInitializingFilterChainAfterServerInitializati
   expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener},
                     ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener, true}});
 
-  FakeStreamPtr ecds_stream = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream));
+  ecds_stream_ = waitForNewEcdsStream();
+  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream_));
 
   sendDataVerifyResponse(l0_port_, default_response, ip_2_);
 

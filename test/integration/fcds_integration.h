@@ -535,6 +535,12 @@ public:
     AdsIntegrationTest::initialize();
   }
 
+  void resetStream(FakeStreamPtr& stream) {
+    if (stream != nullptr) {
+      stream->encodeResetStream();
+    }
+  }
+
   void resetConnection(FakeHttpConnectionPtr& connection) {
     if (connection != nullptr) {
       AssertionResult result = connection->close();
@@ -546,11 +552,16 @@ public:
   }
 
   ~FcdsIntegrationTestBase() override {
+    resetStream(ecds_stream_);
+    resetStream(ecds_stream_2_);
+    fake_upstreams_[1]->cleanUp();
     resetConnection(ecds_connection_);
     resetConnection(xds_connection_);
   }
 
   const std::string ecds_cluster_name_ = "ecds_cluster";
+  FakeStreamPtr ecds_stream_{nullptr};
+  FakeStreamPtr ecds_stream_2_{nullptr};
   FakeHttpConnectionPtr ecds_connection_{nullptr};
   const std::string all_listeners_ = "all_listeners";
   const std::string l0_name_ = "listener_0";
