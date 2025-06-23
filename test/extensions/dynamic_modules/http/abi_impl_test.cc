@@ -910,10 +910,15 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
 
   // empty connection, should return false
+  DynamicModuleHttpFilter filter_without_callbacks{nullptr};
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
+      &result_str_ptr, &result_str_length));
+
   EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(absl::nullopt));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
-      &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result_str_ptr,
-      &result_str_length));
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate,
+      &result_str_ptr, &result_str_length));
 
   // tests for TLS connection attributes
   const Network::MockConnection connection;
