@@ -1342,10 +1342,11 @@ RouteEntryImplBase::validateClusters(const Upstream::ClusterManager& cluster_man
     if (!cluster_manager.hasCluster(cluster_name_)) {
       return absl::InvalidArgumentError(fmt::format("route: unknown cluster '{}'", cluster_name_));
     }
+  } else {
+    ASSERT(cluster_specifier_plugin_ != nullptr);
+    return cluster_specifier_plugin_->validateClusters(cluster_manager);
   }
-
-  ASSERT(cluster_specifier_plugin_ != nullptr);
-  return cluster_specifier_plugin_->validateClusters(cluster_manager);
+  return absl::OkStatus();
 }
 
 absl::optional<bool> RouteEntryImplBase::filterDisabled(absl::string_view config_name) const {
