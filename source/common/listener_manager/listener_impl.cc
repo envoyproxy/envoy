@@ -84,7 +84,7 @@ FcdsApiPtr ListenerImpl::createFcdsSubscription(
     dynamic_init_manager_->add(subscription->initTarget());
   }
 
-  return std::move(subscription);
+  return subscription;
 }
 
 absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>> ListenSocketFactoryImpl::create(
