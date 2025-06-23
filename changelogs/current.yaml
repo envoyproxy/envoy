@@ -283,5 +283,11 @@ new_features:
     Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
     They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
     and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
+- area: tcp_proxy
+  change: |
+    Added more upstream and downstream timing information to the access log, including:
+    ``time_to_last_downstream_rx_byte_received``, ``time_to_last_downstream_tx_byte_sent``,
+    ``time_to_first_upstream_rx_byte_received``, ``time_to_last_upstream_rx_byte_received``,
+    ``time_to_first_upstream_tx_byte``, ``time_to_last_upstream_tx_byte``.
 
 deprecated:
