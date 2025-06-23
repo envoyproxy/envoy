@@ -385,7 +385,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
           [] { return std::make_shared<IpTagsRegistrySingleton>(); })),
       tags_loader_(api, validation_visitor, stat_name_set_) {
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig constructor starting");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig constructor starting");
 
   // Once loading IP tags from a file system is supported, the restriction on the size
   // of the set should be removed and observability into what tags are loaded needs
@@ -393,115 +393,115 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   // TODO(ccaraman): Remove size check once file system support is implemented.
   // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
   if (config.ip_tags().empty() && !config.has_ip_tags_file_provider()) {
-    ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig validation failed - no ip_tags or ip_tags_file_provider");
+    ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig validation failed - no ip_tags or ip_tags_file_provider");
     creation_status = absl::InvalidArgumentError(
         "HTTP IP Tagging Filter requires either ip_tags or ip_tags_file_provider to be specified.");
   }
 
   if (!config.ip_tags().empty() && config.has_ip_tags_file_provider()) {
-    ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig validation failed - both ip_tags and ip_tags_file_provider specified");
+    ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig validation failed - both ip_tags and ip_tags_file_provider specified");
     creation_status = absl::InvalidArgumentError(
         "Only one of ip_tags or ip_tags_file_provider can be configured.");
   }
 
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (!config.ip_tags().empty()) {
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig using inline ip_tags");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig using inline ip_tags");
     auto trie_or_error = tags_loader_.parseIpTagsAsProto(config.ip_tags());
     if (trie_or_error.status().ok()) {
-      ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig inline tags parsed successfully");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig inline tags parsed successfully");
       trie_ = trie_or_error.value();
     } else {
-      ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig inline tags parsing failed: {}",
+      ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig inline tags parsing failed: {}",
                 trie_or_error.status().message());
       creation_status = trie_or_error.status();
       return;
     }
   } else {
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig using file-based ip_tags");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig using file-based ip_tags");
     if (!config.ip_tags_file_provider().has_ip_tags_datasource()) {
-      ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig file provider missing datasource");
+      ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig file provider missing datasource");
       creation_status = absl::InvalidArgumentError(
           "ip_tags_file_provider requires a valid ip_tags_datasource to be configured.");
       return;
     }
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig registering reload stats");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig registering reload stats");
     stat_name_set_->rememberBuiltin("ip_tags_reload_success");
     stat_name_set_->rememberBuiltin("ip_tags_reload_error");
 
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig creating reload success callback");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig creating reload success callback");
     auto reload_success_cb = [this]() {
-      ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb starting");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb starting");
       try {
         incIpTagsReloadSuccess();
-        ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb completed");
+        ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb completed");
       } catch (const std::exception& e) {
-        ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig reload_success_cb exception: {}", e.what());
+        ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_success_cb exception: {}", e.what());
         throw;
       } catch (...) {
-        ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig reload_success_cb unknown exception");
+        ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_success_cb unknown exception");
         throw;
       }
     };
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig creating reload error callback");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig creating reload error callback");
     auto reload_error_cb = [this]() {
-      ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb starting");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb starting");
       try {
         incIpTagsReloadError();
-        ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb completed");
+        ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb completed");
       } catch (const std::exception& e) {
-        ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig reload_error_cb exception: {}", e.what());
+        ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_error_cb exception: {}", e.what());
         throw;
       } catch (...) {
-        ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig reload_error_cb unknown exception");
+        ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_error_cb unknown exception");
         throw;
       }
     };
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig getting or creating provider");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig getting or creating provider");
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
         ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, api, tls, dispatcher, ip_tags_registry_);
 
     if (provider_or_error.status().ok()) {
-      ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig provider created successfully");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig provider created successfully");
       provider_ = provider_or_error.value();
     } else {
-      ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig provider creation failed: {}",
+      ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig provider creation failed: {}",
                 provider_or_error.status().message());
       creation_status = provider_or_error.status();
       return;
     }
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig getting initial tags from provider");
+    ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig getting initial tags from provider");
     if (provider_ && provider_->ipTags()) {
-      ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig got initial tags from provider");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig got initial tags from provider");
       trie_ = provider_->ipTags();
     } else {
-      ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig failed to get ip tags from provider");
+      ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig failed to get ip tags from provider");
       creation_status = absl::InvalidArgumentError("Failed to get ip tags from provider");
     }
   }
 
-  ENVOY_LOG(debug, "[ip_tagging] IpTaggingFilterConfig constructor completed successfully");
+  ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig constructor completed successfully");
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name) {
-  ENVOY_LOG(trace, "[ip_tagging] IpTaggingFilterConfig::incCounter() called");
+  ENVOY_LOG_MISC(trace, "[ip_tagging] IpTaggingFilterConfig::incCounter() called");
   try {
     Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join({stats_prefix_, name});
     scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
-    ENVOY_LOG(trace, "[ip_tagging] IpTaggingFilterConfig::incCounter() completed");
+    ENVOY_LOG_MISC(trace, "[ip_tagging] IpTaggingFilterConfig::incCounter() completed");
   } catch (const std::exception& e) {
-    ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig::incCounter() exception: {}", e.what());
+    ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig::incCounter() exception: {}", e.what());
     throw;
   } catch (...) {
-    ENVOY_LOG(error, "[ip_tagging] IpTaggingFilterConfig::incCounter() unknown exception");
+    ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig::incCounter() unknown exception");
     throw;
   }
 }
