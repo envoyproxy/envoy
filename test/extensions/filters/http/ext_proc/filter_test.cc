@@ -3331,7 +3331,7 @@ TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-// With failure_mode_allow set to true, test the filter with a processor that
+// With failure_mode_allow set to true, tests the filter with a processor that
 // replies to the request_headers message incorrectly by sending a
 // request_body message, which should result in the stream being closed
 // and ignored.
@@ -3378,7 +3378,7 @@ TEST_F(HttpFilterTest, OutOfOrderFailOpen) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-// With failure_mode_allow set to false, i.e, default case, test the filter with
+// With failure_mode_allow set to false, i.e, default case, tests the filter with
 // a processor that replies to the request_headers message incorrectly by sending
 // a request_body message, which should result in local reply being sent.
 TEST_F(HttpFilterTest, OutOfOrderFailClose) {
@@ -3396,8 +3396,8 @@ TEST_F(HttpFilterTest, OutOfOrderFailClose) {
   EXPECT_FALSE(last_request_.observability_mode());
   ASSERT_TRUE(last_request_.has_request_headers());
 
-  // Return an out-of-order message. spurious_msgs_received_ stats counter is
-  // incremented by 1. failure_mode_allowed_ stats counter is not incremented.
+  // Return an out-of-order message. Spurious message stats counter is
+  // incremented by 1. Failure mode stats counter is not incremented.
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   resp1->mutable_request_body();
   stream_callbacks_->onReceiveMessage(std::move(resp1));

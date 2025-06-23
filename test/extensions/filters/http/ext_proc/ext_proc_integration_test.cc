@@ -5672,9 +5672,11 @@ TEST_P(ExtProcIntegrationTest, DuplexStreamedInBothDirection) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// The ext_proc server sends out-of-order response causing Envoy to shutdown the external
-// processing.
-TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
+// With the filter failure_mode_allow set to true, the ext_proc server sends
+// out-of-order response causing Envoy to shutdown the external
+// processing, and the request is forwarded upstream.
+TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamedFailOpen) {
+  proto_config_.set_failure_mode_allow(true);
   const std::string body_sent(8 * 1024, 's');
   // Enable FULL_DUPLEX_STREAMED body processing in both directions.
   IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, true);
@@ -5697,6 +5699,26 @@ TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
   // As the external processing is shut down, the response messages are not sent
   // to the ext_proc server. Instead it is sent to the downstream directly.
   verifyDownstreamResponse(*response, 400);
+}
+
+// With the filter failure_mode_allow set to false, the ext_proc server sends
+// out-of-order response causing Envoy to send local reply to the client,
+// and reset the HTTP stream.
+TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamedFailClose) {
+  proto_config_.set_failure_mode_allow(false);
+  const std::string body_sent(8 * 1024, 's');
+  // Enable FULL_DUPLEX_STREAMED body processing in both directions.
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true, true);
+
+  // The ext_proc server receives the request headers and body.
+  ProcessingRequest header_request;
+  serverReceiveHeaderDuplexStreamed(header_request);
+  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
+  // The ext_proc server sends back the body response, which is wrong.
+  processor_stream_->startGrpcStream();
+  serverSendBodyRespDuplexStreamed(total_req_body_msg);
+  // Envoy sends 500 response code to the client.
+  verifyDownstreamResponse(*response, 500);
 }
 
 // The ext_proc server failed to send response in time trigger Envoy HCM stream_idle_timeout.
