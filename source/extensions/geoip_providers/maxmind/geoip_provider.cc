@@ -249,6 +249,7 @@ void GeoipProvider::lookupInAsnDb(
         return;
       }
       IS_ENVOY_BUG("Maxmind asn database must be initialised for performing lookups");
+      return;
     }
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         asn_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
