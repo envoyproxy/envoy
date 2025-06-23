@@ -30,6 +30,25 @@ public:
   SubscriptionFactory& subscriptionFactory() override { return *subscription_factory_; }
 
 private:
+  class AuthorityData {
+  public:
+    AuthorityData(absl::flat_hash_set<std::string>&& authority_names, GrpcMuxSharedPtr&& grpc_mux)
+        : authority_names_(std::move(authority_names)), grpc_mux_(std::move(grpc_mux)) {}
+
+  private:
+    // The set of authority names this config-source supports.
+    // Note that only the `default_config_source` may have an empty list of authority names.
+    absl::flat_hash_set<std::string> authority_names_;
+    // The ADS gRPC mux to the server.
+    Config::GrpcMuxSharedPtr grpc_mux_;
+  };
+
+  // Creates an authority based on a given config source.
+  // Returns the new authority, or an error if one occurred.
+  absl::StatusOr<AuthorityData>
+  createAuthority(const envoy::config::core::v3::ConfigSource& config_source,
+                  bool allow_no_authority_names);
+
   // Validates (syntactically) the config_source by doing the PGV validation.
   absl::Status validateAdsConfig(const envoy::config::core::v3::ApiConfigSource& config_source);
 
@@ -56,6 +75,15 @@ private:
   // prior to the cluster-manager deletion.
   Upstream::ClusterManager* cm_;
   GrpcMuxSharedPtr ads_mux_;
+
+  // Stores all authorities as configured in the bootstrap under config_sources.
+  // It does not include the default config-source.
+  std::vector<AuthorityData> authorities_;
+
+  // The default authority that will be used for cases where the authority in a resource doesn't
+  // exist, or doesn't match. This will only be populated if default_config_source
+  // is defined in the bootstrap.
+  std::unique_ptr<AuthorityData> default_authority_;
 };
 
 } // namespace Config

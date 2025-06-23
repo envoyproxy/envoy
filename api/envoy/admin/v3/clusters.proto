@@ -143,8 +143,8 @@ message HostStatus {
   //
   // .. note::
   //
-  //   The message will be missing if the host didn’t receive enough traffic to compute a success rate, or if the
-  //   cluster didn’t have enough hosts to perform outlier ejection based on success rate.
+  //   The message will be missing if the host didn't receive enough traffic to compute a success rate, or if the
+  //   cluster didn't have enough hosts to perform outlier ejection based on success rate.
   //
   type.v3.Percent local_origin_success_rate = 8;
 
@@ -171,18 +171,22 @@ message HostHealthStatus {
   // health checking.
   bool pending_dynamic_removal = 5;
 
-  // The host has not yet been health checked.
+  // The host is awaiting first health check.
   bool pending_active_hc = 6;
 
   // The host should be excluded from panic, spillover, etc. calculations because it was explicitly
   // taken out of rotation via protocol signal and is not meant to be routed to.
   bool excluded_via_immediate_hc_fail = 7;
 
-  // The host failed active HC due to timeout.
+  // The host failed active health check due to timeout.
   bool active_hc_timeout = 8;
 
-  // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
-  // here.
+  // Health status as reported by EDS.
+  //
+  // .. note::
+  //
+  //   Currently, only ``HEALTHY`` and ``UNHEALTHY`` are supported.
+  //
   // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
   config.core.v3.HealthStatus eds_health_status = 3;
 }

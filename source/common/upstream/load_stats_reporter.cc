@@ -62,15 +62,14 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
-  auto all_clusters = cm_.clusters();
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
-    auto it = all_clusters.active_clusters_.find(cluster_name);
-    if (it == all_clusters.active_clusters_.end()) {
+    OptRef<const Upstream::Cluster> active_cluster = cm_.getActiveCluster(cluster_name);
+    if (!active_cluster.has_value()) {
       ENVOY_LOG(debug, "Cluster {} does not exist", cluster_name);
       continue;
     }
-    auto& cluster = it->second.get();
+    const Upstream::Cluster& cluster = active_cluster.value();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
     if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {

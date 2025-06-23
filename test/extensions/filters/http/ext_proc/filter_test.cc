@@ -1122,16 +1122,16 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedComesFast) {
   Buffer::OwnedImpl buffered_data;
   setUpDecodingBuffering(buffered_data);
 
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_1, false));
   buffered_data.add(req_data_1);
 
   // Pretend that Envoy ignores the watermark and keep sending. It often does!
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_2, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_2, false));
   buffered_data.add(req_data_2);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_3, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_3, false));
   buffered_data.add(req_data_3);
   // when end_stream is true, we still do buffering.
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_4, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_4, true));
   buffered_data.add(req_data_4);
 
   processRequestHeaders(true, absl::nullopt);
@@ -1187,9 +1187,9 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedComesALittleFast) {
   Buffer::OwnedImpl buffered_data;
   setUpDecodingBuffering(buffered_data);
 
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_1, false));
   buffered_data.add(req_data_1);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_2, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_2, false));
   buffered_data.add(req_data_2);
 
   processRequestHeaders(true, absl::nullopt);
@@ -2907,6 +2907,34 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, ProtocolConfigEncodingPerRouteTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+  )EOF");
+
+  // Route configuration overrides the processing mode.
+  ExtProcPerRoute route_proto;
+  auto* processing_mode = route_proto.mutable_overrides()->mutable_processing_mode();
+  processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+  processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillOnce(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_TRUE(last_request_.has_protocol_config());
+  EXPECT_EQ(last_request_.protocol_config().request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(last_request_.protocol_config().response_body_mode(),
+            ProcessingMode::FULL_DUPLEX_STREAMED);
+  filter_->onDestroy();
 }
 
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate

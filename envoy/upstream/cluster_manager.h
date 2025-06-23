@@ -333,6 +333,33 @@ public:
    */
   virtual ClusterInfoMaps clusters() const PURE;
 
+  /**
+   * Receives a cluster name and returns an active cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
+
+  /**
+   * Returns true iff the given cluster name is known in the cluster-manager
+   * (either as active or as warming).
+   * @param cluster_name the name of the cluster.
+   * @return bool true if the cluster name is known, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasCluster(const std::string& cluster_name) const PURE;
+
+  /**
+   * Returns true iff there's an active cluster in the cluster-manager.
+   * @return bool true if there is an active cluster, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasActiveClusters() const PURE;
+
   using ClusterSet = absl::flat_hash_set<std::string>;
 
   /**
@@ -418,11 +445,6 @@ public:
    */
   virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
-
-  /**
-   * Return the factory to use for creating cluster manager related objects.
-   */
-  virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 
   /**
    * Obtain the subscription factory for the cluster manager. Since subscriptions may have an
@@ -609,16 +631,6 @@ public:
   virtual absl::StatusOr<CdsApiPtr>
   createCds(const envoy::config::core::v3::ConfigSource& cds_config,
             const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) PURE;
-
-  /**
-   * Returns the secret manager.
-   */
-  virtual Secret::SecretManager& secretManager() PURE;
-
-  /**
-   * Returns the singleton manager.
-   */
-  virtual Singleton::Manager& singletonManager() PURE;
 };
 
 /**

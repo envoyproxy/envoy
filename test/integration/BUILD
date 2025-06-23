@@ -103,6 +103,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
         "//test/mocks/http:stream_encoder_mock",
         "//test/server:utility_lib",
     ],
@@ -1313,6 +1314,8 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -1445,6 +1448,7 @@ envoy_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     rbe_pool = "6gig",
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -1485,16 +1489,16 @@ envoy_cc_test(
     shard_count = 2,
     tags = [
         "cpu:3",
-        "nofips",
     ],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
-        "//test/integration/filters:pause_filter_for_quic_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//test/integration/filters:pause_filter_for_quic_lib",
+    ]),
 )
 
 envoy_cc_test(
@@ -2556,7 +2560,6 @@ envoy_cc_test(
     shard_count = 16,
     tags = [
         "cpu:4",
-        "nofips",
     ],
     deps = select({
         "//bazel:disable_http3": [],
@@ -2575,10 +2578,10 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "quic_http_integration_test_lib",
-    hdrs = [
+    hdrs = envoy_select_enable_http3([
         "quic_http_integration_test.h",
-    ],
-    deps = [
+    ]),
+    deps = envoy_select_enable_http3([
         ":http_integration_lib",
         ":socket_interface_swap_lib",
         "//source/common/quic:client_connection_factory_lib",
@@ -2604,7 +2607,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/extensions/quic/connection_debug_visitor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
-    ],
+    ]),
 )
 
 # TODO(mattklein123): Use target_compatible_with when we switch to Bazel 4.0 instead of multiple
@@ -2631,7 +2634,6 @@ envoy_cc_test(
         "cpu:3",
         "fails_on_clang_cl",
         "fails_on_windows",
-        "nofips",
     ],
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",

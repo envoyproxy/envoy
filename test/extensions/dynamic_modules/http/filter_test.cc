@@ -60,6 +60,17 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   filter->onDestroy();
 }
 
+TEST(DynamicModulesTest, ConfigInitializationFailure) {
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  EXPECT_TRUE(dynamic_module.ok()) << dynamic_module.status().message();
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_config_or_status = newDynamicModuleHttpFilterConfig(
+      "config_init_failure", "", std::move(dynamic_module.value()), context);
+  EXPECT_FALSE(filter_config_or_status.ok());
+  EXPECT_THAT(filter_config_or_status.status().message(),
+              testing::HasSubstr("Failed to initialize dynamic module"));
+}
+
 TEST(DynamicModulesTest, HeaderCallbacks) {
   const std::string filter_name = "header_callbacks";
   const std::string filter_config = "";
@@ -79,14 +90,17 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
   filter->initializeInModuleFilter();
 
-  Http::MockStreamDecoderFilterCallbacks callbacks;
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   StreamInfo::MockStreamInfo stream_info;
-  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(decoder_callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   Http::MockDownstreamStreamFilterCallbacks downstream_callbacks;
   EXPECT_CALL(downstream_callbacks, clearRouteCache());
-  EXPECT_CALL(callbacks, downstreamCallbacks())
+  EXPECT_CALL(decoder_callbacks, downstreamCallbacks())
       .WillOnce(testing::Return(OptRef(downstream_callbacks)));
-  filter->setDecoderFilterCallbacks(callbacks);
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+
+  Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
 
   NiceMock<StreamInfo::MockStreamInfo> info;
   EXPECT_CALL(stream_info, downstreamAddressProvider())
@@ -100,6 +114,14 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
   Http::TestRequestTrailerMapImpl request_trailers{headers};
   Http::TestResponseHeaderMapImpl response_headers{headers};
   Http::TestResponseTrailerMapImpl response_trailers{headers};
+  EXPECT_CALL(decoder_callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
@@ -127,11 +149,32 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
   filter->initializeInModuleFilter();
 
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
   EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
+  EXPECT_CALL(callbacks, streamInfo()).WillRepeatedly(testing::ReturnRef(stream_info));
   envoy::config::core::v3::Metadata metadata;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(testing::ReturnRef(metadata));
+
+  EXPECT_CALL(stream_info, route()).WillRepeatedly(Return(route));
+  EXPECT_CALL(callbacks, clusterInfo()).WillRepeatedly(testing::Return(callbacks.cluster_info_));
+
+  Envoy::Config::Metadata::mutableMetadataValue(callbacks.cluster_info_->metadata_, "metadata",
+                                                "cluster_key")
+      .set_string_value("cluster");
+  Envoy::Config::Metadata::mutableMetadataValue(route->metadata_, "metadata", "route_key")
+      .set_string_value("route");
+
+  auto upstream_info = std::make_shared<NiceMock<StreamInfo::MockUpstreamInfo>>();
+  auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  auto host_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  EXPECT_CALL(*upstream_host, metadata()).WillRepeatedly(testing::Return(host_metadata));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+
+  upstream_info->upstream_host_ = upstream_host;
+  Envoy::Config::Metadata::mutableMetadataValue(*host_metadata, "metadata", "host_key")
+      .set_string_value("host");
   filter->setDecoderFilterCallbacks(callbacks);
 
   Http::TestRequestHeaderMapImpl request_headers{};
@@ -506,6 +549,120 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
       &cluster->async_client_}; // This is not used, just for making compiler happy.
   EXPECT_TRUE(callbacks_captured);
   callbacks_captured->onFailure(req, Http::AsyncClient::FailureReason::Reset);
+}
+
+// This test verifies that handling of per-route config is correct in terms of lifetimes.
+TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
+  const std::string filter_name = "per_route_config";
+  auto dynamic_module =
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Upstream::MockClusterManager cluster_manager;
+  NiceMock<Upstream::MockThreadLocalCluster> thread_local_cluster;
+  EXPECT_CALL(cluster_manager, getThreadLocalCluster(_))
+      .WillRepeatedly(testing::Return(&thread_local_cluster));
+  EXPECT_CALL(context, clusterManager()).WillRepeatedly(testing::ReturnRef(cluster_manager));
+
+  const std::string filter_config = "listener config";
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()), context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto dynamic_module_for_route =
+      newDynamicModule(testSharedObjectPath("http_integration_test", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module_for_route.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value());
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+
+  filter->setDecoderFilterCallbacks(decoder_callbacks);
+  filter->setEncoderFilterCallbacks(encoder_callbacks);
+  filter->initializeInModuleFilter();
+
+  // Now simulate a per-route config that is very short lived, and verify that the filter doesn't
+  // segfaults if it uses it after after it discarded.
+  {
+    // do all per-route config in an inner scope to make sure the is destroyed before the filter
+    // response headers is called.
+    const std::string route_filter_config_str = "router config";
+    auto route_filter_config_or_status =
+        Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpPerRouteConfig(
+            filter_name, route_filter_config_str, std::move(dynamic_module_for_route.value()));
+    EXPECT_TRUE(route_filter_config_or_status.ok());
+    auto route_filter_config = std::move(route_filter_config_or_status.value());
+
+    const Router::RouteSpecificFilterConfig* router_config_ptr = route_filter_config.get();
+
+    EXPECT_CALL(decoder_callbacks, mostSpecificPerFilterConfig())
+        .WillOnce(testing::Return(router_config_ptr));
+
+    TestRequestHeaderMapImpl headers{{}};
+    EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(headers, true));
+    route_filter_config.reset();
+  }
+
+  TestResponseHeaderMapImpl response_headers{{}};
+  EXPECT_CALL(encoder_callbacks, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, true));
+
+  // Assert response header is what we expect
+  EXPECT_EQ(response_headers.get(Http::LowerCaseString("x-per-route-config-response"))[0]
+                ->value()
+                .getStringView(),
+            "router config");
+}
+
+TEST(HttpFilter, HeaderMapGetter) {
+  DynamicModuleHttpFilter filter(nullptr);
+
+  EXPECT_EQ(absl::nullopt, filter.requestHeaders());
+  EXPECT_EQ(absl::nullopt, filter.requestTrailers());
+  EXPECT_EQ(absl::nullopt, filter.responseHeaders());
+  EXPECT_EQ(absl::nullopt, filter.responseTrailers());
+
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
+  NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks;
+  filter.setDecoderFilterCallbacks(decoder_callbacks);
+  filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+  EXPECT_CALL(decoder_callbacks, requestHeaders()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(decoder_callbacks, requestTrailers()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(encoder_callbacks, responseHeaders()).WillOnce(testing::Return(absl::nullopt));
+  EXPECT_CALL(encoder_callbacks, responseTrailers()).WillOnce(testing::Return(absl::nullopt));
+
+  EXPECT_EQ(absl::nullopt, filter.requestHeaders());
+  EXPECT_EQ(absl::nullopt, filter.requestTrailers());
+  EXPECT_EQ(absl::nullopt, filter.responseHeaders());
+  EXPECT_EQ(absl::nullopt, filter.responseTrailers());
+
+  TestRequestHeaderMapImpl request_headers{{}};
+  TestResponseHeaderMapImpl response_headers{{}};
+  TestRequestTrailerMapImpl request_trailers{{}};
+  TestResponseTrailerMapImpl response_trailers{{}};
+  EXPECT_CALL(decoder_callbacks, requestHeaders())
+      .WillOnce(testing::Return(makeOptRef<Http::RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks, requestTrailers())
+      .WillOnce(testing::Return(makeOptRef<Http::RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks, responseHeaders())
+      .WillOnce(testing::Return(makeOptRef<Http::ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks, responseTrailers())
+      .WillOnce(testing::Return(makeOptRef<Http::ResponseTrailerMap>(response_trailers)));
+  EXPECT_EQ(request_headers, filter.requestHeaders().value());
+  EXPECT_EQ(request_trailers, filter.requestTrailers().value());
+  EXPECT_EQ(response_headers, filter.responseHeaders().value());
+  EXPECT_EQ(response_trailers, filter.responseTrailers().value());
 }
 
 } // namespace HttpFilters

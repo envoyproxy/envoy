@@ -148,7 +148,8 @@ public:
               CookieConfig_SameSite_DISABLED,
       ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite code_verifier_samesite =
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-              CookieConfig_SameSite_DISABLED) {
+              CookieConfig_SameSite_DISABLED,
+      int csrf_token_expires_in = 0, int code_verifier_token_expires_in = 0) {
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -171,6 +172,16 @@ public:
     if (default_refresh_token_expires_in != 0) {
       auto* refresh_token_expires_in = p.mutable_default_refresh_token_expires_in();
       refresh_token_expires_in->set_seconds(default_refresh_token_expires_in);
+    }
+
+    if (csrf_token_expires_in != 0) {
+      auto* expires_in = p.mutable_csrf_token_expires_in();
+      expires_in->set_seconds(csrf_token_expires_in);
+    }
+
+    if (code_verifier_token_expires_in != 0) {
+      auto* expires_in = p.mutable_code_verifier_token_expires_in();
+      expires_in->set_seconds(code_verifier_token_expires_in);
     }
 
     p.set_auth_type(auth_type);
@@ -313,11 +324,11 @@ TEST_F(OAuth2Test, SdsDynamicGenericSecret) {
       }));
 
   auto client_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, "client", secret_context, init_manager);
+      config_source, "client", secret_context.server_context_, init_manager);
   auto client_callback =
       secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
   auto token_secret_provider = secret_manager.findOrCreateGenericSecretProvider(
-      config_source, "token", secret_context, init_manager);
+      config_source, "token", secret_context.server_context_, init_manager);
   auto token_callback =
       secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_;
 
@@ -471,6 +482,138 @@ TEST_F(OAuth2Test, DefaultAuthScope) {
             filter_->decodeHeaders(request_headers, false));
 }
 
+// Verifies that the CSRF token cookie expiration (Max-Age) uses the custom
+// value from csrf_token_expires_in configuration.
+TEST_F(OAuth2Test, CustomCsrfTokenExpiresIn) {
+  // Create a filter config with a custom CSRF token expiration.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  // Set custom CSRF token expiration
+  const int custom_csrf_token_expires_in = 1234;
+  auto* csrf_token_expires_in = p.mutable_csrf_token_expires_in();
+  csrf_token_expires_in->set_seconds(custom_csrf_token_expires_in);
+
+  // Create the OAuth config.
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr test_config_;
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                secret_reader, scope_, "test.");
+
+  init(test_config_);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // Explicitly tell the validator to fail the validation.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
+
+  // Verify that the CSRF token cookie (OauthNonce) expiration is set to the custom value.
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=" + TEST_CSRF_TOKEN +
+           ";path=/;Max-Age=" + std::to_string(custom_csrf_token_expires_in) + ";secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID + "&code_challenge=" + TEST_CODE_CHALLENGE +
+           "&code_challenge_method=S256" +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_DEFAULT_SCOPE + "&state=" + TEST_ENCODED_STATE},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+// Verifies that the code verifier token cookie expiration (Max-Age) uses the custom
+// value from code_verifier_token_expires_in configuration.
+TEST_F(OAuth2Test, CustomCodeVerifierTokenExpiresIn) {
+  // Create a filter config with a custom code verifier token expiration.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+
+  // Set custom code verifier token expiration
+  const int custom_code_verifier_token_expires_in = 1234;
+  auto* code_verifier_token_expires_in = p.mutable_code_verifier_token_expires_in();
+  code_verifier_token_expires_in->set_seconds(custom_code_verifier_token_expires_in);
+
+  // Create the OAuth config.
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr test_config_;
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                secret_reader, scope_, "test.");
+
+  init(test_config_);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+  };
+
+  // Explicitly tell the validator to fail the validation.
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(false));
+  EXPECT_CALL(*validator_, canUpdateTokenByRefreshToken()).WillOnce(Return(false));
+
+  // Verify that the CSRF token cookie (OauthNonce) expiration is set to the custom value.
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=" + TEST_CSRF_TOKEN + ";path=/;Max-Age=600;secure;HttpOnly"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=" + TEST_ENCRYPTED_CODE_VERIFIER + ";path=/;Max-Age=" +
+           std::to_string(custom_code_verifier_token_expires_in) + ";secure;HttpOnly"},
+      {Http::Headers::get().Location.get(),
+       "https://auth.example.com/oauth/"
+       "authorize/?client_id=" +
+           TEST_CLIENT_ID + "&code_challenge=" + TEST_CODE_CHALLENGE +
+           "&code_challenge_method=S256" +
+           "&redirect_uri=https%3A%2F%2Ftraffic.example.com%2F_oauth"
+           "&response_type=code"
+           "&scope=" +
+           TEST_DEFAULT_SCOPE + "&state=" + TEST_ENCODED_STATE},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
 // Verifies that query parameters in the authorization_endpoint URL are preserved.
 TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpoint) {
   // Create a filter config with an authorization_endpoint URL with query parameters.
@@ -616,6 +759,68 @@ TEST_F(OAuth2Test, RequestSignout) {
       {Http::Headers::get().SetCookie.get(),
        "CodeVerifier=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
       {Http::Headers::get().Location.get(), "https://traffic.example.com/"},
+  };
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers, false));
+}
+
+/**
+ * Scenario: The OAuth filter receives a sign out request when end session endpoint is configured.
+ *
+ * Expected behavior: the filter should redirect to the end session endpoint.
+ */
+TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
+  // Create a filter config with end session endpoint and openid scope.
+  envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+  auto* endpoint = p.mutable_token_endpoint();
+  endpoint->set_cluster("auth.example.com");
+  endpoint->set_uri("auth.example.com/_oauth");
+  endpoint->mutable_timeout()->set_seconds(1);
+  p.set_redirect_uri("%REQ(:scheme)%://%REQ(:authority)%" + TEST_CALLBACK);
+  p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+  p.set_authorization_endpoint("https://auth.example.com/oauth/authorize/");
+  p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+  auto credentials = p.mutable_credentials();
+  credentials->set_client_id(TEST_CLIENT_ID);
+  credentials->mutable_token_secret()->set_name("secret");
+  credentials->mutable_hmac_secret()->set_name("hmac");
+  p.set_end_session_endpoint("https://auth.example.com/oauth/logout");
+  p.add_auth_scopes("openid");
+
+  // Create the OAuth config.
+  auto secret_reader = std::make_shared<MockSecretReader>();
+  FilterConfigSharedPtr test_config_;
+  test_config_ = std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_,
+                                                secret_reader, scope_, "test.");
+  init(test_config_);
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Path.get(), "/_signout"},
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Scheme.get(), "https"},
+      {Http::Headers::get().Cookie.get(), "IdToken=xyztoken"},
+  };
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {Http::Headers::get().Status.get(), "302"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthHMAC=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "BearerToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "IdToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "RefreshToken=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "OauthNonce=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().SetCookie.get(),
+       "CodeVerifier=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"},
+      {Http::Headers::get().Location.get(), "https://auth.example.com/oauth/"
+                                            "logout?id_token_hint=xyztoken&client_id=1&post_logout_"
+                                            "redirect_uri=https%3A%2F%2Ftraffic.example.com%2F"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
 

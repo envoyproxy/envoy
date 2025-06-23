@@ -63,6 +63,7 @@ public:
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
     EXPECT_CALL(stream_decoder_, accessLogHandlers());
+    setupRequestDecoderMock(stream_decoder_);
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_stream_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
@@ -116,6 +117,16 @@ public:
                   SendConnectionClosePacket(_, quic::NO_IETF_QUIC_ERROR, "Closed by application"));
       quic_session_.close(Network::ConnectionCloseType::NoFlush);
     }
+  }
+
+  void setupRequestDecoderMock(Http::MockRequestDecoder& request_decoder) {
+    EXPECT_CALL(request_decoder, getRequestDecoderHandle())
+        .WillRepeatedly(Invoke([&request_decoder]() {
+          auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+          ON_CALL(*handle, get())
+              .WillByDefault(testing::Return(OptRef<Http::RequestDecoder>(request_decoder)));
+          return handle;
+        }));
   }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -252,7 +263,7 @@ protected:
 };
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
@@ -262,7 +273,6 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
         EXPECT_EQ("a=b; c=d",
                   headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
   quiche::HttpHeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";

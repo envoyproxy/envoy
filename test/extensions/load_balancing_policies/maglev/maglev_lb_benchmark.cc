@@ -11,15 +11,11 @@ class MaglevTester : public BaseTester {
 public:
   MaglevTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
       : BaseTester(num_hosts, weighted_subset_percent, weight) {
-    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(
-        priority_set_, stats_, stats_scope_, runtime_, random_,
-        config_.has_value()
-            ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(config_.value())
-            : absl::nullopt,
-        common_config_);
+    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_scope_, runtime_,
+                                                      random_, 50, config_);
   }
 
-  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
+  envoy::extensions::load_balancing_policies::maglev::v3::Maglev config_;
   std::unique_ptr<MaglevLoadBalancer> maglev_lb_;
 };
 

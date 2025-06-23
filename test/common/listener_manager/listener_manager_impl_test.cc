@@ -5887,11 +5887,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
 
   // Unit test PerListenerFactoryContextImpl for coverage.
   ASSERT_TRUE(listener_factory_context != nullptr);
-  ListenerFactoryContextBaseImpl& parent_context =
-      static_cast<PerListenerFactoryContextImpl*>(listener_factory_context)->parentFactoryContext();
   EXPECT_EQ(&listener_factory_context->initManager(), &listener.initManager());
-  EXPECT_EQ(&listener_factory_context->getTransportSocketFactoryContext(),
-            &parent_context.getTransportSocketFactoryContext());
 
   Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
   Network::MockListenerFilterManager manager;
@@ -6329,7 +6325,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, UdpListenerWithDynamicFilterConfi
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     enable_reuse_port: false
@@ -6363,7 +6359,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithMultiAddressesNoOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     additional_addresses:
@@ -6409,7 +6405,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithMultiAddressesOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     additional_addresses:
@@ -6472,7 +6468,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithMultiAddressesEmptyOverrideOpts) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     additional_addresses:
@@ -6520,7 +6516,7 @@ TEST_P(ListenerManagerImplWithRealFiltersTest,
 TEST_P(ListenerManagerImplWithRealFiltersTest,
        LiteralSockoptListenerEnabledWithSocketOptOnAdditionalAddressOnly) {
   const envoy::config::listener::v3::Listener listener = parseListenerFromV3Yaml(R"EOF(
-    name: SockoptsListener
+    name: SockOptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
     additional_addresses:
