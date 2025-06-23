@@ -389,7 +389,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithMaxCacheSize) {
 
   // Now force flush by setting min_flush_spans to 1
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
-      .WillOnce(Return(1));
+      .Times(1)
+      .WillRepeatedly(Return(1));
 
   // Create another span to trigger flush
   Tracing::SpanPtr trigger_span =
