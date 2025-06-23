@@ -677,6 +677,13 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
+  // Whether proxy has sent any data to the downstream.
+  bool first_downstream_tx_byte_sent_{false};
+  // Whether proxy has sent any data to the upstream.
+  bool first_upstream_tx_byte_sent_{false};
+  // Whether proxy has received any data from the upstream.
+  bool first_upstream_rx_byte_received_{false};
+
   // Stores the ReceiveBeforeConnect filter state value which can be set by preceding
   // filters in the filter chain. When the filter state is set, TCP_PROXY doesn't disable
   // downstream read during initialization. This feature can hence be used by preceding filters

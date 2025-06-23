@@ -1259,6 +1259,51 @@ TEST_P(TcpProxyTest, UpstreamConnectionLimit) {
   EXPECT_EQ(access_log_data_, "UO");
 }
 
+TEST_P(TcpProxyTest, PopulateUpstreamDownstreamTiming) {
+  setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
+  raiseEventUpstreamConnected(0);
+
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(100));
+
+  Buffer::OwnedImpl buffer("test_data");
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
+  filter_->onData(buffer, false);
+
+  Buffer::OwnedImpl response("response_data");
+  EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
+  upstream_callbacks_->onUpstreamData(response, false);
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_));
+  upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  // Verify timing information is populated and greater than 100ms
+  const auto expected_min_time = std::chrono::milliseconds(100);
+  
+  // Downstream timing assertions
+  auto& downstream_timing = filter_->getStreamInfo().downstreamTiming();
+  EXPECT_TRUE(downstream_timing.lastDownstreamRxByteReceived().has_value());
+  EXPECT_GE(downstream_timing.lastDownstreamRxByteReceived().value().time_since_epoch(), expected_min_time);
+  
+  EXPECT_TRUE(downstream_timing.lastDownstreamTxByteSent().has_value());
+  EXPECT_GE(downstream_timing.lastDownstreamTxByteSent().value().time_since_epoch(), expected_min_time);
+
+  // Upstream timing assertions
+  auto& upstream_timing = filter_->getStreamInfo().upstreamInfo()->upstreamTiming();
+  EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
+  EXPECT_GE(upstream_timing.first_upstream_rx_byte_received_.value().time_since_epoch(), expected_min_time);
+  
+  EXPECT_TRUE(upstream_timing.last_upstream_rx_byte_received_.has_value());
+  EXPECT_GE(upstream_timing.last_upstream_rx_byte_received_.value().time_since_epoch(), expected_min_time);
+  
+  EXPECT_TRUE(upstream_timing.first_upstream_tx_byte_sent_.has_value());
+  EXPECT_GE(upstream_timing.first_upstream_tx_byte_sent_.value().time_since_epoch(), expected_min_time);
+  
+  EXPECT_TRUE(upstream_timing.last_upstream_tx_byte_sent_.has_value());
+  EXPECT_GE(upstream_timing.last_upstream_tx_byte_sent_.value().time_since_epoch(), expected_min_time);
+
+  filter_.reset();
+}
+
 TEST_P(TcpProxyTest, IdleTimeoutObjectFactory) {
   const std::string name = "envoy.tcp_proxy.per_connection_idle_timeout_ms";
   auto* factory =

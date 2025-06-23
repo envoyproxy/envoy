@@ -307,7 +307,6 @@ struct UpstreamTiming {
    * Sets the time when the last byte of the request was sent upstream.
    */
   void onLastUpstreamTxByteSent(TimeSource& time_source) {
-    // ASSERT(!last_upstream_tx_byte_sent_);
     last_upstream_tx_byte_sent_ = time_source.monotonicTime();
   }
 
@@ -323,7 +322,6 @@ struct UpstreamTiming {
    * Sets the time when the last byte of the response is received from upstream.
    */
   void onLastUpstreamRxByteReceived(TimeSource& time_source) {
-    // ASSERT(!last_upstream_rx_byte_received_);
     last_upstream_rx_byte_received_ = time_source.monotonicTime();
   }
 
@@ -390,9 +388,9 @@ struct DownstreamTiming {
   }
 
   void onLastDownstreamRxByteReceived(TimeSource& time_source) {
-    // ASSERT(!last_downstream_rx_byte_received_);
     last_downstream_rx_byte_received_ = time_source.monotonicTime();
   }
+
   void onFirstDownstreamTxByteSent(TimeSource& time_source) {
     ASSERT(!first_downstream_tx_byte_sent_);
     first_downstream_tx_byte_sent_ = time_source.monotonicTime();

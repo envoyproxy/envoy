@@ -458,10 +458,13 @@ void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  // When TCP proxy filter is still in place, writing to downstream.
   if (parent_) {
     parent_->onUpstreamData(data, end_stream);
   } else {
-    // TODO: drainer needs to double check.
+    // Drainer takes over, and just consume data.
+    // For debugging sake, worth adding to accesslog but may not be available since whole filter is gone.
+    // TODO: check that.
     drainer_->onData(data, end_stream);
   }
 }
@@ -832,12 +835,17 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   getStreamInfo().downstreamTiming().onLastDownstreamRxByteReceived(
       read_callbacks_->connection().dispatcher().timeSource());
 
-  // getStreamInfo().downstreamTiming().onLastDownstreamTxByteSent(
-  //     read_callbacks_->connection().dispatcher().timeSource());
-
-  // TODO: check drainer case: downstream is closed, if this event is tracked.
-  // getStreamInfo().onl
   if (upstream_) {
+    if (!first_upstream_tx_byte_sent_) {
+      getStreamInfo().upstreamInfo()->upstreamTiming().onFirstUpstreamTxByteSent(
+          read_callbacks_->connection().dispatcher().timeSource());
+      first_upstream_tx_byte_sent_ = true;
+    }
+
+    // Keep updating last X timing as we don't know when a TCP stream is complete.
+    getStreamInfo().upstreamInfo()->upstreamTiming().onLastUpstreamTxByteSent(
+        read_callbacks_->connection().dispatcher().timeSource());
+
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
     upstream_->encodeData(data, end_stream);
     resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
@@ -941,12 +949,29 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   getStreamInfo().getUpstreamBytesMeter()->addWireBytesReceived(data.length());
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesSent(data.length());
 
-  // TODO: check drainer case: downstream is closed, if this event is tracked.
+  if (!first_upstream_rx_byte_received_) {
+    getStreamInfo().upstreamInfo()->upstreamTiming().onFirstUpstreamRxByteReceived(
+        read_callbacks_->connection().dispatcher().timeSource());
+    first_upstream_rx_byte_received_ = true;
+  }
+
+  // We don't know when a TCP stream is complete, so we keep updating last X timing.
+  // Same for downstream below.
   getStreamInfo().upstreamInfo()->upstreamTiming().onLastUpstreamRxByteReceived(
       read_callbacks_->connection().dispatcher().timeSource());
 
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
+
+ if (!first_downstream_tx_byte_sent_) {
+    getStreamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
+        read_callbacks_->connection().dispatcher().timeSource());
+    first_downstream_tx_byte_sent_ = true;
+  }
+
+  getStreamInfo().downstreamTiming().onLastDownstreamTxByteSent(
+      read_callbacks_->connection().dispatcher().timeSource());
+
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
 }
 
