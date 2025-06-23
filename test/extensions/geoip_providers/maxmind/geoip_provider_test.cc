@@ -285,6 +285,66 @@ TEST_F(GeoipProviderTest, ValidConfigUsingAsnAndIspDbsSuccessfulLookup) {
   expectStats("isp_db");
 }
 
+
+TEST_F(GeoipProviderTest, AsnDbAndIspDbNotSetCausesEnvoyBug) {
+  // Configuration that exposes the logical bug:
+  // 1. ASN header is requested (triggers lookupInAsnDb call)
+  // 2. No ASN database path configured (asn_db_ptr will be null)
+  // 3. No ISP database path configured (isIspDbPathSet() returns false)
+  // This should trigger IS_ENVOY_BUG.
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        asn: "x-geo-asn"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("::1.128.0.1");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+
+  // This should trigger IS_ENVOY_BUG because there's no fallback database
+  // (neither ASN DB nor ISP DB is configured for ASN lookup)
+  EXPECT_ENVOY_BUG(provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std)),
+                   "Maxmind asn database must be initialised for performing lookups");
+
+  EXPECT_EQ(0, captured_lookup_response_.size());
+}
+
+// Test case showing the correct behavior when ISP DB serves as ASN fallback
+TEST_F(GeoipProviderTest, AsnLookupFallsBackToIspDb) {
+  // This configuration should work correctly:
+  // 1. ASN header is requested but no ASN database configured
+  // 2. ISP database is configured and should provide ASN as fallback
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        asn: "x-geo-asn"
+    isp_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoIP2-ISP-Test.mmdb"
+  )EOF";
+
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("::1.128.0.1");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+
+  // This should NOT trigger IS_ENVOY_BUG because ISP DB can provide ASN
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+
+  // ASN should be retrieved from ISP database
+  EXPECT_EQ(1, captured_lookup_response_.size());
+  const auto& asn_it = captured_lookup_response_.find("x-geo-asn");
+  EXPECT_EQ("1221", asn_it->second);
+  expectStats("isp_db");
+}
+
 TEST_F(GeoipProviderTest, ValidConfigUsingAsnDbNotReadingIspDbsSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
