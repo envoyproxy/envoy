@@ -535,12 +535,6 @@ public:
     AdsIntegrationTest::initialize();
   }
 
-  void resetStream(FakeStreamPtr& stream) {
-    if (stream != nullptr) {
-      stream->encodeResetStream();
-    }
-  }
-
   void resetConnection(FakeHttpConnectionPtr& connection) {
     if (connection != nullptr) {
       AssertionResult result = connection->close();
@@ -552,9 +546,6 @@ public:
   }
 
   ~FcdsIntegrationTestBase() override {
-    resetStream(ecds_stream_);
-    resetStream(ecds_stream_2_);
-    fake_upstreams_[1]->cleanUp();
     resetConnection(ecds_connection_);
     resetConnection(xds_connection_);
   }
