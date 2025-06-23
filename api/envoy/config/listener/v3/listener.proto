@@ -119,15 +119,14 @@ message Listener {
   // Configuration for filter chains discovery.
   // [#not-implemented-hide:]
   message FcdsConfig {
-    // Optional name to present to the filter chain discovery service. This may be an arbitrary name with arbitrary
-    // length. If a name is not provided, the listener's name is used. Refer to :ref:`filter_chains <envoy_v3_api_field_config.listener.v3.Listener.name>`.
-    // for details on how listener name is determined if unspecified. In addition, this may be a xdstp:// URL.
-    string name = 1;
+    // xdstp:// resource locator for the filter chain collection.
+    string resources_locator = 1;
 
     // Configuration for the source of FCDS updates for this listener.
-    // .. note::
-    //   This discovery service only supports ``AGGREGATED_GRPC`` API type.
     core.v3.ConfigSource config_source = 2;
+
+    // Allow listener to start without waiting for filter chains to be discovered.
+    bool start_listener_without_warming = 3;
   }
 
   reserved 14, 23;

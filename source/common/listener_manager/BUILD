@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         ":active_raw_udp_listener_config",
         ":connection_handler_lib",
+        ":fcds_api_lib",
         ":filter_chain_manager_lib",
         ":lds_api_lib",
         ":listener_info_lib",
@@ -146,6 +147,25 @@ envoy_cc_library(
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "fcds_api_lib",
+    srcs = ["fcds_api.cc"],
+    hdrs = ["fcds_api.h"],
+    deps = [
+        "//envoy/config:subscription_factory_interface",
+        "//envoy/config:subscription_interface",
+        "//envoy/init:manager_interface",
+        "//envoy/server:listener_manager_interface",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/config:utility_lib",
+        "//source/common/config:xds_resource_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/init:target_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

@@ -19,6 +19,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/config/utility.h"
 #include "source/common/listener_manager/active_raw_udp_listener_config.h"
+#include "source/common/listener_manager/fcds_api.h"
 #include "source/common/listener_manager/filter_chain_manager_impl.h"
 #include "source/common/listener_manager/listener_manager_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
@@ -71,6 +72,20 @@ bool shouldBindToPort(const envoy::config::listener::v3::Listener& config) {
          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true);
 }
 } // namespace
+
+FcdsApiPtr ListenerImpl::createFcdsSubscription(
+    const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config) {
+  std::unique_ptr<FcdsApiImpl> subscription =
+      std::make_unique<FcdsApiImpl>(fcds_config.config_source(), fcds_config.resources_locator(),
+                                    name_, parent_.server_.clusterManager(), listenerScope(),
+                                    *dynamic_init_manager_, parent_, validation_visitor_);
+
+  if (!fcds_config.start_listener_without_warming()) {
+    dynamic_init_manager_->add(subscription->initTarget());
+  }
+
+  return std::move(subscription);
+}
 
 absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>> ListenSocketFactoryImpl::create(
     ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
@@ -306,13 +321,17 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
       bypass_overload_manager_(config.bypass_overload_manager()),
-      listener_init_target_(fmt::format("Listener-init-target {}", name),
-                            [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
-      dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
+      start_listener_without_warming_(config.has_fcds_config() &&
+                                      config.fcds_config().start_listener_without_warming()),
+      created_by_fcds_(false),
+      listener_init_target_(std::make_shared<Init::TargetImpl>(
+          fmt::format("Listener-init-target {}", name),
+          [this]() { dynamic_init_manager_->initialize(*local_init_watcher_); })),
+      dynamic_init_manager_(std::make_shared<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
       config_maybe_partial_filter_chains_(config), version_info_(version_info),
-      listener_filters_timeout_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
+      fcds_version_info_(""), listener_filters_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(
+                                  config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
       listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
           parent.server_, validation_visitor_, config, *this,
@@ -323,16 +342,16 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       open_connections_(std::make_shared<BasicResourceLimitImpl>(
           std::numeric_limits<uint64_t>::max(),
           listener_factory_context_->serverFactoryContext().runtime(), cx_limit_runtime_key_)),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] {
-                            if (workers_started_) {
-                              parent_.onListenerWarmed(*this);
-                            } else {
-                              // Notify Server that this listener is
-                              // ready.
-                              listener_init_target_.ready();
-                            }
-                          }),
+      local_init_watcher_(std::make_shared<Init::WatcherImpl>(
+          fmt::format("Listener-local-init-watcher {}", name),
+          [this, target = listener_init_target_, workers_started = workers_started_]() {
+            if (workers_started) {
+              parent_.onListenerWarmed(*this);
+            } else {
+              // Notify Server that this listener is ready.
+              target->ready();
+            }
+          })),
       transport_factory_context_(
           std::make_shared<Server::Configuration::TransportSocketFactoryContextImpl>(
               parent_.server_.serverFactoryContext(), listenerScope(), validation_visitor_)),
@@ -412,13 +431,6 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
     buildProxyProtocolListenerFilter(config);
     SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config), creation_status);
   }
-  if (!workers_started_) {
-    // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
-    // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
-    // listener constructor so that this listener's children entities could register their targets
-    // with their parent's initManager.
-    parent_.server_.initManager().add(listener_init_target_);
-  }
 }
 
 ListenerImpl::ListenerImpl(ListenerImpl& origin,
@@ -444,12 +456,14 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
       bypass_overload_manager_(config.bypass_overload_manager()),
+      start_listener_without_warming_(origin.start_listener_without_warming_),
+      created_by_fcds_(false),
       // listener_init_target_ is not used during in place update because we expect server started.
-      listener_init_target_("", nullptr),
-      dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
+      listener_init_target_(std::make_shared<Init::TargetImpl>("", nullptr)),
+      dynamic_init_manager_(std::make_shared<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
       config_maybe_partial_filter_chains_(config), version_info_(version_info),
-      listen_socket_options_list_(origin.listen_socket_options_list_),
+      fcds_version_info_(""), listen_socket_options_list_(origin.listen_socket_options_list_),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
@@ -462,12 +476,12 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
           addresses_, origin.listener_factory_context_->parentFactoryContext(), initManager(),
           *origin.filter_chain_manager_)),
-      reuse_port_(origin.reuse_port_),
-      local_init_watcher_(fmt::format("Listener-local-init-watcher {}", name),
-                          [this] {
-                            ASSERT(workers_started_);
-                            parent_.inPlaceFilterChainUpdate(*this);
-                          }),
+      reuse_port_(origin.reuse_port_), local_init_watcher_(std::make_shared<Init::WatcherImpl>(
+                                           fmt::format("Listener-local-init-watcher {}", name),
+                                           [this] {
+                                             ASSERT(workers_started_);
+                                             parent_.inPlaceFilterChainUpdate(*this);
+                                           })),
       transport_factory_context_(origin.transport_factory_context_),
       quic_stat_names_(parent_.quicStatNames()),
       missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
@@ -484,6 +498,110 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
     buildOriginalDstListenerFilter(config);
     buildProxyProtocolListenerFilter(config);
     open_connections_ = origin.open_connections_;
+  }
+}
+
+ListenerImpl::ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& added_filter_chains,
+                           const absl::flat_hash_set<absl::string_view>& removed_filter_chains,
+                           absl::optional<std::string>& fcds_version_info, bool workers_started,
+                           absl::Status& creation_status)
+    : parent_(origin.parent_), addresses_(origin.addresses_), socket_type_(origin.socket_type_),
+      bind_to_port_(origin.bind_to_port_), mptcp_enabled_(origin.mptcp_enabled_),
+      hand_off_restored_destination_connections_(origin.hand_off_restored_destination_connections_),
+      per_connection_buffer_limit_bytes_(origin.per_connection_buffer_limit_bytes_),
+      listener_tag_(origin.listener_tag_), name_(origin.name_),
+      added_via_api_(origin.added_via_api_), workers_started_(workers_started),
+      maybe_stale_hash_(origin.maybe_stale_hash_), tcp_backlog_size_(origin.tcp_backlog_size_),
+      max_connections_to_accept_per_socket_event_(
+          origin.max_connections_to_accept_per_socket_event_),
+      validation_visitor_(
+          added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
+                         : parent_.server_.messageValidationContext().staticValidationVisitor()),
+      ignore_global_conn_limit_(origin.ignore_global_conn_limit_),
+      bypass_overload_manager_(origin.bypass_overload_manager_),
+      start_listener_without_warming_(origin.start_listener_without_warming_),
+      created_by_fcds_(true),
+      // Used in case where FCDS is received while server is initializing and the listener has a
+      // dependency on FCDS update to arrive to complete initialization.
+      listener_init_target_(std::make_shared<Init::TargetImpl>(
+          fmt::format("FCDS-Listener-init-target {}", name_),
+          [this]() { dynamic_init_manager_->initialize(*local_init_watcher_); })),
+      dynamic_init_manager_(std::make_shared<Init::ManagerImpl>(
+          fmt::format("FCDS-Listener-local-init-manager {} {}", origin.name_, maybe_stale_hash_))),
+      config_maybe_partial_filter_chains_(origin.config_maybe_partial_filter_chains_),
+      version_info_(origin.version_info_),
+      fcds_version_info_(fcds_version_info.has_value() ? fcds_version_info.value()
+                                                       : origin.fcds_version_info_),
+      listen_socket_options_list_(origin.listen_socket_options_list_),
+      listener_filters_timeout_(origin.listener_filters_timeout_),
+      continue_on_listener_filters_timeout_(origin.continue_on_listener_filters_timeout_),
+      udp_listener_config_(origin.udp_listener_config_),
+      connection_balancers_(origin.connection_balancers_),
+      // Reuse the listener_factory_context_base_ from the origin listener because the filter chain
+      // only updates will not change the listener_factory_context_base_.
+      listener_factory_context_(std::make_shared<PerListenerFactoryContextImpl>(
+          origin.listener_factory_context_->listener_factory_context_base_, *this)),
+      filter_chain_manager_(std::make_unique<FilterChainManagerImpl>(
+          addresses_, origin.listener_factory_context_->parentFactoryContext(), initManager(),
+          *origin.filter_chain_manager_)),
+      reuse_port_(origin.reuse_port_),
+      local_init_watcher_(std::make_shared<Init::WatcherImpl>(
+          fmt::format("FCDS-Listener-local-init-watcher {}", origin.name_),
+          [this, target = listener_init_target_, workers_started = workers_started_,
+           start_listener_without_warming = start_listener_without_warming_] {
+            if (workers_started) {
+              auto active_listener_tag = parent_.activeListenerTagByName(name_);
+              if (active_listener_tag.has_value() && active_listener_tag.value() == listener_tag_) {
+                parent_.inPlaceFilterChainUpdate(*this);
+              } else {
+                parent_.onListenerWarmed(*this);
+              }
+            } else if (!start_listener_without_warming) {
+              // Notify Server that this listener is ready.
+              target->ready();
+            }
+          })),
+      transport_factory_context_(origin.transport_factory_context_),
+      quic_stat_names_(origin.quic_stat_names_),
+      missing_listener_config_stats_({ALL_MISSING_LISTENER_CONFIG_STATS(
+          POOL_COUNTER(listener_factory_context_->listenerScope()))}) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+  buildAccessLog(config_maybe_partial_filter_chains_);
+  SET_AND_RETURN_IF_NOT_OK(validateConfig(), creation_status);
+  SET_AND_RETURN_IF_NOT_OK(createListenerFilterFactories(config_maybe_partial_filter_chains_),
+                           creation_status);
+  SET_AND_RETURN_IF_NOT_OK(validateFilterChains(config_maybe_partial_filter_chains_),
+                           creation_status);
+  SET_AND_RETURN_IF_NOT_OK(buildFilterChains(added_filter_chains, removed_filter_chains),
+                           creation_status);
+  SET_AND_RETURN_IF_NOT_OK(buildInternalListener(config_maybe_partial_filter_chains_),
+                           creation_status);
+  if (socket_type_ == Network::Socket::Type::Stream) {
+    // Apply the options below only for TCP.
+    buildSocketOptions(config_maybe_partial_filter_chains_);
+    buildOriginalDstListenerFilter(config_maybe_partial_filter_chains_);
+    buildProxyProtocolListenerFilter(config_maybe_partial_filter_chains_);
+    open_connections_ = origin.open_connections_;
+  }
+
+  trackOriginInitDependencies(origin);
+  if (!workers_started_ && !start_listener_without_warming_) {
+    ASSERT(parent_.server_.initManager().state() == Init::Manager::State::Initializing);
+    // If workers have not started yet and the listener was updated using FCDS, we need to
+    // add the listener_init_target_ to the server's init manager, so all the new filter chain
+    // dependencies are initialized before the listener is started. In this case, the
+    // dynamic_init_manager_ will immediately be called to initialize its dependencies.
+    parent_.server_.initManager().add(*listener_init_target_);
+  }
+}
+
+void ListenerImpl::maybeAddListenerInitTarget() {
+  if (!workers_started_) {
+    // Initialize dynamic_init_manager_ from Server's init manager if it's not initialized.
+    // NOTE: listener_init_target_ should be added to parent's initManager at the end of the
+    // listener constructor so that this listener's children entities could register their targets
+    // with their parent's initManager.
+    parent_.server_.initManager().add(*listener_init_target_);
   }
 }
 
@@ -761,12 +879,13 @@ absl::Status
 ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& config) {
   if (config.filter_chains().empty() && !config.has_default_filter_chain() &&
       (socket_type_ == Network::Socket::Type::Stream ||
-       !udp_listener_config_->listener_factory_->isTransportConnectionless())) {
+       !udp_listener_config_->listener_factory_->isTransportConnectionless()) &&
+      !config.has_fcds_config()) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
-    return absl::InvalidArgumentError(
-        fmt::format("error adding listener '{}': no filter chains specified",
-                    absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
+    return absl::InvalidArgumentError(fmt::format(
+        "error adding listener '{}': no filter chains specified and no filter chain discovery",
+        absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
   } else if (udp_listener_config_ != nullptr &&
              !udp_listener_config_->listener_factory_->isTransportConnectionless()) {
     // Early fail if any filter chain doesn't have transport socket configured.
@@ -778,13 +897,14 @@ ListenerImpl::validateFilterChains(const envoy::config::listener::v3::Listener& 
                       "specified for connection oriented UDP listener",
                       absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
     }
-  } else if ((!config.filter_chains().empty() || config.has_default_filter_chain()) &&
+  } else if ((!config.filter_chains().empty() || config.has_default_filter_chain() ||
+              config.has_fcds_config()) &&
              udp_listener_config_ != nullptr &&
              udp_listener_config_->listener_factory_->isTransportConnectionless()) {
 
     return absl::InvalidArgumentError(
         fmt::format("error adding listener '{}': {} filter chain(s) specified for "
-                    "connection-less UDP listener.",
+                    "connection-less UDP listener, or filter chain discovery is configured.",
                     absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
                     config.filter_chains_size()));
   }
@@ -799,6 +919,52 @@ absl::Status ListenerImpl::buildFilterChains(const envoy::config::listener::v3::
       config.filter_chains(),
       config.has_default_filter_chain() ? &config.default_filter_chain() : nullptr, builder,
       *filter_chain_manager_);
+}
+
+absl::Status ListenerImpl::buildFilterChains(
+    const FilterChainRefVector& added_filter_chains,
+    const absl::flat_hash_set<absl::string_view>& removed_filter_chains) {
+  transport_factory_context_->setInitManager(*dynamic_init_manager_);
+  ListenerFilterChainFactoryBuilder builder(*this, *transport_factory_context_);
+  return filter_chain_manager_->addFilterChains(
+      configInternal().has_filter_chain_matcher() ? &configInternal().filter_chain_matcher()
+                                                  : nullptr,
+      added_filter_chains, removed_filter_chains,
+      configInternal().has_default_filter_chain() ? &configInternal().default_filter_chain()
+                                                  : nullptr,
+      builder, *filter_chain_manager_);
+}
+
+void ListenerImpl::trackOriginInitDependencies(ListenerImpl& origin) {
+  if (origin.dynamic_init_manager_->state() != Init::Manager::State::Initializing) {
+    return;
+  }
+
+  // If the origin listeners are in the process of initializing, we need keep reference to the
+  // init objects so new listener will only be initialized after all previous versions dependencies
+  // are also initialized.
+  origins_dynamic_init_manager_ = origin.origins_dynamic_init_manager_;
+  origins_dynamic_init_manager_.push_back(origin.dynamic_init_manager_);
+  origins_listener_init_target_ = origin.origins_listener_init_target_;
+  origins_listener_init_target_.push_back(origin.listener_init_target_);
+  origins_local_init_watcher_ = origin.origins_local_init_watcher_;
+  origins_local_init_watcher_.push_back(origin.local_init_watcher_);
+  if (origin.tracking_init_watcher_ != nullptr) {
+    origins_local_init_watcher_.push_back(origin.tracking_init_watcher_);
+  }
+  if (origin.tracking_init_target_ != nullptr) {
+    origins_listener_init_target_.push_back(origin.tracking_init_target_);
+  }
+
+  if (workers_started_) {
+    tracking_init_target_ =
+        std::make_shared<Init::TargetImpl>("origin-listener-tracking-target", []() {});
+    tracking_init_watcher_ = std::make_shared<Init::WatcherImpl>(
+        "origin-listener-tracking-watcher",
+        [target = tracking_init_target_]() { target->ready(); });
+    dynamic_init_manager_->add(*tracking_init_target_);
+    origin.dynamic_init_manager_->updateWatcher(*tracking_init_watcher_);
+  }
 }
 
 absl::Status
@@ -990,19 +1156,22 @@ void ListenerImpl::initialize() {
   // If workers have already started, we shift from using the global init manager to using a local
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // by resetting the watcher.
-  if (workers_started_) {
+  // If the listener was created due to FCDS update, initialize the dynamic init manager in case
+  // where start_listener_without_warming_ is true, because listener_init_target_ will not be in
+  // use.
+  if (workers_started_ || (created_by_fcds_ && start_listener_without_warming_)) {
     ENVOY_LOG_MISC(debug, "Initialize listener {} local-init-manager.", name_);
     // If workers_started_ is true, dynamic_init_manager_ should be initialized by listener
     // manager directly.
-    dynamic_init_manager_->initialize(local_init_watcher_);
+    dynamic_init_manager_->initialize(*local_init_watcher_);
   }
 }
 
 ListenerImpl::~ListenerImpl() {
-  if (!workers_started_) {
+  if (!workers_started_ && !updating_listener_) {
     // We need to remove the listener_init_target_ handle from parent's initManager(), to unblock
     // parent's initManager to get ready().
-    listener_init_target_.ready();
+    listener_init_target_->ready();
   }
 }
 
@@ -1070,16 +1239,38 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
   return ret;
 }
 
+absl::StatusOr<std::unique_ptr<ListenerImpl>> ListenerImpl::newListenerWithFilterChain(
+    absl::optional<std::string>& fcds_version_info, const FilterChainRefVector& added_filter_chains,
+    const absl::flat_hash_set<absl::string_view>& removed_filter_chains, bool workers_started) {
+  absl::Status creation_status = absl::OkStatus();
+  // Use WrapUnique since the constructor is private.
+  auto ret =
+      absl::WrapUnique(new ListenerImpl(*this, added_filter_chains, removed_filter_chains,
+                                        fcds_version_info, workers_started, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
+  updating_listener_ = true;
+  return ret;
+}
+
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
-  for (const auto& message_and_filter_chain : filter_chain_manager_->filterChainsByMessage()) {
-    if (another_listener.filter_chain_manager_->filterChainsByMessage().find(
-            message_and_filter_chain.first) ==
-        another_listener.filter_chain_manager_->filterChainsByMessage().end()) {
-      // The filter chain exists in `this` listener but not in the listener passed in.
-      callback(*message_and_filter_chain.second);
+  auto known_draining_filter_chains = filter_chain_manager_->drainingFilterChains();
+  if (known_draining_filter_chains) {
+    ENVOY_LOG(debug, "skipping filter chain diff as draining filter chains are known");
+    for (const auto& draining_filter_chain : known_draining_filter_chains.value()) {
+      callback(*draining_filter_chain);
+    }
+  } else {
+    for (const auto& message_and_filter_chain : filter_chain_manager_->filterChainsByMessage()) {
+      if (another_listener.filter_chain_manager_->filterChainsByMessage().find(
+              message_and_filter_chain.first) ==
+          another_listener.filter_chain_manager_->filterChainsByMessage().end()) {
+        // The filter chain exists in `this` listener but not in the listener passed in.
+        callback(*message_and_filter_chain.second);
+      }
     }
   }
+
   // Filter chain manager maintains an optional default filter chain besides the filter chains
   // indexed by message.
   if (auto eq = MessageUtil();

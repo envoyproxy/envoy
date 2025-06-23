@@ -654,7 +654,7 @@ address:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                          "no filter chains specified");
+                          "no filter chains specified and no filter chain discovery");
 }
 
 TEST_P(ListenerManagerImplWithRealFiltersTest, BadFilterConfig) {
@@ -687,7 +687,60 @@ filter_chains:
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
-                          "1 filter chain\\(s\\) specified for connection-less UDP listener");
+                          "1 filter chain\\(s\\) specified for connection-less UDP listener, "
+                          "or filter chain discovery is configured.");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, FcdsConfigWithBadResourcesLocatorRejected) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+fcds_config:
+  resources_locator: not_xdstp
+  config_source:
+    resource_api_version: V3
+    ads: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+                          "not_xdstp does not have a xdstp:, http: or file: scheme");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, FcdsConfiguredWithUdpListenerRejected) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    protocol: UDP
+    address: 127.0.0.1
+    port_value: 1234
+fcds_config:
+  resources_locator: xdstp://test/envoy.config.listener.v3.FilterChain/listener_0/*
+  config_source:
+    resource_api_version: V3
+    ads: {}
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(addOrUpdateListener(parseListenerFromV3Yaml(yaml)), EnvoyException,
+                          "0 filter chain\\(s\\) specified for connection-less UDP listener, "
+                          "or filter chain discovery is configured.");
+}
+
+TEST_P(ListenerManagerImplWithRealFiltersTest, NoFilterChainsWithFcdsAccepted) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+fcds_config:
+  resources_locator: xdstp://test/envoy.config.listener.v3.FilterChain/listener_0/*
+  config_source:
+    resource_api_version: V3
+    ads: {}
+  )EOF";
+
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(yaml)));
 }
 
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
@@ -7339,6 +7392,195 @@ filter_chains:
   EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
 }
 
+TEST_P(ListenerManagerImplTest, BasicDeltaFilterChainsUpdateSuccess) {
+  InSequence s;
+
+  const std::string listener_foo_yaml = R"EOF(
+    name: foo
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    fcds_config:
+      resources_locator: xdstp://test/envoy.config.listener.v3.FilterChain/foo/*
+      config_source:
+        resource_api_version: V3
+        ads: {}
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*worker_, start(_, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+  worker_->callAddCompletion();
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  const std::string filter_chain = R"EOF(
+    filters: []
+    name: fc_1
+  )EOF";
+
+  ListenerHandle* listener_foo_update = expectListenerOverridden(true);
+  auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
+  EXPECT_CALL(*listener_factory_.socket_, duplicate())
+      .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
+  EXPECT_CALL(listener_foo_update->target_, initialize());
+  updateDynamicFilterChains("foo", filter_chain, {});
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  listener_foo_update->target_.ready();
+  worker_->callAddCompletion();
+  checkStats(__LINE__, 1, 1, 0, 0, 1, 0, 0);
+  EXPECT_EQ(1,
+            server_.stats_store_.counter("listener_manager.listener_dynamic_filter_chains_update")
+                .value());
+
+  const std::string filter_chain_2 = R"EOF(
+    filters: []
+    name: fc_2
+  )EOF";
+
+  ListenerHandle* listener_foo_update_2 = expectListenerOverridden(true, listener_foo_update);
+  EXPECT_CALL(*duplicated_socket, duplicate());
+  EXPECT_CALL(listener_foo_update_2->target_, initialize());
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  updateDynamicFilterChains("foo", filter_chain_2, "fc_1");
+  checkStats(__LINE__, 1, 2, 0, 1, 1, 0, 0);
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  EXPECT_CALL(server_.options_, drainTime()).WillOnce(Return(std::chrono::seconds(600)));
+  Event::MockTimer* filter_chain_drain_timer = new Event::MockTimer(&server_.dispatcher_);
+  EXPECT_CALL(*filter_chain_drain_timer, enableTimer(std::chrono::milliseconds(600000), _));
+  listener_foo_update_2->target_.ready();
+
+  EXPECT_CALL(*worker_, removeFilterChains(_, _, _));
+  filter_chain_drain_timer->invokeCallback();
+
+  EXPECT_CALL(*listener_foo_update, onDestroy());
+  worker_->callDrainFilterChainsComplete();
+
+  checkStats(__LINE__, 1, 2, 0, 0, 1, 0, 0);
+  EXPECT_EQ(2,
+            server_.stats_store_.counter("listener_manager.listener_dynamic_filter_chains_update")
+                .value());
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo_update_2, onDestroy());
+}
+
+TEST_P(ListenerManagerImplTest, StopListenerDestroyWarmingDeltaFilterChainsListener) {
+  InSequence s;
+
+  const std::string listener_foo_yaml = R"EOF(
+    name: foo
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    fcds_config:
+      resources_locator: xdstp://test/envoy.config.listener.v3.FilterChain/foo/*
+      config_source:
+        resource_api_version: V3
+        ads: {}
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*worker_, start(_, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+  worker_->callAddCompletion();
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  const std::string filter_chain = R"EOF(
+    filters: []
+    name: fc_1
+  )EOF";
+
+  ListenerHandle* listener_foo_update = expectListenerOverridden(true);
+  auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
+  EXPECT_CALL(*listener_factory_.socket_, duplicate())
+      .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
+  EXPECT_CALL(listener_foo_update->target_, initialize());
+  updateDynamicFilterChains("foo", filter_chain, {});
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo_update, onDestroy());
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
+  manager_->stopListeners(ListenerManager::StopListenersType::All, {});
+  EXPECT_EQ(1, server_.stats_store_.counter("listener_manager.listener_stopped").value());
+}
+
+TEST_P(ListenerManagerImplTest, RemoveListenerDestroyWarmingDeltaFilterChainsListener) {
+  InSequence s;
+
+  const std::string listener_foo_yaml = R"EOF(
+    name: foo
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 1234
+    filter_chains:
+    - filters:
+      filter_chain_match:
+        destination_port: 1234
+    fcds_config:
+      resources_locator: xdstp://test/envoy.config.listener.v3.FilterChain/foo/*
+      config_source:
+        resource_api_version: V3
+        ads: {}
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(true, true);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  EXPECT_TRUE(addOrUpdateListener(parseListenerFromV3Yaml(listener_foo_yaml)));
+  checkStats(__LINE__, 1, 0, 0, 0, 1, 0, 0);
+
+  EXPECT_CALL(*worker_, addListener(_, _, _, _, _));
+  EXPECT_CALL(*worker_, start(_, _));
+  ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
+  listener_foo->target_.ready();
+  worker_->callAddCompletion();
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  const std::string filter_chain = R"EOF(
+    filters: []
+    name: fc_1
+  )EOF";
+
+  ListenerHandle* listener_foo_update = expectListenerOverridden(true);
+  auto duplicated_socket = new NiceMock<Network::MockListenSocket>();
+  EXPECT_CALL(*listener_factory_.socket_, duplicate())
+      .WillOnce(Return(ByMove(std::unique_ptr<Network::Socket>(duplicated_socket))));
+  EXPECT_CALL(listener_foo_update->target_, initialize());
+  updateDynamicFilterChains("foo", filter_chain, {});
+  checkStats(__LINE__, 1, 1, 0, 1, 1, 0, 0);
+  EXPECT_EQ(1, manager_->listeners().size());
+
+  EXPECT_CALL(*listener_foo_update, onDestroy());
+  EXPECT_CALL(*worker_, stopListener(_, _, _));
+  EXPECT_CALL(*listener_factory_.socket_, close());
+  EXPECT_CALL(*listener_foo->drain_manager_, startDrainSequence(Network::DrainDirection::All, _));
+  EXPECT_TRUE(manager_->removeListener("foo"));
+  checkStats(__LINE__, 1, 1, 1, 0, 0, 1, 0);
+  EXPECT_CALL(*worker_, removeListener(_, _));
+  listener_foo->drain_manager_->drain_sequence_completion_();
+  checkStats(__LINE__, 1, 1, 1, 0, 0, 1, 0);
+  EXPECT_CALL(*listener_foo, onDestroy());
+  worker_->callRemovalCompletion();
+  EXPECT_EQ(0UL, manager_->listeners().size());
+  checkStats(__LINE__, 1, 1, 1, 0, 0, 0, 0);
+}
+
 TEST_P(ListenerManagerImplTest, RemoveInplaceUpdatingListener) {
   InSequence s;
 
@@ -8030,9 +8272,10 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateIfDi
   EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
   EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
   EXPECT_CALL(listener_factory_, createDrainManager_(_));
-  EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(new_listener_proto), EnvoyException,
-                            "error adding listener '127.0.0.1:1234': 1 filter chain(s) specified "
-                            "for connection-less UDP listener.");
+  EXPECT_THROW_WITH_MESSAGE(
+      addOrUpdateListener(new_listener_proto), EnvoyException,
+      "error adding listener '127.0.0.1:1234': 1 filter chain(s) specified "
+      "for connection-less UDP listener, or filter chain discovery is configured.");
 
   expectRemove(new_listener_proto, listener_foo, *listener_factory_.socket_);
   EXPECT_EQ(0UL, manager_->listeners().size());
@@ -8076,7 +8319,8 @@ TEST_P(ListenerManagerImplForInPlaceFilterChainUpdateTest, TraditionalUpdateOnZe
   EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
   EXPECT_CALL(listener_factory_, createDrainManager_(_));
   EXPECT_THROW_WITH_MESSAGE(addOrUpdateListener(new_listener_proto), EnvoyException,
-                            "error adding listener '127.0.0.1:1234': no filter chains specified");
+                            "error adding listener '127.0.0.1:1234': no filter chains specified "
+                            "and no filter chain discovery");
 
   expectRemove(listener_proto, listener_foo, *listener_factory_.socket_);
   EXPECT_EQ(0UL, manager_->listeners().size());

@@ -382,6 +382,30 @@ protected:
     throw EnvoyException(std::string(status_or_error.status().message()));
   }
 
+  void updateDynamicFilterChains(const std::string& listener_name,
+                                 absl::optional<std::string> added_filter_chain,
+                                 absl::optional<std::string> removed_filter_chain) {
+    std::vector<std::reference_wrapper<const envoy::config::listener::v3::FilterChain>> added_vec;
+    envoy::config::listener::v3::FilterChain added_filter_chain_proto;
+    if (added_filter_chain.has_value()) {
+      TestUtility::loadFromYaml(added_filter_chain.value(), added_filter_chain_proto);
+      added_vec.push_back(added_filter_chain_proto);
+    }
+
+    auto removed_set = absl::flat_hash_set<absl::string_view>();
+    if (removed_filter_chain.has_value()) {
+      removed_set.insert(removed_filter_chain.value());
+    }
+
+    absl::optional<std::string> version = {};
+    auto status_or_error =
+        manager_->updateDynamicFilterChains(listener_name, version, added_vec, removed_set);
+    if (status_or_error.ok()) {
+      return;
+    }
+    throw EnvoyException(std::string(status_or_error.message()));
+  }
+
   void testListenerUpdateWithSocketOptionsChange(const std::string& origin,
                                                  const std::string& updated,
                                                  bool multiple_addresses = false) {

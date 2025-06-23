@@ -145,6 +145,24 @@ class ListenerImpl;
 using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
 
 /**
+ * Manages FCDS subscriptions for all listeners.
+ */
+class FcdsSubscriptionManager {
+public:
+  using SubscriptionPtr = FcdsApiPtr;
+  using SubscriptionMap = absl::flat_hash_map<std::string, SubscriptionPtr>;
+
+  void setSubscription(const std::string& listener_name, SubscriptionPtr&& subscription) {
+    subscriptions_[listener_name] = std::move(subscription);
+  }
+
+  void removeSubscription(const std::string& listener_name) { subscriptions_.erase(listener_name); }
+
+private:
+  SubscriptionMap subscriptions_;
+};
+
+/**
  * All listener manager stats. @see stats_macros.h
  */
 #define ALL_LISTENER_MANAGER_STATS(COUNTER, GAUGE)                                                 \
@@ -152,6 +170,7 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_create_failure)                                                                 \
   COUNTER(listener_create_success)                                                                 \
   COUNTER(listener_in_place_updated)                                                               \
+  COUNTER(listener_dynamic_filter_chains_update)                                                   \
   COUNTER(listener_modified)                                                                       \
   COUNTER(listener_removed)                                                                        \
   COUNTER(listener_stopped)                                                                        \
@@ -223,6 +242,10 @@ public:
   absl::StatusOr<bool> addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                            const std::string& version_info,
                                            bool added_via_api) override;
+  absl::Status updateDynamicFilterChains(
+      const std::string& listener_name, absl::optional<std::string>& version_info,
+      const FilterChainRefVector& added_filter_chains,
+      const absl::flat_hash_set<absl::string_view>& removed_filter_chains) override;
   void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                     const xds::core::v3::ResourceLocator* lds_resources_locator) override {
     ASSERT(lds_api_ == nullptr);
@@ -243,6 +266,7 @@ public:
   ApiListenerOptRef apiListener() override;
 
   Quic::QuicStatNames& quicStatNames() { return quic_stat_names_; }
+  absl::optional<uint64_t> activeListenerTagByName(const std::string& name);
 
   Instance& server_;
   std::unique_ptr<ListenerComponentFactory> factory_;
@@ -341,6 +365,7 @@ private:
   absl::Status setupSocketFactoryForListener(ListenerImpl& new_listener,
                                              const ListenerImpl& existing_listener);
 
+  FcdsSubscriptionManager fcds_subscription_manager_;
   ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;

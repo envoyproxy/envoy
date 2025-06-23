@@ -25,6 +25,9 @@ class TcpListenerFilterConfigProviderManagerImpl;
 
 namespace Server {
 
+using FilterChainRefVector =
+    std::vector<std::reference_wrapper<const envoy::config::listener::v3::FilterChain>>;
+
 /**
  * Interface for an LDS API provider.
  */
@@ -39,6 +42,21 @@ public:
 };
 
 using LdsApiPtr = std::unique_ptr<LdsApi>;
+
+/**
+ * Interface for filter chain discovery service.
+ */
+class FcdsApi {
+public:
+  virtual ~FcdsApi() = default;
+
+  /**
+   * @return std::string the last version passed to onConfigUpdate.
+   */
+  virtual std::string versionInfo() const PURE;
+};
+
+using FcdsApiPtr = std::unique_ptr<FcdsApi>;
 
 /**
  * Factory for creating listener components.
@@ -196,6 +214,19 @@ public:
    */
   virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config,
                             const xds::core::v3::ResourceLocator* lds_resources_locator) PURE;
+
+  /**
+   * Updates the dynamic filter chains for a given listener.
+   * @param listener_name the name of the listener whose filter chains should be updated.
+   * @param version_info supplies the xDS version of the filter chains, if any added.
+   * @param added_filter_chains the new filter chains to add.
+   * @param removed_filter_chains the names of filter chains to remove.
+   * @return absl::Status OK if the update succeeded, otherwise an error status.
+   */
+  virtual absl::Status updateDynamicFilterChains(
+      const std::string& listener_name, absl::optional<std::string>& version_info,
+      const FilterChainRefVector& added_filter_chains,
+      const absl::flat_hash_set<absl::string_view>& removed_filter_chains) PURE;
 
   /**
    * @param state the type of listener to be returned (defaults to ACTIVE), states can be OR'd

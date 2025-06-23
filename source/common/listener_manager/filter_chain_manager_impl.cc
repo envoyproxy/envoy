@@ -155,6 +155,107 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   return absl::OkStatus();
 }
 
+absl::Status FilterChainManagerImpl::addFilterChains(
+    const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+    const FilterChainRefVector& added_filter_chains,
+    const absl::flat_hash_set<absl::string_view>& removed_filter_chains,
+    const envoy::config::listener::v3::FilterChain* default_filter_chain,
+    FilterChainFactoryBuilder& filter_chain_factory_builder,
+    FilterChainFactoryContextCreator& context_creator) {
+  ASSERT(origin_.has_value());
+  const auto* origin = origin_.value();
+  Cleanup origin_cleanup([this]() { origin_ = absl::nullopt; });
+  Cleanup draining_cleanup([origin]() { origin->draining_filter_chains_ = absl::nullopt; });
+  origin->draining_filter_chains_ = std::list<Network::DrainableFilterChainSharedPtr>{};
+
+  uint32_t filter_chains_remove_count = 0;
+  uint32_t filter_chains_update_count = 0;
+
+  FilterChainsByMatcher filter_chains;
+  absl::flat_hash_map<std::string, const envoy::config::listener::v3::FilterChain*>
+      added_filter_chain_map;
+  FilterChainsByName filter_chains_by_name;
+
+  for (const auto& filter_chain : added_filter_chains) {
+    if (added_filter_chain_map.contains(filter_chain.get().name())) {
+      return absl::InvalidArgumentError(
+          fmt::format("error applying FCDS update; duplicate filter chain name '{}'",
+                      filter_chain.get().name()));
+    }
+
+    added_filter_chain_map[filter_chain.get().name()] = &filter_chain.get();
+  }
+
+  for (const auto& [filter_chain, filter_chain_impl] : origin->fc_contexts_) {
+    if (removed_filter_chains.contains(filter_chain.name())) {
+      if (!filter_chain_impl->addedViaApi()) {
+        return absl::InvalidArgumentError(
+            fmt::format("error applying FCDS update; filter chain '{}' cannot be removed"
+                        " as it was not added by filter chain discovery",
+                        filter_chain.name()));
+      }
+
+      origin->draining_filter_chains_->push_back(filter_chain_impl);
+      filter_chains_remove_count++;
+      continue;
+    }
+
+    if (added_filter_chain_map.contains(filter_chain.name())) {
+      const auto& added_filter_chain = *added_filter_chain_map[filter_chain.name()];
+      if (MessageUtil::hash(filter_chain) != MessageUtil::hash(added_filter_chain)) {
+        if (!filter_chain_impl->addedViaApi()) {
+          return absl::InvalidArgumentError(
+              fmt::format("error applying FCDS update; filter chain '{}' cannot be updated"
+                          " as it was not added by filter chain discovery",
+                          filter_chain.name()));
+        }
+
+        origin->draining_filter_chains_->push_back(filter_chain_impl);
+        filter_chains_update_count++;
+        continue;
+      }
+    }
+
+    // If we got here, the existing filter chain is not removed or updated, we can reuse it.
+    // First, remove it from the map of added filter chains so we don't try to add it again.
+    added_filter_chain_map.erase(filter_chain.name());
+
+    RETURN_IF_NOT_OK(verifyNoDuplicateMatchers(filter_chain_matcher, filter_chains, filter_chain));
+    RETURN_IF_NOT_OK(setupFilterChainMatcher(filter_chain_matcher, filter_chains_by_name,
+                                             filter_chain, filter_chain_impl));
+
+    fc_contexts_.emplace(filter_chain, filter_chain_impl);
+  }
+
+  // added_filter_chain_map now contains added/updated filter chains. The updated filter chains
+  // were not added in the loop above, so we need to add them now.
+  for (const auto& [_, filter_chain] : added_filter_chain_map) {
+    RETURN_IF_NOT_OK(verifyNoDuplicateMatchers(filter_chain_matcher, filter_chains, *filter_chain));
+
+    auto filter_chain_or_error =
+        filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator, true);
+    RETURN_IF_NOT_OK(filter_chain_or_error.status());
+    auto filter_chain_impl = filter_chain_or_error.value();
+
+    RETURN_IF_NOT_OK(setupFilterChainMatcher(filter_chain_matcher, filter_chains_by_name,
+                                             *filter_chain, filter_chain_impl));
+
+    fc_contexts_.emplace(*filter_chain, filter_chain_impl);
+  }
+
+  RETURN_IF_NOT_OK(convertIPsToTries());
+  RETURN_IF_NOT_OK(copyOrRebuildDefaultFilterChain(default_filter_chain,
+                                                   filter_chain_factory_builder, context_creator));
+  maybeConstructMatcher(filter_chain_matcher, filter_chains_by_name, parent_context_);
+
+  ENVOY_LOG(debug, "FCDS update applied; removed {}, updated {}, added {} filter chains",
+            filter_chains_remove_count, filter_chains_update_count,
+            added_filter_chain_map.size() - filter_chains_update_count);
+
+  draining_cleanup.cancel();
+  return absl::OkStatus();
+}
+
 absl::Status FilterChainManagerImpl::verifyNoDuplicateMatchers(
     const xds::type::matcher::v3::Matcher* filter_chain_matcher,
     absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch, std::string, MessageUtil,

@@ -111,6 +111,7 @@ paths:
     - source/common/protobuf/utility.cc
     - source/common/grpc/google_grpc_utils.cc
     - source/common/tcp_proxy/tcp_proxy.cc
+    - source/common/listener_manager/fcds_api.cc
     - source/common/listener_manager/lds_api.cc
     - source/common/rds/common/route_config_provider_manager_impl.h
     - source/common/rds/route_config_provider_manager.h
