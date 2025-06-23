@@ -64,20 +64,12 @@ Example
 
 A sample aggregate cluster configuration could be:
 
-.. code-block:: yaml
-
-  name: aggregate_cluster
-  connect_timeout: 0.25s
-  lb_policy: CLUSTER_PROVIDED
-  cluster_type:
-    name: envoy.clusters.aggregate
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.clusters.aggregate.v3.ClusterConfig
-      clusters:
-      # cluster primary, secondary and tertiary should be defined outside.
-      - primary
-      - secondary
-      - tertiary
+.. literalinclude:: _include/aggregate-cluster.yaml
+    :language: yaml
+    :lines: 24-32
+    :lineno-start: 24
+    :linenos:
+    :caption: :download:`aggregate-cluster.yaml <_include/aggregate-cluster.yaml>`
 
 Important Considerations for Aggregate Clusters
 -----------------------------------------------
