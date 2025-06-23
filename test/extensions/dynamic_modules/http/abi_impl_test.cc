@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <memory>
 #include <string>
 
@@ -908,17 +909,24 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(result_str_length, 14);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
 
-  // Tests for TLS connection attributes
+  // empty connection, should return false
+  EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result_str_ptr,
+      &result_str_length));
+
+  // tests for TLS connection attributes
   const Network::MockConnection connection;
   EXPECT_CALL(callbacks, connection())
       .WillRepeatedly(
           testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
   EXPECT_CALL(connection, ssl()).WillRepeatedly(testing::Return(nullptr));
-  // no TLS connection, should return false
+  // no TLS, should return false
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result_str_ptr,
       &result_str_length));
 
+  // mock TLS and its attributes
   auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
   EXPECT_CALL(connection, ssl()).WillRepeatedly(testing::Return(ssl));
   const std::string tls_version = "TLSv1.2";
@@ -954,6 +962,12 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), subject_cert);
 
   // test returning the first entry when there are multiple SANs
+  const std::vector<std::string> sans_empty;
+  EXPECT_CALL(*ssl, dnsSansLocalCertificate()).WillOnce(testing::Return(sans_empty));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate,
+      &result_str_ptr, &result_str_length));
+
   const std::vector<std::string> sans = {"alt_name1", "alt_name2"};
   EXPECT_CALL(*ssl, dnsSansLocalCertificate()).WillRepeatedly(testing::Return(sans));
   EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(testing::Return(sans));
