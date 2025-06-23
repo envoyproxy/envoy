@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -17,7 +18,8 @@ namespace PostgresProxy {
  */
 class PostgresConfigFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy> {
+          envoy::extensions::filters::network::postgres_proxy::v3alpha::PostgresProxy>,
+      Logger::Loggable<Logger::Id::filter> {
 public:
   PostgresConfigFactory() : FactoryBase{NetworkFilterNames::get().PostgresProxy} {}
 

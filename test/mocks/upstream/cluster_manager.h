@@ -45,6 +45,7 @@ public:
   MOCK_METHOD(ClusterInfoMaps, clusters, (), (const));
   MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (const std::string& cluster_name), (const));
   MOCK_METHOD(bool, hasCluster, (const std::string& cluster_name), (const));
+  MOCK_METHOD(bool, hasActiveClusters, (), (const));
 
   MOCK_METHOD(const ClusterSet&, primaryClusters, ());
   MOCK_METHOD(ThreadLocalCluster*, getThreadLocalCluster, (absl::string_view cluster));

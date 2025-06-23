@@ -18,7 +18,7 @@ public:
   PerSocketTapperImpl(
       SocketTapConfigSharedPtr config,
       const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
-      const Network::Connection& connection);
+      const TransportTapStats& stats, const Network::Connection& connection);
 
   // PerSocketTapper
   void closeSocket(Network::ConnectionEvent event) override;
@@ -28,6 +28,12 @@ public:
 private:
   void initEvent(envoy::data::tap::v3::SocketEvent&);
   void initStreamingEvent(envoy::data::tap::v3::SocketEvent&);
+  void makeStreamedTraceIfNeeded() {
+    if (streamed_trace_ == nullptr) {
+      streamed_trace_ = Extensions::Common::Tap::makeTraceWrapper();
+      streamed_trace_->mutable_socket_streamed_trace_segment()->set_trace_id(connection_.id());
+    }
+  }
   void fillConnectionInfo(envoy::data::tap::v3::Connection& connection);
   void makeBufferedTraceIfNeeded() {
     if (buffered_trace_ == nullptr) {
@@ -40,7 +46,15 @@ private:
     trace->mutable_socket_streamed_trace_segment()->set_trace_id(connection_.id());
     return trace;
   }
-
+  void pegSubmitCounter(const bool is_streaming);
+  bool shouldSendStreamedMsgByConfiguredSize() const;
+  void handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
+                                                 const uint32_t total_bytes, const bool is_read,
+                                                 const bool is_end_stream);
+  // This is the default value for min buffered bytes.
+  // (This means that per transport socket buffer trace, the minimum amount
+  // which triggering to send the tapped messages size is 9 bytes).
+  static constexpr uint32_t DefaultMinBufferedBytes = 9;
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;
@@ -50,6 +64,9 @@ private:
   uint32_t rx_bytes_buffered_{};
   uint32_t tx_bytes_buffered_{};
   const bool should_output_conn_info_per_event_{false};
+  uint32_t current_streamed_rx_tx_bytes_{0};
+  Extensions::Common::Tap::TraceWrapperPtr streamed_trace_{nullptr};
+  const TransportTapStats stats_;
 };
 
 class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
@@ -66,8 +83,8 @@ public:
   // SocketTapConfig
   PerSocketTapperPtr createPerSocketTapper(
       const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
-      const Network::Connection& connection) override {
-    return std::make_unique<PerSocketTapperImpl>(shared_from_this(), tap_config, connection);
+      const TransportTapStats& stats, const Network::Connection& connection) override {
+    return std::make_unique<PerSocketTapperImpl>(shared_from_this(), tap_config, stats, connection);
   }
   TimeSource& timeSource() const override { return time_source_; }
 
