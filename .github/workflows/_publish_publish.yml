@@ -10,6 +10,8 @@ on:
       ENVOY_CI_SYNC_APP_KEY:
       ENVOY_CI_PUBLISH_APP_ID:
       ENVOY_CI_PUBLISH_APP_KEY:
+      dockerhub-password:
+      dockerhub-username:
       gcs-cache-key:
         required: true
     inputs:
@@ -37,6 +39,8 @@ jobs:
     secrets:
       app-id: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
       app-key: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
+      dockerhub-password: ${{ inputs.trusted && secrets.dockerhub-password || '' }}
+      dockerhub-username: ${{ inputs.trusted && secrets.dockerhub-username || '' }}
       gcs-cache-key: ${{ secrets.gcs-cache-key }}
     permissions:
       contents: read
@@ -64,6 +68,11 @@ jobs:
             export ENVOY_COMMIT=${{ fromJSON(inputs.request).request.sha }}
             export ENVOY_REPO=${{ github.repository }}
             export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
+        - target: dockerhub-publish
+          name: dockerhub
+          source: |
+            export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
+            export GCS_ARTIFACT_BUCKET=${{ ! inputs.trusted && vars.GCS_ARTIFACT_BUCKET_PRE || '' }}
 
   publish_docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
