@@ -396,7 +396,6 @@ struct DownstreamTiming {
     first_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
   void onLastDownstreamTxByteSent(TimeSource& time_source) {
-    ASSERT(!last_downstream_tx_byte_sent_);
     last_downstream_tx_byte_sent_ = time_source.monotonicTime();
   }
   void onDownstreamHandshakeComplete(TimeSource& time_source) {
