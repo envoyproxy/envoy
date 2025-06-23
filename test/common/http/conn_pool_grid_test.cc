@@ -190,7 +190,7 @@ public:
         cluster_, host_impl_hostname_, *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
         nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::config::core::v3::UNKNOWN, simTime(), address_list_));
+        envoy::config::core::v3::UNKNOWN, address_list_));
 
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_, host_, Upstream::ResourcePriority::Default, socket_options_,
@@ -1693,7 +1693,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
   ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
       *quic_connection_persistent_info_, {}, overload_manager_);
@@ -1733,7 +1733,7 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
   ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
       *quic_connection_persistent_info_, {}, overload_manager_);

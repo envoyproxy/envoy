@@ -60,11 +60,6 @@ public:
   StreamDecoderFilterCallbacks* decoder_callbacks_ = nullptr;
   StreamEncoderFilterCallbacks* encoder_callbacks_ = nullptr;
 
-  RequestHeaderMap* request_headers_ = nullptr;
-  RequestTrailerMap* request_trailers_ = nullptr;
-  ResponseHeaderMap* response_headers_ = nullptr;
-  ResponseTrailerMap* response_trailers_ = nullptr;
-
   // These are used to hold the current chunk of the request/response body during the decodeData and
   // encodeData callbacks. It is only valid during the call and should not be used outside of the
   // call.
@@ -82,6 +77,34 @@ public:
     } else {
       return nullptr;
     }
+  }
+
+  RequestHeaderMapOptRef requestHeaders() {
+    if (decoder_callbacks_) {
+      return decoder_callbacks_->requestHeaders();
+    }
+    return absl::nullopt;
+  }
+
+  RequestTrailerMapOptRef requestTrailers() {
+    if (decoder_callbacks_) {
+      return decoder_callbacks_->requestTrailers();
+    }
+    return absl::nullopt;
+  }
+
+  ResponseHeaderMapOptRef responseHeaders() {
+    if (encoder_callbacks_) {
+      return encoder_callbacks_->responseHeaders();
+    }
+    return absl::nullopt;
+  }
+
+  ResponseTrailerMapOptRef responseTrailers() {
+    if (encoder_callbacks_) {
+      return encoder_callbacks_->responseTrailers();
+    }
+    return absl::nullopt;
   }
 
   /**

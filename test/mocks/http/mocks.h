@@ -237,6 +237,7 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(void, refreshRouteCluster, ());
 
   std::shared_ptr<Router::MockRoute> route_;
 };
@@ -727,7 +728,7 @@ public:
 
   MOCK_METHOD(const absl::optional<uint32_t>&, maxConcurrentStreams, (), (const));
 
-  absl::optional<uint32_t> max_concurrent_streams_{};
+  absl::optional<uint32_t> max_concurrent_streams_;
 };
 
 } // namespace Http

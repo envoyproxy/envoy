@@ -251,7 +251,7 @@ protected:
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, absl::Status& creation_status);
+      uint32_t priority, absl::Status& creation_status);
 
   /**
    * @return nullptr if address_list is empty, otherwise a shared_ptr copy of address_list.
@@ -277,7 +277,6 @@ private:
   std::atomic<uint32_t> priority_;
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
-  const MonotonicTime creation_time_;
   absl::optional<MonotonicTime> last_hc_pass_time_;
   HostLbPolicyDataPtr lb_policy_data_;
 };
@@ -298,7 +297,7 @@ public:
          MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
          const envoy::config::core::v3::Locality& locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-         uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
+         uint32_t priority, const AddressVector& address_list = {});
 
   // HostDescription
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
@@ -314,7 +313,7 @@ protected:
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
+      uint32_t priority, const AddressVector& address_list = {});
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -482,7 +481,7 @@ public:
          const envoy::config::core::v3::Locality& locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
          uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-         TimeSource& time_source, const AddressVector& address_list = {});
+         const AddressVector& address_list = {});
 
 protected:
   HostImpl(absl::Status& creation_status, ClusterInfoConstSharedPtr cluster,
@@ -491,10 +490,10 @@ protected:
            uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-           TimeSource& time_source, const AddressVector& address_list = {})
+           const AddressVector& address_list = {})
       : HostImplBase(initial_weight, health_check_config, health_status),
         HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
-                            locality_metadata, locality, health_check_config, priority, time_source,
+                            locality_metadata, locality, health_check_config, priority,
                             address_list) {}
 };
 
@@ -1286,7 +1285,6 @@ protected:
 
 protected:
   Random::RandomGenerator& random_;
-  TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
 
   absl::Status validateEndpointsForZoneAwareRouting(
@@ -1335,7 +1333,7 @@ public:
       const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
       const HostDescription::AddressVector& address_list,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source);
+      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
 
   void registerHostForPriority(
       const HostSharedPtr& host,

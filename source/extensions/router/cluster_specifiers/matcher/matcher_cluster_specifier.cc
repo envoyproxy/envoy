@@ -33,7 +33,7 @@ public:
   }
 
   void refreshRouteCluster(const Http::RequestHeaderMap& headers,
-                           const StreamInfo::StreamInfo& stream_info) {
+                           const StreamInfo::StreamInfo& stream_info) const override {
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
@@ -50,7 +50,7 @@ public:
 
 private:
   Envoy::Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree_;
-  OptRef<const std::string> cluster_name_;
+  mutable OptRef<const std::string> cluster_name_;
 };
 
 Envoy::Router::RouteConstSharedPtr
