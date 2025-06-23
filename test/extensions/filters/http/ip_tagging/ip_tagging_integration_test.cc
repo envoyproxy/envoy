@@ -31,8 +31,9 @@ const std::string FileBasedIpTaggingConfig = R"EOF(
     "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
     request_type: both
     ip_tags_file_provider:
+      ip_tags_refresh_rate: 1s
       ip_tags_datasource:
-        filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_external_request.yaml"
+        filename: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data/ip_tags_internal_request.yaml"
         watched_directory:
           path: "{{ test_rundir }}/test/extensions/filters/http/ip_tagging/test_data"
 )EOF";
@@ -43,9 +44,10 @@ TEST_P(IpTaggingIntegrationTest, IpTaggingV3StaticTypedStructConfig) {
   initialize();
 }
 
-TEST_P(IpTaggingIntegrationTest, FileBasedIpTagging) {
+TEST_P(IpTaggingIntegrationTest, FileBasedIpTaggingWithReload) {
   config_helper_.prependFilter(TestEnvironment::substitute(FileBasedIpTaggingConfig));
   initialize();
+  test_server_->waitForCounterEq("http.config_test.ip_tagging.ip_tags_reload_success", 1);
 }
 
 } // namespace

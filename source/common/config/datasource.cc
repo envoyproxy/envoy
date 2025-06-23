@@ -99,8 +99,6 @@ DynamicData::~DynamicData() {
 }
 
 const std::string& DynamicData::data() const {
-  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
-                      "Accessing TLS data in DataSourceProvider start");
   const auto thread_local_data = slot_->get();
   ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
                       "TLS data in DataSourceProvider retrieved");
@@ -108,18 +106,11 @@ const std::string& DynamicData::data() const {
 }
 
 const std::string& DataSourceProvider::data() const {
-  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
-                      "Accessing TLS data in DataSourceProvider start1");
   if (absl::holds_alternative<std::string>(data_)) {
     return absl::get<std::string>(data_);
   }
   return absl::get<DynamicData>(data_).data();
 }
-
-DataSourceProvider::~DataSourceProvider() {
-  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
-                      "Destroying DataSourceProvider");
-};
 
 absl::StatusOr<DataSourceProviderPtr> DataSourceProvider::create(const ProtoDataSource& source,
                                                                  Event::Dispatcher& main_dispatcher,

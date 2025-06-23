@@ -39,10 +39,10 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   if (tags_or_error.status().ok()) {
     tags_ = tags_or_error.value();
   }
-  ip_tags_reload_dispatcher_ = api.allocateDispatcher("ip_tags_reload_routine");
-  ip_tags_reload_timer_ = ip_tags_reload_dispatcher_->createTimer([this]() -> void {
+  ip_tags_reload_timer_ = main_dispatcher.createTimer([this]() -> void {
+    const auto new_data = tags_loader_.getDataSourceData();
     ENVOY_LOG(debug, "Trying to update ip tags in background");
-    auto new_tags_or_error = tags_loader_.refreshTags();
+    auto new_tags_or_error = tags_loader_.refreshTags(new_data);
     if (new_tags_or_error.status().ok()) {
       updateIpTags(new_tags_or_error.value());
       reload_success_cb_();
@@ -53,28 +53,10 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     }
     ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
   });
-
-  ip_tags_reload_thread_ = api.threadFactory().createThread(
-      [this]() -> void {
-        ENVOY_LOG(debug, "Started ip_tags_reload_routine");
-        if (ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0)) {
-          ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
-        }
-        ip_tags_reload_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
-      },
-      Thread::Options{std::string("ip_tags_reload_routine")});
+  ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
 }
 
-IpTagsProvider::~IpTagsProvider() {
-  ENVOY_LOG(debug, "Shutting down ip tags provider");
-  if (ip_tags_reload_dispatcher_) {
-    ip_tags_reload_dispatcher_->exit();
-  }
-  if (ip_tags_reload_thread_) {
-    ip_tags_reload_thread_->join();
-    ip_tags_reload_thread_.reset();
-  }
-};
+IpTagsProvider::~IpTagsProvider() { ENVOY_LOG(debug, "Shutting down ip tags provider"); };
 
 LcTrieSharedPtr IpTagsProvider::ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
   absl::ReaderMutexLock lock(&ip_tags_mutex_);
@@ -117,7 +99,10 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   return ip_tags_provider;
 }
 
-IpTagsLoader::~IpTagsLoader() { ENVOY_LOG(warn, "Destroying IpTagsLoader"); };
+const std::string& IpTagsLoader::getDataSourceData() {
+  data_ = data_source_provider_->data();
+  return data_;
+}
 
 IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                            Stats::StatNameSetPtr& stat_name_set)
@@ -141,15 +126,15 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
     }
     data_source_provider_ = std::move(provider_or_error.value());
     ip_tags_path_ = ip_tags_datasource.filename();
-    return refreshTags();
+    const auto& new_data = getDataSourceData();
+    return refreshTags(new_data);
   }
   return absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
 }
 
-absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
+absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags(const std::string& new_data) {
   if (data_source_provider_) {
     IpTagFileProto ip_tags_proto;
-    auto new_data = data_source_provider_->data();
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       auto load_status =
           MessageUtil::loadFromYamlNoThrow(new_data, ip_tags_proto, validation_visitor_);
@@ -260,6 +245,8 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
           "ip_tags_file_provider requires a valid ip_tags_datasource to be configured.");
       return;
     }
+    stat_name_set_->rememberBuiltin("ip_tags_reload_success");
+    stat_name_set_->rememberBuiltin("ip_tags_reload_error");
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
@@ -277,8 +264,6 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     } else {
       creation_status = absl::InvalidArgumentError("Failed to get ip tags from provider");
     }
-    stat_name_set_->rememberBuiltin("ip_tags_reload_success");
-    stat_name_set_->rememberBuiltin("ip_tags_reload_error");
   }
 }
 

@@ -37,8 +37,6 @@ public:
   IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                Stats::StatNameSetPtr& stat_name_set);
 
-  ~IpTagsLoader();
-
   /**
    * Loads file based ip tags from a data source and parses them into a trie structure.
    * @param ip_tags_datasource file based data source to load ip tags from.
@@ -53,10 +51,10 @@ public:
 
   /**
    * Performs periodic refresh of file based ip tags via data source.
-   * @param refresh_status This status will be populated with error if refresh fails.
-   * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise..
+   * @param new_data New data from data source which is used to refresh the ip tags structure.
+   * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
    */
-  absl::StatusOr<LcTrieSharedPtr> refreshTags();
+  absl::StatusOr<LcTrieSharedPtr> refreshTags(const std::string& new_data);
 
   /**
    * Parses ip tags in a proto format into a trie structure.
@@ -68,9 +66,15 @@ public:
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
+  /**
+   * Fetches latest data source data via TLS slot.
+   */
+  const std::string& getDataSourceData();
+
 private:
   Api::Api& api_;
   Envoy::Config::DataSource::DataSourceProviderPtr data_source_provider_;
+  std::string data_;
   std::string ip_tags_path_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::StatNameSetPtr& stat_name_set_;
@@ -111,8 +115,6 @@ private:
   IpTagsReloadErrorCb reload_error_cb_;
   mutable absl::Mutex ip_tags_mutex_;
   LcTrieSharedPtr tags_ ABSL_GUARDED_BY(ip_tags_mutex_);
-  Thread::ThreadPtr ip_tags_reload_thread_;
-  Event::DispatcherPtr ip_tags_reload_dispatcher_;
   Event::TimerPtr ip_tags_reload_timer_;
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;

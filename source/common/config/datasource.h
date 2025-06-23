@@ -88,7 +88,6 @@ private:
  */
 class DataSourceProvider {
 public:
-  ~DataSourceProvider();
   /**
    * Create a DataSourceProvider from a DataSource.
    * @param source data source.
