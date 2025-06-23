@@ -1322,29 +1322,20 @@ RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
                                                      const StreamInfo::StreamInfo& stream_info,
                                                      uint64_t random_value) const {
-  // Gets the route object chosen from the list of weighted clusters
-  // (if there is one) or returns self.
-  if (!cluster_name_.empty() || isDirectResponse()) {
-    return shared_from_this();
-  } else {
-    ASSERT(cluster_specifier_plugin_ != nullptr);
+  if (cluster_specifier_plugin_ != nullptr) {
     return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info, random_value);
   }
+  return shared_from_this();
 }
 
-absl::Status
-RouteEntryImplBase::validateClusters(const Upstream::ClusterManager& cluster_manager) const {
-  if (isDirectResponse()) {
-    return absl::OkStatus();
-  }
-
+absl::Status RouteEntryImplBase::validateClusters(const Upstream::ClusterManager& cm) const {
   if (!cluster_name_.empty()) {
-    if (!cluster_manager.hasCluster(cluster_name_)) {
-      return absl::InvalidArgumentError(fmt::format("route: unknown cluster '{}'", cluster_name_));
-    }
-  } else {
-    ASSERT(cluster_specifier_plugin_ != nullptr);
-    return cluster_specifier_plugin_->validateClusters(cluster_manager);
+    return !cm.hasCluster(cluster_name_) ? absl::InvalidArgumentError(fmt::format(
+                                               "route: unknown cluster '{}'", cluster_name_))
+                                         : absl::OkStatus();
+  }
+  if (cluster_specifier_plugin_ != nullptr) {
+    return cluster_specifier_plugin_->validateClusters(cm);
   }
   return absl::OkStatus();
 }
