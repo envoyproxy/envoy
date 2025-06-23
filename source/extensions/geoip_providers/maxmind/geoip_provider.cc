@@ -243,12 +243,12 @@ void GeoipProvider::lookupInAsnDb(
     // Used for testing.
     synchronizer_.syncPoint(std::string(ASN_DB_TYPE).append("_lookup_pre_complete"));
     if (!asn_db_ptr) {
-      // ASN information can be looked up from ISP database as well, so we don't need to
-      // throw an error if is not set.
-      if (!config_->isIspDbPathSet()) {
-        IS_ENVOY_BUG("Maxmind asn database must be initialised for performing lookups");
+      if (config_->isIspDbPathSet()) {
+        // ASN information can be looked up from ISP database as well, so we don't need to
+        // throw an error if is not set.
+        return;
       }
-      return;
+      IS_ENVOY_BUG("Maxmind asn database must be initialised for performing lookups");
     }
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         asn_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
