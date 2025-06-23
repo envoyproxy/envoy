@@ -32,7 +32,7 @@ public:
   constexpr static char name[] = "set-route-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool) override {
-    auto route_override = std::make_shared<Router::ExampleDerivedDelegatingRoute>(
+    auto route_override = std::make_shared<Router::ExampleDerivedDelegatingRouteEntry>(
         decoder_callbacks_->downstreamCallbacks()->route(nullptr),
         config_->proto_config_.cluster_override(),
         PROTOBUF_GET_OPTIONAL_MS(config_->proto_config_, idle_timeout_override));

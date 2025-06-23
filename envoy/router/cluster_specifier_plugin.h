@@ -23,11 +23,13 @@ public:
    * Create route from related route entry and request headers.
    *
    * @param parent related route.
-   * @param header request headers.
+   * @param headers request headers.
+   * @param stream_info stream info of the downstream request.
    * @return RouteConstSharedPtr final route with specific cluster.
    */
-  virtual RouteConstSharedPtr route(RouteConstSharedPtr parent,
-                                    const Http::RequestHeaderMap& header) const PURE;
+  virtual RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
+                                    const Http::RequestHeaderMap& headers,
+                                    const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using ClusterSpecifierPluginSharedPtr = std::shared_ptr<ClusterSpecifierPlugin>;
@@ -46,7 +48,7 @@ public:
    */
   virtual ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
-                               Server::Configuration::CommonFactoryContext& context) PURE;
+                               Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.router.cluster_specifier_plugin"; }
 };

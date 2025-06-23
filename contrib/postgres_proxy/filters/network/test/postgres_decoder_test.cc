@@ -29,6 +29,7 @@ public:
   MOCK_METHOD(bool, shouldEncryptUpstream, (), (const));
   MOCK_METHOD(void, sendUpstream, (Buffer::Instance&));
   MOCK_METHOD(bool, encryptUpstream, (bool, Buffer::Instance&));
+  MOCK_METHOD(void, verifyDownstreamSSL, (), (override));
 };
 
 // Define fixture class with decoder and mock callbacks.
@@ -628,6 +629,24 @@ TEST_F(PostgresProxyDecoderTest, TerminateSSL) {
 
   // Decoder should interpret the session as clear-text stream.
   ASSERT_FALSE(decoder_->encrypted());
+}
+
+// Test verifyDownstreamSSL callback.
+TEST_F(PostgresProxyDecoderTest, DownstreamSSL) {
+  // Set decoder to wait for initial message.
+  decoder_->state(DecoderImpl::State::InitState);
+
+  // if message is not requesting SSL,
+  // verifyDownstreamSSL should be called to check
+  // if ssl negotiation is done
+  // and if require client ssl is set
+  EXPECT_CALL(callbacks_, verifyDownstreamSSL);
+
+  // send a init postgres request that is not ssl init request
+  createInitialPostgresRequest(data_);
+
+  ASSERT_THAT(decoder_->onData(data_, false), Decoder::Result::ReadyForNext);
+  ASSERT_THAT(decoder_->state(), DecoderImpl::State::InSyncState);
 }
 
 class PostgresProxyUpstreamSSLTest

@@ -1127,6 +1127,12 @@ public:
    * @return EarlyDataPolicy& the configured early data option.
    */
   virtual const EarlyDataPolicy& earlyDataPolicy() const PURE;
+
+  /**
+   * Refresh the target cluster of the route with the request attributes if possible.
+   */
+  virtual void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 /**
@@ -1268,6 +1274,7 @@ public:
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 class RouteEntryAndRoute : public RouteEntry, public Route {};
+using RouteEntryAndRouteConstSharedPtr = std::shared_ptr<const RouteEntryAndRoute>;
 
 /**
  * RouteCallback, returns one of these enums to the route matcher to indicate

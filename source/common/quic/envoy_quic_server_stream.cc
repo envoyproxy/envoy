@@ -45,6 +45,10 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   stats_gatherer_ = new QuicStatsGatherer(&filterManagerConnection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
   RegisterMetadataVisitor(this);
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.validate_http3_pseudo_headers") &&
+      session->allow_extended_connect()) {
+    header_validator().SetAllowExtendedConnect();
+  }
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {

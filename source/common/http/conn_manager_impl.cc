@@ -2185,6 +2185,27 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   }
 }
 
+void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {
+  // If there is no cached route, or route cache is frozen, or the request headers are not
+  // available, then do not refresh the route cluster.
+  if (!hasCachedRoute() || routeCacheBlocked() || request_headers_ == nullptr) {
+    return;
+  }
+  if (const auto* entry = (*cached_route_)->routeEntry(); entry != nullptr) {
+    // Refresh the cluster if possible.
+    entry->refreshRouteCluster(*request_headers_, filter_manager_.streamInfo());
+
+    // Refresh the cached cluster info is necessary.
+    if (!cached_cluster_info_.has_value() || cached_cluster_info_.value() == nullptr ||
+        (*cached_cluster_info_)->name() != entry->clusterName()) {
+      auto* cluster =
+          connection_manager_.cluster_manager_.getThreadLocalCluster(entry->clusterName());
+      cached_cluster_info_ = (nullptr == cluster) ? nullptr : cluster->info();
+      filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
+    }
+  }
+}
+
 void ConnectionManagerImpl::ActiveStream::setCachedRoute(
     absl::optional<Router::RouteConstSharedPtr>&& route) {
   if (hasCachedRoute()) {

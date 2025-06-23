@@ -49,7 +49,7 @@ jobs:
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-14-xlarge
+      runs-on: macos-15-xlarge
       source: ${{ matrix.source }}
       steps-post:
       steps-pre: ${{ matrix.steps-pre }}

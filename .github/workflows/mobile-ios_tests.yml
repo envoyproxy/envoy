@@ -50,7 +50,7 @@ jobs:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
       # revert this to non-large once updated
-      runs-on: macos-14-xlarge
+      runs-on: macos-15
       source: |
         source ./ci/mac_ci_setup.sh
       steps-post: ${{ matrix.steps-post }}

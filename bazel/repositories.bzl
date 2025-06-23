@@ -221,9 +221,10 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
-
     external_http_archive(
         "aspect_bazel_lib",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:aspect.patch"],
     )
 
     _com_github_fdio_vpp_vcl()
@@ -260,6 +261,30 @@ def _boringssl_fips():
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
         patches = ["@envoy//bazel:boringssl_fips.patch"],
         patch_args = ["-p1"],
+    )
+
+    NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_ninja",
+        build_file_content = NINJA_BUILD_CONTENT,
+    )
+    CMAKE_BUILD_CONTENT = "%s\nexports_files([\"bin/cmake\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_cmake_linux_x86_64",
+        build_file_content = CMAKE_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "fips_cmake_linux_aarch64",
+        build_file_content = CMAKE_BUILD_CONTENT,
+    )
+    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_go_linux_amd64",
+        build_file_content = GO_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "fips_go_linux_arm64",
+        build_file_content = GO_BUILD_CONTENT,
     )
 
 def _aws_lc():

@@ -135,7 +135,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
     auto filter_chain_impl = findExistingFilterChain(*filter_chain);
     if (filter_chain_impl == nullptr) {
       auto filter_chain_or_error =
-          filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
+          filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator, false);
       RETURN_IF_NOT_OK(filter_chain_or_error.status());
       filter_chain_impl = filter_chain_or_error.value();
       ++new_filter_chain_size;
@@ -295,8 +295,8 @@ absl::Status FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
   if (origin == nullptr) {
-    auto filter_chain_or_error =
-        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+    auto filter_chain_or_error = filter_chain_factory_builder.buildFilterChain(
+        *default_filter_chain, context_creator, false);
     RETURN_IF_NOT_OK(filter_chain_or_error.status());
     default_filter_chain_ = *filter_chain_or_error;
     return absl::OkStatus();
@@ -309,8 +309,8 @@ absl::Status FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
       eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
     default_filter_chain_ = origin->default_filter_chain_;
   } else {
-    auto filter_chain_or_error =
-        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+    auto filter_chain_or_error = filter_chain_factory_builder.buildFilterChain(
+        *default_filter_chain, context_creator, false);
     RETURN_IF_NOT_OK(filter_chain_or_error.status());
     default_filter_chain_ = *filter_chain_or_error;
   }
@@ -569,12 +569,12 @@ const Network::FilterChain*
 FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
                                                     const StreamInfo::StreamInfo& info) const {
   Network::Matching::MatchingDataImpl data(socket, info.filterState(), info.dynamicMetadata());
-  const auto& match_result = Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
-  ASSERT(match_result.match_state_ == Matcher::MatchState::MatchComplete,
-         "Matching must complete for network streams.");
-  if (match_result.result_) {
-    const auto result = match_result.result_();
-    return result->getTyped<Configuration::FilterChainBaseAction>().get(filter_chains_by_name_,
+  const Matcher::MatchResult match_result =
+      Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
+  ASSERT(match_result.isComplete(), "Matching must complete for network streams.");
+  if (match_result.isMatch()) {
+    const Matcher::ActionPtr action = match_result.action();
+    return action->getTyped<Configuration::FilterChainBaseAction>().get(filter_chains_by_name_,
                                                                         info);
   }
   return default_filter_chain_.get();
