@@ -582,7 +582,8 @@ private:
 
   std::unique_ptr<OnProcessingResponse> on_processing_response_;
 
-  // The effective failure_mode_allow setting, considering both the main config and per-route overrides.
+  // The effective failure_mode_allow setting, considering both the main config and per-route
+  // overrides.
   bool failure_mode_allow_;
 
   // Set to true when no more messages need to be sent to the processor.

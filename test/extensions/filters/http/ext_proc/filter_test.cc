@@ -1656,8 +1656,8 @@ failure_mode_allow: )EOF";
     if (expect_fail_closed) {
       TestResponseHeaderMapImpl immediate_response_headers;
       EXPECT_CALL(encoder_callbacks_,
-                  sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _,
-                                 Eq(absl::nullopt), "ext_proc_error_gRPC_error_13{error_message}"))
+                  sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+                                 "ext_proc_error_gRPC_error_13{error_message}"))
           .WillOnce(Invoke([&immediate_response_headers](
                                Unused, Unused,
                                std::function<void(ResponseHeaderMap & headers)> modify_headers,
@@ -1688,28 +1688,32 @@ TEST_F(FailureModeAllowOverrideTest, FilterAllowRouteDisallow) {
   // Filter: failure_mode_allow = true
   // Route: failure_mode_allow = false
   // Expected: Fail closed
-  testFailureMode(/*filter_level_allow=*/true, /*route_level_allow=*/false, /*expect_fail_closed=*/true);
+  testFailureMode(/*filter_level_allow=*/true, /*route_level_allow=*/false,
+                  /*expect_fail_closed=*/true);
 }
 
 TEST_F(FailureModeAllowOverrideTest, FilterDisallowRouteAllow) {
   // Filter: failure_mode_allow = false
   // Route: failure_mode_allow = true
   // Expected: Allow request
-  testFailureMode(/*filter_level_allow=*/false, /*route_level_allow=*/true, /*expect_fail_closed=*/false);
+  testFailureMode(/*filter_level_allow=*/false, /*route_level_allow=*/true,
+                  /*expect_fail_closed=*/false);
 }
 
 TEST_F(FailureModeAllowOverrideTest, FilterAllowNoRouteOverride) {
   // Filter: failure_mode_allow = true
   // Route: No override
   // Expected: Allow request
-  testFailureMode(/*filter_level_allow=*/true, /*route_level_allow=*/absl::nullopt, /*expect_fail_closed=*/false);
+  testFailureMode(/*filter_level_allow=*/true, /*route_level_allow=*/absl::nullopt,
+                  /*expect_fail_closed=*/false);
 }
 
 TEST_F(FailureModeAllowOverrideTest, FilterDisallowNoRouteOverride) {
   // Filter: failure_mode_allow = false
   // Route: No override
   // Expected: Fail closed
-  testFailureMode(/*filter_level_allow=*/false, /*route_level_allow=*/absl::nullopt, /*expect_fail_closed=*/true);
+  testFailureMode(/*filter_level_allow=*/false, /*route_level_allow=*/absl::nullopt,
+                  /*expect_fail_closed=*/true);
 }
 
 TEST_F(HttpFilterTest, StreamingBodyMutateLastEmptyChunk) {
