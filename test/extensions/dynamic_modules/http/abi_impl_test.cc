@@ -9,6 +9,8 @@
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace DynamicModules {
@@ -906,12 +908,13 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(result_str_length, 14);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
 
-  // test TLS connection attributes
+  // Tests for TLS connection attributes
   const Network::MockConnection connection;
   EXPECT_CALL(callbacks, connection())
       .WillRepeatedly(
           testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
   EXPECT_CALL(connection, ssl()).WillRepeatedly(testing::Return(nullptr));
+  // no TLS connection, should return false
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result_str_ptr,
       &result_str_length));
@@ -925,6 +928,14 @@ TEST(ABIImpl, GetAttributes) {
       &result_str_length));
   EXPECT_EQ(result_str_length, tls_version.size());
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), tls_version);
+
+  const std::string digest = "sha256_digest";
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillRepeatedly(testing::ReturnRef(digest));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest,
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, digest.size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), digest);
 
   const std::string subject_cert = "subject_cert";
   EXPECT_CALL(*ssl, subjectLocalCertificate()).WillRepeatedly(testing::ReturnRef(subject_cert));
@@ -992,6 +1003,12 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_DestinationPort, &result_number));
   EXPECT_EQ(result_number, 4321);
+
+  // envoy_dynamic_module_type_attribute_id_ConnectionId
+  EXPECT_CALL(connection, id()).WillRepeatedly(testing::Return(8386));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionId, &result_number));
+  EXPECT_EQ(result_number, 8386);
 }
 
 TEST(ABIImpl, HttpCallout) {
