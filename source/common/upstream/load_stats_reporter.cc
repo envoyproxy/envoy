@@ -164,23 +164,23 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           cluster_stats->add_upstream_locality_stats()->MergeFrom(locality_stats);
         }
       }
-      cluster_stats->set_total_dropped_requests(
-          cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
-      const uint64_t drop_overload_count =
-          cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
-      if (drop_overload_count > 0) {
-        auto* dropped_request = cluster_stats->add_dropped_requests();
-        dropped_request->set_category(cluster.dropCategory());
-        dropped_request->set_dropped_count(drop_overload_count);
-      }
-
-      const auto now = time_source_.monotonicTime().time_since_epoch();
-      const auto measured_interval = now - cluster_name_and_timestamp.second;
-      cluster_stats->mutable_load_report_interval()->MergeFrom(
-          Protobuf::util::TimeUtil::MicrosecondsToDuration(
-              std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
-      clusters_[cluster_name] = now;
     }
+    cluster_stats->set_total_dropped_requests(
+        cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
+    const uint64_t drop_overload_count =
+        cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
+    if (drop_overload_count > 0) {
+      auto* dropped_request = cluster_stats->add_dropped_requests();
+      dropped_request->set_category(cluster.dropCategory());
+      dropped_request->set_dropped_count(drop_overload_count);
+    }
+
+    const auto now = time_source_.monotonicTime().time_since_epoch();
+    const auto measured_interval = now - cluster_name_and_timestamp.second;
+    cluster_stats->mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(
+            std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
+    clusters_[cluster_name] = now;
   }
 
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
