@@ -285,7 +285,6 @@ TEST_F(GeoipProviderTest, ValidConfigUsingAsnAndIspDbsSuccessfulLookup) {
   expectStats("isp_db");
 }
 
-
 TEST_F(GeoipProviderTest, AsnDbAndIspDbNotSetCausesEnvoyBug) {
   // Configuration that exposes the logical bug:
   // 1. ASN header is requested (triggers lookupInAsnDb call)
