@@ -1295,6 +1295,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChanged(JNIEnv*
   reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChanged(network_type);
 }
 
+extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChangeEvent(JNIEnv*, jclass,
                                                                              jlong engine,
                                                                              jint network_type) {
