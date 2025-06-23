@@ -25,9 +25,9 @@ import java.util.concurrent.TimeUnit
 
 private const val TAG = "MainActivity"
 private const val REQUEST_HANDLER_THREAD_NAME = "hello_envoy_kt"
-private const val REQUEST_AUTHORITY = "localhost:10000"
+private const val REQUEST_AUTHORITY = "api.lyft.com"
 private const val REQUEST_PATH = "/ping"
-private const val REQUEST_SCHEME = "http"
+private const val REQUEST_SCHEME = "https"
 private val FILTERED_HEADERS =
   setOf(
     "server",
