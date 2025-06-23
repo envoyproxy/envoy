@@ -882,38 +882,6 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     }
     break;
   }
-  case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate: {
-    return getFirstSanEntry(
-        filter->connection(),
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
-          return ssl->dnsSansLocalCertificate();
-        },
-        result, result_length);
-  }
-  case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate: {
-    return getFirstSanEntry(
-        filter->connection(),
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
-          return ssl->dnsSansPeerCertificate();
-        },
-        result, result_length);
-  }
-  case envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate: {
-    return getFirstSanEntry(
-        filter->connection(),
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
-          return ssl->uriSanLocalCertificate();
-        },
-        result, result_length);
-  }
-  case envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate: {
-    return getFirstSanEntry(
-        filter->connection(),
-        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
-          return ssl->uriSanPeerCertificate();
-        },
-        result, result_length);
-  }
   case envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest: {
     const auto connection = filter->connection();
     if (connection) {
@@ -927,6 +895,34 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
     }
     break;
   }
+  case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate:
+    return getFirstSanEntry(
+        filter->connection(),
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
+          return ssl->dnsSansLocalCertificate();
+        },
+        result, result_length);
+  case envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate:
+    return getFirstSanEntry(
+        filter->connection(),
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
+          return ssl->dnsSansPeerCertificate();
+        },
+        result, result_length);
+  case envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate:
+    return getFirstSanEntry(
+        filter->connection(),
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
+          return ssl->uriSanLocalCertificate();
+        },
+        result, result_length);
+  case envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate:
+    return getFirstSanEntry(
+        filter->connection(),
+        [](const Ssl::ConnectionInfoConstSharedPtr ssl) -> absl::Span<const std::string> {
+          return ssl->uriSanPeerCertificate();
+        },
+        result, result_length);
   default:
     ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), error,
                         "Unsupported attribute ID {} as string",
