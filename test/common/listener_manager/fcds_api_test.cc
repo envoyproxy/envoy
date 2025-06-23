@@ -154,13 +154,16 @@ TEST_F(FcdsApiTest, BasicFilterChainOperations) {
 
   // Test update with removal and addition
   const auto filter_chain_3 = buildFilterChain(filter_chain_3_name_);
-  absl::flat_hash_set<absl::string_view> removed_filter_chains{filter_chain_1_name_};
+  absl::flat_hash_set<absl::string_view> removed_filter_chains;
+  removed_filter_chains.insert(absl::string_view(filter_chain_1_name_));
   expectFilterChainUpdateSuccess(1, removed_filter_chains);
   EXPECT_TRUE(startConfigUpdate({filter_chain_3}, {filter_chain_1_name_}, version_1_).ok());
   EXPECT_EQ(version_1_, fcds_->versionInfo());
 
   // Test removing all filter chains
-  absl::flat_hash_set<absl::string_view> all_removed{filter_chain_2_name_, filter_chain_3_name_};
+  absl::flat_hash_set<absl::string_view> all_removed;
+  all_removed.insert(absl::string_view(filter_chain_2_name_));
+  all_removed.insert(absl::string_view(filter_chain_3_name_));
   expectFilterChainUpdateSuccess(0, all_removed);
   EXPECT_TRUE(startConfigUpdate({}, {filter_chain_2_name_, filter_chain_3_name_}, version_2_).ok());
   EXPECT_EQ(version_2_, fcds_->versionInfo());
