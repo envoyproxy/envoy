@@ -744,6 +744,7 @@ TEST(ABIImpl, ClearRouteCache) {
 }
 
 TEST(ABIImpl, GetAttributes) {
+  DynamicModuleHttpFilter filter_without_callbacks{nullptr};
   DynamicModuleHttpFilter filter{nullptr};
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
@@ -910,7 +911,6 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
 
   // empty connection, should return false
-  DynamicModuleHttpFilter filter_without_callbacks{nullptr};
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
       &result_str_ptr, &result_str_length));
@@ -1004,6 +1004,9 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), sans[0]);
 
   // envoy_dynamic_module_type_attribute_id_ResponseCode
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ResponseCode,
+      &result_number));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ResponseCode, &result_number));
   EXPECT_EQ(result_number, 200);
