@@ -87,43 +87,61 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_issued = 0;
         LoadMetricStats::StatMap load_metrics;
 
-        // Store per-host stats for endpoint granularity reporting.
-        struct EndpointStats {
-          uint64_t rq_success;
-          uint64_t rq_error;
-          uint64_t rq_active;
-          uint64_t rq_issued;
-        };
-        absl::flat_hash_map<const Host*, EndpointStats> endpoint_stats_map;
-        absl::flat_hash_map<const Host*, std::unique_ptr<LoadMetricStats::StatMap>>
-            endpoint_metric_stats_map;
+        envoy::config::endpoint::v3::UpstreamLocalityStats locality_stats;
+        locality_stats.mutable_locality()->MergeFrom(hosts[0]->locality());
+        locality_stats.set_priority(host_set->priority());
 
         for (const HostSharedPtr& host : hosts) {
           uint64_t host_rq_success = host->stats().rq_success_.latch();
           uint64_t host_rq_error = host->stats().rq_error_.latch();
           uint64_t host_rq_active = host->stats().rq_active_.value();
           uint64_t host_rq_issued = host->stats().rq_total_.latch();
-          rq_success += host_rq_success;
-          rq_error += host_rq_error;
-          rq_active += host_rq_active;
-          rq_issued += host_rq_issued;
-          if (host_rq_success + host_rq_error + host_rq_active != 0) {
+
+          bool endpoint_has_updates =
+              (host_rq_success + host_rq_error + host_rq_active + host_rq_issued) != 0;
+
+          if (endpoint_has_updates) {
+            rq_success += host_rq_success;
+            rq_error += host_rq_error;
+            rq_active += host_rq_active;
+            rq_issued += host_rq_issued;
+
+            envoy::config::endpoint::v3::UpstreamEndpointStats* upstream_endpoint_stats = nullptr;
+            // Set the upstream endpoint stats if we are reporting endpoint granularity.
+            if (message_ && message_->report_endpoint_granularity()) {
+              upstream_endpoint_stats = locality_stats.add_upstream_endpoint_stats();
+              Network::Utility::addressToProtobufAddress(
+                  *host->address(), *upstream_endpoint_stats->mutable_address());
+              upstream_endpoint_stats->set_total_successful_requests(host_rq_success);
+              upstream_endpoint_stats->set_total_error_requests(host_rq_error);
+              upstream_endpoint_stats->set_total_requests_in_progress(host_rq_active);
+              upstream_endpoint_stats->set_total_issued_requests(host_rq_issued);
+            }
+
             const std::unique_ptr<LoadMetricStats::StatMap> latched_stats =
                 host->loadMetricStats().latch();
             if (latched_stats != nullptr) {
-              endpoint_metric_stats_map[host.get()] =
-                  std::make_unique<LoadMetricStats::StatMap>(*latched_stats);
               for (const auto& metric : *latched_stats) {
-                const std::string& name = metric.first;
-                LoadMetricStats::Stat& stat = load_metrics[name];
-                stat.num_requests_with_metric += metric.second.num_requests_with_metric;
-                stat.total_metric_value += metric.second.total_metric_value;
+                const auto& metric_name = metric.first;
+                const auto& metric_value = metric.second;
+
+                // Add the metric to the load metrics map.
+                LoadMetricStats::Stat& stat = load_metrics[metric_name];
+                stat.num_requests_with_metric += metric_value.num_requests_with_metric;
+                stat.total_metric_value += metric_value.total_metric_value;
+
+                // If we are reporting endpoint granularity, add the metric to the
+                // upstream endpoint stats.
+                if (upstream_endpoint_stats != nullptr) {
+                  auto* endpoint_load_metric = upstream_endpoint_stats->add_load_metric_stats();
+                  endpoint_load_metric->set_metric_name(metric_name);
+                  endpoint_load_metric->set_num_requests_finished_with_metric(
+                      metric_value.num_requests_with_metric);
+                  endpoint_load_metric->set_total_metric_value(metric_value.total_metric_value);
+                }
               }
             }
           }
-          // Store endpoint stats for this host.
-          endpoint_stats_map[host.get()] = {host_rq_success, host_rq_error, host_rq_active,
-                                            host_rq_issued};
         }
 
         bool should_send_locality_stats = rq_success + rq_error + rq_active != 0;
@@ -132,71 +150,37 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           should_send_locality_stats = rq_issued != 0;
         }
         if (should_send_locality_stats) {
-          auto* locality_stats = cluster_stats->add_upstream_locality_stats();
-          locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
-          locality_stats->set_priority(host_set->priority());
-          locality_stats->set_total_successful_requests(rq_success);
-          locality_stats->set_total_error_requests(rq_error);
-          locality_stats->set_total_requests_in_progress(rq_active);
-          locality_stats->set_total_issued_requests(rq_issued);
+          locality_stats.set_total_successful_requests(rq_success);
+          locality_stats.set_total_error_requests(rq_error);
+          locality_stats.set_total_requests_in_progress(rq_active);
+          locality_stats.set_total_issued_requests(rq_issued);
           for (const auto& metric : load_metrics) {
-            auto* load_metric_stats = locality_stats->add_load_metric_stats();
+            auto* load_metric_stats = locality_stats.add_load_metric_stats();
             load_metric_stats->set_metric_name(metric.first);
             load_metric_stats->set_num_requests_finished_with_metric(
                 metric.second.num_requests_with_metric);
             load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
           }
-          // Check if endpoint granularity should be reported.
-          if (message_->report_endpoint_granularity()) {
-            for (const HostSharedPtr& host : hosts) {
-              ENVOY_LOG(trace, "Load report endpoint {}:{} count {}", host->address()->asString(),
-                        host->address()->ip()->port(), hosts.size());
-              // Add upstream endpoint stats to locality stats.
-              auto* const upstream_endpoint_stats = locality_stats->add_upstream_endpoint_stats();
-              // Add address to upstream endpoint stats.
-              Network::Utility::addressToProtobufAddress(
-                  *host->address(), *upstream_endpoint_stats->mutable_address());
-
-              // Add endpoint stats (successful requests, requests in progress, error requests, and
-              // issued requests).
-              const auto& stats = endpoint_stats_map[host.get()];
-              upstream_endpoint_stats->set_total_successful_requests(stats.rq_success);
-              upstream_endpoint_stats->set_total_requests_in_progress(stats.rq_active);
-              upstream_endpoint_stats->set_total_error_requests(stats.rq_error);
-              upstream_endpoint_stats->set_total_issued_requests(stats.rq_issued);
-
-              // Add load metric stats.
-              const auto it = endpoint_metric_stats_map.find(host.get());
-              if (it != endpoint_metric_stats_map.end() && it->second != nullptr) {
-                for (const auto& metric : *(it->second)) {
-                  auto* endpoint_metric_stats = upstream_endpoint_stats->add_load_metric_stats();
-                  endpoint_metric_stats->set_metric_name(metric.first);
-                  endpoint_metric_stats->set_num_requests_finished_with_metric(
-                      metric.second.num_requests_with_metric);
-                  endpoint_metric_stats->set_total_metric_value(metric.second.total_metric_value);
-                }
-              }
-            }
-          }
+          cluster_stats->add_upstream_locality_stats()->MergeFrom(locality_stats);
         }
       }
-    }
-    cluster_stats->set_total_dropped_requests(
-        cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
-    const uint64_t drop_overload_count =
-        cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
-    if (drop_overload_count > 0) {
-      auto* dropped_request = cluster_stats->add_dropped_requests();
-      dropped_request->set_category(cluster.dropCategory());
-      dropped_request->set_dropped_count(drop_overload_count);
-    }
+      cluster_stats->set_total_dropped_requests(
+          cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
+      const uint64_t drop_overload_count =
+          cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
+      if (drop_overload_count > 0) {
+        auto* dropped_request = cluster_stats->add_dropped_requests();
+        dropped_request->set_category(cluster.dropCategory());
+        dropped_request->set_dropped_count(drop_overload_count);
+      }
 
-    const auto now = time_source_.monotonicTime().time_since_epoch();
-    const auto measured_interval = now - cluster_name_and_timestamp.second;
-    cluster_stats->mutable_load_report_interval()->MergeFrom(
-        Protobuf::util::TimeUtil::MicrosecondsToDuration(
-            std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
-    clusters_[cluster_name] = now;
+      const auto now = time_source_.monotonicTime().time_since_epoch();
+      const auto measured_interval = now - cluster_name_and_timestamp.second;
+      cluster_stats->mutable_load_report_interval()->MergeFrom(
+          Protobuf::util::TimeUtil::MicrosecondsToDuration(
+              std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
+      clusters_[cluster_name] = now;
+    }
   }
 
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
@@ -313,6 +297,5 @@ void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std
     setRetryTimer();
   }
 }
-
 } // namespace Upstream
 } // namespace Envoy
