@@ -42,7 +42,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-android }}
     needs: load
     name: Build envoy.aar distributable
     uses: ./.github/workflows/_mobile_container_ci.yml
@@ -51,7 +51,7 @@ jobs:
         build
         --config=mobile-remote-release-clang-android
         //:android_dist
-      container: ${{ fromJSON(needs.load.outputs.build-image).mobile }}
+      container: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).mobile || '' }}
       diskspace-hack: true
       request: ${{ needs.load.outputs.request }}
       timeout-minutes: 90
@@ -63,7 +63,7 @@ jobs:
       packages: read
     name: kotlin-hello-world
     uses: ./.github/workflows/_run.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-android }}
     needs:
     - load
     - build
@@ -90,7 +90,7 @@ jobs:
             app: io.envoyproxy.envoymobile.helloenvoykotlin/.MainActivity
             status: 200
       timeout-minutes: 50
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
       working-directory: mobile
 
   apps:
@@ -99,7 +99,7 @@ jobs:
       packages: read
     name: Android apps
     uses: ./.github/workflows/_run.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-android-all }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-android-all }}
     needs:
     - load
     - build
@@ -114,7 +114,7 @@ jobs:
         - uses: envoyproxy/toolshed/gh-actions/envoy/android/pre@actions-v0.3.20
       steps-post: ${{ matrix.steps-post }}
       timeout-minutes: 50
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
       working-directory: mobile
     strategy:
       fail-fast: false
@@ -176,6 +176,7 @@ jobs:
       && github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && needs.load.outputs.request
       && fromJSON(needs.load.outputs.request).run.mobile-android
     needs:
     - load
