@@ -1,0 +1,53 @@
+name: Security check
+
+# This workflow validates that workflow_run events are only triggered by authorized sources
+# It will only run (and fail) if triggered by unauthorized events
+
+on:
+  workflow_run:
+    workflows:
+    - Request
+    types:
+    - completed
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI)
+      && (
+        github.event.workflow_run.repository.full_name != github.repository
+        || !contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      )
+    runs-on: ubuntu-24.04
+    name: Security violation detected
+    steps:
+    - name: Report security violation
+      run: |
+        echo "::error::SECURITY VIOLATION DETECTED"
+        echo "::error::Unauthorized workflow_run trigger attempt"
+        echo ""
+        echo "Details:"
+        echo "- Workflow triggered by: ${{ github.event.workflow_run.event }}"
+        echo "- Repository: ${{ github.event.workflow_run.repository.full_name }}"
+        echo "- Expected repository: ${{ github.repository }}"
+        echo "- Workflow run ID: ${{ github.event.workflow_run.id }}"
+        echo "- Actor: ${{ github.event.workflow_run.actor.login }}"
+        echo ""
+
+        # Check specific violation
+        if [[ "${{ github.event.workflow_run.repository.full_name }}" != "${{ github.repository }}" ]]; then
+          echo "::error::Violation: Workflow triggered from unauthorized repository"
+        fi
+
+        ALLOWED_EVENTS='["pull_request_target", "push", "schedule"]'
+        EVENT="${{ github.event.workflow_run.event }}"
+
+        if ! echo "$ALLOWED_EVENTS" | jq -e --arg event "$EVENT" 'contains([$event])' > /dev/null; then
+          echo "::error::Violation: Workflow triggered by unauthorized event type: $EVENT"
+        fi
+
+        exit 1
