@@ -32,13 +32,9 @@ class SecurityNotifier(runner.Runner):
     def add_arguments(self, parser) -> None:
         super().add_arguments(parser)
         parser.add_argument(
-            '--violation_file',
-            required=True,
-            help="JSON file containing violation data")
+            '--violation_file', required=True, help="JSON file containing violation data")
         parser.add_argument(
-            '--channel',
-            default='#envoy-maintainer-oncall',
-            help="Slack channel to notify")
+            '--channel', default='#envoy-maintainer-oncall', help="Slack channel to notify")
         parser.add_argument(
             '--dry_run',
             action="store_true",
@@ -47,43 +43,35 @@ class SecurityNotifier(runner.Runner):
     async def notify(self):
         violation = self.violation_data
 
-        message_blocks = [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "🚨 *SECURITY VIOLATION DETECTED* 🚨"
-                }
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*Unauthorized workflow trigger attempt*"
-                }
-            },
-            {
-                "type": "section",
-                "fields": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Actor:*\n{violation['actor']}"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Repository:*\n{violation['repository']}"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Event Type:*\n{violation['event_type']}"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Workflow Run ID:*\n{violation['workflow_run_id']}"
-                    }
-                ]
+        message_blocks = [{
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "🚨 *SECURITY VIOLATION DETECTED* 🚨"
             }
-        ]
+        }, {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Unauthorized workflow trigger attempt*"
+            }
+        }, {
+            "type":
+                "section",
+            "fields": [{
+                "type": "mrkdwn",
+                "text": f"*Actor:*\n{violation['actor']}"
+            }, {
+                "type": "mrkdwn",
+                "text": f"*Repository:*\n{violation['repository']}"
+            }, {
+                "type": "mrkdwn",
+                "text": f"*Event Type:*\n{violation['event_type']}"
+            }, {
+                "type": "mrkdwn",
+                "text": f"*Workflow Run ID:*\n{violation['workflow_run_id']}"
+            }]
+        }]
 
         if violation.get('pr_number'):
             message_blocks.append({
@@ -122,11 +110,11 @@ class SecurityNotifier(runner.Runner):
                 await self.slack_client.chat_postMessage(
                     channel=channel,
                     text="Security Violation Detected - Unauthorized workflow trigger",
-                    blocks=message_blocks
-                )
+                    blocks=message_blocks)
                 self.log.notice(f"Security violation notification sent to {channel}")
             except SlackApiError as e:
-                self.log.error(f"Failed to send Slack notification to {channel}: {e.response['error']}")
+                self.log.error(
+                    f"Failed to send Slack notification to {channel}: {e.response['error']}")
                 errors.append(channel)
 
         return 1 if errors else 0
