@@ -669,6 +669,10 @@ ValidationResults ContextImpl::customVerifyCertChainForQuic(
   return result;
 }
 
+bssl::UniquePtr<STACK_OF(X509_NAME)> ContextImpl::clientCA() const {
+  return cert_validator_->getCaCertificates();
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

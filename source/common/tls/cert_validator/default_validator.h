@@ -56,6 +56,7 @@ public:
                                 unsigned hash_length) override;
 
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
+  bssl::UniquePtr<STACK_OF(X509_NAME)> getCaCertificates() const override;
   std::string getCaFileName() const override { return ca_file_path_; };
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
 

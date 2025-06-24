@@ -167,6 +167,32 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "envoy_quic_server_proof_verifier_lib",
+    srcs = envoy_select_enable_http3(["envoy_quic_server_proof_verifier.cc"]),
+    hdrs = envoy_select_enable_http3(["envoy_quic_server_proof_verifier.h"]),
+    deps = envoy_select_enable_http3([
+        ":envoy_quic_proof_verifier_base_lib",
+        ":envoy_quic_proof_verifier_lib",
+        ":envoy_quic_utils_lib",
+        ":quic_server_transport_socket_factory_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/common/tls:server_context_lib",
+        "@com_github_google_quiche//:quic_core_crypto_certificate_view_lib",
+        "@com_github_google_quiche//:quic_platform",
+    ]),
+)
+
+envoy_cc_library(
+    name = "envoy_quic_server_proof_verifier_factory_interface",
+    hdrs = envoy_select_enable_http3(["envoy_quic_server_proof_verifier_factory_interface.h"]),
+    deps = envoy_select_enable_http3([
+        "//envoy/config:typed_config_interface",
+        "@com_github_google_quiche//:quic_platform",
+    ]),
+)
+
+envoy_cc_library(
     name = "envoy_quic_stream_lib",
     srcs = envoy_select_enable_http3(["envoy_quic_stream.cc"]),
     hdrs = envoy_select_enable_http3(["envoy_quic_stream.h"]),
@@ -435,6 +461,7 @@ envoy_cc_library(
         ":envoy_quic_proof_source_factory_interface",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_preferred_address_config_factory_interface",
+        "//source/extensions/quic/proof_verifier:envoy_quic_server_proof_verifier_factory_impl_lib",
         ":envoy_quic_utils_lib",
         "//envoy/network:listener_interface",
         "//source/common/network:listener_lib",

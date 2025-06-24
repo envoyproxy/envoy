@@ -22,6 +22,7 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_network_connection.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/quic/proof_verifier/envoy_quic_server_proof_verifier_factory_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -37,6 +38,7 @@ ActiveQuicListener::ActiveQuicListener(
     uint32_t packets_to_read_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+    EnvoyQuicServerProofVerifierFactoryInterface& proof_verifier_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator, QuicConnectionIdWorkerSelector worker_selector,
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory,
     bool reject_new_connections)
@@ -61,12 +63,23 @@ ActiveQuicListener::ActiveQuicListener(
 
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
+
+  // Create ProofVerifier for client certificate validation during handshake
+  auto proof_verifier = proof_verifier_factory.createQuicServerProofVerifier(
+      listen_socket_, listener_config.filterChainManager(), dispatcher.timeSource());
+
+  // Create the crypto server config with proof source (for server certs)
+  // and proof verifier (for client cert validation)
+  // Using the new QUICHE API that accepts ProofVerifier in constructor
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       absl::string_view(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(),
       proof_source_factory.createQuicProofSource(
           listen_socket_, listener_config.filterChainManager(), stats_, dispatcher.timeSource()),
-      quic::KeyExchangeSource::Default());
+      quic::KeyExchangeSource::Default(),
+      std::move(proof_verifier)); // Pass ProofVerifier for client certificate validation
+
+  ENVOY_LOG(debug, "QUIC server: ProofVerifier integrated for client certificate enforcement");
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());
@@ -316,6 +329,19 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   proof_source_factory_ = Config::Utility::getAndCheckFactory<EnvoyQuicProofSourceFactoryInterface>(
       proof_source_config);
 
+  // Initialize proof verifier factory for client certificate validation.
+  envoy::config::core::v3::TypedExtensionConfig proof_verifier_config;
+  if (!config.has_proof_verifier_config()) {
+    proof_verifier_config.set_name("envoy.quic.server.proof_verifier.filter_chain");
+    envoy::extensions::quic::proof_source::v3::ProofSourceConfig empty_proof_verifier_config;
+    proof_verifier_config.mutable_typed_config()->PackFrom(empty_proof_verifier_config);
+  } else {
+    proof_verifier_config = config.proof_verifier_config();
+  }
+  proof_verifier_factory_ =
+      Config::Utility::getAndCheckFactory<EnvoyQuicServerProofVerifierFactoryInterface>(
+          proof_verifier_config);
+
   // Initialize connection debug visitor factory if one is configured.
   if (config.has_connection_debug_visitor_config()) {
     auto& factory =
@@ -425,7 +451,7 @@ Network::ConnectionHandler::ActiveUdpListenerPtr ActiveQuicListenerFactory::crea
       runtime, worker_index, concurrency_, dispatcher, parent, std::move(listen_socket_ptr), config,
       quic_config_, kernel_worker_routing_, enabled_, quic_stat_names_,
       packets_to_read_to_connection_count_ratio_, crypto_server_stream_factory_.value(),
-      proof_source_factory_.value(),
+      proof_source_factory_.value(), proof_verifier_factory_.value(),
       quic_cid_generator_factory_->createQuicConnectionIdGenerator(worker_index));
 }
 Network::ConnectionHandler::ActiveUdpListenerPtr
@@ -438,12 +464,13 @@ ActiveQuicListenerFactory::createActiveQuicListener(
     uint32_t packets_to_read_to_connection_count_ratio,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     EnvoyQuicProofSourceFactoryInterface& proof_source_factory,
+    EnvoyQuicServerProofVerifierFactoryInterface& proof_verifier_factory,
     QuicConnectionIdGeneratorPtr&& cid_generator) {
   return std::make_unique<ActiveQuicListener>(
       runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
       listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
       packets_to_read_to_connection_count_ratio, crypto_server_stream_factory, proof_source_factory,
-      std::move(cid_generator), worker_selector_,
+      proof_verifier_factory, std::move(cid_generator), worker_selector_,
       makeOptRefFromPtr(connection_debug_visitor_factory_.get()), reject_new_connections_);
 }
 

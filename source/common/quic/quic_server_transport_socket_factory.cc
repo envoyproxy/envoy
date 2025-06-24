@@ -16,19 +16,16 @@ absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
 QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& config, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
-  auto quic_transport = MessageUtil::downcastAndValidate<
+  auto& quic_transport = MessageUtil::downcastAndValidate<
       const envoy::extensions::transport_sockets::quic::v3::QuicDownstreamTransport&>(
       config, context.messageValidationVisitor());
+
   absl::StatusOr<std::unique_ptr<Extensions::TransportSockets::Tls::ServerContextConfigImpl>>
       server_config_or_error = Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
           quic_transport.downstream_tls_context(), context, true);
   RETURN_IF_NOT_OK(server_config_or_error.status());
   auto server_config = std::move(server_config_or_error.value());
-  // TODO(RyanTheOptimist): support TLS client authentication.
-  if (server_config->requireClientCertificate()) {
-    return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
-  }
-
+  // Client certificate authentication is supported in QUIC as per RFC 9001 Section 4.4.
   auto factory_or_error = QuicServerTransportSocketFactory::create(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
       context.statsScope(), std::move(server_config),
@@ -176,6 +173,25 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   // Both of these members are themselves reference counted, so it is safe to use them after
   // ``ssl_ctx`` goes out of scope after the function returns.
   return {tls_context.quic_cert_, tls_context.quic_private_key_};
+}
+
+bssl::UniquePtr<STACK_OF(X509_NAME)> QuicServerTransportSocketFactory::getClientCaList() const {
+  Envoy::Ssl::ServerContextSharedPtr ssl_ctx;
+  {
+    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx = ssl_ctx_;
+  }
+  if (!ssl_ctx) {
+    return nullptr;
+  }
+  auto ctx =
+      std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
+  return ctx->clientCA();
+}
+
+Envoy::Ssl::ServerContextSharedPtr QuicServerTransportSocketFactory::getServerSslContext() const {
+  absl::ReaderMutexLock l(&ssl_ctx_mu_);
+  return ssl_ctx_;
 }
 
 absl::Status QuicServerTransportSocketFactory::onSecretUpdated() {

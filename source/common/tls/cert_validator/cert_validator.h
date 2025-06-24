@@ -112,6 +112,7 @@ public:
                                         unsigned hash_length) PURE;
 
   virtual absl::optional<uint32_t> daysUntilFirstCertExpires() const PURE;
+  virtual bssl::UniquePtr<STACK_OF(X509_NAME)> getCaCertificates() const PURE;
   virtual std::string getCaFileName() const PURE;
   virtual Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const PURE;
 };

@@ -496,7 +496,9 @@ Envoy::Ssl::CertificateDetailsPtr SPIFFEValidator::getCaCertInformation() const 
   // So temporarily we return the first CA's info here.
   return Utility::certificateDetails(spiffe_data->ca_certs_[0].get(), getCaFileName(),
                                      time_source_);
-};
+}
+
+bssl::UniquePtr<STACK_OF(X509_NAME)> SPIFFEValidator::getCaCertificates() const { return nullptr; }
 
 class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
