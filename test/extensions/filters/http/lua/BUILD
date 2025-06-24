@@ -47,7 +47,6 @@ envoy_extension_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
-        "@envoy_api//envoy/data/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -60,6 +59,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/lua:config",
+        "//source/extensions/filters/http/set_metadata:config",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//test/config:v2_link_hacks",
         "//test/integration:http_integration_lib",

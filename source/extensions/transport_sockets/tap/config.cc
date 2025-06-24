@@ -55,7 +55,8 @@ UpstreamTapSocketConfigFactory::createTransportSocketFactory(
       std::make_unique<SocketTapConfigFactoryImpl>(
           server_context.mainThreadDispatcher().timeSource(), context),
       server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
-      server_context.mainThreadDispatcher(), std::move(factory_or_error.value()));
+      server_context.mainThreadDispatcher(), server_context.scope(),
+      std::move(factory_or_error.value()));
 }
 
 absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
@@ -79,7 +80,8 @@ DownstreamTapSocketConfigFactory::createTransportSocketFactory(
       std::make_unique<SocketTapConfigFactoryImpl>(
           server_context.mainThreadDispatcher().timeSource(), context),
       server_context.admin(), server_context.singletonManager(), server_context.threadLocal(),
-      server_context.mainThreadDispatcher(), std::move(factory_or_error.value()));
+      server_context.mainThreadDispatcher(), server_context.scope(),
+      std::move(factory_or_error.value()));
 }
 
 ProtobufTypes::MessagePtr TapSocketConfigFactory::createEmptyConfigProto() {
