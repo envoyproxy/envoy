@@ -57,6 +57,19 @@ public:
                                       const Protobuf::ReflectableMessage& message);
 
   /**
+   * Process typed metadata and push the result to Lua stack
+   * @param state the Lua state
+   * @param typed_metadata_map the typed filter metadata map to search in
+   * @return number of values pushed to the stack (1 for table or nil)
+   *
+   * This function gets the filter name from Lua stack argument at index 2, looks up typed metadata
+   * by filter name, unpacks the protobuf Any message, and converts it to a Lua table.
+   * Returns nil if metadata is not found or cannot be processed.
+   */
+  static int processDynamicTypedMetadataFromLuaCall(
+      lua_State* state, const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_metadata_map);
+
+  /**
    * Push a Lua value onto the stack that represents the value of a field
    * @param state the Lua state
    * @param message the protobuf message containing the field

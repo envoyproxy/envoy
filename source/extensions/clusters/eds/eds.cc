@@ -180,8 +180,7 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   }
 
   priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
-                                                 address_list, locality_lb_endpoint, lb_endpoint,
-                                                 parent_.time_source_);
+                                                 address_list, locality_lb_endpoint, lb_endpoint);
   all_new_hosts.emplace(address_as_string);
 }
 

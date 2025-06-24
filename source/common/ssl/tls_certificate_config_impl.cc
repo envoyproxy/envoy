@@ -47,9 +47,10 @@ static const std::string INLINE_STRING = "<inline>";
 
 absl::StatusOr<TlsCertificateConfigImpl> TlsCertificateConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api) {
+    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
+    const std::string& certificate_name) {
   absl::Status creation_status = absl::OkStatus();
-  TlsCertificateConfigImpl ret(config, factory_context, api, creation_status);
+  TlsCertificateConfigImpl ret(config, factory_context, api, creation_status, certificate_name);
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -57,12 +58,13 @@ absl::StatusOr<TlsCertificateConfigImpl> TlsCertificateConfigImpl::create(
 TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
-    absl::Status& creation_status)
+    absl::Status& creation_status, const std::string& certificate_name)
     : certificate_chain_(maybeSet(Config::DataSource::read(config.certificate_chain(), true, api),
                                   creation_status)),
       certificate_chain_path_(
           Config::DataSource::getPath(config.certificate_chain())
               .value_or(certificate_chain_.empty() ? EMPTY_STRING : INLINE_STRING)),
+      certificate_name_(certificate_name),
       private_key_(
           maybeSet(Config::DataSource::read(config.private_key(), true, api), creation_status)),
       private_key_path_(Config::DataSource::getPath(config.private_key())

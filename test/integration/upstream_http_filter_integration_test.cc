@@ -74,12 +74,13 @@ public:
   }
 
   const HttpFilterProto getAddHeaderFilterConfig(const std::string& name, const std::string& key,
-                                                 const std::string& value) {
+                                                 const std::string& value, bool disabled = false) {
     HttpFilterProto filter_config;
     filter_config.set_name(name);
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
+    filter_config.set_disabled(disabled);
     filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
@@ -175,6 +176,26 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
   auto headers = sendRequestAndGetHeaders();
   EXPECT_THAT(*headers, Not(HeaderValueOf("x-test-router", "aa")));
   EXPECT_THAT(*headers, HeaderValueOf("x-test-cluster", "bb"));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, ClusterUpstreamFiltersDisabled) {
+  addStaticRouterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-router", "aa", true));
+  addCodecRouterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(*headers, Not(HeaderValueOf("x-test-router", "aa")));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, RouterUpstreamFiltersDisabled) {
+  addStaticClusterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-cluster", "bb", true));
+  addCodecClusterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(*headers, Not(HeaderValueOf("x-test-cluster", "bb")));
 }
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest,

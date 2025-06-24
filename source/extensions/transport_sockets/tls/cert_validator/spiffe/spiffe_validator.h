@@ -43,7 +43,7 @@ public:
       : spiffe_data_(std::make_shared<SpiffeData>()), api_(context.api()), stats_(stats),
         time_source_(context.timeSource()) {};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                  Server::Configuration::CommonFactoryContext& context);
+                  Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope);
 
   ~SPIFFEValidator() override = default;
 
@@ -58,11 +58,11 @@ public:
                     absl::string_view host_name) override;
 
   absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                            bool provides_certificates) override;
+                                            bool provides_certificates,
+                                            Stats::Scope& scope) override;
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
-
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   std::string getCaFileName() const override { return ca_file_name_; }
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
@@ -85,6 +85,7 @@ private:
                                             std::string& error_details);
 
   void initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
+  void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);
   absl::StatusOr<std::shared_ptr<SpiffeData>>
   parseTrustBundles(const std::string& trust_bundles_str);
 

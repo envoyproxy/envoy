@@ -7,6 +7,10 @@
 
 #include "source/common/matcher/matcher.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -62,9 +66,15 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   ENVOY_LOG(trace, "Initializing filter config from the proto config: {}",
             proto_config.DebugString());
 
+  // Initialize filtering mode.
   FilteringMode filtering_mode = proto_config.filtering_mode();
   RETURN_IF_ERROR(validateFilteringMode(filtering_mode));
   filtering_mode_ = filtering_mode;
+
+  // Initialize proto descriptor pool.
+  absl::Status descriptor_pool_init_status = initializeDescriptorPool(
+      context.serverFactoryContext().api(), proto_config.descriptor_set().data_source());
+  RETURN_IF_ERROR(descriptor_pool_init_status);
 
   for (const auto& method_restriction : proto_config.restrictions().method_restrictions()) {
     std::string method_name = method_restriction.first;
@@ -78,6 +88,52 @@ ProtoApiScrubberFilterConfig::initialize(const ProtoApiScrubberConfig& proto_con
   }
 
   ENVOY_LOG(trace, "Filter config initialized successfully.");
+  return absl::OkStatus();
+}
+
+absl::Status ProtoApiScrubberFilterConfig::initializeDescriptorPool(
+    Api::Api& api, const ::envoy::config::core::v3::DataSource& data_source) {
+  Envoy::Protobuf::FileDescriptorSet descriptor_set;
+
+  switch (data_source.specifier_case()) {
+  case envoy::config::core::v3::DataSource::SpecifierCase::kFilename: {
+    auto file_or_error = api.fileSystem().fileReadToEnd(data_source.filename());
+    if (!file_or_error.status().ok()) {
+      return absl::InvalidArgumentError(fmt::format(
+          "{} Unable to read from file `{}`", kConfigInitializationError, data_source.filename()));
+    }
+
+    if (!descriptor_set.ParseFromString(file_or_error.value())) {
+      return absl::InvalidArgumentError(
+          fmt::format("{} Unable to parse proto descriptor from file `{}`",
+                      kConfigInitializationError, data_source.filename()));
+    }
+    break;
+  }
+  case envoy::config::core::v3::DataSource::SpecifierCase::kInlineBytes: {
+    if (!descriptor_set.ParseFromString(data_source.inline_bytes())) {
+      return absl::InvalidArgumentError(
+          fmt::format("{} Unable to parse proto descriptor from inline bytes `{}`",
+                      kConfigInitializationError, data_source.inline_bytes()));
+    }
+    break;
+  }
+  default:
+    return absl::InvalidArgumentError(
+        fmt::format("{} Unsupported DataSource case `{}` for configuring `descriptor_set`",
+                    kConfigInitializationError, static_cast<int>(data_source.specifier_case())));
+  }
+
+  auto pool = std::make_unique<Envoy::Protobuf::DescriptorPool>();
+  for (const auto& file : descriptor_set.file()) {
+    if (pool->BuildFile(file) == nullptr) {
+      return absl::InvalidArgumentError(
+          fmt::format("{} Error occurred in file `{}` while trying to build proto descriptors.",
+                      kConfigInitializationError, file.name()));
+    }
+  }
+
+  descriptor_pool_ = std::move(pool);
   return absl::OkStatus();
 }
 
