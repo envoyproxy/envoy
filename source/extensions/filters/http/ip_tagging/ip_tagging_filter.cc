@@ -46,7 +46,7 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     try {
       const auto new_data = tags_loader_.getDataSourceData();
       if (new_data.empty()) {
-        return;
+        return; // Skip update if data is empty (likely volume mount issue)
       }
       auto new_tags_or_error = tags_loader_.refreshTags(new_data);
       if (new_tags_or_error.status().ok()) {
@@ -299,6 +299,31 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     stat_name_set_->rememberBuiltin("ip_tags_reload_error");
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
+
+    // Create callbacks that don't capture 'this' to prevent segfaults
+    auto reload_success_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
+      try {
+        auto success_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_success", stat_name_set_ptr->add("unknown_tag.hit"));
+        Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, success_stat});
+        scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
+      } catch (const std::exception& e) {
+        // Don't re-throw from callbacks that may be called from timer context
+      } catch (...) {
+        // Don't re-throw from callbacks that may be called from timer context
+      }
+    };
+
+    auto reload_error_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
+      try {
+        auto error_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_error", stat_name_set_ptr->add("unknown_tag.hit"));
+        Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, error_stat});
+        scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
+      } catch (const std::exception& e) {
+        // Don't re-throw from callbacks that may be called from timer context
+      } catch (...) {
+        // Don't re-throw from callbacks that may be called from timer context
+      }
+    };
 
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
