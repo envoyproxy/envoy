@@ -4,10 +4,12 @@
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 #include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/extensions/common/aws/credential_providers/iam_roles_anywhere_x509_credentials_provider.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 #include "source/extensions/common/aws/signer.h"
+#include "source/extensions/common/aws/signers/iam_roles_anywhere_sigv4_signer_impl.h"
 #include "source/extensions/common/aws/signers/sigv4a_key_derivation.h"
 
 #include "gmock/gmock.h"
@@ -120,6 +122,13 @@ public:
               (Server::Configuration::ServerFactoryContext&, AwsClusterManagerPtr,
                CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                std::chrono::seconds, absl::string_view));
+
+  MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
+              (Server::Configuration::ServerFactoryContext & context,
+               AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+               const envoy::extensions::common::aws::v3::IAMRolesAnywhereCredentialProvider&
+                   iam_roles_anywhere_config),
+              (const));
 };
 
 class MockSigV4AKeyDerivation : public SigV4AKeyDerivationBase {
@@ -139,8 +148,72 @@ public:
   void setMetadataFetcher(MetadataFetcherPtr fetcher) {
     provider_->metadata_fetcher_ = std::move(fetcher);
   }
-
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
+};
+
+// Friend class for testing private pem functionality
+class IAMRolesAnywhereX509CredentialsProviderFriend {
+public:
+  IAMRolesAnywhereX509CredentialsProviderFriend(
+      std::unique_ptr<IAMRolesAnywhereX509CredentialsProvider> provider)
+      : provider_(std::move(provider)) {}
+
+  absl::Status pemToDerB64(absl::string_view pem, std::string& output, bool chain = false) {
+    return provider_->pemToDerB64(pem, output, chain);
+  }
+
+  absl::Status
+  pemToAlgorithmSerialExpiration(absl::string_view pem,
+                                 X509Credentials::PublicKeySignatureAlgorithm& algorithm,
+                                 std::string& serial, SystemTime& time) {
+    return provider_->pemToAlgorithmSerialExpiration(pem, algorithm, serial, time);
+  }
+
+  std::chrono::seconds getCacheDuration() { return provider_->getCacheDuration(); }
+  void refresh() { return provider_->refresh(); }
+  X509Credentials getCredentials() { return provider_->getCredentials(); }
+
+  std::unique_ptr<IAMRolesAnywhereX509CredentialsProvider> provider_;
+};
+
+class MockIAMRolesAnywhereSigV4Signer : public IAMRolesAnywhereSigV4Signer {
+
+public:
+  MockIAMRolesAnywhereSigV4Signer(absl::string_view service_name, absl::string_view region,
+                                  const X509CredentialsProviderSharedPtr& credentials_provider,
+                                  TimeSource& timesource)
+      : IAMRolesAnywhereSigV4Signer(service_name, region, credentials_provider, timesource) {}
+  ~MockIAMRolesAnywhereSigV4Signer() override = default;
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestMessage & message, bool sign_body,
+               const absl::string_view override_region));
+
+private:
+  MOCK_METHOD(std::string, createCredentialScope,
+              (const absl::string_view short_date, const absl::string_view override_region),
+              (const));
+
+  MOCK_METHOD(absl::StatusOr<std::string>, createSignature,
+              (const X509Credentials& credentials, const absl::string_view string_to_sign),
+              (const));
+
+  MOCK_METHOD(std::string, createAuthorizationHeader,
+              (const X509Credentials& x509_credentials, const absl::string_view credential_scope,
+               (const std::map<std::string, std::string>& canonical_headers),
+               const absl::string_view signature),
+              (const));
+
+  MOCK_METHOD(std::string, createStringToSign,
+              (const X509Credentials& x509_credentials, const absl::string_view canonical_request,
+               const absl::string_view long_date, const absl::string_view credential_scope),
+              (const));
+};
+
+class MockX509CredentialsProvider : public X509CredentialsProvider {
+public:
+  ~MockX509CredentialsProvider() override = default;
+
+  MOCK_METHOD(X509Credentials, getCredentials, ());
 };
 
 } // namespace Aws

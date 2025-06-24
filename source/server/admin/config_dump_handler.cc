@@ -194,8 +194,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    auto all_clusters = server_.clusterManager().clusters();
-    if (!all_clusters.active_clusters_.empty()) {
+    if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
         return dumpEndpointConfigs(name_matcher);
       });
@@ -248,8 +247,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConf
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    auto all_clusters = server_.clusterManager().clusters();
-    if (!all_clusters.active_clusters_.empty()) {
+    if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
         return dumpEndpointConfigs(name_matcher);
       });

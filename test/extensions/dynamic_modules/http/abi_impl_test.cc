@@ -52,13 +52,17 @@ TEST_P(DynamicModuleHttpFilterGetHeaderValueTest, GetHeaderValue) {
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter_->request_headers_ = &request_headers;
   Http::TestRequestTrailerMapImpl request_trailers{headers};
-  filter_->request_trailers_ = &request_trailers;
   Http::TestResponseHeaderMapImpl response_headers{headers};
-  filter_->response_headers_ = &response_headers;
   Http::TestResponseTrailerMapImpl response_trailers{headers};
-  filter_->response_trailers_ = &response_trailers;
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
   // The key is not found.
   std::string key = "nonexistent";
@@ -165,13 +169,17 @@ TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, SetHeaderValue) {
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter_->request_headers_ = &request_headers;
   Http::TestRequestTrailerMapImpl request_trailers{headers};
-  filter_->request_trailers_ = &request_trailers;
   Http::TestResponseHeaderMapImpl response_headers{headers};
-  filter_->response_headers_ = &response_headers;
   Http::TestResponseTrailerMapImpl response_trailers{headers};
-  filter_->response_trailers_ = &response_trailers;
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
   Http::HeaderMap* header_map = nullptr;
   if (callback == &envoy_dynamic_module_callback_http_set_request_header) {
@@ -258,14 +266,17 @@ TEST_P(DynamicModuleHttpFilterGetHeadersCountTest, GetHeadersCount) {
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter_->request_headers_ = &request_headers;
   Http::TestRequestTrailerMapImpl request_trailers{headers};
-  filter_->request_trailers_ = &request_trailers;
   Http::TestResponseHeaderMapImpl response_headers{headers};
-  filter_->response_headers_ = &response_headers;
   Http::TestResponseTrailerMapImpl response_trailers{headers};
-  filter_->response_trailers_ = &response_trailers;
-
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
   EXPECT_EQ(callback(filter_.get()), 3);
 }
 
@@ -294,13 +305,17 @@ TEST_P(DynamicModuleHttpFilterGetHeadersTest, GetHeaders) {
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter_->request_headers_ = &request_headers;
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
   Http::TestRequestTrailerMapImpl request_trailers{headers};
-  filter_->request_trailers_ = &request_trailers;
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
   Http::TestResponseHeaderMapImpl response_headers{headers};
-  filter_->response_headers_ = &response_headers;
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
   Http::TestResponseTrailerMapImpl response_trailers{headers};
-  filter_->response_trailers_ = &response_trailers;
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
   EXPECT_TRUE(callback(filter_.get(), result_headers));
 
@@ -335,7 +350,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseNullptr) {
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseEmptyResponse) {
   Http::TestResponseHeaderMapImpl response_headers;
-  filter_->response_headers_ = &response_headers;
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
 
   // Test with empty response.
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
@@ -749,6 +765,7 @@ TEST(ABIImpl, GetAttributes) {
   uint64_t result_number = 0;
 
   // envoy_dynamic_module_type_attribute_id_RequestPath with null headers map, should return false.
+  EXPECT_CALL(callbacks, requestHeaders()).WillOnce(testing::Return(absl::nullopt));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_str_ptr,
       &result_str_length));
@@ -761,7 +778,8 @@ TEST(ABIImpl, GetAttributes) {
       {"referer", "envoyproxy.io"},
       {"user-agent", "curl/7.54.1"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter.request_headers_ = &request_headers;
+  EXPECT_CALL(callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
 
   // Unsupported attributes.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(

@@ -958,6 +958,68 @@ Returns the string representation of the downstream remote address for the curre
 
 Returns a :ref:`dynamic metadata object <config_http_filters_lua_stream_info_dynamic_metadata_wrapper>`.
 
+``dynamicTypedMetadata()``
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:dynamicTypedMetadata(filterName)
+
+Returns dynamic typed metadata for a given filter name. This provides type-safe access to metadata values that are stored as protocol buffer messages, particularly useful when working with HTTP filters that store structured data.
+
+``filterName`` is a string that supplies the filter name, e.g. ``envoy.filters.http.set_metadata``. Returns a Lua table containing the unpacked protocol buffer message. Returns nil if no dynamic metadata exists for the given filter name or if the metadata cannot be unpacked.
+
+.. include:: _include/lua_dynamic_typed_metadata_common.rst
+
+**Common Use Cases:**
+
+1. **Accessing Set Metadata Filter Data:**
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    -- Access typed metadata set by the set_metadata filter
+    local typed_meta = request_handle:streamInfo():dynamicTypedMetadata("envoy.filters.http.set_metadata")
+
+    -- Check if metadata exists
+    if typed_meta then
+      -- Access specific fields
+      local metadata_namespace = typed_meta.metadata_namespace
+      local allow_overwrite = typed_meta.allow_overwrite
+
+      request_handle:logInfo(string.format("Metadata namespace: %s, Allow overwrite: %s",
+                                          metadata_namespace or "none", tostring(allow_overwrite)))
+    else
+      request_handle:logInfo("No set_metadata typed metadata available")
+    end
+  end
+
+2. **Working with External Processing Filter Metadata:**
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local metadata = request_handle:streamInfo():dynamicTypedMetadata("envoy.filters.http.ext_proc")
+
+    -- Check if metadata exists before accessing
+    if metadata then
+      -- Safely access potentially nested fields
+      if metadata.processing_mode then
+        -- Access processing mode configuration
+        if metadata.processing_mode.request_header_mode then
+          request_handle:logInfo(string.format("Request header mode: %s", metadata.processing_mode.request_header_mode))
+        end
+
+        -- Access grpc service configuration
+        if metadata.grpc_service and metadata.grpc_service.envoy_grpc then
+          request_handle:logInfo(string.format("Cluster name: %s", metadata.grpc_service.envoy_grpc.cluster_name))
+        end
+      end
+    else
+      request_handle:logInfo("No ext_proc typed metadata available")
+    end
+  end
+
 ``downstreamSslConnection()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -999,27 +1061,7 @@ Returns dynamic metadata for a given filter name. Dynamic metadata provides type
 
 ``filterName`` is a string that supplies the filter name, e.g. ``envoy.lb``. Returns a Lua table containing the unpacked protocol buffer message. Returns nil if no dynamic metadata exists for the given filter name or if the metadata cannot be unpacked.
 
-**Type Conversion Details:**
-
-The following rules apply when converting protocol buffer messages into Lua tables:
-
-* Repeated fields are converted to Lua arrays (1-based indexing)
-* Map fields become Lua tables with string keys
-* Enums are represented as their numeric values
-* Byte fields are translated to Lua strings
-* Nested messages are converted to nested tables
-* Optional fields that are not set are returned as nil
-
-**Error Handling:**
-
-This method ensures type-safe access to metadata but returns nil in the following scenarios:
-
-* If the specified filter name does not exist. For example, trying to access
-  ``dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")`` when the proxy protocol filter isn't configured.
-* If the metadata exists but cannot be unpacked. It could happen if the filter state exists but is stored as a different
-  type than ``ProtobufWkt::Struct``.
-* If the protocol buffer message is malformed. It could happen when the data in the filter state is corrupted or
-  partially written.
+.. include:: _include/lua_dynamic_typed_metadata_common.rst
 
 **Common Use Cases:**
 
@@ -1081,14 +1123,6 @@ This method ensures type-safe access to metadata but returns nil in the followin
       request_handle:logInfo("No metadata available for custom.filter")
     end
   end
-
-**Limitations:**
-
-1. Dynamic metadata is read-only and cannot be modified through this API
-2. Raw protobuf message structure cannot be accessed directly
-3. Extension types or unknown fields cannot be accessed through this API
-4. Map keys must be strings or integers
-5. Some protocol buffer features (like Any messages) may not be fully supported
 
 ``dynamicMetadata()``
 ^^^^^^^^^^^^^^^^^^^^^
