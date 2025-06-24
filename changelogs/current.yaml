@@ -63,6 +63,10 @@ minor_behavior_changes:
   change: |
     :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
     providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
+- area: filters
+  change: |
+    :ref:`Credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>` is no longer
+    a work in progress field.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -96,6 +100,10 @@ bug_fixes:
     Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
     chain. This fix addresses this issue by rejecting such configuration with empty value. This behavior can be reverted by setting
     the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file`` to ``false``.
+
+- area: http3
+  change: |
+    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
