@@ -248,7 +248,8 @@ void Tracer::flushSpans() {
 
 void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
   if (span_buffer_.size() >= max_cache_size_) {
-    ENVOY_LOG(warn, "Span buffer size exceeded maximum limit. Discarding span.");
+    ENVOY_LOG(warn, "Span buffer size exceeded maximum limit. Discarding span. Current size: {}, Max size: {}", span_buffer_.size(), max_cache_size_);
+    flushSpans();
     return;
   }
   span_buffer_.push_back(span);

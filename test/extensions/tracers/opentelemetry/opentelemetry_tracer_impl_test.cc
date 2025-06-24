@@ -371,8 +371,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithMaxCacheSize) {
 
   // set min_flush_spans to 10 avoid automatic flushing.
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
-      .Times(10)
-      .WillRepeatedly(Return(10))
+      .Times(2)
+      .WillRepeatedly(Return(10));
 
   // Create first span - should be cached (1/2)
   Tracing::SpanPtr span1 = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
