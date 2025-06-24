@@ -32,6 +32,7 @@ envoy_cc_library(
         "//envoy/ssl:connection_interface",
         "//envoy/stream_info:stream_info_interface",
         "@com_google_absl//absl/numeric:int128",
+        "@com_google_absl//absl/types:span",
     ],
 )
 

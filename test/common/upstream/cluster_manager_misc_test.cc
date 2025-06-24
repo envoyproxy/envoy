@@ -143,7 +143,7 @@ public:
     EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
 
     cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
-        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_)};
+        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
     cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
         cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
     cluster1->initialize_callback_();
@@ -259,7 +259,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
 
   cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_)};
+      makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
   cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
       cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
   cluster1->initialize_callback_();
@@ -1029,10 +1029,10 @@ public:
     cluster_ = &cluster_manager_->activeClusters().begin()->second.get();
 
     // Set up the HostSet.
-    host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
-    host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
-    host3_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
-    host4_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
+    host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host3_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host4_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
 
     HostVector hosts{host1_, host2_, host3_, host4_};
     auto hosts_ptr = std::make_shared<HostVector>(hosts);

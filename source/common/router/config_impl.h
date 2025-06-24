@@ -671,6 +671,8 @@ public:
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  void refreshRouteCluster(const Http::RequestHeaderMap&,
+                           const StreamInfo::StreamInfo&) const override {}
   const RouteStatsContextOptRef routeStatsContext() const override {
     if (route_stats_context_ != nullptr) {
       return *route_stats_context_;
@@ -840,6 +842,10 @@ public:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                             const StreamInfo::StreamInfo& stream_info) const override {
+      return parent_->refreshRouteCluster(headers, stream_info);
+    }
     Http::Code clusterNotFoundResponseCode() const override {
       return parent_->clusterNotFoundResponseCode();
     }
@@ -1211,7 +1217,6 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
-  const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const std::chrono::milliseconds timeout_;
   const OptionalTimeouts optional_timeouts_;

@@ -416,11 +416,12 @@ To observe more verbose test output:
 bazel test --test_output=streamed //test/common/http:async_client_impl_test
 ```
 
-It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. For
+It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. Note
+that `--test_arg="--"` should be added to pass Envoy command-line arguments. For
 example, for extremely verbose test debugging:
 
 ```
-bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="-l trace"
+bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="--" --test_arg="-l trace"
 ```
 
 By default, testing exercises both IPv4 and IPv6 address connections. In IPv4 or IPv6 only
@@ -662,7 +663,7 @@ logging at `-l trace`. For example, in tests:
 
 ```
 bazel test //test/integration:protocol_integration_test --test_output=streamed \
-  --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
+  --test_arg="--" --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
 ```
 
 Similarly, `QUICHE` verbose logs can be enabled by setting `ENVOY_QUICHE_VERBOSITY=n` in the
