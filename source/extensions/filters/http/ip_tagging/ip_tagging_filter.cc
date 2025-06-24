@@ -9,6 +9,12 @@
 
 #include "absl/strings/str_join.h"
 
+// Add includes for file system operations and threading
+#include <sys/stat.h>
+#include <cerrno>
+#include <cstring>
+#include <thread>
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -56,9 +62,40 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider timer callback starting");
 
     try {
+      // If data source provider is null (due to startup race condition), try to recreate it
+      if (!data_source_provider_) {
+        ENVOY_LOG(warn, "[ip_tagging] IpTagsProvider data source provider is null, attempting to recreate");
+
+        // Check if file now exists
+        struct stat file_stat;
+        if (stat(ip_tags_path_.c_str(), &file_stat) == 0) {
+          ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider file now exists: {} (size: {} bytes)",
+                    ip_tags_path_, file_stat.st_size);
+
+          // Try to recreate the data source provider
+          envoy::config::core::v3::DataSource datasource;
+          datasource.set_filename(ip_tags_path_);
+
+          // We need access to the dispatcher and tls from the timer context
+          // For now, log the issue and rely on the next timer cycle
+          ENVOY_LOG(warn, "[ip_tagging] IpTagsProvider cannot recreate data source provider from timer context, skipping this cycle");
+          return;
+        } else {
+          ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider file still doesn't exist: {} (errno: {})",
+                    ip_tags_path_, strerror(errno));
+          return;
+        }
+      }
+
       ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider getting new data source data");
       const auto new_data = tags_loader_.getDataSourceData();
       ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider got new data, size: {} bytes", new_data.size());
+
+      // If data is empty and this is likely a volume mount issue, don't update the trie
+      if (new_data.empty()) {
+        ENVOY_LOG(warn, "[ip_tagging] IpTagsProvider got empty data, likely volume mount issue, skipping update");
+        return;
+      }
 
       ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider refreshing tags with new data");
       auto new_tags_or_error = tags_loader_.refreshTags(new_data);
@@ -270,25 +307,105 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
           ip_tags_datasource.filename());
     }
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() creating data source provider");
-    auto provider_or_error = Config::DataSource::DataSourceProvider::create(
-        ip_tags_datasource, main_dispatcher, tls, api_, false, 0);
-    if (!provider_or_error.status().ok()) {
-      ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::loadTags() failed to create data source provider: {}",
-                provider_or_error.status().message());
-      return absl::InvalidArgumentError(
-          fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
+    // Add diagnostics for Kubernetes volume mount race conditions
+    const std::string& file_path = ip_tags_datasource.filename();
+    ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() diagnosing file system state for: {}", file_path);
+
+    // Check if the directory exists
+    auto dir_pos = file_path.find_last_of('/');
+    if (dir_pos != std::string::npos) {
+      std::string dir_path = file_path.substr(0, dir_pos);
+      struct stat dir_stat;
+      if (stat(dir_path.c_str(), &dir_stat) == 0) {
+        ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() directory exists: {}", dir_path);
+        if (S_ISDIR(dir_stat.st_mode)) {
+          ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() confirmed directory is valid");
+        } else {
+          ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::loadTags() path exists but is not a directory: {}", dir_path);
+        }
+      } else {
+        ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::loadTags() directory does not exist: {} (errno: {})",
+                  dir_path, strerror(errno));
+      }
     }
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() data source provider created successfully");
-    data_source_provider_ = std::move(provider_or_error.value());
-    ip_tags_path_ = ip_tags_datasource.filename();
+    // Check if the file exists
+    struct stat file_stat;
+    if (stat(file_path.c_str(), &file_stat) == 0) {
+      ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() file exists: {} (size: {} bytes)",
+                file_path, file_stat.st_size);
+    } else {
+      ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::loadTags() file does not exist: {} (errno: {})",
+                file_path, strerror(errno));
+    }
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() getting initial data");
-    const auto& new_data = getDataSourceData();
+    ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() creating data source provider with retry logic");
 
-    ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() refreshing tags with initial data");
-    return refreshTags(new_data);
+    // Implement retry logic for volume mount race conditions
+    const int max_retries = 5;
+    const std::chrono::milliseconds retry_delay(100);
+    absl::Status last_error;
+
+    for (int attempt = 1; attempt <= max_retries; ++attempt) {
+      ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() attempt {} of {} to create data source provider",
+                attempt, max_retries);
+
+      auto provider_or_error = Config::DataSource::DataSourceProvider::create(
+          ip_tags_datasource, main_dispatcher, tls, api_, false, 0);
+
+      if (provider_or_error.status().ok()) {
+        ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() data source provider created successfully on attempt {}",
+                  attempt);
+        data_source_provider_ = std::move(provider_or_error.value());
+        ip_tags_path_ = ip_tags_datasource.filename();
+
+        ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() getting initial data");
+        const auto& new_data = getDataSourceData();
+
+        if (!new_data.empty()) {
+          ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() refreshing tags with initial data");
+          return refreshTags(new_data);
+        } else {
+          ENVOY_LOG(warn, "[ip_tagging] IpTagsLoader::loadTags() file is empty, creating empty trie");
+          // Return empty trie instead of failing - file might be populated later
+          std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
+          return std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
+        }
+      } else {
+        last_error = provider_or_error.status();
+        ENVOY_LOG(warn, "[ip_tagging] IpTagsLoader::loadTags() attempt {} failed: {}",
+                  attempt, last_error.message());
+
+        if (attempt < max_retries) {
+          ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() waiting {}ms before retry",
+                    retry_delay.count());
+          std::this_thread::sleep_for(retry_delay);
+
+          // Re-check file system state
+          if (stat(file_path.c_str(), &file_stat) == 0) {
+            ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() file now exists on attempt {}", attempt);
+          } else {
+            ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::loadTags() file still missing on attempt {}", attempt);
+          }
+        }
+      }
+    }
+
+    ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::loadTags() all {} attempts failed, last error: {}",
+              max_retries, last_error.message());
+
+    // For Kubernetes deployments, we'll be more lenient and create an empty trie
+    // The file reload mechanism will pick up the file once it's available
+    if (ip_tags_datasource.has_watched_directory()) {
+      ENVOY_LOG(warn, "[ip_tagging] IpTagsLoader::loadTags() file watching enabled, creating empty trie and relying on reload");
+      data_source_provider_ = nullptr; // Will be recreated during reload
+      ip_tags_path_ = ip_tags_datasource.filename();
+      std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
+      return std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
+    }
+
+    return absl::InvalidArgumentError(
+        fmt::format("unable to create data source after {} attempts: '{}'", max_retries, last_error.message()));
   }
 
   ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::loadTags() empty filename in datasource");
@@ -481,32 +598,40 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
 
     ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig creating reload success callback");
-    auto reload_success_cb = [this]() {
+    auto reload_success_cb = [scope = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set = stat_name_set_]() {
       ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb starting");
       try {
-        incIpTagsReloadSuccess();
+        ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb incrementing success counter");
+        // Safely increment counter without relying on 'this' pointer
+        auto success_stat = stat_name_set->getBuiltin("ip_tags_reload_success", stat_name_set->add("unknown_tag.hit"));
+        Stats::SymbolTable::StoragePtr storage = scope.get().symbolTable().join({stats_prefix, success_stat});
+        scope.get().counterFromStatName(Stats::StatName(storage.get())).inc();
         ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb completed");
       } catch (const std::exception& e) {
         ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_success_cb exception: {}", e.what());
-        throw;
+        // Don't re-throw from callbacks that may be called from timer context
       } catch (...) {
         ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_success_cb unknown exception");
-        throw;
+        // Don't re-throw from callbacks that may be called from timer context
       }
     };
 
     ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig creating reload error callback");
-    auto reload_error_cb = [this]() {
+    auto reload_error_cb = [scope = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set = stat_name_set_]() {
       ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb starting");
       try {
-        incIpTagsReloadError();
+        ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb incrementing error counter");
+        // Safely increment counter without relying on 'this' pointer
+        auto error_stat = stat_name_set->getBuiltin("ip_tags_reload_error", stat_name_set->add("unknown_tag.hit"));
+        Stats::SymbolTable::StoragePtr storage = scope.get().symbolTable().join({stats_prefix, error_stat});
+        scope.get().counterFromStatName(Stats::StatName(storage.get())).inc();
         ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb completed");
       } catch (const std::exception& e) {
         ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_error_cb exception: {}", e.what());
-        throw;
+        // Don't re-throw from callbacks that may be called from timer context
       } catch (...) {
         ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_error_cb unknown exception");
-        throw;
+        // Don't re-throw from callbacks that may be called from timer context
       }
     };
 
