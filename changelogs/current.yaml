@@ -69,7 +69,8 @@ minor_behavior_changes:
     a work in progress field.
 - area: oauth2
   change: |
-    The access token, id token and refresh token in the cookies are now encrypted using the HMAC secret.
+    The access token, id token and refresh token in the cookies are now encrypted using the HMAC secret. This behavior can
+    be reverted by setting the runtime guard ``"envoy.reloadable_features.oauth2_encrypt_tokens"`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
