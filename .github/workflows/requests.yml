@@ -1,0 +1,20 @@
+name: Request
+
+on:
+  pull_request:
+
+jobs:
+  foo:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout this repo
+      uses: actions/checkout@v4
+    - name: Prepare env directory
+      run: |
+        mkdir -p env
+        echo "BOOM" > env/env.json
+    - name: Deploy Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: env
+        path: env/
