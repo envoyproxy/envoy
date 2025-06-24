@@ -1,8 +1,5 @@
 #pragma once
 
-#include <cstddef>
-#include <optional>
-
 #include "source/extensions/dynamic_modules/dynamic_modules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/dynamic_modules/filter_config.h"
