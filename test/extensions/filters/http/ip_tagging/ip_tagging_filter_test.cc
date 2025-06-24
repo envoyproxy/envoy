@@ -894,7 +894,6 @@ TEST_F(IpTaggingFilterTest, InternalRequestWithReload) {
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
 
-  envoy::config::core::v3::DataSource config;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("ip_tagging_test"));
 
   const std::string yaml =
@@ -996,7 +995,6 @@ TEST_F(IpTaggingFilterTest, InternalRequestWithFailedReloadUsesOldData) {
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
 
-  envoy::config::core::v3::DataSource config;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("ip_tagging_test"));
 
   const std::string yaml =
@@ -1096,7 +1094,6 @@ TEST_F(IpTaggingFilterTest, IpTagsReloadedInFlightRequestsNotAffected) {
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml").c_str());
   unlink(TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml").c_str());
 
-  envoy::config::core::v3::DataSource config;
   TestEnvironment::createPath(TestEnvironment::temporaryPath("ip_tagging_test"));
 
   const std::string yaml =
