@@ -98,7 +98,7 @@ bug_fixes:
     the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file`` to ``false``.
 - area: tls_inspector
   change: |
-    Fixes a bug where the TLS inspector filter would not correctly report client_hello_too_large_ stat for too big client hello messages
+    Fixes a bug where the TLS inspector filter would not correctly report ``client_hello_too_large`` stat for too big client hello messages
     i.e bigger than 16kb.
 
 
