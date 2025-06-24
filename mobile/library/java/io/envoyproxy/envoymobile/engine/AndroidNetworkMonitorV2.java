@@ -35,128 +35,126 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Arrays;
 
-/** Immutable class representing the state of a device's network. */
-class NetworkState {
-  private final boolean mConnected;
-  private final int mType;
-  private final int mSubtype;
-  private final boolean mIsMetered;
-  // WIFI SSID of the connection on pre-Marshmallow, NetID starting with Marshmallow. Always
-  // non-null (i.e. instead of null it'll be an empty string) to facilitate .equals().
-  private final String mNetworkIdentifier;
-  // Indicates if this network is using DNS-over-TLS.
-  private final boolean mIsPrivateDnsActive;
-  // Indicates the DNS-over-TLS server in use, if specified.
-  private final String mPrivateDnsServerName;
+/**
+ * This class does the following.
+ *
+ * When any network is available: call the EnvoyEngine::onNetworkConnect.
+ *
+ * When any network is unavailable: call the EnvoyEngine::onNetworkDisconnect.
+ *
+ * When VPN network is available: call the EnvoyEngine::purgeActiveNetworkList.
+ *
+ * When VPN network is unavailable: call the EnvoyEngine::onNetworkConnected with all the rest of
+ *the connected networks.
+ *
+ * When an available network is picked as default network (the internet becomes available or default
+ *network is changed): call the EnvoyEngine::onDefaultNetworkAvailable and
+ *onDefaultNetworkChangedV2.
+ *
+ * When the internet is not available: call the InternalEngine::onDefaultNetworkUnavailable
+ *callback.
+ *
+ * The implementation is heavily borrowed from
+ *https://source.chromium.org/chromium/chromium/src/+/main:net/android/java/src/org/chromium/net/NetworkChangeNotifierAutoDetect.java
+ **/
+public class AndroidNetworkMonitorV2 {
 
-  // Consolidate network type and subtype into one enum.
-  public static EnvoyConnectionType convertToEnvoyConnectionType(int type, int subtype) {
-    switch (type) {
-    case ConnectivityManager.TYPE_ETHERNET:
-      return EnvoyConnectionType.CONNECTION_ETHERNET;
-    case ConnectivityManager.TYPE_WIFI:
-      return EnvoyConnectionType.CONNECTION_WIFI;
-    case ConnectivityManager.TYPE_WIMAX:
-      return EnvoyConnectionType.CONNECTION_4G;
-    case ConnectivityManager.TYPE_BLUETOOTH:
-      return EnvoyConnectionType.CONNECTION_BLUETOOTH;
-    case ConnectivityManager.TYPE_MOBILE:
-    case ConnectivityManager.TYPE_MOBILE_DUN:
-    case ConnectivityManager.TYPE_MOBILE_HIPRI:
-      // Use information from TelephonyManager to classify the connection.
-      switch (subtype) {
-      case TelephonyManager.NETWORK_TYPE_GPRS:
-      case TelephonyManager.NETWORK_TYPE_EDGE:
-      case TelephonyManager.NETWORK_TYPE_CDMA:
-      case TelephonyManager.NETWORK_TYPE_1xRTT:
-      case TelephonyManager.NETWORK_TYPE_IDEN:
-        return EnvoyConnectionType.CONNECTION_2G;
-      case TelephonyManager.NETWORK_TYPE_UMTS:
-      case TelephonyManager.NETWORK_TYPE_EVDO_0:
-      case TelephonyManager.NETWORK_TYPE_EVDO_A:
-      case TelephonyManager.NETWORK_TYPE_HSDPA:
-      case TelephonyManager.NETWORK_TYPE_HSUPA:
-      case TelephonyManager.NETWORK_TYPE_HSPA:
-      case TelephonyManager.NETWORK_TYPE_EVDO_B:
-      case TelephonyManager.NETWORK_TYPE_EHRPD:
-      case TelephonyManager.NETWORK_TYPE_HSPAP:
-        return EnvoyConnectionType.CONNECTION_3G;
-      case TelephonyManager.NETWORK_TYPE_LTE:
+  /** Immutable class representing the state of a device's network. */
+  private static class NetworkState {
+    private final boolean mConnected;
+    private final int mType;
+    private final int mSubtype;
+    private final boolean mIsMetered;
+    // WIFI SSID of the connection on pre-Marshmallow, NetID starting with Marshmallow. Always
+    // non-null (i.e. instead of null it'll be an empty string) to facilitate .equals().
+    private final String mNetworkIdentifier;
+    // Indicates if this network is using DNS-over-TLS.
+    private final boolean mIsPrivateDnsActive;
+    // Indicates the DNS-over-TLS server in use, if specified.
+    private final String mPrivateDnsServerName;
+
+    // Consolidate network type and subtype into one enum.
+    public static EnvoyConnectionType convertToEnvoyConnectionType(int type, int subtype) {
+      switch (type) {
+      case ConnectivityManager.TYPE_ETHERNET:
+        return EnvoyConnectionType.CONNECTION_ETHERNET;
+      case ConnectivityManager.TYPE_WIFI:
+        return EnvoyConnectionType.CONNECTION_WIFI;
+      case ConnectivityManager.TYPE_WIMAX:
         return EnvoyConnectionType.CONNECTION_4G;
-      case TelephonyManager.NETWORK_TYPE_NR:
-        return EnvoyConnectionType.CONNECTION_5G;
+      case ConnectivityManager.TYPE_BLUETOOTH:
+        return EnvoyConnectionType.CONNECTION_BLUETOOTH;
+      case ConnectivityManager.TYPE_MOBILE:
+      case ConnectivityManager.TYPE_MOBILE_DUN:
+      case ConnectivityManager.TYPE_MOBILE_HIPRI:
+        // Use information from TelephonyManager to classify the connection.
+        switch (subtype) {
+        case TelephonyManager.NETWORK_TYPE_GPRS:
+        case TelephonyManager.NETWORK_TYPE_EDGE:
+        case TelephonyManager.NETWORK_TYPE_CDMA:
+        case TelephonyManager.NETWORK_TYPE_1xRTT:
+        case TelephonyManager.NETWORK_TYPE_IDEN:
+          return EnvoyConnectionType.CONNECTION_2G;
+        case TelephonyManager.NETWORK_TYPE_UMTS:
+        case TelephonyManager.NETWORK_TYPE_EVDO_0:
+        case TelephonyManager.NETWORK_TYPE_EVDO_A:
+        case TelephonyManager.NETWORK_TYPE_HSDPA:
+        case TelephonyManager.NETWORK_TYPE_HSUPA:
+        case TelephonyManager.NETWORK_TYPE_HSPA:
+        case TelephonyManager.NETWORK_TYPE_EVDO_B:
+        case TelephonyManager.NETWORK_TYPE_EHRPD:
+        case TelephonyManager.NETWORK_TYPE_HSPAP:
+          return EnvoyConnectionType.CONNECTION_3G;
+        case TelephonyManager.NETWORK_TYPE_LTE:
+          return EnvoyConnectionType.CONNECTION_4G;
+        case TelephonyManager.NETWORK_TYPE_NR:
+          return EnvoyConnectionType.CONNECTION_5G;
+        default:
+          return EnvoyConnectionType.CONNECTION_UNKNOWN;
+        }
       default:
         return EnvoyConnectionType.CONNECTION_UNKNOWN;
       }
-    default:
-      return EnvoyConnectionType.CONNECTION_UNKNOWN;
     }
-  }
 
-  public NetworkState(boolean connected, int type, int subtype, boolean isMetered,
-                      String networkIdentifier, boolean isPrivateDnsActive,
-                      String privateDnsServerName) {
-    mConnected = connected;
-    mType = type;
-    mSubtype = subtype;
-    mIsMetered = isMetered;
-    mNetworkIdentifier = networkIdentifier == null ? "" : networkIdentifier;
-    mIsPrivateDnsActive = isPrivateDnsActive;
-    mPrivateDnsServerName = privateDnsServerName == null ? "" : privateDnsServerName;
-  }
-
-  public boolean isConnected() { return mConnected; }
-
-  public int getNetworkType() { return mType; }
-
-  public boolean isMetered() { return mIsMetered; }
-
-  public int getNetworkSubType() { return mSubtype; }
-
-  // Always non-null to facilitate .equals().
-  public String getNetworkIdentifier() { return mNetworkIdentifier; }
-
-  /** Returns the connection type for the given NetworkState. */
-  public EnvoyConnectionType getEnvoyConnectionType() {
-    if (!isConnected()) {
-      return EnvoyConnectionType.CONNECTION_NONE;
+    public NetworkState(boolean connected, int type, int subtype, boolean isMetered,
+                        String networkIdentifier, boolean isPrivateDnsActive,
+                        String privateDnsServerName) {
+      mConnected = connected;
+      mType = type;
+      mSubtype = subtype;
+      mIsMetered = isMetered;
+      mNetworkIdentifier = networkIdentifier == null ? "" : networkIdentifier;
+      mIsPrivateDnsActive = isPrivateDnsActive;
+      mPrivateDnsServerName = privateDnsServerName == null ? "" : privateDnsServerName;
     }
-    return convertToEnvoyConnectionType(mType, mSubtype);
+
+    public boolean isConnected() { return mConnected; }
+
+    public int getNetworkType() { return mType; }
+
+    public boolean isMetered() { return mIsMetered; }
+
+    public int getNetworkSubType() { return mSubtype; }
+
+    // Always non-null to facilitate .equals().
+    public String getNetworkIdentifier() { return mNetworkIdentifier; }
+
+    /** Returns the connection type for the given NetworkState. */
+    public EnvoyConnectionType getEnvoyConnectionType() {
+      if (!isConnected()) {
+        return EnvoyConnectionType.CONNECTION_NONE;
+      }
+      return convertToEnvoyConnectionType(mType, mSubtype);
+    }
+
+    /** Returns boolean indicating if this network uses DNS-over-TLS. */
+    public boolean isPrivateDnsActive() { return mIsPrivateDnsActive; }
+
+    /** Returns the DNS-over-TLS server in use, if specified. */
+    public String getPrivateDnsServerName() { return mPrivateDnsServerName; }
   }
 
-  /** Returns boolean indicating if this network uses DNS-over-TLS. */
-  public boolean isPrivateDnsActive() { return mIsPrivateDnsActive; }
-
-  /** Returns the DNS-over-TLS server in use, if specified. */
-  public String getPrivateDnsServerName() { return mPrivateDnsServerName; }
-}
-
-/**
- * This class does the following.
- * <ul>
- * <li>When the internet is available: call the
- * <code>InternalEngine::onDefaultNetworkAvailable</code> callback.</li>
- *
- * <li>When the internet is not available: call the
- * <code>InternalEngine::onDefaultNetworkUnavailable</code> callback.</li>
- *
- * <li>When the default network is changed: call the
- * <code>EnvoyEngine::onDefaultNetworkChangedV2</code>.</li>
- *
- * <li>When any network is available: call the
- * <code>EnvoyEngine::onNetworkConnect</code>.</li>
- *
- * <li>When any network is unavailable: call the
- * <code>EnvoyEngine::onNetworkDisconnect</code>.</li>
- *
- * <li>When VPN network is available: call the
- * <code>EnvoyEngine::purgeActiveNetworkList</code>.</li>
- *
- * <li>When VPN network is unavailable: call the
- * <code>EnvoyEngine::onNetworkConnected</code> with all the rest of the connected networks.</li>
- * </ul>
- */
-public class AndroidNetworkMonitorV2 {
   private static final String TAG = AndroidNetworkMonitorV2.class.getSimpleName();
   private static final String PERMISSION_DENIED_STATS_ELEMENT =
       "android_permissions.network_state_denied";
@@ -170,7 +168,7 @@ public class AndroidNetworkMonitorV2 {
   // Starting with Android O, used to detect changes on default network.
   private NetworkCallback mDefaultNetworkCallback;
   // Will be null if ConnectivityManager.registerNetworkCallback() ever fails.
-  private MyNetworkCallback mNetworkCallback;
+  private AllNetworksCallback mAllNetworksCallback;
   private NetworkRequest mNetworkRequest;
   private NetworkState mNetworkState;
   private boolean mRegistered = false;
@@ -239,20 +237,13 @@ public class AndroidNetworkMonitorV2 {
   private static boolean vpnAccessible(Network network) {
     // Determine if the VPN applies to the current user by seeing if a socket can be bound
     // to the VPN.
-    Socket s = new Socket();
-    try {
-      // Avoid using network.getSocketFactory().createSocket() because it leaks.
-      // https://crbug.com/805424
+    try (Socket s = new Socket()) {
+      // Avoid using network.getSocketFactory().createSocket() because it leaks
+      // (https://crbug.com/805424).
       network.bindSocket(s);
     } catch (IOException e) {
       // Failed to bind so this VPN isn't for the current user to use.
       return false;
-    } finally {
-      try {
-        s.close();
-      } catch (IOException e) {
-        // Not worth taking action on a failed close.
-      }
     }
     return true;
   }
@@ -263,7 +254,7 @@ public class AndroidNetworkMonitorV2 {
    */
   private Network[] getAllNetworksFiltered(Network ignoreNetwork) {
     Network[] networks = mConnectivityManager.getAllNetworks();
-    // Very rarely this API inexplicably returns {@code null}, crbug.com/721116.
+    // Very rarely this API inexplicably returns {@code null} (crbug.com/721116).
     networks = networks == null ? new Network[0] : networks;
     // Whittle down |networks| into just the list of networks useful to us.
     int filteredIndex = 0;
@@ -330,8 +321,7 @@ public class AndroidNetworkMonitorV2 {
            || networkInfo.getType() == TYPE_VPN)) {
         // Android 10+ devices occasionally return multiple networks
         // of the same type that are stuck in the CONNECTING state.
-        // Now that Java asserts are enabled, ignore these zombie
-        // networks here to avoid hitting the assert below. crbug.com/1361170
+        // Ignore these zombie networks.
         if (defaultNetwork != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
           // If `network` is CONNECTING, ignore it.
           if (networkInfo.getDetailedState() == NetworkInfo.DetailedState.CONNECTING) {
@@ -346,11 +336,11 @@ public class AndroidNetworkMonitorV2 {
         }
         if (defaultNetwork != null) {
           // TODO(crbug.com/40060873): Investigate why there are multiple
-          // connected networks.
+          // connected networks of the same type.
           Log.e(TAG, "There should not be multiple connected "
                          + "networks of the same type. At least as of Android "
                          + "Marshmallow this is not supported. If this becomes "
-                         + "supported this assertion may trigger.");
+                         + "supported this error may trigger.");
         }
         defaultNetwork = network;
       }
@@ -399,7 +389,7 @@ public class AndroidNetworkMonitorV2 {
    * Returns connection type and status information about the current
    * default network.
    */
-  NetworkState getNetworkStateOfDefaultNetwork() {
+  NetworkState getDefaultNetworkState() {
     Network network = getDefaultNetwork();
     NetworkInfo networkInfo = getNetworkInfo(network);
     networkInfo = processActiveNetworkInfo(networkInfo);
@@ -519,7 +509,7 @@ public class AndroidNetworkMonitorV2 {
       }
     }
 
-    // Calculate the given NetworkState. Unlike getNetworkStateOfDefaultNetwork(), this method
+    // Calculate the given NetworkState. Unlike getDefaultNetworkState(), this method
     // avoids calling synchronous ConnectivityManager methods which is prohibited inside
     // NetworkCallbacks see "Do NOT call" here:
     // https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#onAvailable(android.net.Network)
@@ -573,7 +563,7 @@ public class AndroidNetworkMonitorV2 {
   // and go. It gets called back on a special handler thread
   // ConnectivityManager creates for making the callbacks. The callbacks in
   // turn post to mLooper where mObserver lives.
-  private class MyNetworkCallback extends NetworkCallback {
+  private class AllNetworksCallback extends NetworkCallback {
     // If non-null, this indicates a VPN is in place for the current user, and no other
     // networks are accessible.
     private Network mVpnInPlace;
@@ -700,7 +690,7 @@ public class AndroidNetworkMonitorV2 {
         runOnThread(new Runnable() {
           @Override
           public void run() {
-            mNetworkState = getNetworkStateOfDefaultNetwork();
+            mNetworkState = getDefaultNetworkState();
             final EnvoyConnectionType newConnectionType = mNetworkState.getEnvoyConnectionType();
             mEnvoyEngine.onDefaultNetworkChangedV2(newConnectionType, getDefaultNetId());
           }
@@ -738,13 +728,13 @@ public class AndroidNetworkMonitorV2 {
     mLooper = Looper.myLooper();
     mHandler = new Handler(mLooper);
     mDefaultNetworkCallback = new DefaultNetworkCallback();
-    mNetworkCallback = new MyNetworkCallback();
+    mAllNetworksCallback = new AllNetworksCallback();
     mNetworkRequest = new NetworkRequest.Builder()
                           .addCapability(NET_CAPABILITY_INTERNET)
                           // Need to hear about VPNs too.
                           .removeCapability(NET_CAPABILITY_NOT_VPN)
                           .build();
-    mNetworkState = getNetworkStateOfDefaultNetwork();
+    mNetworkState = getDefaultNetworkState();
     registerNetworkCallbacks(false);
   }
 
@@ -753,7 +743,7 @@ public class AndroidNetworkMonitorV2 {
     assert !mRegistered;
 
     if (shouldSignalDefaultNetworkChange) {
-      onNetworkStateChangedTo(getNetworkStateOfDefaultNetwork(), getDefaultNetId());
+      onNetworkStateChangedTo(getDefaultNetworkState(), getDefaultNetId());
     }
 
     if (mDefaultNetworkCallback != null) {
@@ -765,24 +755,25 @@ public class AndroidNetworkMonitorV2 {
     }
     mRegistered = true;
 
-    if (mNetworkCallback != null) {
-      mNetworkCallback.initializeVpnInPlace();
+    if (mAllNetworksCallback != null) {
+      mAllNetworksCallback.initializeVpnInPlace();
       try {
-        mConnectivityManager.registerNetworkCallback(mNetworkRequest, mNetworkCallback, mHandler);
+        mConnectivityManager.registerNetworkCallback(mNetworkRequest, mAllNetworksCallback,
+                                                     mHandler);
       } catch (RuntimeException e) {
         // If Android thinks this app has used up all available NetworkRequests, don't
         // bother trying to register any more callbacks as Android will still think
         // all available NetworkRequests are used up and fail again needlessly.
         // Also don't bother unregistering as this call didn't actually register.
         // See crbug.com/791025 for more info.
-        mNetworkCallback = null;
+        mAllNetworksCallback = null;
       }
-      if (mNetworkCallback != null && shouldSignalDefaultNetworkChange) {
+      if (mAllNetworksCallback != null && shouldSignalDefaultNetworkChange) {
         // registerNetworkCallback() will rematch the NetworkRequest
         // against active networks, so a cached list of active networks
         // will be repopulated immediately after this. However we need to
         // purge any cached networks as they may have been disconnected
-        // while mNetworkCallback was unregistered.
+        // while mAllNetworksCallback was unregistered.
         final Network[] networks = getAllNetworksFiltered(null);
         // Convert Networks to NetIDs.
         final long[] netIds = new long[networks.length];
@@ -799,8 +790,8 @@ public class AndroidNetworkMonitorV2 {
     if (!mRegistered)
       return;
     mRegistered = false;
-    if (mNetworkCallback != null) {
-      mConnectivityManager.unregisterNetworkCallback(mNetworkCallback);
+    if (mAllNetworksCallback != null) {
+      mConnectivityManager.unregisterNetworkCallback(mAllNetworksCallback);
     }
     if (mDefaultNetworkCallback != null) {
       mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);

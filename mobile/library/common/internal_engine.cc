@@ -372,6 +372,30 @@ void InternalEngine::onDefaultNetworkChanged(int network) {
   });
 }
 
+void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType /*connection_type*/,
+                                                    int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling the default network changed callback on Android");
+}
+
+void InternalEngine::onNetworkDisconnectAndroid(int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling network disconnect callback on Android");
+}
+
+void InternalEngine::onNetworkConnectAndroid(ConnectionType /*connection_type*/,
+                                             int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling network connect callback on Android");
+}
+
+void InternalEngine::purgeActiveNetworkListAndroid(
+    const std::vector<int64_t>& /*active_network_ids*/) {
+  ENVOY_LOG_MISC(trace, "Calling network purge callback on Android");
+}
+
+void InternalEngine::onDefaultNetworkUnavailable() {
+  ENVOY_LOG_MISC(trace, "Calling the default network unavailable callback");
+  dispatcher_->post([&]() -> void { connectivity_manager_->dnsCache()->stop(); });
+}
+
 void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
   envoy_netconf_t configuration =
       Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
@@ -412,29 +436,6 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
   }
 }
 
-void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType /*connection_type*/,
-                                                    int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling the default network changed callback on Android");
-}
-
-void InternalEngine::onNetworkDisconnectAndroid(int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling network disconnect callback on Android");
-}
-
-void InternalEngine::onNetworkConnectAndroid(ConnectionType /*connection_type*/,
-                                             int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling network connect callback on Android");
-}
-
-void InternalEngine::purgeActiveNetworkListAndroid(
-    const std::vector<int64_t>& /*active_network_ids*/) {
-  ENVOY_LOG_MISC(trace, "Calling network purge callback on Android");
-}
-
-void InternalEngine::onDefaultNetworkUnavailable() {
-  ENVOY_LOG_MISC(trace, "Calling the default network unavailable callback");
-  dispatcher_->post([&]() -> void { connectivity_manager_->dnsCache()->stop(); });
-}
 envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
                                                 uint64_t count) {
   return dispatcher_->post(

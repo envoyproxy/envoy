@@ -12,8 +12,7 @@ public enum EnvoyConnectionType {
   CONNECTION_4G(5),
   CONNECTION_NONE(6), // No connection.
   CONNECTION_BLUETOOTH(7),
-  CONNECTION_5G(8),
-  CONNECTION_LAST(8);
+  CONNECTION_5G(8);
 
   private final int value;
 
