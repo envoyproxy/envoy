@@ -278,5 +278,10 @@ new_features:
     Added a new ``failure_mode_deny_percent`` field of type ``Envoy::Runtime::FractionalPercent`` attached to the rate limit filter
     to configure the failure mode for rate limit service errors in runtime.
     It acts as an override for the existing ``failure_mode_deny`` field in the filter config.
+- area: tls
+  change: |
+    Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
+    They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
+    and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
 
 deprecated:
