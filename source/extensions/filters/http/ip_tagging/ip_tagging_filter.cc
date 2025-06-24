@@ -94,16 +94,51 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
         }
       }
 
+    } catch (const std::exception& e) {
+      ENVOY_LOG(error, "[ip_tagging] IpTagsProvider timer callback exception: {}", e.what());
+      // DO NOT re-throw exceptions from timer callbacks - they cause std::terminate!
+      // Instead, call the error callback to notify about the failure
+      ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider calling reload_error_cb_ due to exception");
+      if (reload_error_cb_) {
+        try {
+          reload_error_cb_();
+          ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider reload_error_cb_ completed after exception");
+        } catch (const std::exception& cb_e) {
+          ENVOY_LOG(error, "[ip_tagging] IpTagsProvider reload_error_cb_ also threw exception: {}", cb_e.what());
+        } catch (...) {
+          ENVOY_LOG(error, "[ip_tagging] IpTagsProvider reload_error_cb_ threw unknown exception");
+        }
+      } else {
+        ENVOY_LOG(error, "[ip_tagging] IpTagsProvider reload_error_cb_ is null, cannot notify about exception");
+      }
+    } catch (...) {
+      ENVOY_LOG(error, "[ip_tagging] IpTagsProvider timer callback unknown exception");
+      // DO NOT re-throw exceptions from timer callbacks - they cause std::terminate!
+      // Instead, call the error callback to notify about the failure
+      ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider calling reload_error_cb_ due to unknown exception");
+      if (reload_error_cb_) {
+        try {
+          reload_error_cb_();
+          ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider reload_error_cb_ completed after unknown exception");
+        } catch (const std::exception& cb_e) {
+          ENVOY_LOG(error, "[ip_tagging] IpTagsProvider reload_error_cb_ also threw exception: {}", cb_e.what());
+        } catch (...) {
+          ENVOY_LOG(error, "[ip_tagging] IpTagsProvider reload_error_cb_ threw unknown exception");
+        }
+      } else {
+        ENVOY_LOG(error, "[ip_tagging] IpTagsProvider reload_error_cb_ is null, cannot notify about unknown exception");
+      }
+    }
+
+    // Always try to re-enable the timer for the next refresh, even after errors
+    try {
       ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider re-enabling timer for next refresh");
       ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
       ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider timer callback completed");
-
-    } catch (const std::exception& e) {
-      ENVOY_LOG(error, "[ip_tagging] IpTagsProvider timer callback exception: {}", e.what());
-      throw;
+    } catch (const std::exception& timer_e) {
+      ENVOY_LOG(error, "[ip_tagging] IpTagsProvider failed to re-enable timer: {}", timer_e.what());
     } catch (...) {
-      ENVOY_LOG(error, "[ip_tagging] IpTagsProvider timer callback unknown exception");
-      throw;
+      ENVOY_LOG(error, "[ip_tagging] IpTagsProvider failed to re-enable timer: unknown exception");
     }
   });
 
@@ -189,11 +224,23 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
 const std::string& IpTagsLoader::getDataSourceData() {
   ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::getDataSourceData() starting");
   try {
+    if (!data_source_provider_) {
+      ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::getDataSourceData() data_source_provider_ is null");
+      data_ = "";
+      return data_;
+    }
+
     data_ = data_source_provider_->data();
     ENVOY_LOG(debug, "[ip_tagging] IpTagsLoader::getDataSourceData() got data, size: {} bytes", data_.size());
     return data_;
+  } catch (const std::bad_variant_access& e) {
+    ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::getDataSourceData() bad_variant_access: {}", e.what());
+    ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::getDataSourceData() data source provider may be in invalid state, returning empty data");
+    data_ = "";
+    return data_;
   } catch (const std::exception& e) {
     ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::getDataSourceData() exception: {}", e.what());
+    // For non-variant access errors, still throw as they might be more serious
     throw;
   } catch (...) {
     ENVOY_LOG(error, "[ip_tagging] IpTagsLoader::getDataSourceData() unknown exception");
