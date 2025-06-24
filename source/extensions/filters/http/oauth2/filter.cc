@@ -774,18 +774,15 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
   const std::string encrypted_refresh_token = findValue(cookies, cookie_names.refresh_token_);
 
   if (!encrypted_access_token.empty()) {
-    cookies.insert_or_assign(cookie_names.bearer_token_,
-                             decryptToken(encrypted_access_token, config_->hmacSecret()));
+    cookies.insert_or_assign(cookie_names.bearer_token_, decryptToken(encrypted_access_token));
   }
 
   if (!encrypted_id_token.empty()) {
-    cookies.insert_or_assign(cookie_names.id_token_,
-                             decryptToken(encrypted_id_token, config_->hmacSecret()));
+    cookies.insert_or_assign(cookie_names.id_token_, decryptToken(encrypted_id_token));
   }
 
   if (!encrypted_refresh_token.empty()) {
-    cookies.insert_or_assign(cookie_names.refresh_token_,
-                             decryptToken(encrypted_refresh_token, config_->hmacSecret()));
+    cookies.insert_or_assign(cookie_names.refresh_token_, decryptToken(encrypted_refresh_token));
   }
 
   if (!encrypted_access_token.empty() || !encrypted_id_token.empty() ||
@@ -795,13 +792,23 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
   }
 }
 
-std::string OAuth2Filter::decryptToken(const std::string& encrypted_token,
-                                       const std::string& secret) {
+std::string OAuth2Filter::encryptToken(const std::string& token) const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_token")) {
+    return token;
+  }
+  return encrypt(token, config_->hmacSecret(), random_);
+}
+
+std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_token")) {
+    return encrypted_token;
+  }
+
   if (encrypted_token.empty()) {
     return EMPTY_STRING;
   }
 
-  DecryptResult decrypt_result = decrypt(encrypted_token, secret);
+  DecryptResult decrypt_result = decrypt(encrypted_token, config_->hmacSecret());
   if (decrypt_result.error.has_value()) {
     ENVOY_LOG(error, "failed to decrypt token: {}, error: {}", encrypted_token,
               decrypt_result.error.value());
@@ -1224,7 +1231,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   if (!access_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.bearer_token_, "=",
-                                         encrypt(access_token_, config_->hmacSecret(), random_),
+                                         encryptToken(access_token_),
                                          BuildCookieTail(1))); // BEARER_TOKEN
   } else if (request_cookies.contains(cookie_names.bearer_token_)) {
     headers.addReferenceKey(
@@ -1235,8 +1242,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
 
   if (!id_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(cookie_names.id_token_, "=",
-                                         encrypt(id_token_, config_->hmacSecret(), random_),
+                            absl::StrCat(cookie_names.id_token_, "=", encryptToken(id_token_),
                                          BuildCookieTail(4))); // ID_TOKEN
   } else if (request_cookies.contains(cookie_names.id_token_)) {
     headers.addReferenceKey(
@@ -1248,7 +1254,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   if (!refresh_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
                             absl::StrCat(cookie_names.refresh_token_, "=",
-                                         encrypt(refresh_token_, config_->hmacSecret(), random_),
+                                         encryptToken(refresh_token_),
                                          BuildCookieTail(5))); // REFRESH_TOKEN
   } else if (request_cookies.contains(cookie_names.refresh_token_)) {
     headers.addReferenceKey(
