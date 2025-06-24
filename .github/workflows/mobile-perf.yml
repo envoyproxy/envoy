@@ -42,7 +42,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-perf }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-perf }}
     needs: load
     name: Build test binaries
     uses: ./.github/workflows/_mobile_container_ci.yml
@@ -83,7 +83,7 @@ jobs:
     permissions:
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-perf }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-perf }}
     needs:
     - load
     - build
@@ -121,6 +121,7 @@ jobs:
       && github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && needs.load.outputs.request
       && fromJSON(needs.load.outputs.request).run.mobile-perf
     needs:
     - load
