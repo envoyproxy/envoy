@@ -73,7 +73,7 @@ private:
   const Http::LowerCaseString random_value_header_;
   const std::string runtime_key_prefix_;
   std::vector<WeightedClustersConfigEntryConstSharedPtr> weighted_clusters_;
-  uint64_t total_cluster_weight_;
+  uint64_t total_cluster_weight_{0};
 };
 
 } // namespace Router
