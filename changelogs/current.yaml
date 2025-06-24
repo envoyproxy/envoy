@@ -65,7 +65,7 @@ minor_behavior_changes:
     providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
 - area: oauth2
   change: |
-    The access token, id token and refresh token in the cookies are now encrypted using the HMCA secret.
+    The access token, id token and refresh token in the cookies are now encrypted using the HMAC secret.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
