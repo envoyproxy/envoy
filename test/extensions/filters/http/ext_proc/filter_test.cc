@@ -1629,91 +1629,120 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
 }
 
 // Test suite for failure_mode_allow override.
-class FailureModeAllowOverrideTest : public HttpFilterTest {
-protected:
-  void testFailureMode(bool filter_level_allow, absl::optional<bool> route_level_allow,
-                       bool expect_fail_closed) {
-    std::string yaml_config = R"EOF(
+class FailureModeAllowOverrideTest : public HttpFilterTest {};
+
+TEST_F(FailureModeAllowOverrideTest, FilterAllowRouteDisallow) {
+  std::string yaml_config = R"EOF(
 grpc_service:
   envoy_grpc:
     cluster_name: "ext_proc_server"
-failure_mode_allow: )EOF";
-    yaml_config += filter_level_allow ? "true" : "false";
-    initialize(std::move(yaml_config));
+failure_mode_allow: true)EOF";
+  initialize(std::move(yaml_config));
 
-    if (route_level_allow.has_value()) {
-      ExtProcPerRoute route_proto;
-      route_proto.mutable_overrides()->set_failure_mode_allow(route_level_allow.value());
-      FilterConfigPerRoute route_config(route_proto);
-      EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
-          .WillRepeatedly(testing::Invoke(
-              [&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
-    }
+  ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->set_failure_mode_allow(false);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
 
-    EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-    test_time_->advanceTimeWait(std::chrono::microseconds(10));
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
 
-    if (expect_fail_closed) {
-      TestResponseHeaderMapImpl immediate_response_headers;
-      EXPECT_CALL(encoder_callbacks_,
-                  sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
-                                 "ext_proc_error_gRPC_error_13{error_message}"))
-          .WillOnce(Invoke([&immediate_response_headers](
-                               Unused, Unused,
-                               std::function<void(ResponseHeaderMap & headers)> modify_headers,
-                               Unused, Unused) { modify_headers(immediate_response_headers); }));
-    } else {
-      EXPECT_CALL(decoder_callbacks_, continueDecoding());
-    }
+  TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+                             "ext_proc_error_gRPC_error_13{error_message}"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
+                           Unused) { modify_headers(immediate_response_headers); }));
 
-    server_closed_stream_ = true; // Simulate stream close without proper gRPC response
-    stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
-
-    // Ensure filter state is cleaned up if we didn't fail closed
-    if (!expect_fail_closed) {
-      Buffer::OwnedImpl req_data("foo");
-      EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
-      EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-      EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
-    }
-    filter_->onDestroy();
-
-    if (!expect_fail_closed) {
-      EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
-    }
-  }
-};
-
-TEST_F(FailureModeAllowOverrideTest, FilterAllowRouteDisallow) {
-  // Filter: failure_mode_allow = true
-  // Route: failure_mode_allow = false
-  // Expected: Fail closed
-  testFailureMode(/*filter_level_allow=*/true, /*route_level_allow=*/false,
-                  /*expect_fail_closed=*/true);
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+  filter_->onDestroy();
 }
 
 TEST_F(FailureModeAllowOverrideTest, FilterDisallowRouteAllow) {
-  // Filter: failure_mode_allow = false
-  // Route: failure_mode_allow = true
-  // Expected: Allow request
-  testFailureMode(/*filter_level_allow=*/false, /*route_level_allow=*/true,
-                  /*expect_fail_closed=*/false);
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: false)EOF";
+  initialize(std::move(yaml_config));
+
+  ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->set_failure_mode_allow(true);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
 }
 
 TEST_F(FailureModeAllowOverrideTest, FilterAllowNoRouteOverride) {
-  // Filter: failure_mode_allow = true
-  // Route: No override
-  // Expected: Allow request
-  testFailureMode(/*filter_level_allow=*/true, /*route_level_allow=*/absl::nullopt,
-                  /*expect_fail_closed=*/false);
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: true)EOF";
+  initialize(std::move(yaml_config));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
 }
 
 TEST_F(FailureModeAllowOverrideTest, FilterDisallowNoRouteOverride) {
-  // Filter: failure_mode_allow = false
-  // Route: No override
-  // Expected: Fail closed
-  testFailureMode(/*filter_level_allow=*/false, /*route_level_allow=*/absl::nullopt,
-                  /*expect_fail_closed=*/true);
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: false)EOF";
+  initialize(std::move(yaml_config));
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+                             "ext_proc_error_gRPC_error_13{error_message}"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
+                           Unused) { modify_headers(immediate_response_headers); }));
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+  filter_->onDestroy();
 }
 
 TEST_F(HttpFilterTest, StreamingBodyMutateLastEmptyChunk) {
