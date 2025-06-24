@@ -262,13 +262,15 @@ typedef enum {
  */
 typedef enum {
   // stream's dynamic metadata.
-  envoy_dynamic_module_type_metadata_source_dynamic,
+  envoy_dynamic_module_type_metadata_source_Dynamic,
   // route metadata
-  envoy_dynamic_module_type_metadata_source_route,
+  envoy_dynamic_module_type_metadata_source_Route,
   // cluster metadata
-  envoy_dynamic_module_type_metadata_source_cluster,
+  envoy_dynamic_module_type_metadata_source_Cluster,
   // host (LbEndpoint in xDS) metadata
-  envoy_dynamic_module_type_metadata_source_host,
+  envoy_dynamic_module_type_metadata_source_Host,
+  // host locality (LocalityLbEndpoints in xDS) metadata
+  envoy_dynamic_module_type_metadata_source_HostLocality,
 } envoy_dynamic_module_type_metadata_source;
 
 /**
