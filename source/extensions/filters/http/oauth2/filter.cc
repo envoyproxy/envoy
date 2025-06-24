@@ -761,7 +761,7 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
 
 // Decrypt the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
 // the request upstream.
-void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) {
+void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const {
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
   if (cookies.empty()) {
     return;
@@ -933,7 +933,7 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 /**
  * Modifies the state of the filter by adding response headers to the decoder_callbacks
  */
-Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) {
+Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) const {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
   std::string cookie_domain;
@@ -1275,8 +1275,9 @@ void OAuth2Filter::sendUnauthorizedResponse() {
 // * Does the query parameters contain the code and state?
 // * Does the state contain the original request URL and the CSRF token?
 // * Does the CSRF token in the state match the one in the cookie?
-CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
-                                                             const absl::string_view path_str) {
+CallbackValidationResult
+OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
+                                    const absl::string_view path_str) const {
   // Return 401 unauthorized if the query parameters contain an error response.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError).has_value()) {
