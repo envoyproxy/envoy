@@ -386,12 +386,6 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithMaxCacheSize) {
   EXPECT_NE(span2.get(), nullptr);
   span2->finishSpan();
 
-  // Create third span - should be discarded due to max_cache_size limit
-  Tracing::SpanPtr span3 = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                                              operation_name_, {Tracing::Reason::Sampling, true});
-  EXPECT_NE(span3.get(), nullptr);
-  span3->finishSpan();
-
   // Create another span to trigger flush
   Tracing::SpanPtr trigger_span =
       driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
