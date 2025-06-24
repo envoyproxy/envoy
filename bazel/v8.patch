@@ -9,7 +9,7 @@ index 4e89f90..0df4f67 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -4,7 +4,7 @@
- 
+
  load("@bazel_skylib//lib:selects.bzl", "selects")
  load("@rules_python//python:defs.bzl", "py_binary")
 -load("@v8_python_deps//:requirements.bzl", "requirement")
@@ -24,7 +24,7 @@ index 4e89f90..0df4f67 100644
 -    default = "none",
 +    default = "False",
  )
- 
+
  # Default setting for v8_enable_pointer_compression.
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
 index e957c0f..0327669 100644
@@ -35,7 +35,7 @@ index e957c0f..0327669 100644
              "@v8//bazel/config:is_clang": [
                  "-Wno-invalid-offsetof",
 +                "-Wno-unneeded-internal-declaration",
-                 "-std=c++17",
+                 "-std=c++20",
              ],
              "@v8//bazel/config:is_gcc": [
 @@ -131,6 +132,9 @@ def _default_args():
@@ -85,23 +85,23 @@ index 4649cf0..6fc6e57 100644
 +    DFSPop(stack, node);
    }
  }
- 
+
 diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
 index 4473e20..65a6ec7 100644
 --- a/src/wasm/c-api.cc
 +++ b/src/wasm/c-api.cc
 @@ -2247,6 +2247,8 @@ auto Instance::exports() const -> ownvec<Extern> {
- 
+
  }  // namespace wasm
- 
+
 +#if 0
 +
  // BEGIN FILE wasm-c.cc
- 
+
  extern "C" {
 @@ -3274,3 +3276,5 @@ wasm_instance_t* wasm_frame_instance(const wasm_frame_t* frame) {
  #undef WASM_DEFINE_SHARABLE_REF
- 
+
  }  // extern "C"
 +
 +#endif
@@ -112,9 +112,9 @@ index c3768b8..d4a1dda 100755
 @@ -16,6 +16,8 @@ try:
  except ImportError:
    import simplejson as json
- 
+
 +sys.path += [os.path.dirname(__file__)]
 +
  import pdl
- 
+
  try:

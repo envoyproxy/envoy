@@ -130,7 +130,7 @@ index 5960d2a..08295ff 100644
 +++ b/build_config/build_config.bzl
 @@ -7,6 +7,7 @@ _default_copts = select({
      "//conditions:default": [
-         "-std=c++17",
+         "-std=c++20",
          "-fno-strict-aliasing",
 +        "-Wno-unused-parameter",
      ],
