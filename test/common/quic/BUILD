@@ -117,6 +117,28 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "envoy_quic_server_proof_verifier_test",
+    srcs = envoy_select_enable_http3(["envoy_quic_server_proof_verifier_test.cc"]),
+    data = [
+        "//test/common/tls/test_data:certs",
+    ],
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        "//source/common/quic:envoy_quic_proof_verifier_lib",
+        "//source/common/quic:envoy_quic_server_proof_verifier_lib",
+        "//source/common/quic:quic_server_transport_socket_factory_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:environment_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_certificates_lib",
+    ]),
+)
+
+envoy_cc_test(
     name = "envoy_quic_server_stream_test",
     srcs = envoy_select_enable_http3(["envoy_quic_server_stream_test.cc"]),
     rbe_pool = "6gig",

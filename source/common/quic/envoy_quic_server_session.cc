@@ -169,6 +169,7 @@ quic::QuicConnection* EnvoyQuicServerSession::quicConnection() {
 
 void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
+  ENVOY_LOG(debug, "QUIC TLS handshake completed.");
   streamInfo().downstreamTiming().onDownstreamHandshakeComplete(dispatcher_.timeSource());
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
@@ -214,11 +215,22 @@ void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionM
 
 quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
   quic::QuicSSLConfig config = quic::QuicServerSessionBase::GetSSLConfig();
-  config.early_data_enabled = position_.has_value()
-                                  ? dynamic_cast<const QuicServerTransportSocketFactory&>(
-                                        position_->filter_chain_.transportSocketFactory())
-                                        .earlyDataEnabled()
-                                  : true;
+
+  if (position_.has_value()) {
+    const auto& transport_socket_factory = dynamic_cast<const QuicServerTransportSocketFactory&>(
+        position_->filter_chain_.transportSocketFactory());
+
+    config.early_data_enabled = transport_socket_factory.earlyDataEnabled();
+
+    // Configure client certificate mode based on transport socket factory requirements.
+    config.client_cert_mode = transport_socket_factory.requiresClientCertificate()
+                                  ? quic::ClientCertMode::kRequire
+                                  : quic::ClientCertMode::kNone;
+  } else {
+    config.early_data_enabled = true;
+    config.client_cert_mode = quic::ClientCertMode::kNone;
+  }
+
   return config;
 }
 

@@ -235,6 +235,11 @@ new_features:
   change: |
     Removed work-in-progress annotations from RBAC filter ``matcher`` and ``shadow_matcher`` fields in HTTP and network
     filters, marking the feature stable.
+- area: quic
+  change: |
+    Added support for client certificate authentication (mTLS) in QUIC/HTTP3 connections. When
+    ``require_client_certificate`` is enabled in the downstream TLS context, the QUIC server will enforce client
+    certificate validation during the TLS handshake.
 - area: access_log
   change: |
     Added process-level rate limiting on access log emission via
