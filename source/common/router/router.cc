@@ -1641,7 +1641,18 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       // Outlier detector distinguishes only two values:
       // Anything >= 500 is error.
       // Anything < 500 is success.
-      put_result_code = matched.value() ? 500 : 200;
+      if (!matched.value()) {
+        // Matcher returned non-match.
+        // report success to outlier detector.
+        put_result_code = 200;
+      } else {
+        // Matcher returned match (treat the response as error).
+        // If the original status code was error (>= 500), then report the
+        // original status code to the outlier detector.
+        if (response_code < 500) {
+          put_result_code = 500;
+        }
+      }
     }
   }
 

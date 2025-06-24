@@ -1575,21 +1575,23 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 
 absl::optional<bool>
 ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers) const {
-  for (const auto& http_event : http_protocol_options_->outlier_detection_http_events_matcher_) {
-    Extensions::Common::Matcher::Matcher::MatchStatusVector statuses;
-
-    statuses.reserve(http_event.first.size());
-    statuses = Extensions::Common::Matcher::Matcher::MatchStatusVector(http_event.first.size());
-    http_event.first[0]->onNewStream(statuses);
-
-    // Run matchers.
-    http_event.first[0]->onHttpResponseHeaders(headers, statuses);
-    if (http_event.first[0]->matchStatus(statuses).matches_) {
-      return absl::optional<bool>(!http_event.second);
-    }
+  if (http_protocol_options_->outlier_detection_http_error_matcher_[0] == nullptr) {
+    return absl::nullopt;
   }
 
-  return absl::nullopt;
+  Extensions::Common::Matcher::Matcher::MatchStatusVector statuses;
+
+  statuses.reserve(http_protocol_options_->outlier_detection_http_error_matcher_.size());
+  statuses = Extensions::Common::Matcher::Matcher::MatchStatusVector(
+      http_protocol_options_->outlier_detection_http_error_matcher_.size());
+  http_protocol_options_->outlier_detection_http_error_matcher_[0]->onNewStream(statuses);
+
+  // Run matchers.
+  http_protocol_options_->outlier_detection_http_error_matcher_[0]->onHttpResponseHeaders(headers,
+                                                                                          statuses);
+  return absl::optional<bool>(http_protocol_options_->outlier_detection_http_error_matcher_[0]
+                                  ->matchStatus(statuses)
+                                  .matches_);
 }
 
 absl::StatusOr<bool> validateTransportSocketSupportsQuic(

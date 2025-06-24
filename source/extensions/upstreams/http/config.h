@@ -62,8 +62,7 @@ public:
   const bool use_http3_{};
   const bool use_alpn_{};
 
-  std::vector<std::pair<std::vector<Extensions::Common::Matcher::MatcherPtr>, bool>>
-      outlier_detection_http_events_matcher_;
+  std::vector<Extensions::Common::Matcher::MatcherPtr> outlier_detection_http_error_matcher_;
 
 private:
   ProtocolOptionsConfigImpl(

@@ -238,10 +238,9 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       use_alpn_(options.has_auto_config()) {
   ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
   // Build outlier detection config
-  for (const auto& http_event : options.outlier_detection()) {
-    outlier_detection_http_events_matcher_.emplace_back(std::make_pair(
-        std::vector<Extensions::Common::Matcher::MatcherPtr>(), http_event.success_on_match()));
-    buildMatcher(http_event.match(), outlier_detection_http_events_matcher_.back().first,
+
+  if (options.has_outlier_detection_error_matcher()) {
+    buildMatcher(options.outlier_detection_error_matcher(), outlier_detection_http_error_matcher_,
                  server_context);
   }
 }

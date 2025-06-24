@@ -6,7 +6,6 @@ import "envoy/config/common/matcher/v3/matcher.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/protocol.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
-import "envoy/type/v3/http_status.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -61,7 +60,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //             http2_protocol_options:
 //               max_concurrent_streams: 100
 //        .... [further cluster config]
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message HttpProtocolOptions {
   // If this is used, the cluster will only operate on one of the possible upstream protocols.
   // Note that HTTP/2 or above should generally be used for upstream gRPC clusters.
@@ -177,15 +176,7 @@ message HttpProtocolOptions {
   // [#extension-category: envoy.http.header_validators]
   config.core.v3.TypedExtensionConfig header_validation_config = 7;
 
-  message HttpEvents {
-    // Matcher for response headers.
-    config.common.matcher.v3.MatchPredicate match = 1 [(validate.rules).message = {required: true}];
-
-    // Determines if matching indicate error or non-error. Defaults to false (error).
-    bool success_on_match = 2;
-  }
-
-  // List of matchers for response headers along with codes to be reported to outlier detection.
-  // The first matcher which returns matching success is applied.
-  repeated HttpEvents outlier_detection = 8;
+  // If specified, only responses matching the matcher will be treated by outlier detection as errors.
+  // If not specified, only 5xx codes are treated by outlier detection as errors.
+  config.common.matcher.v3.MatchPredicate outlier_detection_error_matcher = 8;
 }
