@@ -76,6 +76,10 @@ private:
   Http::FilterHeadersStatus processCachedBucket(const DenyResponseSettings& deny_response_settings,
                                                 CachedBucket& cached_bucket);
   bool shouldAllowRequest(const CachedBucket& cached_bucket);
+  // Handle the first Matcher that's marked with keep_matching as a preview/darklaunch.
+  void handlePreviewMatch(Matcher::ActionFactoryCb skipped_action);
+  // Record the usage of a bucket, including bucket creation if hitting a new bucket.
+  Http::FilterHeadersStatus recordBucketUsage(Matcher::ActionPtr matched, bool is_preview_match);
 
   FilterConfigConstSharedPtr config_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
@@ -84,6 +88,8 @@ private:
   RateLimitQuotaValidationVisitor visitor_ = {};
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
   std::unique_ptr<Http::Matching::HttpMatchingDataImpl> data_ptr_ = nullptr;
+  // If a preview / darklaunch Matcher has already been hit, so future hits shouldn't be recorded.
+  bool first_skipped_match_ = true;
 
   // Own a local, filter-specific client to provider functions needed by worker
   // threads.
