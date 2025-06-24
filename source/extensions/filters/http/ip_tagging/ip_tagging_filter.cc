@@ -42,7 +42,8 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   ip_tags_reload_timer_ = main_dispatcher.createTimer([this]() -> void {
     try {
       ENVOY_LOG(debug, "Trying to update ip tags in background");
-      auto new_tags_or_error = tags_loader_.refreshTags();
+      const auto new_data = tags_loader_.getDataSourceData();
+      auto new_tags_or_error = tags_loader_.refreshTags(new_data);
       if (new_tags_or_error.status().ok()) {
         updateIpTags(new_tags_or_error.value());
         reload_success_cb_();
@@ -166,15 +167,15 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
     }
     data_source_provider_ = std::move(provider_or_error.value());
     ip_tags_path_ = ip_tags_datasource.filename();
-    return refreshTags();
+    const auto& initial_data = getDataSourceData();
+    return refreshTags(initial_data);
   }
   return absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
 }
 
-absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
+absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags(const std::string& new_data) {
   if (data_source_provider_) {
     IpTagFileProto ip_tags_proto;
-    const auto new_data = getDataSourceData();
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       auto load_status =
           MessageUtil::loadFromYamlNoThrow(new_data, ip_tags_proto, validation_visitor_);
