@@ -164,6 +164,11 @@ TEST_P(StatsIntegrationTest, WithoutCert) {
 
 TEST_P(StatsIntegrationTest, WithExpiringCert) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listen_address = bootstrap.mutable_static_resources()
+                               ->mutable_listeners(0)
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    listen_address->set_address("0.0.0.0");
     auto* transport_socket = bootstrap.mutable_static_resources()
                                  ->mutable_listeners(0)
                                  ->mutable_filter_chains(0)
@@ -199,10 +204,21 @@ TEST_P(StatsIntegrationTest, WithExpiringCert) {
   int64_t days_until_expiry = absl::ToInt64Hours(cert_expiry - absl::Now()) / 24;
   EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(),
             days_until_expiry);
+
+  auto actual_cert_expire_time_since_epoch =
+      test_server_
+          ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_seconds")
+          ->value();
+  EXPECT_EQ(actual_cert_expire_time_since_epoch, absl::ToUnixSeconds(cert_expiry));
 }
 
 TEST_P(StatsIntegrationTest, WithExpiredCert) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* listen_address = bootstrap.mutable_static_resources()
+                               ->mutable_listeners(0)
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    listen_address->set_address("0.0.0.0");
     auto* transport_socket = bootstrap.mutable_static_resources()
                                  ->mutable_listeners(0)
                                  ->mutable_filter_chains(0)
@@ -235,6 +251,11 @@ TEST_P(StatsIntegrationTest, WithExpiredCert) {
 
   initialize();
   EXPECT_EQ(test_server_->gauge("server.days_until_first_cert_expiring")->value(), 0);
+  EXPECT_EQ(
+      test_server_
+          ->gauge("listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_seconds")
+          ->value(),
+      1681036973);
 }
 
 // TODO(cmluciano) Refactor once https://github.com/envoyproxy/envoy/issues/5624 is solved

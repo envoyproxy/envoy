@@ -1,6 +1,8 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -52,13 +54,17 @@ TEST_P(DynamicModuleHttpFilterGetHeaderValueTest, GetHeaderValue) {
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter_->request_headers_ = &request_headers;
   Http::TestRequestTrailerMapImpl request_trailers{headers};
-  filter_->request_trailers_ = &request_trailers;
   Http::TestResponseHeaderMapImpl response_headers{headers};
-  filter_->response_headers_ = &response_headers;
   Http::TestResponseTrailerMapImpl response_trailers{headers};
-  filter_->response_trailers_ = &response_trailers;
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
   // The key is not found.
   std::string key = "nonexistent";
@@ -165,13 +171,17 @@ TEST_P(DynamicModuleHttpFilterSetHeaderValueTest, SetHeaderValue) {
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter_->request_headers_ = &request_headers;
   Http::TestRequestTrailerMapImpl request_trailers{headers};
-  filter_->request_trailers_ = &request_trailers;
   Http::TestResponseHeaderMapImpl response_headers{headers};
-  filter_->response_headers_ = &response_headers;
   Http::TestResponseTrailerMapImpl response_trailers{headers};
-  filter_->response_trailers_ = &response_trailers;
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
   Http::HeaderMap* header_map = nullptr;
   if (callback == &envoy_dynamic_module_callback_http_set_request_header) {
@@ -258,14 +268,17 @@ TEST_P(DynamicModuleHttpFilterGetHeadersCountTest, GetHeadersCount) {
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter_->request_headers_ = &request_headers;
   Http::TestRequestTrailerMapImpl request_trailers{headers};
-  filter_->request_trailers_ = &request_trailers;
   Http::TestResponseHeaderMapImpl response_headers{headers};
-  filter_->response_headers_ = &response_headers;
   Http::TestResponseTrailerMapImpl response_trailers{headers};
-  filter_->response_trailers_ = &response_trailers;
-
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
   EXPECT_EQ(callback(filter_.get()), 3);
 }
 
@@ -294,13 +307,17 @@ TEST_P(DynamicModuleHttpFilterGetHeadersTest, GetHeaders) {
   std::initializer_list<std::pair<std::string, std::string>> headers = {
       {"single", "value"}, {"multi", "value1"}, {"multi", "value2"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter_->request_headers_ = &request_headers;
+  EXPECT_CALL(decoder_callbacks_, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
   Http::TestRequestTrailerMapImpl request_trailers{headers};
-  filter_->request_trailers_ = &request_trailers;
+  EXPECT_CALL(decoder_callbacks_, requestTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestTrailerMap>(request_trailers)));
   Http::TestResponseHeaderMapImpl response_headers{headers};
-  filter_->response_headers_ = &response_headers;
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
   Http::TestResponseTrailerMapImpl response_trailers{headers};
-  filter_->response_trailers_ = &response_trailers;
+  EXPECT_CALL(encoder_callbacks_, responseTrailers())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseTrailerMap>(response_trailers)));
 
   EXPECT_TRUE(callback(filter_.get(), result_headers));
 
@@ -335,7 +352,8 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseNullptr) {
 
 TEST_F(DynamicModuleHttpFilterTest, SendResponseEmptyResponse) {
   Http::TestResponseHeaderMapImpl response_headers;
-  filter_->response_headers_ = &response_headers;
+  EXPECT_CALL(encoder_callbacks_, responseHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<ResponseHeaderMap>(response_headers)));
 
   // Test with empty response.
   EXPECT_CALL(decoder_callbacks_, sendLocalReply(Envoy::Http::Code::OK, testing::Eq(""), _,
@@ -720,6 +738,7 @@ TEST(ABIImpl, ClearRouteCache) {
 }
 
 TEST(ABIImpl, GetAttributes) {
+  DynamicModuleHttpFilter filter_without_callbacks{nullptr};
   DynamicModuleHttpFilter filter{nullptr};
   Http::MockStreamDecoderFilterCallbacks callbacks;
   StreamInfo::MockStreamInfo stream_info;
@@ -749,6 +768,7 @@ TEST(ABIImpl, GetAttributes) {
   uint64_t result_number = 0;
 
   // envoy_dynamic_module_type_attribute_id_RequestPath with null headers map, should return false.
+  EXPECT_CALL(callbacks, requestHeaders()).WillOnce(testing::Return(absl::nullopt));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
       &filter, envoy_dynamic_module_type_attribute_id_RequestPath, &result_str_ptr,
       &result_str_length));
@@ -761,7 +781,8 @@ TEST(ABIImpl, GetAttributes) {
       {"referer", "envoyproxy.io"},
       {"user-agent", "curl/7.54.1"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
-  filter.request_headers_ = &request_headers;
+  EXPECT_CALL(callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
 
   // Unsupported attributes.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
@@ -883,7 +904,103 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_EQ(result_str_length, 14);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), "/api/v1/action");
 
+  // empty connection, should return false
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
+      &result_str_ptr, &result_str_length));
+
+  EXPECT_CALL(callbacks, connection()).WillRepeatedly(testing::Return(absl::nullopt));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate,
+      &result_str_ptr, &result_str_length));
+
+  // tests for TLS connection attributes
+  const Network::MockConnection connection;
+  EXPECT_CALL(callbacks, connection())
+      .WillRepeatedly(
+          testing::Return(makeOptRef(dynamic_cast<const Network::Connection&>(connection))));
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(testing::Return(nullptr));
+  // no TLS, should return false
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result_str_ptr,
+      &result_str_length));
+
+  // mock TLS and its attributes
+  auto ssl = std::make_shared<Ssl::MockConnectionInfo>();
+  EXPECT_CALL(connection, ssl()).WillRepeatedly(testing::Return(ssl));
+  const std::string tls_version = "TLSv1.2";
+  EXPECT_CALL(*ssl, tlsVersion()).WillRepeatedly(testing::ReturnRef(tls_version));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion, &result_str_ptr,
+      &result_str_length));
+  EXPECT_EQ(result_str_length, tls_version.size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), tls_version);
+
+  const std::string digest = "sha256_digest";
+  EXPECT_CALL(*ssl, sha256PeerCertificateDigest()).WillRepeatedly(testing::ReturnRef(digest));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest,
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, digest.size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), digest);
+
+  const std::string subject_cert = "subject_cert";
+  EXPECT_CALL(*ssl, subjectLocalCertificate()).WillRepeatedly(testing::ReturnRef(subject_cert));
+  EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(testing::ReturnRef(subject_cert));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate,
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, subject_cert.size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), subject_cert);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate,
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, subject_cert.size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), subject_cert);
+
+  // test returning the first entry when there are multiple SANs
+  const std::vector<std::string> sans_empty;
+  EXPECT_CALL(*ssl, dnsSansLocalCertificate()).WillOnce(testing::Return(sans_empty));
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate,
+      &result_str_ptr, &result_str_length));
+
+  const std::vector<std::string> sans = {"alt_name1", "alt_name2"};
+  EXPECT_CALL(*ssl, dnsSansLocalCertificate()).WillRepeatedly(testing::Return(sans));
+  EXPECT_CALL(*ssl, dnsSansPeerCertificate()).WillRepeatedly(testing::Return(sans));
+  EXPECT_CALL(*ssl, uriSanLocalCertificate()).WillRepeatedly(testing::Return(sans));
+  EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(testing::Return(sans));
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate,
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, sans[0].size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), sans[0]);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate,
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, sans[0].size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), sans[0]);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate,
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, sans[0].size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), sans[0]);
+
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_string(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate,
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, sans[0].size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), sans[0]);
+
   // envoy_dynamic_module_type_attribute_id_ResponseCode
+  EXPECT_FALSE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter_without_callbacks, envoy_dynamic_module_type_attribute_id_ResponseCode,
+      &result_number));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_ResponseCode, &result_number));
   EXPECT_EQ(result_number, 200);
@@ -902,6 +1019,12 @@ TEST(ABIImpl, GetAttributes) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
       &filter, envoy_dynamic_module_type_attribute_id_DestinationPort, &result_number));
   EXPECT_EQ(result_number, 4321);
+
+  // envoy_dynamic_module_type_attribute_id_ConnectionId
+  EXPECT_CALL(connection, id()).WillRepeatedly(testing::Return(8386));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_filter_get_attribute_int(
+      &filter, envoy_dynamic_module_type_attribute_id_ConnectionId, &result_number));
+  EXPECT_EQ(result_number, 8386);
 }
 
 TEST(ABIImpl, HttpCallout) {

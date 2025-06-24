@@ -34,21 +34,39 @@ using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::ProtobufWkt::Struct;
 using ::testing::Eq;
 
+inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
+
 class ProtoApiScrubberFilterTest : public ::testing::Test {
 protected:
-  void setUp(absl::string_view config = "") {
-    ASSERT_THAT(Envoy::Protobuf::TextFormat::ParseFromString(config, &proto_config_), true);
+  ProtoApiScrubberFilterTest() : api_(Api::createApiForTest()) { setup(); }
 
+  void setup() {
+    setupMocks();
+    setupFilterConfig();
+    setupFilter();
+  }
+
+  void setupMocks() {
     ON_CALL(mock_decoder_callbacks_, decoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
 
     ON_CALL(mock_encoder_callbacks_, encoderBufferLimit())
         .WillByDefault(testing::Return(UINT32_MAX));
+  }
 
+  void setupFilter() {
     filter_ = std::make_unique<ProtoApiScrubberFilter>(
         *(ProtoApiScrubberFilterConfig::create(proto_config_, mock_factory_context_).value()));
     filter_->setDecoderFilterCallbacks(mock_decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(mock_encoder_callbacks_);
+  }
+
+  void setupFilterConfig() {
+    Protobuf::TextFormat::ParseFromString("", &proto_config_);
+    *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
   }
 
   void TearDown() override {
@@ -83,6 +101,7 @@ protected:
     EXPECT_EQ(data->length(), 0);
   }
 
+  Api::ApiPtr api_;
   ProtoApiScrubberConfig proto_config_;
   testing::NiceMock<MockStreamDecoderFilterCallbacks> mock_decoder_callbacks_;
   testing::NiceMock<MockStreamEncoderFilterCallbacks> mock_encoder_callbacks_;
@@ -94,7 +113,6 @@ protected:
 using ProtoApiScrubberInvalidRequestHeaderTests = ProtoApiScrubberFilterTest;
 
 TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, RequestNotGrpc) {
-  setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
                                {":path", "/apikeys.ApiKeys/CreateApiKey"},
@@ -110,7 +128,6 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, RequestNotGrpc) {
 }
 
 TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
-  setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"}, {"content-type", "application/grpc"}};
 
@@ -127,7 +144,6 @@ TEST_F(ProtoApiScrubberInvalidRequestHeaderTests, PathNotExist) {
 using ProtoApiScrubberRequestRejectedTests = ProtoApiScrubberFilterTest;
 
 TEST_F(ProtoApiScrubberRequestRejectedTests, BufferLimitedExceeded) {
-  setUp();
   ON_CALL(mock_decoder_callbacks_, decoderBufferLimit()).WillByDefault(testing::Return(0));
 
   TestRequestHeaderMapImpl req_headers =
@@ -152,8 +168,6 @@ TEST_F(ProtoApiScrubberRequestRejectedTests, BufferLimitedExceeded) {
 using ProtoApiScrubberPassThroughTest = ProtoApiScrubberFilterTest;
 
 TEST_F(ProtoApiScrubberPassThroughTest, UnarySingleBuffer) {
-  setUp();
-
   Envoy::Http::TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
                                {":path", "/apikeys.ApiKeys/CreateApiKey"},
@@ -169,7 +183,6 @@ TEST_F(ProtoApiScrubberPassThroughTest, UnarySingleBuffer) {
 }
 
 TEST_F(ProtoApiScrubberPassThroughTest, UnaryMultipeBuffers) {
-  setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
                                {":path", "/apikeys.ApiKeys/CreateApiKey"},
@@ -201,7 +214,6 @@ TEST_F(ProtoApiScrubberPassThroughTest, UnaryMultipeBuffers) {
 }
 
 TEST_F(ProtoApiScrubberPassThroughTest, StreamingMultipleMessageSingleBuffer) {
-  setUp();
   TestRequestHeaderMapImpl req_headers =
       TestRequestHeaderMapImpl{{":method", "POST"},
                                {":path", "/apikeys.ApiKeys/CreateApiKeyInStream"},

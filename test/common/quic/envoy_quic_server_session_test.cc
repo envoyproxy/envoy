@@ -1192,6 +1192,16 @@ TEST_F(EnvoyQuicServerSessionTest, Http3OptionsTest) {
   installReadFilter();
 }
 
+TEST_F(EnvoyQuicServerSessionTest, SetSocketOption) {
+  installReadFilter();
+
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(envoy_quic_session_.setSocketOption(sockopt_name, sockopt_val));
+}
+
 class EnvoyQuicServerSessionTestWillNotInitialize : public EnvoyQuicServerSessionTest {
   void SetUp() override {}
   void TearDown() override {
