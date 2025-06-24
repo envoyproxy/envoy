@@ -580,7 +580,7 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
   // the request upstream.
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
     decryptAndUpdateOAuthTokenCookies(headers);
   }
 
@@ -795,10 +795,10 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
 }
 
 std::string OAuth2Filter::encryptToken(const std::string& token) const {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    return token;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
+    return encrypt(token, config_->hmacSecret(), random_);
   }
-  return encrypt(token, config_->hmacSecret(), random_);
+  return token;
 }
 
 std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const {
