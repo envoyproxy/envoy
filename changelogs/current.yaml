@@ -100,6 +100,11 @@ bug_fixes:
     Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
     chain. This fix addresses this issue by rejecting such configuration with empty value. This behavior can be reverted by setting
     the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file`` to ``false``.
+- area: tls_inspector
+  change: |
+    Fixes a bug where the TLS inspector filter would not correctly report ``client_hello_too_large`` stat for too big client hello messages
+    i.e bigger than 16kb.
+
 
 - area: http3
   change: |
