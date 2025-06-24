@@ -280,7 +280,7 @@ void envoy_dynamic_module_callback_http_send_response(
  * @return the metadata namespace if it exists, nullptr otherwise.
  *
  * This will be reused by all envoy_dynamic_module_type_metadata_source where
- * each variant differs in the returned type of the matadata. For example, route metadata will
+ * each variant differs in the returned type of the metadata. For example, route metadata will
  * return OptRef vs upstream host metadata will return a shared pointer.
  */
 const ProtobufWkt::Struct*
