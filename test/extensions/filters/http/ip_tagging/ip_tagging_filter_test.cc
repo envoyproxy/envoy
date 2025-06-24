@@ -962,9 +962,6 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  auto contents = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
-
   time_system_.advanceTimeAsyncImpl(std::chrono::seconds(6));
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1067,8 +1064,6 @@ ip_tags
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
-  auto contents = TestEnvironment::readFileToStringForTest(
-      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
   time_system_.advanceTimeAsyncImpl(std::chrono::seconds(6));
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
@@ -1184,9 +1179,6 @@ ip_tags:
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_old_target.yaml"));
   TestEnvironment::renameFile(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
-      TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
-
-  auto contents = TestEnvironment::readFileToStringForTest(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
 
   time_system_.advanceTimeAsyncImpl(std::chrono::seconds(6));
