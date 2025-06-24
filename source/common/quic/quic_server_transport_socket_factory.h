@@ -67,6 +67,9 @@ public:
     return ssl_ctx_;
   }
 
+  // True when the configured downstream TLS context requires a client certificate.
+  bool requiresClientCertificate() const { return config_->requireClientCertificate(); }
+
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, bool enable_resumption,
                                    Stats::Scope& store, Ssl::ServerContextConfigPtr config,

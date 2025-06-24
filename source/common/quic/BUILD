@@ -157,14 +157,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "envoy_quic_proof_verifier_base_lib",
-    srcs = envoy_select_enable_http3(["envoy_quic_proof_verifier_base.cc"]),
     hdrs = envoy_select_enable_http3(["envoy_quic_proof_verifier_base.h"]),
     deps = envoy_select_enable_http3([
-        ":envoy_quic_utils_lib",
-        "@quiche//:quic_core_crypto_certificate_view_lib",
+        "//source/common/common:assert_lib",
         "@quiche//:quic_core_crypto_crypto_handshake_lib",
         "@quiche//:quic_core_versions_lib",
-        "@quiche//:quic_platform",
     ]),
 )
 
@@ -176,6 +173,23 @@ envoy_cc_library(
         ":envoy_quic_proof_verifier_base_lib",
         ":envoy_quic_utils_lib",
         ":quic_ssl_connection_info_lib",
+        "//source/common/tls:context_lib",
+        "@quiche//:quic_platform",
+    ]),
+)
+
+envoy_cc_library(
+    name = "envoy_quic_server_proof_verifier_lib",
+    srcs = envoy_select_enable_http3(["envoy_quic_server_proof_verifier.cc"]),
+    hdrs = envoy_select_enable_http3(["envoy_quic_server_proof_verifier.h"]),
+    deps = envoy_select_enable_http3([
+        ":envoy_quic_proof_verifier_base_lib",
+        ":envoy_quic_proof_verifier_lib",
+        ":envoy_quic_utils_lib",
+        ":quic_server_transport_socket_factory_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/common/stream_info:stream_info_lib",
         "//source/common/tls:context_lib",
         "@quiche//:quic_platform",
     ]),
@@ -264,7 +278,12 @@ envoy_cc_library(
     hdrs = envoy_select_enable_http3(["quic_ssl_connection_info.h"]),
     external_deps = ["ssl"],
     deps = envoy_select_enable_http3([
+        "//source/common/common:empty_string",
+        "//source/common/common:hex_lib",
+        "//source/common/http:utility_lib",
         "//source/common/tls:connection_info_impl_base_lib",
+        "//source/common/tls:utility_lib",
+        "//source/common/tls/cert_validator:cert_validator_lib",
         "@quiche//:quic_core_session_lib",
     ]),
 )
@@ -504,6 +523,7 @@ envoy_cc_library(
         ":envoy_quic_proof_source_factory_interface",
         ":envoy_quic_proof_source_lib",
         ":envoy_quic_server_preferred_address_config_factory_interface",
+        ":envoy_quic_server_proof_verifier_lib",
         ":envoy_quic_utils_lib",
         ":quic_packet_writer_interface",
         "//envoy/network:listener_interface",
@@ -588,6 +608,7 @@ envoy_cc_library(
         "//envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/network:transport_socket_options_lib",
+        "//source/common/runtime:runtime_features_lib",
         "//source/common/tls:server_context_config_lib",
         "//source/common/tls:server_context_lib",
         "//source/common/tls:server_ssl_socket_lib",
