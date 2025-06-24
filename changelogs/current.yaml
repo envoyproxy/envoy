@@ -105,6 +105,11 @@ bug_fixes:
   change: |
     Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
 
+- area: docs
+  change: |
+    fix returned value for ``max_headers_count``. It was 503 now it is 502.
+
+
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: websocket
