@@ -38,20 +38,53 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   creation_status = tags_or_error.status();
   if (tags_or_error.status().ok()) {
     tags_ = tags_or_error.value();
+  } else {
+    return;
   }
+
   ip_tags_reload_timer_ = main_dispatcher.createTimer([this]() -> void {
-    const auto new_data = tags_loader_.getDataSourceData();
-    ENVOY_LOG(debug, "Trying to update ip tags in background");
-    auto new_tags_or_error = tags_loader_.refreshTags(new_data);
-    if (new_tags_or_error.status().ok()) {
-      updateIpTags(new_tags_or_error.value());
-      reload_success_cb_();
-    } else {
-      ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
-                new_tags_or_error.status().message());
-      reload_error_cb_();
+    try {
+      const auto new_data = tags_loader_.getDataSourceData();
+      if (new_data.empty()) {
+        return;
+      }
+      auto new_tags_or_error = tags_loader_.refreshTags(new_data);
+      if (new_tags_or_error.status().ok()) {
+        updateIpTags(new_tags_or_error.value());
+        if (reload_success_cb_) {
+          reload_success_cb_();
+        }
+      } else {
+        if (reload_error_cb_) {
+          reload_error_cb_();
+        }
+      }
+    } catch (const std::exception& e) {
+      // DO NOT re-throw exceptions from timer callbacks - they cause std::terminate!
+      if (reload_error_cb_) {
+        try {
+          reload_error_cb_();
+        } catch (...) {
+          // Ignore callback exceptions
+        }
+      }
+    } catch (...) {
+      // DO NOT re-throw exceptions from timer callbacks - they cause std::terminate!
+      if (reload_error_cb_) {
+        try {
+          reload_error_cb_();
+        } catch (...) {
+          // Ignore callback exceptions
+        }
+      }
     }
-    ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
+
+    // Always try to re-enable the timer for the next refresh, even after errors
+    try {
+      ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
+    } catch (...) {
+      // Ignore timer re-enable failures
+    }
   });
   ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
 }
@@ -104,8 +137,21 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
 }
 
 const std::string& IpTagsLoader::getDataSourceData() {
-  data_ = data_source_provider_->data();
-  return data_;
+  try {
+    if (!data_source_provider_) {
+      data_ = "";
+      return data_;
+    }
+    data_ = data_source_provider_->data();
+    return data_;
+  } catch (const std::bad_variant_access& e) {
+    data_ = "";
+    return data_;
+  } catch (const std::exception& e) {
+    throw;
+  } catch (...) {
+    throw;
+  }
 }
 
 IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -253,27 +299,6 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     stat_name_set_->rememberBuiltin("ip_tags_reload_error");
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
-
-    // Create callbacks that don't capture 'this' to avoid use-after-free
-    auto reload_success_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
-      try {
-        auto success_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_success", stat_name_set_ptr->add("unknown_tag.hit"));
-        Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, success_stat});
-        scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
-      } catch (...) {
-        // Don't re-throw from callbacks
-      }
-    };
-
-    auto reload_error_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
-      try {
-        auto error_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_error", stat_name_set_ptr->add("unknown_tag.hit"));
-        Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, error_stat});
-        scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
-      } catch (...) {
-        // Don't re-throw from callbacks
-      }
-    };
 
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
