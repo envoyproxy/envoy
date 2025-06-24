@@ -38,10 +38,7 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   creation_status = tags_or_error.status();
   if (tags_or_error.status().ok()) {
     tags_ = tags_or_error.value();
-  } else {
-    return;
   }
-
   ip_tags_reload_timer_ = main_dispatcher.createTimer([this]() -> void {
     try {
       const auto new_data = tags_loader_.getDataSourceData();
@@ -79,7 +76,7 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
       }
     }
 
-    // Always try to re-enable the timer for the next refresh, even after errors
+    // Always try to re-enable the timer for the next refresh
     try {
       ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
     } catch (...) {
@@ -148,8 +145,6 @@ const std::string& IpTagsLoader::getDataSourceData() {
     data_ = "";
     return data_;
   } catch (const std::exception& e) {
-    throw;
-  } catch (...) {
     throw;
   }
 }
@@ -300,16 +295,14 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
 
-    // Create callbacks that don't capture 'this' to prevent segfaults
+    // Create callbacks that don't capture 'this' to avoid use-after-free
     auto reload_success_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
       try {
         auto success_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_success", stat_name_set_ptr->add("unknown_tag.hit"));
         Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, success_stat});
         scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
-      } catch (const std::exception& e) {
-        // Don't re-throw from callbacks that may be called from timer context
       } catch (...) {
-        // Don't re-throw from callbacks that may be called from timer context
+        // Don't re-throw from callbacks
       }
     };
 
@@ -318,10 +311,8 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         auto error_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_error", stat_name_set_ptr->add("unknown_tag.hit"));
         Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, error_stat});
         scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
-      } catch (const std::exception& e) {
-        // Don't re-throw from callbacks that may be called from timer context
       } catch (...) {
-        // Don't re-throw from callbacks that may be called from timer context
+        // Don't re-throw from callbacks
       }
     };
 
