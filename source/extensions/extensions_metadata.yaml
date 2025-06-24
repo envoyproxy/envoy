@@ -1118,6 +1118,13 @@ envoy.quic.proof_source.filter_chain:
   status: alpha
   type_urls:
   - envoy.extensions.quic.proof_source.v3.ProofSourceConfig
+envoy.quic.server.proof_verifier.filter_chain:
+  categories:
+  - envoy.quic.server.proof_verifier
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.quic.proof_verifier.v3.ProofVerifierConfig
 envoy.quic.server_preferred_address.fixed:
   categories:
   - envoy.quic.server_preferred_address

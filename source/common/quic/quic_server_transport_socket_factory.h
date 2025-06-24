@@ -38,6 +38,11 @@ public:
 
   bool earlyDataEnabled() const { return enable_early_data_; }
 
+  bool requiresClientCertificate() const { return config_->requireClientCertificate(); }
+
+  // Get the server SSL context for certificate validation.
+  Envoy::Ssl::ServerContextSharedPtr getServerSslContext() const;
+
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
                                    Ssl::ServerContextConfigPtr config,
