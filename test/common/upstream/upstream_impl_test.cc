@@ -2253,8 +2253,7 @@ TEST_F(HostImplTest, NetnsInvalid) {
       Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:9999", true, "/netns/filepath");
   EXPECT_EQ(
       HostDescriptionImpl::create(info, "", dest_addr, nullptr, nullptr,
-                                  envoy::config::core::v3::Locality().default_instance(), config, 1,
-                                  simTime())
+                                  envoy::config::core::v3::Locality().default_instance(), config, 1)
           .status()
           .message(),
       "Invalid host configuration: hosts cannot specify network namespaces with their address");
