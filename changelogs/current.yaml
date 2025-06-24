@@ -66,6 +66,10 @@ minor_behavior_changes:
   change: |
     :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
     providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
+- area: filters
+  change: |
+    :ref:`Credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>` is no longer
+    a work in progress field.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
