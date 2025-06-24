@@ -62,31 +62,6 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider timer callback starting");
 
     try {
-      // If data source provider is null (due to startup race condition), try to recreate it
-      if (!data_source_provider_) {
-        ENVOY_LOG(warn, "[ip_tagging] IpTagsProvider data source provider is null, attempting to recreate");
-
-        // Check if file now exists
-        struct stat file_stat;
-        if (stat(ip_tags_path_.c_str(), &file_stat) == 0) {
-          ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider file now exists: {} (size: {} bytes)",
-                    ip_tags_path_, file_stat.st_size);
-
-          // Try to recreate the data source provider
-          envoy::config::core::v3::DataSource datasource;
-          datasource.set_filename(ip_tags_path_);
-
-          // We need access to the dispatcher and tls from the timer context
-          // For now, log the issue and rely on the next timer cycle
-          ENVOY_LOG(warn, "[ip_tagging] IpTagsProvider cannot recreate data source provider from timer context, skipping this cycle");
-          return;
-        } else {
-          ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider file still doesn't exist: {} (errno: {})",
-                    ip_tags_path_, strerror(errno));
-          return;
-        }
-      }
-
       ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider getting new data source data");
       const auto new_data = tags_loader_.getDataSourceData();
       ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider got new data, size: {} bytes", new_data.size());
@@ -598,14 +573,14 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
 
     ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig creating reload success callback");
-    auto reload_success_cb = [scope = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set = stat_name_set_]() {
+    auto reload_success_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
       ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb starting");
       try {
         ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb incrementing success counter");
         // Safely increment counter without relying on 'this' pointer
-        auto success_stat = stat_name_set->getBuiltin("ip_tags_reload_success", stat_name_set->add("unknown_tag.hit"));
-        Stats::SymbolTable::StoragePtr storage = scope.get().symbolTable().join({stats_prefix, success_stat});
-        scope.get().counterFromStatName(Stats::StatName(storage.get())).inc();
+        auto success_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_success", stat_name_set_ptr->add("unknown_tag.hit"));
+        Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, success_stat});
+        scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
         ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_success_cb completed");
       } catch (const std::exception& e) {
         ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_success_cb exception: {}", e.what());
@@ -617,14 +592,14 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     };
 
     ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig creating reload error callback");
-    auto reload_error_cb = [scope = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set = stat_name_set_]() {
+    auto reload_error_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
       ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb starting");
       try {
         ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb incrementing error counter");
         // Safely increment counter without relying on 'this' pointer
-        auto error_stat = stat_name_set->getBuiltin("ip_tags_reload_error", stat_name_set->add("unknown_tag.hit"));
-        Stats::SymbolTable::StoragePtr storage = scope.get().symbolTable().join({stats_prefix, error_stat});
-        scope.get().counterFromStatName(Stats::StatName(storage.get())).inc();
+        auto error_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_error", stat_name_set_ptr->add("unknown_tag.hit"));
+        Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, error_stat});
+        scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
         ENVOY_LOG_MISC(debug, "[ip_tagging] IpTaggingFilterConfig reload_error_cb completed");
       } catch (const std::exception& e) {
         ENVOY_LOG_MISC(error, "[ip_tagging] IpTaggingFilterConfig reload_error_cb exception: {}", e.what());
