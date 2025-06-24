@@ -40,48 +40,18 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     tags_ = tags_or_error.value();
   }
   ip_tags_reload_timer_ = main_dispatcher.createTimer([this]() -> void {
-    try {
-      const auto new_data = tags_loader_.getDataSourceData();
-      if (new_data.empty()) {
-        return; // Skip update if data is empty (likely volume mount issue)
-      }
-      auto new_tags_or_error = tags_loader_.refreshTags(new_data);
-      if (new_tags_or_error.status().ok()) {
-        updateIpTags(new_tags_or_error.value());
-        if (reload_success_cb_) {
-          reload_success_cb_();
-        }
-      } else {
-        if (reload_error_cb_) {
-          reload_error_cb_();
-        }
-      }
-    } catch (const std::exception& e) {
-      // DO NOT re-throw exceptions from timer callbacks - they cause std::terminate!
-      if (reload_error_cb_) {
-        try {
-          reload_error_cb_();
-        } catch (...) {
-          // Ignore callback exceptions
-        }
-      }
-    } catch (...) {
-      // DO NOT re-throw exceptions from timer callbacks - they cause std::terminate!
-      if (reload_error_cb_) {
-        try {
-          reload_error_cb_();
-        } catch (...) {
-          // Ignore callback exceptions
-        }
-      }
+    const auto new_data = tags_loader_.getDataSourceData();
+    ENVOY_LOG(debug, "Trying to update ip tags in background");
+    auto new_tags_or_error = tags_loader_.refreshTags(new_data);
+    if (new_tags_or_error.status().ok()) {
+      updateIpTags(new_tags_or_error.value());
+      reload_success_cb_();
+    } else {
+      ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
+                new_tags_or_error.status().message());
+      reload_error_cb_();
     }
-
-    // Always try to re-enable the timer for the next refresh
-    try {
-      ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
-    } catch (...) {
-      // Ignore timer re-enable failures
-    }
+    ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
   });
   ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
 }
@@ -134,19 +104,8 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
 }
 
 const std::string& IpTagsLoader::getDataSourceData() {
-  try {
-    if (!data_source_provider_) {
-      data_ = "";
-      return data_;
-    }
-    data_ = data_source_provider_->data();
-    return data_;
-  } catch (const std::bad_variant_access& e) {
-    data_ = "";
-    return data_;
-  } catch (const std::exception& e) {
-    throw;
-  }
+  data_ = data_source_provider_->data();
+  return data_;
 }
 
 IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
