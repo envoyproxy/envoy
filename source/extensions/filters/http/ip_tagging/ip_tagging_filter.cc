@@ -20,13 +20,13 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
                                IpTagsReloadErrorCb reload_error_cb,
                                Event::Dispatcher& main_dispatcher, Api::Api& api,
                                ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Stats::StatNameSetPtr& stat_name_set, ThreadLocal::SlotAllocator& tls,
+                               Stats::StatNameSetPtr stat_name_set, ThreadLocal::SlotAllocator& tls,
                                Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
     : ip_tags_path_(ip_tags_datasource.filename()),
       ip_tags_datasource_(ip_tags_datasource),
       api_(api),
       validation_visitor_(validation_visitor),
-      stat_name_set_(stat_name_set),
+      stat_name_set_(std::move(stat_name_set)),
       time_source_(api.timeSource()),
       ip_tags_refresh_interval_ms_(std::chrono::milliseconds(ip_tags_refresh_interval_ms)),
       needs_refresh_(ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0) &&
@@ -155,7 +155,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
     IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
     ProtobufMessage::ValidationVisitor& validation_visitor,
-    Stats::StatNameSetPtr& stat_name_set, ThreadLocal::SlotAllocator& tls,
+    Stats::StatNameSetPtr stat_name_set, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
   std::shared_ptr<IpTagsProvider> ip_tags_provider;
   absl::Status creation_status = absl::OkStatus();
@@ -168,7 +168,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     } else {
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-          reload_error_cb, main_dispatcher, api, validation_visitor, stat_name_set, tls, singleton, creation_status);
+          reload_error_cb, main_dispatcher, api, validation_visitor, std::move(stat_name_set), tls, singleton, creation_status);
       if (creation_status.ok()) {
         ip_tags_provider->setupTimer(main_dispatcher);
       }
@@ -177,7 +177,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-        reload_error_cb, main_dispatcher, api, validation_visitor, stat_name_set, tls, singleton, creation_status);
+        reload_error_cb, main_dispatcher, api, validation_visitor, std::move(stat_name_set), tls, singleton, creation_status);
     if (creation_status.ok()) {
       ip_tags_provider->setupTimer(main_dispatcher);
     }
@@ -367,10 +367,12 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb (no-op)");
     };
 
+    // Create a separate stat name set for the provider
+    auto provider_stat_name_set = scope.symbolTable().makeSet("IpTagging");
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
         ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, api, validation_visitor,
-        stat_name_set_, tls, dispatcher, ip_tags_registry_);
+        std::move(provider_stat_name_set), tls, dispatcher, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
     } else {
