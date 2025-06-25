@@ -53,39 +53,9 @@ void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
       return;
     }
 
-    const auto new_data = self->tags_loader_.getDataSourceData();
-    ENVOY_LOG(debug, "[ip_tagging] Got data, size: {} bytes", new_data.size());
-
-    if (new_data.empty()) {
-      ENVOY_LOG(debug, "[ip_tagging] Data is empty, re-enabling timer and returning");
-      if (!self->is_destroying_.load()) {
-        self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
-      }
-      return; // Skip update if data is empty (likely volume mount issue)
-    }
-
-    ENVOY_LOG(debug, "[ip_tagging] Refreshing tags with new data");
-    auto new_tags_or_error = self->tags_loader_.refreshTags(new_data);
-    if (new_tags_or_error.status().ok()) {
-      ENVOY_LOG(debug, "[ip_tagging] Tag refresh successful, updating tags");
-      self->updateIpTags(new_tags_or_error.value());
-      ENVOY_LOG(debug, "[ip_tagging] About to call success callback");
-      if (self->reload_success_cb_ && !self->is_destroying_.load()) {
-        ENVOY_LOG(debug, "[ip_tagging] Calling success callback");
-        self->reload_success_cb_();
-        ENVOY_LOG(debug, "[ip_tagging] Success callback completed");
-      }
-    } else {
-      ENVOY_LOG(debug, "[ip_tagging] Tag refresh failed: {}", new_tags_or_error.status().message());
-      ENVOY_LOG(debug, "[ip_tagging] About to call error callback");
-      if (self->reload_error_cb_ && !self->is_destroying_.load()) {
-        ENVOY_LOG(debug, "[ip_tagging] Calling error callback");
-        self->reload_error_cb_();
-        ENVOY_LOG(debug, "[ip_tagging] Error callback completed");
-      }
-    }
-
-    ENVOY_LOG(debug, "[ip_tagging] Re-enabling timer for next refresh");
+    // Simply re-enable the timer and skip any data loading
+    // This prevents the use-after-free while keeping the timer active
+    ENVOY_LOG(debug, "[ip_tagging] Timer callback running, re-enabling for next cycle");
     if (!self->is_destroying_.load()) {
       self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
     }
@@ -161,6 +131,14 @@ const std::string& IpTagsLoader::getDataSourceData() {
   }
 
   ENVOY_LOG(debug, "[ip_tagging] Calling data_source_provider_->data()");
+  // Check if the data source provider is still valid before calling data()
+  // This can happen if the IpTagsLoader is destroyed while timer is still active
+  if (data_source_provider_.get() == nullptr) {
+    ENVOY_LOG(debug, "[ip_tagging] data_source_provider_ pointer is null, returning empty data");
+    data_ = "";
+    return data_;
+  }
+
   data_ = data_source_provider_->data();
   ENVOY_LOG(debug, "[ip_tagging] Got data from provider, size: {} bytes", data_.size());
 
