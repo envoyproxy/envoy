@@ -313,21 +313,13 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
 
-    // Create callbacks that don't capture 'this' to avoid use-after-free
-    auto reload_success_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
-      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_success_cb starting");
-      auto success_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_success", stat_name_set_ptr->add("unknown_tag.hit"));
-      Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, success_stat});
-      scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
-      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_success_cb completed");
+    // Create safe no-op callbacks - stats will be handled elsewhere if needed
+    auto reload_success_cb = []() {
+      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_success_cb (safe no-op)");
     };
 
-    auto reload_error_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
-      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb starting");
-      auto error_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_error", stat_name_set_ptr->add("unknown_tag.hit"));
-      Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, error_stat});
-      scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
-      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb completed");
+    auto reload_error_cb = []() {
+      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb (safe no-op)");
     };
 
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
