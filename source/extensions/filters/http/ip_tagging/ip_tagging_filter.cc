@@ -57,15 +57,16 @@ void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
       return;
     }
 
-    // For now, just re-enable the timer without doing any data loading
-    // This maintains the timer lifecycle without accessing potentially invalid references
-    // TODO: Implement self-contained data loading using stored ip_tags_datasource_ and api_
-    ENVOY_LOG(debug, "[ip_tagging] Timer callback running (self-contained mode)");
+    // For now, just maintain the timer without doing actual reloading
+    // This prevents segfaults while maintaining the timer infrastructure
+    // TODO: Implement safe self-contained data loading in the future
+    ENVOY_LOG(debug, "[ip_tagging] Timer callback running (safe no-op mode)");
 
+    // Re-enable timer for next cycle if not being destroyed
     if (!self->is_destroying_.load()) {
       self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
     }
-    ENVOY_LOG(debug, "[ip_tagging] Timer callback completed successfully");
+    ENVOY_LOG(debug, "[ip_tagging] Timer callback completed safely");
   });
 
   ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);

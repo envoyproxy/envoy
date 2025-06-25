@@ -113,7 +113,7 @@ public:
 
 private:
   const std::string ip_tags_path_;
-  // Store the data source configuration and API reference for self-contained operation
+  // Store the data source configuration for potential future self-contained operation
   const envoy::config::core::v3::DataSource ip_tags_datasource_;
   Api::Api& api_;
   TimeSource& time_source_;
