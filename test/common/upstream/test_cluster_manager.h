@@ -66,15 +66,15 @@ public:
   TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
 
     ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(*this, clusterFromProto_(_, _, _, _))
+    ON_CALL(*this, clusterFromProto_(_, _, _))
         .WillByDefault(Invoke(
-            [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+            [&](const envoy::config::cluster::v3::Cluster& cluster,
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  cluster, server_context_, cm,
+                  cluster, server_context_,
                   [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-                  ssl_context_manager_, outlier_event_logger, added_via_api);
+                  outlier_event_logger, added_via_api);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               if (!result.ok()) {
                 throw EnvoyException(std::string(result.status().message()));
@@ -108,10 +108,10 @@ public:
   }
 
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
-    auto result = clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
+    auto result = clusterFromProto_(cluster, outlier_event_logger, added_via_api);
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
@@ -138,7 +138,7 @@ public:
                Server::OverloadManager& overload_manager));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
-              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+              (const envoy::config::cluster::v3::Cluster& cluster,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
   MOCK_METHOD(CdsApi*, createCds_, ());
 
@@ -164,7 +164,7 @@ public:
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
-  static std::unique_ptr<TestClusterManagerImpl> createAndInit(
+  static std::unique_ptr<TestClusterManagerImpl> createTestClusterManager(
       const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
       Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
       ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
@@ -177,7 +177,6 @@ public:
         main_thread_dispatcher, admin, api, http_context, grpc_context, router_context, server,
         xds_manager, creation_status)};
     THROW_IF_NOT_OK(creation_status);
-    THROW_IF_NOT_OK(cluster_manager->initialize(bootstrap));
     return cluster_manager;
   }
 

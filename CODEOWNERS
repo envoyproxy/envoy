@@ -2,6 +2,10 @@
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
 
+# ci
+/.github/ @agrawroh @phlax
+/ci/ @agrawroh @phlax
+
 # api
 /api/ @envoyproxy/api-shepherds
 

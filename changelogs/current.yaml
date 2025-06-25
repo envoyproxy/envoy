@@ -28,6 +28,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    The lookup for asn information is fetched from ``asn_db`` if asn_db_path is defined and from ``isb_db`` if asn_db_path is not defined.
 - area: lua
   change: |
     The ``metadata()`` of lua filter now will search the metadata by the :ref:`filter config name
@@ -100,6 +103,11 @@ bug_fixes:
     Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
     chain. This fix addresses this issue by rejecting such configuration with empty value. This behavior can be reverted by setting
     the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file`` to ``false``.
+- area: tls_inspector
+  change: |
+    Fixes a bug where the TLS inspector filter would not correctly report ``client_hello_too_large`` stat for too big client hello messages
+    i.e bigger than 16kb.
+
 
 - area: http3
   change: |
@@ -273,5 +281,10 @@ new_features:
     Added a new ``failure_mode_deny_percent`` field of type ``Envoy::Runtime::FractionalPercent`` attached to the rate limit filter
     to configure the failure mode for rate limit service errors in runtime.
     It acts as an override for the existing ``failure_mode_deny`` field in the filter config.
+- area: tls
+  change: |
+    Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
+    They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
+    and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
 
 deprecated:

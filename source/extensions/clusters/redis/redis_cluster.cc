@@ -45,7 +45,7 @@ RedisCluster::RedisCluster(
     Network::DnsResolverSharedPtr dns_resolver, ClusterSlotUpdateCallBackSharedPtr lb_factory,
     absl::Status& creation_status)
     : Upstream::BaseDynamicClusterImpl(cluster, context, creation_status),
-      cluster_manager_(context.clusterManager()),
+      cluster_manager_(context.serverFactoryContext().clusterManager()),
       cluster_refresh_rate_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
       cluster_refresh_timeout_(std::chrono::milliseconds(
@@ -69,11 +69,11 @@ RedisCluster::RedisCluster(
           info(), context.serverFactoryContext().api())),
       auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
           info(), context.serverFactoryContext().api())),
-      cluster_name_(cluster.name()),
-      refresh_manager_(Common::Redis::getClusterRefreshManager(
-          context.serverFactoryContext().singletonManager(),
-          context.serverFactoryContext().mainThreadDispatcher(), context.clusterManager(),
-          context.serverFactoryContext().api().timeSource())),
+      cluster_name_(cluster.name()), refresh_manager_(Common::Redis::getClusterRefreshManager(
+                                         context.serverFactoryContext().singletonManager(),
+                                         context.serverFactoryContext().mainThreadDispatcher(),
+                                         context.serverFactoryContext().clusterManager(),
+                                         context.serverFactoryContext().api().timeSource())),
       registration_handle_(refresh_manager_->registerCluster(
           cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
           failure_refresh_threshold_, host_degraded_refresh_threshold_, [&]() {
