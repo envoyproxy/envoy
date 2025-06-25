@@ -1179,6 +1179,185 @@ TEST_F(LuaProtobufConverterTest, PrototypeNotFound) {
   lua_pop(lua_state_, 3); // Pop result + the 2 values we pushed
 }
 
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_StringValue) {
+  ProtobufWkt::StringValue string_value;
+  string_value.set_value("test_string_value");
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, string_value);
+
+  // Should push native Lua string, not a table.
+  EXPECT_TRUE(lua_isstring(lua_state_, -1));
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "test_string_value");
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_BoolValue) {
+  ProtobufWkt::BoolValue bool_value;
+  bool_value.set_value(true);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, bool_value);
+
+  // Should push native Lua boolean, not a table.
+  EXPECT_TRUE(lua_isboolean(lua_state_, -1));
+  EXPECT_TRUE(lua_toboolean(lua_state_, -1));
+  lua_pop(lua_state_, 1);
+
+  // Test false value.
+  bool_value.set_value(false);
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, bool_value);
+
+  EXPECT_TRUE(lua_isboolean(lua_state_, -1));
+  EXPECT_FALSE(lua_toboolean(lua_state_, -1));
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_UInt64Value) {
+  ProtobufWkt::UInt64Value uint64_value;
+  uint64_value.set_value(12345);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, uint64_value);
+
+  // Should push native Lua number, not a table.
+  EXPECT_TRUE(lua_isnumber(lua_state_, -1));
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 12345);
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_Int64Value) {
+  ProtobufWkt::Int64Value int64_value;
+  int64_value.set_value(-67890);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, int64_value);
+
+  // Should push native Lua number, not a table.
+  EXPECT_TRUE(lua_isnumber(lua_state_, -1));
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), -67890);
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_UInt32Value) {
+  ProtobufWkt::UInt32Value uint32_value;
+  uint32_value.set_value(54321);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, uint32_value);
+
+  // Should push native Lua number, not a table.
+  EXPECT_TRUE(lua_isnumber(lua_state_, -1));
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 54321);
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_Int32Value) {
+  ProtobufWkt::Int32Value int32_value;
+  int32_value.set_value(-98765);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, int32_value);
+
+  // Should push native Lua number, not a table.
+  EXPECT_TRUE(lua_isnumber(lua_state_, -1));
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), -98765);
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_FloatValue) {
+  ProtobufWkt::FloatValue float_value;
+  float_value.set_value(3.14159f);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, float_value);
+
+  // Should push native Lua number, not a table.
+  EXPECT_TRUE(lua_isnumber(lua_state_, -1));
+  EXPECT_NEAR(lua_tonumber(lua_state_, -1), 3.14159, 0.00001);
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_DoubleValue) {
+  ProtobufWkt::DoubleValue double_value;
+  double_value.set_value(2.718281828);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, double_value);
+
+  // Should push native Lua number, not a table.
+  EXPECT_TRUE(lua_isnumber(lua_state_, -1));
+  EXPECT_NEAR(lua_tonumber(lua_state_, -1), 2.718281828, 0.00001);
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_ComplexMessage) {
+  // Test that non-wrapper messages still get converted to Lua tables.
+  envoy::config::core::v3::Metadata metadata;
+  auto* filter_metadata = metadata.mutable_filter_metadata();
+  auto& struct_value = (*filter_metadata)["envoy.test"];
+  auto* fields = struct_value.mutable_fields();
+  (*fields)["string_field"].set_string_value("test_value");
+  (*fields)["number_field"].set_number_value(42);
+  (*fields)["bool_field"].set_bool_value(true);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, metadata);
+
+  // Should push a Lua table for complex messages.
+  EXPECT_TRUE(lua_istable(lua_state_, -1));
+
+  lua_getfield(lua_state_, -1, "filter_metadata");
+  EXPECT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "envoy.test");
+  EXPECT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "fields");
+  EXPECT_TRUE(lua_istable(lua_state_, -1));
+
+  // Verify the nested fields are properly converted.
+  lua_getfield(lua_state_, -1, "string_field");
+  EXPECT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "string_value");
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "test_value");
+  lua_pop(lua_state_, 2);
+
+  lua_getfield(lua_state_, -1, "number_field");
+  EXPECT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "number_value");
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 42);
+  lua_pop(lua_state_, 2);
+
+  lua_getfield(lua_state_, -1, "bool_field");
+  EXPECT_TRUE(lua_istable(lua_state_, -1));
+  lua_getfield(lua_state_, -1, "bool_value");
+  EXPECT_TRUE(lua_toboolean(lua_state_, -1));
+  lua_pop(lua_state_, 6);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_EmptyStringValue) {
+  ProtobufWkt::StringValue string_value;
+  string_value.set_value("");
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, string_value);
+
+  // Should push empty string, not nil.
+  EXPECT_TRUE(lua_isstring(lua_state_, -1));
+  EXPECT_STREQ(lua_tostring(lua_state_, -1), "");
+  lua_pop(lua_state_, 1);
+}
+
+TEST_F(LuaProtobufConverterTest, PushLuaValueFromMessage_ZeroValues) {
+  // Test that zero values are handled correctly.
+  ProtobufWkt::UInt64Value uint64_zero;
+  uint64_zero.set_value(0);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, uint64_zero);
+
+  EXPECT_TRUE(lua_isnumber(lua_state_, -1));
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 0);
+  lua_pop(lua_state_, 1);
+
+  ProtobufWkt::Int32Value int32_zero;
+  int32_zero.set_value(0);
+
+  ProtobufConverterUtils::pushLuaValueFromMessage(lua_state_, int32_zero);
+
+  EXPECT_TRUE(lua_isnumber(lua_state_, -1));
+  EXPECT_EQ(lua_tonumber(lua_state_, -1), 0);
+  lua_pop(lua_state_, 1);
+}
+
 } // namespace
 } // namespace Lua
 } // namespace Common

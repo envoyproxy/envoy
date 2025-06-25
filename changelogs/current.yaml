@@ -286,5 +286,11 @@ new_features:
     Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
     They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
     and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
+- area: lua
+  change: |
+    Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
+    This allows Lua scripts to retrieve string, boolean, and numeric values stored by various filters for use in routing decisions,
+    header modifications, and other processing logic. See :ref:`Filter State API <config_http_filters_lua_stream_info_filter_state_wrapper>`
+    for more details.
 
 deprecated:

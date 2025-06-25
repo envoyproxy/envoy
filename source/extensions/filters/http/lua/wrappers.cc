@@ -180,6 +180,15 @@ int StreamInfoWrapper::luaDynamicTypedMetadata(lua_State* state) {
       state, typed_metadata);
 }
 
+int StreamInfoWrapper::luaFilterState(lua_State* state) {
+  if (filter_state_wrapper_.get() != nullptr) {
+    filter_state_wrapper_.pushStack();
+  } else {
+    filter_state_wrapper_.reset(FilterStateWrapper::create(state, *this), true);
+  }
+  return 1;
+}
+
 int ConnectionStreamInfoWrapper::luaConnectionDynamicMetadata(lua_State* state) {
   if (connection_dynamic_metadata_wrapper_.get() != nullptr) {
     connection_dynamic_metadata_wrapper_.pushStack();
@@ -378,6 +387,34 @@ int PublicKeyWrapper::luaGet(lua_State* state) {
     lua_pushlstring(state, public_key_.data(), public_key_.size());
   }
   return 1;
+}
+
+StreamInfo::StreamInfo& FilterStateWrapper::streamInfo() { return parent_.stream_info_; }
+
+int FilterStateWrapper::luaGet(lua_State* state) {
+  const char* object_name = luaL_checkstring(state, 2);
+  const StreamInfo::FilterStateSharedPtr filter_state = streamInfo().filterState();
+
+  // Check if filter state exists.
+  if (filter_state == nullptr) {
+    return 0; // Return nil if filter state is null.
+  }
+
+  // Get the filter state object by name.
+  const StreamInfo::FilterState::Object* object = filter_state->getDataReadOnlyGeneric(object_name);
+  if (object == nullptr) {
+    return 0; // Return nil if object not found.
+  }
+
+  // Try to serialize the object as protobuf first.
+  ProtobufTypes::MessagePtr proto_msg = object->serializeAsProto();
+  if (proto_msg != nullptr) {
+    Filters::Common::Lua::ProtobufConverterUtils::pushLuaValueFromMessage(state, *proto_msg);
+    return 1;
+  }
+
+  // If protobuf serialization is not supported, return nil.
+  return 0;
 }
 
 } // namespace Lua
