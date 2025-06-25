@@ -828,19 +828,23 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
                  read_callbacks_->connection(), data.length(), end_stream, upstream_ != nullptr);
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesReceived(data.length());
 
+  // Keep updating last X timing as we don't know when a TCP stream is complete.
+  // Same for upstream below.
   getStreamInfo().downstreamTiming().onLastDownstreamRxByteReceived(
       read_callbacks_->connection().dispatcher().timeSource());
 
   if (upstream_) {
-    if (!first_upstream_tx_byte_sent_) {
-      getStreamInfo().upstreamInfo()->upstreamTiming().onFirstUpstreamTxByteSent(
-          read_callbacks_->connection().dispatcher().timeSource());
-      first_upstream_tx_byte_sent_ = true;
-    }
+    auto upstream_info = getStreamInfo().upstreamInfo();
 
-    // Keep updating last X timing as we don't know when a TCP stream is complete.
-    getStreamInfo().upstreamInfo()->upstreamTiming().onLastUpstreamTxByteSent(
-        read_callbacks_->connection().dispatcher().timeSource());
+    if (!config_->tunnelingConfigHelper() && upstream_info) {
+      if (!first_upstream_tx_byte_sent_) {
+        upstream_info->upstreamTiming().onFirstUpstreamTxByteSent(
+            read_callbacks_->connection().dispatcher().timeSource());
+        first_upstream_tx_byte_sent_ = true;
+      }
+      upstream_info->upstreamTiming().onLastUpstreamTxByteSent(
+          read_callbacks_->connection().dispatcher().timeSource());
+    }
 
     getStreamInfo().getUpstreamBytesMeter()->addWireBytesSent(data.length());
     upstream_->encodeData(data, end_stream);
@@ -945,21 +949,30 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   getStreamInfo().getUpstreamBytesMeter()->addWireBytesReceived(data.length());
   getStreamInfo().getDownstreamBytesMeter()->addWireBytesSent(data.length());
 
-  if (!first_upstream_rx_byte_received_) {
-    getStreamInfo().upstreamInfo()->upstreamTiming().onFirstUpstreamRxByteReceived(
+  auto upstream_info = getStreamInfo().upstreamInfo();
+
+  // When TCP proxy is used for tunneling, upstream_info_ is overridden by the router filter
+  // and can cause use-after-free in certain cases (e.g. idle timeout).
+  // Therefore we only populate information for pure TCP proxy cases.
+  bool populate_timing = upstream_info && !config_->tunnelingConfigHelper();
+
+  if (!first_upstream_rx_byte_received_ && populate_timing) {
+    upstream_info->upstreamTiming().onFirstUpstreamRxByteReceived(
         read_callbacks_->connection().dispatcher().timeSource());
     first_upstream_rx_byte_received_ = true;
   }
 
   // We don't know when a TCP stream is complete, so we keep updating last X timing.
   // Same for downstream below.
-  getStreamInfo().upstreamInfo()->upstreamTiming().onLastUpstreamRxByteReceived(
-      read_callbacks_->connection().dispatcher().timeSource());
+  if (populate_timing) {
+    upstream_info->upstreamTiming().onLastUpstreamRxByteReceived(
+        read_callbacks_->connection().dispatcher().timeSource());
+  }
 
   read_callbacks_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
 
- if (!first_downstream_tx_byte_sent_) {
+  if (!first_downstream_tx_byte_sent_) {
     getStreamInfo().downstreamTiming().onFirstDownstreamTxByteSent(
         read_callbacks_->connection().dispatcher().timeSource());
     first_downstream_tx_byte_sent_ = true;

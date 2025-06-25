@@ -1278,28 +1278,34 @@ TEST_P(TcpProxyTest, PopulateUpstreamDownstreamTiming) {
 
   // Verify timing information is populated and greater than 100ms
   const auto expected_min_time = std::chrono::milliseconds(100);
-  
+
   // Downstream timing assertions
   auto& downstream_timing = filter_->getStreamInfo().downstreamTiming();
   EXPECT_TRUE(downstream_timing.lastDownstreamRxByteReceived().has_value());
-  EXPECT_GE(downstream_timing.lastDownstreamRxByteReceived().value().time_since_epoch(), expected_min_time);
-  
+  EXPECT_GE(downstream_timing.lastDownstreamRxByteReceived().value().time_since_epoch(),
+            expected_min_time);
+
   EXPECT_TRUE(downstream_timing.lastDownstreamTxByteSent().has_value());
-  EXPECT_GE(downstream_timing.lastDownstreamTxByteSent().value().time_since_epoch(), expected_min_time);
+  EXPECT_GE(downstream_timing.lastDownstreamTxByteSent().value().time_since_epoch(),
+            expected_min_time);
 
   // Upstream timing assertions
   auto& upstream_timing = filter_->getStreamInfo().upstreamInfo()->upstreamTiming();
   EXPECT_TRUE(upstream_timing.first_upstream_rx_byte_received_.has_value());
-  EXPECT_GE(upstream_timing.first_upstream_rx_byte_received_.value().time_since_epoch(), expected_min_time);
-  
+  EXPECT_GE(upstream_timing.first_upstream_rx_byte_received_.value().time_since_epoch(),
+            expected_min_time);
+
   EXPECT_TRUE(upstream_timing.last_upstream_rx_byte_received_.has_value());
-  EXPECT_GE(upstream_timing.last_upstream_rx_byte_received_.value().time_since_epoch(), expected_min_time);
-  
+  EXPECT_GE(upstream_timing.last_upstream_rx_byte_received_.value().time_since_epoch(),
+            expected_min_time);
+
   EXPECT_TRUE(upstream_timing.first_upstream_tx_byte_sent_.has_value());
-  EXPECT_GE(upstream_timing.first_upstream_tx_byte_sent_.value().time_since_epoch(), expected_min_time);
-  
+  EXPECT_GE(upstream_timing.first_upstream_tx_byte_sent_.value().time_since_epoch(),
+            expected_min_time);
+
   EXPECT_TRUE(upstream_timing.last_upstream_tx_byte_sent_.has_value());
-  EXPECT_GE(upstream_timing.last_upstream_tx_byte_sent_.value().time_since_epoch(), expected_min_time);
+  EXPECT_GE(upstream_timing.last_upstream_tx_byte_sent_.value().time_since_epoch(),
+            expected_min_time);
 
   filter_.reset();
 }
