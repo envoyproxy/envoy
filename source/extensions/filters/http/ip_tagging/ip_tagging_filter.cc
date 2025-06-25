@@ -45,35 +45,64 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
 
 void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
   ip_tags_reload_timer_ = main_dispatcher.createTimer([self = shared_from_this()]() -> void {
+    ENVOY_LOG(debug, "[ip_tagging] Timer callback starting, self ptr: {}", static_cast<void*>(self.get()));
+
+    // Check if the object is being destroyed
+    if (self->is_destroying_.load()) {
+      ENVOY_LOG(debug, "[ip_tagging] Object is being destroyed, skipping timer callback");
+      return;
+    }
+
     const auto new_data = self->tags_loader_.getDataSourceData();
+    ENVOY_LOG(debug, "[ip_tagging] Got data, size: {} bytes", new_data.size());
 
     if (new_data.empty()) {
-      self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
+      ENVOY_LOG(debug, "[ip_tagging] Data is empty, re-enabling timer and returning");
+      if (!self->is_destroying_.load()) {
+        self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
+      }
       return; // Skip update if data is empty (likely volume mount issue)
     }
 
+    ENVOY_LOG(debug, "[ip_tagging] Refreshing tags with new data");
     auto new_tags_or_error = self->tags_loader_.refreshTags(new_data);
     if (new_tags_or_error.status().ok()) {
+      ENVOY_LOG(debug, "[ip_tagging] Tag refresh successful, updating tags");
       self->updateIpTags(new_tags_or_error.value());
-      if (self->reload_success_cb_) {
+      ENVOY_LOG(debug, "[ip_tagging] About to call success callback");
+      if (self->reload_success_cb_ && !self->is_destroying_.load()) {
+        ENVOY_LOG(debug, "[ip_tagging] Calling success callback");
         self->reload_success_cb_();
+        ENVOY_LOG(debug, "[ip_tagging] Success callback completed");
       }
     } else {
-      if (self->reload_error_cb_) {
+      ENVOY_LOG(debug, "[ip_tagging] Tag refresh failed: {}", new_tags_or_error.status().message());
+      ENVOY_LOG(debug, "[ip_tagging] About to call error callback");
+      if (self->reload_error_cb_ && !self->is_destroying_.load()) {
+        ENVOY_LOG(debug, "[ip_tagging] Calling error callback");
         self->reload_error_cb_();
+        ENVOY_LOG(debug, "[ip_tagging] Error callback completed");
       }
     }
 
-    self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
+    ENVOY_LOG(debug, "[ip_tagging] Re-enabling timer for next refresh");
+    if (!self->is_destroying_.load()) {
+      self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
+    }
+    ENVOY_LOG(debug, "[ip_tagging] Timer callback completed successfully");
   });
 
   ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
 }
 
 IpTagsProvider::~IpTagsProvider() {
+  ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider destructor starting, this ptr: {}", static_cast<void*>(this));
+  is_destroying_.store(true);
   if (ip_tags_reload_timer_) {
+    ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider disabling timer in destructor");
     ip_tags_reload_timer_->disableTimer();
   }
+  ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider destructor completed");
 }
 
 LcTrieSharedPtr IpTagsProvider::ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
@@ -124,11 +153,17 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
 }
 
 const std::string& IpTagsLoader::getDataSourceData() {
+  ENVOY_LOG(debug, "[ip_tagging] getDataSourceData() starting");
   if (!data_source_provider_) {
+    ENVOY_LOG(debug, "[ip_tagging] data_source_provider_ is null, returning empty data");
     data_ = "";
     return data_;
   }
+
+  ENVOY_LOG(debug, "[ip_tagging] Calling data_source_provider_->data()");
   data_ = data_source_provider_->data();
+  ENVOY_LOG(debug, "[ip_tagging] Got data from provider, size: {} bytes", data_.size());
+
   return data_;
 }
 
@@ -280,15 +315,19 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
     // Create callbacks that don't capture 'this' to avoid use-after-free
     auto reload_success_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
+      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_success_cb starting");
       auto success_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_success", stat_name_set_ptr->add("unknown_tag.hit"));
       Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, success_stat});
       scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
+      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_success_cb completed");
     };
 
     auto reload_error_cb = [scope_ref = std::ref(scope_), stats_prefix = stats_prefix_, stat_name_set_ptr = stat_name_set_.get()]() {
+      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb starting");
       auto error_stat = stat_name_set_ptr->getBuiltin("ip_tags_reload_error", stat_name_set_ptr->add("unknown_tag.hit"));
       Stats::SymbolTable::StoragePtr storage = scope_ref.get().symbolTable().join({stats_prefix, error_stat});
       scope_ref.get().counterFromStatName(Stats::StatName(storage.get())).inc();
+      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb completed");
     };
 
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(

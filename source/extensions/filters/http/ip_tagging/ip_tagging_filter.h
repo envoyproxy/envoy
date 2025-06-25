@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <atomic>
 
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
@@ -124,6 +125,9 @@ private:
   Event::TimerPtr ip_tags_reload_timer_;
   // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;
+
+  // Flag to track if the object is being destroyed
+  std::atomic<bool> is_destroying_{false};
 
   void updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 };
