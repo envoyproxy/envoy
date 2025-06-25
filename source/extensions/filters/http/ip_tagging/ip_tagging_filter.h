@@ -142,7 +142,6 @@ private:
   absl::StatusOr<LcTrieSharedPtr> parseFileContent(const std::string& content, const std::string& file_path);
   absl::StatusOr<LcTrieSharedPtr> parseIpTagsAsProto(
       const Protobuf::RepeatedPtrField<envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
-  void scheduleNextTimer();
 };
 
 using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;

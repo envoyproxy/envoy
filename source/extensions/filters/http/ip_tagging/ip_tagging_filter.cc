@@ -52,61 +52,38 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
 
 void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
   ip_tags_reload_timer_ = main_dispatcher.createTimer([self = shared_from_this()]() -> void {
-    ENVOY_LOG(debug, "[ip_tagging] Timer callback starting, self ptr: {}", static_cast<void*>(self.get()));
-
     // Early exit conditions
-    if (self->is_destroying_.load()) {
-      ENVOY_LOG(debug, "[ip_tagging] Object is being destroyed, skipping timer callback");
-      return;
-    }
-
-    if (!self->needs_refresh_ || self->ip_tags_datasource_.filename().empty()) {
-      ENVOY_LOG(debug, "[ip_tagging] Timer callback: refresh disabled or no file path");
-      self->scheduleNextTimer();
+    if (self->is_destroying_.load() || !self->needs_refresh_ ||
+        self->ip_tags_datasource_.filename().empty()) {
+      if (!self->is_destroying_.load() && self->ip_tags_reload_timer_) {
+        self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
+      }
       return;
     }
 
     const std::string& file_path = self->ip_tags_datasource_.filename();
-    ENVOY_LOG(debug, "[ip_tagging] Timer callback attempting to reload IP tags from file: {}", file_path);
-
-    // Try to reload the file
     auto reload_result = self->reloadFromFile(file_path);
 
-    // Handle the result
     if (reload_result.ok()) {
       self->updateIpTags(reload_result.value());
-      ENVOY_LOG(debug, "[ip_tagging] Timer callback successfully reloaded IP tags");
-      if (self->reload_success_cb_) {
-        self->reload_success_cb_();
-      }
+      if (self->reload_success_cb_) self->reload_success_cb_();
     } else {
-      ENVOY_LOG(debug, "[ip_tagging] Timer callback failed to reload IP tags: {}", reload_result.status().message());
-      if (self->reload_error_cb_) {
-        self->reload_error_cb_();
-      }
+      if (self->reload_error_cb_) self->reload_error_cb_();
     }
 
-    // Schedule next timer cycle
-    self->scheduleNextTimer();
-    ENVOY_LOG(debug, "[ip_tagging] Timer callback completed");
+    if (!self->is_destroying_.load() && self->ip_tags_reload_timer_) {
+      self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
+    }
   });
 
   ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
 }
 
 IpTagsProvider::~IpTagsProvider() {
-  ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider destructor starting, this ptr: {}", static_cast<void*>(this));
-
-  // Set the destroying flag first
   is_destroying_.store(true);
-
-  // Disable timer if it exists
   if (ip_tags_reload_timer_) {
-    ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider disabling timer in destructor");
     ip_tags_reload_timer_->disableTimer();
   }
-
-  ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider destructor completed");
 }
 
 LcTrieSharedPtr IpTagsProvider::ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
@@ -452,90 +429,49 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::reloadFromFile(const std::string& file_path) {
-  ENVOY_LOG(debug, "[ip_tagging] reloadFromFile: attempting to access file: {}", file_path);
-
-  // Check if file exists
   if (!api_.fileSystem().fileExists(file_path)) {
-    ENVOY_LOG(debug, "[ip_tagging] reloadFromFile: file {} does not exist", file_path);
     return absl::NotFoundError(fmt::format("File {} does not exist", file_path));
   }
 
-  ENVOY_LOG(debug, "[ip_tagging] reloadFromFile: file {} exists, attempting to read", file_path);
-
-  // Read file content
   auto file_result = api_.fileSystem().fileReadToEnd(file_path);
   if (!file_result.ok()) {
-    ENVOY_LOG(debug, "[ip_tagging] reloadFromFile: failed to read file {}: {}", file_path, file_result.status().message());
     return absl::Status(file_result.status().code(),
                        fmt::format("Failed to read file {}: {}", file_path, file_result.status().message()));
   }
 
   const std::string& file_content = file_result.value();
-  ENVOY_LOG(debug, "[ip_tagging] reloadFromFile: successfully read {} bytes from file {}", file_content.size(), file_path);
-
   if (file_content.empty()) {
-    ENVOY_LOG(debug, "[ip_tagging] reloadFromFile: file {} is empty", file_path);
     return absl::InvalidArgumentError(fmt::format("File {} is empty", file_path));
   }
 
-  // Parse the content directly
-  ENVOY_LOG(debug, "[ip_tagging] reloadFromFile: parsing file content for {}", file_path);
   return parseFileContent(file_content, file_path);
 }
 
-// Expected YAML file format:
-// ip_tags:
-//   - ip_tag_name: "blocked_ips"
-//     ip_list:
-//       - address_prefix: "192.168.1.0"
-//         prefix_len: 24
-//       - address_prefix: "10.0.0.0"
-//         prefix_len: 8
-//   - ip_tag_name: "internal_ips"
-//     ip_list:
-//       - address_prefix: "172.16.0.0"
-//         prefix_len: 12
 absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::parseFileContent(const std::string& content, const std::string& file_path) {
-  ENVOY_LOG(debug, "[ip_tagging] parseFileContent: parsing {} bytes from {}", content.size(), file_path);
-
   IpTagFileProto ip_tags_proto;
 
-  // Parse based on file extension
   if (absl::EndsWith(file_path, MessageUtil::FileExtensions::get().Yaml)) {
-    ENVOY_LOG(debug, "[ip_tagging] parseFileContent: parsing as YAML");
     auto load_status = MessageUtil::loadFromYamlNoThrow(content, ip_tags_proto, validation_visitor_);
     if (!load_status.ok()) {
-      ENVOY_LOG(debug, "[ip_tagging] parseFileContent: YAML parsing failed: {}", load_status.message());
       return absl::Status(load_status.code(), fmt::format("Failed to parse YAML: {}", load_status.message()));
     }
-    ENVOY_LOG(debug, "[ip_tagging] parseFileContent: YAML parsing succeeded");
   } else if (absl::EndsWith(file_path, MessageUtil::FileExtensions::get().Json)) {
-    ENVOY_LOG(debug, "[ip_tagging] parseFileContent: parsing as JSON");
     bool has_unknown_field;
     auto load_status = MessageUtil::loadFromJsonNoThrow(content, ip_tags_proto, has_unknown_field);
     if (!load_status.ok()) {
-      ENVOY_LOG(debug, "[ip_tagging] parseFileContent: JSON parsing failed: {}", load_status.message());
       return absl::Status(load_status.code(), fmt::format("Failed to parse JSON: {}", load_status.message()));
     }
-    ENVOY_LOG(debug, "[ip_tagging] parseFileContent: JSON parsing succeeded");
   } else {
-    ENVOY_LOG(debug, "[ip_tagging] parseFileContent: unsupported file format for {}", file_path);
     return absl::InvalidArgumentError(fmt::format("Unsupported file format for {}", file_path));
   }
 
-  ENVOY_LOG(debug, "[ip_tagging] parseFileContent: found {} ip_tags in proto", ip_tags_proto.ip_tags().size());
-
-  // Convert to trie structure
   return parseIpTagsAsProto(ip_tags_proto.ip_tags());
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::parseIpTagsAsProto(
     const Protobuf::RepeatedPtrField<envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags) {
 
-  ENVOY_LOG(debug, "[ip_tagging] parseIpTagsAsProto: processing {} IP tags", ip_tags.size());
-
   if (ip_tags.empty()) {
-    ENVOY_LOG(debug, "[ip_tagging] parseIpTagsAsProto: no IP tags found - file should contain 'ip_tags' array");
     return absl::InvalidArgumentError("No IP tags found in file - ensure file contains 'ip_tags' array");
   }
 
@@ -543,17 +479,12 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::parseIpTagsAsProto(
   tag_data.reserve(ip_tags.size());
 
   for (const auto& ip_tag : ip_tags) {
-    ENVOY_LOG(debug, "[ip_tagging] parseIpTagsAsProto: processing tag '{}' with {} IP entries",
-              ip_tag.ip_tag_name(), ip_tag.ip_list().size());
-
     std::vector<Network::Address::CidrRange> cidr_set;
     cidr_set.reserve(ip_tag.ip_list().size());
 
     for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
       auto cidr_or_error = Network::Address::CidrRange::create(entry);
       if (!cidr_or_error.ok()) {
-        ENVOY_LOG(debug, "[ip_tagging] parseIpTagsAsProto: invalid CIDR range '{}/{}': {}",
-                  entry.address_prefix(), entry.prefix_len().value(), cidr_or_error.status().message());
         return absl::InvalidArgumentError(
             fmt::format("Invalid IP/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
                         entry.address_prefix(), entry.prefix_len().value()));
@@ -565,15 +496,7 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::parseIpTagsAsProto(
     stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
 
-  ENVOY_LOG(debug, "[ip_tagging] parseIpTagsAsProto: successfully processed {} tags, creating trie", tag_data.size());
-
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(std::move(tag_data));
-}
-
-void IpTagsProvider::scheduleNextTimer() {
-  if (!is_destroying_.load() && ip_tags_reload_timer_) {
-    ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
-  }
 }
 
 } // namespace IpTagging
