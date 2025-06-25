@@ -21,7 +21,9 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
                                Event::Dispatcher& main_dispatcher, Api::Api& api,
                                ThreadLocal::SlotAllocator& tls, Singleton::InstanceSharedPtr owner,
                                absl::Status& creation_status)
-    : ip_tags_path_(ip_tags_datasource.filename()), tags_loader_(tags_loader),
+    : ip_tags_path_(ip_tags_datasource.filename()),
+      ip_tags_datasource_(ip_tags_datasource),
+      api_(api),
       time_source_(api.timeSource()),
       ip_tags_refresh_interval_ms_(std::chrono::milliseconds(ip_tags_refresh_interval_ms)),
       needs_refresh_(ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0) &&
@@ -34,7 +36,9 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
     return;
   }
-  auto tags_or_error = tags_loader_.loadTags(ip_tags_datasource, main_dispatcher, tls);
+
+  // Load initial tags using the provided loader (only during construction)
+  auto tags_or_error = tags_loader.loadTags(ip_tags_datasource, main_dispatcher, tls);
   creation_status = tags_or_error.status();
   if (tags_or_error.status().ok()) {
     tags_ = tags_or_error.value();
@@ -53,9 +57,11 @@ void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
       return;
     }
 
-    // Simply re-enable the timer and skip any data loading
-    // This prevents the use-after-free while keeping the timer active
-    ENVOY_LOG(debug, "[ip_tagging] Timer callback running, re-enabling for next cycle");
+    // For now, just re-enable the timer without doing any data loading
+    // This maintains the timer lifecycle without accessing potentially invalid references
+    // TODO: Implement self-contained data loading using stored ip_tags_datasource_ and api_
+    ENVOY_LOG(debug, "[ip_tagging] Timer callback running (self-contained mode)");
+
     if (!self->is_destroying_.load()) {
       self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
     }

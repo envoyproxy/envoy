@@ -113,7 +113,9 @@ public:
 
 private:
   const std::string ip_tags_path_;
-  IpTagsLoader& tags_loader_;
+  // Store the data source configuration and API reference for self-contained operation
+  const envoy::config::core::v3::DataSource ip_tags_datasource_;
+  Api::Api& api_;
   TimeSource& time_source_;
   MonotonicTime last_reloaded_time_;
   const std::chrono::milliseconds ip_tags_refresh_interval_ms_;
