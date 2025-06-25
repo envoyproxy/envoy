@@ -420,6 +420,9 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
+      use_host_weight_(locality_config.has_value()
+                           ? locality_config->zone_aware_lb_config().use_host_weight()
+                           : false),
       locality_weighted_balancing_(locality_config.has_value() &&
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
@@ -637,18 +640,44 @@ absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>
 ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     const HostsPerLocality& local_hosts_per_locality,
     const HostsPerLocality& upstream_hosts_per_locality) {
-  uint64_t total_local_hosts = 0;
-  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> local_counts;
+  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> local_weights;
+  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> upstream_weights;
+  uint64_t total_local_weight = 0;
   for (const auto& locality_hosts : local_hosts_per_locality.get()) {
-    total_local_hosts += locality_hosts.size();
+    uint64_t locality_weight = 0;
+    for (const auto& host : locality_hosts) {
+      // If use_host_weight_ is true, we use the host's weight to calculate the locality percentage.
+      // Otherwise, we count the number of hosts in the locality.
+      if (use_host_weight_) {
+        locality_weight += host->weight();
+      } else {
+        locality_weight += 1;
+      }
+    }
+
+    total_local_weight += locality_weight;
     // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
     if (!locality_hosts.empty()) {
-      local_counts.insert(std::make_pair(locality_hosts[0]->locality(), locality_hosts.size()));
+      local_weights.insert(std::make_pair(locality_hosts[0]->locality(), locality_weight));
     }
   }
-  uint64_t total_upstream_hosts = 0;
+  uint64_t total_upstream_weight = 0;
   for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
-    total_upstream_hosts += locality_hosts.size();
+    uint64_t locality_weight = 0;
+    for (const auto& host : locality_hosts) {
+      // If use_host_weight_ is true, we use the host's weight to calculate the locality percentage.
+      // Otherwise, we count the number of hosts in the locality.
+      if (use_host_weight_) {
+        locality_weight += host->weight();
+      } else {
+        locality_weight += 1;
+      }
+    }
+    total_upstream_weight += locality_weight;
+    // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
+    if (!locality_hosts.empty()) {
+      upstream_weights.insert(std::make_pair(locality_hosts[0]->locality(), locality_weight));
+    }
   }
 
   absl::FixedArray<LocalityPercentages> percentages(upstream_hosts_per_locality.get().size());
@@ -664,13 +693,16 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     }
     const auto& locality = upstream_hosts[0]->locality();
 
-    const auto& local_count_it = local_counts.find(locality);
-    const uint64_t local_count = local_count_it == local_counts.end() ? 0 : local_count_it->second;
+    const auto& local_weight_it = local_weights.find(locality);
+    const uint64_t local_weight = local_weight_it == local_weights.end() ? 0 : local_weight_it->second;
+    const auto& upstream_weight_it = upstream_weights.find(locality);
+    const uint64_t upstream_weight =
+        upstream_weight_it == upstream_weights.end() ? 0 : upstream_weight_it->second;
 
     const uint64_t local_percentage =
-        total_local_hosts > 0 ? 10000ULL * local_count / total_local_hosts : 0;
+        total_local_weight > 0 ? 10000ULL * local_weight / total_local_weight : 0;
     const uint64_t upstream_percentage =
-        total_upstream_hosts > 0 ? 10000ULL * upstream_hosts.size() / total_upstream_hosts : 0;
+        total_upstream_weight > 0 ? 10000ULL * upstream_weight / total_upstream_weight : 0;
 
     percentages[i] = LocalityPercentages{local_percentage, upstream_percentage};
   }
