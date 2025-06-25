@@ -18,11 +18,16 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
                                IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                                IpTagsReloadSuccessCb reload_success_cb,
                                IpTagsReloadErrorCb reload_error_cb,
-                               Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
+                               Event::Dispatcher& main_dispatcher, Api::Api& api,
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               Stats::StatNameSetPtr& stat_name_set, ThreadLocal::SlotAllocator& tls,
                                Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
     : ip_tags_path_(ip_tags_datasource.filename()),
       ip_tags_datasource_(ip_tags_datasource),
-      time_source_(main_dispatcher.timeSource()),
+      api_(api),
+      validation_visitor_(validation_visitor),
+      stat_name_set_(stat_name_set),
+      time_source_(api.timeSource()),
       ip_tags_refresh_interval_ms_(std::chrono::milliseconds(ip_tags_refresh_interval_ms)),
       needs_refresh_(ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0) &&
                              ip_tags_datasource.has_watched_directory()
@@ -55,16 +60,66 @@ void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
       return;
     }
 
-    // For now, just maintain the timer without doing actual reloading
-    // This prevents segfaults while maintaining the timer infrastructure
-    // TODO: Implement safe self-contained data loading in the future
-    ENVOY_LOG(debug, "[ip_tagging] Timer callback running (safe no-op mode)");
+    // Only attempt reloading if refresh is enabled and we have a valid file path
+    if (!self->needs_refresh_ || self->ip_tags_datasource_.filename().empty()) {
+      ENVOY_LOG(debug, "[ip_tagging] Timer callback: refresh disabled or no file path");
+      if (!self->is_destroying_.load()) {
+        self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
+      }
+      return;
+    }
+
+    bool reload_success = false;
+    const std::string& file_path = self->ip_tags_datasource_.filename();
+
+    ENVOY_LOG(debug, "[ip_tagging] Timer callback attempting to reload IP tags from file: {}", file_path);
+
+    // Check if file exists
+    if (self->api_.fileSystem().fileExists(file_path)) {
+      // Read file content
+      auto file_result = self->api_.fileSystem().fileReadToEnd(file_path);
+      if (file_result.ok()) {
+        const std::string& file_content = file_result.value();
+        if (!file_content.empty()) {
+          // Create a temporary loader for parsing
+          IpTagsLoader temp_loader(self->api_, self->validation_visitor_, self->stat_name_set_);
+
+          // Parse the content
+          auto fresh_tags_result = temp_loader.refreshTags(file_content);
+
+          if (fresh_tags_result.ok() && fresh_tags_result.value()) {
+            // Successfully parsed new tags, update them atomically
+            self->updateIpTags(fresh_tags_result.value());
+            reload_success = true;
+            ENVOY_LOG(debug, "[ip_tagging] Timer callback successfully reloaded IP tags");
+          } else {
+            ENVOY_LOG(debug, "[ip_tagging] Timer callback failed to parse IP tags: {}",
+                      fresh_tags_result.status().message());
+          }
+        } else {
+          ENVOY_LOG(debug, "[ip_tagging] Timer callback: file {} is empty", file_path);
+        }
+      } else {
+        ENVOY_LOG(debug, "[ip_tagging] Timer callback: failed to read file {}: {}",
+                  file_path, file_result.status().message());
+      }
+    } else {
+      ENVOY_LOG(debug, "[ip_tagging] Timer callback: file {} does not exist", file_path);
+    }
+
+    // Call appropriate callback
+    if (reload_success && self->reload_success_cb_) {
+      self->reload_success_cb_();
+    } else if (!reload_success && self->reload_error_cb_) {
+      self->reload_error_cb_();
+    }
 
     // Re-enable timer for next cycle if not being destroyed
     if (!self->is_destroying_.load()) {
       self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
     }
-    ENVOY_LOG(debug, "[ip_tagging] Timer callback completed safely");
+
+    ENVOY_LOG(debug, "[ip_tagging] Timer callback completed");
   });
 
   ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
@@ -72,11 +127,16 @@ void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
 
 IpTagsProvider::~IpTagsProvider() {
   ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider destructor starting, this ptr: {}", static_cast<void*>(this));
+
+  // Set the destroying flag first
   is_destroying_.store(true);
+
+  // Disable timer if it exists
   if (ip_tags_reload_timer_) {
     ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider disabling timer in destructor");
     ip_tags_reload_timer_->disableTimer();
   }
+
   ENVOY_LOG(debug, "[ip_tagging] IpTagsProvider destructor completed");
 }
 
@@ -93,7 +153,9 @@ void IpTagsProvider::updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(
 absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
     const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
     uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
-    IpTagsReloadErrorCb reload_error_cb, ThreadLocal::SlotAllocator& tls,
+    IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
+    ProtobufMessage::ValidationVisitor& validation_visitor,
+    Stats::StatNameSetPtr& stat_name_set, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
   std::shared_ptr<IpTagsProvider> ip_tags_provider;
   absl::Status creation_status = absl::OkStatus();
@@ -106,7 +168,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     } else {
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-          reload_error_cb, main_dispatcher, tls, singleton, creation_status);
+          reload_error_cb, main_dispatcher, api, validation_visitor, stat_name_set, tls, singleton, creation_status);
       if (creation_status.ok()) {
         ip_tags_provider->setupTimer(main_dispatcher);
       }
@@ -115,7 +177,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-        reload_error_cb, main_dispatcher, tls, singleton, creation_status);
+        reload_error_cb, main_dispatcher, api, validation_visitor, stat_name_set, tls, singleton, creation_status);
     if (creation_status.ok()) {
       ip_tags_provider->setupTimer(main_dispatcher);
     }
@@ -296,18 +358,19 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
 
-    // Create safe no-op callbacks - stats will be handled elsewhere if needed
+    // Create simple no-op callbacks
     auto reload_success_cb = []() {
-      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_success_cb (safe no-op)");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_success_cb (no-op)");
     };
 
     auto reload_error_cb = []() {
-      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb (safe no-op)");
+      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb (no-op)");
     };
 
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
-        ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, tls, dispatcher, ip_tags_registry_);
+        ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, api, validation_visitor,
+        stat_name_set_, tls, dispatcher, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
     } else {
