@@ -225,7 +225,11 @@ public:
     log_entry->mutable_common_properties()->clear_duration();
     log_entry->mutable_common_properties()->clear_time_to_last_rx_byte();
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
+    log_entry->mutable_common_properties()->clear_time_to_first_upstream_rx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
+    log_entry->mutable_common_properties()->clear_time_to_last_upstream_rx_byte();
+    log_entry->mutable_common_properties()->clear_time_to_first_upstream_tx_byte();
+    log_entry->mutable_common_properties()->clear_time_to_last_upstream_tx_byte();
     if (request_msg.has_identifier()) {
       auto* node = request_msg.mutable_identifier()->mutable_node();
       node->clear_extensions();
