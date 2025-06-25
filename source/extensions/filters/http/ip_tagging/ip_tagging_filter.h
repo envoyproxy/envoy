@@ -87,7 +87,8 @@ using IpTagsReloadErrorCb = std::function<void()>;
  * This class owns ip tags trie structure for a configured absolute file path and provides access to
  * the ip tags data. It also performs periodic refresh of ip tags data.
  */
-class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
+class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging>,
+                       public std::enable_shared_from_this<IpTagsProvider> {
 public:
   IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                  IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
@@ -103,6 +104,11 @@ public:
    * @return Valid LcTrieSharedPtr or nullptr if reload has failed.
    */
   LcTrieSharedPtr ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
+
+  /**
+   * Set up the timer after construction. This must be called after the shared_ptr is created.
+   */
+  void setupTimer(Event::Dispatcher& main_dispatcher);
 
 private:
   const std::string ip_tags_path_;

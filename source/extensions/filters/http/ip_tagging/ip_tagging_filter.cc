@@ -40,21 +40,31 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     tags_ = tags_or_error.value();
   }
 
-  ip_tags_reload_timer_ = main_dispatcher.createTimer([this]() -> void {
-    const auto new_data = tags_loader_.getDataSourceData();
+  // Timer will be set up after construction via setupTimer() method
+}
+
+void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
+  ip_tags_reload_timer_ = main_dispatcher.createTimer([self = shared_from_this()]() -> void {
+    const auto new_data = self->tags_loader_.getDataSourceData();
+
     if (new_data.empty()) {
+      self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
       return; // Skip update if data is empty (likely volume mount issue)
     }
 
-    auto new_tags_or_error = tags_loader_.refreshTags(new_data);
+    auto new_tags_or_error = self->tags_loader_.refreshTags(new_data);
     if (new_tags_or_error.status().ok()) {
-      updateIpTags(new_tags_or_error.value());
-      if (reload_success_cb_) reload_success_cb_();
+      self->updateIpTags(new_tags_or_error.value());
+      if (self->reload_success_cb_) {
+        self->reload_success_cb_();
+      }
     } else {
-      if (reload_error_cb_) reload_error_cb_();
+      if (self->reload_error_cb_) {
+        self->reload_error_cb_();
+      }
     }
 
-    ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
+    self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
   });
 
   ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
@@ -93,12 +103,18 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
           reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
+      if (creation_status.ok()) {
+        ip_tags_provider->setupTimer(main_dispatcher);
+      }
       ip_tags_registry_[key] = ip_tags_provider;
     }
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
         reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
+    if (creation_status.ok()) {
+      ip_tags_provider->setupTimer(main_dispatcher);
+    }
     ip_tags_registry_[key] = ip_tags_provider;
   }
   if (!creation_status.ok()) {
