@@ -273,6 +273,31 @@ void envoy_dynamic_module_callback_http_send_response(
 }
 
 /**
+ * Helper to get the metadata namespace from the metadata.
+ * @param metadata is the metadata to search in.
+ * @param namespace_ptr is the namespace of the metadata.
+ * @param namespace_length is the length of the namespace.
+ * @return the metadata namespace if it exists, nullptr otherwise.
+ *
+ * This will be reused by all envoy_dynamic_module_type_metadata_source where
+ * each variant differs in the returned type of the metadata. For example, route metadata will
+ * return OptRef vs upstream host metadata will return a shared pointer.
+ */
+const ProtobufWkt::Struct*
+getMetadataNamespaceImpl(const envoy::config::core::v3::Metadata& metadata,
+                         envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
+                         size_t namespace_length) {
+  absl::string_view namespace_view(static_cast<const char*>(namespace_ptr), namespace_length);
+  auto metadata_namespace = metadata.filter_metadata().find(namespace_view);
+  if (metadata_namespace == metadata.filter_metadata().end()) {
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                        fmt::format("namespace {} not found in metadata", namespace_view));
+    return nullptr;
+  }
+  return &metadata_namespace->second;
+}
+
+/**
  * Helper to get the metadata namespace from the stream info.
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.
@@ -294,55 +319,55 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
     return nullptr;
   }
   auto& stream_info = callbacks->streamInfo();
-  const envoy::config::core::v3::Metadata* metadata = nullptr;
 
   switch (metadata_source) {
-  case envoy_dynamic_module_type_metadata_source_dynamic: {
-    metadata = &stream_info.dynamicMetadata();
-    break;
+  case envoy_dynamic_module_type_metadata_source_Dynamic: {
+    return getMetadataNamespaceImpl(stream_info.dynamicMetadata(), namespace_ptr, namespace_length);
   }
-  case envoy_dynamic_module_type_metadata_source_route: {
+  case envoy_dynamic_module_type_metadata_source_Route: {
     auto route = stream_info.route();
     if (route) {
-      metadata = &route->metadata();
+      return getMetadataNamespaceImpl(route->metadata(), namespace_ptr, namespace_length);
     }
     break;
   }
-  case envoy_dynamic_module_type_metadata_source_cluster: {
+  case envoy_dynamic_module_type_metadata_source_Cluster: {
     auto clusterInfo = callbacks->clusterInfo();
     if (clusterInfo) {
-      metadata = &clusterInfo->metadata();
+      return getMetadataNamespaceImpl(clusterInfo->metadata(), namespace_ptr, namespace_length);
     }
     break;
   }
-  case envoy_dynamic_module_type_metadata_source_host: {
-    auto upstreamInfo = stream_info.upstreamInfo();
+  case envoy_dynamic_module_type_metadata_source_Host: {
+    std::shared_ptr<StreamInfo::UpstreamInfo> upstreamInfo = stream_info.upstreamInfo();
     if (upstreamInfo) {
-      auto hostInfo = upstreamInfo->upstreamHost();
+      Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
       if (hostInfo) {
-        auto md = hostInfo->metadata();
+        Upstream::MetadataConstSharedPtr md = hostInfo->metadata();
         if (md) {
-          metadata = md.get();
+          return getMetadataNamespaceImpl(*md, namespace_ptr, namespace_length);
+        }
+      }
+    }
+    break;
+  }
+  case envoy_dynamic_module_type_metadata_source_HostLocality: {
+    std::shared_ptr<StreamInfo::UpstreamInfo> upstreamInfo = stream_info.upstreamInfo();
+    if (upstreamInfo) {
+      Upstream::HostDescriptionConstSharedPtr hostInfo = upstreamInfo->upstreamHost();
+      if (hostInfo) {
+        Upstream::MetadataConstSharedPtr md = hostInfo->localityMetadata();
+        if (md) {
+          return getMetadataNamespaceImpl(*md, namespace_ptr, namespace_length);
         }
       }
     }
     break;
   }
   }
-  if (!metadata) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        "metadata is not available");
-    return nullptr;
-  }
-  const auto& filter_metdata = metadata->filter_metadata();
-  absl::string_view namespace_view(static_cast<const char*>(namespace_ptr), namespace_length);
-  auto metadata_namespace = filter_metdata.find(namespace_view);
-  if (metadata_namespace == filter_metdata.end()) {
-    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
-                        fmt::format("namespace {} not found in metadata", namespace_view));
-    return nullptr;
-  }
-  return &metadata_namespace->second;
+  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules), debug,
+                      "metadata is not available");
+  return nullptr;
 }
 
 /**
