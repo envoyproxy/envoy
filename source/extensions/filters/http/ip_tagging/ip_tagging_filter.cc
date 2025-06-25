@@ -18,13 +18,11 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
                                IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                                IpTagsReloadSuccessCb reload_success_cb,
                                IpTagsReloadErrorCb reload_error_cb,
-                               Event::Dispatcher& main_dispatcher, Api::Api& api,
-                               ThreadLocal::SlotAllocator& tls, Singleton::InstanceSharedPtr owner,
-                               absl::Status& creation_status)
+                               Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
+                               Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
     : ip_tags_path_(ip_tags_datasource.filename()),
       ip_tags_datasource_(ip_tags_datasource),
-      api_(api),
-      time_source_(api.timeSource()),
+      time_source_(main_dispatcher.timeSource()),
       ip_tags_refresh_interval_ms_(std::chrono::milliseconds(ip_tags_refresh_interval_ms)),
       needs_refresh_(ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0) &&
                              ip_tags_datasource.has_watched_directory()
@@ -95,7 +93,7 @@ void IpTagsProvider::updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(
 absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
     const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
     uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
-    IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+    IpTagsReloadErrorCb reload_error_cb, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
   std::shared_ptr<IpTagsProvider> ip_tags_provider;
   absl::Status creation_status = absl::OkStatus();
@@ -108,7 +106,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     } else {
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-          reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
+          reload_error_cb, main_dispatcher, tls, singleton, creation_status);
       if (creation_status.ok()) {
         ip_tags_provider->setupTimer(main_dispatcher);
       }
@@ -117,7 +115,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-        reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
+        reload_error_cb, main_dispatcher, tls, singleton, creation_status);
     if (creation_status.ok()) {
       ip_tags_provider->setupTimer(main_dispatcher);
     }
@@ -309,7 +307,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
-        ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, api, tls, dispatcher, ip_tags_registry_);
+        ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, tls, dispatcher, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
     } else {

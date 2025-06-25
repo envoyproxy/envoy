@@ -94,7 +94,7 @@ public:
   IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
                  IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                  IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
-                 Event::Dispatcher& main_dispatcher, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+                 Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
                  Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
 
   ~IpTagsProvider();
@@ -115,7 +115,6 @@ private:
   const std::string ip_tags_path_;
   // Store the data source configuration for potential future self-contained operation
   const envoy::config::core::v3::DataSource ip_tags_datasource_;
-  Api::Api& api_;
   TimeSource& time_source_;
   MonotonicTime last_reloaded_time_;
   const std::chrono::milliseconds ip_tags_refresh_interval_ms_;
@@ -148,7 +147,7 @@ public:
   absl::StatusOr<std::shared_ptr<IpTagsProvider>> getOrCreateProvider(
       const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
       uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
-      IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+      IpTagsReloadErrorCb reload_error_cb, ThreadLocal::SlotAllocator& tls,
       Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton);
 
 private:
