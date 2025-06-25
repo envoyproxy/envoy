@@ -157,7 +157,8 @@ void SPIFFEValidator::initializeCertificateRefresh(
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                  SslStats& stats,
-                                 Server::Configuration::CommonFactoryContext& context)
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 Stats::Scope& scope)
     : api_(config->api()), stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
@@ -199,6 +200,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
       initializeCertificateRefresh(context);
     }
 
+    initializeCertExpirationStats(scope, config->caCertName());
     return;
   }
 
@@ -253,6 +255,8 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
     }
     spiffe_data_->trust_bundle_stores_[domain.name()] = std::move(store);
   }
+
+  initializeCertExpirationStats(scope, config->caCertName());
 }
 
 absl::Status SPIFFEValidator::addClientValidationContext(SSL_CTX* ctx, bool) {
@@ -294,7 +298,8 @@ void SPIFFEValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
   }
 }
 
-absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool) {
+absl::StatusOr<int> SPIFFEValidator::initializeSslContexts(std::vector<SSL_CTX*>, bool,
+                                                           Stats::Scope&) {
   return SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 }
 
@@ -439,6 +444,23 @@ std::string SPIFFEValidator::extractTrustDomain(const std::string& san) {
   return "";
 }
 
+void SPIFFEValidator::initializeCertExpirationStats(Stats::Scope& scope,
+                                                    const std::string& cert_name) {
+  // TODO(peterl328): Due to current interface, we only receive one cert name.
+  // Since we may have multiple certificates here, we will use the provided cert name and append
+  // an index to it. Assumes the order in the ca_certs_ vector doesn't change.
+  int idx = 0;
+  for (bssl::UniquePtr<X509>& cert : spiffe_data_->ca_certs_) {
+    // Add underscore between cert name and index to avoid collisions
+    std::string cert_name_with_idx = absl::StrCat(cert_name, "_", idx);
+
+    Stats::Gauge& expiration_gauge = createCertificateExpirationGauge(scope, cert_name_with_idx);
+    expiration_gauge.set(Utility::getExpirationUnixTime(cert.get()).count());
+
+    idx++;
+  }
+}
+
 absl::optional<uint32_t> SPIFFEValidator::daysUntilFirstCertExpires() const {
   auto spiffe_data = getSpiffeData();
   if (spiffe_data->ca_certs_.empty()) {
@@ -471,8 +493,9 @@ class SPIFFEValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
-    return std::make_unique<SPIFFEValidator>(config, stats, context);
+                      Server::Configuration::CommonFactoryContext& context,
+                      Stats::Scope& scope) override {
+    return std::make_unique<SPIFFEValidator>(config, stats, context, scope);
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.spiffe"; }

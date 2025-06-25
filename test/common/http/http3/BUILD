@@ -13,7 +13,6 @@ envoy_cc_test(
     name = "conn_pool_test",
     srcs = envoy_select_enable_http3(["conn_pool_test.cc"]),
     rbe_pool = "6gig",
-    tags = ["nofips"],
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",

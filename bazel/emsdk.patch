@@ -117,30 +117,6 @@ index a989450..4cfa098 100644
      linker_files = ":linker_files",
      objcopy_files = ":empty",
      strip_files = ":empty",
-diff --git a/bazel/emscripten_toolchain/dwp.bat b/bazel/emscripten_toolchain/dwp.bat
-new file mode 100644
-index 0000000..85ed4b5
---- /dev/null
-+++ b/bazel/emscripten_toolchain/dwp.bat
-@@ -0,0 +1,4 @@
-+@echo off
-+REM Dummy dwp script for emscripten toolchain
-+REM Since wasm doesn't support split debug info, this is a no-op
-+exit /b 0
-diff --git a/bazel/emscripten_toolchain/dwp.sh b/bazel/emscripten_toolchain/dwp.sh
-new file mode 100644
-index 0000000..50a1d80
---- /dev/null
-+++ b/bazel/emscripten_toolchain/dwp.sh
-@@ -0,0 +1,8 @@
-+#!/bin/bash
-+
-+# Dummy dwp script for emscripten toolchain
-+# Since wasm doesn't support split debug info, this is a no-op
-+# Just echo the command for debugging and exit successfully
-+
-+echo "DWP called with args: $@" >&2
-+exit 0
 diff --git a/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux.sh b/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux.sh
 new file mode 100755
 index 0000000..513feee
@@ -222,7 +198,7 @@ index 0000000..3cb1f2e
 +
 +call external\emscripten_bin_win\bin\llvm-dwp %*
 diff --git a/bazel/emscripten_toolchain/toolchain.bzl b/bazel/emscripten_toolchain/toolchain.bzl
-index c8cec07..a89ad1e 100644
+index c8cec07..01943c7 100644
 --- a/bazel/emscripten_toolchain/toolchain.bzl
 +++ b/bazel/emscripten_toolchain/toolchain.bzl
 @@ -72,12 +72,14 @@ def _impl(ctx):
@@ -253,7 +229,7 @@ index c8cec07..a89ad1e 100644
              name = "wasm_standalone",
          ),
 +        # Support for debug fission. In short, debugging fission should:
-+        #   * reduce linking time, RAM usage and disk usage
++        #   * reduce linking time, RAM usage and disk usage  
 +        #   * speed up incremental builds
 +        #   * speed up debugger work (reduce startup and breakpoint time)
 +        # (to use this, follow the --fission=yes flag)
@@ -332,7 +308,7 @@ index d7d6142..0da7f55 100644
    tar = tarfile.open(args.archive)
  
 diff --git a/bazel/emscripten_toolchain/wasm_cc_binary.bzl b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
-index 6ea4f12..5cfd86d 100644
+index 6ea4f12..c43037e 100644
 --- a/bazel/emscripten_toolchain/wasm_cc_binary.bzl
 +++ b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
 @@ -69,6 +69,7 @@ _ALLOW_OUTPUT_EXTNAMES = [
@@ -343,12 +319,11 @@ index 6ea4f12..5cfd86d 100644
      ".html",
      ".aw.js",
  ]
-@@ -107,10 +108,12 @@ _WASM_BINARY_COMMON_ATTRS = {
+@@ -107,10 +108,11 @@ _WASM_BINARY_COMMON_ATTRS = {
  }
  
  def _wasm_cc_binary_impl(ctx):
 -    args = ctx.actions.args()
-+    print("IN BINARY RULE")
      cc_target = ctx.attr.cc_target[0]
 +    dwp_file = cc_target[DebugPackageInfo].dwp_file if DebugPackageInfo in cc_target else None
 +    outputs = ctx.outputs.outputs
@@ -358,7 +333,7 @@ index 6ea4f12..5cfd86d 100644
          valid_extname = False
          for allowed_extname in _ALLOW_OUTPUT_EXTNAMES:
              if output.path.endswith(allowed_extname):
-@@ -119,28 +122,36 @@ def _wasm_cc_binary_impl(ctx):
+@@ -119,28 +121,35 @@ def _wasm_cc_binary_impl(ctx):
          if not valid_extname:
              fail("Invalid output '{}'. Allowed extnames: {}".format(output.basename, ", ".join(_ALLOW_OUTPUT_EXTNAMES)))
  
@@ -394,13 +369,12 @@ index 6ea4f12..5cfd86d 100644
      ]
  
  def _wasm_cc_binary_legacy_impl(ctx):
-+    print("IN LEGACY BINARY RULE")
      cc_target = ctx.attr.cc_target[0]
 +    dwp_file = cc_target[DebugPackageInfo].dwp_file if DebugPackageInfo in cc_target else None
      outputs = [
          ctx.outputs.loader,
          ctx.outputs.wasm,
-@@ -151,17 +162,23 @@ def _wasm_cc_binary_legacy_impl(ctx):
+@@ -151,17 +160,23 @@ def _wasm_cc_binary_legacy_impl(ctx):
          ctx.outputs.data,
          ctx.outputs.symbols,
          ctx.outputs.dwarf,
@@ -425,7 +399,7 @@ index 6ea4f12..5cfd86d 100644
          outputs = outputs,
          arguments = [args],
          executable = ctx.executable._wasm_binary_extractor,
-@@ -202,6 +219,7 @@ def _wasm_binary_legacy_outputs(name, cc_target):
+@@ -202,6 +217,7 @@ def _wasm_binary_legacy_outputs(name, cc_target):
          "data": "{}/{}.data".format(name, basename),
          "symbols": "{}/{}.js.symbols".format(name, basename),
          "dwarf": "{}/{}.wasm.debug.wasm".format(name, basename),

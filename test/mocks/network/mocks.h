@@ -334,6 +334,7 @@ public:
   MOCK_METHOD(const NetworkFilterFactoriesList&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(bool, addedViaApi, (), (const));
 };
 
 class MockFilterChainInfo : public FilterChainInfo {

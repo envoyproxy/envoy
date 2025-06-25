@@ -19,6 +19,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/raw_buffer_socket.h"
+#include "source/common/network/socket_option_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/runtime/runtime_impl.h"
@@ -2576,6 +2577,60 @@ TEST_P(ConnectionImplTest, NetworkConnectionDumpsWithoutAllocatingMemory) {
   EXPECT_THAT(ostream.contents(), HasSubstr("ListenSocketImpl"));
 
   server_connection->close(ConnectionCloseType::NoFlush);
+}
+
+TEST_P(ConnectionImplTest, SetSocketOptionTest) {
+  setUpBasicConnection();
+
+  {
+    Api::MockOsSysCalls os_sys_calls_;
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, 1, 2, _, sizeof(int))).WillOnce(Return(0));
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+
+    Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
+
+    int val = 1;
+    absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+    EXPECT_TRUE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
+
+    absl::string_view sockopt_str{reinterpret_cast<char*>(&val), sizeof(val)};
+    SocketOptionImpl expected_opt(sockopt_name, sockopt_str);
+    std::vector<uint8_t> expected_key;
+    expected_opt.hashKey(expected_key);
+
+    auto options = client_connection_->socketOptions();
+    bool opt_found = false;
+    for (const std::shared_ptr<const Socket::Option>& opt : *options) {
+      std::vector<uint8_t> key;
+      opt->hashKey(key);
+      EXPECT_EQ(key, expected_key);
+      if (key == expected_key) {
+        opt_found = true;
+      }
+    }
+
+    EXPECT_TRUE(opt_found);
+  }
+
+  disconnect(false);
+}
+
+TEST_P(ConnectionImplTest, SetSocketOptionFailedTest) {
+  setUpBasicConnection();
+
+  {
+    Api::MockOsSysCalls os_sys_calls_;
+    EXPECT_CALL(os_sys_calls_, setsockopt_(_, 1, 2, _, sizeof(int))).WillOnce(Return(1));
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+
+    Envoy::Network::SocketOptionName sockopt_name = ENVOY_MAKE_SOCKET_OPTION_NAME(1, 2);
+
+    int val = 1;
+    absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+    EXPECT_FALSE(client_connection_->setSocketOption(sockopt_name, sockopt_val));
+  }
+
+  disconnect(false);
 }
 
 class FakeReadFilter : public Network::ReadFilter {
