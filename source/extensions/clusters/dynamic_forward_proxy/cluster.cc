@@ -75,7 +75,8 @@ Cluster::Cluster(
       main_thread_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       orig_cluster_config_(cluster),
       allow_coalesced_connections_(config.allow_coalesced_connections()),
-      time_source_(context.serverFactoryContext().timeSource()), cm_(context.clusterManager()),
+      time_source_(context.serverFactoryContext().timeSource()),
+      cm_(context.serverFactoryContext().clusterManager()),
       max_sub_clusters_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.sub_clusters_config(), max_sub_clusters, 1024)),
       sub_cluster_ttl_(
