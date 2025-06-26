@@ -168,7 +168,7 @@ public:
   static absl::StatusOr<std::shared_ptr<IpTaggingFilterConfig>>
   create(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
          const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
-         Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+         Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator&,
          Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Runtime::Loader& runtime() { return runtime_; }
@@ -214,7 +214,7 @@ private:
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
                         const std::string& stat_prefix, Singleton::Manager& singleton_manager,
                         Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
-                        ThreadLocal::SlotAllocator& tls, Event::Dispatcher& dispatcher,
+                        ThreadLocal::SlotAllocator&, Event::Dispatcher& dispatcher,
                         ProtobufMessage::ValidationVisitor& validation_visitor,
                         absl::Status& creation_status);
 
