@@ -42,10 +42,22 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
 
   // Load initial tags using the provided loader (only during construction)
   auto tags_or_error = tags_loader.loadTags(ip_tags_datasource, main_dispatcher, tls);
-  creation_status = tags_or_error.status();
   if (tags_or_error.status().ok()) {
     tags_ = tags_or_error.value();
+    ENVOY_LOG(info, "[ip_tagging] Successfully loaded initial IP tags from {}", ip_tags_path_);
+  } else {
+    // File not found or other error - start with empty trie and let timer retry
+    ENVOY_LOG(warn, "[ip_tagging] Failed to load initial IP tags from {}: {}. "
+                   "Starting with empty tags, will retry in background.",
+              ip_tags_path_, tags_or_error.status().message());
+
+    // Create an empty trie so the filter can still function
+    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
+    tags_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
   }
+
+  // Always succeed construction - don't fail Envoy startup for missing files
+  creation_status = absl::OkStatus();
 
   // Timer will be set up after construction via setupTimer() method
 }
@@ -66,8 +78,11 @@ void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
 
     if (reload_result.ok()) {
       self->updateIpTags(reload_result.value());
+      ENVOY_LOG(info, "[ip_tagging] Successfully reloaded IP tags from {}", file_path);
       if (self->reload_success_cb_) self->reload_success_cb_();
     } else {
+      ENVOY_LOG(debug, "[ip_tagging] Failed to reload IP tags from {}: {}",
+                file_path, reload_result.status().message());
       if (self->reload_error_cb_) self->reload_error_cb_();
     }
 
@@ -115,23 +130,19 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
           reload_error_cb, main_dispatcher, api, validation_visitor, std::move(stat_name_set), tls, singleton, creation_status);
-      if (creation_status.ok()) {
-        ip_tags_provider->setupTimer(main_dispatcher);
-      }
+      // Always set up timer since we now gracefully handle missing files
+      ip_tags_provider->setupTimer(main_dispatcher);
       ip_tags_registry_[key] = ip_tags_provider;
     }
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
         reload_error_cb, main_dispatcher, api, validation_visitor, std::move(stat_name_set), tls, singleton, creation_status);
-    if (creation_status.ok()) {
-      ip_tags_provider->setupTimer(main_dispatcher);
-    }
+    // Always set up timer since we now gracefully handle missing files
+    ip_tags_provider->setupTimer(main_dispatcher);
     ip_tags_registry_[key] = ip_tags_provider;
   }
-  if (!creation_status.ok()) {
-    return creation_status;
-  }
+  // Constructor now always succeeds, so this check is no longer needed
   return ip_tags_provider;
 }
 
@@ -350,14 +361,19 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         std::move(provider_stat_name_set), tls, dispatcher, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
+      if (provider_ && provider_->ipTags()) {
+        trie_ = provider_->ipTags();
+      } else {
+        // Provider exists but has no tags yet (file not found) - create empty trie
+        std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
+        trie_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
+        ENVOY_LOG(warn, "[ip_tagging] Provider created but no initial tags loaded, starting with empty trie");
+      }
     } else {
+      // Provider creation failed - this should not happen with our graceful approach, but handle it
+      ENVOY_LOG(error, "[ip_tagging] Failed to create IP tags provider: {}", provider_or_error.status().message());
       creation_status = provider_or_error.status();
       return;
-    }
-    if (provider_ && provider_->ipTags()) {
-      trie_ = provider_->ipTags();
-    } else {
-      creation_status = absl::InvalidArgumentError("Failed to get ip tags from provider");
     }
   }
 }
@@ -459,6 +475,8 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::reloadFromFile(const std::string& file_path) {
   if (!api_.fileSystem().fileExists(file_path)) {
+    // Use debug level for missing files during background retries - this is expected
+    ENVOY_LOG(debug, "[ip_tagging] IP tags file {} not found, will retry later", file_path);
     return absl::NotFoundError(fmt::format("File {} does not exist", file_path));
   }
 
