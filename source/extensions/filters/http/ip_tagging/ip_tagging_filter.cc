@@ -15,7 +15,7 @@ namespace HttpFilters {
 namespace IpTagging {
 
 IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                               IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
+                               IpTagsLoader&, uint64_t ip_tags_refresh_interval_ms,
                                IpTagsReloadSuccessCb reload_success_cb,
                                IpTagsReloadErrorCb reload_error_cb,
                                Event::Dispatcher&, Api::Api& api,

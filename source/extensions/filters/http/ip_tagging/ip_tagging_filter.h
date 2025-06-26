@@ -94,10 +94,10 @@ class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging>,
                        public std::enable_shared_from_this<IpTagsProvider> {
 public:
   IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                 IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
+                 IpTagsLoader&, uint64_t ip_tags_refresh_interval_ms,
                  IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
-                 Event::Dispatcher& main_dispatcher, Api::Api& api,
-                 ThreadLocal::SlotAllocator& tls, Singleton::InstanceSharedPtr owner,
+                 Event::Dispatcher&, Api::Api& api,
+                 ThreadLocal::SlotAllocator&, Singleton::InstanceSharedPtr owner,
                  absl::Status& creation_status);
 
   ~IpTagsProvider();
