@@ -42,6 +42,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/header_cluster_specifier.h"
 #include "source/common/router/matcher_visitor.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
@@ -560,7 +561,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           route.route().has_host_rewrite_path_regex()
               ? route.route().host_rewrite_path_regex().substitution()
               : ""),
-      cluster_name_(route.route().cluster()), cluster_header_name_(route.route().cluster_header()),
+      cluster_name_(route.route().cluster()),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       optional_timeouts_(buildOptionalTimeouts(route.route())), loader_(factory_context.runtime()),
       runtime_(loadRuntimeData(route.match())),
@@ -709,6 +710,9 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
         route.route().cluster_specifier_plugin());
     SET_AND_RETURN_IF_NOT_OK(plugin_or_error.status(), creation_status);
     cluster_specifier_plugin_ = std::move(plugin_or_error.value());
+  } else if (route.route().has_cluster_header()) {
+    cluster_specifier_plugin_ =
+        std::make_shared<HeaderClusterSpecifierPlugin>(route.route().cluster_header());
   }
 
   for (const auto& query_parameter : route.match().query_parameters()) {
@@ -1382,11 +1386,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
   if (weighted_clusters_config_ == nullptr) {
     if (!cluster_name_.empty() || isDirectResponse()) {
       return shared_from_this();
-    } else if (!cluster_header_name_.get().empty()) {
-      return pickClusterViaClusterHeader(cluster_header_name_, headers,
-                                         /*route_selector_override=*/nullptr);
     } else {
-      // TODO(wbpcode): make the cluster header or weighted clusters an implementation of the
+      // TODO(wbpcode): make the weighted clusters an implementation of the
       // cluster specifier plugin.
       ASSERT(cluster_specifier_plugin_ != nullptr);
       return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info);

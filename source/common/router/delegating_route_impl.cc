@@ -168,5 +168,10 @@ const RouteStatsContextOptRef DelegatingRouteEntry::routeStatsContext() const {
   return base_route_entry_->routeStatsContext();
 }
 
+void DelegatingRouteEntry::refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                                               const StreamInfo::StreamInfo& stream_info) const {
+  base_route_entry_->refreshRouteCluster(headers, stream_info);
+}
+
 } // namespace Router
 } // namespace Envoy

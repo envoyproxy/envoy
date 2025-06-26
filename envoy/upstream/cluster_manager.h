@@ -352,6 +352,14 @@ public:
    */
   virtual bool hasCluster(const std::string& cluster_name) const PURE;
 
+  /**
+   * Returns true iff there's an active cluster in the cluster-manager.
+   * @return bool true if there is an active cluster, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasActiveClusters() const PURE;
+
   using ClusterSet = absl::flat_hash_set<std::string>;
 
   /**
@@ -614,7 +622,7 @@ public:
    * Allocate a cluster from configuration proto.
    */
   virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
   /**
