@@ -176,7 +176,13 @@ message HttpProtocolOptions {
   // [#extension-category: envoy.http.header_validators]
   config.core.v3.TypedExtensionConfig header_validation_config = 7;
 
-  // If specified, only responses matching the matcher will be treated by outlier detection as errors.
-  // If not specified, only 5xx codes are treated by outlier detection as errors.
-  config.common.matcher.v3.MatchPredicate outlier_detection_error_matcher = 8;
+  message OutlierDetection {
+    // If specified, only responses matching the matcher will be treated by outlier detection as errors.
+    // If not specified, only 5xx codes are treated by outlier detection as errors.
+    config.common.matcher.v3.MatchPredicate error_matcher = 1
+        [(validate.rules).message = {required: true}];
+  }
+
+  // Defines http specific outlier detection parameters.
+  OutlierDetection outlier_detection = 8;
 }

@@ -239,8 +239,8 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
   ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
   // Build outlier detection config
 
-  if (options.has_outlier_detection_error_matcher()) {
-    buildMatcher(options.outlier_detection_error_matcher(), outlier_detection_http_error_matcher_,
+  if (options.has_outlier_detection()) {
+    buildMatcher(options.outlier_detection().error_matcher(), outlier_detection_http_error_matcher_,
                  server_context);
   }
 }
