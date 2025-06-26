@@ -2,11 +2,11 @@
 
 #import "library/common/internal_engine.h"
 
-#include "library/common/network/network_types.h" 
-
 #import <Foundation/Foundation.h>
 #import <Network/Network.h>
 #import <SystemConfiguration/SystemConfiguration.h>
+
+#include "library/common/network/network_types.h" 
 
 @implementation EnvoyNetworkMonitor {
   Envoy::InternalEngine *_engine;

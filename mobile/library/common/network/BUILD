@@ -14,8 +14,8 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
-        ":network_types_lib",
         ":network_type_socket_option_lib",
+        ":network_types_lib",
         ":proxy_settings_lib",
         "//library/common:engine_types_lib",
         "//library/common/network:src_addr_socket_option_lib",
