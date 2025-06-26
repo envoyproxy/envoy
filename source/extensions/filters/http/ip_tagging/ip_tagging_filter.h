@@ -7,28 +7,19 @@
 #include <vector>
 #include <atomic>
 
+#include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/api/api.h"
-#include "envoy/event/dispatcher.h"
-#include "envoy/singleton/instance.h"
-#include "envoy/singleton/manager.h"
 
-#include "source/common/common/logger.h"
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
 #include "source/common/stats/symbol_table.h"
-#include "source/common/protobuf/message_validator.h"
-
-#include "absl/status/status.h"
-#include "absl/status/statusor.h"
-#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,32 +28,44 @@ namespace IpTagging {
 
 using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
 using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
-using IpTagsReloadSuccessCb = std::function<void()>;
-using IpTagsReloadErrorCb = std::function<void()>;
 
 /**
- * Simplified IP tags loader that handles both inline and file-based IP tags
+ * This class is responsible for loading and parsing of ip tags (both inline and file based)
+ * as well as for periodic refresh of ip tags (file based).
  */
 class IpTagsLoader : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                Stats::StatNameSetPtr& stat_name_set);
 
-  // Load tags from datasource (file or inline)
+  /**
+   * Loads file based ip tags from a data source and parses them into a trie structure.
+   * @param ip_tags_datasource file based data source to load ip tags from.
+   * @param dispatcher The dispatcher for the thread used by a data source provider.
+   * @param tls The thread local slot allocator used by a data source provider.
+   * @param creation_status This status will be populated with error if loading fails.
+   * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
+   */
   absl::StatusOr<LcTrieSharedPtr>
   loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
            Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls);
 
-  // Refresh tags from existing datasource
+  /**
+   * Performs periodic refresh of file based ip tags via data source.
+   * @param new_data New data from data source which is used to refresh the ip tags structure.
+   * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
+   */
   absl::StatusOr<LcTrieSharedPtr> refreshTags();
 
-  // Parse proto format tags into trie
+  /**
+   * Parses ip tags in a proto format into a trie structure.
+   * @param ip_tags Collection of ip tags in proto format.
+   * @param creation_status This status will be populated with error if parsing fails.
+   * @return Valid LcTrieSharedPtr if parsing succeeded or error status otherwise.
+   */
   absl::StatusOr<LcTrieSharedPtr>
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
-
-  // Get current data from datasource (used for debugging)
-  const std::string& getDataSourceData();
 
 private:
   Api::Api& api_;
@@ -70,11 +73,14 @@ private:
   std::string ip_tags_path_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::StatNameSetPtr& stat_name_set_;
-  std::string data_; // Cache for data source content
 };
 
+using IpTagsReloadSuccessCb = std::function<void()>;
+using IpTagsReloadErrorCb = std::function<void()>;
+
 /**
- * IP tags provider with automatic refresh capability
+ * This class owns ip tags trie structure for a configured absolute file path and provides access to
+ * the ip tags data. It also performs periodic refresh of ip tags data.
  */
 class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging>,
                        public std::enable_shared_from_this<IpTagsProvider> {
@@ -89,19 +95,27 @@ public:
 
   ~IpTagsProvider();
 
-  // Get current IP tags (thread-safe)
+  /**
+   * Getter method for ip tags trie structure which either returns the current version of ip tags
+   * data or performs a reload of data and returns the most recent version of ip tags data.
+   * @return Valid LcTrieSharedPtr or nullptr if reload has failed.
+   */
   LcTrieSharedPtr ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 
-  // Setup timer (must be called after shared_ptr creation)
+  /**
+   * Set up the timer after construction. This must be called after the shared_ptr is created.
+   */
   void setupTimer(Event::Dispatcher& main_dispatcher);
 
 private:
   const std::string ip_tags_path_;
+  // Store the data source configuration and dependencies for self-contained operation
   const envoy::config::core::v3::DataSource ip_tags_datasource_;
   Api::Api& api_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::StatNameSetPtr stat_name_set_;
   TimeSource& time_source_;
+  MonotonicTime last_reloaded_time_;
   const std::chrono::milliseconds ip_tags_refresh_interval_ms_;
   const bool needs_refresh_;
   IpTagsReloadSuccessCb reload_success_cb_;
@@ -109,22 +123,31 @@ private:
   mutable absl::Mutex ip_tags_mutex_;
   LcTrieSharedPtr tags_ ABSL_GUARDED_BY(ip_tags_mutex_);
   Event::TimerPtr ip_tags_reload_timer_;
+  // A shared_ptr to keep the provider singleton alive as long as any of its providers are in use.
   const Singleton::InstanceSharedPtr owner_;
+
+  // Flag to track if the object is being destroyed
   std::atomic<bool> is_destroying_{false};
 
   void updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 
-  // File-based reload methods - these now handle missing files gracefully
+  // New helper methods for file reloading
   absl::StatusOr<LcTrieSharedPtr> reloadFromFile(const std::string& file_path);
   absl::StatusOr<LcTrieSharedPtr> parseFileContent(const std::string& content, const std::string& file_path);
+  absl::StatusOr<LcTrieSharedPtr> parseIpTagsAsProto(
+      const Protobuf::RepeatedPtrField<envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 };
 
+using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
+
 /**
- * Registry singleton for managing IP tags providers
+ * A singleton for file based loading of ip tags and looking up parsed trie data structures with Ip
+ * tags. When given equivalent file paths to the Ip tags, the singleton returns pointers to the same
+ * trie structure.
  */
 class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
-  IpTagsRegistrySingleton() = default;
+  IpTagsRegistrySingleton() {}
 
   absl::StatusOr<std::shared_ptr<IpTagsProvider>> getOrCreateProvider(
       const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
@@ -136,16 +159,20 @@ public:
 
 private:
   absl::Mutex mu_;
+  // Each provider stores shared_ptrs to this singleton, which keeps the singleton
+  // from being destroyed unless it's no longer keeping track of any providers.
+  // Each entry in this map consists of a key (hash of an absolute file path to ip tags file)
+  // and and value (instance of `IpTagsProvider` that owns ip tags data).
   absl::flat_hash_map<size_t, std::weak_ptr<IpTagsProvider>> ip_tags_registry_ ABSL_GUARDED_BY(mu_);
 };
 
 /**
- * Type of requests the filter should apply to
+ * Type of requests the filter should apply to.
  */
 enum class FilterRequestType { INTERNAL, EXTERNAL, BOTH };
 
 /**
- * Simplified configuration for the HTTP IP Tagging filter
+ * Configuration for the HTTP IP Tagging filter.
  */
 class IpTaggingFilterConfig {
 public:
@@ -160,16 +187,12 @@ public:
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
-
   const Network::LcTrie::LcTrie<std::string>& trie() const {
     if (provider_) {
-      auto provider_tags = provider_->ipTags();
-      if (provider_tags) {
-        return *provider_tags;
-      }
+      return *(provider_->ipTags());
+    } else {
+      return *trie_;
     }
-    // Return default empty trie if provider fails
-    return *trie_;
   }
 
   OptRef<const Http::LowerCaseString> ipTagHeader() const {
@@ -178,12 +201,19 @@ public:
     }
     return ip_tag_header_;
   }
-
   HeaderAction ipTagHeaderAction() const { return ip_tag_header_action_; }
 
   void incHit(absl::string_view tag) {
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
   }
+
+  void incIpTagsReloadSuccess() {
+    incCounter(stat_name_set_->getBuiltin("ip_tags_reload_success", unknown_tag_));
+  }
+  void incIpTagsReloadError() {
+    incCounter(stat_name_set_->getBuiltin("ip_tags_reload_error", unknown_tag_));
+  }
+
   void incNoHit() { incCounter(no_hit_); }
   void incTotal() { incCounter(total_); }
 
@@ -210,7 +240,8 @@ private:
   }
 
   void incCounter(Stats::StatName name);
-
+  // Allow the unit test to have access to private members.
+  friend class IpTaggingFilterConfigPeer;
   const FilterRequestType request_type_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
@@ -219,8 +250,11 @@ private:
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
   const Stats::StatName unknown_tag_;
-  const Http::LowerCaseString ip_tag_header_;
+  const Http::LowerCaseString
+      ip_tag_header_; // An empty string indicates that no ip_tag_header is set.
   const HeaderAction ip_tag_header_action_;
+  // A shared_ptr to keep the ip tags registry singleton alive as long as any of its trie structures
+  // are in use.
   const std::shared_ptr<IpTagsRegistrySingleton> ip_tags_registry_;
   IpTagsLoader tags_loader_;
   LcTrieSharedPtr trie_;
@@ -230,7 +264,8 @@ private:
 using IpTaggingFilterConfigSharedPtr = std::shared_ptr<IpTaggingFilterConfig>;
 
 /**
- * HTTP IP tagging filter
+ * A filter that gets all tags associated with a request's downstream remote address and
+ * sets a header `x-envoy-ip-tags` with those values.
  */
 class IpTaggingFilter : public Http::StreamDecoderFilter {
 public:
@@ -252,7 +287,10 @@ private:
 
   IpTaggingFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
+  // Used for testing only.
   mutable Thread::ThreadSynchronizer synchronizer_;
+  // Allow the unit test to have access to private members.
+  friend class IpTaggingFilterPeer;
 };
 
 } // namespace IpTagging
