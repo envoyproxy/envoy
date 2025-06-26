@@ -136,19 +136,19 @@ matcher_tree:
   )EOF";
   loadConfig(yaml);
 
-  // Test exact match (highest priority)
+  // Test exact match (highest priority).
   {
     auto input = TestDataInputStringFactory("api.example.com");
     validateMatch("exact_match");
   }
 
-  // Test wildcard match (middle priority)
+  // Test wildcard match (middle priority).
   {
     auto input = TestDataInputStringFactory("foo.example.com");
     validateMatch("wildcard_match");
   }
 
-  // Test broader wildcard match (lower priority)
+  // Test broader wildcard match (lower priority).
   {
     auto input = TestDataInputStringFactory("something.else.com");
     validateMatch("global_wildcard");
@@ -186,14 +186,13 @@ matcher_tree:
   )EOF";
   loadConfig(yaml);
 
-  // Should match the longer suffix wildcard (*.example.com) first
-  // Declaration order matters when multiple matchers are present
+  // It should match the longer suffix wildcard (*.example.com) first.
   {
     auto input = TestDataInputStringFactory("api.example.com");
-    validateMatch("short_wildcard"); // First declared matcher wins in this case
+    validateMatch("long_wildcard"); // Longest suffix wins.
   }
 
-  // Should match shorter wildcard when longer doesn't apply
+  // It should match shorter wildcard when longer doesn't apply.
   {
     auto input = TestDataInputStringFactory("api.other.com");
     validateMatch("short_wildcard");
@@ -223,7 +222,7 @@ matcher_tree:
   )EOF";
   loadConfig(yaml);
 
-  // Global wildcard should match any domain
+  // Global wildcard should match any domain.
   {
     auto input = TestDataInputStringFactory("example.com");
     validateMatch("global_wildcard_match");
@@ -235,6 +234,62 @@ matcher_tree:
   {
     auto input = TestDataInputStringFactory("totally.different.org");
     validateMatch("global_wildcard_match");
+  }
+}
+
+TEST_F(DomainMatcherTest, MultipleDomainsSingleMatcher) {
+  const std::string yaml = R"EOF(
+matcher_tree:
+  input:
+    name: input
+    typed_config:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+  custom_match:
+    name: domain_matcher
+    typed_config:
+      "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
+      domain_matchers:
+      - domains:
+        - "api.example.com"
+        - "web.example.com"
+        - "*.example.com"
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: example_group_match
+      - domains:
+        - "*.com"
+        on_match:
+          action:
+            name: test_action
+            typed_config:
+              "@type": type.googleapis.com/google.protobuf.StringValue
+              value: com_wildcard
+  )EOF";
+  loadConfig(yaml);
+
+  // Test exact matches from the multi-domain matcher.
+  {
+    auto input = TestDataInputStringFactory("api.example.com");
+    validateMatch("example_group_match");
+  }
+  {
+    auto input = TestDataInputStringFactory("web.example.com");
+    validateMatch("example_group_match");
+  }
+
+  // Test wildcard match from the multi-domain matcher.
+  {
+    auto input = TestDataInputStringFactory("other.example.com");
+    validateMatch("example_group_match");
+  }
+
+  // Test fall-through to less specific matcher.
+  {
+    auto input = TestDataInputStringFactory("different.com");
+    validateMatch("com_wildcard");
   }
 }
 
@@ -277,19 +332,19 @@ matcher_tree:
   )EOF";
   loadConfig(yaml);
 
-  // Test exact match (highest priority)
+  // Test exact match (highest priority).
   {
     auto input = TestDataInputStringFactory("exact.example.com");
     validateMatch("exact_match");
   }
 
-  // Test specific wildcard match (middle priority)
+  // Test specific wildcard match (middle priority).
   {
     auto input = TestDataInputStringFactory("test.example.com");
     validateMatch("specific_wildcard");
   }
 
-  // Test global wildcard match (lowest priority)
+  // Test global wildcard match (lowest priority).
   {
     auto input = TestDataInputStringFactory("something.else.com");
     validateMatch("global_wildcard");
@@ -418,7 +473,7 @@ matcher_tree:
 }
 
 TEST_F(DomainMatcherTest, InvalidDomainFormats) {
-  // Test multiple wildcards
+  // Test multiple wildcards.
   {
     const std::string yaml = R"EOF(
     matcher_tree:
@@ -441,11 +496,12 @@ TEST_F(DomainMatcherTest, InvalidDomainFormats) {
                   value: invalid
     )EOF";
     loadConfig(yaml);
-    EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher_), EnvoyException,
-                              "Invalid wildcard domain format: *.*.example.com");
+    EXPECT_THROW_WITH_MESSAGE(
+        factory_.create(matcher_), EnvoyException,
+        "Invalid wildcard domain format: *.*.example.com. Multiple wildcards are not supported");
   }
 
-  // Test malformed wildcard
+  // Test malformed wildcard.
   {
     const std::string yaml = R"EOF(
     matcher_tree:
@@ -469,10 +525,39 @@ TEST_F(DomainMatcherTest, InvalidDomainFormats) {
     )EOF";
     loadConfig(yaml);
     EXPECT_THROW_WITH_MESSAGE(factory_.create(matcher_), EnvoyException,
-                              "Invalid wildcard domain format: *something.com");
+                              "Invalid wildcard domain format: *something.com. Only '*' and "
+                              "'*.domain' patterns are supported");
   }
 
-  // Test duplicate domain
+  // Test wildcard in middle of domain.
+  {
+    const std::string yaml = R"EOF(
+    matcher_tree:
+      input:
+        name: input
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.StringValue
+      custom_match:
+        name: domain_matcher
+        typed_config:
+          "@type": type.googleapis.com/xds.type.matcher.v3.ServerNameMatcher
+          domain_matchers:
+          - domains:
+            - "a.*"
+            on_match:
+              action:
+                name: test_action
+                typed_config:
+                  "@type": type.googleapis.com/google.protobuf.StringValue
+                  value: invalid
+    )EOF";
+    loadConfig(yaml);
+    EXPECT_THROW_WITH_MESSAGE(
+        factory_.create(matcher_), EnvoyException,
+        "Invalid wildcard domain format: a.*. Only '*' and '*.domain' patterns are supported");
+  }
+
+  // Test duplicate domain.
   {
     const std::string yaml = R"EOF(
     matcher_tree:
@@ -547,7 +632,8 @@ on_no_match:
 
   auto input = TestDataInputStringFactory("example.com");
   const auto result = doMatch();
-  EXPECT_THAT(result, HasNoMatch()); // keep_matching=true results in NoMatch
+  // With ``keep_matching=true``, exact match is skipped and wildcard match is used.
+  EXPECT_THAT(result, HasStringAction("final_match"));
   EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("keep_matching")));
 }
 
@@ -722,18 +808,18 @@ on_no_match:
   )EOF";
   loadConfig(yaml);
 
-  // Test successful exact match with inner condition success
+  // Test successful exact match with inner condition success.
   {
     auto domain_input = TestDataInputStringFactory("api.example.com");
     auto nested_input = TestDataInputBoolFactory("fail_condition");
     validateMatch("exact_inner_match");
   }
 
-  // Test backtracking: exact match fails inner condition, falls back to wildcard match
+  // Test backtracking: exact match fails inner condition, falls back to wildcard match.
   {
     auto domain_input = TestDataInputStringFactory("api.example.com");
     auto nested_input =
-        TestDataInputBoolFactory("different_condition"); // This will cause exact match to fail
+        TestDataInputBoolFactory("different_condition"); // This will cause exact match to fail.
     validateMatch("wildcard_broad_match");               // Should backtrack to *.com
   }
 
@@ -741,18 +827,18 @@ on_no_match:
   {
     auto domain_input = TestDataInputStringFactory("test.example.com");
     auto nested_input =
-        TestDataInputBoolFactory("different_condition"); // This will cause *.example.com to fail
+        TestDataInputBoolFactory("different_condition"); // This will cause *.example.com to fail.
     validateMatch("wildcard_broad_match");               // Should backtrack to *.com
   }
 
-  // Test backtracking: all specific matches fail, falls back to global wildcard
+  // Test backtracking. All specific matches should fail, falling back to global wildcard.
   {
     auto domain_input = TestDataInputStringFactory("test.other.org");
     auto nested_input = TestDataInputBoolFactory("any_condition");
     validateMatch("global_wildcard_match"); // Should backtrack to *
   }
 
-  // Test successful wildcard specific match with inner condition success
+  // Test successful wildcard specific match with inner condition success.
   {
     auto domain_input = TestDataInputStringFactory("staging.example.com");
     auto nested_input = TestDataInputBoolFactory("fail_condition");
