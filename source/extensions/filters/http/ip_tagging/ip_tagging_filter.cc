@@ -135,29 +135,6 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   return ip_tags_provider;
 }
 
-const std::string& IpTagsLoader::getDataSourceData() {
-  ENVOY_LOG(debug, "[ip_tagging] getDataSourceData() starting");
-  if (!data_source_provider_) {
-    ENVOY_LOG(debug, "[ip_tagging] data_source_provider_ is null, returning empty data");
-    data_ = "";
-    return data_;
-  }
-
-  ENVOY_LOG(debug, "[ip_tagging] Calling data_source_provider_->data()");
-  // Check if the data source provider is still valid before calling data()
-  // This can happen if the IpTagsLoader is destroyed while timer is still active
-  if (data_source_provider_.get() == nullptr) {
-    ENVOY_LOG(debug, "[ip_tagging] data_source_provider_ pointer is null, returning empty data");
-    data_ = "";
-    return data_;
-  }
-
-  data_ = data_source_provider_->data();
-  ENVOY_LOG(debug, "[ip_tagging] Got data from provider, size: {} bytes", data_.size());
-
-  return data_;
-}
-
 IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                            Stats::StatNameSetPtr& stat_name_set)
     : api_(api), validation_visitor_(validation_visitor), stat_name_set_(stat_name_set) {}
@@ -185,10 +162,62 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
   return absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
 }
 
+const std::string& IpTagsLoader::getDataSourceData() {
+  absl::MutexLock lock(&cache_mutex_);
+
+  if (!data_source_provider_) {
+    // If no provider, return empty cached data
+    if (cached_data_.empty()) {
+      cached_data_ = "";
+    }
+    return cached_data_;
+  }
+
+  // Check if enough time has passed since last check
+  auto now = api_.timeSource().monotonicTime();
+  bool should_check = cached_data_.empty() ||
+                     (now - last_check_time_) >= IpTagsLoader::kCacheCheckInterval;
+
+  if (!should_check) {
+    // Return cached data without checking file
+    ENVOY_LOG(debug, "[ip_tagging] Cache hit (time-based): {} bytes", cached_data_.size());
+    return cached_data_;
+  }
+
+  // Time to check if file has changed
+  last_check_time_ = now;
+  std::string current_data = data_source_provider_->data();
+
+  // Calculate hash of current data to detect changes
+  std::string current_hash = absl::StrCat(std::hash<std::string>{}(current_data));
+
+  // Check if data has changed by comparing hashes
+  if (cached_data_hash_ != current_hash) {
+    // Data changed - update cache
+    cached_data_ = std::move(current_data);
+    cached_data_hash_ = std::move(current_hash);
+
+    ENVOY_LOG(debug, "[ip_tagging] Cache updated: {} bytes, hash: {}",
+              cached_data_.size(), cached_data_hash_);
+  } else {
+    ENVOY_LOG(debug, "[ip_tagging] Cache hit (content unchanged): {} bytes", cached_data_.size());
+  }
+
+  return cached_data_;
+}
+
+void IpTagsLoader::clearCache() {
+  absl::MutexLock lock(&cache_mutex_);
+  cached_data_.clear();
+  cached_data_hash_.clear();
+  last_check_time_ = MonotonicTime{};
+  ENVOY_LOG(debug, "[ip_tagging] Cache cleared");
+}
+
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   if (data_source_provider_) {
     IpTagFileProto ip_tags_proto;
-    const auto new_data = data_source_provider_->data();
+    const auto& new_data = getDataSourceData();  // Use smart caching
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       auto load_status =
           MessageUtil::loadFromYamlNoThrow(new_data, ip_tags_proto, validation_visitor_);

@@ -67,12 +67,31 @@ public:
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
+  /**
+   * Gets data from the data source provider with smart caching for large files.
+   * Only re-reads if the underlying data has changed.
+   */
+  const std::string& getDataSourceData();
+
+  /**
+   * Clears the cached data, forcing a fresh read on next access.
+   * Useful for testing or when you know the file has changed.
+   */
+  void clearCache();
+
 private:
   Api::Api& api_;
   Envoy::Config::DataSource::DataSourceProviderPtr data_source_provider_;
   std::string ip_tags_path_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::StatNameSetPtr& stat_name_set_;
+
+  // Smart caching for large files
+  mutable std::string cached_data_;
+  mutable std::string cached_data_hash_;
+  mutable absl::Mutex cache_mutex_;
+  mutable MonotonicTime last_check_time_;
+  static constexpr std::chrono::milliseconds kCacheCheckInterval{1000}; // Check every 1 second
 };
 
 using IpTagsReloadSuccessCb = std::function<void()>;
