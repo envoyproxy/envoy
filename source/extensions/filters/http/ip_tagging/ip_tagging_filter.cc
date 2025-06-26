@@ -164,8 +164,11 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
     auto provider_or_error = Config::DataSource::DataSourceProvider::create(
         ip_tags_datasource, main_dispatcher, tls, api_, false, 0);
     if (!provider_or_error.status().ok()) {
-      return absl::InvalidArgumentError(
-          fmt::format("unable to create data source '{}'", provider_or_error.status().message()));
+      ENVOY_LOG(warn, "Failed to create data source for IP tagging file {}: {}. Starting with empty tag set.",
+                ip_tags_datasource.filename(), provider_or_error.status().message());
+      // Create an empty trie instead of failing
+      std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_tag_data;
+      return std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_tag_data);
     }
     data_source_provider_ = std::move(provider_or_error.value());
     ip_tags_path_ = ip_tags_datasource.filename();
