@@ -147,29 +147,6 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   return ip_tags_provider;
 }
 
-const std::string& IpTagsLoader::getDataSourceData() {
-  ENVOY_LOG(debug, "[ip_tagging] getDataSourceData() starting");
-  if (!data_source_provider_) {
-    ENVOY_LOG(debug, "[ip_tagging] data_source_provider_ is null, returning empty data");
-    data_ = "";
-    return data_;
-  }
-
-  ENVOY_LOG(debug, "[ip_tagging] Calling data_source_provider_->data()");
-  // Check if the data source provider is still valid before calling data()
-  // This can happen if the IpTagsLoader is destroyed while timer is still active
-  if (data_source_provider_.get() == nullptr) {
-    ENVOY_LOG(debug, "[ip_tagging] data_source_provider_ pointer is null, returning empty data");
-    data_ = "";
-    return data_;
-  }
-
-  data_ = data_source_provider_->data();
-  ENVOY_LOG(debug, "[ip_tagging] Got data from provider, size: {} bytes", data_.size());
-
-  return data_;
-}
-
 IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
                            Stats::StatNameSetPtr& stat_name_set)
     : api_(api), validation_visitor_(validation_visitor), stat_name_set_(stat_name_set) {}
