@@ -130,6 +130,14 @@ public:
    */
   void onDefaultNetworkChanged(int network);
 
+  void onDefaultNetworkChangedAndroid(ConnectionType connection_type, int64_t net_id);
+
+  void onNetworkDisconnectAndroid(int64_t net_id);
+
+  void onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id);
+
+  void purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids);
+
   /**
    * The callback that gets executed when the mobile device network monitor receives a network
    * change event.
@@ -188,7 +196,8 @@ private:
   //  - Sets the preferred network.
   //  - If no IPv6 connectivity, tells the DNS cache to remove IPv6 addresses from host entries.
   //  - Clear HTTP/3 broken status.
-  //  - Force refresh DNS cache.
+  //  - Drain all connections immediately or force refresh DNS cache and drain
+  //  all connections upon completion.
   void handleNetworkChange(int network_type, bool has_ipv6_connectivity);
 
   // Probe for connectivity for the provided `domain` and get a pointer to the local address. If

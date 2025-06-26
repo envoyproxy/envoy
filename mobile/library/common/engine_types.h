@@ -154,4 +154,18 @@ enum class NetworkType : int {
   WWAN_5G = 64, // 1000000
 };
 
+/** In sync with EnvoyConnectionType in EvnoyConnectionType.java */
+enum class ConnectionType : int {
+  CONNECTION_UNKNOWN = 0, // A connection exists, but its type is unknown.
+                          // Also used as a default value.
+  CONNECTION_ETHERNET = 1,
+  CONNECTION_WIFI = 2,
+  CONNECTION_2G = 3,
+  CONNECTION_3G = 4,
+  CONNECTION_4G = 5,
+  CONNECTION_NONE = 6, // No connection.
+  CONNECTION_BLUETOOTH = 7,
+  CONNECTION_5G = 8,
+};
+
 } // namespace Envoy

@@ -1303,6 +1303,37 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChangeEvent(JNI
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChangedV2(JNIEnv*, jclass,
+                                                                           jlong engine,
+                                                                           jint connection_type,
+                                                                           jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChangedAndroid(
+      static_cast<Envoy::ConnectionType>(connection_type), net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkDisconnect(JNIEnv*, jclass, jlong engine,
+                                                                     jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkDisconnectAndroid(net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkConnect(
+    JNIEnv*, jclass, jlong engine, jint connection_type, jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkConnectAndroid(
+      static_cast<Envoy::ConnectionType>(connection_type), net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_purgeActiveNetworkList(JNIEnv* env, jclass,
+                                                                        jlong engine,
+                                                                        jlongArray active_net_ids) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::vector<int64_t> active_networks;
+  javaLongArrayToInt64Vector(jni_helper, active_net_ids, &active_networks);
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->purgeActiveNetworkListAndroid(active_networks);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkUnavailable(JNIEnv*, jclass,
                                                                              jlong engine) {
   reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkUnavailable();
