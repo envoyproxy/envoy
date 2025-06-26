@@ -1,8 +1,7 @@
 #import "library/objective-c/EnvoyEngine.h"
 
-#include "library/common/network/network_types.h" 
-
 #import "library/common/internal_engine.h"
+#import "library/common/network/network_types.h" 
 
 #import <Foundation/Foundation.h>
 #import <Network/Network.h>
