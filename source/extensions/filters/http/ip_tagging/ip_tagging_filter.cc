@@ -465,38 +465,8 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::parseFileContent(const std::stri
     return absl::InvalidArgumentError(fmt::format("Unsupported file format for {}", file_path));
   }
 
-  return parseIpTagsAsProto(ip_tags_proto.ip_tags());
-}
-
-absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::parseIpTagsAsProto(
-    const Protobuf::RepeatedPtrField<envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags) {
-
-  if (ip_tags.empty()) {
-    return absl::InvalidArgumentError("No IP tags found in file - ensure file contains 'ip_tags' array");
-  }
-
-  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> tag_data;
-  tag_data.reserve(ip_tags.size());
-
-  for (const auto& ip_tag : ip_tags) {
-    std::vector<Network::Address::CidrRange> cidr_set;
-    cidr_set.reserve(ip_tag.ip_list().size());
-
-    for (const envoy::config::core::v3::CidrRange& entry : ip_tag.ip_list()) {
-      auto cidr_or_error = Network::Address::CidrRange::create(entry);
-      if (!cidr_or_error.ok()) {
-        return absl::InvalidArgumentError(
-            fmt::format("Invalid IP/mask combo '{}/{}' (format is <ip>/<# mask bits>)",
-                        entry.address_prefix(), entry.prefix_len().value()));
-      }
-      cidr_set.emplace_back(std::move(cidr_or_error.value()));
-    }
-
-    tag_data.emplace_back(ip_tag.ip_tag_name(), std::move(cidr_set));
-    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
-  }
-
-  return std::make_shared<Network::LcTrie::LcTrie<std::string>>(std::move(tag_data));
+  IpTagsLoader temp_loader(api_, validation_visitor_, stat_name_set_);
+  return temp_loader.parseIpTagsAsProto(ip_tags_proto.ip_tags());
 }
 
 } // namespace IpTagging
