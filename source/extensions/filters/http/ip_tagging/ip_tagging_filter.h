@@ -14,12 +14,23 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/api/api.h"
+#include "envoy/event/dispatcher.h"
+#include "envoy/singleton/instance.h"
+#include "envoy/singleton/manager.h"
 
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/cidr_range.h"
 #include "source/common/network/lc_trie.h"
 #include "source/common/stats/symbol_table.h"
+#include "source/common/common/logger.h"
+#include "source/common/protobuf/message_validator_impl.h"
+
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,7 +54,6 @@ public:
    * @param ip_tags_datasource file based data source to load ip tags from.
    * @param dispatcher The dispatcher for the thread used by a data source provider.
    * @param tls The thread local slot allocator used by a data source provider.
-   * @param creation_status This status will be populated with error if loading fails.
    * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
    */
   absl::StatusOr<LcTrieSharedPtr>
@@ -52,7 +62,6 @@ public:
 
   /**
    * Performs periodic refresh of file based ip tags via data source.
-   * @param new_data New data from data source which is used to refresh the ip tags structure.
    * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
    */
   absl::StatusOr<LcTrieSharedPtr> refreshTags();
@@ -60,7 +69,6 @@ public:
   /**
    * Parses ip tags in a proto format into a trie structure.
    * @param ip_tags Collection of ip tags in proto format.
-   * @param creation_status This status will be populated with error if parsing fails.
    * @return Valid LcTrieSharedPtr if parsing succeeded or error status otherwise.
    */
   absl::StatusOr<LcTrieSharedPtr>
@@ -89,7 +97,8 @@ public:
                  IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                  IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
                  Event::Dispatcher& main_dispatcher, Api::Api& api,
-                 Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
+                 ThreadLocal::SlotAllocator& tls, Singleton::InstanceSharedPtr owner,
+                 absl::Status& creation_status);
 
   ~IpTagsProvider();
 
@@ -141,7 +150,8 @@ public:
       const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
       uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
       IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
-      Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton);
+      Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
+      std::shared_ptr<IpTagsRegistrySingleton> singleton);
 
 private:
   absl::Mutex mu_;
@@ -168,16 +178,17 @@ public:
   static absl::StatusOr<std::shared_ptr<IpTaggingFilterConfig>>
   create(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
          const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
-         Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator&,
+         Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator& tls,
          Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const {
-    if (provider_ && provider_->ipTags()) {
-      return *(provider_->ipTags());
-    } else if (trie_) {
+    // Priority: 1. Inline trie_ (from ip_tags), 2. Provider trie (from ip_tags_file_provider)
+    if (trie_) {
       return *trie_;
+    } else if (provider_ && provider_->ipTags()) {
+      return *(provider_->ipTags());
     } else {
       // Fallback: create empty trie if both are null (should never happen with graceful init)
       static const auto empty_trie = []() {
@@ -214,7 +225,7 @@ private:
   IpTaggingFilterConfig(const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
                         const std::string& stat_prefix, Singleton::Manager& singleton_manager,
                         Stats::Scope& scope, Runtime::Loader& runtime, Api::Api& api,
-                        ThreadLocal::SlotAllocator&, Event::Dispatcher& dispatcher,
+                        ThreadLocal::SlotAllocator& tls, Event::Dispatcher& dispatcher,
                         ProtobufMessage::ValidationVisitor& validation_visitor,
                         absl::Status& creation_status);
 

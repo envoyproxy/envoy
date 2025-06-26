@@ -15,11 +15,12 @@ namespace HttpFilters {
 namespace IpTagging {
 
 IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                               IpTagsLoader&, uint64_t ip_tags_refresh_interval_ms,
+                               IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                                IpTagsReloadSuccessCb reload_success_cb,
                                IpTagsReloadErrorCb reload_error_cb,
-                               Event::Dispatcher&, Api::Api& api,
-                               Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
+                               Event::Dispatcher& main_dispatcher, Api::Api& api,
+                               ThreadLocal::SlotAllocator& tls, Singleton::InstanceSharedPtr owner,
+                               absl::Status& creation_status)
     : ip_tags_path_(ip_tags_datasource.filename()),
       ip_tags_datasource_(ip_tags_datasource),
       api_(api),
@@ -29,13 +30,13 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
                          ? true
                          : false),
       reload_success_cb_(reload_success_cb), reload_error_cb_(reload_error_cb), owner_(owner) {
-  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+
   if (ip_tags_datasource.filename().empty()) {
     creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
     return;
   }
 
-  // Start with empty trie - timer will handle loading
+  // Start with empty trie - file loading will be handled later via timer/callbacks
   std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
   tags_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
 
@@ -111,7 +112,8 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
     uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
     IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
-    Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
+    Event::Dispatcher& main_dispatcher, ThreadLocal::SlotAllocator& tls,
+    std::shared_ptr<IpTagsRegistrySingleton> singleton) {
   std::shared_ptr<IpTagsProvider> ip_tags_provider;
   absl::Status creation_status = absl::OkStatus();
   const uint64_t key = std::hash<std::string>()(ip_tags_datasource.filename());
@@ -123,14 +125,14 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     } else {
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-          reload_error_cb, main_dispatcher, api, singleton, creation_status);
+          reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
       ip_tags_provider->setupTimer(main_dispatcher);
       ip_tags_registry_[key] = ip_tags_provider;
     }
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-        reload_error_cb, main_dispatcher, api, singleton, creation_status);
+        reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
     ip_tags_provider->setupTimer(main_dispatcher);
     ip_tags_registry_[key] = ip_tags_provider;
   }
@@ -241,7 +243,7 @@ absl::StatusOr<IpTaggingFilterConfigSharedPtr> IpTaggingFilterConfig::create(
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
-    Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator&,
+    Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor,
     absl::Status& creation_status)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
@@ -275,14 +277,19 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (!config.ip_tags().empty()) {
+    ENVOY_LOG(debug, "IP Tagging Filter Config: Processing {} inline ip_tags", config.ip_tags().size());
     auto trie_or_error = tags_loader_.parseIpTagsAsProto(config.ip_tags());
     if (trie_or_error.status().ok()) {
       trie_ = trie_or_error.value();
+      ENVOY_LOG(debug, "IP Tagging Filter Config: Successfully created trie from inline ip_tags");
     } else {
+      ENVOY_LOG(error, "IP Tagging Filter Config: Failed to parse inline ip_tags: {}",
+                trie_or_error.status().message());
       creation_status = trie_or_error.status();
       return;
     }
   } else {
+    ENVOY_LOG(debug, "IP Tagging Filter Config: Processing file-based ip_tags_file_provider");
     if (!config.ip_tags_file_provider().has_ip_tags_datasource()) {
       creation_status = absl::InvalidArgumentError(
           "ip_tags_file_provider requires a valid ip_tags_datasource to be configured.");
@@ -305,7 +312,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
         ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, api,
-        dispatcher, ip_tags_registry_);
+        dispatcher, tls, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
       if (provider_ && provider_->ipTags()) {
@@ -340,14 +347,26 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::RequestHeaderMap&
                                    (headers.EnvoyInternalRequest()->value() ==
                                     Http::Headers::get().EnvoyInternalRequestValues.True.c_str());
 
+  ENVOY_LOG(debug, "IP Tagging Filter: Processing request, is_internal={}, request_type={}",
+            is_internal_request, static_cast<int>(config_->requestType()));
+
   if ((is_internal_request && config_->requestType() == FilterRequestType::EXTERNAL) ||
       (!is_internal_request && config_->requestType() == FilterRequestType::INTERNAL) ||
       !config_->runtime().snapshot().featureEnabled("ip_tagging.http_filter_enabled", 100)) {
+    ENVOY_LOG(debug, "IP Tagging Filter: Skipping due to request type or runtime filter");
     return Http::FilterHeadersStatus::Continue;
   }
 
-  std::vector<std::string> tags =
-      config_->trie().getData(callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
+  auto remote_address = callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
+  ENVOY_LOG(debug, "IP Tagging Filter: Looking up tags for address: {}",
+            remote_address ? remote_address->asString() : "null");
+
+  std::vector<std::string> tags = config_->trie().getData(remote_address);
+
+  ENVOY_LOG(debug, "IP Tagging Filter: Found {} tags", tags.size());
+  for (const auto& tag : tags) {
+    ENVOY_LOG(debug, "IP Tagging Filter: Tag: {}", tag);
+  }
 
   // Used for testing.
   synchronizer_.syncPoint("_trie_lookup_complete");
