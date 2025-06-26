@@ -18,6 +18,7 @@
 
 #include "absl/synchronization/notification.h"
 #include "extension_registry.h"
+#include "library/common/network_types.h"
 #include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
