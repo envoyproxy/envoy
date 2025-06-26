@@ -5,7 +5,7 @@ namespace Envoy {
 /**
  * Networks classified by the physical link.
  * In real world the network type can be compounded, e.g. wifi with vpn.
- * Enums values in this class will be AND'ed to form the compound type. 
+ * Enums values in this class will be AND'ed to form the compound type.
  */
 enum class NetworkType : int {
   // Includes VPN or cases where network characteristics are unknown.
