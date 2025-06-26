@@ -180,15 +180,15 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
     }
     data_source_provider_ = std::move(provider_or_error.value());
     ip_tags_path_ = ip_tags_datasource.filename();
-    const auto& new_data = getDataSourceData();
-    return refreshTags(new_data);
+    return refreshTags();
   }
   return absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
 }
 
-absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags(const std::string& new_data) {
+absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   if (data_source_provider_) {
     IpTagFileProto ip_tags_proto;
+    const auto new_data = data_source_provider_->data();
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       auto load_status =
           MessageUtil::loadFromYamlNoThrow(new_data, ip_tags_proto, validation_visitor_);

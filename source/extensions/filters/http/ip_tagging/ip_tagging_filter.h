@@ -55,7 +55,7 @@ public:
    * @param new_data New data from data source which is used to refresh the ip tags structure.
    * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
    */
-  absl::StatusOr<LcTrieSharedPtr> refreshTags(const std::string& new_data);
+  absl::StatusOr<LcTrieSharedPtr> refreshTags();
 
   /**
    * Parses ip tags in a proto format into a trie structure.
@@ -67,15 +67,9 @@ public:
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
-  /**
-   * Fetches latest data source data via TLS slot.
-   */
-  const std::string& getDataSourceData();
-
 private:
   Api::Api& api_;
   Envoy::Config::DataSource::DataSourceProviderPtr data_source_provider_;
-  std::string data_;
   std::string ip_tags_path_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::StatNameSetPtr& stat_name_set_;
