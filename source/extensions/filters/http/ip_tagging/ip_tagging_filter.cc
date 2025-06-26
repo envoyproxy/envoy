@@ -19,15 +19,10 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
                                IpTagsReloadSuccessCb reload_success_cb,
                                IpTagsReloadErrorCb reload_error_cb,
                                Event::Dispatcher& main_dispatcher, Api::Api& api,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Stats::StatNameSetPtr stat_name_set, ThreadLocal::SlotAllocator& tls,
                                Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
     : ip_tags_path_(ip_tags_datasource.filename()),
       ip_tags_datasource_(ip_tags_datasource),
       api_(api),
-      validation_visitor_(validation_visitor),
-      stat_name_set_(std::move(stat_name_set)),
-      time_source_(api.timeSource()),
       ip_tags_refresh_interval_ms_(std::chrono::milliseconds(ip_tags_refresh_interval_ms)),
       needs_refresh_(ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0) &&
                              ip_tags_datasource.has_watched_directory()
@@ -40,16 +35,9 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     return;
   }
 
-  // Load initial tags using the provided loader (only during construction)
-  auto tags_or_error = tags_loader.loadTags(ip_tags_datasource, main_dispatcher, tls);
-  if (tags_or_error.status().ok()) {
-    tags_ = tags_or_error.value();
-  } else {
-    // File not found or other error - start with empty trie and let timer retry
-    // Create an empty trie so the filter can still function
-    std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
-    tags_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
-  }
+  // Start with empty trie - timer will handle loading
+  std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
+  tags_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
 
   // Always succeed construction - don't fail Envoy startup for missing files
   creation_status = absl::OkStatus();
@@ -123,8 +111,6 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
     uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
     IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
-    ProtobufMessage::ValidationVisitor& validation_visitor,
-    Stats::StatNameSetPtr stat_name_set, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
   std::shared_ptr<IpTagsProvider> ip_tags_provider;
   absl::Status creation_status = absl::OkStatus();
@@ -137,25 +123,25 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     } else {
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-          reload_error_cb, main_dispatcher, api, validation_visitor, std::move(stat_name_set), tls, singleton, creation_status);
+          reload_error_cb, main_dispatcher, api, singleton, creation_status);
       ip_tags_provider->setupTimer(main_dispatcher);
       ip_tags_registry_[key] = ip_tags_provider;
     }
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-        reload_error_cb, main_dispatcher, api, validation_visitor, std::move(stat_name_set), tls, singleton, creation_status);
+        reload_error_cb, main_dispatcher, api, singleton, creation_status);
     ip_tags_provider->setupTimer(main_dispatcher);
     ip_tags_registry_[key] = ip_tags_provider;
   }
 
   // Simple cleanup: remove expired entries
-  auto it = ip_tags_registry_.begin();
-  while (it != ip_tags_registry_.end()) {
-    if (it->second.expired()) {
-      it = ip_tags_registry_.erase(it);
+  auto cleanup_it = ip_tags_registry_.begin();
+  while (cleanup_it != ip_tags_registry_.end()) {
+    if (cleanup_it->second.expired()) {
+      cleanup_it = ip_tags_registry_.erase(cleanup_it);
     } else {
-      ++it;
+      ++cleanup_it;
     }
   }
 
@@ -316,12 +302,10 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       // No-op callback for reload error
     };
 
-    // Create a separate stat name set for the provider
-    auto provider_stat_name_set = scope.symbolTable().makeSet("IpTagging");
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
         config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
-        ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, api, validation_visitor,
-        std::move(provider_stat_name_set), tls, dispatcher, ip_tags_registry_);
+        ip_tags_refresh_interval_ms, reload_success_cb, reload_error_cb, api,
+        dispatcher, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
       if (provider_ && provider_->ipTags()) {

@@ -89,8 +89,6 @@ public:
                  IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
                  IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
                  Event::Dispatcher& main_dispatcher, Api::Api& api,
-                 ProtobufMessage::ValidationVisitor& validation_visitor,
-                 Stats::StatNameSetPtr stat_name_set, ThreadLocal::SlotAllocator& tls,
                  Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
 
   ~IpTagsProvider();
@@ -143,8 +141,6 @@ public:
       const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
       uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
       IpTagsReloadErrorCb reload_error_cb, Api::Api& api,
-      ProtobufMessage::ValidationVisitor& validation_visitor,
-      Stats::StatNameSetPtr stat_name_set, ThreadLocal::SlotAllocator& tls,
       Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton);
 
 private:
