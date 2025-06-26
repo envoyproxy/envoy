@@ -15,10 +15,10 @@ namespace HttpFilters {
 namespace IpTagging {
 
 IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                               IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
+                               IpTagsLoader&, uint64_t ip_tags_refresh_interval_ms,
                                IpTagsReloadSuccessCb reload_success_cb,
                                IpTagsReloadErrorCb reload_error_cb,
-                               Event::Dispatcher& main_dispatcher, Api::Api& api,
+                               Event::Dispatcher&, Api::Api& api,
                                Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
     : ip_tags_path_(ip_tags_datasource.filename()),
       ip_tags_datasource_(ip_tags_datasource),
@@ -136,8 +136,7 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   }
 
   // Simple cleanup: remove expired entries
-  auto cleanup_it = ip_tags_registry_.begin();
-  while (cleanup_it != ip_tags_registry_.end()) {
+  for (auto cleanup_it = ip_tags_registry_.begin(); cleanup_it != ip_tags_registry_.end();) {
     if (cleanup_it->second.expired()) {
       cleanup_it = ip_tags_registry_.erase(cleanup_it);
     } else {
