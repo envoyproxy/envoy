@@ -49,7 +49,8 @@ public:
                     bool is_server, absl::string_view host_name) override;
 
   absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                            bool provides_certificates) override;
+                                            bool provides_certificates,
+                                            Stats::Scope& scope) override;
 
   void updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md, uint8_t hash_buffer[EVP_MAX_MD_SIZE],
                                 unsigned hash_length) override;
@@ -111,10 +112,10 @@ private:
                                  Envoy::Ssl::ClientValidationStatus& detailed_status,
                                  std::string* error_details, uint8_t* out_alert);
 
+  void initializeCertExpirationStats(Stats::Scope& scope);
   const Envoy::Ssl::CertificateValidationContextConfig* config_;
   SslStats& stats_;
   Server::Configuration::CommonFactoryContext& context_;
-
   bssl::UniquePtr<X509> ca_cert_;
   std::string ca_file_path_;
   std::vector<SanMatcherPtr> subject_alt_name_matchers_;

@@ -119,6 +119,7 @@ envoy_cc_test(
     srcs = ["multi_connection_base_impl_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//envoy/network:socket_interface",
         "//source/common/network:multi_connection_base_impl_lib",
         "//source/common/network:socket_option_lib",
         "//test/mocks/event:event_mocks",

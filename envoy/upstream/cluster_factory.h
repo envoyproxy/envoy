@@ -47,14 +47,6 @@ public:
   virtual Server::Configuration::ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
-   * @return Upstream::ClusterManager& singleton for use by the entire server.
-   * TODO(wbpcode): clusterManager() of ServerFactoryContext still be invalid when loading
-   * static cluster. So we need to provide an cluster manager reference here.
-   * This could be removed after https://github.com/envoyproxy/envoy/issues/26653 is resolved.
-   */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for cluster configuration
    * messages.
    */
@@ -69,11 +61,6 @@ public:
    * @return Network::DnsResolverSharedPtr the dns resolver for the server.
    */
   virtual Network::DnsResolverSharedPtr dnsResolver() PURE;
-
-  /**
-   * @return Ssl::ContextManager& the SSL context manager.
-   */
-  virtual Ssl::ContextManager& sslContextManager() PURE;
 
   /**
    * @return Outlier::EventLoggerSharedPtr sink for outlier detection event logs.

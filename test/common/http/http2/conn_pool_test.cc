@@ -140,8 +140,7 @@ public:
       test_client.codec_client_ = new CodecClientForTest(
           CodecType::HTTP1, std::move(connection), test_client.codec_,
           [this](CodecClient*) -> void { onClientDestroy(); },
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
-          *test_client.client_dispatcher_);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
       if (buffer_limits) {
         EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes())
             .Times(num_clients)
@@ -219,7 +218,7 @@ public:
   Api::ApiPtr api_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime())};
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
   std::unique_ptr<TestConnPoolImpl> pool_;
@@ -348,7 +347,7 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
 
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
-  host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime());
+  host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80");
   new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
   pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
                                              Upstream::ResourcePriority::Default, nullptr, nullptr,

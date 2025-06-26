@@ -125,9 +125,26 @@ public:
   const ConnectConfigOptRef connectConfig() const override;
   const EarlyDataPolicy& earlyDataPolicy() const override;
   const RouteStatsContextOptRef routeStatsContext() const override;
+  void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
   const RouteEntry* base_route_entry_{};
+};
+
+/**
+ * A DynamicRouteEntry is a DelegatingRouteEntry that overrides the clusterName() method.
+ * The cluster name is determined by the filter that created this route entry.
+ */
+class DynamicRouteEntry : public DelegatingRouteEntry {
+public:
+  DynamicRouteEntry(RouteConstSharedPtr route, std::string&& cluster_name)
+      : DelegatingRouteEntry(std::move(route)), cluster_name_(std::move(cluster_name)) {}
+
+  const std::string& clusterName() const override { return cluster_name_; }
+
+private:
+  const std::string cluster_name_;
 };
 
 } // namespace Router
