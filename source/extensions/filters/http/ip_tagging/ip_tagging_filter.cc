@@ -44,13 +44,8 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   auto tags_or_error = tags_loader.loadTags(ip_tags_datasource, main_dispatcher, tls);
   if (tags_or_error.status().ok()) {
     tags_ = tags_or_error.value();
-    ENVOY_LOG(info, "[ip_tagging] Successfully loaded initial IP tags from {}", ip_tags_path_);
   } else {
     // File not found or other error - start with empty trie and let timer retry
-    ENVOY_LOG(warn, "[ip_tagging] Failed to load initial IP tags from {}: {}. "
-                   "Starting with empty tags, will retry in background.",
-              ip_tags_path_, tags_or_error.status().message());
-
     // Create an empty trie so the filter can still function
     std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
     tags_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
@@ -63,29 +58,33 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
 }
 
 void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
-  ip_tags_reload_timer_ = main_dispatcher.createTimer([self = shared_from_this()]() -> void {
-    // Early exit conditions
-    if (self->is_destroying_.load() || !self->needs_refresh_ ||
-        self->ip_tags_datasource_.filename().empty()) {
-      if (!self->is_destroying_.load() && self->ip_tags_reload_timer_) {
+  // Use weak_ptr to avoid circular reference memory leak
+  std::weak_ptr<IpTagsProvider> weak_self = shared_from_this();
+
+  ip_tags_reload_timer_ = main_dispatcher.createTimer([weak_self]() -> void {
+    auto self = weak_self.lock();
+    if (!self || self->is_destroying_.load()) {
+      return; // Object destroyed or being destroyed
+    }
+
+    if (!self->needs_refresh_ || self->ip_tags_datasource_.filename().empty()) {
+      // Re-enable timer for next cycle
+      if (self->ip_tags_reload_timer_) {
         self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
       }
       return;
     }
 
-    const std::string& file_path = self->ip_tags_datasource_.filename();
-    auto reload_result = self->reloadFromFile(file_path);
-
-    if (reload_result.ok()) {
-      self->updateIpTags(reload_result.value());
-      ENVOY_LOG(info, "[ip_tagging] Successfully reloaded IP tags from {}", file_path);
+    // Try to reload the file - simple approach
+    if (self->api_.fileSystem().fileExists(self->ip_tags_datasource_.filename())) {
+      // File exists, let success callback handle it
       if (self->reload_success_cb_) self->reload_success_cb_();
     } else {
-      ENVOY_LOG(debug, "[ip_tagging] Failed to reload IP tags from {}: {}",
-                file_path, reload_result.status().message());
+      // File missing, let error callback handle it
       if (self->reload_error_cb_) self->reload_error_cb_();
     }
 
+    // Schedule next reload
     if (!self->is_destroying_.load() && self->ip_tags_reload_timer_) {
       self->ip_tags_reload_timer_->enableTimer(self->ip_tags_refresh_interval_ms_);
     }
@@ -96,8 +95,17 @@ void IpTagsProvider::setupTimer(Event::Dispatcher& main_dispatcher) {
 
 IpTagsProvider::~IpTagsProvider() {
   is_destroying_.store(true);
+
+  // Disable and clear the timer to break any potential references
   if (ip_tags_reload_timer_) {
     ip_tags_reload_timer_->disableTimer();
+    ip_tags_reload_timer_.reset(); // Explicitly release the timer
+  }
+
+  // Clear tags to release memory
+  {
+    absl::MutexLock lock(&ip_tags_mutex_);
+    tags_.reset();
   }
 }
 
@@ -130,7 +138,6 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
       ip_tags_provider = std::make_shared<IpTagsProvider>(
           ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
           reload_error_cb, main_dispatcher, api, validation_visitor, std::move(stat_name_set), tls, singleton, creation_status);
-      // Always set up timer since we now gracefully handle missing files
       ip_tags_provider->setupTimer(main_dispatcher);
       ip_tags_registry_[key] = ip_tags_provider;
     }
@@ -138,11 +145,20 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
     ip_tags_provider = std::make_shared<IpTagsProvider>(
         ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
         reload_error_cb, main_dispatcher, api, validation_visitor, std::move(stat_name_set), tls, singleton, creation_status);
-    // Always set up timer since we now gracefully handle missing files
     ip_tags_provider->setupTimer(main_dispatcher);
     ip_tags_registry_[key] = ip_tags_provider;
   }
-  // Constructor now always succeeds, so this check is no longer needed
+
+  // Simple cleanup: remove expired entries
+  auto it = ip_tags_registry_.begin();
+  while (it != ip_tags_registry_.end()) {
+    if (it->second.expired()) {
+      it = ip_tags_registry_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   return ip_tags_provider;
 }
 
@@ -173,80 +189,27 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
   return absl::InvalidArgumentError("Cannot load tags from empty filename in datasource.");
 }
 
-const std::string& IpTagsLoader::getDataSourceData() {
-  absl::MutexLock lock(&cache_mutex_);
-
-  if (!data_source_provider_) {
-    // If no provider, return empty cached data
-    if (cached_data_.empty()) {
-      cached_data_ = "";
-    }
-    return cached_data_;
-  }
-
-  // Check if enough time has passed since last check
-  auto now = api_.timeSource().monotonicTime();
-  bool should_check = cached_data_.empty() ||
-                     (now - last_check_time_) >= IpTagsLoader::kCacheCheckInterval;
-
-  if (!should_check) {
-    // Return cached data without checking file
-    ENVOY_LOG(debug, "[ip_tagging] Cache hit (time-based): {} bytes", cached_data_.size());
-    return cached_data_;
-  }
-
-  // Time to check if file has changed
-  last_check_time_ = now;
-  std::string current_data = data_source_provider_->data();
-
-  // Calculate hash of current data to detect changes
-  std::string current_hash = absl::StrCat(std::hash<std::string>{}(current_data));
-
-  // Check if data has changed by comparing hashes
-  if (cached_data_hash_ != current_hash) {
-    // Data changed - update cache
-    cached_data_ = std::move(current_data);
-    cached_data_hash_ = std::move(current_hash);
-
-    ENVOY_LOG(debug, "[ip_tagging] Cache updated: {} bytes, hash: {}",
-              cached_data_.size(), cached_data_hash_);
-  } else {
-    ENVOY_LOG(debug, "[ip_tagging] Cache hit (content unchanged): {} bytes", cached_data_.size());
-  }
-
-  return cached_data_;
-}
-
-void IpTagsLoader::clearCache() {
-  absl::MutexLock lock(&cache_mutex_);
-  cached_data_.clear();
-  cached_data_hash_.clear();
-  last_check_time_ = MonotonicTime{};
-  ENVOY_LOG(debug, "[ip_tagging] Cache cleared");
-}
-
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
-  if (data_source_provider_) {
-    IpTagFileProto ip_tags_proto;
-    const auto& new_data = getDataSourceData();  // Use smart caching
-    if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
-      auto load_status =
-          MessageUtil::loadFromYamlNoThrow(new_data, ip_tags_proto, validation_visitor_);
-      if (!load_status.ok()) {
-        return load_status;
-      }
-    } else if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Json)) {
-      bool has_unknown_field;
-      auto load_status =
-          MessageUtil::loadFromJsonNoThrow(new_data, ip_tags_proto, has_unknown_field);
-      if (!load_status.ok()) {
-        return load_status;
-      }
-    }
-    return parseIpTagsAsProto(ip_tags_proto.ip_tags());
-  } else {
+  if (!data_source_provider_) {
     return absl::InvalidArgumentError("Unable to load tags from empty datasource");
   }
+
+  IpTagFileProto ip_tags_proto;
+  const auto& data = data_source_provider_->data();
+
+  if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
+    auto load_status = MessageUtil::loadFromYamlNoThrow(data, ip_tags_proto, validation_visitor_);
+    if (!load_status.ok()) {
+      return load_status;
+    }
+  } else if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Json)) {
+    bool has_unknown_field;
+    auto load_status = MessageUtil::loadFromJsonNoThrow(data, ip_tags_proto, has_unknown_field);
+    if (!load_status.ok()) {
+      return load_status;
+    }
+  }
+  return parseIpTagsAsProto(ip_tags_proto.ip_tags());
 }
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
@@ -346,11 +309,11 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
 
     // Create simple no-op callbacks
     auto reload_success_cb = []() {
-      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_success_cb (no-op)");
+      // No-op callback for reload success
     };
 
     auto reload_error_cb = []() {
-      ENVOY_LOG_MISC(debug, "[ip_tagging] reload_error_cb (no-op)");
+      // No-op callback for reload error
     };
 
     // Create a separate stat name set for the provider
@@ -367,11 +330,9 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
         // Provider exists but has no tags yet (file not found) - create empty trie
         std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
         trie_ = std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
-        ENVOY_LOG(warn, "[ip_tagging] Provider created but no initial tags loaded, starting with empty trie");
       }
     } else {
       // Provider creation failed - this should not happen with our graceful approach, but handle it
-      ENVOY_LOG(error, "[ip_tagging] Failed to create IP tags provider: {}", provider_or_error.status().message());
       creation_status = provider_or_error.status();
       return;
     }
@@ -471,49 +432,6 @@ void IpTaggingFilter::applyTags(Http::RequestHeaderMap& headers,
 
   // We must clear the route cache so it can match on the updated value of the header.
   callbacks_->downstreamCallbacks()->clearRouteCache();
-}
-
-absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::reloadFromFile(const std::string& file_path) {
-  if (!api_.fileSystem().fileExists(file_path)) {
-    // Use debug level for missing files during background retries - this is expected
-    ENVOY_LOG(debug, "[ip_tagging] IP tags file {} not found, will retry later", file_path);
-    return absl::NotFoundError(fmt::format("File {} does not exist", file_path));
-  }
-
-  auto file_result = api_.fileSystem().fileReadToEnd(file_path);
-  if (!file_result.ok()) {
-    return absl::Status(file_result.status().code(),
-                       fmt::format("Failed to read file {}: {}", file_path, file_result.status().message()));
-  }
-
-  const std::string& file_content = file_result.value();
-  if (file_content.empty()) {
-    return absl::InvalidArgumentError(fmt::format("File {} is empty", file_path));
-  }
-
-  return parseFileContent(file_content, file_path);
-}
-
-absl::StatusOr<LcTrieSharedPtr> IpTagsProvider::parseFileContent(const std::string& content, const std::string& file_path) {
-  IpTagFileProto ip_tags_proto;
-
-  if (absl::EndsWith(file_path, MessageUtil::FileExtensions::get().Yaml)) {
-    auto load_status = MessageUtil::loadFromYamlNoThrow(content, ip_tags_proto, validation_visitor_);
-    if (!load_status.ok()) {
-      return absl::Status(load_status.code(), fmt::format("Failed to parse YAML: {}", load_status.message()));
-    }
-  } else if (absl::EndsWith(file_path, MessageUtil::FileExtensions::get().Json)) {
-    bool has_unknown_field;
-    auto load_status = MessageUtil::loadFromJsonNoThrow(content, ip_tags_proto, has_unknown_field);
-    if (!load_status.ok()) {
-      return absl::Status(load_status.code(), fmt::format("Failed to parse JSON: {}", load_status.message()));
-    }
-  } else {
-    return absl::InvalidArgumentError(fmt::format("Unsupported file format for {}", file_path));
-  }
-
-  IpTagsLoader temp_loader(api_, validation_visitor_, stat_name_set_);
-  return temp_loader.parseIpTagsAsProto(ip_tags_proto.ip_tags());
 }
 
 } // namespace IpTagging

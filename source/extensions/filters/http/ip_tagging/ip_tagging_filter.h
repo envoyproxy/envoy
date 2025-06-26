@@ -67,31 +67,12 @@ public:
   parseIpTagsAsProto(const Protobuf::RepeatedPtrField<
                      envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTag>& ip_tags);
 
-  /**
-   * Gets data from the data source provider with smart caching for large files.
-   * Only re-reads if the underlying data has changed.
-   */
-  const std::string& getDataSourceData();
-
-  /**
-   * Clears the cached data, forcing a fresh read on next access.
-   * Useful for testing or when you know the file has changed.
-   */
-  void clearCache();
-
 private:
   Api::Api& api_;
   Envoy::Config::DataSource::DataSourceProviderPtr data_source_provider_;
   std::string ip_tags_path_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::StatNameSetPtr& stat_name_set_;
-
-  // Smart caching for large files
-  mutable std::string cached_data_;
-  mutable std::string cached_data_hash_;
-  mutable absl::Mutex cache_mutex_;
-  mutable MonotonicTime last_check_time_;
-  static constexpr std::chrono::milliseconds kCacheCheckInterval{1000}; // Check every 1 second
 };
 
 using IpTagsReloadSuccessCb = std::function<void()>;
@@ -131,10 +112,6 @@ private:
   // Store the data source configuration and dependencies for self-contained operation
   const envoy::config::core::v3::DataSource ip_tags_datasource_;
   Api::Api& api_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
-  Stats::StatNameSetPtr stat_name_set_;
-  TimeSource& time_source_;
-  MonotonicTime last_reloaded_time_;
   const std::chrono::milliseconds ip_tags_refresh_interval_ms_;
   const bool needs_refresh_;
   IpTagsReloadSuccessCb reload_success_cb_;
@@ -149,10 +126,6 @@ private:
   std::atomic<bool> is_destroying_{false};
 
   void updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
-
-  // New helper methods for file reloading
-  absl::StatusOr<LcTrieSharedPtr> reloadFromFile(const std::string& file_path);
-  absl::StatusOr<LcTrieSharedPtr> parseFileContent(const std::string& content, const std::string& file_path);
 };
 
 using IpTagsProviderSharedPtr = std::shared_ptr<IpTagsProvider>;
@@ -205,10 +178,17 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   FilterRequestType requestType() const { return request_type_; }
   const Network::LcTrie::LcTrie<std::string>& trie() const {
-    if (provider_) {
+    if (provider_ && provider_->ipTags()) {
       return *(provider_->ipTags());
-    } else {
+    } else if (trie_) {
       return *trie_;
+    } else {
+      // Fallback: create empty trie if both are null (should never happen with graceful init)
+      static const auto empty_trie = []() {
+        std::vector<std::pair<std::string, std::vector<Network::Address::CidrRange>>> empty_data;
+        return std::make_shared<Network::LcTrie::LcTrie<std::string>>(empty_data);
+      }();
+      return *empty_trie;
     }
   }
 
