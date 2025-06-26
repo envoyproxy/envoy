@@ -12,6 +12,7 @@ import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -455,5 +456,5 @@ message ExtProcOverrides {
   // If true, the filter will not fail closed if the gRPC stream is prematurely closed
   // or could not be opened. This field is the per-route override of
   // :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`.
-  bool failure_mode_allow = 8;
+  google.protobuf.BoolValue failure_mode_allow = 8;
 }

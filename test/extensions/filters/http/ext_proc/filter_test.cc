@@ -1640,7 +1640,7 @@ failure_mode_allow: true)EOF";
   initialize(std::move(yaml_config));
 
   ExtProcPerRoute route_proto;
-  route_proto.mutable_overrides()->set_failure_mode_allow(false);
+  route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
   FilterConfigPerRoute route_config(route_proto);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(
@@ -1672,7 +1672,7 @@ failure_mode_allow: false)EOF";
   initialize(std::move(yaml_config));
 
   ExtProcPerRoute route_proto;
-  route_proto.mutable_overrides()->set_failure_mode_allow(true);
+  route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
   FilterConfigPerRoute route_config(route_proto);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(
@@ -1743,6 +1743,40 @@ failure_mode_allow: false)EOF";
   server_closed_stream_ = true; // Simulate stream close without proper gRPC response
   stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
   filter_->onDestroy();
+}
+
+TEST_F(FailureModeAllowOverrideTest, FilterAllowRouteUnrelatedOverride) {
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: true)EOF";
+  initialize(std::move(yaml_config));
+
+  ExtProcPerRoute route_proto;
+  // This override does not set failure_mode_allow, so the filter's value should still apply.
+  route_proto.mutable_overrides()->mutable_processing_mode()->set_response_header_mode(
+      ProcessingMode::SKIP);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, true));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
 }
 
 TEST_F(HttpFilterTest, StreamingBodyMutateLastEmptyChunk) {
