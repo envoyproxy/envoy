@@ -5721,8 +5721,8 @@ TEST_P(ExtProcIntegrationTest, ServerWaitTooLongBeforeSendRespDuplexStreamed) {
   verifyDownstreamResponse(*response, 504);
 }
 
-// Testing the case that the client does not send trailers. After sending
-// back the data responses, the ext_proc server sends back synthesized trailers.
+// Testing the case that when the client does not send trailers, if the ext_proc server sends
+// back a synthesized trailer, it is ignored by Envoy and never reaches the upstream server.
 TEST_P(ExtProcIntegrationTest, DuplexStreamedServerResponseWithSynthesizedTrailer) {
   const std::string body_sent(64 * 1024, 's');
   IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
@@ -5740,12 +5740,13 @@ TEST_P(ExtProcIntegrationTest, DuplexStreamedServerResponseWithSynthesizedTraile
   const std::string body_upstream(total_resp_body_msg, 'r');
   // The end_of_stream of the last body response is false.
   serverSendBodyRespDuplexStreamed(total_resp_body_msg, false, false);
-  // The ext_proc server sends back the trailer response.
+  // The ext_proc server sends back a synthesized trailer response.
   serverSendTrailerRespDuplexStreamed();
 
   handleUpstreamRequest();
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
   EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  EXPECT_EQ(upstream_request_->trailers(), nullptr);
   verifyDownstreamResponse(*response, 200);
 }
 
