@@ -228,12 +228,12 @@ SINGLETON_MANAGER_REGISTRATION(ip_tags_registry);
 absl::StatusOr<IpTaggingFilterConfigSharedPtr> IpTaggingFilterConfig::create(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
-    Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator&,
+    Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor) {
   absl::Status creation_status = absl::OkStatus();
   auto config_ptr = std::shared_ptr<IpTaggingFilterConfig>(
       new IpTaggingFilterConfig(config, stat_prefix, singleton_manager, scope, runtime, api,
-                                dispatcher, validation_visitor, creation_status));
+                                tls, dispatcher, validation_visitor, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return config_ptr;
 }
@@ -241,8 +241,9 @@ absl::StatusOr<IpTaggingFilterConfigSharedPtr> IpTaggingFilterConfig::create(
 IpTaggingFilterConfig::IpTaggingFilterConfig(
     const envoy::extensions::filters::http::ip_tagging::v3::IPTagging& config,
     const std::string& stat_prefix, Singleton::Manager& singleton_manager, Stats::Scope& scope,
-    Runtime::Loader& runtime, Api::Api& api, Event::Dispatcher& dispatcher,
-    ProtobufMessage::ValidationVisitor& validation_visitor, absl::Status& creation_status)
+    Runtime::Loader& runtime, Api::Api& api, ThreadLocal::SlotAllocator&,
+    Event::Dispatcher& dispatcher, ProtobufMessage::ValidationVisitor& validation_visitor,
+    absl::Status& creation_status)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),
       stats_prefix_(stat_name_set_->add(stat_prefix + "ip_tagging")),
