@@ -90,12 +90,12 @@ public:
 
     // 2. Try wildcard matches from longest suffix to shortest.
     // For "www.example.com", try "example.com", then "com".
-    auto best_wildcard_match = findBestWildcardMatch(domain);
-    if (best_wildcard_match) {
-      MatchResult result = MatchTree<DataType>::handleRecursionAndSkips(*best_wildcard_match, data,
-                                                                        skipped_match_cb);
+    auto wildcard_matches = findAllWildcardMatches(domain);
+    for (const auto& wildcard_match : wildcard_matches) {
+      MatchResult result =
+          MatchTree<DataType>::handleRecursionAndSkips(*wildcard_match, data, skipped_match_cb);
 
-      // If ``keep_matching`` is used, treat as no match and continue to global wildcard.
+      // If ``keep_matching`` is used, treat as no match and continue to next wildcard.
       if (result.isMatch() || result.isInsufficientData()) {
         return result;
       }
@@ -115,9 +115,12 @@ public:
   }
 
 private:
-  // Find the best wildcard match for the given domain. It returns the longest suffix match.
-  // Returns ``nullptr`` if no wildcard matches are found.
-  std::shared_ptr<OnMatch<DataType>> findBestWildcardMatch(absl::string_view domain) const {
+  // Find all wildcard matches for the given domain ordered from longest to shortest suffix.
+  // Returns empty vector if no wildcard matches are found.
+  std::vector<std::shared_ptr<OnMatch<DataType>>>
+  findAllWildcardMatches(absl::string_view domain) const {
+    std::vector<std::shared_ptr<OnMatch<DataType>>> matches;
+
     size_t dot_pos = domain.find('.');
     while (dot_pos != absl::string_view::npos) {
       const auto suffix = domain.substr(dot_pos + 1);
@@ -125,14 +128,14 @@ private:
       // Direct lookup without creating temporary strings.
       auto wildcard_it = config_->wildcard_matches_.find(suffix);
       if (wildcard_it != config_->wildcard_matches_.end()) {
-        return wildcard_it->second; // Return the first longest match found.
+        matches.push_back(wildcard_it->second);
       }
 
       // Find next "dot" for shorter patterns.
       dot_pos = domain.find('.', dot_pos + 1);
     }
 
-    return nullptr;
+    return matches;
   }
 
   const DataInputPtr<DataType> data_input_;
