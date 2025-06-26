@@ -97,6 +97,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           uint64_t host_rq_active = host->stats().rq_active_.value();
           uint64_t host_rq_issued = host->stats().rq_total_.latch();
 
+          // Check if the host has any load stats updates.
+          // If the host has no load stats updates, we skip it.
           bool endpoint_has_updates =
               (host_rq_success + host_rq_error + host_rq_active + host_rq_issued) != 0;
 
