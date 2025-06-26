@@ -520,6 +520,36 @@ TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixQuicBrokennessNoBackPro
   EXPECT_FALSE(protocols_->isHttp3Broken(origin1));
 }
 
+TEST_P(HttpServerPropertiesCacheImplTest, CanonicalSuffixSrtt) {
+  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_canonical_suffix_for_srtt", true);
+  std::string suffix = ".example.com";
+  std::string host1 = "first.example.com";
+  std::string host2 = "www.second.example.com";
+  std::string host3 = "www.third.example.com";
+  const HttpServerPropertiesCacheImpl::Origin origin1 = {https_, host1, port1_};
+  const HttpServerPropertiesCacheImpl::Origin origin2 = {https_, host2, port2_};
+  const HttpServerPropertiesCacheImpl::Origin origin3 = {https_, host3, port3_};
+  const HttpServerPropertiesCacheImpl::Origin no_match = {https_, "www.third.nomatch.com", port3_};
+
+  suffixes_.push_back(suffix);
+  initialize();
+
+  std::chrono::microseconds set_srtt1(42);
+  protocols_->setSrtt(origin1, set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt1);
+  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt1);
+
+  std::chrono::microseconds set_srtt2(422);
+  protocols_->setSrtt(origin2, set_srtt2);
+  EXPECT_EQ(protocols_->getSrtt(origin1), set_srtt1);
+  EXPECT_EQ(protocols_->getSrtt(origin2), set_srtt2);
+  EXPECT_EQ(protocols_->getSrtt(origin3), set_srtt2);
+  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt1);
+  EXPECT_NE(protocols_->getSrtt(no_match), set_srtt2);
+}
+
 TEST_P(HttpServerPropertiesCacheImplTest, ExplicitAlternativeTakesPriorityOverCanonicalSuffix) {
   std::string suffix = ".example.com";
   std::string host1 = "first.example.com";
