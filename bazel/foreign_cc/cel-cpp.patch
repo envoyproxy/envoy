@@ -62,7 +62,7 @@ index 61c19ce5f..c8e4aba5c 100644
 +        // We need to suppress the compiler warnings about memory manipulation.
 +        // The memcpy usage here is intentional for performance optimization
 +#pragma GCC diagnostic push
-+#pragma GCC diagnostic ignored "-Wpragmas"
++#pragma GCC diagnostic ignored "-Wclass-memaccess"
          alignas(ValueVariant) std::byte tmp[sizeof(ValueVariant)];
          // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
          std::memcpy(tmp, std::addressof(lhs), sizeof(ValueVariant));
