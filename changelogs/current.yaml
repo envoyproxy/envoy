@@ -74,6 +74,11 @@ minor_behavior_changes:
   change: |
     Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
 
+- area: ext_authz
+  change: |
+    Implement support for ext_authz grpc check to use ``append_action`` when given in upstream header handling to support
+    multi header fields.
+
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: conn_pool

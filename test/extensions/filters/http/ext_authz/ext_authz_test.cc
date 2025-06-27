@@ -558,10 +558,18 @@ TEST_F(InvalidMutationTest, HeadersToSetValueOk) {
 }
 
 // Same as above, setting a different field...
-TEST_F(InvalidMutationTest, HeadersToAddValue) {
+TEST_F(InvalidMutationTest, HeadersToAppendIfAbsent) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_add = {{"foo", invalid_value_}};
+  response.headers_to_add_if_absent = {{"foo", invalid_value_}};
+  testResponse(response);
+}
+
+// Same as above, setting a different field...
+TEST_F(InvalidMutationTest, HeadersToOverwriteIfExists) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_overwrite_if_exists = {{"foo", invalid_value_}};
   testResponse(response);
 }
 
@@ -3299,6 +3307,59 @@ TEST_P(HttpFilterTestParam, OkWithResponseHeadersAndAppendActionsDoNotTakeEffect
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(response_metadata));
   EXPECT_EQ(response_headers.get_("header-to-add-if-absent"), "original-value");
   EXPECT_FALSE(response_headers.has("header-to-overwrite-if-exists"));
+}
+
+TEST_P(HttpFilterTestParam, OkWithHeadersAndAppendActions) {
+  InSequence s;
+
+  // `add` will be added to this header.
+  const Http::LowerCaseString add_key{"add"};
+  request_headers_.addCopy(add_key, "initial");
+
+  // `add_if_absent` will be added to this header.
+  const Http::LowerCaseString add_if_absent_key{"add_if_absent"};
+  request_headers_.addCopy(add_if_absent_key, "initial");
+
+  // `overwrite_if_exists` will be appended to this header.
+  const Http::LowerCaseString overwrite_if_exists_key{"overwrite_if_exists"};
+  request_headers_.addCopy(overwrite_if_exists_key, "initial");
+
+  // `append` will be added to this header.
+  const Http::LowerCaseString append_key{"append"};
+  request_headers_.addCopy(append_key, "initial");
+
+  // `add_if_absent` second key will be added via check response.
+  const Http::LowerCaseString add_if_absent_two_key{"add_if_absent_two"};
+
+  prepareCheck();
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_add = {{add_key.get(), "second"}};
+  response.headers_to_add_if_absent = {{add_if_absent_key.get(), "second"},
+                                       {add_if_absent_two_key.get(), "initial"}};
+  response.headers_to_overwrite_if_exists = {{overwrite_if_exists_key.get(), "second"}};
+  response.headers_to_append = {{append_key.get(), "second"}}; // test old behaviour
+
+  auto response_ptr = std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        callbacks.onComplete(std::move(response_ptr));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+  EXPECT_EQ(request_headers_.get_(add_if_absent_key), "initial");
+  EXPECT_EQ(request_headers_.get_(overwrite_if_exists_key), "second");
+  EXPECT_EQ(request_headers_.getNth(add_key, 0), "initial");
+  EXPECT_EQ(request_headers_.getNth(add_key, 1), "second");
+  EXPECT_EQ(request_headers_.get_(append_key), "initial,second");
+  EXPECT_EQ(request_headers_.get_(add_if_absent_two_key), "initial");
 }
 
 TEST_P(HttpFilterTestParam, ImmediateOkResponseWithUnmodifiedQueryParameters) {

@@ -28,7 +28,14 @@ struct KeyValueOption {
   bool append;
 };
 
+struct KeyValueAction {
+  std::string key;
+  std::string value;
+  envoy::config::core::v3::HeaderValueOption::HeaderAppendAction append_action;
+};
+
 using KeyValueOptionVector = std::vector<KeyValueOption>;
+using KeyValueActionVector = std::vector<KeyValueAction>;
 using HeaderValueOptionVector = std::vector<envoy::config::core::v3::HeaderValueOption>;
 using CheckResponsePtr = std::unique_ptr<envoy::service::auth::v3::CheckResponse>;
 
@@ -51,6 +58,7 @@ public:
                     const absl::optional<Grpc::Status::GrpcStatus>& grpc_status = absl::nullopt);
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
+  static HeaderValueOptionVector makeHeaderValueAction(KeyValueActionVector&& headers);
 
   static bool compareHeaderVector(const UnsafeHeaderVector& lhs, const UnsafeHeaderVector& rhs);
   static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
