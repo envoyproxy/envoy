@@ -6,6 +6,7 @@
 
 #include "source/common/matcher/matcher.h"
 
+#include "absl/status/status.h"
 #include "xds/type/matcher/v3/domain.pb.h"
 #include "xds/type/matcher/v3/domain.pb.validate.h"
 
@@ -53,11 +54,9 @@ public:
                     std::shared_ptr<DomainMatcherConfig<DataType>> config)
       : data_input_(std::move(data_input)), on_no_match_(std::move(on_no_match)),
         config_(std::move(config)) {
-    const auto input_type = data_input_->dataInputType();
-    if (input_type != Envoy::Matcher::DefaultMatchingDataType) {
-      throw EnvoyException(
-          absl::StrCat("Unsupported data input type: ", input_type,
-                       ", currently only string type is supported in domain matcher"));
+    absl::Status validation_status = validateDataInputType();
+    if (!validation_status.ok()) {
+      throw EnvoyException(std::string(validation_status.message()));
     }
   }
 
@@ -115,6 +114,17 @@ public:
   }
 
 private:
+  // Validate that the data input type is supported.
+  absl::Status validateDataInputType() const {
+    const auto input_type = data_input_->dataInputType();
+    if (input_type != Envoy::Matcher::DefaultMatchingDataType) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("Unsupported data input type: ", input_type,
+                       ", currently only string type is supported in domain matcher"));
+    }
+    return absl::OkStatus();
+  }
+
   // Find all wildcard matches for the given domain ordered from longest to shortest suffix.
   // Returns empty vector if no wildcard matches are found.
   std::vector<std::shared_ptr<OnMatch<DataType>>>
@@ -156,7 +166,10 @@ public:
         MessageUtil::downcastAndValidate<const xds::type::matcher::v3::ServerNameMatcher&>(
             config, factory_context.messageValidationVisitor()));
 
-    validateConfiguration(*typed_config);
+    absl::Status validation_status = validateConfiguration(*typed_config);
+    if (!validation_status.ok()) {
+      throw EnvoyException(std::string(validation_status.message()));
+    }
 
     auto domain_config = buildDomainMatcherConfig(*typed_config, on_match_factory);
 
@@ -174,27 +187,35 @@ public:
   std::string name() const override { return "envoy.matching.custom_matchers.domain_matcher"; }
 
 private:
-  void validateConfiguration(const xds::type::matcher::v3::ServerNameMatcher& config) const {
+  absl::Status
+  validateConfiguration(const xds::type::matcher::v3::ServerNameMatcher& config) const {
     absl::flat_hash_set<std::string> seen_domains;
     seen_domains.reserve(getTotalDomainCount(config));
 
     for (const auto& domain_matcher : config.domain_matchers()) {
       for (const auto& domain : domain_matcher.domains()) {
         if (!seen_domains.insert(domain).second) {
-          throw EnvoyException(absl::StrCat("Duplicate domain in ServerNameMatcher: ", domain));
+          return absl::InvalidArgumentError(
+              absl::StrCat("Duplicate domain in ServerNameMatcher: ", domain));
         }
-        validateDomainFormat(domain);
+
+        absl::Status validation_status = validateDomainFormat(domain);
+        if (!validation_status.ok()) {
+          return validation_status;
+        }
       }
     }
+
+    return absl::OkStatus();
   }
 
-  static void validateDomainFormat(absl::string_view domain) {
+  static absl::Status validateDomainFormat(absl::string_view domain) {
     if (domain == "*") {
-      return; // Global wildcard is valid.
+      return absl::OkStatus(); // Global wildcard is valid.
     }
 
     if (domain.empty()) {
-      throw EnvoyException("Empty domain in ServerNameMatcher");
+      return absl::InvalidArgumentError("Empty domain in ServerNameMatcher");
     }
 
     // Check for invalid wildcard patterns anywhere in the domain.
@@ -202,16 +223,19 @@ private:
     if (wildcard_pos != absl::string_view::npos) {
       // Only allow "*." at the beginning (prefix wildcard).
       if (wildcard_pos != 0 || domain.size() < 3 || domain[1] != '.') {
-        throw EnvoyException(absl::StrCat("Invalid wildcard domain format: ", domain,
-                                          ". Only '*' and '*.domain' patterns are supported"));
+        return absl::InvalidArgumentError(
+            absl::StrCat("Invalid wildcard domain format: ", domain,
+                         ". Only '*' and '*.domain' patterns are supported"));
       }
 
       // Ensure no additional wildcards exist.
       if (domain.find('*', 1) != absl::string_view::npos) {
-        throw EnvoyException(absl::StrCat("Invalid wildcard domain format: ", domain,
-                                          ". Multiple wildcards are not supported"));
+        return absl::InvalidArgumentError(absl::StrCat("Invalid wildcard domain format: ", domain,
+                                                       ". Multiple wildcards are not supported"));
       }
     }
+
+    return absl::OkStatus();
   }
 
   static size_t getTotalDomainCount(const xds::type::matcher::v3::ServerNameMatcher& config) {
