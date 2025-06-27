@@ -7,16 +7,16 @@ Signed-off-by: Rohit Agrawal <rohit.agrawal@databricks.com>
 ---
  common/internal/byte_string.cc | 14 ++++++--------
  common/value.h                 |  2 +-
- common/values/value_variant.h  |  6 ++++++
+ common/values/value_variant.h  | 10 ++++++++++
  runtime/type_registry.h        |  4 ++--
- 4 files changed, 15 insertions(+), 11 deletions(-)
+ 4 files changed, 19 insertions(+), 11 deletions(-)
 
 diff --git a/common/internal/byte_string.cc b/common/internal/byte_string.cc
 index e01c797f8..56237a71f 100644
 --- a/common/internal/byte_string.cc
 +++ b/common/internal/byte_string.cc
-@@ -104,16 +104,14 @@ ByteString ByteString::Concat(const ByteString& lhs, const ByteString& rhs,
-
+@@ -104,16 +104,14 @@
+ 
  ByteString::ByteString(Allocator<> allocator, absl::string_view string) {
    ABSL_DCHECK_LE(string.size(), max_size());
 -  auto* arena = allocator.arena();
@@ -32,7 +32,7 @@ index e01c797f8..56237a71f 100644
 +    return;
    }
 -}
-
+ 
 -ByteString::ByteString(Allocator<> allocator, const std::string& string) {
 -  ABSL_DCHECK_LE(string.size(), max_size());
    auto* arena = allocator.arena();
@@ -42,7 +42,7 @@ diff --git a/common/value.h b/common/value.h
 index 06a03c13d..9f5d77980 100644
 --- a/common/value.h
 +++ b/common/value.h
-@@ -2733,7 +2733,7 @@ absl::StatusOr<std::pair<Value, int>> StructValueMixin<Base>::Qualify(
+@@ -2733,7 +2733,7 @@
      absl::Nonnull<const google::protobuf::DescriptorPool*> descriptor_pool,
      absl::Nonnull<google::protobuf::MessageFactory*> message_factory,
      absl::Nonnull<google::protobuf::Arena*> arena) const {
@@ -52,26 +52,30 @@ index 06a03c13d..9f5d77980 100644
    ABSL_DCHECK(message_factory != nullptr);
    ABSL_DCHECK(arena != nullptr);
 diff --git a/common/values/value_variant.h b/common/values/value_variant.h
-index 61c19ce5f..c8e4aba5c 100644
+index 61c19ce5f..fc7969bc8 100644
 --- a/common/values/value_variant.h
 +++ b/common/values/value_variant.h
-@@ -732,6 +732,10 @@ class alignas(kValueVariantAlign) CEL_COMMON_INTERNAL_VALUE_VARIANT_TRIVIAL_ABI
+@@ -732,6 +732,13 @@
        const bool rhs_trivial =
            (rhs.flags_ & ValueFlags::kNonTrivial) == ValueFlags::kNone;
        if (lhs_trivial && rhs_trivial) {
 +        // We need to suppress the compiler warnings about memory manipulation.
 +        // The memcpy usage here is intentional for performance optimization
++        // Only suppress this warning on GCC, as Clang doesn't have this warning
++#if defined(__GNUC__) && !defined(__clang__)
 +#pragma GCC diagnostic push
 +#pragma GCC diagnostic ignored "-Wclass-memaccess"
++#endif
          alignas(ValueVariant) std::byte tmp[sizeof(ValueVariant)];
          // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
          std::memcpy(tmp, std::addressof(lhs), sizeof(ValueVariant));
-@@ -740,6 +744,8 @@ class alignas(kValueVariantAlign) CEL_COMMON_INTERNAL_VALUE_VARIANT_TRIVIAL_ABI
+@@ -740,6 +747,9 @@
                      sizeof(ValueVariant));
          // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
          std::memcpy(std::addressof(rhs), tmp, sizeof(ValueVariant));
++#if defined(__GNUC__) && !defined(__clang__)
 +#pragma GCC diagnostic pop
-+
++#endif
        } else {
          SlowSwap(lhs, rhs, lhs_trivial, rhs_trivial);
        }
@@ -79,7 +83,7 @@ diff --git a/runtime/type_registry.h b/runtime/type_registry.h
 index 2b247946c..3e5ad423b 100644
 --- a/runtime/type_registry.h
 +++ b/runtime/type_registry.h
-@@ -77,8 +77,8 @@ class TypeRegistry {
+@@ -77,8 +77,8 @@
    // Move-only
    TypeRegistry(const TypeRegistry& other) = delete;
    TypeRegistry& operator=(TypeRegistry& other) = delete;
@@ -87,6 +91,6 @@ index 2b247946c..3e5ad423b 100644
 -  TypeRegistry& operator=(TypeRegistry&& other) = default;
 +  TypeRegistry(TypeRegistry&& other) = delete;
 +  TypeRegistry& operator=(TypeRegistry&& other) = delete;
-
+ 
    // Registers a type such that it can be accessed by name, i.e. `type(foo) ==
    // my_type`. Where `my_type` is the type being registered.
