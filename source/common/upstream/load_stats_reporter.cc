@@ -97,8 +97,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           uint64_t host_rq_active = host->stats().rq_active_.value();
           uint64_t host_rq_issued = host->stats().rq_total_.latch();
 
-          // Check if the host has any load stats updates.
-          // If the host has no load stats updates, we skip it.
+          // Check if the host has any load stats updates. If the host has no load stats updates, we
+          // skip it.
           bool endpoint_has_updates =
               (host_rq_success + host_rq_error + host_rq_active + host_rq_issued) != 0;
 
@@ -132,8 +132,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
                 stat.num_requests_with_metric += metric_value.num_requests_with_metric;
                 stat.total_metric_value += metric_value.total_metric_value;
 
-                // If we are reporting endpoint granularity, add the metric to the
-                // upstream endpoint stats.
+                // If we are reporting endpoint granularity, add the metric to the upstream endpoint
+                // stats.
                 if (upstream_endpoint_stats != nullptr) {
                   auto* endpoint_load_metric = upstream_endpoint_stats->add_load_metric_stats();
                   endpoint_load_metric->set_metric_name(metric_name);
@@ -188,8 +188,8 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
   stream_->sendMessage(request_, false);
   stats_.responses_.inc();
-  // When the connection is established, the message has not yet been read so we
-  // will not have a load reporting period.
+  // When the connection is established, the message has not yet been read so we will not have a
+  // load reporting period.
   if (message_) {
     startLoadReportPeriod();
   }
