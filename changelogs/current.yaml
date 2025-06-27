@@ -246,5 +246,9 @@ new_features:
   change: |
     Added a new ``dynamicTypedMetadata()`` on ``streamInfo()`` which could be used to access the typed metadata from
     HTTP filters, such as the Set Metadata filter, etc.
+- area: ext_proc
+  change: |
+    The :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`
+    setting may now be overridden on a per-route basis.
 
 deprecated:
