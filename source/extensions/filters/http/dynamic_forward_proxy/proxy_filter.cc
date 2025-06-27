@@ -28,9 +28,9 @@ void latchTime(Http::StreamDecoderFilterCallbacks* decoder_callbacks, absl::stri
 
 // Helper function to apply filter state overrides to host and port.
 // Conditionally checks filter state based on the allow_dynamic_host_from_filter_state flag.
-auto applyFilterStateOverrides = [](absl::string_view& host, uint32_t& port,
-                                    Http::StreamDecoderFilterCallbacks* decoder_callbacks,
-                                    bool allow_dynamic_host_from_filter_state) {
+void applyFilterStateOverrides(absl::string_view& host, uint32_t& port,
+                               Http::StreamDecoderFilterCallbacks* decoder_callbacks,
+                               bool allow_dynamic_host_from_filter_state) {
   if (!allow_dynamic_host_from_filter_state) {
     return;
   }
@@ -49,7 +49,7 @@ auto applyFilterStateOverrides = [](absl::string_view& host, uint32_t& port,
       dynamic_port_filter_state->value() <= 65535) {
     port = dynamic_port_filter_state->value();
   }
-};
+}
 
 } // namespace
 
