@@ -595,7 +595,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
       // line to be ingressed into YAML.
       absl::StrReplaceAll({{"\n  ", "\n"}}, &certs);
     }
-    validation->mutable_trusted_ca()->set_inline_string(certs);
+    if (!certs.empty()) {
+      validation->mutable_trusted_ca()->set_inline_string(certs);
+    }
   }
   envoy::extensions::transport_sockets::http_11_proxy::v3::Http11ProxyUpstreamTransport
       ssl_proxy_socket;

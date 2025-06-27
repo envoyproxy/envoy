@@ -68,6 +68,8 @@ build:ios --define=envoy_full_protos=enabled
 
 # Default flags for builds targeting Android
 build:android --define=logger=android
+build:android --java_language_version=8
+build:android --tool_java_language_version=8
 
 # Default flags for Android debug builds
 build:mobile-dbg-android --config=mobile-dbg-common
@@ -81,6 +83,8 @@ build:mobile-dbg-ios --config=ios
 build:mobile-test-android --define=static_extension_registration=disabled
 build:mobile-android --android_crosstool_top=@androidndk//:toolchain
 build:mobile-android --noincompatible_enable_android_toolchain_resolution
+build:mobile-android --java_language_version=8
+build:mobile-android --tool_java_language_version=8
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
@@ -257,6 +261,7 @@ test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios
+build:mobile-remote-ci-macos-ios --strategy=ProcessAndSign=sandboxed,local
 
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
 test:mobile-remote-ci-macos-ios-swift --build_tests_only
