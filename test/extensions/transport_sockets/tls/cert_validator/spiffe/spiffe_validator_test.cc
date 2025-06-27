@@ -54,7 +54,8 @@ public:
     ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source));
 
     // Initialize SPIFFEValidator with mocked context and stats
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+                                                   *store_.rootScope());
   }
 
   std::string compactJson(const std::string& json_string) {
@@ -105,7 +106,8 @@ public:
           }));
     }
 
-    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_);
+    validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
+                                                   *store_.rootScope());
   }
 
   void initialize() { validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_); }
@@ -113,6 +115,7 @@ public:
   // Getter.
   SPIFFEValidator& validator() { return *validator_; }
   SslStats& stats() { return stats_; }
+  Stats::TestUtil::TestStore& store() { return store_; }
 
   // Setter.
   void setAllowExpiredCertificate(bool val) { allow_expired_certificate_ = val; }
@@ -256,8 +259,9 @@ TEST(SPIFFEValidator, TestCertificatePrecheck) {
 
 TEST_F(TestSPIFFEValidator, TestInitializeSslContexts) {
   initialize();
+  Stats::TestUtil::TestStore store;
   EXPECT_EQ(SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-            validator().initializeSslContexts({}, false).value());
+            validator().initializeSslContexts({}, false, *store.rootScope()).value());
 }
 
 TEST_F(TestSPIFFEValidator, TestGetTrustBundleStore) {
@@ -1069,6 +1073,25 @@ typed_config:
     EXPECT_EQ(1, stats().fail_verify_san_.value());
     stats().fail_verify_san_.reset();
   }
+}
+
+TEST_F(TestSPIFFEValidator, SpiffeCaExpirationMetrics) {
+  initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: example.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF"));
+
+  std::string expected_metric_name =
+      "ssl.certificate.TEST_CA_CERT_NAME_0.expiration_unix_time_seconds";
+
+  auto gauge_opt = store().findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->get().value(), 1787339642);
 }
 
 } // namespace Tls

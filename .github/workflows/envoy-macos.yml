@@ -30,7 +30,10 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
     uses: ./.github/workflows/_load.yml
     with:
       check-name: macos
@@ -56,7 +59,7 @@ jobs:
       target: ${{ matrix.target }}
       target-name: ${{ matrix.target-name }}
       timeout-minutes: 180
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -81,10 +84,12 @@ jobs:
     secrets:
       app-id: ${{ secrets.ENVOY_CI_APP_ID }}
       app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
-    if: >-
-      ${{ always()
-          && github.event.workflow_run.conclusion == 'success'
-          && fromJSON(needs.load.outputs.request).run.build-macos }}
+    if: |
+      always()
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && fromJSON(needs.load.outputs.request).run.build-macos
     needs:
     - load
     - macos
