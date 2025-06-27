@@ -436,8 +436,9 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  // In case when upstream connection is draining `parent_` will be set to nullptr.
   // TCP Tunneling may call on high/low watermark multiple times.
-  ASSERT((parent_ != nullptr && parent_->config_->tunnelingConfigHelper()) ||
+  ASSERT(parent == nullptr || parent_->config_->tunnelingConfigHelper() ||
          !on_high_watermark_called_);
   on_high_watermark_called_ = true;
 
@@ -448,8 +449,9 @@ void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  // In case when upstream connection is draining `parent_` will be set to nullptr.
   // TCP Tunneling may call on high/low watermark multiple times.
-  ASSERT((parent_ != nullptr && parent_->config_->tunnelingConfigHelper()) ||
+  ASSERT(parent_ == nullptr || parent_->config_->tunnelingConfigHelper() ||
          on_high_watermark_called_);
   on_high_watermark_called_ = false;
 
