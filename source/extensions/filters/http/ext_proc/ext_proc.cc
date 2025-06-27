@@ -305,6 +305,171 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
              : encoding_processor_grpc_calls_;
 }
 
+ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
+  auto struct_msg = std::make_unique<ProtobufWkt::Struct>();
+
+  if (decoding_processor_grpc_calls_.header_stats_) {
+    (*struct_msg->mutable_fields())["request_header_latency_us"].set_number_value(
+        static_cast<double>(decoding_processor_grpc_calls_.header_stats_->latency_.count()));
+    (*struct_msg->mutable_fields())["request_header_call_status"].set_number_value(
+        static_cast<double>(
+            static_cast<int>(decoding_processor_grpc_calls_.header_stats_->call_status_)));
+  }
+  if (decoding_processor_grpc_calls_.body_stats_) {
+    (*struct_msg->mutable_fields())["request_body_call_count"].set_number_value(
+        static_cast<double>(decoding_processor_grpc_calls_.body_stats_->call_count_));
+    (*struct_msg->mutable_fields())["request_body_total_latency_us"].set_number_value(
+        static_cast<double>(decoding_processor_grpc_calls_.body_stats_->total_latency_.count()));
+    (*struct_msg->mutable_fields())["request_body_max_latency_us"].set_number_value(
+        static_cast<double>(decoding_processor_grpc_calls_.body_stats_->max_latency_.count()));
+    (*struct_msg->mutable_fields())["request_body_last_call_status"].set_number_value(
+        static_cast<double>(
+            static_cast<int>(decoding_processor_grpc_calls_.body_stats_->last_call_status_)));
+  }
+  if (decoding_processor_grpc_calls_.trailer_stats_) {
+    (*struct_msg->mutable_fields())["request_trailer_latency_us"].set_number_value(
+        static_cast<double>(decoding_processor_grpc_calls_.trailer_stats_->latency_.count()));
+    (*struct_msg->mutable_fields())["request_trailer_call_status"].set_number_value(
+        static_cast<double>(
+            static_cast<int>(decoding_processor_grpc_calls_.trailer_stats_->call_status_)));
+  }
+  if (encoding_processor_grpc_calls_.header_stats_) {
+    (*struct_msg->mutable_fields())["response_header_latency_us"].set_number_value(
+        static_cast<double>(encoding_processor_grpc_calls_.header_stats_->latency_.count()));
+    (*struct_msg->mutable_fields())["response_header_call_status"].set_number_value(
+        static_cast<double>(
+            static_cast<int>(encoding_processor_grpc_calls_.header_stats_->call_status_)));
+  }
+  if (encoding_processor_grpc_calls_.body_stats_) {
+    (*struct_msg->mutable_fields())["response_body_call_count"].set_number_value(
+        static_cast<double>(encoding_processor_grpc_calls_.body_stats_->call_count_));
+    (*struct_msg->mutable_fields())["response_body_total_latency_us"].set_number_value(
+        static_cast<double>(encoding_processor_grpc_calls_.body_stats_->total_latency_.count()));
+    (*struct_msg->mutable_fields())["response_body_max_latency_us"].set_number_value(
+        static_cast<double>(encoding_processor_grpc_calls_.body_stats_->max_latency_.count()));
+    (*struct_msg->mutable_fields())["response_body_last_call_status"].set_number_value(
+        static_cast<double>(
+            static_cast<int>(encoding_processor_grpc_calls_.body_stats_->last_call_status_)));
+  }
+  if (encoding_processor_grpc_calls_.trailer_stats_) {
+    (*struct_msg->mutable_fields())["response_trailer_latency_us"].set_number_value(
+        static_cast<double>(encoding_processor_grpc_calls_.trailer_stats_->latency_.count()));
+    (*struct_msg->mutable_fields())["response_trailer_call_status"].set_number_value(
+        static_cast<double>(
+            static_cast<int>(encoding_processor_grpc_calls_.trailer_stats_->call_status_)));
+  }
+  (*struct_msg->mutable_fields())["bytes_sent"].set_number_value(static_cast<double>(bytes_sent_));
+  (*struct_msg->mutable_fields())["bytes_received"].set_number_value(
+      static_cast<double>(bytes_received_));
+  return struct_msg;
+}
+
+absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
+  std::vector<std::string> parts;
+  parts.reserve(8);
+
+  if (decoding_processor_grpc_calls_.header_stats_) {
+    parts.push_back(
+        absl::StrCat("rh:", decoding_processor_grpc_calls_.header_stats_->latency_.count(), ":",
+                     static_cast<int>(decoding_processor_grpc_calls_.header_stats_->call_status_)));
+  }
+  if (decoding_processor_grpc_calls_.body_stats_) {
+    parts.push_back(absl::StrCat(
+        "rb:", decoding_processor_grpc_calls_.body_stats_->call_count_, ":",
+        decoding_processor_grpc_calls_.body_stats_->total_latency_.count(), ":",
+        static_cast<int>(decoding_processor_grpc_calls_.body_stats_->last_call_status_)));
+  }
+  if (decoding_processor_grpc_calls_.trailer_stats_) {
+    parts.push_back(absl::StrCat(
+        "rt:", decoding_processor_grpc_calls_.trailer_stats_->latency_.count(), ":",
+        static_cast<int>(decoding_processor_grpc_calls_.trailer_stats_->call_status_)));
+  }
+  if (encoding_processor_grpc_calls_.header_stats_) {
+    parts.push_back(
+        absl::StrCat("sh:", encoding_processor_grpc_calls_.header_stats_->latency_.count(), ":",
+                     static_cast<int>(encoding_processor_grpc_calls_.header_stats_->call_status_)));
+  }
+  if (encoding_processor_grpc_calls_.body_stats_) {
+    parts.push_back(absl::StrCat(
+        "sb:", encoding_processor_grpc_calls_.body_stats_->call_count_, ":",
+        encoding_processor_grpc_calls_.body_stats_->total_latency_.count(), ":",
+        static_cast<int>(encoding_processor_grpc_calls_.body_stats_->last_call_status_)));
+  }
+  if (encoding_processor_grpc_calls_.trailer_stats_) {
+    parts.push_back(absl::StrCat(
+        "st:", encoding_processor_grpc_calls_.trailer_stats_->latency_.count(), ":",
+        static_cast<int>(encoding_processor_grpc_calls_.trailer_stats_->call_status_)));
+  }
+  parts.push_back(absl::StrCat("bs:", bytes_sent_));
+  parts.push_back(absl::StrCat("br:", bytes_received_));
+
+  return absl::StrJoin(parts, ",");
+}
+
+StreamInfo::FilterState::Object::FieldType
+ExtProcLoggingInfo::getField(absl::string_view field_name) const {
+  if (field_name == "request_header_latency_us" && decoding_processor_grpc_calls_.header_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.header_stats_->latency_.count());
+  }
+  if (field_name == "request_header_call_status" && decoding_processor_grpc_calls_.header_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.header_stats_->call_status_);
+  }
+  if (field_name == "request_body_call_count" && decoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->call_count_);
+  }
+  if (field_name == "request_body_total_latency_us" && decoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->total_latency_.count());
+  }
+  if (field_name == "request_body_max_latency_us" && decoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->max_latency_.count());
+  }
+  if (field_name == "request_body_last_call_status" && decoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->last_call_status_);
+  }
+  if (field_name == "request_trailer_latency_us" && decoding_processor_grpc_calls_.trailer_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.trailer_stats_->latency_.count());
+  }
+  if (field_name == "request_trailer_call_status" &&
+      decoding_processor_grpc_calls_.trailer_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.trailer_stats_->call_status_);
+  }
+  if (field_name == "response_header_latency_us" && encoding_processor_grpc_calls_.header_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.header_stats_->latency_.count());
+  }
+  if (field_name == "response_header_call_status" && encoding_processor_grpc_calls_.header_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.header_stats_->call_status_);
+  }
+  if (field_name == "response_body_call_count" && encoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->call_count_);
+  }
+  if (field_name == "response_body_total_latency_us" &&
+      encoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->total_latency_.count());
+  }
+  if (field_name == "response_body_max_latency_us" && encoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->max_latency_.count());
+  }
+  if (field_name == "response_body_last_call_status" &&
+      encoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->last_call_status_);
+  }
+  if (field_name == "response_trailer_latency_us" &&
+      encoding_processor_grpc_calls_.trailer_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.trailer_stats_->latency_.count());
+  }
+  if (field_name == "response_trailer_call_status" &&
+      encoding_processor_grpc_calls_.trailer_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.trailer_stats_->call_status_);
+  }
+  if (field_name == "bytes_sent") {
+    return static_cast<int64_t>(bytes_sent_);
+  }
+  if (field_name == "bytes_received") {
+    return static_cast<int64_t>(bytes_received_);
+  }
+  return {};
+}
+
 FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),

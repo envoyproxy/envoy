@@ -5899,38 +5899,38 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
         "%FILTER_STATE(envoy.filters.http.ext_proc:TYPED)%");
 
     // Test field extraction for coverage.
-    (*json_format->mutable_fields())["field_inbound_header_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:inbound_header_latency_us)%");
-    (*json_format->mutable_fields())["field_inbound_header_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:inbound_header_status)%");
-    (*json_format->mutable_fields())["field_inbound_body_calls"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:inbound_body_calls)%");
-    (*json_format->mutable_fields())["field_inbound_body_total_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:inbound_body_total_latency_us)%");
-    (*json_format->mutable_fields())["field_inbound_body_max_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:inbound_body_max_latency_us)%");
-    (*json_format->mutable_fields())["field_inbound_body_last_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:inbound_body_last_status)%");
-    (*json_format->mutable_fields())["field_inbound_trailer_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:inbound_trailer_latency_us)%");
-    (*json_format->mutable_fields())["field_inbound_trailer_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:inbound_trailer_status)%");
-    (*json_format->mutable_fields())["field_outbound_header_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:outbound_header_latency_us)%");
-    (*json_format->mutable_fields())["field_outbound_header_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:outbound_header_status)%");
-    (*json_format->mutable_fields())["field_outbound_body_calls"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:outbound_body_calls)%");
-    (*json_format->mutable_fields())["field_outbound_body_total_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:outbound_body_total_latency_us)%");
-    (*json_format->mutable_fields())["field_outbound_body_max_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:outbound_body_max_latency_us)%");
-    (*json_format->mutable_fields())["field_outbound_body_last_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:outbound_body_last_status)%");
-    (*json_format->mutable_fields())["field_outbound_trailer_latency"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:outbound_trailer_latency_us)%");
-    (*json_format->mutable_fields())["field_outbound_trailer_status"].set_string_value(
-        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:outbound_trailer_status)%");
+    (*json_format->mutable_fields())["field_request_header_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_latency_us)%");
+    (*json_format->mutable_fields())["field_request_header_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
+    (*json_format->mutable_fields())["field_request_body_calls"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_call_count)%");
+    (*json_format->mutable_fields())["field_request_body_total_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_total_latency_us)%");
+    (*json_format->mutable_fields())["field_request_body_max_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_max_latency_us)%");
+    (*json_format->mutable_fields())["field_request_body_last_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_request_trailer_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_latency_us)%");
+    (*json_format->mutable_fields())["field_request_trailer_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_response_header_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_latency_us)%");
+    (*json_format->mutable_fields())["field_response_header_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_call_status)%");
+    (*json_format->mutable_fields())["field_response_body_calls"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_call_count)%");
+    (*json_format->mutable_fields())["field_response_body_total_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_total_latency_us)%");
+    (*json_format->mutable_fields())["field_response_body_max_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_max_latency_us)%");
+    (*json_format->mutable_fields())["field_response_body_last_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_response_trailer_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_latency_us)%");
+    (*json_format->mutable_fields())["field_response_trailer_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_call_status)%");
     (*json_format->mutable_fields())["field_bytes_sent"].set_string_value(
         "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
     (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
@@ -5970,12 +5970,12 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   // Verify PLAIN format contains all processing phases.
   auto plain_value = json_log->getString("ext_proc_plain");
   EXPECT_TRUE(plain_value.ok());
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("ih:[0-9]+:[0-9]+"));        // inbound header
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("ib:[0-9]+:[0-9]+:[0-9]+")); // inbound body
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("it:[0-9]+:[0-9]+"));        // inbound trailer
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("oh:[0-9]+:[0-9]+"));        // outbound header
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("ob:[0-9]+:[0-9]+:[0-9]+")); // outbound body
-  EXPECT_THAT(*plain_value, testing::ContainsRegex("ot:[0-9]+:[0-9]+"));        // outbound trailer
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rh:[0-9]+:[0-9]+"));        // request header
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rb:[0-9]+:[0-9]+:[0-9]+")); // request body
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rt:[0-9]+:[0-9]+"));        // request trailer
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("sh:[0-9]+:[0-9]+"));        // response header
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("sb:[0-9]+:[0-9]+:[0-9]+")); // response body
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("st:[0-9]+:[0-9]+"));        // response trailer
   EXPECT_THAT(*plain_value, testing::ContainsRegex("bs:[0-9]+"));               // bytes sent
   EXPECT_THAT(*plain_value, testing::ContainsRegex("br:[0-9]+"));               // bytes received
 
@@ -5983,22 +5983,22 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   auto typed_obj = json_log->getObject("ext_proc_typed");
   EXPECT_TRUE(typed_obj.ok());
   auto typed_json_str = (*typed_obj)->asJsonString();
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"inbound_header_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"inbound_header_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"inbound_body_calls\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"inbound_body_total_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"inbound_body_max_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"inbound_body_last_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"inbound_trailer_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"inbound_trailer_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"outbound_header_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"outbound_header_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"outbound_body_calls\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"outbound_body_total_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"outbound_body_max_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"outbound_body_last_status\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"outbound_trailer_latency_us\""));
-  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"outbound_trailer_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_call_count\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_total_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_max_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_last_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_call_count\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_total_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_max_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_last_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_call_status\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_sent\""));
   EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_received\""));
 
@@ -6013,22 +6013,22 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   };
 
   // Validate all individual fields can be extracted.
-  validateField("field_inbound_header_latency");
-  validateField("field_inbound_header_status");
-  validateField("field_inbound_body_calls");
-  validateField("field_inbound_body_total_latency");
-  validateField("field_inbound_body_max_latency");
-  validateField("field_inbound_body_last_status");
-  validateField("field_inbound_trailer_latency");
-  validateField("field_inbound_trailer_status");
-  validateField("field_outbound_header_latency");
-  validateField("field_outbound_header_status");
-  validateField("field_outbound_body_calls");
-  validateField("field_outbound_body_total_latency");
-  validateField("field_outbound_body_max_latency");
-  validateField("field_outbound_body_last_status");
-  validateField("field_outbound_trailer_latency");
-  validateField("field_outbound_trailer_status");
+  validateField("field_request_header_latency");
+  validateField("field_request_header_status");
+  validateField("field_request_body_calls");
+  validateField("field_request_body_total_latency");
+  validateField("field_request_body_max_latency");
+  validateField("field_request_body_last_status");
+  validateField("field_request_trailer_latency");
+  validateField("field_request_trailer_status");
+  validateField("field_response_header_latency");
+  validateField("field_response_header_status");
+  validateField("field_response_body_calls");
+  validateField("field_response_body_total_latency");
+  validateField("field_response_body_max_latency");
+  validateField("field_response_body_last_status");
+  validateField("field_response_trailer_latency");
+  validateField("field_response_trailer_status");
   validateField("field_bytes_sent");
   validateField("field_bytes_received");
 
