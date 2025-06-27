@@ -287,5 +287,9 @@ new_features:
     Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
     They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
     and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
+- area: ext_proc
+  change: |
+    The :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`
+    setting may now be overridden on a per-route basis.
 
 deprecated:
