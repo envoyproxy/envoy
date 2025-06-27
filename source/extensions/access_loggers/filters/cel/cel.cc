@@ -12,9 +12,9 @@ CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
     const ::Envoy::LocalInfo::LocalInfo& local_info,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
     const cel::expr::Expr& input_expr)
-    : local_info_(local_info), builder_(builder) {
+    : local_info_(local_info), builder_(builder), parsed_expr_(input_expr) {
   compiled_expr_ =
-      Extensions::Filters::Common::Expr::createExpression(builder_->builder(), input_expr);
+      Extensions::Filters::Common::Expr::createExpression(builder_->builder(), parsed_expr_);
 }
 
 bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext& log_context,
@@ -26,7 +26,8 @@ bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext
   if (!result.has_value() || result.value().IsError()) {
     return false;
   }
-  return result.value().BoolOrDie();
+  auto eval_result = result.value();
+  return eval_result.IsBool() ? eval_result.BoolOrDie() : false;
 }
 
 } // namespace CEL

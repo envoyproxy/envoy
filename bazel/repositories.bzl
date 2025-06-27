@@ -506,23 +506,22 @@ def _com_google_cel_cpp():
         patches = ["@envoy//bazel/foreign_cc:cel-cpp.patch"],
     )
 
-    # Load required dependencies that cel-cpp expects
+    # Load required dependencies that cel-cpp expects.
     external_http_archive("com_google_cel_spec")
-    external_http_archive(
-        "antlr4_cpp_runtime",
-        build_file = "@envoy//bazel/external:antlr4_cpp_runtime.BUILD",
-    )
 
-    # CEL-cpp expects this specific repository name for antlr4
+    # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime`` but it internally
+    # defines ``antlr4_runtimes`` with a cpp target.
+    # We are creating a repository alias to avoid duplicating the ANTLR4 dependency.
     native.new_local_repository(
         name = "antlr4-cpp-runtime",
-        path = ".",  # Empty path since we're not using files from the path
+        path = ".",
         build_file_content = """
 package(default_visibility = ["//visibility:public"])
 
-cc_library(
+# Alias to cel-cpp's embedded ANTLR4 runtime.
+alias(
     name = "antlr4-cpp-runtime",
-    deps = ["@antlr4_cpp_runtime//:antlr4"],
+    actual = "@antlr4_runtimes//:cpp",
 )
 """,
     )

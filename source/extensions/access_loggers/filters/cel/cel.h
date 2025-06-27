@@ -29,6 +29,7 @@ public:
 private:
   const ::Envoy::LocalInfo::LocalInfo& local_info_;
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
+  const cel::expr::Expr parsed_expr_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
 };
 
