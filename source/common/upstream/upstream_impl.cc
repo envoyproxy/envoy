@@ -1594,8 +1594,9 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
       runtime_(cluster_context.serverFactoryContext().runtime()),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       random_(cluster_context.serverFactoryContext().api().randomGenerator()),
-      local_cluster_(cluster_context.clusterManager().localClusterName().value_or("") ==
-                     cluster.name()),
+      local_cluster_(
+          cluster_context.serverFactoryContext().clusterManager().localClusterName().value_or("") ==
+          cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
           cluster_context.serverFactoryContext().mainThreadDispatcher())) {
@@ -1618,10 +1619,11 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   auto socket_matcher = std::move(*socket_matcher_or_error);
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = server_context.mainThreadDispatcher();
-  auto info_or_error = ClusterInfoImpl::create(
-      init_manager_, server_context, cluster, cluster_context.clusterManager().bindConfig(),
-      runtime_, std::move(socket_matcher), std::move(stats_scope), cluster_context.addedViaApi(),
-      *transport_factory_context_);
+  auto info_or_error =
+      ClusterInfoImpl::create(init_manager_, server_context, cluster,
+                              cluster_context.serverFactoryContext().clusterManager().bindConfig(),
+                              runtime_, std::move(socket_matcher), std::move(stats_scope),
+                              cluster_context.addedViaApi(), *transport_factory_context_);
   SET_AND_RETURN_IF_NOT_OK(info_or_error.status(), creation_status);
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       (*info_or_error).release(), [&dispatcher](const ClusterInfoImpl* self) {

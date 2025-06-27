@@ -115,13 +115,13 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
 
   // This part tests static init.
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cds_cluster, nullptr)));
   ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   ON_CALL(*cluster2, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
@@ -149,20 +149,20 @@ TEST_P(ClusterManagerLifecycleTest, InitializeOrder) {
   std::shared_ptr<MockClusterMockPrioritySet> cluster5(new NiceMock<MockClusterMockPrioritySet>());
   cluster5->info_->name_ = "cluster5";
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster3, nullptr)));
   ON_CALL(*cluster3, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   ASSERT_TRUE(
       cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster3"), "version1").ok());
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster4, nullptr)));
   ON_CALL(*cluster4, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster4, initialize(_));
   ASSERT_TRUE(
       cluster_manager_->addOrUpdateCluster(defaultStaticCluster("cluster4"), "version2").ok());
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster5, nullptr)));
   ON_CALL(*cluster5, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Secondary));
   ASSERT_TRUE(
@@ -313,7 +313,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicRemoveWithLocalCluster) {
 
   std::shared_ptr<MockClusterMockPrioritySet> foo(new NiceMock<MockClusterMockPrioritySet>());
   foo->info_->name_ = "foo";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, false))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, false))
       .WillOnce(Return(std::make_pair(foo, nullptr)));
   ON_CALL(*foo, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*foo, initialize(_));
@@ -325,7 +325,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicRemoveWithLocalCluster) {
   // cluster in its load balancer.
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "cluster1";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, true))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
@@ -365,7 +365,7 @@ TEST_P(ClusterManagerLifecycleTest, RemoveWarmingCluster) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
@@ -429,7 +429,7 @@ TEST_P(ClusterManagerLifecycleTest, TestModifyWarmingClusterDuringInitialization
 
   // This part tests static init.
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cds_cluster, nullptr)));
   ON_CALL(*cds_cluster, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(factory_, createCds_()).WillOnce(Return(cds));
@@ -475,7 +475,7 @@ TEST_P(ClusterManagerLifecycleTest, TestModifyWarmingClusterDuringInitialization
 
   {
     SCOPED_TRACE("Add a primary cluster staying in warming.");
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _));
     EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(warming_cluster_yaml),
                                                       "warming"));
 
@@ -486,7 +486,7 @@ TEST_P(ClusterManagerLifecycleTest, TestModifyWarmingClusterDuringInitialization
 
   {
     SCOPED_TRACE("Modify the only warming primary cluster to immediate ready.");
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _));
     EXPECT_CALL(*cds, initialize());
     EXPECT_TRUE(
         *cluster_manager_->addOrUpdateCluster(parseClusterFromV3Yaml(ready_cluster_yaml), "ready"));
@@ -511,7 +511,7 @@ TEST_P(ClusterManagerLifecycleTest, ModifyWarmingCluster) {
   // Add a "fake_cluster" in warming state.
   std::shared_ptr<MockClusterMockPrioritySet> cluster1 =
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
@@ -543,7 +543,7 @@ TEST_P(ClusterManagerLifecycleTest, ModifyWarmingCluster) {
   // Update the warming cluster that was just added.
   std::shared_ptr<MockClusterMockPrioritySet> cluster2 =
       std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize(_));
@@ -608,7 +608,7 @@ TEST_P(ClusterManagerLifecycleTest, TestRevertWarmingCluster) {
   cluster3->info_->name_ = "cds_cluster";
 
   // Initialize version1.
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initialize(_));
   checkStats(0 /*added*/, 0 /*modified*/, 0 /*removed*/, 0 /*active*/, 0 /*warming*/);
@@ -621,7 +621,7 @@ TEST_P(ClusterManagerLifecycleTest, TestRevertWarmingCluster) {
   checkStats(1 /*added*/, 0 /*modified*/, 0 /*removed*/, 1 /*active*/, 0 /*warming*/);
 
   // Start warming version2.
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initialize(_));
   ASSERT_TRUE(
@@ -629,7 +629,7 @@ TEST_P(ClusterManagerLifecycleTest, TestRevertWarmingCluster) {
   checkStats(1 /*added*/, 1 /*modified*/, 0 /*removed*/, 1 /*active*/, 1 /*warming*/);
 
   // Start warming version3 instead, which is the same as version1.
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster3, nullptr)));
   EXPECT_CALL(*cluster3, initialize(_));
   ASSERT_TRUE(
@@ -675,7 +675,7 @@ TEST_P(ClusterManagerLifecycleTest, ShutdownWithWarming) {
   cluster_manager_->setInitializedCb([&]() -> void { initialized.ready(); });
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
@@ -701,7 +701,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
@@ -726,7 +726,7 @@ TEST_P(ClusterManagerLifecycleTest, DynamicAddRemove) {
   std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
   cluster2->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster2->info_, "tcp://127.0.0.1:80")};
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize(_))
@@ -809,7 +809,7 @@ TEST_P(ClusterManagerLifecycleTest, ClusterAddOrUpdateCallbackRemovalDuringItera
       cluster_manager_->addThreadLocalClusterUpdateCallbacks(*callbacks);
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(*cluster1, initializePhase()).Times(0);
   EXPECT_CALL(*cluster1, initialize(_));
@@ -835,7 +835,7 @@ TEST_P(ClusterManagerLifecycleTest, ClusterAddOrUpdateCallbackRemovalDuringItera
   std::shared_ptr<MockClusterMockPrioritySet> cluster2(new NiceMock<MockClusterMockPrioritySet>());
   cluster2->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster2->info_, "tcp://127.0.0.1:80")};
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster2, nullptr)));
   EXPECT_CALL(*cluster2, initializePhase()).Times(0);
   EXPECT_CALL(*cluster2, initialize(_))
@@ -860,7 +860,7 @@ TEST_P(ClusterManagerLifecycleTest, AddOrUpdateClusterStaticExists) {
                                         clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
@@ -889,7 +889,7 @@ TEST_P(ClusterManagerLifecycleTest, HostsPostedToTlsCluster) {
                                         clustersJson({defaultStaticClusterJson("fake_cluster")}));
   std::shared_ptr<MockClusterRealPrioritySet> cluster1(new NiceMock<MockClusterRealPrioritySet>());
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   EXPECT_CALL(*cluster1, initialize(_));
@@ -954,7 +954,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsOnHealthFailure) {
   {
     InSequence s;
 
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
         .WillOnce(Return(std::make_pair(cluster1, nullptr)));
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
@@ -1029,7 +1029,7 @@ TEST_P(ClusterManagerLifecycleTest,
 
   InSequence s;
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(outlier_detector, addChangedStateCb(_));
@@ -1081,7 +1081,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseHttpConnectionsAndDeletePoolOnHealthFai
 
   InSequence s;
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(outlier_detector, addChangedStateCb(_));
@@ -1130,7 +1130,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionPoolsOnHealthFailure) {
   {
     InSequence s;
 
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
         .WillOnce(Return(std::make_pair(cluster1, nullptr)));
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
@@ -1206,7 +1206,7 @@ TEST_P(ClusterManagerLifecycleTest, CloseTcpConnectionsOnHealthFailure) {
   {
     InSequence s;
 
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
         .WillOnce(Return(std::make_pair(cluster1, nullptr)));
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
@@ -1279,7 +1279,7 @@ TEST_P(ClusterManagerLifecycleTest, DoNotCloseTcpConnectionsOnHealthFailure) {
   Network::MockClientConnection* connection1 = new NiceMock<Network::MockClientConnection>();
   Host::CreateConnectionData conn_info1;
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(outlier_detector, addChangedStateCb(_));
@@ -2332,7 +2332,7 @@ TEST_P(ClusterManagerLifecycleTest, MergedUpdatesDestroyedOnUpdate) {
   // Update the cluster, which should cancel the pending updates.
   std::shared_ptr<MockClusterMockPrioritySet> updated(new NiceMock<MockClusterMockPrioritySet>());
   updated->info_->name_ = "new_cluster";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, true))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, true))
       .WillOnce(Return(std::make_pair(updated, nullptr)));
 
   const std::string yaml_updated = R"EOF(

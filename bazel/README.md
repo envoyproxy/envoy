@@ -364,7 +364,7 @@ for more details.
 
 ## Supported compiler versions
 
-We now require Clang >= 9 due to C++17 support and tcmalloc requirement. GCC >= 9 is also known to work.
+We now require Clang >= 18 due to C++20 support (for Clang >= 14, your mileage may vary) and tcmalloc requirement. GCC >= 13 is also known to work for C++20.
 Currently the CI is running with Clang 14.
 
 ## Clang STL debug symbols
