@@ -1077,6 +1077,24 @@ TEST(HttpUtility, TestMakeSetCookieValue) {
                                         ref_attributes));
 }
 
+TEST(HttpUtility, TestRemoveCookieValue) {
+  TestRequestHeaderMapImpl headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "somekey=somevalue; someotherkey=someothervalue"},
+      {"cookie", "abc=def; token=abc123; Expires=Wed, 09 Jun 2021 10:18:14 GMT"},
+      {"cookie", "key2=value2; key3=value3"}};
+
+  std::string key{"token"};
+  Utility::removeCookieValue(headers, key);
+
+  TestRequestHeaderMapImpl new_headers{
+      {"someheader", "10.0.0.1"},
+      {"cookie", "somekey=somevalue; someotherkey=someothervalue; abc=def; "
+                 "Expires=Wed, 09 Jun 2021 10:18:14 GMT; key2=value2; key3=value3"}};
+
+  EXPECT_EQ(new_headers, headers);
+}
+
 TEST(HttpUtility, SendLocalReply) {
   MockStreamDecoderFilterCallbacks callbacks;
   bool is_reset = false;

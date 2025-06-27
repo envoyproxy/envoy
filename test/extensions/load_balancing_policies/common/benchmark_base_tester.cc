@@ -19,9 +19,9 @@ BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uin
           (*metadata.mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB];
       (*map.mutable_fields())[std::string(metadata_key)] = value;
 
-      hosts.push_back(Upstream::makeTestHost(info_, url, metadata, simTime(), effective_weight));
+      hosts.push_back(Upstream::makeTestHost(info_, url, metadata, effective_weight));
     } else {
-      hosts.push_back(Upstream::makeTestHost(info_, url, simTime(), effective_weight));
+      hosts.push_back(Upstream::makeTestHost(info_, url, effective_weight));
     }
   }
 

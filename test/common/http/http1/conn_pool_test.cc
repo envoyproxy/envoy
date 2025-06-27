@@ -20,6 +20,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/printers.h"
@@ -60,9 +61,10 @@ public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       Random::RandomGenerator& random_generator,
-                      Event::MockSchedulableCallback* upstream_ready_cb)
+                      Event::MockSchedulableCallback* upstream_ready_cb,
+                      Server::OverloadManager& overload_manager)
       : FixedHttpConnPoolImpl(
-            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource()),
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
             Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr, random_generator,
             state_,
             [](HttpConnPoolImplBase* pool) {
@@ -71,7 +73,7 @@ public:
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) {
               return nullptr; // Not used: createCodecClient overloaded.
             },
-            std::vector<Protocol>{Protocol::Http11}),
+            std::vector<Protocol>{Protocol::Http11}, overload_manager, absl::nullopt, nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_cb_(upstream_ready_cb) {}
 
@@ -119,8 +121,7 @@ public:
             }
           }
         },
-        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
-        *test_client.client_dispatcher_);
+        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
@@ -151,7 +152,7 @@ public:
   Http1ConnPoolImplTest()
       : upstream_ready_cb_(new Event::MockSchedulableCallback(&dispatcher_)),
         conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
-                                                         upstream_ready_cb_)) {}
+                                                         upstream_ready_cb_, overload_manager_)) {}
 
   ~Http1ConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -160,6 +161,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   Event::MockSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -316,8 +318,8 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
   // our test transport socket factory.
   // Recreate this to refresh expectation that the callback is scheduled and saved.
   new Event::MockSchedulableCallback(&dispatcher_);
-  conn_pool_ =
-      std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_, upstream_ready_cb_);
+  conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
+                                                     upstream_ready_cb_, overload_manager_);
   NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_->expectClientCreate(Protocol::Http11);
@@ -1117,7 +1119,7 @@ public:
   Http1ConnPoolDestructImplTest()
       : upstream_ready_cb_(new MockDestructSchedulableCallback(&dispatcher_)),
         conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
-                                                         upstream_ready_cb_)) {}
+                                                         upstream_ready_cb_, overload_manager_)) {}
 
   ~Http1ConnPoolDestructImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -1126,6 +1128,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   MockDestructSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;

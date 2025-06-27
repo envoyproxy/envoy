@@ -1,4 +1,32 @@
+load("@envoy//bazel/external:fips_build.bzl", "boringssl_fips_build_command", "ninja_build_command")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+
 licenses(["notice"])  # Apache 2
+
+# BoringSSL build as described in the Security Policy for BoringCrypto module "update stream":
+# https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md#update-stream
+
+FIPS_GO_VERSION = "go1.24.2"
+
+FIPS_NINJA_VERSION = "1.10.2"
+
+FIPS_CMAKE_VERSION = "cmake version 3.22.1"
+
+SUPPORTED_ARCHES = {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+}
+
+STDLIBS = [
+    "libc++",
+    "libstdc++",
+]
+
+# marker for dir
+filegroup(
+    name = "crypto_marker",
+    srcs = ["crypto/crypto.cc"],
+)
 
 cc_library(
     name = "crypto",
@@ -22,12 +50,64 @@ cc_library(
 )
 
 genrule(
+    name = "ninja_bin",
+    srcs = [
+        "@fips_ninja//:all",
+        "@fips_ninja//:configure.py",
+    ],
+    outs = ["ninja"],
+    cmd = select(ninja_build_command()),
+    toolchains = [
+        "@rules_python//python:current_py_toolchain",
+        "@bazel_tools//tools/cpp:current_cc_toolchain",
+    ],
+    tools = [
+        "@bazel_tools//tools/cpp:current_cc_toolchain",
+        "@rules_python//python:current_py_toolchain",
+    ],
+)
+
+genrule(
     name = "build",
-    srcs = glob(["**"]),
+    srcs = glob(["**"]) + ["crypto_marker"],
     outs = [
         "crypto/libcrypto.a",
         "ssl/libssl.a",
     ],
-    cmd = "$(location {}) $(location crypto/libcrypto.a) $(location ssl/libssl.a)".format("@envoy//bazel/external:boringssl_fips.genrule_cmd"),
-    tools = ["@envoy//bazel/external:boringssl_fips.genrule_cmd"],
+    cmd = select(boringssl_fips_build_command(
+        SUPPORTED_ARCHES,
+        STDLIBS,
+        FIPS_GO_VERSION,
+        FIPS_NINJA_VERSION,
+        FIPS_CMAKE_VERSION,
+    )),
+    exec_properties = select({
+        "@envoy//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "@envoy//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    toolchains = ["@bazel_tools//tools/cpp:current_cc_toolchain"],
+    tools = [
+        ":ninja_bin",
+        "@bazel_tools//tools/cpp:current_cc_toolchain",
+        "@envoy//bazel/external:boringssl_fips.genrule_cmd",
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            "@fips_cmake_linux_x86_64//:all",
+            "@fips_cmake_linux_x86_64//:bin/cmake",
+            "@fips_go_linux_amd64//:all",
+            "@fips_go_linux_amd64//:bin/go",
+        ],
+        "@platforms//cpu:aarch64": [
+            "@fips_cmake_linux_aarch64//:all",
+            "@fips_cmake_linux_aarch64//:bin/cmake",
+            "@fips_go_linux_arm64//:all",
+            "@fips_go_linux_arm64//:bin/go",
+        ],
+        "//conditions:default": [],
+    }),
 )

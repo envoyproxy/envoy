@@ -2747,5 +2747,104 @@ TEST_F(HttpConnectionManagerImplTest, DecodingWithAddedTrailersByNonTerminalEnco
   decoder_filters_[ecoder_filter_index]->callbacks_->encodeData(fake_response, true);
 }
 
+TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteClusterWithoutRouteCache) {
+  setup();
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _)).WillOnce(Return(nullptr));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        // This will be noop because no cached route.
+        filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  // Clean up.
+  expectOnDestroy();
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteCluster) {
+  setup();
+
+  cluster_manager_.initializeThreadLocalClusters({"fake_cluster, cluster_after_refresh"});
+
+  MockStreamDecoderFilter* filter = new NiceMock<MockStreamDecoderFilter>();
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillOnce(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(StreamDecoderFilterSharedPtr{filter});
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  auto mock_route_0 = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
+      .WillOnce(Return(mock_route_0));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, true))
+      .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
+        // Now we refresh the cluster by the downstream callbacks
+        EXPECT_CALL(mock_route_0->route_entry_, refreshRouteCluster(_, _))
+            .WillOnce(Invoke([&](const RequestHeaderMap&, const StreamInfo::StreamInfo&) {
+              mock_route_0->route_entry_.cluster_name_ = "cluster_after_refrsh";
+            }));
+        EXPECT_CALL(cluster_manager_, getThreadLocalCluster("cluster_after_refrsh"));
+
+        filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> Http::Status {
+    decoder_ = &conn_manager_->newStream(response_encoder_);
+    RequestHeaderMapPtr headers{
+        new TestRequestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder_->decodeHeaders(std::move(headers), true);
+    return Http::okStatus();
+  }));
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+
+  ResponseHeaderMapPtr response_headers{
+      new TestResponseHeaderMapImpl{{":status", "200"}, {"content-length", "2"}}};
+
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
+  filter->callbacks_->streamInfo().setResponseCodeDetails("");
+  filter->callbacks_->encodeHeaders(std::move(response_headers), false, "details");
+
+  // It also not allowed to update the cluster after the response headers is sent.
+  EXPECT_ENVOY_BUG(
+      {
+        EXPECT_CALL(mock_route_0->route_entry_, refreshRouteCluster(_, _)).Times(0);
+        filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
+      },
+      "Should never try to refresh or clear the route cache when it is blocked!");
+
+  EXPECT_CALL(response_encoder_, encodeData(_, true));
+  expectOnDestroy();
+
+  Buffer::OwnedImpl response_data("ok");
+  filter->callbacks_->encodeData(response_data, true);
+}
+
 } // namespace Http
 } // namespace Envoy

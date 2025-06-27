@@ -6,7 +6,7 @@
 #pragma mark - Constants
 
 NSString *_CELL_ID = @"cell-id";
-NSString *_REQUEST_AUTHORITY = @"api.lyft.com";
+NSString *_REQUEST_AUTHORITY = @"localhost:10000";
 NSString *_REQUEST_PATH = @"/ping";
 NSString *_REQUEST_SCHEME = @"http";
 

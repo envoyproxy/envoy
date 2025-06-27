@@ -14,6 +14,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/connection.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -151,6 +152,7 @@ public:
   void setDestroying() { destroying_ = true; }
   std::vector<ConnectionPool::Callbacks*> callbacks_;
   NiceMock<Envoy::ConnectionPool::MockCancellable>* cancel_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   bool immediate_success_{};
   bool immediate_failure_{};
   bool second_pool_immediate_success_{};
@@ -188,12 +190,13 @@ public:
         cluster_, host_impl_hostname_, *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
         nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::config::core::v3::UNKNOWN, simTime(), address_list_));
+        envoy::config::core::v3::UNKNOWN, address_list_));
 
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_, host_, Upstream::ResourcePriority::Default, socket_options_,
         transport_socket_options_, state_, simTime(), alternate_protocols_, options_,
-        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_, registry_);
+        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_, registry_,
+        overload_manager_);
     grid_->cancel_ = &cancel_;
     grid_->info_ = &info_;
     grid_->encoder_ = &encoder_;
@@ -233,6 +236,7 @@ public:
   NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_;
   std::shared_ptr<Upstream::HostImpl> host_;
   Upstream::HostDescriptionImpl::AddressVector address_list_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 
   NiceMock<ConnPoolCallbacks> callbacks_;
   NiceMock<MockResponseDecoder> decoder_;
@@ -1689,10 +1693,10 @@ TEST_F(ConnectivityGridTest, RealGrid) {
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
   ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_, {});
+      *quic_connection_persistent_info_, {}, overload_manager_);
   EXPECT_EQ("connection grid", grid.protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
@@ -1729,10 +1733,10 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
   ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_, {});
+      *quic_connection_persistent_info_, {}, overload_manager_);
 
   // Create the HTTP/3 pool.
   auto pool = ConnectivityGridForTest::forceGetOrCreateHttp3Pool(grid);

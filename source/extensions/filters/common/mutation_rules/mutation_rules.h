@@ -46,9 +46,13 @@ private:
   bool isValidValue(const Http::LowerCaseString& header_name, absl::string_view header_value) const;
   static const ExtraRoutingHeaders& extraRoutingHeaders();
 
-  envoy::config::common::mutation_rules::v3::HeaderMutationRules rules_;
   Regex::CompiledMatcherPtr allow_expression_;
   Regex::CompiledMatcherPtr disallow_expression_;
+  const bool allow_all_routing_ : 1;
+  const bool allow_envoy_ : 1;
+  const bool disallow_system_ : 1;
+  const bool disallow_all_ : 1;
+  const bool disallow_is_error_ : 1;
 };
 
 } // namespace MutationRules

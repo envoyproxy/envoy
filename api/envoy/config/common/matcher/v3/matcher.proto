@@ -95,7 +95,7 @@ message Matcher {
         // A list of predicates to be AND-ed together.
         PredicateList and_matcher = 3;
 
-        // The invert of a predicate
+        // The inverse of a predicate
         Predicate not_matcher = 4;
       }
     }
@@ -148,8 +148,8 @@ message Matcher {
     MatcherTree matcher_tree = 2;
   }
 
-  // Optional OnMatch to use if the matcher failed.
-  // If specified, the OnMatch is used, and the matcher is considered
+  // Optional ``OnMatch`` to use if the matcher failed.
+  // If specified, the ``OnMatch`` is used, and the matcher is considered
   // to have matched.
   // If not specified, the matcher is considered not to have matched.
   OnMatch on_no_match = 3;
@@ -215,9 +215,9 @@ message HttpHeadersMatch {
 //
 // .. attention::
 //
-//   Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+//   Searching for patterns in HTTP body is potentially CPU-intensive. For each specified pattern, HTTP body is scanned byte by byte to find a match.
 //   If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
-//   to scan only part of the http body.
+//   to scan only part of the HTTP body.
 message HttpGenericBodyMatch {
   message GenericTextMatch {
     oneof rule {

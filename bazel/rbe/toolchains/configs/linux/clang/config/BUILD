@@ -45,8 +45,38 @@ platform(
     ],
     exec_properties = {
         "cache-silo-key": CACHE_SILO_KEY,
-        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:a41f69c56ba636856576949a22cc2ec450c48a7a37487554d8a31827e0d54c03",
+        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:95d7afdea0f0f8881e88fa5e581db4f50907d0745ac8d90e00357ac1a316abe5",
         "OSFamily": "Linux",
+    },
+    parents = ["@local_config_platform//:host"],
+)
+
+toolchain(
+    name = "cc-toolchain-arm64",
+    exec_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+    target_compatible_with = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+    ],
+    toolchain = "//bazel/rbe/toolchains/configs/linux/clang/cc:cc-compiler-aarch64",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+platform(
+    name = "platform-arm64",
+    constraint_values = [
+        "@platforms//os:linux",
+        "@platforms//cpu:aarch64",
+        "@bazel_tools//tools/cpp:clang",
+    ],
+    exec_properties = {
+        "container-image": "docker://gcr.io/envoy-ci/envoy-build@sha256:95d7afdea0f0f8881e88fa5e581db4f50907d0745ac8d90e00357ac1a316abe5",
+        "OSFamily": "Linux",
+        "Pool": "arm",
     },
     parents = ["@local_config_platform//:host"],
 )

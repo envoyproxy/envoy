@@ -162,9 +162,9 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest,
        UpdateWeightsOnHostsAllHostsHaveClientSideWeights) {
   init(false);
   HostVector hosts = {
-      makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:80"),
+      makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"),
   };
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
   lb_->setHostClientSideWeight(hosts[0], 40, 5, 10);
@@ -185,9 +185,9 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest,
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsOneHostHasClientSideWeight) {
   init(false);
   HostVector hosts = {
-      makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:80"),
+      makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"),
   };
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
   // Set client side weight for one host.
@@ -207,11 +207,9 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsOneHostHasClie
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsOddMedianWeight) {
   init(false);
   HostVector hosts = {
-      makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"),
   };
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
   // Set client side weight for first three hosts.
@@ -238,11 +236,9 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsOddMe
 TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, UpdateWeightsDefaultIsEvenMedianWeight) {
   init(false);
   HostVector hosts = {
-      makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"),
   };
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(30)));
   // Set client side weight for first two hosts.
@@ -270,9 +266,9 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     return;
   }
   hostSet().healthy_hosts_ = {
-      makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
+      makeTestHost(info_, "tcp://127.0.0.1:80"),
+      makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"),
   };
   hostSet().hosts_ = hostSet().healthy_hosts_;
   init(false);

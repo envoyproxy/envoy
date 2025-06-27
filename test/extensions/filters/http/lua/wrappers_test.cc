@@ -738,6 +738,252 @@ TEST_F(LuaStreamInfoWrapperTest, GetEmptyVirtualClusterName) {
   wrapper.reset();
 }
 
+// Test for dynamicTypedMetadata basic functionality
+TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataBasic) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local typed_metadata = object:dynamicTypedMetadata("envoy.test.metadata")
+      if typed_metadata then
+        testPrint("found_metadata")
+        testPrint(typed_metadata.fields.test_field.string_value)
+      else
+        testPrint("no_metadata")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Create test typed metadata
+  ProtobufWkt::Struct test_struct;
+  (*test_struct.mutable_fields())["test_field"].set_string_value("test_value");
+
+  ProtobufWkt::Any any_metadata;
+  any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any_metadata.PackFrom(test_struct);
+
+  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.test.metadata"] = any_metadata;
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_metadata"));
+  EXPECT_CALL(printer_, testPrint("test_value"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for dynamicTypedMetadata with missing metadata
+TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataMissing) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local typed_metadata = object:dynamicTypedMetadata("envoy.missing.metadata")
+      if typed_metadata == nil then
+        testPrint("metadata_not_found")
+      else
+        testPrint("metadata_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("metadata_not_found"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for dynamicTypedMetadata with complex nested structure
+TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataComplexStructure) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local typed_metadata = object:dynamicTypedMetadata("envoy.complex.metadata")
+      if typed_metadata then
+        testPrint(typed_metadata.fields.nested.struct_value.fields.inner_field.string_value)
+        testPrint(tostring(typed_metadata.fields.bool_field.bool_value))
+        testPrint(tostring(typed_metadata.fields.number_field.number_value))
+        testPrint(typed_metadata.fields.array_field.list_value.values[1].string_value)
+        testPrint(typed_metadata.fields.array_field.list_value.values[2].string_value)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Create complex test metadata
+  ProtobufWkt::Struct complex_struct;
+
+  // Add nested structure
+  ProtobufWkt::Struct nested_struct;
+  (*nested_struct.mutable_fields())["inner_field"].set_string_value("inner_value");
+  (*complex_struct.mutable_fields())["nested"].mutable_struct_value()->CopyFrom(nested_struct);
+
+  // Add various field types
+  (*complex_struct.mutable_fields())["bool_field"].set_bool_value(true);
+  (*complex_struct.mutable_fields())["number_field"].set_number_value(42.5);
+
+  // Add array
+  ProtobufWkt::ListValue array_value;
+  array_value.add_values()->set_string_value("first");
+  array_value.add_values()->set_string_value("second");
+  (*complex_struct.mutable_fields())["array_field"].mutable_list_value()->CopyFrom(array_value);
+
+  ProtobufWkt::Any any_metadata;
+  any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any_metadata.PackFrom(complex_struct);
+
+  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.complex.metadata"] = any_metadata;
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("inner_value"));
+  EXPECT_CALL(printer_, testPrint("true"));
+  EXPECT_CALL(printer_, testPrint("42.5"));
+  EXPECT_CALL(printer_, testPrint("first"));
+  EXPECT_CALL(printer_, testPrint("second"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for dynamicTypedMetadata with invalid type URL
+TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataInvalidTypeUrl) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local typed_metadata = object:dynamicTypedMetadata("envoy.invalid.metadata")
+      if typed_metadata == nil then
+        testPrint("invalid_type_url_handled")
+      else
+        testPrint("should_not_reach_here")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Create metadata with invalid/unknown type URL
+  ProtobufWkt::Any any_metadata;
+  any_metadata.set_type_url("type.googleapis.com/invalid.unknown.Type");
+  any_metadata.set_value("invalid_data");
+
+  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.invalid.metadata"] = any_metadata;
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("invalid_type_url_handled"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for dynamicTypedMetadata unpack failure handling
+TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataUnpackFailure) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local typed_metadata = object:dynamicTypedMetadata("envoy.corrupted.metadata")
+      if typed_metadata == nil then
+        testPrint("unpack_failure_handled")
+      else
+        testPrint("should_not_reach_here")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Create metadata with correct type URL but corrupted data
+  ProtobufWkt::Any any_metadata;
+  any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any_metadata.set_value("corrupted_protobuf_data_that_cannot_be_unpacked");
+
+  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.corrupted.metadata"] =
+      any_metadata;
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("unpack_failure_handled"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for iterating over multiple typed metadata entries
+TEST_F(LuaStreamInfoWrapperTest, IterateDynamicTypedMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      -- Test with first metadata entry
+      local metadata1 = object:dynamicTypedMetadata("envoy.metadata.one")
+      if metadata1 then
+        testPrint("found_metadata_one")
+        testPrint(metadata1.fields.field_one.string_value)
+      end
+
+      -- Test with second metadata entry
+      local metadata2 = object:dynamicTypedMetadata("envoy.metadata.two")
+      if metadata2 then
+        testPrint("found_metadata_two")
+        testPrint(metadata2.fields.field_two.string_value)
+      end
+
+      -- Test with non-existent entry
+      local metadata3 = object:dynamicTypedMetadata("envoy.metadata.nonexistent")
+      if metadata3 == nil then
+        testPrint("metadata_three_not_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Create first metadata entry
+  ProtobufWkt::Struct struct1;
+  (*struct1.mutable_fields())["field_one"].set_string_value("value_one");
+  ProtobufWkt::Any any1;
+  any1.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any1.PackFrom(struct1);
+  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.one"] = any1;
+
+  // Create second metadata entry
+  ProtobufWkt::Struct struct2;
+  (*struct2.mutable_fields())["field_two"].set_string_value("value_two");
+  ProtobufWkt::Any any2;
+  any2.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  any2.PackFrom(struct2);
+  (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.two"] = any2;
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_metadata_one"));
+  EXPECT_CALL(printer_, testPrint("value_one"));
+  EXPECT_CALL(printer_, testPrint("found_metadata_two"));
+  EXPECT_CALL(printer_, testPrint("value_two"));
+  EXPECT_CALL(printer_, testPrint("metadata_three_not_found"));
+  start("callMe");
+  wrapper.reset();
+}
+
 } // namespace
 } // namespace Lua
 } // namespace HttpFilters

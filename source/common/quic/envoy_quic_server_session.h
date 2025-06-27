@@ -99,6 +99,10 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
+    return false;
+  }
+
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
   using quic::QuicSession::PerformActionOnActiveStreams;
 

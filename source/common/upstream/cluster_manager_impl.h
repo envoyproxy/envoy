@@ -84,7 +84,7 @@ public:
                       ClusterConnectivityState& state,
                       absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) override;
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                       const xds::core::v3::ResourceLocator* cds_resources_locator,
@@ -280,13 +280,22 @@ public:
     return clusters_maps;
   }
 
-  OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const override {
+  OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
-    if (const auto& it = active_clusters_.find(std::string(cluster_name));
-        it != active_clusters_.end()) {
-      return OptRef<const Cluster>(*it->second->cluster_);
+    if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+      return *it->second->cluster_;
     }
     return absl::nullopt;
+  }
+
+  bool hasCluster(const std::string& cluster_name) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);
+  }
+
+  bool hasActiveClusters() const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    return !active_clusters_.empty();
   }
 
   const ClusterSet& primaryClusters() override { return primary_clusters_; }

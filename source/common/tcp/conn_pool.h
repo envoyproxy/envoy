@@ -7,6 +7,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
@@ -140,9 +141,10 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                Network::TransportSocketOptionsConstSharedPtr transport_socket_options,
                Upstream::ClusterConnectivityState& state,
-               absl::optional<std::chrono::milliseconds> idle_timeout)
+               absl::optional<std::chrono::milliseconds> idle_timeout,
+               Server::OverloadManager& overload_manager)
       : Envoy::ConnectionPool::ConnPoolImplBase(host, priority, dispatcher, options,
-                                                transport_socket_options, state),
+                                                transport_socket_options, state, overload_manager),
         idle_timeout_(idle_timeout) {}
   ~ConnPoolImpl() override { destructAllConnections(); }
 

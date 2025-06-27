@@ -153,12 +153,10 @@ TEST_P(RingHashLoadBalancerTest, BadRingSizeBounds) {
 }
 
 TEST_P(RingHashLoadBalancerTest, Basic) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -223,8 +221,8 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
 
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(RingHashFailoverTest, BasicFailover) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
-  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
 
   config_.mutable_minimum_ring_size()->set_value(12);
@@ -249,8 +247,8 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr).host);
 
   // Set up so P=0 gets 70% of the load, and P=1 gets 30%.
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
   host_set_.runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
@@ -262,12 +260,10 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
 
 // Expect reasonable results with Murmur2 hash.
 TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -319,12 +315,12 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
 // Test bounded load. This test only ensures that the
 // hash balancer factory won't break the normal load balancer process.
 TEST_P(RingHashLoadBalancerTest, BasicWithDoundedLoad) {
-  hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -389,12 +385,12 @@ TEST_P(RingHashLoadBalancerTest, BasicWithDoundedLoad) {
 
 // Expect reasonable results with hostname.
 TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
-  hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -458,12 +454,12 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
 
 // Expect reasonable results with metadata hash_key.
 TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
-  hostSet().hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  hostSet().hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -527,12 +523,10 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
 
 // Test the same ring as Basic but exercise retry host predicate behavior.
 TEST_P(RingHashLoadBalancerTest, BasicWithRetryHostPredicate) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -593,8 +587,8 @@ TEST_P(RingHashLoadBalancerTest, BasicWithRetryHostPredicate) {
 
 // Given 2 hosts and a minimum ring size of 3, expect 2 hashes per host and a ring size of 4.
 TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -618,8 +612,8 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
     EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(&context).host);
   }
 
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81"),
+                      makeTestHost(info_, "tcp://127.0.0.1:82")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -641,9 +635,9 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
 // Given hosts with weights 1, 2 and 3, and a ring size of exactly 6, expect the correct number of
 // hashes for each host.
 TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 3)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -670,9 +664,9 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
 // Given hosts with weights 1, 2 and 3, and a sufficiently large ring, expect that requests will
 // distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 3)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -703,8 +697,8 @@ TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
 
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_b)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ =
       makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}});
@@ -728,10 +722,10 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   envoy::config::core::v3::Locality zone_d;
   zone_d.set_zone("D");
 
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_c),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_d)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_c),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", zone_d)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
@@ -772,10 +766,10 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   envoy::config::core::v3::Locality zone_d;
   zone_d.set_zone("D");
 
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_c),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_d)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_c),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", zone_d)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
@@ -813,10 +807,10 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
 
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_a, 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_b, 2)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_a, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_b, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", zone_b, 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
@@ -856,10 +850,10 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
 
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_a, 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_b, 2)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_a, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_b, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", zone_b, 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
@@ -891,10 +885,9 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
 // Given 4 hosts and a ring size of exactly 2, expect that 2 hosts will be present in the ring and
 // the other 2 hosts will be absent.
 TEST_P(RingHashLoadBalancerTest, SmallFractionalScale) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime())};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -932,8 +925,8 @@ TEST_P(RingHashLoadBalancerTest, SmallFractionalScale) {
 // Given 2 hosts and a ring size of exactly 1023, expect that one host will have 511 entries and the
 // other will have 512.
 TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "tcp://127.0.0.1:91")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -969,7 +962,7 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
   HostVector heavy_but_sparse, light_but_dense;
   for (uint32_t i = 0; i < 1024; ++i) {
     auto host_locality = i == 0 ? zone_a : zone_b;
-    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime(), host_locality));
+    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), host_locality));
     hostSet().hosts_.push_back(host);
     (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }

@@ -276,7 +276,7 @@ message HttpProtocolOptions {
   // The default value for responses can be overridden by setting runtime key ``envoy.reloadable_features.max_response_headers_count``.
   // Downstream requests that exceed this limit will receive a 431 response for HTTP/1.x and cause a stream
   // reset for HTTP/2.
-  // Upstream responses that exceed this limit will result in a 503 response.
+  // Upstream responses that exceed this limit will result in a 502 response.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
 
   // The maximum size of response headers.

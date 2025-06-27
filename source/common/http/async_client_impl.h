@@ -84,7 +84,6 @@ private:
   const Router::FilterConfigSharedPtr config_;
   Event::Dispatcher& dispatcher_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
-  Runtime::Loader& runtime_;
   const LocalReply::LocalReplyPtr local_reply_;
 
   friend class AsyncStreamImpl;

@@ -63,6 +63,11 @@ void ManagerImpl::initialize(const Watcher& watcher) {
   }
 }
 
+void ManagerImpl::updateWatcher(const Watcher& watcher) {
+  ASSERT(state_ != State::Initialized, "attempted to update watcher on initialized manager");
+  watcher_handle_ = watcher.createHandle(name_);
+};
+
 void ManagerImpl::dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& unready_targets_dumps) {
   auto& message = *unready_targets_dumps.mutable_unready_targets_dumps()->Add();
   message.set_name(name_);

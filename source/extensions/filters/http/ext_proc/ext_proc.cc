@@ -312,7 +312,11 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
                              config.overrides().grpc_initial_metadata().end()),
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
-      untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)) {}
+      untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
+      failure_mode_allow_(
+          config.overrides().has_failure_mode_allow()
+              ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
+              : absl::nullopt) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
@@ -329,7 +333,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
                                        : less_specific.typedForwardingMetadataNamespaces()),
       untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
                                         ? more_specific.untypedReceivingMetadataNamespaces()
-                                        : less_specific.untypedReceivingMetadataNamespaces()) {}
+                                        : less_specific.untypedReceivingMetadataNamespaces()),
+      failure_mode_allow_(more_specific.failureModeAllow().has_value()
+                              ? more_specific.failureModeAllow()
+                              : less_specific.failureModeAllow()) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -374,7 +381,7 @@ void Filter::onError() {
     return;
   }
 
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // The user would like a none-200-ok response to not cause message processing to fail.
     // Close the external processing.
     processing_complete_ = true;
@@ -1449,7 +1456,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     return;
   }
 
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // Ignore this and treat as a successful close
     onGrpcClose();
     stats_.failure_mode_allowed_.inc();
@@ -1483,7 +1490,7 @@ void Filter::onMessageTimeout() {
   ENVOY_STREAM_LOG(debug, "message timeout reached", *decoder_callbacks_);
   logStreamInfo();
   stats_.message_timeouts_.inc();
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // The user would like a timeout to not cause message processing to fail.
     // However, we don't know if the external processor will send a response later,
     // and we can't wait any more. So, as we do for a spurious message, ignore
@@ -1642,6 +1649,12 @@ void Filter::mergePerRouteConfig() {
         *decoder_callbacks_);
     decoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
     encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
+  }
+
+  if (merged_config->failureModeAllow().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting new failureModeAllow from per-route configuration",
+                     *decoder_callbacks_);
+    failure_mode_allow_ = merged_config->failureModeAllow().value();
   }
 }
 

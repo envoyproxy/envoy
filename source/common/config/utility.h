@@ -394,13 +394,17 @@ public:
    * @param skip_cluster_check whether to skip cluster validation.
    * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
    *                         in the given index, a nullptr factory will be returned.
+   * @param xdstp_config_source whether the config source will be used for xdstp config source.
+   *                            These sources must be of type AGGREGATED_GRPC or
+   *                            AGGREGATED_DELTA_GRPC.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory, or nullptr if there's no
-   * grpc_service in the given index.
+   *         grpc_service in the given index.
    */
   static absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx);
+                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx,
+                                bool xdstp_config_source);
 
   /**
    * Translate opaque config from google.protobuf.Any to defined proto message.

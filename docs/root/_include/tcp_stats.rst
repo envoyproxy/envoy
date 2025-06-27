@@ -16,6 +16,6 @@
    cx_tx_bytes_sent, Counter, Total payload bytes transmitted (including retransmitted bytes).
    cx_tx_unsent_bytes, Gauge, Bytes which Envoy has sent to the operating system which have not yet been sent
    cx_tx_unacked_segments, Gauge, Segments which have been transmitted that have not yet been acknowledged
-   cx_tx_percent_retransmitted_segments, Histogram, Percent of segments on a connection which were retransmistted
+   cx_tx_percent_retransmitted_segments, Histogram, Percent of segments on a connection which were retransmitted
    cx_rtt_us, Histogram, Smoothed round trip time estimate in microseconds
    cx_rtt_variance_us, Histogram, Estimated variance in microseconds of the round trip time. Higher values indicated more variability.

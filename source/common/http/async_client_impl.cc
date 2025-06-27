@@ -33,8 +33,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
           factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
           false, false, false, Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(),
           http_context, router_context)),
-      dispatcher_(dispatcher), runtime_(factory_context.runtime()),
-      local_reply_(LocalReply::Factory::createDefault()) {}
+      dispatcher_(dispatcher), local_reply_(LocalReply::Factory::createDefault()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -375,7 +374,7 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
                                                const AsyncClient::RequestOptions& options,
                                                absl::Status& creation_status)
     : AsyncStreamImpl(parent, *this, options, creation_status), callbacks_(callbacks),
-      response_buffer_limit_(parent.runtime_.snapshot().getInteger(
+      response_buffer_limit_(parent.config_->runtime_.snapshot().getInteger(
           AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse)) {
   if (!creation_status.ok()) {
     return;

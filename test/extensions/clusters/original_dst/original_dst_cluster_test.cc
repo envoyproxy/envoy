@@ -79,9 +79,8 @@ public:
   }
 
   void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     OriginalDstClusterFactory factory;
     auto status_or_pair = factory.createClusterImpl(cluster_config, factory_context);
@@ -112,7 +111,6 @@ public:
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
-  Ssl::MockContextManager ssl_context_manager_;
 
   std::shared_ptr<OriginalDstCluster> cluster_;
   OriginalDstClusterHandleSharedPtr handle_;

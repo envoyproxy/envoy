@@ -3,6 +3,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -380,6 +381,21 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "refresh_route_cluster_filter_lib",
+    srcs = [
+        "refresh_route_cluster_filter.cc",
+    ],
+    deps = [
+        ":common_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_test_library(
     name = "eds_ready_filter_config_lib",
     srcs = [
         "eds_ready_filter.cc",
@@ -469,17 +485,16 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "pause_filter_for_quic_lib",
-    srcs = [
+    srcs = envoy_select_enable_http3([
         "pause_filter_for_quic.cc",
-    ],
-    tags = ["nofips"],
-    deps = [
+    ]),
+    deps = envoy_select_enable_http3([
         "//envoy/http:filter_interface",
         "//envoy/registry",
         "//source/common/quic:quic_filter_manager_connection_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
-    ],
+    ]),
 )
 
 envoy_cc_test_library(

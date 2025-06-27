@@ -3,6 +3,7 @@
 #include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -183,7 +184,8 @@ public:
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   Upstream::ClusterConnectivityState& state);
+                   Upstream::ClusterConnectivityState& state,
+                   Server::OverloadManager& overload_manager);
   virtual ~ConnPoolImplBase();
 
   void deleteIsPendingImpl();
@@ -323,6 +325,7 @@ protected:
     ShouldNotConnect,
     NoConnectionRateLimited,
     CreatedButRateLimited,
+    LoadShed,
   };
   // Creates up to 3 connections, based on the preconnect ratio.
   // Returns the ConnectionResult of the last attempt.
@@ -415,6 +418,7 @@ private:
 
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   Common::DebugRecursionChecker recursion_checker_;
+  Server::LoadShedPoint* create_new_connection_load_shed_{nullptr};
 };
 
 } // namespace ConnectionPool

@@ -29,9 +29,15 @@ GO_VERSION = "1.23.1"
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
 
+BUF_SHA = "736e74d1697dcf253bc60b2f0fb4389c39dbc7be68472a7d564a953df8b19d12"
 BUF_VERSION = "v1.50.0"
 
-def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION, buf_version = BUF_VERSION):
+def envoy_dependency_imports(
+        go_version = GO_VERSION,
+        jq_version = JQ_VERSION,
+        yq_version = YQ_VERSION,
+        buf_sha = BUF_SHA,
+        buf_version = BUF_VERSION):
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
@@ -75,7 +81,10 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     register_yq_toolchains(version = yq_version)
     parser_deps()
 
-    rules_buf_toolchains(version = buf_version)
+    rules_buf_toolchains(
+        sha256 = buf_sha,
+        version = buf_version,
+    )
 
     setup_sanitizer_libs()
 

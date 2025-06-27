@@ -135,6 +135,27 @@ TEST(UtilityTest, TestGetSerialNumber) {
   EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*cert));
 }
 
+TEST(UtilityTest, TestExpirationWithUnixTimeWithExpiredCert) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  // Set a known date (2033-05-18 03:33:20 UTC) so that we get fixed output from this test.
+  const time_t known_date_time = 2000000000;
+  Event::SimulatedTimeSystem time_source;
+  time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+
+  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
+}
+
+TEST(UtilityTest, TestExpirationWithUnixTimeWithNotExpiredCert) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  const time_t known_date_time = 0;
+  Event::SimulatedTimeSystem time_source;
+  time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+
+  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
+}
+
 TEST(UtilityTest, TestDaysUntilExpiration) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));

@@ -1,0 +1,20 @@
+diff --git a/lib/private/yq.bzl b/lib/private/yq.bzl
+index 29ca3d7..c8cd5eb 100644
+--- a/lib/private/yq.bzl
++++ b/lib/private/yq.bzl
+@@ -71,10 +71,13 @@ def _yq_impl(ctx):
+ 
+     # For split operations, yq outputs files in the same directory so we
+     # must cd to the correct output dir before executing it
+-    bin_dir = "/".join([ctx.bin_dir.path, ctx.label.package]) if ctx.label.package else ctx.bin_dir.path
++    bin_dir = ctx.bin_dir.path
++    if ctx.label.workspace_name:
++        bin_dir = "%s/external/%s" % (bin_dir, ctx.label.workspace_name)
++    bin_dir = "/".join([bin_dir, ctx.label.package]) if ctx.label.package else bin_dir
+     escape_bin_dir = _escape_path(bin_dir)
+     cmd = "cd {bin_dir} && {yq} {args} {eval_cmd} {expression} {sources} {maybe_out}".format(
+-        bin_dir = ctx.bin_dir.path + "/" + ctx.label.package,
++        bin_dir = bin_dir,
+         yq = escape_bin_dir + yq_bin.path,
+         eval_cmd = "eval" if len(inputs) <= 1 else "eval-all",
+         args = " ".join(args),

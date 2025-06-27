@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sys/resource.h>
 #include <sys/stat.h>
 
 #include <chrono>
@@ -288,6 +289,16 @@ public:
    * @see man freeaddrinfo
    */
   virtual void freeaddrinfo(addrinfo* res) PURE;
+
+  /**
+   * @see man getrlimit
+   */
+  virtual SysCallIntResult getrlimit(int resource, struct rlimit* rlim) PURE;
+
+  /**
+   * @see man setrlimit
+   */
+  virtual SysCallIntResult setrlimit(int resource, const struct rlimit* rlim) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

@@ -49,7 +49,7 @@ public:
     Upstream::MockHost::MockCreateConnectionData conn_info;
     conn_info.connection_ = connection_;
     conn_info.host_description_ = Upstream::makeTestHost(
-        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80", simTime());
+        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80");
 
     EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, setConnectionStats(_));

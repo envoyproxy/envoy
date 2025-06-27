@@ -33,7 +33,7 @@ using testing::ReturnRef;
 // mux.
 class MockGrpcMuxFactory : public MuxFactory {
 public:
-  MockGrpcMuxFactory() {
+  MockGrpcMuxFactory(absl::string_view name = "envoy.config_mux.grpc_mux_factory") : name_(name) {
     ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
         .WillByDefault(Invoke(
             [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
@@ -46,7 +46,7 @@ public:
             }));
   }
 
-  std::string name() const override { return "envoy.config_mux.grpc_mux_factory"; }
+  std::string name() const override { return name_; }
   void shutdownAll() override {}
 
   MOCK_METHOD(std::shared_ptr<Config::GrpcMux>, create,
@@ -55,6 +55,7 @@ public:
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
                OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>, bool));
+  const std::string name_;
 };
 
 // A fake cluster validator that exercises the code that uses ADS with
@@ -777,6 +778,584 @@ TEST_F(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
   EXPECT_THAT(res.message(),
               HasSubstr("Cannot replace config_validators in ADS config (different contents)"));
+}
+
+/*
+ * Tests that cover the usage of xDS-TP based configuration-sources.
+ */
+class XdsManagerImplXdstpConfigSourcesTest : public testing::Test {
+public:
+  XdsManagerImplXdstpConfigSourcesTest()
+      : xds_manager_impl_(dispatcher_, api_, stats_, local_info_, validation_context_, server_) {
+    ON_CALL(validation_context_, staticValidationVisitor())
+        .WillByDefault(ReturnRef(validation_visitor_));
+  }
+
+  void initialize(const std::string& bootstrap_yaml = "") {
+    if (!bootstrap_yaml.empty()) {
+      TestUtility::loadFromYaml(bootstrap_yaml, server_.bootstrap_);
+    }
+    ASSERT_OK(xds_manager_impl_.initialize(server_.bootstrap_, &cm_));
+  }
+
+  NiceMock<Server::MockInstance> server_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Api::MockApi> api_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Upstream::MockClusterManager> cm_;
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
+  NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
+  XdsManagerImpl xds_manager_impl_;
+  std::shared_ptr<NiceMock<MockGrpcMux>> default_mux_{std::make_shared<NiceMock<MockGrpcMux>>()};
+  std::shared_ptr<NiceMock<MockGrpcMux>> authority_A_mux_{
+      std::make_shared<NiceMock<MockGrpcMux>>()};
+};
+
+// Validates that when only a default config source defined with no authority, a gRPC connection is
+// established.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoAuthority) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the created GrpcMux mock.
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return default_mux_;
+          }));
+
+  // Have a single default_config_source with no authorities in it.
+  initialize(R"EOF(
+  default_config_source:
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+}
+
+// Validates that when a default config source that is not gRPC based is
+// rejected as this is currently not supported.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceSotwNonGrpc) {
+  // Remove the gRPC mux factory.
+  MockGrpcMuxFactory mux_factory;
+  Registry::FactoryCategoryRegistry::disableFactory(mux_factory.category(), mux_factory.name());
+  // Have a single default_config_source configured with ADS.
+  initialize(R"EOF(
+  default_config_source:
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(res.message(), HasSubstr("envoy.config_mux.grpc_mux_factory not found"));
+}
+
+// Validates that when a default config source that is not gRPC based is
+// rejected as this is currently not supported.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceDeltaNonGrpc) {
+  // Remove the gRPC mux factory.
+  MockGrpcMuxFactory mux_factory;
+  Registry::FactoryCategoryRegistry::disableFactory(mux_factory.category(), mux_factory.name());
+  // Have a single default_config_source configured with ADS.
+  initialize(R"EOF(
+  default_config_source:
+    api_config_source:
+      api_type: AGGREGATED_DELTA_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(res.message(), HasSubstr("envoy.config_mux.new_grpc_mux_factory not found"));
+}
+
+// Validates that a default config source is used but the gRPC extension
+// isn't linked, the config is rejected.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoExtensionLinked) {
+  // Have a single default_config_source configured with ADS.
+  initialize(R"EOF(
+  default_config_source:
+    ads: {}
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(
+      res.message(),
+      HasSubstr(
+          "Only api_config_source type is currently supported for xdstp-based config sources."));
+}
+
+// Test only a default config source defined with two authorities.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceTwoAuthorities) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the created GrpcMux mock.
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return default_mux_;
+          }));
+
+  // Have a single default_config_source with two authorities in it.
+  initialize(R"EOF(
+  default_config_source:
+    authorities:
+    - name: authority_D1.com
+    - name: authority_D2.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+}
+
+// Test only a default config source with wrong api_type.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceWrongApi) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  // Have a single default_config_source with non-aggregated api type.
+  initialize(R"EOF(
+  default_config_source:
+    authorities:
+    - name: authority_D1.com
+    api_config_source:
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(res.message(), HasSubstr("xdstp-based config source authority only supports "
+                                       "AGGREGATED_GRPC and AGGREGATED_DELTA_GRPC types."));
+}
+
+// Test a non-default only config source with repeated authority (invalid).
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceRepeatedAuthority) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  // Have a single default_config_source with repeated authority_D1.com in it.
+  initialize(R"EOF(
+  default_config_source:
+    authorities:
+    - name: authority_D1.com
+    - name: authority_D1.com
+    api_config_source:
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(res.message(),
+              HasSubstr("xdstp-based config source authority authority_D1.com is configured more "
+                        "than once in an xdstp-based config source."));
+}
+
+// Test only a non-default config source defined with no authority (should fail).
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceNoAuthority) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  // Have a single config_source with no authorities in it.
+  initialize(R"EOF(
+  config_sources:
+  - api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source1_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source1_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(res.message(),
+              HasSubstr("xdstp-based non-default config source must have at least one authority."));
+}
+
+// Test only a non-default config source with an authority using AGGREGATED_DELTA_GRPC.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory("envoy.config_mux.new_grpc_mux_factory");
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the created GrpcMux mock.
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return authority_A_mux_;
+          }));
+
+  // Have a single config_source with two authorities in it.
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_1.com
+    api_config_source:
+      api_type: AGGREGATED_DELTA_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source1_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source1_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+}
+
+// Test only a non-default config source defined with two authorities.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceTwoAuthorities) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the created GrpcMux mock.
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return authority_A_mux_;
+          }));
+
+  // Have a single config_source with two authorities in it.
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_1.com
+    - name: authority_2.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source1_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source1_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+}
+
+// Test a non-default and default config source (valid) with the same authority in both.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultConfigSources) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+  // Replace the created GrpcMux mock.
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return authority_A_mux_;
+          }));
+  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
+      .WillOnce(Invoke(
+          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
+              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
+              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
+              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
+            EXPECT_NE(primary_async_client, nullptr);
+            return default_mux_;
+          }));
+
+  // Have a config-source and default_config_source with authority_2.com in each of them.
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_1.com
+    - name: authority_2.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source1_cluster
+  default_config_source:
+    authorities:
+    - name: authority_2.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source1_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: default_config_source_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+}
+
+// Test a default only config source with repeated authority (invalid).
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceRepeatedAuthority) {
+  TestScopedRuntime scoped_runtime;
+  testing::InSequence s;
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<Config::MuxFactory> registry(factory);
+
+  // Have a single config_source option with repeated authorities in it.
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_1.com
+    - name: authority_1.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source1_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source1_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_THAT(res.message(),
+              HasSubstr("xdstp-based config source authority authority_1.com is configured more "
+                        "than once in an xdstp-based config source."));
 }
 
 } // namespace

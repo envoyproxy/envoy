@@ -48,7 +48,7 @@ public:
   bool credentialsPending() override;
 
   // Get the Metadata credentials cache duration.
-  static std::chrono::seconds getCacheDuration();
+  std::chrono::seconds getCacheDuration();
 
   // Store the RAII cluster callback handle following registration call with AWS cluster manager
   void setClusterReadyCallbackHandle(AwsManagedClusterUpdateCallbacksHandlePtr handle) {

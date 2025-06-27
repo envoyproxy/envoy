@@ -16,15 +16,24 @@ RedisHealthChecker::RedisHealthChecker(
     const envoy::extensions::health_checkers::redis::v3::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
-    Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
+    Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
+    const absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+        aws_iam_config,
+    const absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+                             AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
                             std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()),
       redis_stats_(generateRedisStats(cluster.info()->statsScope())),
       auth_username_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(cluster.info(), api)),
-      auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
-          cluster.info(), api)) {
+      auth_password_(
+          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(cluster.info(), api)),
+      aws_iam_authenticator_(aws_iam_authenticator), aws_iam_config_(aws_iam_config),
+      redis_config_(redis_config)
+
+{
   if (!key_.empty()) {
     type_ = Type::Exists;
   } else {
@@ -72,10 +81,10 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    client_ =
-        parent_.client_factory_.create(host_, parent_.dispatcher_, redis_config_,
-                                       redis_command_stats_, parent_.cluster_.info()->statsScope(),
-                                       parent_.auth_username_, parent_.auth_password_, false);
+    client_ = parent_.client_factory_.create(
+        host_, parent_.dispatcher_, redis_config_, redis_command_stats_,
+        parent_.cluster_.info()->statsScope(), parent_.auth_username_, parent_.auth_password_,
+        false, parent_.aws_iam_config_, parent_.aws_iam_authenticator_);
     client_->addConnectionCallbacks(*this);
   }
 

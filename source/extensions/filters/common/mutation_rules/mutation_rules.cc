@@ -37,7 +37,11 @@ private:
 
 Checker::Checker(const envoy::config::common::mutation_rules::v3::HeaderMutationRules& rules,
                  Regex::Engine& regex_engine)
-    : rules_(rules) {
+    : allow_all_routing_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules, allow_all_routing, false)),
+      allow_envoy_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules, allow_envoy, false)),
+      disallow_system_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules, disallow_system, false)),
+      disallow_all_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules, disallow_all, false)),
+      disallow_is_error_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules, disallow_is_error, false)) {
   if (rules.has_allow_expression()) {
     allow_expression_ =
         THROW_OR_RETURN_VALUE(Regex::Utility::parseRegex(rules.allow_expression(), regex_engine),
@@ -56,7 +60,7 @@ CheckResult Checker::check(CheckOperation op, const LowerCaseString& header_name
       (op == CheckOperation::REMOVE || isValidValue(header_name, header_value))) {
     return CheckResult::OK;
   }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, disallow_is_error, false)) {
+  if (disallow_is_error_) {
     return CheckResult::FAIL;
   }
   return CheckResult::IGNORE;
@@ -75,26 +79,22 @@ bool Checker::isAllowed(CheckOperation op, const LowerCaseString& header_name) c
     // Mutations are always allowed if they match the expression.
     return true;
   }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, disallow_all, false)) {
+  if (disallow_all_) {
     // Mutations are always disallowed if this is true.
     return false;
   }
-  if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, allow_all_routing, false) &&
-      extraRoutingHeaders().headers().contains(header_name)) {
+  if (!allow_all_routing_ && extraRoutingHeaders().headers().contains(header_name)) {
     // If false, check the pre-defined list of "extra routing headers"
     // and fail if the header is in that list.
     return false;
   }
-  if (absl::StartsWith(header_name, ":") &&
-      (op == CheckOperation::APPEND ||
-       PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, disallow_system, false))) {
+  if (absl::StartsWith(header_name, ":") && (op == CheckOperation::APPEND || disallow_system_)) {
     // Disallow changes to system headers if explicitly disallowed, or if
     // if the operation is "append," since system headers don't allow multiple
     // values.
     return false;
   }
-  if (!PROTOBUF_GET_WRAPPED_OR_DEFAULT(rules_, allow_envoy, false) &&
-      absl::StartsWith(header_name, Http::Headers::get().prefix())) {
+  if (!allow_envoy_ && absl::StartsWith(header_name, Http::Headers::get().prefix())) {
     // If false, prevent changes to "x-envoy" headers (or the equivalent).
     return false;
   }

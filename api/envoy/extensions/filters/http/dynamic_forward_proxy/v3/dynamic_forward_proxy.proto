@@ -53,22 +53,25 @@ message PerRouteConfig {
     // this value. If not set or empty, the original host header value
     // will be used and no rewrite will happen.
     //
-    // Note: this rewrite affects both DNS lookup and host header forwarding. However, this
-    // option shouldn't be used with
-    // :ref:`HCM host rewrite <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>` given that the
-    // value set here would be used for DNS lookups whereas the value set in the HCM would be used
-    // for host header forwarding which is not the desired outcome.
+    // .. note::
+    //
+    //   This rewrite affects both DNS lookup and host header forwarding. However, this option shouldn't be used with
+    //   :ref:`HCM host rewrite header <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>` given that
+    //   the value set here would be used for DNS lookups whereas the value set in the HCM would be used for host
+    //   header forwarding which might not be the desired outcome.
+    //
     string host_rewrite_literal = 1;
 
     // Indicates that before DNS lookup, the host header will be swapped with
     // the value of this header. If not set or empty, the original host header
     // value will be used and no rewrite will happen.
     //
-    // Note: this rewrite affects both DNS lookup and host header forwarding. However, this
-    // option shouldn't be used with
-    // :ref:`HCM host rewrite header <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`
-    // given that the value set here would be used for DNS lookups whereas the value set in the HCM
-    // would be used for host header forwarding which is not the desired outcome.
+    // .. note::
+    //
+    //   This rewrite affects both DNS lookup and host header forwarding. However, this option shouldn't be used with
+    //   :ref:`HCM host rewrite header <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>` given that
+    //   the value set here would be used for DNS lookups whereas the value set in the HCM would be used for host
+    //   header forwarding which might not be the desired outcome.
     //
     // .. note::
     //
@@ -78,6 +81,6 @@ message PerRouteConfig {
 }
 
 message SubClusterConfig {
-  // The timeout used for sub cluster initialization. Defaults to 5s if not set.
+  // The timeout used for sub cluster initialization. Defaults to **5s** if not set.
   google.protobuf.Duration cluster_init_timeout = 3 [(validate.rules).duration = {gt {}}];
 }

@@ -72,14 +72,16 @@ TypeUrlToV3ServiceMap* buildTypeUrlToServiceMap() {
     // services don't implement all, e.g. VHDS doesn't support SotW or REST.
     for (int method_index = 0; method_index < service_desc->method_count(); ++method_index) {
       const auto& method_desc = *service_desc->method(method_index);
+      ASSERT(absl::StartsWith(method_desc.name(), "Stream") ||
+                 absl::StartsWith(method_desc.name(), "Delta") ||
+                 absl::StartsWith(method_desc.name(), "Fetch"),
+             "Unknown xDS service method");
       if (absl::StartsWith(method_desc.name(), "Stream")) {
         service.sotw_grpc_ = method_desc.full_name();
       } else if (absl::StartsWith(method_desc.name(), "Delta")) {
         service.delta_grpc_ = method_desc.full_name();
       } else if (absl::StartsWith(method_desc.name(), "Fetch")) {
         service.rest_ = method_desc.full_name();
-      } else {
-        ASSERT(false, "Unknown xDS service method");
       }
     }
   }

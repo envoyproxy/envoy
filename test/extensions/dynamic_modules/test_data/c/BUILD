@@ -19,6 +19,12 @@ test_program(name = "abi_version_mismatch")
 
 test_program(name = "no_http_config_new")
 
+test_program(name = "http_filter_per_route_config_new_fail")
+
+test_program(name = "no_http_filter_per_route_config_new")
+
+test_program(name = "no_http_filter_per_route_config_destroy")
+
 test_program(name = "no_http_config_destroy")
 
 test_program(name = "no_http_filter_new")

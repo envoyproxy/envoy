@@ -136,6 +136,8 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpoint) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
+  // Emulate an addition of a cluster to the cluster-manager.
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
 
@@ -232,6 +234,8 @@ TEST_P(AdminInstanceTest, ConfigDumpWithLocalityEndpoint) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster;
   cluster_maps.active_clusters_.emplace(cluster.info_->name_, cluster);
+  // Emulate an addition of a cluster to the cluster-manager.
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(false));
 
@@ -445,6 +449,8 @@ TEST_P(AdminInstanceTest, ConfigDumpWithEndpointFiltersByResourceAndName) {
 
   NiceMock<Upstream::MockClusterMockPrioritySet> cluster_1;
   cluster_maps.active_clusters_.emplace(cluster_1.info_->name_, cluster_1);
+  // Emulate an addition of a cluster to the cluster-manager.
+  ON_CALL(server_.cluster_manager_, hasActiveClusters()).WillByDefault(Return(true));
 
   ON_CALL(*cluster_1.info_, addedViaApi()).WillByDefault(Return(true));
 

@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 16]
+// [#next-free-field: 17]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
@@ -149,6 +149,24 @@ message RateLimit {
   // the fraction of requests to enforce rate limits on. And the default percentage of the
   // runtime key is 100% for backwards compatibility.
   config.core.v3.RuntimeFractionalPercent filter_enforced = 15;
+
+  // If set, this will override the failure_mode_deny parameter with a runtime fraction.
+  // If the runtime key is not specified, the value of failure_mode_deny will be used.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //   failure_mode_deny: true
+  //   failure_mode_deny_percent:
+  //     default_value:
+  //       numerator: 50
+  //       denominator: HUNDRED
+  //     runtime_key: ratelimit.failure_mode_deny_percent
+  //
+  // This means that when the rate limit service is unavailable, 50% of requests will be denied
+  // (fail closed) and 50% will be allowed (fail open).
+  config.core.v3.RuntimeFractionalPercent failure_mode_deny_percent = 16;
 }
 
 message RateLimitPerRoute {

@@ -12,6 +12,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "library/common/mobile_process_wide.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 

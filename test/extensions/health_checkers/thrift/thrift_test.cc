@@ -40,7 +40,7 @@ public:
         health_check_config, ProtobufMessage::getStrictValidationVisitor());
 
     cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-        Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+        Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
     health_checker_ = std::make_shared<ThriftHealthChecker>(
         *cluster_, health_check_config, thrift_config, dispatcher_, runtime_,

@@ -41,7 +41,7 @@ public:
 
   MOCK_METHOD((absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>),
               clusterFromProto,
-              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+              (const envoy::config::cluster::v3::Cluster& cluster,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
   MOCK_METHOD(absl::StatusOr<CdsApiPtr>, createCds,

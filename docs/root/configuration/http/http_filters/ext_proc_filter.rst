@@ -41,8 +41,8 @@ The following statistics are supported:
   :widths: auto
 
   streams_started, Counter, The number of gRPC streams that have been started to send to the external processing service
-  streams_msgs_sent, Counter, The number of messages sent on those streams
-  streams_msgs_received, Counter, The number of messages received on those streams
+  stream_msgs_sent, Counter, The number of messages sent on those streams
+  stream_msgs_received, Counter, The number of messages received on those streams
   spurious_msgs_received, Counter, The number of unexpected messages received that violated the protocol
   streams_closed, Counter, The number of streams successfully closed on either end
   streams_failed, Counter, The number of times a stream produced a gRPC error

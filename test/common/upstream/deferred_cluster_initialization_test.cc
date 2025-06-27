@@ -68,10 +68,13 @@ protected:
     // methods when creating the cluster-manager.
     ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
 
-    cluster_manager_ = TestClusterManagerImpl::createAndInit(
+    cluster_manager_ = TestClusterManagerImpl::createTestClusterManager(
         bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
         factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
         *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
+    ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
+    THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
+
     cluster_manager_->setPrimaryClustersInitializedCb([this, bootstrap]() {
       THROW_IF_NOT_OK(cluster_manager_->initializeSecondaryClusters(bootstrap));
     });

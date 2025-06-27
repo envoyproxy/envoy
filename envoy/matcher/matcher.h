@@ -13,6 +13,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/variant.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
@@ -125,22 +126,34 @@ public:
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
 
-/**
- * State enum for the result of an attempted match.
- */
-enum class MatchState {
-  /**
-   * The match could not be completed, e.g. due to the required data not being available.
-   */
-  UnableToMatch,
-  /**
-   * The match was completed.
-   */
-  MatchComplete,
+// The result of a match. There are three possible results:
+// - The match could not be completed due to lack of data (isInsufficientData() will return true.)
+// - The match was completed, no match found (isNoMatch() will return true.)
+// - The match was completed, match found (isMatch() will return true, action() will return the
+//   ActionFactoryCb.)
+struct MatchResult {
+public:
+  MatchResult(ActionFactoryCb cb) : result_(std::move(cb)) {}
+  static MatchResult noMatch() { return MatchResult(NoMatch{}); }
+  static MatchResult insufficientData() { return MatchResult(InsufficientData{}); }
+  bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
+  bool isComplete() const { return !isInsufficientData(); }
+  bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
+  bool isMatch() const { return absl::holds_alternative<ActionFactoryCb>(result_); }
+  ActionFactoryCb actionFactory() const { return absl::get<ActionFactoryCb>(result_); }
+  ActionPtr action() const { return actionFactory()(); }
+
+private:
+  struct InsufficientData {};
+  struct NoMatch {};
+  using Result = absl::variant<ActionFactoryCb, NoMatch, InsufficientData>;
+  Result result_;
+  MatchResult(NoMatch) : result_(NoMatch{}) {}
+  MatchResult(InsufficientData) : result_(InsufficientData{}) {}
 };
 
 // Callback to execute against skipped matches' actions.
-template <class DataType> using SkippedMatchCb = std::function<void(const OnMatch<DataType>&)>;
+using SkippedMatchCb = std::function<void(ActionFactoryCb)>;
 /**
  * MatchTree provides the interface for performing matches against the data provided by DataType.
  */
@@ -148,52 +161,45 @@ template <class DataType> class MatchTree {
 public:
   virtual ~MatchTree() = default;
 
-  // The result of a match. There are three possible results:
-  // - The match could not be completed (match_state_ == MatchState::UnableToMatch)
-  // - The match was completed, no match found (match_state_ == MatchState::MatchComplete, on_match_
-  // = {})
-  // - The match was complete, match found (match_state_ == MatchState::MatchComplete, on_match_ =
-  // something).
-  struct MatchResult {
-    const MatchState match_state_;
-    const absl::optional<OnMatch<DataType>> on_match_;
-  };
-
   // Attempts to match against the matching data (which should contain all the data requested via
-  // matching requirements). If the match couldn't be completed, {false, {}} will be returned.
-  // If a match result was determined, {true, action} will be returned. If a match result was
-  // determined to be no match, {true, {}} will be returned.
+  // matching requirements).
+  // If the match couldn't be completed, MatchResult::insufficientData() will be returned.
+  // If a match result was determined, an action callback factory will be returned.
+  // If it was determined to be no match, MatchResult::noMatch() will be returned.
+  //
+  // Implementors should call handleRecursionAndSkips() to transform OnMatch values
+  // into MatchResult values, and handle noMatch and insufficientData results as appropriate
+  // for the specific matcher type.
   virtual MatchResult match(const DataType& matching_data,
-                            SkippedMatchCb<DataType> skipped_match_cb = nullptr) PURE;
+                            SkippedMatchCb skipped_match_cb = nullptr) PURE;
 
 protected:
   // Internally handle recursion & keep_matching logic in matcher implementations.
   // This should be called against initial matching & on-no-match results.
   static inline MatchResult
   handleRecursionAndSkips(const absl::optional<OnMatch<DataType>>& on_match, const DataType& data,
-                          SkippedMatchCb<DataType> skipped_match_cb) {
+                          SkippedMatchCb skipped_match_cb) {
     if (!on_match.has_value()) {
-      return {MatchState::MatchComplete, absl::nullopt};
+      return MatchResult::noMatch();
     }
     if (on_match->matcher_) {
-      auto nested_result = on_match->matcher_->match(data, skipped_match_cb);
+      MatchResult nested_result = on_match->matcher_->match(data, skipped_match_cb);
       // Parent result's keep_matching skips the nested result.
-      if (on_match->keep_matching_ && nested_result.match_state_ == MatchState::MatchComplete &&
-          nested_result.on_match_.has_value()) {
+      if (on_match->keep_matching_ && nested_result.isMatch()) {
         if (skipped_match_cb) {
-          skipped_match_cb(*nested_result.on_match_);
+          skipped_match_cb(nested_result.actionFactory());
         }
-        return {MatchState::MatchComplete, absl::nullopt};
+        return MatchResult::noMatch();
       }
       return nested_result;
     }
     if (on_match->action_cb_ && on_match->keep_matching_) {
       if (skipped_match_cb) {
-        skipped_match_cb(*on_match);
+        skipped_match_cb(on_match->action_cb_);
       }
-      return {MatchState::MatchComplete, absl::nullopt};
+      return MatchResult::noMatch();
     }
-    return {MatchState::MatchComplete, on_match};
+    return MatchResult{on_match->action_cb_};
   }
 };
 

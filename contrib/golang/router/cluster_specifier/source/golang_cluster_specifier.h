@@ -36,8 +36,10 @@ class GolangClusterSpecifierPlugin : public ClusterSpecifierPlugin,
 public:
   GolangClusterSpecifierPlugin(ClusterConfigSharedPtr config) : config_(config) {};
 
-  RouteConstSharedPtr route(RouteConstSharedPtr parent,
-                            const Http::RequestHeaderMap& header) const override;
+  RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
+                            const Http::RequestHeaderMap& header,
+                            const StreamInfo::StreamInfo& stream_info) const override;
+
   void log(absl::string_view& msg) const;
 
 private:

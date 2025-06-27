@@ -237,6 +237,7 @@ private:
   mutable absl::Mutex cluster_map_lock_;
   ClusterInfoMap cluster_map_ ABSL_GUARDED_BY(cluster_map_lock_);
 
+  TimeSource& time_source_;
   Upstream::ClusterManager& cm_;
   const size_t max_sub_clusters_;
   const std::chrono::milliseconds sub_cluster_ttl_;

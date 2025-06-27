@@ -176,8 +176,7 @@ TEST_F(OverrideHostLoadBalancerTest, NoMetadatOrHeaders) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -200,8 +199,7 @@ TEST_F(OverrideHostLoadBalancerTest, NullptrHeaders) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -239,14 +237,11 @@ TEST_F(OverrideHostLoadBalancerTest, PrimaryAddressDoesNotExist) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
-      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2002:a17:93c:a62::1]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2002:a17:93c:a62::1]:80", us_central1_b,
+                                    1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -280,14 +275,11 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderIsPreferredOverMetadata) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -328,14 +320,11 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderWithMultipleValueIsPreferredOverMetad
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -380,14 +369,11 @@ TEST_F(OverrideHostLoadBalancerTest, MetadataIsPreferredOverHeaders) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -428,14 +414,11 @@ TEST_F(OverrideHostLoadBalancerTest, UnparseableHeaderValueUsesFallback) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[2600:2d00:1:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -469,12 +452,11 @@ TEST_F(OverrideHostLoadBalancerTest, SelectIpv4EndpointWithHeader) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://1.2.3.4:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
-                      Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://5.6.7.8:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://5.6.7.8:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ =
       ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
@@ -493,12 +475,10 @@ TEST_F(OverrideHostLoadBalancerTest, SelectIpv6EndpointWithHeader) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://[::1]:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
-                      Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://[::2]:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[::1]:80", us_central1_a,
+                                                    1, 0, Host::HealthStatus::HEALTHY),
+                      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[::2]:80", us_central1_a,
+                                                    1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ =
       ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
@@ -517,12 +497,10 @@ TEST_F(OverrideHostLoadBalancerTest, WrongHeaderName) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://[::1]:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
-                      Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://[::2]:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[::1]:80", us_central1_a,
+                                                    1, 0, Host::HealthStatus::HEALTHY),
+                      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[::2]:80", us_central1_a,
+                                                    1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ =
       ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
@@ -562,8 +540,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectIpv4EndpointUsingMetadata) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -585,8 +562,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectEndpointUsingMetadataMissingEndpoint)
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -611,14 +587,11 @@ TEST_F(OverrideHostLoadBalancerTest, SelectIPv6UsingMetadata) {
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:2]:80",
-                                    server_factory_context_.time_system_, us_central1_a, 1, 0,
-                                    Host::HealthStatus::HEALTHY),
+                                    us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:3]:80",
-                                    server_factory_context_.time_system_, us_central1_b, 1, 0,
-                                    Host::HealthStatus::UNHEALTHY),
+                                    us_central1_b, 1, 0, Host::HealthStatus::UNHEALTHY),
       Envoy::Upstream::makeTestHost(cluster_info_, "tcp://[fda3:e722:ac3:cc00:172:b9fb:a00:4]:80",
-                                    server_factory_context_.time_system_, us_west3_c, 1, 0,
-                                    Host::HealthStatus::DEGRADED)};
+                                    us_west3_c, 1, 0, Host::HealthStatus::DEGRADED)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality(
       {{host_set->hosts_[0]}, {host_set->hosts_[1]}, {host_set->hosts_[2]}});
   makeCrossPriorityHostMap();
@@ -643,8 +616,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectEndpointBadMetadata) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -667,8 +639,7 @@ TEST_F(OverrideHostLoadBalancerTest, SelectEndpointBadMetadataType) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 
@@ -690,12 +661,11 @@ TEST_F(OverrideHostLoadBalancerTest, HeaderOnlySourceWithNoHeader) {
   Locality us_central1_a = makeLocality("us-central1", "us-central1-a");
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
-  host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://1.2.3.4:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY),
-                      Envoy::Upstream::makeTestHost(
-                          cluster_info_, "tcp://5.6.7.8:80", server_factory_context_.time_system_,
-                          us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
+  host_set->hosts_ = {
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://1.2.3.4:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY),
+      Envoy::Upstream::makeTestHost(cluster_info_, "tcp://5.6.7.8:80", us_central1_a, 1, 0,
+                                    Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ =
       ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0], host_set->hosts_[1]}});
   makeCrossPriorityHostMap();
@@ -722,8 +692,7 @@ TEST_F(OverrideHostLoadBalancerTest, NullDownstreamHeaders) {
 
   MockHostSet* host_set = thread_local_priority_set_.getMockHostSet(0);
   host_set->hosts_ = {Envoy::Upstream::makeTestHost(
-      cluster_info_, "tcp://127.0.0.1:80", server_factory_context_.time_system_, us_central1_a, 1,
-      0, Host::HealthStatus::HEALTHY)};
+      cluster_info_, "tcp://127.0.0.1:80", us_central1_a, 1, 0, Host::HealthStatus::HEALTHY)};
   host_set->hosts_per_locality_ = ::Envoy::Upstream::makeHostsPerLocality({{host_set->hosts_[0]}});
   makeCrossPriorityHostMap();
 

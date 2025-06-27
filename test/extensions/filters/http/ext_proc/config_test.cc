@@ -256,6 +256,54 @@ TEST(HttpExtProcConfigTest, InvalidFullDuplexStreamedConfig) {
             "then the request_trailer_mode has to be set to SEND");
 }
 
+TEST(HttpExtProcConfigTest, InvalidRequestFullDuplexStreamedFailureModeAllowConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_proc_server
+  failure_mode_allow: true
+  processing_mode:
+    request_body_mode: FULL_DUPLEX_STREAMED
+    request_trailer_mode: SEND
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result.status().message(),
+            "If the ext_proc filter has either the request_body_mode or the response_body_mode set "
+            "to FULL_DUPLEX_STREAMED, then the failure_mode_allow has to be left as false");
+}
+
+TEST(HttpExtProcConfigTest, InvalidResponseFullDuplexStreamedFailureModeAllowConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: ext_proc_server
+  failure_mode_allow: true
+  processing_mode:
+    response_body_mode: FULL_DUPLEX_STREAMED
+    response_trailer_mode: SEND
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(*proto_config, "stats", context);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_EQ(result.status().message(),
+            "If the ext_proc filter has either the request_body_mode or the response_body_mode set "
+            "to FULL_DUPLEX_STREAMED, then the failure_mode_allow has to be left as false");
+}
+
 TEST(HttpExtProcConfigTest, GrpcServiceHttpServiceBothSet) {
   std::string yaml = R"EOF(
   grpc_service:
