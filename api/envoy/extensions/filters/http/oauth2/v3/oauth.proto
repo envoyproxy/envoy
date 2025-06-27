@@ -126,7 +126,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 24]
+// [#next-free-field: 26]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -242,6 +242,18 @@ message OAuth2Config {
 
   // Optional additional prefix to use when emitting statistics.
   string stat_prefix = 22;
+
+  // Optional expiration time for the CSRF protection token cookie.
+  // The CSRF token prevents cross-site request forgery attacks during the OAuth2 flow.
+  // If not specified, defaults to ``600s`` (10 minutes), which should provide sufficient time
+  // for users to complete the OAuth2 authorization flow.
+  google.protobuf.Duration csrf_token_expires_in = 24;
+
+  // Optional expiration time for the code verifier cookie.
+  // The code verifier is stored in a secure, HTTP-only cookie during the OAuth2 authorization process.
+  // If not specified, defaults to ``600s`` (10 minutes), which should provide sufficient time
+  // for users to complete the OAuth2 authorization flow.
+  google.protobuf.Duration code_verifier_token_expires_in = 25;
 }
 
 // Filter config.
