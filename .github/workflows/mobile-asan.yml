@@ -44,7 +44,7 @@ jobs:
       packages: read
     name: asan
     uses: ./.github/workflows/_mobile_container_ci.yml
-    if: ${{ fromJSON(needs.load.outputs.request).run.mobile-asan }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-asan }}
     needs: load
     with:
       args: >-
@@ -67,6 +67,7 @@ jobs:
       && github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && needs.load.outputs.request
       && fromJSON(needs.load.outputs.request).run.mobile-asan
     needs:
     - load

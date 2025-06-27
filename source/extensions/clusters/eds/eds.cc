@@ -33,7 +33,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       local_info_(cluster_context.serverFactoryContext().localInfo()),
       eds_resources_cache_(
           Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads")
-              ? cluster_context.clusterManager().edsResourcesCache()
+              ? cluster_context.serverFactoryContext().clusterManager().edsResourcesCache()
               : absl::nullopt) {
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
@@ -47,9 +47,11 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
   }
   const auto resource_name = getResourceName();
   subscription_ = THROW_OR_RETURN_VALUE(
-      cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
-          resource_decoder_, {}),
+      cluster_context.serverFactoryContext()
+          .clusterManager()
+          .subscriptionFactory()
+          .subscriptionFromConfigSource(eds_config, Grpc::Common::typeUrl(resource_name),
+                                        info_->statsScope(), *this, resource_decoder_, {}),
       Config::SubscriptionPtr);
 }
 

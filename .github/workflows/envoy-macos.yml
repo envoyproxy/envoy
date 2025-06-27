@@ -59,7 +59,7 @@ jobs:
       target: ${{ matrix.target }}
       target-name: ${{ matrix.target-name }}
       timeout-minutes: 180
-      trusted: ${{ fromJSON(needs.load.outputs.trusted) }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
     strategy:
       fail-fast: false
       matrix:

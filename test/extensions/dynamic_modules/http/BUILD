@@ -68,6 +68,8 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
     ],
 )
 

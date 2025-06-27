@@ -761,7 +761,11 @@ def _com_github_grpc_grpc():
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {"@openssl": "@boringssl"},
     )
-    external_http_archive("build_bazel_rules_apple")
+    external_http_archive(
+        "build_bazel_rules_apple",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_apple.patch"],
+    )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(
