@@ -25,11 +25,13 @@ public:
    * @param parent related route.
    * @param headers request headers.
    * @param stream_info stream info of the downstream request.
+   * @param random random value for cluster selection.
    * @return RouteConstSharedPtr final route with specific cluster.
    */
   virtual RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
                                     const Http::RequestHeaderMap& headers,
-                                    const StreamInfo::StreamInfo& stream_info) const PURE;
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    uint64_t random) const PURE;
 };
 
 using ClusterSpecifierPluginSharedPtr = std::shared_ptr<ClusterSpecifierPlugin>;
