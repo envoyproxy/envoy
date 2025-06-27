@@ -17,7 +17,6 @@ public:
     const auto ip = getIp();
     return ip ? absl::make_optional(ip->asString()) : absl::nullopt;
   }
-  static const std::string& key();
 };
 
 } // namespace Network
