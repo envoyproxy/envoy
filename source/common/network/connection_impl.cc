@@ -87,11 +87,11 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       write_buffer_above_high_watermark_(false), detect_early_close_(true),
       enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
       write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false),
-      transport_wants_read_(false),
+      transport_wants_read_(false), reuse_socket_(false),
       enable_close_through_filter_manager_(Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.connection_close_through_filter_manager")) {
 
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     IS_ENVOY_BUG("Client socket failure");
     return;
   }
@@ -120,8 +120,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
-         "ConnectionImpl was unexpectedly torn down without being closed.");
+  ASSERT((socket_ == nullptr || !socket_->isOpen()) && delayed_close_timer_ == nullptr,
+         "ConnectionImpl destroyed with open socket and/or active timer");
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -147,7 +147,9 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_closing",
+                         "Not closing conn, socket object is null or socket is not open", *this);
     return;
   }
 
@@ -174,7 +176,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 void ConnectionImpl::closeInternal(ConnectionCloseType type) {
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     return;
   }
 
@@ -188,7 +190,12 @@ void ConnectionImpl::closeInternal(ConnectionCloseType type) {
     if (data_to_write > 0 && type != ConnectionCloseType::Abort) {
       // We aren't going to wait to flush, but try to write as much as we can if there is pending
       // data.
-      transport_socket_->doWrite(*write_buffer_, true);
+      if (reuse_socket_) {
+        // Don't close connection socket in case of reversed connection.
+        transport_socket_->doWrite(*write_buffer_, false);
+      } else {
+        transport_socket_->doWrite(*write_buffer_, true);
+      }
     }
 
     if (type != ConnectionCloseType::FlushWriteAndDelay || !delayed_close_timeout_set) {
@@ -251,7 +258,7 @@ void ConnectionImpl::closeInternal(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     return State::Closed;
   } else if (inDelayedClose()) {
     return State::Closing;
@@ -285,6 +292,37 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
   detected_close_type_ = close_type;
 }
 
+ConnectionSocketPtr ConnectionImpl::moveSocket() {
+  // ASSERT(isSocketReused());
+
+  // Clean up connection internals but don't close the socket.
+  // cleanUpConnectionImpl();
+
+  // Transfer socket ownership to the caller.
+  return std::move(socket_);
+}
+
+// void ConnectionImpl::cleanUpConnectionImpl() {
+//   // No need for a delayed close now.
+//   if (delayed_close_timer_) {
+//     delayed_close_timer_->disableTimer();
+//     delayed_close_timer_ = nullptr;
+//   }
+
+//   // Drain input and output buffers.
+//   updateReadBufferStats(0, 0);
+//   updateWriteBufferStats(0, 0);
+
+//   // Drain any remaining data from write buffer.
+//   write_buffer_->drain(write_buffer_->length());
+
+//   // Reset connection stats.
+//   connection_stats_.reset();
+
+//   // Notify listeners that the connection is closing but don't close the actual socket.
+//   ConnectionImpl::raiseEvent(ConnectionEvent::LocalClose);
+// }
+
 void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_action) {
   if (!socket_->isOpen()) {
     return;
@@ -301,7 +339,7 @@ void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_actio
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     return;
   }
 
@@ -312,7 +350,12 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
-  transport_socket_->closeSocket(close_type);
+
+  // Don't close the socket transport if this is a reused connection
+  if (!reuse_socket_) {
+    ENVOY_CONN_LOG(debug, "closing socket transport_socket_", *this);
+    transport_socket_->closeSocket(close_type);
+  }
 
   // Drain input and output buffers.
   updateReadBufferStats(0, 0);
@@ -339,7 +382,10 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   // It is safe to call close() since there is an IO handle check.
-  socket_->close();
+  if (!reuse_socket_) {
+    ENVOY_LOG(debug, "closeSocket:");
+    socket_->close();
+  }
 
   // Call the base class directly as close() is called in the destructor.
   ConnectionImpl::raiseEvent(close_type);
@@ -358,7 +404,7 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     return;
   }
 
@@ -399,7 +445,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
       (enable_close_through_filter_manager_ && filter_manager_.pendingClose())) {
     return;
   }
-  ASSERT(socket_->isOpen());
+  ASSERT(socket_ != nullptr && socket_->isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;
@@ -1047,7 +1093,7 @@ ClientConnectionImpl::ClientConnectionImpl(
                      false),
       stream_info_(dispatcher_.timeSource(), socket_->connectionInfoProviderSharedPtr(),
                    StreamInfo::FilterState::LifeSpan::Connection) {
-  if (!socket_->isOpen()) {
+  if (socket_ == nullptr || !socket_->isOpen()) {
     setFailureReason("socket creation failure");
     // Set up the dispatcher to "close" the connection on the next loop after
     // the owner has a chance to add callbacks.
@@ -1102,6 +1148,18 @@ ClientConnectionImpl::ClientConnectionImpl(
       ioHandle().activateFileEvents(Event::FileReadyType::Write);
     }
   }
+}
+
+// Constructor to create "clientConnection" object from an existing socket.
+ClientConnectionImpl::ClientConnectionImpl(Event::Dispatcher& dispatcher,
+                                           Network::TransportSocketPtr&& transport_socket,
+                                           Network::ConnectionSocketPtr&& downstream_socket)
+    : ConnectionImpl(dispatcher, std::move(downstream_socket), std::move(transport_socket),
+                     stream_info_, false),
+      stream_info_(dispatcher.timeSource(), socket_->connectionInfoProviderSharedPtr(),
+                   StreamInfo::FilterState::LifeSpan::Connection) {
+
+  stream_info_.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
 }
 
 void ClientConnectionImpl::connect() {

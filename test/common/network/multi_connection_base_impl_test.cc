@@ -1209,7 +1209,22 @@ TEST_F(MultiConnectionBaseImplTest, SetSocketOptionFailedTest) {
   absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
 
   EXPECT_FALSE(impl_->setSocketOption(sockopt_name, sockopt_val));
-}
+=======
+  TEST_F(MultiConnectionBaseImplTest, MoveSocket) {
+    setupMultiConnectionImpl(2);
+
+    EXPECT_EQ(impl_->moveSocket(), nullptr);
+  }
+
+  TEST_F(MultiConnectionBaseImplTest, setSocketReused) {
+    setupMultiConnectionImpl(2);
+    impl_->setSocketReused(true);
+  }
+
+  TEST_F(MultiConnectionBaseImplTest, isSocketReused) {
+    setupMultiConnectionImpl(2);
+    EXPECT_EQ(impl_->isSocketReused(), false);
+  }
 
 } // namespace Network
 } // namespace Envoy

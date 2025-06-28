@@ -146,6 +146,10 @@ public:
   void configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
                                         std::chrono::microseconds rtt) override;
   absl::optional<uint64_t> congestionWindowInBytes() const override;
+  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
+  Network::ConnectionSocketPtr moveSocket() override { return nullptr; }
+  void setSocketReused(bool) override {}
+  bool isSocketReused() override { return false; }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;
