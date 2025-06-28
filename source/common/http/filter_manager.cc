@@ -966,7 +966,6 @@ void DownstreamFilterManager::sendLocalReply(
   ASSERT(!state_.under_on_local_reply_);
   const bool is_head_request = state_.is_head_request_;
   const bool is_grpc_request = state_.is_grpc_request_;
-  state_.local_reply_sent_ = true;
 
   // Stop filter chain iteration if local reply was sent while filter decoding or encoding callbacks
   // are running.
@@ -1236,14 +1235,19 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
   // See the previous attempt (#15658) for detail, and for now we choose to protect only against
   // filter chains.
   auto validate_required_headers = absl::MakeCleanup([&]() {
-    const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
-    if (!status.ok() && !state_.local_reply_sent_) {
-      // If the check failed, then we reply with BadGateway, and stop the further processing.
-      sendLocalReply(
-          Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
-          absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
-                       "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
-      should_exit = true;
+    if (filter_manager_callbacks_.responseHeaders().has_value()) {
+      const auto status = HeaderUtility::checkRequiredResponseHeaders(
+          filter_manager_callbacks_.responseHeaders().ref());
+      if (!status.ok() && !state_.local_reply_sent_) {
+        // If the check failed, then we reply with BadGateway, and stop the further processing.
+        state_.local_reply_sent_ = true;
+        sendLocalReply(
+            Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+            absl::StrCat(
+                StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders, "{",
+                StringUtil::replaceAllEmptySpace(status.message()), "}"));
+        should_exit = true;
+      }
     }
   });
 
