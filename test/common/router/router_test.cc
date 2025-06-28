@@ -617,7 +617,7 @@ TEST_F(RouterTest, AddCookie) {
       .WillOnce(
           Invoke([&](OptRef<const Http::RequestHeaderMap>, OptRef<const StreamInfo::StreamInfo>,
                      Http::HashPolicy::AddCookieCallback add_cookie) {
-            cookie_value = add_cookie("foo", "", 1337, {});
+            cookie_value = add_cookie("foo", "", std::chrono::seconds(1337), {});
             return absl::optional<uint64_t>(10);
           }));
 
@@ -659,7 +659,7 @@ TEST_F(RouterTest, AddCookieNoDuplicate) {
           Invoke([&](OptRef<const Http::RequestHeaderMap>, OptRef<const StreamInfo::StreamInfo>,
                      Http::HashPolicy::AddCookieCallback add_cookie) {
             // this should be ignored
-            add_cookie("foo", "", 1337, {});
+            add_cookie("foo", "", std::chrono::seconds(1337), {});
             return absl::optional<uint64_t>(10);
           }));
 
@@ -701,8 +701,8 @@ TEST_F(RouterTest, AddMultipleCookies) {
       .WillOnce(
           Invoke([&](OptRef<const Http::RequestHeaderMap>, OptRef<const StreamInfo::StreamInfo>,
                      Http::HashPolicy::AddCookieCallback add_cookie) {
-            choco_c = add_cookie("choco", "", 15, {});
-            foo_c = add_cookie("foo", "/path", 1337, {});
+            choco_c = add_cookie("choco", "", std::chrono::seconds(15), {});
+            foo_c = add_cookie("foo", "/path", std::chrono::seconds(1337), {});
             return absl::optional<uint64_t>(10);
           }));
 
