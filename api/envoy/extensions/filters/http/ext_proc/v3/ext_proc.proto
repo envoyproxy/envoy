@@ -12,6 +12,7 @@ import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -417,7 +418,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
@@ -451,4 +452,9 @@ message ExtProcOverrides {
   // authorization headers (e.g. ``x-foo-bar: baz-key``) are to be injected or
   // when a route needs to partially override inherited metadata.
   repeated config.core.v3.HeaderValue grpc_initial_metadata = 7;
+
+  // If true, the filter will not fail closed if the gRPC stream is prematurely closed
+  // or could not be opened. This field is the per-route override of
+  // :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`.
+  google.protobuf.BoolValue failure_mode_allow = 8;
 }

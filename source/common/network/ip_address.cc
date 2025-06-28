@@ -8,16 +8,16 @@
 namespace Envoy {
 namespace Network {
 
-const std::string& IPAddressObject::key() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.network.ip");
-}
+namespace {
+const std::string& key() { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.network.ip"); }
+} // namespace
 
 /**
  * Registers the filter state object for the dynamic extension support.
  */
 class BaseIPAddressObjectFactory : public StreamInfo::FilterState::ObjectFactory {
 public:
-  std::string name() const override { return IPAddressObject::key(); }
+  std::string name() const override { return key(); }
 
   std::unique_ptr<StreamInfo::FilterState::Object>
   createFromBytes(absl::string_view data) const override {

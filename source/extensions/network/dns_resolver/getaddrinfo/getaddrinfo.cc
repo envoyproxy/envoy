@@ -31,7 +31,7 @@ GetAddrInfoDnsResolver::GetAddrInfoDnsResolver(
   uint32_t num_threads =
       config_.has_num_resolver_threads() ? config_.num_resolver_threads().value() : 1;
   num_threads = std::min(num_threads, kThreadCap);
-  ENVOY_LOG(debug, "Starting getaddrinfo resolver with {} threads", num_threads);
+  ENVOY_LOG(trace, "Starting getaddrinfo resolver with {} threads", num_threads);
   resolver_threads_.reserve(num_threads);
   for (uint32_t i = 0; i < num_threads; i++) {
     resolver_threads_.emplace_back(
@@ -49,13 +49,13 @@ GetAddrInfoDnsResolver::~GetAddrInfoDnsResolver() {
   for (auto& thread : resolver_threads_) {
     thread->join();
   }
-  ENVOY_LOG(debug, "All getaddrinfo resolver threads joined");
+  ENVOY_LOG(trace, "All getaddrinfo resolver threads joined");
 }
 
 ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
                                                 DnsLookupFamily dns_lookup_family,
                                                 ResolveCb callback) {
-  ENVOY_LOG(debug, "adding new query [{}] to pending queries", dns_name);
+  ENVOY_LOG(trace, "adding new query [{}] to pending queries", dns_name);
   auto new_query = std::make_unique<PendingQuery>(dns_name, dns_lookup_family, std::move(callback));
   new_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::NotStarted));
   ActiveDnsQuery* active_query = new_query.get();
@@ -129,7 +129,7 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
     break;
   }
 
-  ENVOY_LOG(debug, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
+  ENVOY_LOG(trace, "getaddrinfo resolution complete for host '{}': {}", query.dns_name_,
             accumulateToString<Network::DnsResponse>(final_results, [](const auto& dns_response) {
               return dns_response.addrInfo().address_->asString();
             }));
@@ -139,7 +139,7 @@ GetAddrInfoDnsResolver::processResponse(const PendingQuery& query,
 
 // Background thread which wakes up and does resolutions.
 void GetAddrInfoDnsResolver::resolveThreadRoutine() {
-  ENVOY_LOG(debug, "starting getaddrinfo resolver thread");
+  ENVOY_LOG(trace, "starting getaddrinfo resolver thread");
 
   while (true) {
     std::unique_ptr<PendingQuery> next_query;
@@ -163,7 +163,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
       }
     }
 
-    ENVOY_LOG(debug, "Thread ({}) popped pending query [{}]",
+    ENVOY_LOG(trace, "Thread ({}) popped pending query [{}]",
               api_.threadFactory().currentThreadId().getId(), next_query->dns_name_);
 
     // For mock testing make sure the getaddrinfo() response is freed prior to the post.
@@ -190,7 +190,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         response = processResponse(*next_query, addrinfo_wrapper.get());
       } else if (rc.return_value_ == EAI_AGAIN) {
         if (!num_retries.has_value()) {
-          ENVOY_LOG(debug, "retrying query [{}]", next_query->dns_name_);
+          ENVOY_LOG(trace, "retrying query [{}]", next_query->dns_name_);
           next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
           {
             absl::MutexLock guard(&mutex_);
@@ -200,7 +200,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
         }
         (*num_retries)--;
         if (*num_retries > 0) {
-          ENVOY_LOG(debug, "retrying query [{}], num_retries: {}", next_query->dns_name_,
+          ENVOY_LOG(trace, "retrying query [{}], num_retries: {}", next_query->dns_name_,
                     *num_retries);
           next_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Retrying));
           {
@@ -236,7 +236,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
                       details = std::string(details)]() mutable {
       if (finished_query->isCancelled()) {
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Cancelled));
-        ENVOY_LOG(debug, "dropping cancelled query [{}]", finished_query->dns_name_);
+        ENVOY_LOG(trace, "dropping cancelled query [{}]", finished_query->dns_name_);
       } else {
         finished_query->addTrace(static_cast<uint8_t>(GetAddrInfoTrace::Callback));
         finished_query->callback_(response.first, std::move(details), std::move(response.second));
@@ -244,7 +244,7 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
     });
   }
 
-  ENVOY_LOG(debug, "getaddrinfo resolver thread exiting");
+  ENVOY_LOG(trace, "getaddrinfo resolver thread exiting");
 }
 
 // Register the CaresDnsResolverFactory
