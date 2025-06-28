@@ -126,6 +126,20 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   return ProtobufWkt::Struct::default_instance();
 }
 
+const ProtobufWkt::Struct& getVirtualHostMetadata(Http::StreamFilterCallbacks* callbacks) {
+  if (callbacks->route() == nullptr) {
+    return ProtobufWkt::Struct::default_instance();
+  }
+  const auto& metadata = callbacks->route()->virtualHost().metadata();
+
+  if (auto filter_it = metadata.filter_metadata().find(callbacks->filterConfigName());
+      filter_it != metadata.filter_metadata().end()) {
+    return filter_it->second;
+  }
+
+  return ProtobufWkt::Struct::default_instance();
+}
+
 // Okay to return non-const reference because this doesn't ever get changed.
 NoopCallbacks& noopCallbacks() {
   static NoopCallbacks* callbacks = new NoopCallbacks();
@@ -627,6 +641,18 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaVirtualHostMetadata(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (virtual_host_metadata_wrapper_.get() != nullptr) {
+    virtual_host_metadata_wrapper_.pushStack();
+  } else {
+    virtual_host_metadata_wrapper_.reset(
+        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.virtualHostMetadata()),
+        true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
   if (stream_info_wrapper_.get() != nullptr) {
@@ -966,6 +992,10 @@ const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
 }
 
+const ProtobufWkt::Struct& Filter::DecoderCallbacks::virtualHostMetadata() const {
+  return getVirtualHostMetadata(callbacks_);
+}
+
 void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Instance*,
                                        lua_State* state) {
   // TODO(mattklein123): Support response in response path if nothing has been continued
@@ -975,6 +1005,10 @@ void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Ins
 
 const ProtobufWkt::Struct& Filter::EncoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
+}
+
+const ProtobufWkt::Struct& Filter::EncoderCallbacks::virtualHostMetadata() const {
+  return getVirtualHostMetadata(callbacks_);
 }
 
 } // namespace Lua
