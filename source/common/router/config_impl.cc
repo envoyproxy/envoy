@@ -1303,22 +1303,6 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
-    const Http::LowerCaseString& cluster_header_name, const Http::HeaderMap& headers,
-    const RouteEntryAndRoute* route_selector_override) const {
-  const auto entry = headers.get(cluster_header_name);
-  std::string final_cluster_name;
-  if (!entry.empty()) {
-    // This is an implicitly untrusted header, so per the API documentation only
-    // the first value is used.
-    final_cluster_name = std::string(entry[0]->value().getStringView());
-  }
-
-  return std::make_shared<DynamicRouteEntry>(route_selector_override ? route_selector_override
-                                                                     : this,
-                                             shared_from_this(), final_cluster_name);
-}
-
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
                                                      const StreamInfo::StreamInfo& stream_info,
                                                      uint64_t random_value) const {
