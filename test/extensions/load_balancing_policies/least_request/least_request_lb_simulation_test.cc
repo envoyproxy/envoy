@@ -52,14 +52,13 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
   ASSERT_LT(tolerance_pct, 100);
   ASSERT_GE(tolerance_pct, 0);
 
-  NiceMock<MockTimeSystem> time_source_;
   HostVector hosts;
   absl::node_hash_map<HostConstSharedPtr, uint64_t> host_hits;
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   for (uint64_t i = 0; i < params.num_hosts; i++) {
     const bool should_weight = i < params.num_subset_hosts;
     auto hostPtr = makeTestHost(info, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
-                                time_source_, should_weight ? params.weight : 1);
+                                should_weight ? params.weight : 1);
     host_hits[hostPtr] = 0;
     hosts.push_back(hostPtr);
     if (should_weight) {
@@ -82,10 +81,14 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
   ClusterLbStats lb_stats{stat_names, *stats_store.rootScope()};
   NiceMock<Runtime::MockLoader> runtime;
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
   LeastRequestLoadBalancer lb_{
-      priority_set, nullptr, lb_stats, runtime, random, common_config, least_request_lb_config,
+      priority_set,
+      nullptr,
+      lb_stats,
+      runtime,
+      random,
+      50,
+      envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest(),
       *time_source};
 
   for (uint64_t i = 0; i < num_requests; i++) {

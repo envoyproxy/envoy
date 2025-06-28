@@ -83,17 +83,18 @@ tls_certificate:
   ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config =
-      Ssl::TlsCertificateConfigImpl::create(
-          *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx, *api_)
-          .value();
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config =
+      std::move(Ssl::TlsCertificateConfigImpl::create(
+                    *secret_manager->findStaticTlsCertificateProvider("abc.com")->secret(), ctx,
+                    *api_, "cert_name")
+                    .value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            tls_config->certificateChain());
+            tls_config.certificateChain());
 
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            tls_config->privateKey());
+            tls_config.privateKey());
 }
 
 // Validate that secret manager throws an exception when adding duplicated static TLS certificate
@@ -137,7 +138,7 @@ TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
   auto cvc_config =
       Ssl::CertificateValidationContextConfigImpl::create(
           *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
-          false, *api_)
+          false, *api_, "ca_cert_name")
           .value();
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -306,7 +307,7 @@ api_config_source:
       ->set_value(Base64::decode("CjUKMy92YXIvcnVuL3NlY3JldHMva3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3Vud"
                                  "C90b2tlbhILeC10b2tlbi1iaW4="));
   auto secret_provider1 = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context, init_manager);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
 
   // The base64 encoded proto binary is identical to the one above, but in different field order.
   // It is also identical to the YAML below.
@@ -319,7 +320,7 @@ api_config_source:
       ->set_value(Base64::decode("Egt4LXRva2VuLWJpbgo1CjMvdmFyL3J1bi9zZWNyZXRzL2t1YmVybmV0ZXMuaW8vc"
                                  "2VydmljZWFjY291bnQvdG9rZW4="));
   auto secret_provider2 = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context, init_manager);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
 
   API_NO_BOOST(envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig)
   file_based_metadata_config;
@@ -337,7 +338,7 @@ secret_data:
       ->mutable_typed_config()
       ->PackFrom(file_based_metadata_config);
   auto secret_provider3 = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context, init_manager);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
 
   EXPECT_EQ(secret_provider1, secret_provider2);
   EXPECT_EQ(secret_provider2, secret_provider3);
@@ -366,7 +367,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
   EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
 
   auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context, init_manager);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
   const std::string yaml =
       R"EOF(
 name: "abc.com"
@@ -384,14 +385,15 @@ tls_certificate:
                   ->onConfigUpdate(decoded_resources.refvec_, "")
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config =
-      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_, "cert_name")
+          .value());
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            tls_config->certificateChain());
+            tls_config.certificateChain());
   const std::string key_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            tls_config->privateKey());
+            tls_config.privateKey());
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
@@ -408,7 +410,8 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
 
   EXPECT_CALL(secret_context.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(*dispatcher_));
-  EXPECT_CALL(secret_context, messageValidationVisitor()).WillOnce(ReturnRef(validation_visitor));
+  EXPECT_CALL(secret_context.server_context_, messageValidationVisitor())
+      .WillOnce(ReturnRef(validation_visitor));
   EXPECT_CALL(secret_context, initManager()).Times(0);
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillOnce(ReturnRef(local_info));
   EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
@@ -418,7 +421,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicGenericSecret) {
       }));
 
   auto secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "encryption_key", secret_context, init_manager);
+      config_source, "encryption_key", secret_context.server_context_, init_manager);
 
   const std::string yaml = R"EOF(
 name: "encryption_key"
@@ -463,7 +466,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandler) {
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context, init_manager);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
   const std::string yaml =
       R"EOF(
 name: "abc.com"
@@ -483,11 +486,12 @@ tls_certificate:
                   ->onConfigUpdate(decoded_resources.refvec_, "keycert-v1")
                   .ok());
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> ctx;
-  auto tls_config =
-      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_).value();
-  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config->certificateChain());
-  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config->privateKey());
-  EXPECT_EQ("DUMMY_PASSWORD", tls_config->password());
+  Envoy::Ssl::TlsCertificateConfigImpl tls_config = std::move(
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_, "cert_name")
+          .value());
+  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_CERT_CHAIN", tls_config.certificateChain());
+  EXPECT_EQ("DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY", tls_config.privateKey());
+  EXPECT_EQ("DUMMY_PASSWORD", tls_config.password());
 
   // Private key and password are removed.
   const std::string expected_secrets_config_dump = R"EOF(
@@ -516,7 +520,7 @@ dynamic_active_secrets:
   // Add a dynamic tls validation context provider.
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
   auto context_secret_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
-      config_source, "abc.com.validation", secret_context, init_manager);
+      config_source, "abc.com.validation", secret_context.server_context_, init_manager);
   const std::string validation_yaml = R"EOF(
 name: "abc.com.validation"
 validation_context:
@@ -530,9 +534,10 @@ validation_context:
   EXPECT_TRUE(secret_context.server_context_.cluster_manager_.subscription_factory_.callbacks_
                   ->onConfigUpdate(decoded_resources_2.refvec_, "validation-context-v1")
                   .ok());
-  auto cert_validation_context = Ssl::CertificateValidationContextConfigImpl::create(
-                                     *context_secret_provider->secret(), false, *api_)
-                                     .value();
+  auto cert_validation_context =
+      Ssl::CertificateValidationContextConfigImpl::create(*context_secret_provider->secret(), false,
+                                                          *api_, "ca_cert_name")
+          .value();
   EXPECT_EQ("DUMMY_INLINE_STRING_TRUSTED_CA", cert_validation_context->caCert());
   const std::string updated_config_dump = R"EOF(
 dynamic_active_secrets:
@@ -570,7 +575,7 @@ dynamic_active_secrets:
   // Add a dynamic tls session ticket encryption keys context provider.
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
   auto stek_secret_provider = secret_manager->findOrCreateTlsSessionTicketKeysContextProvider(
-      config_source, "abc.com.stek", secret_context, init_manager);
+      config_source, "abc.com.stek", secret_context.server_context_, init_manager);
   const std::string stek_yaml = R"EOF(
 name: "abc.com.stek"
 session_ticket_keys:
@@ -637,7 +642,7 @@ dynamic_active_secrets:
   // Add a dynamic generic secret provider.
   time_system_.setSystemTime(std::chrono::milliseconds(1234567900000));
   auto generic_secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "signing_key", secret_context, init_manager);
+      config_source, "signing_key", secret_context.server_context_, init_manager);
 
   const std::string generic_secret_yaml = R"EOF(
 name: "signing_key"
@@ -738,7 +743,7 @@ TEST_F(SecretManagerImplTest, ConfigDumpHandlerWarmingSecrets) {
   EXPECT_CALL(secret_context.server_context_, localInfo()).WillRepeatedly(ReturnRef(local_info));
 
   auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context, init_manager);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
   const std::string expected_secrets_config_dump = R"EOF(
 dynamic_warming_secrets:
 - name: "abc.com"
@@ -757,7 +762,7 @@ dynamic_warming_secrets:
 
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
   auto context_secret_provider = secret_manager->findOrCreateCertificateValidationContextProvider(
-      config_source, "abc.com.validation", secret_context, init_manager);
+      config_source, "abc.com.validation", secret_context.server_context_, init_manager);
   init_target_handle->initialize(init_watcher);
   const std::string updated_config_dump = R"EOF(
 dynamic_warming_secrets:
@@ -784,7 +789,7 @@ dynamic_warming_secrets:
 
   time_system_.setSystemTime(std::chrono::milliseconds(1234567899000));
   auto stek_secret_provider = secret_manager->findOrCreateTlsSessionTicketKeysContextProvider(
-      config_source, "abc.com.stek", secret_context, init_manager);
+      config_source, "abc.com.stek", secret_context.server_context_, init_manager);
   init_target_handle->initialize(init_watcher);
   const std::string updated_once_more_config_dump = R"EOF(
 dynamic_warming_secrets:
@@ -819,7 +824,7 @@ dynamic_warming_secrets:
 
   time_system_.setSystemTime(std::chrono::milliseconds(1234567900000));
   auto generic_secret_provider = secret_manager->findOrCreateGenericSecretProvider(
-      config_source, "signing_key", secret_context, init_manager);
+      config_source, "signing_key", secret_context.server_context_, init_manager);
   init_target_handle->initialize(init_watcher);
   const std::string config_dump_with_generic_secret = R"EOF(
 dynamic_warming_secrets:
@@ -1089,7 +1094,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretPrivateKeyProviderUpdateSuccess) {
   EXPECT_CALL(secret_context.server_context_, api()).WillRepeatedly(ReturnRef(*api_));
 
   auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
-      config_source, "abc.com", secret_context, init_manager);
+      config_source, "abc.com", secret_context.server_context_, init_manager);
   const std::string yaml =
       R"EOF(
 name: "abc.com"
@@ -1124,10 +1129,11 @@ tls_certificate:
       .WillRepeatedly(ReturnRef(private_key_method_manager));
   EXPECT_CALL(ctx.server_context_, sslContextManager())
       .WillRepeatedly(ReturnRef(ssl_context_manager));
-  EXPECT_EQ(Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_)
-                .status()
-                .message(),
-            "Failed to load private key provider: test");
+  EXPECT_EQ(
+      Ssl::TlsCertificateConfigImpl::create(*secret_provider->secret(), ctx, *api_, "cert_name")
+          .status()
+          .message(),
+      "Failed to load private key provider: test");
 }
 
 // Verify that using the match_subject_alt_names will result in a typed matcher, one for each of
@@ -1153,7 +1159,7 @@ TEST_F(SecretManagerImplTest, DeprecatedSanMatcher) {
   auto cvc_config =
       Ssl::CertificateValidationContextConfigImpl::create(
           *secret_manager->findStaticCertificateValidationContextProvider("abc.com")->secret(),
-          false, *api_)
+          false, *api_, "ca_cert_name")
           .value();
   EXPECT_EQ(cvc_config->subjectAltNameMatchers().size(), 4);
   EXPECT_EQ("example.foo", cvc_config->subjectAltNameMatchers()[0].matcher().exact());

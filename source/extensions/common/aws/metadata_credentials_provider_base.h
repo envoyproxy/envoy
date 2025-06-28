@@ -1,7 +1,6 @@
 #pragma once
 
 #include "source/extensions/common/aws/aws_cluster_manager.h"
-#include "source/extensions/common/aws/cached_credentials_provider_base.h"
 #include "source/extensions/common/aws/credentials_provider.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
@@ -10,7 +9,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
 constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
 constexpr char TOKEN[] = "Token";
@@ -32,15 +30,15 @@ struct MetadataCredentialsProviderStats {
 using CreateMetadataFetcherCb =
     std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
 
-class MetadataCredentialsProviderBase : public CachedCredentialsProviderBase,
+class MetadataCredentialsProviderBase : public CredentialsProvider,
+                                        public Logger::Loggable<Logger::Id::aws>,
                                         public AwsManagedClusterUpdateCallbacks {
 public:
   friend class MetadataCredentialsProviderBaseFriend;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
 
-  MetadataCredentialsProviderBase(Api::Api& api,
-                                  Server::Configuration::ServerFactoryContext& context,
-                                  AwsClusterManagerOptRef aws_cluster_manager,
+  MetadataCredentialsProviderBase(Server::Configuration::ServerFactoryContext& context,
+                                  AwsClusterManagerPtr aws_cluster_manager,
                                   absl::string_view cluster_name,
                                   CreateMetadataFetcherCb create_metadata_fetcher_cb,
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
@@ -50,7 +48,7 @@ public:
   bool credentialsPending() override;
 
   // Get the Metadata credentials cache duration.
-  static std::chrono::seconds getCacheDuration();
+  std::chrono::seconds getCacheDuration();
 
   // Store the RAII cluster callback handle following registration call with AWS cluster manager
   void setClusterReadyCallbackHandle(AwsManagedClusterUpdateCallbacksHandlePtr handle) {
@@ -84,8 +82,8 @@ protected:
   // Set Credentials shared_ptr on all threads.
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds);
 
-  Api::Api& api_;
-  // The optional server factory context.
+  virtual void refresh() PURE;
+
   Server::Configuration::ServerFactoryContext& context_;
   // The callback used to create a MetadataFetcher instance.
   CreateMetadataFetcherCb create_metadata_fetcher_cb_;
@@ -119,7 +117,7 @@ protected:
   // Pointer to our stats structure
   std::shared_ptr<MetadataCredentialsProviderStats> stats_;
   // AWS Cluster Manager for creating clusters and retrieving URIs when async fetch is needed
-  AwsClusterManagerOptRef aws_cluster_manager_;
+  AwsClusterManagerPtr aws_cluster_manager_;
   // RAII handle for callbacks from AWS cluster manager
   AwsManagedClusterUpdateCallbacksHandlePtr callback_handle_;
   // Are credentials pending?

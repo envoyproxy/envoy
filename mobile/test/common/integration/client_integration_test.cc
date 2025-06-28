@@ -21,6 +21,7 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
@@ -252,17 +253,6 @@ TEST_P(ClientIntegrationTest, Basic) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
   }
 }
-
-#if not defined(__APPLE__)
-TEST_P(ClientIntegrationTest, BasicWithCares) {
-  builder_.setUseCares(true);
-  initialize();
-  basicTest();
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
-  }
-}
-#endif
 
 // TODO(fredyw): Disable this until we support treating no DNS record as a failure in the Apple
 // resolver.

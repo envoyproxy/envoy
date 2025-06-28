@@ -797,6 +797,7 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
 
     auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
     auto* resp_add1 = resp_headers_mut->add_set_headers();
+    resp_add1->mutable_append()->set_value(false);
     resp_add1->mutable_header()->set_key("x-new-header");
     resp_add1->mutable_header()->set_raw_value("new");
   });
@@ -848,6 +849,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediately) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   auto* hdr2 = immediate_headers->add_set_headers();
@@ -903,6 +905,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyWithDisabledConfig) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -1119,16 +1122,16 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedComesFast) {
   Buffer::OwnedImpl buffered_data;
   setUpDecodingBuffering(buffered_data);
 
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_1, false));
   buffered_data.add(req_data_1);
 
   // Pretend that Envoy ignores the watermark and keep sending. It often does!
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_2, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_2, false));
   buffered_data.add(req_data_2);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_3, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_3, false));
   buffered_data.add(req_data_3);
   // when end_stream is true, we still do buffering.
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_4, true));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_4, true));
   buffered_data.add(req_data_4);
 
   processRequestHeaders(true, absl::nullopt);
@@ -1184,9 +1187,9 @@ TEST_F(HttpFilterTest, PostAndChangeRequestBodyBufferedComesALittleFast) {
   Buffer::OwnedImpl buffered_data;
   setUpDecodingBuffering(buffered_data);
 
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_1, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_1, false));
   buffered_data.add(req_data_1);
-  EXPECT_EQ(FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(req_data_2, false));
+  EXPECT_EQ(FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(req_data_2, false));
   buffered_data.add(req_data_2);
 
   processRequestHeaders(true, absl::nullopt);
@@ -1623,6 +1626,195 @@ TEST_F(HttpFilterTest, StreamingDataSmallChunk) {
 
   checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::INBOUND, chunk_number);
   checkGrpcCallStatsAll(envoy::config::core::v3::TrafficDirection::OUTBOUND, 2 * chunk_number);
+}
+
+// Test suite for failure_mode_allow override.
+class FailureModeAllowOverrideTest : public HttpFilterTest {};
+
+TEST_F(FailureModeAllowOverrideTest, FilterAllowRouteDisallow) {
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: true)EOF";
+  initialize(std::move(yaml_config));
+
+  ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+                             "ext_proc_error_gRPC_error_13{error_message}"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
+                           Unused) { modify_headers(immediate_response_headers); }));
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+  filter_->onDestroy();
+}
+
+TEST_F(FailureModeAllowOverrideTest, FilterDisallowRouteAllow) {
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: false)EOF";
+  initialize(std::move(yaml_config));
+
+  ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(filter_->decodeData(req_data, true), FilterDataStatus::Continue);
+  EXPECT_EQ(filter_->decodeTrailers(request_trailers_), FilterTrailersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true), FilterHeadersStatus::Continue);
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().failure_mode_allowed_.value(), 1);
+}
+
+TEST_F(FailureModeAllowOverrideTest, FilterAllowNoRouteOverride) {
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: true)EOF";
+  initialize(std::move(yaml_config));
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(filter_->decodeData(req_data, true), FilterDataStatus::Continue);
+  EXPECT_EQ(filter_->decodeTrailers(request_trailers_), FilterTrailersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true), FilterHeadersStatus::Continue);
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().failure_mode_allowed_.value(), 1);
+}
+
+TEST_F(FailureModeAllowOverrideTest, FilterDisallowNoRouteOverride) {
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: false)EOF";
+  initialize(std::move(yaml_config));
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+                             "ext_proc_error_gRPC_error_13{error_message}"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
+                           Unused) { modify_headers(immediate_response_headers); }));
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+  filter_->onDestroy();
+}
+
+TEST_F(FailureModeAllowOverrideTest, FilterAllowRouteUnrelatedOverride) {
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: true)EOF";
+  initialize(std::move(yaml_config));
+
+  ExtProcPerRoute route_proto;
+  // This override does not set failure_mode_allow, so the filter's value should still apply.
+  route_proto.mutable_overrides()->mutable_processing_mode()->set_response_header_mode(
+      ProcessingMode::SKIP);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(filter_->decodeData(req_data, true), FilterDataStatus::Continue);
+  EXPECT_EQ(filter_->decodeTrailers(request_trailers_), FilterTrailersStatus::Continue);
+  EXPECT_EQ(filter_->encodeHeaders(response_headers_, true), FilterHeadersStatus::Continue);
+  filter_->onDestroy();
+
+  EXPECT_EQ(config_->stats().failure_mode_allowed_.value(), 1);
+}
+
+TEST_F(FailureModeAllowOverrideTest, FailureModeAllowMergedOverride) {
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+failure_mode_allow: true)EOF";
+  initialize(std::move(yaml_config));
+
+  ExtProcPerRoute route_proto_less_specific;
+  route_proto_less_specific.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
+  FilterConfigPerRoute route_config_less_specific(route_proto_less_specific);
+
+  ExtProcPerRoute route_proto_more_specific;
+  route_proto_more_specific.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
+  FilterConfigPerRoute route_config_more_specific(route_proto_more_specific);
+
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs {
+        return {&route_config_less_specific, &route_config_more_specific};
+      }));
+
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::InternalServerError, "", _, Eq(absl::nullopt),
+                             "ext_proc_error_gRPC_error_13{error_message}"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
+                           Unused) { modify_headers(immediate_response_headers); }));
+
+  server_closed_stream_ = true; // Simulate stream close without proper gRPC response
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+  filter_->onDestroy();
 }
 
 TEST_F(HttpFilterTest, StreamingBodyMutateLastEmptyChunk) {
@@ -2906,6 +3098,34 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+TEST_F(HttpFilterTest, ProtocolConfigEncodingPerRouteTest) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_mode:
+    request_header_mode: "SEND"
+    response_header_mode: "SKIP"
+  )EOF");
+
+  // Route configuration overrides the processing mode.
+  ExtProcPerRoute route_proto;
+  auto* processing_mode = route_proto.mutable_overrides()->mutable_processing_mode();
+  processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
+  processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillOnce(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
+  EXPECT_TRUE(last_request_.has_protocol_config());
+  EXPECT_EQ(last_request_.protocol_config().request_body_mode(), ProcessingMode::STREAMED);
+  EXPECT_EQ(last_request_.protocol_config().response_body_mode(),
+            ProcessingMode::FULL_DUPLEX_STREAMED);
+  filter_->onDestroy();
+}
+
 // Using the default configuration, verify that the "clear_route_cache" flag makes the appropriate
 // callback on the filter for inbound traffic when header modifications are also present.
 // Also verify it does not make the callback for outbound traffic.
@@ -2924,6 +3144,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -2941,6 +3162,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutation) {
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -2974,6 +3196,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -2991,6 +3214,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheDisabledHeaderMutation) {
   processResponseBody([](const HttpBody&, ProcessingResponse&, BodyResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -3096,6 +3320,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToClearHeaderMutation) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
   });
@@ -3175,6 +3400,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainWithHeaderMutation) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -3203,6 +3429,7 @@ TEST_F(HttpFilterTest, FilterRouteCacheActionSetToRetainResponseNotWithHeaderMut
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
   });
@@ -3234,6 +3461,7 @@ TEST_F(HttpFilterTest, ReplaceRequest) {
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
         hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
         auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key(":method");
         hdr->mutable_header()->set_raw_value("POST");
         hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
@@ -3295,6 +3523,7 @@ TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
       false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& hdrs_resp) {
         hdrs_resp.mutable_response()->set_status(CommonResponse::CONTINUE_AND_REPLACE);
         auto* hdr = hdrs_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("x-test-header");
         hdr->mutable_header()->set_raw_value("true");
         hdrs_resp.mutable_response()->mutable_body_mutation()->set_body("Hello, World!");
@@ -3498,6 +3727,7 @@ TEST_F(HttpFilterTest, IgnoreInvalidHeaderMutations) {
         auto headers_mut = header_resp.mutable_response()->mutable_header_mutation();
         auto add1 = headers_mut->add_set_headers();
         // Not allowed to change the "host" header by default
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("Host");
         add1->mutable_header()->set_raw_value("wrong:1234");
         // Not allowed to remove x-envoy headers by default.
@@ -3546,6 +3776,7 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
       resp1->mutable_request_headers()->mutable_response()->mutable_header_mutation();
   auto add1 = headers_mut->add_set_headers();
   // Not allowed to change the "host" header by default
+  add1->mutable_append()->set_value(false);
   add1->mutable_header()->set_key("Host");
   add1->mutable_header()->set_raw_value("wrong:1234");
   // Not allowed to remove x-envoy headers by default.
@@ -3590,9 +3821,11 @@ TEST_F(HttpFilterTest, ResponseTrailerMutationExceedSizeLimit) {
         // The trailer mutation in the response does not exceed the count limit 100 or the
         // size limit 2kb. But the result header map size exceeds the count limit 2kb.
         auto add1 = headers_mut->add_set_headers();
+        add1->mutable_append()->set_value(false);
         add1->mutable_header()->set_key("x-new-header-0123456789");
         add1->mutable_header()->set_raw_value("new-header-0123456789");
         auto add2 = headers_mut->add_set_headers();
+        add2->mutable_append()->set_value(false);
         add2->mutable_header()->set_key("x-some-other-header-0123456789");
         add2->mutable_header()->set_raw_value("some-new-header-0123456789");
       },
@@ -4753,6 +4986,7 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
   processRequestHeaders(false, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse& resp) {
     auto* resp_headers_mut = resp.mutable_response()->mutable_header_mutation();
     auto* resp_add = resp_headers_mut->add_set_headers();
+    resp_add->mutable_append()->set_value(false);
     resp_add->mutable_header()->set_key("x-new-header");
     resp_add->mutable_header()->set_raw_value("new");
     resp.mutable_response()->set_clear_route_cache(true);
@@ -4796,6 +5030,7 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -5090,9 +5325,11 @@ TEST_F(HttpFilter2Test, LastDecodeDataCallExceedsStreamBufferLimitWouldJustRaise
         auto* headers_response = response->mutable_request_headers();
         auto* hdr =
             headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("foo");
         hdr->mutable_header()->set_raw_value("gift-from-external-server");
         hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key(":path");
         hdr->mutable_header()->set_raw_value("/mutated_path/bluh");
         HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
@@ -5195,9 +5432,11 @@ TEST_F(HttpFilter2Test, LastEncodeDataCallExceedsStreamBufferLimitWouldJustRaise
         auto* headers_response = response->mutable_response_headers();
         auto* hdr =
             headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("foo");
         hdr->mutable_header()->set_raw_value("gift-from-external-server");
         hdr = headers_response->mutable_response()->mutable_header_mutation()->add_set_headers();
+        hdr->mutable_append()->set_value(false);
         hdr->mutable_header()->set_key("new_response_header");
         hdr->mutable_header()->set_raw_value("bluh");
         HttpFilterTest::stream_callbacks_->onReceiveMessage(std::move(response));
@@ -5296,6 +5535,7 @@ TEST_F(HttpFilterTest, ResponseHeaderMutationErrors) {
     auto* header_mut =
         resp.mutable_response_headers()->mutable_response()->mutable_header_mutation();
     auto* header = header_mut->add_set_headers();
+    header->mutable_append()->set_value(false);
     header->mutable_header()->set_key(":scheme");
     header->mutable_header()->set_raw_value("invalid");
   });
@@ -5400,6 +5640,7 @@ TEST_F(HttpFilterTest, OnProcessingResponseHeaders) {
 
     auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
     auto* resp_add1 = resp_headers_mut->add_set_headers();
+    resp_add1->mutable_append()->set_value(false);
     resp_add1->mutable_header()->set_key("x-new-header");
     resp_add1->mutable_header()->set_raw_value("new");
   });
@@ -5537,6 +5778,7 @@ TEST_F(HttpFilterTest, SaveProcessingResponseHeaders) {
 
     auto* resp_headers_mut = header_resp.mutable_response()->mutable_header_mutation();
     auto* resp_add1 = resp_headers_mut->add_set_headers();
+    resp_add1->mutable_append()->set_value(false);
     resp_add1->mutable_header()->set_key("x-new-header");
     resp_add1->mutable_header()->set_raw_value("new");
   });
@@ -5717,6 +5959,7 @@ TEST_F(HttpFilterTest, SaveImmediateResponse) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   auto* hdr2 = immediate_headers->add_set_headers();
@@ -5828,6 +6071,7 @@ TEST_F(HttpFilterTest, DontSaveImmediateResponse) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -5886,6 +6130,7 @@ TEST_F(HttpFilterTest, DontSaveImmediateResponseOnError) {
   immediate_response->set_details("Got a bad request");
   auto* immediate_headers = immediate_response->mutable_headers();
   auto* hdr1 = immediate_headers->add_set_headers();
+  hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
@@ -6008,6 +6253,7 @@ TEST_F(HttpFilterTest, SaveResponseTrailers) {
       [](const HttpTrailers&, ProcessingResponse&, TrailersResponse& trailers_resp) {
         auto headers_mut = trailers_resp.mutable_header_mutation();
         auto* resp_add1 = headers_mut->add_set_headers();
+        resp_add1->mutable_append()->set_value(false);
         resp_add1->mutable_header()->set_key("x-new-header1");
         resp_add1->mutable_header()->set_raw_value("new");
       },

@@ -21,7 +21,8 @@ class CertValidatorFactory : public Config::UntypedFactory {
 public:
   virtual absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) PURE;
+                      Server::Configuration::CommonFactoryContext& context,
+                      Stats::Scope& scope) PURE;
 
   std::string category() const override { return "envoy.tls.cert_validator"; }
 };

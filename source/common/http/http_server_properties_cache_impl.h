@@ -138,7 +138,7 @@ private:
   ProtocolsMap::iterator addOriginData(const Origin& origin, OriginData&& origin_data);
 
   // Returns the canonical suffix, if any, associated with `hostname`.
-  absl::string_view getCanonicalSuffix(absl::string_view hostname);
+  absl::string_view getCanonicalSuffix(absl::string_view hostname) const;
 
   // Returns the canonical origin from the canonical_h3_broken_map, if any, associated with
   // `hostname`.
@@ -148,7 +148,7 @@ private:
   void maybeSetCanonicalOriginForHttp3Brokenness(const Origin& origin);
 
   // Returns the canonical origin, if any, associated with `hostname`.
-  absl::optional<Origin> getCanonicalOrigin(absl::string_view hostname);
+  absl::optional<Origin> getCanonicalOrigin(absl::string_view hostname) const;
 
   // If `origin` matches a canonical suffix then updates canonical_alt_svc_map_ accordingly.
   void maybeSetCanonicalOrigin(const Origin& origin);

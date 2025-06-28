@@ -40,4 +40,7 @@ message SocketTapConfig {
   // Indicates to whether output the connection information per event
   // This is only applicable if the streamed trace is enabled
   bool set_connection_per_event = 1;
+
+  // The contents of the transport tap's statistics prefix.
+  string stats_prefix = 2;
 }

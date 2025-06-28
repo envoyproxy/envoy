@@ -126,7 +126,6 @@ class DetectorHostMonitorNullImpl : public Outlier::DetectorHostMonitor {
 public:
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return 0; }
-  void putHttpResponseCode(uint64_t) override {}
   void putResult(Outlier::Result, absl::optional<uint64_t>) override {}
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
@@ -252,7 +251,7 @@ protected:
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, absl::Status& creation_status);
+      uint32_t priority, absl::Status& creation_status);
 
   /**
    * @return nullptr if address_list is empty, otherwise a shared_ptr copy of address_list.
@@ -278,7 +277,6 @@ private:
   std::atomic<uint32_t> priority_;
   std::reference_wrapper<Network::UpstreamTransportSocketFactory>
       socket_factory_ ABSL_GUARDED_BY(metadata_mutex_);
-  const MonotonicTime creation_time_;
   absl::optional<MonotonicTime> last_hc_pass_time_;
   HostLbPolicyDataPtr lb_policy_data_;
 };
@@ -299,7 +297,7 @@ public:
          MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
          const envoy::config::core::v3::Locality& locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-         uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
+         uint32_t priority, const AddressVector& address_list = {});
 
   // HostDescription
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
@@ -315,7 +313,7 @@ protected:
       MetadataConstSharedPtr endpoint_metadata, MetadataConstSharedPtr locality_metadata,
       const envoy::config::core::v3::Locality& locality,
       const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-      uint32_t priority, TimeSource& time_source, const AddressVector& address_list = {});
+      uint32_t priority, const AddressVector& address_list = {});
 
 private:
   // No locks are required in this implementation: all address-related member
@@ -483,7 +481,7 @@ public:
          const envoy::config::core::v3::Locality& locality,
          const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
          uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-         TimeSource& time_source, const AddressVector& address_list = {});
+         const AddressVector& address_list = {});
 
 protected:
   HostImpl(absl::Status& creation_status, ClusterInfoConstSharedPtr cluster,
@@ -492,10 +490,10 @@ protected:
            uint32_t initial_weight, const envoy::config::core::v3::Locality& locality,
            const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
            uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-           TimeSource& time_source, const AddressVector& address_list = {})
+           const AddressVector& address_list = {})
       : HostImplBase(initial_weight, health_check_config, health_status),
         HostDescriptionImpl(creation_status, cluster, hostname, address, endpoint_metadata,
-                            locality_metadata, locality, health_check_config, priority, time_source,
+                            locality_metadata, locality, health_check_config, priority,
                             address_list) {}
 };
 
@@ -933,7 +931,7 @@ public:
     return *upstream_config_;
   }
   bool maintenanceMode() const override;
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   uint32_t maxResponseHeadersCount() const override { return max_response_headers_count_; }
   absl::optional<uint16_t> maxResponseHeadersKb() const override {
     return max_response_headers_kb_;
@@ -1023,13 +1021,13 @@ public:
 
   // Http::FilterChainFactory
   bool createFilterChain(Http::FilterChainManager& manager,
-                         const Http::FilterChainOptions&) const override {
+                         const Http::FilterChainOptions& options) const override {
     if (http_filter_factories_.empty()) {
       return false;
     }
 
-    Http::FilterChainUtility::createFilterChainForFactories(
-        manager, Http::EmptyFilterChainOptions{}, http_filter_factories_);
+    Http::FilterChainUtility::createFilterChainForFactories(manager, options,
+                                                            http_filter_factories_);
     return true;
   }
   bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
@@ -1111,7 +1109,7 @@ private:
       extension_protocol_options_;
   const std::shared_ptr<const HttpProtocolOptionsConfigImpl> http_protocol_options_;
   const std::shared_ptr<const TcpProtocolOptionsConfigImpl> tcp_protocol_options_;
-  const uint64_t max_requests_per_connection_;
+  const uint32_t max_requests_per_connection_;
   const std::chrono::milliseconds connect_timeout_;
   OptionalTimeouts optional_timeouts_;
   const float per_upstream_preconnect_ratio_;
@@ -1287,7 +1285,6 @@ protected:
 
 protected:
   Random::RandomGenerator& random_;
-  TimeSource& time_source_;
   MainPrioritySetImpl priority_set_;
 
   absl::Status validateEndpointsForZoneAwareRouting(
@@ -1336,7 +1333,7 @@ public:
       const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
       const HostDescription::AddressVector& address_list,
       const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source);
+      const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
 
   void registerHostForPriority(
       const HostSharedPtr& host,

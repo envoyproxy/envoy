@@ -24,8 +24,9 @@ public:
   public:
     FakeClusterSpecifierPlugin(absl::string_view cluster) : cluster_name_(cluster) {}
 
-    RouteConstSharedPtr route(RouteConstSharedPtr parent,
-                              const Http::RequestHeaderMap&) const override {
+    RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
+                              const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+                              uint64_t) const override {
       ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
       return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
           dynamic_cast<const RouteEntryImplBase*>(parent.get()), parent, cluster_name_);
@@ -37,7 +38,7 @@ public:
   FakeClusterSpecifierPluginFactoryConfig() = default;
   ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
-                               Server::Configuration::CommonFactoryContext&) override {
+                               Server::Configuration::ServerFactoryContext&) override {
     const auto& typed_config = dynamic_cast<const ProtobufWkt::Struct&>(config);
     return std::make_shared<FakeClusterSpecifierPlugin>(
         typed_config.fields().at("name").string_value());

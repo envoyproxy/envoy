@@ -45,12 +45,12 @@ std::vector<uint8_t> maybeReadOcspStaple(const envoy::config::core::v3::DataSour
 
 static const std::string INLINE_STRING = "<inline>";
 
-absl::StatusOr<std::unique_ptr<TlsCertificateConfigImpl>> TlsCertificateConfigImpl::create(
+absl::StatusOr<TlsCertificateConfigImpl> TlsCertificateConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api) {
+    Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
+    const std::string& certificate_name) {
   absl::Status creation_status = absl::OkStatus();
-  std::unique_ptr<TlsCertificateConfigImpl> ret(
-      new TlsCertificateConfigImpl(config, factory_context, api, creation_status));
+  TlsCertificateConfigImpl ret(config, factory_context, api, creation_status, certificate_name);
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -58,12 +58,13 @@ absl::StatusOr<std::unique_ptr<TlsCertificateConfigImpl>> TlsCertificateConfigIm
 TlsCertificateConfigImpl::TlsCertificateConfigImpl(
     const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
-    absl::Status& creation_status)
+    absl::Status& creation_status, const std::string& certificate_name)
     : certificate_chain_(maybeSet(Config::DataSource::read(config.certificate_chain(), true, api),
                                   creation_status)),
       certificate_chain_path_(
           Config::DataSource::getPath(config.certificate_chain())
               .value_or(certificate_chain_.empty() ? EMPTY_STRING : INLINE_STRING)),
+      certificate_name_(certificate_name),
       private_key_(
           maybeSet(Config::DataSource::read(config.private_key(), true, api), creation_status)),
       private_key_path_(Config::DataSource::getPath(config.private_key())
@@ -78,6 +79,9 @@ TlsCertificateConfigImpl::TlsCertificateConfigImpl(
       ocsp_staple_path_(Config::DataSource::getPath(config.ocsp_staple())
                             .value_or(ocsp_staple_.empty() ? EMPTY_STRING : INLINE_STRING)),
       private_key_method_(nullptr) {
+  // If creation_status was invalid as part of the data members init, there's no
+  // need to continue with the update.
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   if (config.has_pkcs12()) {
     if (config.has_private_key()) {
       creation_status = absl::InvalidArgumentError(

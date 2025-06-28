@@ -312,7 +312,11 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
                              config.overrides().grpc_initial_metadata().end()),
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
-      untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)) {}
+      untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
+      failure_mode_allow_(
+          config.overrides().has_failure_mode_allow()
+              ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
+              : absl::nullopt) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
@@ -329,7 +333,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
                                        : less_specific.typedForwardingMetadataNamespaces()),
       untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
                                         ? more_specific.untypedReceivingMetadataNamespaces()
-                                        : less_specific.untypedReceivingMetadataNamespaces()) {}
+                                        : less_specific.untypedReceivingMetadataNamespaces()),
+      failure_mode_allow_(more_specific.failureModeAllow().has_value()
+                              ? more_specific.failureModeAllow()
+                              : less_specific.failureModeAllow()) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -374,7 +381,7 @@ void Filter::onError() {
     return;
   }
 
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // The user would like a none-200-ok response to not cause message processing to fail.
     // Close the external processing.
     processing_complete_ = true;
@@ -422,11 +429,8 @@ Filter::StreamOpenState Filter::openStream() {
     ExternalProcessorStreamPtr stream_object =
         grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
-    if (processing_complete_) {
-      // Stream failed while starting and either onGrpcError or onGrpcClose was already called
-      // Asserts that `stream_object` is nullptr since it is not valid to be used any further
-      // beyond this point.
-      ASSERT(stream_object == nullptr);
+    if (processing_complete_ || stream_object == nullptr) {
+      // Stream failed while starting and either onGrpcError or onGrpcClose was already called.
       return sent_immediate_response_ ? StreamOpenState::Error : StreamOpenState::IgnoreError;
     }
     stats_.streams_started_.inc();
@@ -737,12 +741,16 @@ FilterDataStatus Filter::onData(ProcessorState& state, Buffer::Instance& data, b
     } else {
       ENVOY_STREAM_LOG(trace, "Header processing still in progress -- holding body data",
                        *decoder_callbacks_);
-      // We don't know what to do with the body until the response comes back.
-      // We must buffer it in case we need it when that happens. Watermark will be raised when the
-      // buffered data reaches the buffer's watermark limit. When end_stream is true, we need to
-      // StopIterationAndWatermark as well to stop the ActiveStream from returning error when the
-      // last chunk added to stream buffer exceeds the buffer limit.
       state.setPaused(true);
+      // Buffer the body when waiting for header response.
+      // For BUFFERED mode, return StopIterationAndBuffer so when buffered data reaches
+      // the per-connection-limit, Envoy will a send a 413: payload-too-large local reply.
+      // For non-BUFFERED mode, return StopIterationAndWatermark so watermark can be raised
+      // when the buffered data reaches the per-connection-limit. The watermark will be cleared
+      // during the header response handling at which Envoy will send the buffered data out.
+      if (state.bodyMode() == ProcessingMode::BUFFERED) {
+        return FilterDataStatus::StopIterationAndBuffer;
+      }
       return FilterDataStatus::StopIterationAndWatermark;
     }
   }
@@ -774,8 +782,8 @@ void Filter::encodeProtocolConfig(ProcessingRequest& req) {
   ENVOY_STREAM_LOG(debug, "Trying to encode filter protocol configurations", *decoder_callbacks_);
   if (!protocol_config_encoded_ && !config_->observabilityMode()) {
     auto* protocol_config = req.mutable_protocol_config();
-    protocol_config->set_request_body_mode(config_->processingMode().request_body_mode());
-    protocol_config->set_response_body_mode(config_->processingMode().response_body_mode());
+    protocol_config->set_request_body_mode(decoding_state_.bodyMode());
+    protocol_config->set_response_body_mode(encoding_state_.bodyMode());
     protocol_config->set_send_body_without_waiting_for_header_response(
         config_->sendBodyWithoutWaitingForHeaderResponse());
     protocol_config_encoded_ = true;
@@ -1448,7 +1456,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     return;
   }
 
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // Ignore this and treat as a successful close
     onGrpcClose();
     stats_.failure_mode_allowed_.inc();
@@ -1482,7 +1490,7 @@ void Filter::onMessageTimeout() {
   ENVOY_STREAM_LOG(debug, "message timeout reached", *decoder_callbacks_);
   logStreamInfo();
   stats_.message_timeouts_.inc();
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // The user would like a timeout to not cause message processing to fail.
     // However, we don't know if the external processor will send a response later,
     // and we can't wait any more. So, as we do for a spurious message, ignore
@@ -1641,6 +1649,12 @@ void Filter::mergePerRouteConfig() {
         *decoder_callbacks_);
     decoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
     encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
+  }
+
+  if (merged_config->failureModeAllow().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting new failureModeAllow from per-route configuration",
+                     *decoder_callbacks_);
+    failure_mode_allow_ = merged_config->failureModeAllow().value();
   }
 }
 

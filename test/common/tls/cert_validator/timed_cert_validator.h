@@ -52,7 +52,8 @@ class TimedCertValidatorFactory : public CertValidatorFactory {
 public:
   absl::StatusOr<CertValidatorPtr>
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                      Server::Configuration::CommonFactoryContext& context) override {
+                      Server::Configuration::CommonFactoryContext& context,
+                      Stats::Scope& /*scope*/) override {
     auto validator = std::make_unique<TimedCertValidator>(validation_time_out_ms_, config, stats,
                                                           context, expected_host_name_);
     if (expected_peer_address_.has_value()) {

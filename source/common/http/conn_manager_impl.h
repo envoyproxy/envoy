@@ -207,6 +207,11 @@ private:
                                    filter_log_handlers.end());
       return combined_log_handlers;
     }
+
+    RequestDecoderHandlePtr getRequestDecoderHandle() override {
+      return std::make_unique<ActiveStreamHandle>(*this);
+    }
+
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
     // (i.e. possibly after this stream has been destroyed).
     //
@@ -298,6 +303,7 @@ private:
     void setRoute(Router::RouteConstSharedPtr route) override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
+    void refreshRouteCluster() override;
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 

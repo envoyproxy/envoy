@@ -1,8 +1,12 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/data/core/v3/tlv_metadata.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
-#include "test/config/v2_link_hacks.h"
+#include "source/common/protobuf/utility.h"
+
+#include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -1432,6 +1436,594 @@ typed_config:
   codec_client_->sendData(*request_encoder, buffer_limit + 1, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
+}
+
+// Forward declare the filter class
+class TestTypedMetadataFilter;
+
+// Custom filter to add typed metadata
+class TestTypedMetadataFilter final : public Network::ReadFilter {
+public:
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    const std::string metadata_key = "envoy.test.typed_metadata";
+
+    // Get mutable access to the typed filter metadata map
+    auto& typed_filter_metadata = *read_callbacks_->connection()
+                                       .streamInfo()
+                                       .dynamicMetadata()
+                                       .mutable_typed_filter_metadata();
+
+    // Create metadata protobuf
+    envoy::data::core::v3::TlvsMetadata metadata;
+    auto* typed_metadata_map = metadata.mutable_typed_metadata();
+
+    // Add basic key-value pair
+    (*typed_metadata_map)["test_key"] = "test_key";
+    (*typed_metadata_map)["test_value"] = "test_value";
+
+    // Add protocol value
+    (*typed_metadata_map)["protocol_version"] = "h2,http/1.1";
+
+    // Add authority
+    (*typed_metadata_map)["authority"] = "example.com";
+
+    // Add some metadata that would typically be in SSL properties
+    (*typed_metadata_map)["ssl_version"] = "TLSv1.3";
+    (*typed_metadata_map)["ssl_cn"] = "client.example.com";
+
+    // Pack metadata into Any
+    ProtobufWkt::Any typed_config;
+    typed_config.PackFrom(metadata);
+    typed_filter_metadata.insert({metadata_key, typed_config});
+
+    return Network::FilterStatus::Continue;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+  }
+
+private:
+  Network::ReadFilterCallbacks* read_callbacks_{};
+};
+
+// Filter factory
+class TestTypedMetadataFilterConfig final
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    return Network::FilterFactoryCb([](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<TestTypedMetadataFilter>());
+    });
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Any>();
+  }
+
+  std::string name() const override { return "envoy.test.typed_metadata"; }
+  std::set<std::string> configTypes() override { return {}; };
+};
+
+// ``PPV2`` typed metadata filter that mimics the real proxy protocol behavior
+class PPV2TypedMetadataFilter final : public Network::ReadFilter {
+public:
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    const std::string metadata_key = "envoy.filters.listener.proxy_protocol";
+
+    // Get mutable access to the typed filter metadata map
+    auto& typed_filter_metadata = *read_callbacks_->connection()
+                                       .streamInfo()
+                                       .dynamicMetadata()
+                                       .mutable_typed_filter_metadata();
+
+    // Create metadata protobuf that mimics PP v2 structure
+    envoy::data::core::v3::TlvsMetadata metadata;
+    auto* typed_metadata_map = metadata.mutable_typed_metadata();
+
+    // PP2_TYPE_ALPN (0x01)
+    (*typed_metadata_map)["PP2_TYPE_ALPN"] = "h2,http/1.1";
+
+    // PP2_TYPE_AUTHORITY (0x02)
+    (*typed_metadata_map)["PP2_TYPE_AUTHORITY"] = "proxy.example.com";
+
+    // PP2_TYPE_CRC32C (0x03)
+    (*typed_metadata_map)["PP2_TYPE_CRC32C"] = std::string("\x12\x34\x56\x78", 4);
+
+    // PP2_TYPE_NOOP (0x04)
+    (*typed_metadata_map)["PP2_TYPE_NOOP"] = "";
+
+    // PP2_TYPE_UNIQUE_ID (0x05)
+    (*typed_metadata_map)["PP2_TYPE_UNIQUE_ID"] = "d8e8fca2-dc0f-4a8d-8664-5a97001";
+
+    // PP2_SUBTYPE_SSL (0x20)
+    (*typed_metadata_map)["ssl_version"] = "TLSv1.3";
+    (*typed_metadata_map)["ssl_cn"] = "client.example.com";
+    (*typed_metadata_map)["ssl_cipher"] = "ECDHE-RSA-AES128-GCM-SHA256";
+
+    // Pack metadata into Any
+    ProtobufWkt::Any typed_config;
+    typed_config.PackFrom(metadata);
+    typed_filter_metadata.insert({metadata_key, typed_config});
+
+    return Network::FilterStatus::Continue;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+  }
+
+private:
+  Network::ReadFilterCallbacks* read_callbacks_{};
+};
+
+// Filter factory for ``PPV2`` typed metadata
+class PPV2TypedMetadataFilterConfig final
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    return Network::FilterFactoryCb([](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<PPV2TypedMetadataFilter>());
+    });
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Any>();
+  }
+
+  std::string name() const override { return "envoy.test.ppv2.typed_metadata"; }
+  std::set<std::string> configTypes() override { return {}; };
+};
+
+TEST_P(LuaIntegrationTest, ConnectionTypedMetadata) {
+  // Register our test filter
+  TestTypedMetadataFilterConfig factory;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(factory);
+
+  // Setup network filter config
+  const std::string FILTER_CONFIG = R"EOF(
+name: envoy.test.typed_metadata
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Any
+)EOF";
+
+  config_helper_.addNetworkFilter(FILTER_CONFIG);
+
+  const std::string LUA_FILTER = R"EOF(
+  name: lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    default_source_code:
+      inline_string: |
+        function envoy_on_request(request_handle)
+          -- Test valid metadata
+          local meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.test.typed_metadata")
+          if meta and meta.typed_metadata then
+            -- Check basic key-value pair
+            request_handle:headers():add("typed_metadata_key", meta.typed_metadata.test_key)
+            request_handle:headers():add("typed_metadata_value", meta.typed_metadata.test_value)
+
+            -- Check protocol field
+            if meta.typed_metadata.protocol_version then
+              request_handle:headers():add("protocol_version", meta.typed_metadata.protocol_version)
+            end
+
+            -- Check authority field
+            if meta.typed_metadata.authority then
+              request_handle:headers():add("authority", meta.typed_metadata.authority)
+            end
+
+            -- Check SSL properties
+            if meta.typed_metadata.ssl_version then
+              request_handle:headers():add("ssl_version", meta.typed_metadata.ssl_version)
+            end
+
+            if meta.typed_metadata.ssl_cn then
+              request_handle:headers():add("ssl_cn", meta.typed_metadata.ssl_cn)
+            end
+          end
+
+          -- Test missing metadata
+          local missing = request_handle:connectionStreamInfo():dynamicTypedMetadata("missing.metadata")
+          if missing == nil then
+            request_handle:headers():add("missing_metadata", "is_nil")
+          end
+        end
+)EOF";
+
+  initializeFilter(LUA_FILTER);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  };
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify the typed metadata was accessible
+  auto typed_metadata_key =
+      upstream_request_->headers().get(Http::LowerCaseString("typed_metadata_key"));
+  EXPECT_FALSE(typed_metadata_key.empty());
+  EXPECT_EQ("test_key", typed_metadata_key[0]->value().getStringView());
+
+  auto typed_metadata_value =
+      upstream_request_->headers().get(Http::LowerCaseString("typed_metadata_value"));
+  EXPECT_FALSE(typed_metadata_value.empty());
+  EXPECT_EQ("test_value", typed_metadata_value[0]->value().getStringView());
+
+  // Verify protocol fields
+  auto protocol_version =
+      upstream_request_->headers().get(Http::LowerCaseString("protocol_version"));
+  EXPECT_FALSE(protocol_version.empty());
+  EXPECT_EQ("h2,http/1.1", protocol_version[0]->value().getStringView());
+
+  auto authority = upstream_request_->headers().get(Http::LowerCaseString("authority"));
+  EXPECT_FALSE(authority.empty());
+  EXPECT_EQ("example.com", authority[0]->value().getStringView());
+
+  // Verify SSL properties
+  auto ssl_version = upstream_request_->headers().get(Http::LowerCaseString("ssl_version"));
+  EXPECT_FALSE(ssl_version.empty());
+  EXPECT_EQ("TLSv1.3", ssl_version[0]->value().getStringView());
+
+  auto ssl_cn = upstream_request_->headers().get(Http::LowerCaseString("ssl_cn"));
+  EXPECT_FALSE(ssl_cn.empty());
+  EXPECT_EQ("client.example.com", ssl_cn[0]->value().getStringView());
+
+  // Verify the missing metadata returns nil
+  auto missing_metadata =
+      upstream_request_->headers().get(Http::LowerCaseString("missing_metadata"));
+  EXPECT_FALSE(missing_metadata.empty());
+  EXPECT_EQ("is_nil", missing_metadata[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Add this after the existing ConnectionTypedMetadata test
+TEST_P(LuaIntegrationTest, ProxyProtocolTypedMetadata) {
+  // Register our test filter
+  PPV2TypedMetadataFilterConfig factory;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(factory);
+
+  // Setup network filter config
+  const std::string FILTER_CONFIG = R"EOF(
+name: envoy.test.ppv2.typed_metadata
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Any
+)EOF";
+
+  config_helper_.addNetworkFilter(FILTER_CONFIG);
+
+  const std::string LUA_FILTER = R"EOF(
+  name: lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+    default_source_code:
+      inline_string: |
+        function envoy_on_request(request_handle)
+          -- Access Proxy Protocol typed metadata
+          local meta = request_handle:connectionStreamInfo():dynamicTypedMetadata("envoy.filters.listener.proxy_protocol")
+          if meta and meta.typed_metadata then
+            -- Add ALPN values
+            if meta.typed_metadata.PP2_TYPE_ALPN then
+              request_handle:headers():add("pp-alpn", meta.typed_metadata.PP2_TYPE_ALPN)
+            end
+
+            -- Add Authority
+            if meta.typed_metadata.PP2_TYPE_AUTHORITY then
+              request_handle:headers():add("pp-authority", meta.typed_metadata.PP2_TYPE_AUTHORITY)
+            end
+
+            -- Add unique ID if present
+            if meta.typed_metadata.PP2_TYPE_UNIQUE_ID then
+              request_handle:headers():add("pp-unique-id", meta.typed_metadata.PP2_TYPE_UNIQUE_ID)
+            end
+
+            -- Check SSL properties
+            if meta.typed_metadata.ssl_version then
+              request_handle:headers():add("pp-ssl-version", meta.typed_metadata.ssl_version)
+            end
+
+            if meta.typed_metadata.ssl_cipher then
+              request_handle:headers():add("pp-ssl-cipher", meta.typed_metadata.ssl_cipher)
+            end
+          end
+        end
+)EOF";
+
+  initializeFilter(LUA_FILTER);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},
+      {":path", "/test/long/url"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  };
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify the proxy protocol typed metadata was accessible
+  auto alpn = upstream_request_->headers().get(Http::LowerCaseString("pp-alpn"));
+  EXPECT_FALSE(alpn.empty());
+  EXPECT_EQ("h2,http/1.1", alpn[0]->value().getStringView());
+
+  auto authority = upstream_request_->headers().get(Http::LowerCaseString("pp-authority"));
+  EXPECT_FALSE(authority.empty());
+  EXPECT_EQ("proxy.example.com", authority[0]->value().getStringView());
+
+  auto unique_id = upstream_request_->headers().get(Http::LowerCaseString("pp-unique-id"));
+  EXPECT_FALSE(unique_id.empty());
+  EXPECT_EQ("d8e8fca2-dc0f-4a8d-8664-5a97001", unique_id[0]->value().getStringView());
+
+  // Verify SSL properties
+  auto ssl_version = upstream_request_->headers().get(Http::LowerCaseString("pp-ssl-version"));
+  EXPECT_FALSE(ssl_version.empty());
+  EXPECT_EQ("TLSv1.3", ssl_version[0]->value().getStringView());
+
+  auto ssl_cipher = upstream_request_->headers().get(Http::LowerCaseString("pp-ssl-cipher"));
+  EXPECT_FALSE(ssl_cipher.empty());
+  EXPECT_EQ("ECDHE-RSA-AES128-GCM-SHA256", ssl_cipher[0]->value().getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test StreamInfo dynamicTypedMetadata basic functionality.
+TEST_P(LuaIntegrationTest, StreamInfoDynamicTypedMetadataBasic) {
+  const std::string FILTER_AND_CODE = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        -- Test dynamicTypedMetadata function with non-existent filter
+        local result = request_handle:streamInfo():dynamicTypedMetadata("nonexistent.filter")
+        if result == nil then
+          request_handle:headers():add("typed_metadata_result", "nil")
+        else
+          request_handle:headers():add("typed_metadata_result", "unexpected")
+        end
+
+        -- Test another non-existent filter name
+        local result2 = request_handle:streamInfo():dynamicTypedMetadata("test.filter")
+        if result2 == nil then
+          request_handle:headers():add("typed_metadata_result2", "nil")
+        else
+          request_handle:headers():add("typed_metadata_result2", "unexpected")
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify both calls return nil as expected
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("typed_metadata_result"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("typed_metadata_result2"))[0]
+                       ->value()
+                       .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test StreamInfo dynamicTypedMetadata with actual metadata from set_metadata filter.
+TEST_P(LuaIntegrationTest, StreamInfoDynamicTypedMetadata) {
+  // First, configure the set_metadata filter to set actual typed metadata
+  const std::string SET_METADATA_FILTER = R"EOF(
+name: envoy.filters.http.set_metadata
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+  metadata:
+  - metadata_namespace: test.namespace
+    typed_value:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        test_key: "test_value"
+        version: "1.0.0"
+        enabled: true
+        count: 42
+  - metadata_namespace: simple.typed.metadata
+    typed_value:
+      "@type": type.googleapis.com/google.protobuf.StringValue
+      value: "simple_string_value"
+)EOF";
+
+  // Then configure the Lua filter to read the typed metadata
+  const std::string LUA_FILTER = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local stream_info = request_handle:streamInfo()
+
+        -- Test retrieving the structured typed metadata from set_metadata filter
+        local struct_meta = stream_info:dynamicTypedMetadata("test.namespace")
+        if struct_meta then
+          request_handle:headers():add("struct_meta_found", "true")
+
+          -- Access the values directly from the Struct (converted to Lua table)
+          if struct_meta.test_key then
+            request_handle:headers():add("struct_test_key", struct_meta.test_key)
+          end
+          if struct_meta.version then
+            request_handle:headers():add("struct_version", struct_meta.version)
+          end
+          if struct_meta.enabled ~= nil then
+            request_handle:headers():add("struct_enabled", tostring(struct_meta.enabled))
+          end
+          if struct_meta.count then
+            request_handle:headers():add("struct_count", tostring(struct_meta.count))
+          end
+        else
+          request_handle:headers():add("struct_meta_found", "false")
+
+          -- Debug: Try a few other possible namespaces
+          local alt1 = stream_info:dynamicTypedMetadata("envoy.filters.http.set_metadata")
+          if alt1 then
+            request_handle:headers():add("debug_alt1", "found")
+          else
+            request_handle:headers():add("debug_alt1", "nil")
+          end
+
+          local alt2 = stream_info:dynamicTypedMetadata("set_metadata")
+          if alt2 then
+            request_handle:headers():add("debug_alt2", "found")
+          else
+            request_handle:headers():add("debug_alt2", "nil")
+          end
+        end
+
+        -- Test retrieving the simple typed metadata
+        local simple_meta = stream_info:dynamicTypedMetadata("simple.typed.metadata")
+        if simple_meta then
+          request_handle:headers():add("simple_meta_found", "true")
+          if simple_meta.value then
+            request_handle:headers():add("simple_value", simple_meta.value)
+          end
+        else
+          request_handle:headers():add("simple_meta_found", "false")
+        end
+
+        -- Test non-existent metadata still returns nil
+        local missing_meta = stream_info:dynamicTypedMetadata("nonexistent.filter")
+        if missing_meta == nil then
+          request_handle:headers():add("missing_meta", "nil")
+        else
+          request_handle:headers():add("missing_meta", "found")
+        end
+      end
+)EOF";
+
+  // Configure both filters in the chain (set_metadata first, then lua)
+  config_helper_.prependFilter(LUA_FILTER);
+  config_helper_.prependFilter(SET_METADATA_FILTER);
+
+  // Create static clusters
+  createClusters();
+
+  // Add basic route configuration
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_match()
+            ->set_prefix("/test/long/url");
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Check what we found for struct metadata
+  auto struct_found_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("struct_meta_found"));
+  std::string struct_meta_result = std::string(struct_found_headers[0]->value().getStringView());
+  // Verify structured typed metadata was successfully retrieved
+  auto test_key_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("struct_test_key"));
+  if (!test_key_headers.empty()) {
+    EXPECT_EQ("test_value", test_key_headers[0]->value().getStringView());
+  }
+
+  auto version_headers = upstream_request_->headers().get(Http::LowerCaseString("struct_version"));
+  if (!version_headers.empty()) {
+    EXPECT_EQ("1.0.0", version_headers[0]->value().getStringView());
+  }
+
+  auto enabled_headers = upstream_request_->headers().get(Http::LowerCaseString("struct_enabled"));
+  if (!enabled_headers.empty()) {
+    EXPECT_EQ("true", enabled_headers[0]->value().getStringView());
+  }
+
+  auto count_headers = upstream_request_->headers().get(Http::LowerCaseString("struct_count"));
+  if (!count_headers.empty()) {
+    EXPECT_EQ("42", count_headers[0]->value().getStringView());
+  }
+
+  // Verify simple typed metadata was successfully retrieved
+  auto simple_found_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("simple_meta_found"));
+  if (simple_found_headers.empty()) {
+    FAIL() << "simple_meta_found header not present - Lua code crashed before checking simple "
+              "metadata";
+  }
+  EXPECT_EQ("true", simple_found_headers[0]->value().getStringView());
+
+  auto simple_value_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("simple_value"));
+  if (!simple_value_headers.empty()) {
+    EXPECT_EQ("simple_string_value", simple_value_headers[0]->value().getStringView());
+  }
+
+  // Verify non-existent metadata still returns nil
+  auto missing_meta_headers =
+      upstream_request_->headers().get(Http::LowerCaseString("missing_meta"));
+  if (!missing_meta_headers.empty()) {
+    EXPECT_EQ("nil", missing_meta_headers[0]->value().getStringView());
+  }
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
 }
 
 #ifdef NDEBUG

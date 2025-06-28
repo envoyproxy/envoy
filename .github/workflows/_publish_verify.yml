@@ -98,6 +98,7 @@ jobs:
       cache-build-image-key-suffix: ${{ matrix.arch == 'arm64' && format('-{0}', matrix.arch) || '' }}
       container-command: ./ci/run_envoy_docker.sh
       concurrency-suffix: -${{ matrix.arch || 'x64' }}
+      diskspace-hack: true
       downloads: |
         release.signed: release.signed
       gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}

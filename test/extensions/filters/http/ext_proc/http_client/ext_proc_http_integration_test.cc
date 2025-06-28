@@ -352,6 +352,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, GetAndSetHeadersWithMutation) {
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         response_header_mutation->add_remove_headers("x-remove-this");
@@ -463,6 +464,7 @@ TEST_P(ExtProcHttpClientIntegrationTest, SentHeadersInBothDirection) {
 
         auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
         auto* mut1 = response_header_mutation->add_set_headers();
+        mut1->mutable_append()->set_value(false);
         mut1->mutable_header()->set_key("x-new-header");
         mut1->mutable_header()->set_raw_value("new");
         return true;

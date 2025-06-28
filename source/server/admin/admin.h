@@ -220,7 +220,7 @@ public:
   void closeSocket() override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
-  uint64_t maxRequestsPerConnection() const override { return 0; }
+  uint32_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
@@ -440,6 +440,8 @@ private:
     }
 
     absl::string_view name() const override { return "admin"; }
+
+    bool addedViaApi() const override { return false; }
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;

@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/dynamic_modules/v3/dynamic_modules.pb.h"
+
 #include "source/common/common/base64.h"
 
 #include "test/integration/http_integration.h"
@@ -10,6 +12,7 @@ public:
 
   void
   initializeFilter(const std::string& filter_name, const std::string& config = "",
+                   const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
                    bool upstream_filter = false) {
     TestEnvironment::setEnvVar(
@@ -30,6 +33,34 @@ typed_config:
     value: {}
 )EOF";
 
+    if (!per_route_config.empty()) {
+      constexpr auto filter_per_route_config = R"EOF(
+dynamic_module_config:
+  name: http_integration_test
+per_route_config_name: {}
+filter_config:
+  "@type": {}
+  value: {}
+)EOF";
+      envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute
+          per_route_config_proto;
+      TestUtility::loadFromYaml(
+          fmt::format(filter_per_route_config, filter_name, type_url, per_route_config),
+          per_route_config_proto);
+
+      config_helper_.addConfigModifier(
+          [per_route_config_proto](envoy::extensions::filters::network::http_connection_manager::
+                                       v3::HttpConnectionManager& cfg) {
+            auto* config = cfg.mutable_route_config()
+                               ->mutable_virtual_hosts()
+                               ->Mutable(0)
+                               ->mutable_typed_per_filter_config();
+
+            (*config)["envoy.extensions.filters.http.dynamic_modules"].PackFrom(
+                per_route_config_proto);
+          });
+    }
+
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
     config_helper_.prependFilter(fmt::format(filter_config, filter_name, type_url, config),
@@ -37,7 +68,7 @@ typed_config:
     initialize();
   }
   void runHeaderCallbacksTest(bool upstream_filter) {
-    initializeFilter("header_callbacks", "dog:cat",
+    initializeFilter("header_callbacks", "dog:cat", "",
                      "type.googleapis.com/google.protobuf.StringValue", upstream_filter);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
@@ -122,7 +153,7 @@ TEST_P(DynamicModulesIntegrationTest, HeaderCallbacksWithUpstreamFilter) {
 }
 
 TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
-  initializeFilter("header_callbacks", "ZG9nOmNhdA==" /* echo -n "dog:cat" | base64 */,
+  initializeFilter("header_callbacks", "ZG9nOmNhdA==" /* echo -n "dog:cat" | base64 */, "",
                    "type.googleapis.com/google.protobuf.BytesValue");
   codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
@@ -154,6 +185,30 @@ TEST_P(DynamicModulesIntegrationTest, BytesConfig) {
   EXPECT_EQ(
       "cat",
       upstream_request_->headers().get(Http::LowerCaseString("dog"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, PerRouteConfig) {
+  initializeFilter("per_route_config", "a", "b");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{"foo", "bar"},
+                                                 {":method", "POST"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  // Verify that the headers/trailers are added as expected.
+  EXPECT_EQ("a", upstream_request_->headers()
+                     .get(Http::LowerCaseString("x-config"))[0]
+                     ->value()
+                     .getStringView());
+  EXPECT_EQ("b", upstream_request_->headers()
+                     .get(Http::LowerCaseString("x-per-route-config"))[0]
+                     ->value()
+                     .getStringView());
 }
 
 TEST_P(DynamicModulesIntegrationTest, BodyCallbacks) {
@@ -263,6 +318,92 @@ TEST_P(DynamicModulesIntegrationTest, SendResponseFromOnResponseHeaders) {
   EXPECT_EQ(
       "some_value",
       response->headers().get(Http::LowerCaseString("some_header"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, HttpCalloutsNonExistentCluster) {
+  initializeFilter("http_callouts", "missing");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("500", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("bar",
+            response->headers().get(Http::LowerCaseString("foo"))[0]->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, HttpCalloutsOK) {
+  initializeFilter("http_callouts", "cluster_0");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_);
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+
+  Http::TestRequestHeaderMapImpl response_headers{{"some_header", "some_value"},
+                                                  {":status", "200"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData("response_body_from_callout", true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("local_response_body", response->body());
+}
+
+TEST_P(DynamicModulesIntegrationTest, Scheduler) {
+  initializeFilter("http_filter_scheduler");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  auto encoder_decoder = codec_client_->startRequest(default_request_headers_, true);
+  auto response = std::move(encoder_decoder.second);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+TEST_P(DynamicModulesIntegrationTest, FakeExternalCache) {
+  initializeFilter("fake_external_cache");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  // Non existent cache key should return 200 OK with body.
+  {
+    auto headers = default_request_headers_;
+    headers.addCopy(Http::LowerCaseString("cacahe-key"), "non-existent");
+    auto encoder_decoder = codec_client_->startRequest(headers, true);
+    auto response = std::move(encoder_decoder.second);
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    EXPECT_EQ("req", upstream_request_->headers()
+                         .get(Http::LowerCaseString("on-scheduled"))[0]
+                         ->value()
+                         .getStringView());
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ(
+        "res",
+        response->headers().get(Http::LowerCaseString("on-scheduled"))[0]->value().getStringView());
+    EXPECT_TRUE(response->body().empty());
+  }
+  // Existing cache key should return 200 OK with body and shouldn't reach the upstream.
+  {
+    auto headers = default_request_headers_;
+    headers.addCopy(Http::LowerCaseString("cacahe-key"), "existing");
+    auto encoder_decoder = codec_client_->startRequest(headers, true);
+    auto response = std::move(encoder_decoder.second);
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+    EXPECT_EQ("yes",
+              response->headers().get(Http::LowerCaseString("cached"))[0]->value().getStringView());
+    EXPECT_EQ("cached_response_body", response->body());
+  }
 }
 
 } // namespace Envoy

@@ -1,40 +1,35 @@
 #include "source/extensions/common/aws/credential_providers/container_credentials_provider.h"
 
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 
 ContainerCredentialsProvider::ContainerCredentialsProvider(
-    Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-    absl::string_view credential_uri, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    CreateMetadataFetcherCb create_metadata_fetcher_cb, absl::string_view credential_uri,
+    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer, absl::string_view authorization_token,
     absl::string_view cluster_name)
-    : MetadataCredentialsProviderBase(api, context, aws_cluster_manager, cluster_name,
+    : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
       credential_uri_(credential_uri), authorization_token_(authorization_token) {}
-
-bool ContainerCredentialsProvider::needsRefresh() {
-  const auto now = api_.timeSource().systemTime();
-  auto expired = (now - last_updated_ > REFRESH_INTERVAL);
-
-  if (expiration_time_.has_value()) {
-    return expired || (expiration_time_.value() - now < REFRESH_GRACE_PERIOD);
-  } else {
-    return expired;
-  }
-}
 
 void ContainerCredentialsProvider::refresh() {
 
   absl::string_view host, path;
 
   ENVOY_LOG(debug, "Getting AWS credentials from the container role at URI: {}",
-            aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value());
+            aws_cluster_manager_->getUriFromClusterName(cluster_name_).value());
   Http::Utility::extractHostPathFromUri(
-      aws_cluster_manager_.ref()->getUriFromClusterName(cluster_name_).value(), host, path);
+      aws_cluster_manager_->getUriFromClusterName(cluster_name_).value(), host, path);
 
   // ECS Task role: use const authorization_token set during initialization
   absl::string_view authorization_header = authorization_token_;
@@ -43,7 +38,7 @@ void ContainerCredentialsProvider::refresh() {
   if (authorization_token_.empty()) {
     // EKS Pod Identity token is sourced from AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE
     if (const auto token_file = std::getenv(AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE)) {
-      token_or_error = api_.fileSystem().fileReadToEnd(std::string(token_file));
+      token_or_error = context_.api().fileSystem().fileReadToEnd(std::string(token_file));
       if (token_or_error.ok()) {
         ENVOY_LOG(debug, "Container authorization token file contents loaded");
         authorization_header = token_or_error.value();
@@ -59,10 +54,7 @@ void ContainerCredentialsProvider::refresh() {
   message.headers().setHost(host);
   message.headers().setPath(path);
   message.headers().setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
-  // Stop any existing timer.
-  if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
-    cache_duration_timer_->disableTimer();
-  }
+
   // Using Http async client to fetch the AWS credentials.
   if (!metadata_fetcher_) {
     metadata_fetcher_ = create_metadata_fetcher_cb_(context_.clusterManager(), clusterName());
@@ -117,7 +109,7 @@ void ContainerCredentialsProvider::extractCredentials(
     }
   }
 
-  last_updated_ = api_.timeSource().systemTime();
+  last_updated_ = context_.api().timeSource().systemTime();
   setCredentialsToAllThreads(
       std::make_unique<Credentials>(access_key_id, secret_access_key, session_token));
   stats_->credential_refreshes_succeeded_.inc();
