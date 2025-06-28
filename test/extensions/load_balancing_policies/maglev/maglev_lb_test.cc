@@ -283,12 +283,12 @@ TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
 }
 
 TEST_F(MaglevLoadBalancerTest, MaglevLbWithHashPolicy) {
-  host_set_.hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  host_set_.hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
 
