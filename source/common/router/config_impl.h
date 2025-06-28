@@ -391,13 +391,11 @@ private:
  */
 class VirtualHostImpl : Logger::Loggable<Logger::Id::router> {
 public:
-  VirtualHostImpl(
-      const envoy::config::route::v3::VirtualHost& virtual_host,
-      const CommonConfigSharedPtr& global_route_config,
-      Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-      ProtobufMessage::ValidationVisitor& validator,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
-      absl::Status& creation_status);
+  VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
+                  const CommonConfigSharedPtr& global_route_config,
+                  Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+                  ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
+                  absl::Status& creation_status);
 
   RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
                                           const Http::RequestHeaderMap& headers,
@@ -669,11 +667,12 @@ public:
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
-  absl::Status
-  validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
+  absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
+  void refreshRouteCluster(const Http::RequestHeaderMap&,
+                           const StreamInfo::StreamInfo&) const override {}
   const RouteStatsContextOptRef routeStatsContext() const override {
     if (route_stats_context_ != nullptr) {
       return *route_stats_context_;
@@ -843,6 +842,10 @@ public:
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+    void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                             const StreamInfo::StreamInfo& stream_info) const override {
+      return parent_->refreshRouteCluster(headers, stream_info);
+    }
     Http::Code clusterNotFoundResponseCode() const override {
       return parent_->clusterNotFoundResponseCode();
     }
@@ -1214,7 +1217,6 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
-  const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const std::chrono::milliseconds timeout_;
   const OptionalTimeouts optional_timeouts_;

@@ -456,6 +456,8 @@ public:
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
+  MOCK_METHOD(void, refreshRouteCluster,
+              (const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -569,6 +571,8 @@ public:
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
+  MOCK_METHOD(void, refreshRouteCluster,
+              (const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
@@ -735,7 +739,7 @@ public:
 
   MOCK_METHOD(RouteConstSharedPtr, route,
               (RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo& stream_info),
+               const StreamInfo::StreamInfo& stream_info, uint64_t random),
               (const));
 };
 
@@ -744,7 +748,7 @@ public:
   MockClusterSpecifierPluginFactoryConfig();
   MOCK_METHOD(ClusterSpecifierPluginSharedPtr, createClusterSpecifierPlugin,
               (const Protobuf::Message& config,
-               Server::Configuration::CommonFactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();

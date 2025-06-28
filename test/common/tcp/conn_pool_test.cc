@@ -236,7 +236,7 @@ class TcpConnPoolImplTest : public Event::TestUsingSimulatedTime, public testing
 public:
   TcpConnPoolImplTest()
       : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
-        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime())) {}
+        host_(Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000")) {}
 
   ~TcpConnPoolImplTest() override {
     EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()))
@@ -268,7 +268,7 @@ class TcpConnPoolImplDestructorTest : public Event::TestUsingSimulatedTime, publ
 public:
   TcpConnPoolImplDestructorTest()
       : upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)) {
-    host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime());
+    host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000");
     conn_pool_ =
         std::make_unique<ConnPoolImpl>(dispatcher_, host_, Upstream::ResourcePriority::Default,
                                        nullptr, nullptr, state_, absl::nullopt, overload_manager_);

@@ -184,7 +184,6 @@ public:
 };
 
 } // namespace ExternalAuth
-
 } // namespace RedisProxy
 } // namespace NetworkFilters
 } // namespace Extensions

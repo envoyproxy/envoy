@@ -96,6 +96,11 @@ message SocketBufferedTrace {
   bool write_truncated = 5;
 }
 
+// A message for the sequence of observed events
+message SocketEvents {
+  repeated SocketEvent events = 1;
+}
+
 // A streamed socket trace segment. Multiple segments make up a full trace.
 message SocketStreamedTraceSegment {
   option (udpa.annotations.versioning).previous_message_type =
@@ -111,5 +116,8 @@ message SocketStreamedTraceSegment {
 
     // Socket event.
     SocketEvent event = 3;
+
+    // Sequence of observed events.
+    SocketEvents events = 4;
   }
 }

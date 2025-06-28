@@ -359,8 +359,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   // Now that the async-client manager is set, the xDS-Manager can be initialized.
-  absl::Status status = xds_manager_.initialize(bootstrap, this);
-  SET_AND_RETURN_IF_NOT_OK(status, creation_status);
+  SET_AND_RETURN_IF_NOT_OK(xds_manager_.initialize(bootstrap, this), creation_status);
 }
 
 absl::Status
@@ -498,7 +497,7 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0);
+        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
     RETURN_IF_NOT_OK_REF(factory_or_error.status());
     absl::StatusOr<Grpc::RawAsyncClientPtr> client_or_error =
         factory_or_error.value()->createUncachedRawAsyncClient();
@@ -846,7 +845,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                                 ClusterMap& cluster_map, const bool avoid_cds_removal) {
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
       new_cluster_pair_or_error =
-          factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
+          factory_.clusterFromProto(cluster, outlier_event_logger_, added_via_api);
 
   if (!new_cluster_pair_or_error.ok()) {
     return absl::InvalidArgumentError(std::string(new_cluster_pair_or_error.status().message()));
@@ -2261,11 +2260,10 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 
 absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ProdClusterManagerFactory::clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
-                                            ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
                                             bool added_via_api) {
-  return ClusterFactoryImplBase::create(cluster, context_, cm, dns_resolver_fn_,
-                                        ssl_context_manager_, outlier_event_logger, added_via_api);
+  return ClusterFactoryImplBase::create(cluster, context_, dns_resolver_fn_, outlier_event_logger,
+                                        added_via_api);
 }
 
 absl::StatusOr<CdsApiPtr>

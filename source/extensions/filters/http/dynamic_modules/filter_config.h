@@ -31,6 +31,7 @@ using OnHttpFilterStreamCompleteType =
 using OnHttpFilterDestroyType = decltype(&envoy_dynamic_module_on_http_filter_destroy);
 using OnHttpFilterHttpCalloutDoneType =
     decltype(&envoy_dynamic_module_on_http_filter_http_callout_done);
+using OnHttpFilterScheduled = decltype(&envoy_dynamic_module_on_http_filter_scheduled);
 
 /**
  * A config to create http filters based on a dynamic module. This will be owned by multiple
@@ -70,6 +71,7 @@ public:
   OnHttpFilterStreamCompleteType on_http_filter_stream_complete_ = nullptr;
   OnHttpFilterDestroyType on_http_filter_destroy_ = nullptr;
   OnHttpFilterHttpCalloutDoneType on_http_filter_http_callout_done_ = nullptr;
+  OnHttpFilterScheduled on_http_filter_scheduled_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
 

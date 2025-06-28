@@ -269,6 +269,7 @@ public:
   static ExportedFunctions exportedFunctions() {
     return {{"protocol", static_luaProtocol},
             {"dynamicMetadata", static_luaDynamicMetadata},
+            {"dynamicTypedMetadata", static_luaDynamicTypedMetadata},
             {"downstreamDirectLocalAddress", static_luaDownstreamDirectLocalAddress},
             {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
@@ -291,6 +292,12 @@ private:
    * @return DynamicMetadataMapWrapper representation of StreamInfo dynamic metadata.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicMetadata);
+
+  /**
+   * Get reference to stream info typed metadata object.
+   * @return typed metadata wrapped as a Lua table.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicTypedMetadata);
 
   /**
    * Get reference to stream info downstreamSslConnection.

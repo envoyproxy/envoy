@@ -70,6 +70,7 @@ typedef enum { // NOLINT(modernize-use-using)
   CAPIInternalFailure = -7,
   CAPISerializationFailure = -8,
   CAPIInvalidScene = -9,
+  CAPIInvalidIPAddress = -10,
 } CAPIStatus;
 
 /* These APIs are related to the decode/encode phase, use the pointer of processState. */
@@ -98,6 +99,8 @@ CAPIStatus envoyGoFilterHttpCopyTrailers(void* s, void* strs, void* buf);
 CAPIStatus envoyGoFilterHttpSetTrailer(void* s, void* key_data, int key_len, void* value,
                                        int value_len, headerAction action);
 CAPIStatus envoyGoFilterHttpRemoveTrailer(void* s, void* key_data, int key_len);
+CAPIStatus envoyGoFilterHttpSetUpstreamOverrideHost(void* s, void* host_data, int host_len,
+                                                    bool strict);
 
 /* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
 CAPIStatus envoyGoFilterHttpClearRouteCache(void* r, bool refresh);
