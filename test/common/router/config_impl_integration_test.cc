@@ -29,7 +29,7 @@ public:
                               const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                               uint64_t) const override {
       ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
-      return std::make_shared<Router::DynamicRouteEntry>(parent, cluster_name_);
+      return std::make_shared<Router::DynamicRouteEntry>(parent, std::string(cluster_name_));
     }
 
     const std::string cluster_name_;
