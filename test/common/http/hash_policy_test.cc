@@ -151,7 +151,7 @@ TEST_F(HashPolicyImplTest, CookieHashForAbsentCookieWithTTL) {
 
   // Simulate the callback used for adding a new cookie when TTL is defined
   Http::HashPolicy::AddCookieCallback add_cookie =
-      [](absl::string_view, absl::string_view, uint64_t,
+      [](absl::string_view, absl::string_view, std::chrono::seconds,
          absl::Span<const CookieAttribute>) -> std::string { return "new-cookie-value"; };
 
   absl::optional<uint64_t> hash = hash_policy_impl_->generateHash(headers_, {}, add_cookie);
