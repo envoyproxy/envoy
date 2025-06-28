@@ -32,9 +32,9 @@ public:
    * @param ttl the lifetime of the cookie
    * @return std::string the opaque value of the cookie that will be set
    */
-  using AddCookieCallback =
-      std::function<std::string(absl::string_view name, absl::string_view path, uint64_t ttl,
-                                absl::Span<const CookieAttribute> attributes)>;
+  using AddCookieCallback = std::function<std::string(
+      absl::string_view name, absl::string_view path, std::chrono::seconds ttl,
+      absl::Span<const CookieAttribute> attributes)>;
 
   /**
    * @param headers stores the HTTP headers for the stream.

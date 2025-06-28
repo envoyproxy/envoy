@@ -363,7 +363,7 @@ public:
       if (hash_policy) {
         return hash_policy->generateHash(
             *downstream_headers_, callbacks_->streamInfo(),
-            [this](absl::string_view key, absl::string_view path, uint64_t max_age,
+            [this](absl::string_view key, absl::string_view path, std::chrono::seconds max_age,
                    absl::Span<const Http::CookieAttribute> attributes) -> std::string {
               return addDownstreamSetCookie(key, path, max_age, attributes);
             });
@@ -461,7 +461,7 @@ public:
    * @return std::string the value of the new cookie
    */
   std::string addDownstreamSetCookie(absl::string_view key, absl::string_view path,
-                                     uint64_t max_age,
+                                     std::chrono::seconds max_age,
                                      absl::Span<const Http::CookieAttribute> attributes) {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.

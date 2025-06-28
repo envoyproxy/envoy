@@ -579,15 +579,16 @@ std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const s
 }
 
 std::string Utility::makeSetCookieValue(absl::string_view name, absl::string_view value,
-                                        absl::string_view path, uint64_t max_age, bool httponly,
+                                        absl::string_view path, std::chrono::seconds max_age,
+                                        bool httponly,
                                         absl::Span<const CookieAttribute> attributes) {
   std::string cookie_value;
   // Best effort attempt to avoid numerous string copies.
   cookie_value.reserve(value.size() + path.size() + 30);
 
   cookie_value = absl::StrCat(name, "=\"", value, "\"");
-  if (max_age != 0) {
-    absl::StrAppend(&cookie_value, "; Max-Age=", max_age);
+  if (max_age != std::chrono::seconds::zero()) {
+    absl::StrAppend(&cookie_value, "; Max-Age=", max_age.count());
   }
   if (!path.empty()) {
     absl::StrAppend(&cookie_value, "; Path=", path);

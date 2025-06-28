@@ -53,8 +53,8 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     EXPECT_EQ(response_headers.get_("set-cookie"),
               Envoy::Http::Utility::makeSetCookieValue(
                   "override_host",
-                  Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()), "", 0,
-                  true, {}));
+                  Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()), "",
+                  std::chrono::seconds(0), true, {}));
   }
 
   {
@@ -98,7 +98,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
               Envoy::Http::Utility::makeSetCookieValue(
                   "override_host",
                   Envoy::Base64::encode(cookie_content.c_str(), cookie_content.length()), "/path",
-                  5, true, {}));
+                  std::chrono::seconds(5), true, {}));
   }
   {
     CookieBasedSessionStateProto config;

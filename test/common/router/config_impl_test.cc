@@ -2901,7 +2901,7 @@ virtual_hosts:
 class RouterMatcherHashPolicyTest : public testing::Test, public ConfigImplTestBase {
 protected:
   RouterMatcherHashPolicyTest()
-      : add_cookie_nop_([](absl::string_view, absl::string_view, uint64_t,
+      : add_cookie_nop_([](absl::string_view, absl::string_view, std::chrono::seconds,
                            absl::Span<const Http::CookieAttribute>) { return ""; }) {
     const std::string yaml = R"EOF(
 virtual_hosts:
@@ -3059,9 +3059,9 @@ TEST_F(RouterMatcherCookieHashPolicyTest, TtlSet) {
                            absl::Span<const Http::CookieAttribute> attributes)>
       mock_cookie_cb;
   auto add_cookie =
-      [&mock_cookie_cb](absl::string_view name, absl::string_view path, uint64_t ttl,
+      [&mock_cookie_cb](absl::string_view name, absl::string_view path, std::chrono::seconds ttl,
                         absl::Span<const Http::CookieAttribute> attributes) -> std::string {
-    return mock_cookie_cb.Call(name, path, ttl, attributes);
+    return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 
   {
@@ -3113,9 +3113,9 @@ TEST_F(RouterMatcherCookieHashPolicyTest, SetSessionCookie) {
                            absl::Span<const Http::CookieAttribute> attributes)>
       mock_cookie_cb;
   auto add_cookie =
-      [&mock_cookie_cb](absl::string_view name, absl::string_view path, uint64_t ttl,
+      [&mock_cookie_cb](absl::string_view name, absl::string_view path, std::chrono::seconds ttl,
                         absl::Span<const Http::CookieAttribute> attributes) -> std::string {
-    return mock_cookie_cb.Call(name, path, ttl, attributes);
+    return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 
   {
@@ -3133,9 +3133,9 @@ TEST_F(RouterMatcherCookieHashPolicyTest, SetCookiePath) {
                            absl::Span<const Http::CookieAttribute> attributes)>
       mock_cookie_cb;
   auto add_cookie =
-      [&mock_cookie_cb](absl::string_view name, absl::string_view path, uint64_t ttl,
+      [&mock_cookie_cb](absl::string_view name, absl::string_view path, std::chrono::seconds ttl,
                         absl::Span<const Http::CookieAttribute> attributes) -> std::string {
-    return mock_cookie_cb.Call(name, path, ttl, attributes);
+    return mock_cookie_cb.Call(name, path, ttl.count(), attributes);
   };
 
   {

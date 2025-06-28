@@ -87,7 +87,8 @@ public:
   CookieHashMethod(const envoy::config::route::v3::RouteAction::HashPolicy::Cookie& cookie,
                    bool terminal)
       : HashMethodImplBase(terminal), name_(cookie.name()), path_(cookie.path()),
-        ttl_(cookie.has_ttl() ? absl::optional<uint64_t>(cookie.ttl().seconds()) : absl::nullopt) {
+        ttl_(cookie.has_ttl() ? absl::optional<std::chrono::seconds>(cookie.ttl().seconds())
+                              : absl::nullopt) {
     attributes_.reserve(cookie.attributes().size());
     for (const auto& attribute : cookie.attributes()) {
       attributes_.push_back(CookieAttribute{attribute.name(), attribute.value()});
@@ -123,7 +124,7 @@ public:
 private:
   const std::string name_;
   const std::string path_;
-  const absl::optional<uint64_t> ttl_;
+  const absl::optional<std::chrono::seconds> ttl_;
   std::vector<CookieAttribute> attributes_;
 };
 

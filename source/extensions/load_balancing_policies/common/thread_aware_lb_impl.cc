@@ -98,7 +98,7 @@ absl::Status normalizeWeights(const HostSet& host_set, bool in_panic,
 }
 
 std::string generateCookie(LoadBalancerContext* context, absl::string_view name,
-                           absl::string_view path, uint64_t ttl,
+                           absl::string_view path, std::chrono::seconds ttl,
                            absl::Span<const Http::CookieAttribute> attributes) {
   ASSERT(context != nullptr);
   const StreamInfo::StreamInfo* stream_info = context->requestStreamInfo();
@@ -197,7 +197,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
       hash = hash_policy_->generateHash(
           makeOptRefFromPtr(context->downstreamHeaders()),
           makeOptRefFromPtr(context->requestStreamInfo()),
-          [context](absl::string_view name, absl::string_view path, uint64_t ttl,
+          [context](absl::string_view name, absl::string_view path, std::chrono::seconds ttl,
                     absl::Span<const Http::CookieAttribute> attributes) -> std::string {
             return generateCookie(context, name, path, ttl, attributes);
           });

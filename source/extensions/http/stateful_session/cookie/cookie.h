@@ -96,7 +96,7 @@ private:
   }
 
   const std::string name_;
-  const uint64_t ttl_;
+  const std::chrono::seconds ttl_;
   const std::string path_;
   TimeSource& time_source_;
 

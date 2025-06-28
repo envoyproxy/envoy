@@ -74,7 +74,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kMakeSetCookieValue: {
     const auto& cookie_value = input.make_set_cookie_value();
     Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
-                                      cookie_value.max_age(), cookie_value.httponly(), {});
+                                      std::chrono::seconds(cookie_value.max_age()),
+                                      cookie_value.httponly(), {});
     break;
   }
   case test::common::http::UtilityTestCase::kParseAuthorityString: {

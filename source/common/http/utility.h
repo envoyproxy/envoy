@@ -274,7 +274,7 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
  * @return std::string a valid Set-Cookie header value string
  */
 std::string makeSetCookieValue(absl::string_view name, absl::string_view value,
-                               absl::string_view path, uint64_t max_age, bool httponly,
+                               absl::string_view path, std::chrono::seconds max_age, bool httponly,
                                absl::Span<const CookieAttribute> attributes);
 
 /**
