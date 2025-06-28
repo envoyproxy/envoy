@@ -17,19 +17,26 @@ static_resources:
             virtual_hosts:
             - name: local_service
               domains: ["*"]
-              routes:
-              - match:
-                  prefix: "/"
-                route:
-                  host_rewrite_literal: upstream.com
-                  cluster: upstream_com
               metadata:
                 filter_metadata:
                   lua-custom-name:
-                    foo: bar
+                    foo: vh-bar
                     baz:
-                    - bad
-                    - baz
+                    - vh-bad
+                    - vh-baz
+              routes:
+              - match:
+                  prefix: "/"
+                metadata:
+                  filter_metadata:
+                    lua-custom-name:
+                      foo: bar
+                      baz:
+                      - bad
+                      - baz
+                route:
+                  host_rewrite_literal: upstream.com
+                  cluster: upstream_com
           http_filters:
           - name: lua-custom-name
             typed_config:
