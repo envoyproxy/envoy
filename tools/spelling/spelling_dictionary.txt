@@ -164,6 +164,7 @@ ECDHE
 ECDS
 ECDSA
 ECONNREFUSED
+ECR
 EDESTRUCTION
 EDF
 EINVAL
@@ -1068,6 +1069,7 @@ numkeys
 oauth
 observability
 ocagent
+OCI
 offsetof
 oneof
 oneway
