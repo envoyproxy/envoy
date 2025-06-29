@@ -89,6 +89,18 @@ INSTANTIATE_TEST_SUITE_P(
         [](IoUring& uring, os_fd_t fd) -> IoUringResult { return uring.prepareClose(fd, nullptr); },
         [](IoUring& uring, os_fd_t fd) -> IoUringResult {
           return uring.prepareShutdown(fd, 0, nullptr);
+        },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          return uring.prepareSend(fd, nullptr, 0, 0, nullptr);
+        },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          return uring.prepareRecv(fd, nullptr, 0, 0, nullptr);
+        },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          return uring.prepareSendmsg(fd, nullptr, 0, nullptr);
+        },
+        [](IoUring& uring, os_fd_t fd) -> IoUringResult {
+          return uring.prepareRecvmsg(fd, nullptr, 0, nullptr);
         }));
 
 TEST_P(IoUringImplParamTest, InvalidParams) {
@@ -399,6 +411,179 @@ TEST_F(IoUringImplTest, PrepareReadvQueueOverflow) {
 
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[0], 'e');
   EXPECT_EQ(static_cast<char*>(iov3.iov_base)[1], 'f');
+}
+
+TEST_F(IoUringImplTest, PrepareSendRecvOperations) {
+  int sockets[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets), 0);
+
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  os_fd_t event_fd = io_uring_->registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  int32_t completions_nr = 0;
+
+  std::string test_data = "Hello, Send/Recv!";
+  char recv_buffer[256];
+
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [this, &completions_nr, &test_data](uint32_t) {
+        io_uring_->forEveryCompletion([&completions_nr, &test_data](Request*, int32_t res, bool) {
+          if (completions_nr == 0) {
+            // Send completion
+            EXPECT_EQ(res, static_cast<int32_t>(test_data.length()));
+          } else {
+            // Recv completion
+            EXPECT_EQ(res, static_cast<int32_t>(test_data.length()));
+          }
+          completions_nr++;
+        });
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read);
+
+  // Test prepareSend
+  IoUringResult res =
+      io_uring_->prepareSend(sockets[0], test_data.c_str(), test_data.length(), 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  // Test prepareRecv
+  res = io_uring_->prepareRecv(sockets[1], recv_buffer, sizeof(recv_buffer), 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  io_uring_->submit();
+
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
+
+  // Verify received data
+  EXPECT_EQ(std::string(recv_buffer, test_data.length()), test_data);
+
+  close(sockets[0]);
+  close(sockets[1]);
+}
+
+TEST_F(IoUringImplTest, PrepareSendmsgRecvmsgOperations) {
+  int sockets[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets), 0);
+
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  os_fd_t event_fd = io_uring_->registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  int32_t completions_nr = 0;
+
+  std::string test_data = "Hello, Sendmsg/Recvmsg!";
+  char recv_buffer[256];
+
+  // Setup sendmsg structure
+  struct iovec send_iov;
+  send_iov.iov_base = const_cast<char*>(test_data.c_str());
+  send_iov.iov_len = test_data.length();
+
+  struct msghdr send_msg;
+  memset(&send_msg, 0, sizeof(send_msg));
+  send_msg.msg_iov = &send_iov;
+  send_msg.msg_iovlen = 1;
+
+  // Setup recvmsg structure
+  struct iovec recv_iov;
+  recv_iov.iov_base = recv_buffer;
+  recv_iov.iov_len = sizeof(recv_buffer);
+
+  struct msghdr recv_msg;
+  memset(&recv_msg, 0, sizeof(recv_msg));
+  recv_msg.msg_iov = &recv_iov;
+  recv_msg.msg_iovlen = 1;
+
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [this, &completions_nr, &test_data](uint32_t) {
+        io_uring_->forEveryCompletion([&completions_nr, &test_data](Request*, int32_t res, bool) {
+          if (completions_nr == 0) {
+            // Sendmsg completion
+            EXPECT_EQ(res, static_cast<int32_t>(test_data.length()));
+          } else {
+            // Recvmsg completion
+            EXPECT_EQ(res, static_cast<int32_t>(test_data.length()));
+          }
+          completions_nr++;
+        });
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read);
+
+  // Test prepareSendmsg
+  IoUringResult res = io_uring_->prepareSendmsg(sockets[0], &send_msg, 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  // Test prepareRecvmsg
+  res = io_uring_->prepareRecvmsg(sockets[1], &recv_msg, 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  io_uring_->submit();
+
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
+
+  // Verify received data
+  EXPECT_EQ(std::string(recv_buffer, test_data.length()), test_data);
+
+  close(sockets[0]);
+  close(sockets[1]);
+}
+
+TEST_F(IoUringImplTest, SendRecvQueueOverflow) {
+  int sockets[2];
+  ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets), 0);
+
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  os_fd_t event_fd = io_uring_->registerEventfd();
+  const Event::FileTriggerType trigger = Event::PlatformDefaultTriggerType;
+  int32_t completions_nr = 0;
+
+  std::string test_data1 = "Data1";
+  std::string test_data2 = "Data2";
+  char recv_buffer1[64];
+  char recv_buffer2[64];
+
+  auto file_event = dispatcher->createFileEvent(
+      event_fd,
+      [this, &completions_nr](uint32_t) {
+        io_uring_->forEveryCompletion([&completions_nr](Request*, int32_t res, bool) {
+          EXPECT_GT(res, 0);
+          completions_nr++;
+        });
+        return absl::OkStatus();
+      },
+      trigger, Event::FileReadyType::Read);
+
+  // Fill the submission queue (size 2)
+  IoUringResult res =
+      io_uring_->prepareSend(sockets[0], test_data1.c_str(), test_data1.length(), 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  res = io_uring_->prepareRecv(sockets[1], recv_buffer1, sizeof(recv_buffer1), 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  // This should fail due to queue overflow
+  res = io_uring_->prepareSend(sockets[0], test_data2.c_str(), test_data2.length(), 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Failed);
+
+  io_uring_->submit();
+
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 2; });
+
+  // Now we can add more operations
+  res = io_uring_->prepareSend(sockets[0], test_data2.c_str(), test_data2.length(), 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  res = io_uring_->prepareRecv(sockets[1], recv_buffer2, sizeof(recv_buffer2), 0, nullptr);
+  EXPECT_EQ(res, IoUringResult::Ok);
+
+  io_uring_->submit();
+
+  waitForCondition(*dispatcher, [&completions_nr]() { return completions_nr == 4; });
+
+  close(sockets[0]);
+  close(sockets[1]);
 }
 
 } // namespace

@@ -43,6 +43,14 @@ public:
   IoUringResult prepareClose(os_fd_t fd, Request* user_data) override;
   IoUringResult prepareCancel(Request* cancelling_user_data, Request* user_data) override;
   IoUringResult prepareShutdown(os_fd_t fd, int how, Request* user_data) override;
+  IoUringResult prepareSend(os_fd_t fd, const void* buf, size_t len, int flags,
+                            Request* user_data) override;
+  IoUringResult prepareRecv(os_fd_t fd, void* buf, size_t len, int flags,
+                            Request* user_data) override;
+  IoUringResult prepareSendmsg(os_fd_t fd, const struct msghdr* msg, int flags,
+                               Request* user_data) override;
+  IoUringResult prepareRecvmsg(os_fd_t fd, struct msghdr* msg, int flags,
+                               Request* user_data) override;
   IoUringResult submit() override;
   void injectCompletion(os_fd_t fd, Request* user_data, int32_t result) override;
   void removeInjectedCompletion(os_fd_t fd) override;

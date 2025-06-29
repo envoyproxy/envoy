@@ -18,6 +18,64 @@ WriteRequest::WriteRequest(IoUringSocket& socket, const Buffer::RawSliceVector& 
   }
 }
 
+SendRequest::SendRequest(IoUringSocket& socket, const void* buf, size_t len, int flags)
+    : Request(RequestType::Send, socket), buf_(buf), len_(len), flags_(flags) {}
+
+RecvRequest::RecvRequest(IoUringSocket& socket, size_t len, int flags)
+    : Request(RequestType::Recv, socket), buf_(std::make_unique<uint8_t[]>(len)), len_(len),
+      flags_(flags) {}
+
+SendMsgRequest::SendMsgRequest(IoUringSocket& socket, const struct msghdr* msg, int flags)
+    : Request(RequestType::SendMsg, socket), msg_(std::make_unique<struct msghdr>()),
+      flags_(flags) {
+  // Deep copy the msghdr structure.
+  *msg_ = *msg;
+
+  // Copy iovec array.
+  if (msg->msg_iovlen > 0) {
+    iov_ = std::make_unique<struct iovec[]>(msg->msg_iovlen);
+    for (size_t i = 0; i < msg->msg_iovlen; i++) {
+      iov_[i] = msg->msg_iov[i];
+    }
+    msg_->msg_iov = iov_.get();
+  }
+
+  // Copy name buffer.
+  if (msg->msg_name && msg->msg_namelen > 0) {
+    name_buf_ = std::make_unique<uint8_t[]>(msg->msg_namelen);
+    memcpy(name_buf_.get(), msg->msg_name, msg->msg_namelen); // NOLINT(safe-memcpy)
+    msg_->msg_name = name_buf_.get();
+  }
+
+  // Copy control buffer.
+  if (msg->msg_control && msg->msg_controllen > 0) {
+    control_buf_ = std::make_unique<uint8_t[]>(msg->msg_controllen);
+    memcpy(control_buf_.get(), msg->msg_control, msg->msg_controllen); // NOLINT(safe-memcpy)
+    msg_->msg_control = control_buf_.get();
+  }
+}
+
+RecvMsgRequest::RecvMsgRequest(IoUringSocket& socket, size_t buf_size, size_t control_size,
+                               int flags)
+    : Request(RequestType::RecvMsg, socket), msg_(std::make_unique<struct msghdr>()),
+      iov_(std::make_unique<struct iovec>()), buf_(std::make_unique<uint8_t[]>(buf_size)),
+      name_buf_(std::make_unique<uint8_t[]>(256)), // Standard sockaddr_storage size
+      control_buf_(std::make_unique<uint8_t[]>(control_size)), buf_size_(buf_size),
+      control_size_(control_size), flags_(flags) {
+  // Setup iovec.
+  iov_->iov_base = buf_.get();
+  iov_->iov_len = buf_size;
+
+  // Setup msghdr.
+  memset(msg_.get(), 0, sizeof(struct msghdr));
+  msg_->msg_name = name_buf_.get();
+  msg_->msg_namelen = 256;
+  msg_->msg_iov = iov_.get();
+  msg_->msg_iovlen = 1;
+  msg_->msg_control = control_buf_.get();
+  msg_->msg_controllen = control_size;
+}
+
 IoUringSocketEntry::IoUringSocketEntry(os_fd_t fd, IoUringWorkerImpl& parent, Event::FileReadyCb cb,
                                        bool enable_close_event)
     : fd_(fd), parent_(parent), enable_close_event_(enable_close_event), cb_(std::move(cb)) {}
@@ -29,14 +87,14 @@ void IoUringSocketEntry::cleanup() {
 
 void IoUringSocketEntry::injectCompletion(Request::RequestType type) {
   // Avoid injecting the same completion type multiple times.
-  if (injected_completions_ & static_cast<uint8_t>(type)) {
+  if (injected_completions_ & static_cast<uint16_t>(type)) {
     ENVOY_LOG(trace,
               "ignore injected completion since there already has one, injected_completions_: {}, "
               "type: {}",
-              injected_completions_, static_cast<uint8_t>(type));
+              injected_completions_, static_cast<uint16_t>(type));
     return;
   }
-  injected_completions_ |= static_cast<uint8_t>(type);
+  injected_completions_ |= static_cast<uint16_t>(type);
   parent_.injectCompletion(*this, type, -EAGAIN);
 }
 
@@ -60,14 +118,15 @@ void IoUringSocketEntry::onRemoteClose() {
 
 IoUringWorkerImpl::IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                                      uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                                     Event::Dispatcher& dispatcher)
+                                     Event::Dispatcher& dispatcher, IoUringMode mode)
     : IoUringWorkerImpl(std::make_unique<IoUringImpl>(io_uring_size, use_submission_queue_polling),
-                        read_buffer_size, write_timeout_ms, dispatcher) {}
+                        read_buffer_size, write_timeout_ms, dispatcher, mode) {}
 
 IoUringWorkerImpl::IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size,
-                                     uint32_t write_timeout_ms, Event::Dispatcher& dispatcher)
+                                     uint32_t write_timeout_ms, Event::Dispatcher& dispatcher,
+                                     IoUringMode mode)
     : io_uring_(std::move(io_uring)), read_buffer_size_(read_buffer_size),
-      write_timeout_ms_(write_timeout_ms), dispatcher_(dispatcher) {
+      write_timeout_ms_(write_timeout_ms), dispatcher_(dispatcher), mode_(mode) {
   const os_fd_t event_fd = io_uring_->registerEventfd();
   // We only care about the read event of Eventfd, since we only receive the
   // event here.
@@ -235,6 +294,82 @@ Request* IoUringWorkerImpl::submitShutdownRequest(IoUringSocket& socket, int how
   return req;
 }
 
+Request* IoUringWorkerImpl::submitSendRequest(IoUringSocket& socket, const void* buf, size_t len,
+                                              int flags) {
+  SendRequest* req = new SendRequest(socket, buf, len, flags);
+
+  ENVOY_LOG(trace, "submit send request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
+
+  auto res = io_uring_->prepareSend(socket.fd(), req->buf_, req->len_, req->flags_, req);
+  if (res == IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    submit();
+    res = io_uring_->prepareSend(socket.fd(), req->buf_, req->len_, req->flags_, req);
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare send");
+  }
+  submit();
+  return req;
+}
+
+Request* IoUringWorkerImpl::submitRecvRequest(IoUringSocket& socket, void* buf, size_t len,
+                                              int flags) {
+  (void)buf; // Parameter not used - RecvRequest allocates its own buffer
+  RecvRequest* req = new RecvRequest(socket, len, flags);
+
+  ENVOY_LOG(trace, "submit recv request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
+
+  auto res = io_uring_->prepareRecv(socket.fd(), req->buf_.get(), req->len_, req->flags_, req);
+  if (res == IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    submit();
+    res = io_uring_->prepareRecv(socket.fd(), req->buf_.get(), req->len_, req->flags_, req);
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare recv");
+  }
+  submit();
+  return req;
+}
+
+Request* IoUringWorkerImpl::submitSendmsgRequest(IoUringSocket& socket, const struct msghdr* msg,
+                                                 int flags) {
+  SendMsgRequest* req = new SendMsgRequest(socket, msg, flags);
+
+  ENVOY_LOG(trace, "submit sendmsg request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
+
+  auto res = io_uring_->prepareSendmsg(socket.fd(), req->msg_.get(), req->flags_, req);
+  if (res == IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    submit();
+    res = io_uring_->prepareSendmsg(socket.fd(), req->msg_.get(), req->flags_, req);
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare sendmsg");
+  }
+  submit();
+  return req;
+}
+
+Request* IoUringWorkerImpl::submitRecvmsgRequest(IoUringSocket& socket, struct msghdr* msg,
+                                                 int flags) {
+  // Extract size information from the provided msg structure.
+  size_t buf_size = 0;
+  for (size_t i = 0; i < msg->msg_iovlen; i++) {
+    buf_size += msg->msg_iov[i].iov_len;
+  }
+  size_t control_size = msg->msg_controllen;
+
+  RecvMsgRequest* req = new RecvMsgRequest(socket, buf_size, control_size, flags);
+
+  ENVOY_LOG(trace, "submit recvmsg request, fd = {}, req = {}", socket.fd(), fmt::ptr(req));
+
+  auto res = io_uring_->prepareRecvmsg(socket.fd(), req->msg_.get(), req->flags_, req);
+  if (res == IoUringResult::Failed) {
+    // TODO(rojkov): handle `EBUSY` in case the completion queue is never reaped.
+    submit();
+    res = io_uring_->prepareRecvmsg(socket.fd(), req->msg_.get(), req->flags_, req);
+    RELEASE_ASSERT(res == IoUringResult::Ok, "unable to prepare recvmsg");
+  }
+  submit();
+  return req;
+}
+
 IoUringSocketEntryPtr IoUringWorkerImpl::removeSocket(IoUringSocketEntry& socket) {
   // Remove all the injection completion for this socket.
   io_uring_->removeInjectedCompletion(socket.fd());
@@ -253,7 +388,7 @@ void IoUringWorkerImpl::onFileEvent() {
   delay_submit_ = true;
   io_uring_->forEveryCompletion([](Request* req, int32_t result, bool injected) {
     ENVOY_LOG(trace, "receive request completion, type = {}, req = {}",
-              static_cast<uint8_t>(req->type()), fmt::ptr(req));
+              static_cast<uint16_t>(req->type()), fmt::ptr(req));
     ASSERT(req != nullptr);
 
     switch (req->type()) {
@@ -291,6 +426,26 @@ void IoUringWorkerImpl::onFileEvent() {
       ENVOY_LOG(trace, "receive shutdown request completion, fd = {}, req = {}", req->socket().fd(),
                 fmt::ptr(req));
       req->socket().onShutdown(req, result, injected);
+      break;
+    case Request::RequestType::Send:
+      ENVOY_LOG(trace, "receive send request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onSend(req, result, injected);
+      break;
+    case Request::RequestType::Recv:
+      ENVOY_LOG(trace, "receive recv request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onRecv(req, result, injected);
+      break;
+    case Request::RequestType::SendMsg:
+      ENVOY_LOG(trace, "receive sendmsg request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onSendmsg(req, result, injected);
+      break;
+    case Request::RequestType::RecvMsg:
+      ENVOY_LOG(trace, "receive recvmsg request completion, fd = {}, req = {}", req->socket().fd(),
+                fmt::ptr(req));
+      req->socket().onRecvmsg(req, result, injected);
       break;
     }
 
@@ -425,6 +580,195 @@ void IoUringServerSocket::onCancel(Request* req, int32_t result, bool injected) 
   if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_req_ == nullptr &&
       write_or_shutdown_cancel_req_ == nullptr) {
     closeInternal();
+  }
+}
+
+void IoUringServerSocket::onSend(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onSend(req, result, injected);
+  ENVOY_LOG(trace, "onSend with result {}, fd = {}, injected = {}", result, fd_, injected);
+
+  if (!injected) {
+    write_or_shutdown_req_ = nullptr;
+  }
+
+  // Handle send completion similar to write completion.
+  if (result > 0) {
+    // For send operations, we don't track a write buffer, so just callback.
+    if (!shutdown_.has_value() && status_ != Closed) {
+      onWriteCompleted(result);
+    }
+  } else {
+    if (!shutdown_.has_value() && status_ != Closed) {
+      status_ = RemoteClosed;
+      if (result == -EPIPE) {
+        IoUringSocketEntry::onRemoteClose();
+      } else {
+        onWriteCompleted(result);
+      }
+    }
+  }
+}
+
+void IoUringServerSocket::onRecv(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onRecv(req, result, injected);
+  ENVOY_LOG(trace, "onRecv with result {}, fd = {}, injected = {}", result, fd_, injected);
+
+  if (!injected) {
+    read_req_ = nullptr;
+    if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
+        write_or_shutdown_cancel_req_ == nullptr) {
+      if (result > 0 && keep_fd_open_) {
+        // Move received data to read buffer.
+        RecvRequest* recv_req = static_cast<RecvRequest*>(req);
+        Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+            recv_req->buf_.release(), result,
+            [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+              delete[] reinterpret_cast<const uint8_t*>(data);
+              delete this_fragment;
+            });
+        read_buf_.addBufferFragment(*fragment);
+      }
+      closeInternal();
+      return;
+    }
+  }
+
+  // Move received data to read buffer similar to readv.
+  if (result > 0) {
+    RecvRequest* recv_req = static_cast<RecvRequest*>(req);
+    Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+        recv_req->buf_.release(), result,
+        [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          delete this_fragment;
+        });
+    read_buf_.addBufferFragment(*fragment);
+  } else {
+    if (result != -ECANCELED) {
+      read_error_ = result;
+    }
+  }
+
+  // Handle similar to onRead.
+  if (status_ == Initialized || status_ == Closed) {
+    return;
+  }
+
+  if (status_ == ReadEnabled) {
+    if (read_buf_.length() > 0) {
+      onReadCompleted(static_cast<int32_t>(read_buf_.length()));
+    } else if (read_error_.has_value() && read_error_ < 0) {
+      onReadCompleted(read_error_.value());
+      read_error_.reset();
+    }
+
+    if (read_error_.has_value() && read_error_ == 0 && !enable_close_event_) {
+      ENVOY_LOG(trace, "recv remote closed from socket, fd = {}", fd_);
+      onReadCompleted(read_error_.value());
+      read_error_.reset();
+      return;
+    }
+  }
+
+  // Continue with next recv if needed.
+  if (status_ == ReadEnabled) {
+    if (!read_error_.has_value() || read_error_.value() != 0) {
+      submitReadRequest(); // This will use readv by default, but could be changed to recv.
+    }
+  } else if (status_ == ReadDisabled) {
+    if (!read_error_.has_value()) {
+      submitReadRequest();
+    }
+  }
+}
+
+void IoUringServerSocket::onSendmsg(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onSendmsg(req, result, injected);
+  ENVOY_LOG(trace, "onSendmsg with result {}, fd = {}, injected = {}", result, fd_, injected);
+
+  // Handle similar to send.
+  if (!injected) {
+    write_or_shutdown_req_ = nullptr;
+  }
+
+  if (result > 0) {
+    if (!shutdown_.has_value() && status_ != Closed) {
+      onWriteCompleted(result);
+    }
+  } else {
+    if (!shutdown_.has_value() && status_ != Closed) {
+      status_ = RemoteClosed;
+      if (result == -EPIPE) {
+        IoUringSocketEntry::onRemoteClose();
+      } else {
+        onWriteCompleted(result);
+      }
+    }
+  }
+}
+
+void IoUringServerSocket::onRecvmsg(Request* req, int32_t result, bool injected) {
+  IoUringSocketEntry::onRecvmsg(req, result, injected);
+  ENVOY_LOG(trace, "onRecvmsg with result {}, fd = {}, injected = {}", result, fd_, injected);
+
+  if (!injected) {
+    read_req_ = nullptr;
+    if (status_ == Closed && write_or_shutdown_req_ == nullptr && read_cancel_req_ == nullptr &&
+        write_or_shutdown_cancel_req_ == nullptr) {
+      if (result > 0 && keep_fd_open_) {
+        // Move received data to read buffer.
+        RecvMsgRequest* recvmsg_req = static_cast<RecvMsgRequest*>(req);
+        Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+            recvmsg_req->buf_.release(), result,
+            [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+              delete[] reinterpret_cast<const uint8_t*>(data);
+              delete this_fragment;
+            });
+        read_buf_.addBufferFragment(*fragment);
+      }
+      closeInternal();
+      return;
+    }
+  }
+
+  // Handle received data and metadata from recvmsg.
+  if (result > 0) {
+    RecvMsgRequest* recvmsg_req = static_cast<RecvMsgRequest*>(req);
+
+    // Store received data.
+    Buffer::BufferFragment* fragment = new Buffer::BufferFragmentImpl(
+        recvmsg_req->buf_.release(), result,
+        [](const void* data, size_t, const Buffer::BufferFragmentImpl* this_fragment) {
+          delete[] reinterpret_cast<const uint8_t*>(data);
+          delete this_fragment;
+        });
+    read_buf_.addBufferFragment(*fragment);
+
+    // TODO: Handle control messages and peer address from recvmsg_req->msg_
+    // This would be used for UDP sockets to get source address and control info
+  } else {
+    if (result != -ECANCELED) {
+      read_error_ = result;
+    }
+  }
+
+  // Handle similar to onRead/onRecv.
+  if (status_ == Initialized || status_ == Closed) {
+    return;
+  }
+
+  if (status_ == ReadEnabled) {
+    if (read_buf_.length() > 0) {
+      onReadCompleted(static_cast<int32_t>(read_buf_.length()));
+    } else if (read_error_.has_value() && read_error_ < 0) {
+      onReadCompleted(read_error_.value());
+      read_error_.reset();
+    }
+  }
+
+  // Continue with recvmsg if needed for connection-less sockets.
+  if (status_ == ReadEnabled && (!read_error_.has_value() || read_error_.value() != 0)) {
+    submitReadRequest(); // Could be changed to submit recvmsg for UDP.
   }
 }
 
@@ -622,17 +966,94 @@ void IoUringServerSocket::closeInternal() {
 
 void IoUringServerSocket::submitReadRequest() {
   if (!read_req_) {
-    read_req_ = parent_.submitReadRequest(*this);
+    const IoUringMode mode = parent_.getMode();
+
+    switch (mode) {
+    case IoUringMode::SendRecv: {
+      // Use recv operation for simple streaming data.
+      ENVOY_LOG(trace, "submit recv request, buffer_size = {}, fd = {}, mode = SendRecv",
+                parent_.getReadBufferSize(), fd_);
+      read_req_ = parent_.submitRecvRequest(*this, nullptr, parent_.getReadBufferSize(), 0);
+      break;
+    }
+    case IoUringMode::SendmsgRecvmsg: {
+      // Use recvmsg operation for advanced scenarios.
+      // Allocate space for control messages (for ancillary data).
+      constexpr size_t control_size = 256; // Standard size for control messages.
+      ENVOY_LOG(trace,
+                "submit recvmsg request, buffer_size = {}, control_size = {}, fd = {}, mode = "
+                "SendmsgRecvmsg",
+                parent_.getReadBufferSize(), control_size, fd_);
+      read_req_ = parent_.submitRecvmsgRequest(*this, nullptr, 0);
+      break;
+    }
+    case IoUringMode::ReadWritev:
+    default: {
+      // Use readv operation (default/backward compatible behavior).
+      ENVOY_LOG(trace, "submit read request, buffer_size = {}, fd = {}, mode = ReadWritev",
+                parent_.getReadBufferSize(), fd_);
+      read_req_ = parent_.submitReadRequest(*this);
+      break;
+    }
+    }
   }
 }
 
 void IoUringServerSocket::submitWriteOrShutdownRequest() {
   if (!write_or_shutdown_req_) {
     if (write_buf_.length() > 0) {
-      Buffer::RawSliceVector slices = write_buf_.getRawSlices(IOV_MAX);
-      ENVOY_LOG(trace, "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}",
-                write_buf_.length(), slices.size(), fd_);
-      write_or_shutdown_req_ = parent_.submitWriteRequest(*this, slices);
+      const IoUringMode mode = parent_.getMode();
+
+      switch (mode) {
+      case IoUringMode::SendRecv: {
+        // Use send operation for simple streaming data.
+        // Linearize buffer for optimal send performance.
+        const void* data = write_buf_.linearize(write_buf_.length());
+        ENVOY_LOG(trace, "submit send request, write_buf size = {}, fd = {}, mode = SendRecv",
+                  write_buf_.length(), fd_);
+        write_or_shutdown_req_ =
+            parent_.submitSendRequest(*this, data, write_buf_.length(), MSG_NOSIGNAL);
+        break;
+      }
+      case IoUringMode::SendmsgRecvmsg: {
+        // Use sendmsg operation for scatter-gather I/O.
+        Buffer::RawSliceVector slices = write_buf_.getRawSlices(IOV_MAX);
+        ENVOY_LOG(trace,
+                  "submit sendmsg request, write_buf size = {}, num_iovecs = {}, fd = {}, mode = "
+                  "SendmsgRecvmsg",
+                  write_buf_.length(), slices.size(), fd_);
+
+        // Prepare msghdr structure for sendmsg.
+        // Create temporary msghdr on stack - SendMsgRequest will deep copy it.
+        struct msghdr msg;
+        memset(&msg, 0, sizeof(msg));
+
+        // Create temporary iovec array on stack.
+        auto iov_array = std::make_unique<struct iovec[]>(slices.size());
+        for (size_t i = 0; i < slices.size(); i++) {
+          iov_array[i].iov_base = slices[i].mem_;
+          iov_array[i].iov_len = slices[i].len_;
+        }
+
+        msg.msg_iov = iov_array.get();
+        msg.msg_iovlen = slices.size();
+
+        // SendMsgRequest constructor will deep copy the msg structure and iovec array.
+        write_or_shutdown_req_ = parent_.submitSendmsgRequest(*this, &msg, MSG_NOSIGNAL);
+        break;
+      }
+      case IoUringMode::ReadWritev:
+      default: {
+        // Use writev operation (default/backward compatible behavior).
+        Buffer::RawSliceVector slices = write_buf_.getRawSlices(IOV_MAX);
+        ENVOY_LOG(trace,
+                  "submit write request, write_buf size = {}, num_iovecs = {}, fd = {}, mode = "
+                  "ReadWritev",
+                  write_buf_.length(), slices.size(), fd_);
+        write_or_shutdown_req_ = parent_.submitWriteRequest(*this, slices);
+        break;
+      }
+      }
     } else if (shutdown_.has_value() && !shutdown_.value()) {
       write_or_shutdown_req_ = parent_.submitShutdownRequest(*this, SHUT_WR);
     } else if (status_ == Closed && read_req_ == nullptr && read_cancel_req_ == nullptr &&

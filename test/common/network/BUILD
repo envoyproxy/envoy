@@ -575,3 +575,15 @@ envoy_cc_fuzz_test(
         "//test/mocks/network:io_handle_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "socket_interface_impl_test",
+    srcs = ["socket_interface_impl_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:default_socket_interface_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/network/socket_interface/v3:pkg_cc_proto",
+    ],
+)
