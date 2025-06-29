@@ -1346,7 +1346,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessFallback) {
         testPrint("found_whole_object")
         testPrint(whole_obj)
       end
-      
+
       -- Test field access that matches the base_value
       local field_value = object:filterState():get("field_key", "base_value")
       if field_value then
@@ -1388,7 +1388,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNullObject) {
       else
         testPrint("null_filter_state_found_something")
       end
-      
+
       -- Test field access on non-existent key
       local null_field = object:filterState():get("completely_nonexistent_key", "any_field")
       if null_field == nil then
