@@ -1014,6 +1014,22 @@ public:
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
   /**
+   * @param response headers received from upstream.
+   * @return absl::optional<bool> indicates if and what should be reported to outlier detection
+   * extensions as a result of response headers matching.
+   */
+  virtual absl::optional<bool>
+  processHttpForOutlierDetection(Http::ResponseHeaderMap& reponse) const PURE;
+
+  /**
+   * @param result locally originated event received by a router.
+   * @return absl::optional<bool> indicates if and what should be reported to outlier detection
+   * extensions as a result of received locally originated event.
+   */
+  virtual absl::optional<bool>
+      processLocallyOriginatedEventForOutlierDetection(Outlier::Result) const PURE;
+
+  /**
    * @return the service discovery type to use for resolving the cluster.
    */
   virtual envoy::config::cluster::v3::Cluster::DiscoveryType type() const PURE;

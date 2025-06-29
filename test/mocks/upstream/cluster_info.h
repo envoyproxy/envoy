@@ -174,6 +174,10 @@ public:
       OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>,
       happyEyeballsConfig, (), (const));
   MOCK_METHOD(OptRef<const std::vector<std::string>>, lrsReportMetricNames, (), (const));
+  MOCK_METHOD(absl::optional<bool>, processHttpForOutlierDetection, (Http::ResponseHeaderMap&),
+              (const));
+  MOCK_METHOD(absl::optional<bool>, processLocallyOriginatedEventForOutlierDetection,
+              (Outlier::Result), (const));
   ::Envoy::Http::HeaderValidatorStats& codecStats(Http::Protocol protocol) const;
   Http::Http1::CodecStats& http1CodecStats() const override;
   Http::Http2::CodecStats& http2CodecStats() const override;

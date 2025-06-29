@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
@@ -1321,7 +1322,19 @@ void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
                                     UpstreamRequest& upstream_request,
                                     absl::optional<uint64_t> code) {
   if (upstream_request.upstreamHost()) {
-    upstream_request.upstreamHost()->outlierDetector().putResult(result, code);
+    updateOutlierDetection(result, upstream_request.upstreamHost().ref(), code);
+  }
+}
+
+void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
+                                    const Upstream::HostDescription& host,
+                                    absl::optional<uint64_t> code) {
+  host.outlierDetector().putResult(result, code);
+
+  // Forward to outlier detection extensions
+  auto outlier = cluster_->processLocallyOriginatedEventForOutlierDetection(result);
+  if (outlier.has_value()) {
+    host.outlierDetector().reportResult(outlier.value());
   }
 }
 
@@ -1505,6 +1518,10 @@ void Filter::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host
     return;
   }
 
+  // Forward to extensions.
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectSuccess, *host,
+                         absl::nullopt);
+
   if (request_vcluster_) {
     // The cluster increases its upstream_rq_total_ counter right before firing this onPoolReady
     // callback. Hence, the upstream request increases the virtual cluster's upstream_rq_total_ stat
@@ -1640,6 +1657,13 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
                              : Upstream::Outlier::Result::ExtOriginRequestSuccess,
       put_result_code);
+
+  if (!grpc_status.has_value()) {
+    auto outlier = cluster_->processHttpForOutlierDetection(*headers);
+    if (outlier.has_value()) {
+      upstream_request.upstreamHost()->outlierDetector().reportResult(outlier.value());
+    }
+  }
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(

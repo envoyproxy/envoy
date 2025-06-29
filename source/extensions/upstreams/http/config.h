@@ -18,6 +18,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/extensions/common/matcher/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,6 +61,9 @@ public:
   const bool use_http2_{};
   const bool use_http3_{};
   const bool use_alpn_{};
+  // TODO (cpakulski): does it need to be a vector after converting to single matcher?
+  std::vector<Extensions::Common::Matcher::MatcherPtr> outlier_detection_http_events_matcher_;
+  bool outlier_detection_locally_originated_events_{true};
 
 private:
   ProtocolOptionsConfigImpl(
