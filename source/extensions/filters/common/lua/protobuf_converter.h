@@ -57,6 +57,17 @@ public:
                                       const Protobuf::ReflectableMessage& message);
 
   /**
+   * Push a Lua value onto the stack from a protobuf message
+   * @param state the Lua state
+   * @param message The protobuf message to convert
+   *
+   * This function converts protobuf messages to appropriate Lua values:
+   * - Simple wrapper types (StringValue, BoolValue, etc.) are converted to native Lua types.
+   * - Complex messages are converted to Lua tables using ``pushLuaTableFromMessage()``.
+   */
+  static void pushLuaValueFromMessage(lua_State* state, const Protobuf::Message& message);
+
+  /**
    * Process typed metadata and push the result to Lua stack
    * @param state the Lua state
    * @param typed_metadata_map the typed filter metadata map to search in
