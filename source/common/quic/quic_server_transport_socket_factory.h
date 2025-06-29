@@ -36,7 +36,11 @@ public:
             std::shared_ptr<quic::CertificatePrivateKey>>
   getTlsCertificateAndKey(absl::string_view sni, bool* cert_matched_sni) const;
 
+  bssl::UniquePtr<STACK_OF(X509_NAME)> getClientCaList() const;
+
   bool earlyDataEnabled() const { return enable_early_data_; }
+
+  bool requiresClientCertificate() const { return config_->requireClientCertificate(); }
 
 protected:
   QuicServerTransportSocketFactory(bool enable_early_data, Stats::Scope& store,
