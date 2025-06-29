@@ -2269,16 +2269,17 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   return default_virtual_host_.get();
 }
 
-RouteConstSharedPtr RouteMatcher::route(const RouteCallback& cb,
-                                        const Http::RequestHeaderMap& headers,
-                                        const StreamInfo::StreamInfo& stream_info,
-                                        uint64_t random_value) const {
+RouteResult RouteMatcher::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                const StreamInfo::StreamInfo& stream_info,
+                                uint64_t random_value) const {
+  RouteResult route_result;
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
-    return virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
-  } else {
-    return nullptr;
+    route_result.vhost = virtual_host->virtualHost();
+    route_result.route = virtual_host->getRouteFromEntries(cb, headers, stream_info, random_value);
   }
+
+  return route_result;
 }
 
 const SslRedirector SslRedirectRoute::SSL_REDIRECTOR;
@@ -2420,10 +2421,9 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
   route_matcher_ = std::move(matcher_or_error.value());
 }
 
-RouteConstSharedPtr ConfigImpl::route(const RouteCallback& cb,
-                                      const Http::RequestHeaderMap& headers,
-                                      const StreamInfo::StreamInfo& stream_info,
-                                      uint64_t random_value) const {
+RouteResult ConfigImpl::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                              const StreamInfo::StreamInfo& stream_info,
+                              uint64_t random_value) const {
   return route_matcher_->route(cb, headers, stream_info, random_value);
 }
 

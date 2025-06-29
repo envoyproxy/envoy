@@ -407,6 +407,8 @@ public:
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
+  VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
+
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
@@ -1531,8 +1533,8 @@ public:
          Server::Configuration::ServerFactoryContext& factory_context,
          ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
-  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
+  RouteResult route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                    const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
 
@@ -1656,14 +1658,14 @@ public:
   }
 
   // Router::Config
-  RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info,
-                            uint64_t random_value) const override {
+  RouteResult route(const Http::RequestHeaderMap& headers,
+                    const StreamInfo::StreamInfo& stream_info,
+                    uint64_t random_value) const override {
     return route(nullptr, headers, stream_info, random_value);
   }
-  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info,
-                            uint64_t random_value) const override;
+  RouteResult route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                    const StreamInfo::StreamInfo& stream_info,
+                    uint64_t random_value) const override;
   const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return shared_config_->internalOnlyHeaders();
   }
@@ -1705,14 +1707,14 @@ private:
 class NullConfigImpl : public Config {
 public:
   // Router::Config
-  RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
-                            uint64_t) const override {
-    return nullptr;
+  RouteResult route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+                    uint64_t) const override {
+    return {};
   }
 
-  RouteConstSharedPtr route(const RouteCallback&, const Http::RequestHeaderMap&,
-                            const StreamInfo::StreamInfo&, uint64_t) const override {
-    return nullptr;
+  RouteResult route(const RouteCallback&, const Http::RequestHeaderMap&,
+                    const StreamInfo::StreamInfo&, uint64_t) const override {
+    return {};
   }
 
   const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
