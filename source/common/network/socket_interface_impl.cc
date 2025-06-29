@@ -25,6 +25,23 @@ namespace {
   return io_uring_worker_factory != nullptr && io_uring_worker_factory->currentThreadRegistered() &&
          io_uring_worker_factory->getIoUringWorker() != absl::nullopt;
 }
+
+#if defined(__linux__) && !defined(__ANDROID_API__) && defined(ENVOY_ENABLE_IO_URING)
+// Convert proto IoUringMode to C++ IoUringMode enum.
+Io::IoUringMode
+convertIoUringMode(envoy::extensions::network::socket_interface::v3::IoUringMode mode) {
+  switch (mode) {
+  case envoy::extensions::network::socket_interface::v3::READ_WRITEV:
+    return Io::IoUringMode::ReadWritev;
+  case envoy::extensions::network::socket_interface::v3::SEND_RECV:
+    return Io::IoUringMode::SendRecv;
+  case envoy::extensions::network::socket_interface::v3::SENDMSG_RECVMSG:
+    return Io::IoUringMode::SendmsgRecvmsg;
+  default:
+    return Io::IoUringMode::ReadWritev;
+  }
+}
+#endif
 } // namespace
 
 void DefaultSocketInterfaceExtension::onWorkerThreadInitialized() {
@@ -173,13 +190,14 @@ Server::BootstrapExtensionPtr SocketInterfaceImpl::createBootstrapExtension(
       config, context.messageValidationVisitor());
   if (message.has_io_uring_options() && Io::isIoUringSupported()) {
     const auto& options = message.io_uring_options();
+    Io::IoUringMode mode = convertIoUringMode(options.mode());
     std::shared_ptr<Io::IoUringWorkerFactoryImpl> io_uring_worker_factory =
         std::make_shared<Io::IoUringWorkerFactoryImpl>(
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, io_uring_size, 1000),
             options.enable_submission_queue_polling(),
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, read_buffer_size, 8192),
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000),
-            context.threadLocal());
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(options, write_timeout_ms, 1000), context.threadLocal(),
+            mode);
     io_uring_worker_factory_ = io_uring_worker_factory;
 
     return std::make_unique<DefaultSocketInterfaceExtension>(*this, io_uring_worker_factory);

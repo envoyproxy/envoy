@@ -693,6 +693,594 @@ TEST(IoUringWorkerImplTest, NoEnableReadOnConnectError) {
   delete static_cast<Request*>(connect_req);
 }
 
+TEST(IoUringWorkerImplTest, SubmitSendRecvRequestsFailed) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  os_fd_t fd;
+  SET_SOCKET_INVALID(fd);
+  auto& io_uring_socket = worker.addTestSocket(fd);
+
+  // Test submitSendRequest
+  std::string test_data = "Hello, World!";
+  EXPECT_CALL(mock_io_uring, prepareSend(fd, _, test_data.length(), 0, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareSend(fd, _, test_data.length(), 0, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  delete worker.submitSendRequest(io_uring_socket, test_data.c_str(), test_data.length(), 0);
+
+  // Test submitRecvRequest
+  char recv_buffer[256];
+  EXPECT_CALL(mock_io_uring, prepareRecv(fd, _, sizeof(recv_buffer), 0, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareRecv(fd, _, sizeof(recv_buffer), 0, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  delete worker.submitRecvRequest(io_uring_socket, recv_buffer, sizeof(recv_buffer), 0);
+
+  EXPECT_EQ(fd, io_uring_socket.fd());
+  EXPECT_EQ(1, worker.getSockets().size());
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  dynamic_cast<IoUringSocketTestImpl*>(worker.getSockets().front().get())->cleanupForTest();
+  EXPECT_EQ(0, worker.getNumOfSockets());
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
+TEST(IoUringWorkerImplTest, SubmitSendmsgRecvmsgRequestsFailed) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  os_fd_t fd;
+  SET_SOCKET_INVALID(fd);
+  auto& io_uring_socket = worker.addTestSocket(fd);
+
+  // Setup sendmsg structure
+  std::string test_data = "Hello, Sendmsg!";
+  struct iovec send_iov;
+  send_iov.iov_base = const_cast<char*>(test_data.c_str());
+  send_iov.iov_len = test_data.length();
+
+  struct msghdr send_msg;
+  memset(&send_msg, 0, sizeof(send_msg));
+  send_msg.msg_iov = &send_iov;
+  send_msg.msg_iovlen = 1;
+
+  // Test submitSendmsgRequest
+  EXPECT_CALL(mock_io_uring, prepareSendmsg(fd, _, 0, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareSendmsg(fd, _, 0, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  delete worker.submitSendmsgRequest(io_uring_socket, &send_msg, 0);
+
+  // Setup recvmsg structure
+  char recv_buffer[256];
+  struct iovec recv_iov;
+  recv_iov.iov_base = recv_buffer;
+  recv_iov.iov_len = sizeof(recv_buffer);
+
+  struct msghdr recv_msg;
+  memset(&recv_msg, 0, sizeof(recv_msg));
+  recv_msg.msg_iov = &recv_iov;
+  recv_msg.msg_iovlen = 1;
+
+  // Test submitRecvmsgRequest
+  EXPECT_CALL(mock_io_uring, prepareRecvmsg(fd, _, 0, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Ok))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, prepareRecvmsg(fd, _, 0, _))
+      .WillOnce(Return<IoUringResult>(IoUringResult::Failed))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  delete worker.submitRecvmsgRequest(io_uring_socket, &recv_msg, 0);
+
+  EXPECT_EQ(fd, io_uring_socket.fd());
+  EXPECT_EQ(1, worker.getSockets().size());
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  dynamic_cast<IoUringSocketTestImpl*>(worker.getSockets().front().get())->cleanupForTest();
+  EXPECT_EQ(0, worker.getNumOfSockets());
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
+TEST(IoUringWorkerImplTest, ServerSocketSendRecvCompletion) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  os_fd_t fd = 11;
+  SET_SOCKET_INVALID(fd);
+
+  Request* read_req = nullptr;
+  // The read request added by server socket constructor.
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  auto& io_uring_socket =
+      worker.addServerSocket(fd, [](uint32_t) { return absl::OkStatus(); }, false);
+
+  // Test send completion
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&io_uring_socket](const CompletionCb& cb) {
+        // Create a SendRequest for testing
+        std::string test_data = "Test data";
+        auto* send_req = new SendRequest(io_uring_socket, test_data.c_str(), test_data.length(), 0);
+        cb(send_req, test_data.length(), false);
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  // Test recv completion
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&io_uring_socket](const CompletionCb& cb) {
+        // Create a RecvRequest for testing
+        auto* recv_req = new RecvRequest(io_uring_socket, 256, 0);
+        // Fill the buffer with test data
+        const char* test_data = "Received data";
+        memcpy(recv_req->buf_.get(), test_data, strlen(test_data));
+        cb(recv_req, strlen(test_data), false);
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  // Cleanup
+  Request* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  io_uring_socket.close(false);
+
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&read_req, &cancel_req](const CompletionCb& cb) {
+        cb(read_req, -ECANCELED, false);
+        cb(cancel_req, 0, false);
+      }));
+  Request* close_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareClose(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&close_req](const CompletionCb& cb) { cb(close_req, 0, false); }));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_EQ(0, worker.getSockets().size());
+}
+
+TEST(IoUringWorkerImplTest, ServerSocketSendmsgRecvmsgCompletion) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  os_fd_t fd = 11;
+  SET_SOCKET_INVALID(fd);
+
+  Request* read_req = nullptr;
+  // The read request added by server socket constructor.
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  auto& io_uring_socket =
+      worker.addServerSocket(fd, [](uint32_t) { return absl::OkStatus(); }, false);
+
+  // Test sendmsg completion
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&io_uring_socket](const CompletionCb& cb) {
+        // Create a SendMsgRequest for testing
+        std::string test_data = "Test sendmsg data";
+        struct iovec iov;
+        iov.iov_base = const_cast<char*>(test_data.c_str());
+        iov.iov_len = test_data.length();
+
+        struct msghdr msg;
+        memset(&msg, 0, sizeof(msg));
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+
+        auto* sendmsg_req = new SendMsgRequest(io_uring_socket, &msg, 0);
+        cb(sendmsg_req, test_data.length(), false);
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  // Test recvmsg completion
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&io_uring_socket](const CompletionCb& cb) {
+        // Create a RecvMsgRequest for testing
+        auto* recvmsg_req = new RecvMsgRequest(io_uring_socket, 256, 64, 0);
+        // Fill the buffer with test data
+        const char* test_data = "Received sendmsg data";
+        memcpy(recvmsg_req->buf_.get(), test_data, strlen(test_data));
+        cb(recvmsg_req, strlen(test_data), false);
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  // Cleanup
+  Request* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  io_uring_socket.close(false);
+
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&read_req, &cancel_req](const CompletionCb& cb) {
+        cb(read_req, -ECANCELED, false);
+        cb(cancel_req, 0, false);
+      }));
+  Request* close_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareClose(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&close_req](const CompletionCb& cb) { cb(close_req, 0, false); }));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_EQ(0, worker.getSockets().size());
+}
+
+// Test error handling in send/recv operations
+TEST(IoUringWorkerImplTest, SendRecvErrorHandling) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  os_fd_t fd = 11;
+  SET_SOCKET_INVALID(fd);
+
+  Request* read_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  auto& io_uring_socket =
+      worker.addServerSocket(fd, [](uint32_t) { return absl::OkStatus(); }, false);
+
+  // Test send error completion (EPIPE)
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&io_uring_socket](const CompletionCb& cb) {
+        std::string test_data = "Test data";
+        auto* send_req = new SendRequest(io_uring_socket, test_data.c_str(), test_data.length(), 0);
+        cb(send_req, -EPIPE, false);
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  // Test recv error completion
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&io_uring_socket](const CompletionCb& cb) {
+        auto* recv_req = new RecvRequest(io_uring_socket, 256, 0);
+        cb(recv_req, -EAGAIN, false);
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  // Cleanup
+  Request* cancel_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareCancel(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&cancel_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  io_uring_socket.close(false);
+
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&read_req, &cancel_req](const CompletionCb& cb) {
+        cb(read_req, -ECANCELED, false);
+        cb(cancel_req, 0, false);
+      }));
+  Request* close_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareClose(_, _))
+      .WillOnce(DoAll(SaveArg<1>(&close_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&close_req](const CompletionCb& cb) { cb(close_req, 0, false); }));
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_EQ(0, worker.getSockets().size());
+}
+
+// Test request type validation in completion handling
+TEST(IoUringWorkerImplTest, RequestTypeHandling) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+  IoUringWorkerTestImpl worker(std::move(io_uring_instance), dispatcher);
+
+  os_fd_t fd = 11;
+  SET_SOCKET_INVALID(fd);
+  worker.addTestSocket(fd);
+
+  // Test that all new request types are handled properly
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&worker](const CompletionCb& cb) {
+        auto& socket = *worker.getSockets().front();
+
+        // Test Send request type
+        auto* send_req = new Request(Request::RequestType::Send, socket);
+        cb(send_req, 10, false);
+
+        // Test Recv request type
+        auto* recv_req = new Request(Request::RequestType::Recv, socket);
+        cb(recv_req, 15, false);
+
+        // Test SendMsg request type
+        auto* sendmsg_req = new Request(Request::RequestType::SendMsg, socket);
+        cb(sendmsg_req, 20, false);
+
+        // Test RecvMsg request type
+        auto* recvmsg_req = new Request(Request::RequestType::RecvMsg, socket);
+        cb(recvmsg_req, 25, false);
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(mock_io_uring, removeInjectedCompletion(fd));
+  EXPECT_CALL(dispatcher, deferredDelete_);
+  dynamic_cast<IoUringSocketTestImpl*>(worker.getSockets().front().get())->cleanupForTest();
+  EXPECT_EQ(0, worker.getNumOfSockets());
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+}
+
+TEST(IoUringWorkerImplTest, ModeConfiguration) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+
+  // Test default mode (ReadWritev).
+  IoUringWorkerTestImpl worker_default(std::move(io_uring_instance), dispatcher);
+  EXPECT_EQ(worker_default.getMode(), IoUringMode::ReadWritev);
+
+  // Test SendRecv mode.
+  io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring2 = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  EXPECT_CALL(mock_io_uring2, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerImpl worker_sendrecv(std::move(io_uring_instance), 8192, 1000, dispatcher,
+                                    IoUringMode::SendRecv);
+  EXPECT_EQ(worker_sendrecv.getMode(), IoUringMode::SendRecv);
+
+  // Test SendmsgRecvmsg mode.
+  io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring3 = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  EXPECT_CALL(mock_io_uring3, registerEventfd());
+  EXPECT_CALL(dispatcher, createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                                           Event::FileReadyType::Read));
+  IoUringWorkerImpl worker_sendmsgrecvmsg(std::move(io_uring_instance), 8192, 1000, dispatcher,
+                                          IoUringMode::SendmsgRecvmsg);
+  EXPECT_EQ(worker_sendmsgrecvmsg.getMode(), IoUringMode::SendmsgRecvmsg);
+}
+
+TEST(IoUringWorkerImplTest, SendRecvModeWriteOperation) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+
+  // Create worker with SendRecv mode.
+  IoUringWorkerImpl worker(std::move(io_uring_instance), 8192, 1000, dispatcher,
+                           IoUringMode::SendRecv);
+
+  os_fd_t fd = 11;
+  SET_SOCKET_INVALID(fd);
+
+  Request* read_req = nullptr;
+  // The recv request should be used instead of readv.
+  EXPECT_CALL(mock_io_uring, prepareRecv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  auto& io_uring_socket =
+      worker.addServerSocket(fd, [](uint32_t) { return absl::OkStatus(); }, false);
+
+  // Write operation should use send instead of writev.
+  std::string data = "Hello SendRecv Mode!";
+  Buffer::OwnedImpl buf;
+  buf.add(data);
+  Request* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareSend(fd, _, data.length(), MSG_NOSIGNAL, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  io_uring_socket.write(buf);
+
+  // Verify that send operation completed successfully.
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&write_req](const CompletionCb& cb) {
+        cb(write_req, static_cast<int32_t>(20), false); // Simulate successful send.
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete read_req;
+}
+
+TEST(IoUringWorkerImplTest, SendmsgRecvmsgModeWriteOperation) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+
+  // Create worker with SendmsgRecvmsg mode.
+  IoUringWorkerImpl worker(std::move(io_uring_instance), 8192, 1000, dispatcher,
+                           IoUringMode::SendmsgRecvmsg);
+
+  os_fd_t fd = 11;
+  SET_SOCKET_INVALID(fd);
+
+  Request* read_req = nullptr;
+  // The recvmsg request should be used instead of readv.
+  EXPECT_CALL(mock_io_uring, prepareRecvmsg(fd, _, _, _))
+      .WillOnce(DoAll(SaveArg<3>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  auto& io_uring_socket =
+      worker.addServerSocket(fd, [](uint32_t) { return absl::OkStatus(); }, false);
+
+  // Write operation should use sendmsg instead of writev.
+  std::string data = "Hello SendmsgRecvmsg Mode!";
+  Buffer::OwnedImpl buf;
+  buf.add(data);
+  Request* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareSendmsg(fd, _, MSG_NOSIGNAL, _))
+      .WillOnce(DoAll(SaveArg<3>(&write_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  io_uring_socket.write(buf);
+
+  // Verify that sendmsg operation completed successfully.
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&write_req](const CompletionCb& cb) {
+        cb(write_req, static_cast<int32_t>(25), false); // Simulate successful sendmsg.
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete read_req;
+}
+
+TEST(IoUringWorkerImplTest, BackwardCompatibilityReadWritevMode) {
+  Event::MockDispatcher dispatcher;
+  IoUringPtr io_uring_instance = std::make_unique<MockIoUring>();
+  MockIoUring& mock_io_uring = *dynamic_cast<MockIoUring*>(io_uring_instance.get());
+  Event::FileReadyCb file_event_callback;
+
+  EXPECT_CALL(mock_io_uring, registerEventfd());
+  EXPECT_CALL(dispatcher,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType, Event::FileReadyType::Read))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+
+  // Create worker with explicit ReadWritev mode (should behave like before).
+  IoUringWorkerImpl worker(std::move(io_uring_instance), 8192, 1000, dispatcher,
+                           IoUringMode::ReadWritev);
+
+  os_fd_t fd = 11;
+  SET_SOCKET_INVALID(fd);
+
+  Request* read_req = nullptr;
+  // Should still use readv in ReadWritev mode.
+  EXPECT_CALL(mock_io_uring, prepareReadv(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&read_req), Return<IoUringResult>(IoUringResult::Ok)));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  auto& io_uring_socket =
+      worker.addServerSocket(fd, [](uint32_t) { return absl::OkStatus(); }, false);
+
+  // Write operation should still use writev in ReadWritev mode.
+  std::string data = "Backward Compatibility Test!";
+  Buffer::OwnedImpl buf;
+  buf.add(data);
+  Request* write_req = nullptr;
+  EXPECT_CALL(mock_io_uring, prepareWritev(fd, _, _, _, _))
+      .WillOnce(DoAll(SaveArg<4>(&write_req), Return<IoUringResult>(IoUringResult::Ok)))
+      .RetiresOnSaturation();
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  io_uring_socket.write(buf);
+
+  // Verify that writev operation completed successfully.
+  EXPECT_CALL(mock_io_uring, forEveryCompletion(_))
+      .WillOnce(Invoke([&write_req](const CompletionCb& cb) {
+        cb(write_req, static_cast<int32_t>(28), false); // Simulate successful writev.
+      }));
+  EXPECT_CALL(mock_io_uring, submit()).Times(1).RetiresOnSaturation();
+  ASSERT_TRUE(file_event_callback(Event::FileReadyType::Read).ok());
+
+  EXPECT_CALL(dispatcher, clearDeferredDeleteList());
+  delete read_req;
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
