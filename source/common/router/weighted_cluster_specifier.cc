@@ -235,7 +235,7 @@ WeightedClusterSpecifierPlugin::pickWeightedCluster(RouteEntryAndRouteConstShare
   uint32_t total_cluster_weight = total_cluster_weight_;
   absl::InlinedVector<uint32_t, 4> cluster_weights;
 
-  // if runtime config is used, we need to recompute total_weight
+  // if runtime config is used, we need to recompute total_weight.
   if (runtime_key_prefix_configured) {
     // Temporary storage to hold consistent cluster weights. Since cluster weight
     // can be changed with runtime keys, we need a way to gather all the weight
