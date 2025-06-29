@@ -406,14 +406,42 @@ int FilterStateWrapper::luaGet(lua_State* state) {
     return 0; // Return nil if object not found.
   }
 
-  // Try to serialize the object as protobuf first.
-  ProtobufTypes::MessagePtr proto_msg = object->serializeAsProto();
-  if (proto_msg != nullptr) {
-    Filters::Common::Lua::ProtobufConverterUtils::pushLuaValueFromMessage(state, *proto_msg);
+  // Check if there's an optional third parameter for field access.
+  if (lua_gettop(state) >= 3 && !lua_isnil(state, 3)) {
+    const char* field_name = luaL_checkstring(state, 3);
+    if (object->hasFieldSupport()) {
+      auto field_value = object->getField(field_name);
+
+      // Convert the field value to the appropriate Lua type.
+      if (absl::holds_alternative<absl::string_view>(field_value)) {
+        const auto& str_value = absl::get<absl::string_view>(field_value);
+        lua_pushlstring(state, str_value.data(), str_value.size());
+        return 1;
+      }
+
+      if (absl::holds_alternative<int64_t>(field_value)) {
+        lua_pushnumber(state, absl::get<int64_t>(field_value));
+        return 1;
+      }
+
+      // Return nil if field is not found.
+      return 0;
+    }
+
+    // Object doesn't support field access, return nil.
+    return 0;
+  }
+
+  absl::optional<std::string> string_value = object->serializeAsString();
+  if (string_value.has_value()) {
+    const std::string& value = string_value.value();
+
+    // Return the filter state value as a string
+    lua_pushlstring(state, value.data(), value.size());
     return 1;
   }
 
-  // If protobuf serialization is not supported, return nil.
+  // If string serialization is not supported, return nil.
   return 0;
 }
 

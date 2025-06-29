@@ -1104,10 +1104,10 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNumericAccessor) {
       local numeric_obj = object:filterState():get("numeric_key")
       if numeric_obj then
         testPrint("found_numeric")
-        testPrint(tostring(numeric_obj))
-        -- Test that it's actually a number type
-        if type(numeric_obj) == "number" then
-          testPrint("correct_number_type")
+        testPrint(numeric_obj)
+        -- Test that it's returned as a string (new behavior)
+        if type(numeric_obj) == "string" then
+          testPrint("correct_string_type")
         end
       else
         testPrint("numeric_not_found")
@@ -1130,7 +1130,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNumericAccessor) {
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint("found_numeric"));
   EXPECT_CALL(printer_, testPrint("12345"));
-  EXPECT_CALL(printer_, testPrint("correct_number_type"));
+  EXPECT_CALL(printer_, testPrint("correct_string_type"));
   start("callMe");
   wrapper.reset();
 }
@@ -1142,10 +1142,10 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateBooleanAccessor) {
       local bool_obj = object:filterState():get("bool_key")
       if bool_obj ~= nil then
         testPrint("found_boolean")
-        testPrint(tostring(bool_obj))
-        -- Test that it's actually a boolean type
-        if type(bool_obj) == "boolean" then
-          testPrint("correct_boolean_type")
+        testPrint(bool_obj)
+        -- Test that it's returned as a string (new behavior)
+        if type(bool_obj) == "string" then
+          testPrint("correct_string_type")
         end
       else
         testPrint("boolean_not_found")
@@ -1168,7 +1168,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateBooleanAccessor) {
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint("found_boolean"));
   EXPECT_CALL(printer_, testPrint("true"));
-  EXPECT_CALL(printer_, testPrint("correct_boolean_type"));
+  EXPECT_CALL(printer_, testPrint("correct_string_type"));
   start("callMe");
   wrapper.reset();
 }

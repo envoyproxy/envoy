@@ -261,28 +261,25 @@ private:
 };
 
 /**
- * Lua wrapper for filter state.
+ * Lua wrapper for accessing filter state objects.
  */
-class FilterStateWrapper final : public Filters::Common::Lua::BaseLuaObject<FilterStateWrapper> {
+class FilterStateWrapper : public Filters::Common::Lua::BaseLuaObject<FilterStateWrapper> {
 public:
-  explicit FilterStateWrapper(StreamInfoWrapper& parent) : parent_{parent} {}
-
+  FilterStateWrapper(StreamInfoWrapper& parent) : parent_(parent) {}
   static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
 
 private:
   /**
-   * Get a filter state object by name.
+   * Get a filter state object by name, with an optional field name.
    * @param 1 (string): object name.
-   * @return filter metadata wrapped as a Lua table or nil.
+   * @param 2 (string, optional): field name for objects that support field access.
+   * @return filter state value as string, or nil if not found.
    */
   DECLARE_LUA_FUNCTION(FilterStateWrapper, luaGet);
 
-  // To get reference to parent's (StreamInfoWrapper) stream info member.
   StreamInfo::StreamInfo& streamInfo();
 
   StreamInfoWrapper& parent_;
-
-  friend class StreamInfoWrapper;
 };
 
 /**
