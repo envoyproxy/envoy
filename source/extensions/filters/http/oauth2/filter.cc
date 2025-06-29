@@ -41,7 +41,7 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
     authorization_handle(Http::CustomHeaders::get().Authorization);
 
 constexpr const char* CookieDeleteFormatString =
-    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; secure";
 constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
