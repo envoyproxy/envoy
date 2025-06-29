@@ -227,6 +227,12 @@ public:
   absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                              bool workers_started, uint64_t hash);
+  absl::StatusOr<std::unique_ptr<ListenerImpl>>
+  newListenerWithFilterChain(absl::optional<std::string>& fcds_version_info,
+                             const FilterChainRefVector& added_filter_chains,
+                             const absl::flat_hash_set<absl::string_view>& removed_filter_chains,
+                             bool workers_started);
+
   /**
    * Determine if in place filter chain update could be executed at this moment.
    */
@@ -250,6 +256,11 @@ public:
            !added_via_api_;
   }
   bool blockRemove() { return !added_via_api_; }
+
+  FcdsApiPtr
+  createFcdsSubscription(const envoy::config::listener::v3::Listener::FcdsConfig& fcds_config);
+
+  void maybeAddListenerInitTarget();
 
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
     return addresses_;
@@ -399,6 +410,15 @@ private:
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
                absl::Status& creation_status);
+  /**
+   * Create a new listener from an existing listener with delta filter chains.
+   * Should be called only by newListenerWithFilterChain().
+   */
+  ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& added_filter_chains,
+               const absl::flat_hash_set<absl::string_view>& removed_filter_chains,
+               absl::optional<std::string>& fcds_version_info, bool workers_started,
+               absl::Status& creation_status);
+
   // Helpers for constructor.
   void buildAccessLog(const envoy::config::listener::v3::Listener& config);
   absl::Status buildInternalListener(const envoy::config::listener::v3::Listener& config);
@@ -413,6 +433,10 @@ private:
   absl::Status createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
   absl::Status validateFilterChains(const envoy::config::listener::v3::Listener& config);
   absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
+  absl::Status
+  buildFilterChains(const FilterChainRefVector& added_filter_chains,
+                    const absl::flat_hash_set<absl::string_view>& removed_filter_chains);
+  void trackOriginInitDependencies(ListenerImpl& origin);
   absl::Status buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
                                        const Network::Address::Instance& address);
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
@@ -456,12 +480,19 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool ignore_global_conn_limit_;
   const bool bypass_overload_manager_;
+  const bool start_listener_without_warming_;
+  const bool created_by_fcds_;
+
+  std::shared_ptr<Init::TargetImpl> tracking_init_target_;
+  std::shared_ptr<Init::WatcherImpl> tracking_init_watcher_;
 
   // A target is added to Server's InitManager if workers_started_ is false.
-  Init::TargetImpl listener_init_target_;
+  std::shared_ptr<Init::TargetImpl> listener_init_target_;
+  std::vector<std::shared_ptr<Init::TargetImpl>> origins_listener_init_target_;
   // This init manager is populated with targets from the filter chain factories, namely
   // RdsRouteConfigSubscription::init_target_, so the listener can wait for route configs.
-  std::unique_ptr<Init::Manager> dynamic_init_manager_;
+  std::shared_ptr<Init::Manager> dynamic_init_manager_;
+  std::vector<std::shared_ptr<Init::Manager>> origins_dynamic_init_manager_;
 
   Filter::ListenerFilterFactoriesList listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
@@ -472,6 +503,7 @@ private:
   // the config object consistent for every FCDS update has significant performance penalty.
   const envoy::config::listener::v3::Listener config_maybe_partial_filter_chains_;
   const std::string version_info_;
+  const std::string fcds_version_info_;
   // Using std::vector instead of hash map for supporting multiple zero port addresses.
   std::vector<Network::Socket::OptionsSharedPtr> listen_socket_options_list_;
   const std::chrono::milliseconds listener_filters_timeout_;
@@ -495,12 +527,14 @@ private:
   // listener initialization is complete.
   // Important: local_init_watcher_ must be the last field in the class to avoid unexpected
   // watcher callback during the destroy of ListenerImpl.
-  Init::WatcherImpl local_init_watcher_;
+  std::shared_ptr<Init::WatcherImpl> local_init_watcher_;
+  std::vector<std::shared_ptr<Init::WatcherImpl>> origins_local_init_watcher_;
   std::shared_ptr<Server::Configuration::TransportSocketFactoryContextImpl>
       transport_factory_context_;
 
   Quic::QuicStatNames& quic_stat_names_;
   MissingListenerConfigStats missing_listener_config_stats_;
+  bool updating_listener_{false};
 
   // to access ListenerManagerImpl::factory_.
   friend class ListenerFilterChainFactoryBuilder;

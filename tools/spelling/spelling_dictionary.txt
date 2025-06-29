@@ -91,6 +91,7 @@ ETB
 ETX
 FS
 FIXME
+fc
 gperf
 HEXDIG
 HEXDIGIT
@@ -380,6 +381,7 @@ PROT
 Postgre
 Postgres
 Prereq
+Pv
 QDCOUNT
 QPACK
 QUIC

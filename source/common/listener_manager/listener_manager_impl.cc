@@ -546,6 +546,62 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
   return add_or_update_status;
 }
 
+absl::Status ListenerManagerImpl::updateDynamicFilterChains(
+    const std::string& listener_name, absl::optional<std::string>& version_info,
+    const FilterChainRefVector& added_filter_chains,
+    const absl::flat_hash_set<absl::string_view>& removed_filter_chains) {
+  ENVOY_LOG(debug, "begin update of listener {} filter chains", listener_name);
+
+  auto existing_active_listener = getListenerByName(active_listeners_, listener_name);
+  auto existing_warming_listener = getListenerByName(warming_listeners_, listener_name);
+
+  // The filter chain update needs to be based on the current warming listener if it exists.
+  // Otherwise, it needs to be based on the current active listener.
+  ListenerManagerImpl::ListenerList::iterator baseline_listener;
+  if (existing_warming_listener != warming_listeners_.end()) {
+    baseline_listener = existing_warming_listener;
+  } else if (existing_active_listener != active_listeners_.end()) {
+    baseline_listener = existing_active_listener;
+  } else {
+    IS_ENVOY_BUG(
+        fmt::format("FCDS subscription should have been removed for listener {}", listener_name));
+  }
+
+  ListenerImplPtr new_listener;
+  auto listener_or_error =
+      (*baseline_listener)
+          ->newListenerWithFilterChain(version_info, added_filter_chains, removed_filter_chains,
+                                       workers_started_);
+  RETURN_IF_NOT_OK_REF(listener_or_error.status());
+  new_listener = std::move(*listener_or_error);
+  ListenerImpl& new_listener_ref = *new_listener;
+
+  if (existing_warming_listener != warming_listeners_.end()) {
+    ASSERT(workers_started_);
+    new_listener->debugLog("update warming listener");
+    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_warming_listener));
+    // In this case we can just replace inline.
+    *existing_warming_listener = std::move(new_listener);
+  } else if (existing_active_listener != active_listeners_.end()) {
+    RETURN_IF_NOT_OK(setupSocketFactoryForListener(*new_listener, **existing_active_listener));
+    // In this case we have no warming listener, so what we do depends on whether workers
+    // have been started or not.
+    if (workers_started_) {
+      new_listener->debugLog("add warming listener");
+      warming_listeners_.emplace_back(std::move(new_listener));
+    } else {
+      new_listener->debugLog("update active listener");
+      *existing_active_listener = std::move(new_listener);
+    }
+  }
+
+  stats_.listener_dynamic_filter_chains_update_.inc();
+  updateWarmingActiveGauges();
+  stats_.listener_modified_.inc();
+  new_listener_ref.initialize();
+  return absl::OkStatus();
+}
+
 absl::Status
 ListenerManagerImpl::setupSocketFactoryForListener(ListenerImpl& new_listener,
                                                    const ListenerImpl& existing_listener) {
@@ -602,6 +658,7 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
   }
 
   ListenerImplPtr new_listener = nullptr;
+  FcdsApiPtr fcds_subscription;
 
   // In place filter chain update depends on the active listener at worker.
   if (existing_active_listener != active_listeners_.end() &&
@@ -619,6 +676,11 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
                                                   workers_started_, hash);
     RETURN_IF_NOT_OK_REF(listener_or_error.status());
     new_listener = std::move(*listener_or_error);
+    if (config.has_fcds_config()) {
+      fcds_subscription = new_listener->createFcdsSubscription(config.fcds_config());
+    }
+
+    new_listener->maybeAddListenerInitTarget();
   }
 
   ListenerImpl& new_listener_ref = *new_listener;
@@ -661,6 +723,14 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     stats_.listener_added_.inc();
   } else {
     stats_.listener_modified_.inc();
+  }
+
+  if (fcds_subscription) {
+    ENVOY_LOG(debug, "creating filter chain discovery for listener {}", name);
+
+    // Retaining the filter chain discovery subscription only at this point since the listener
+    // creation can fail in previous steps.
+    fcds_subscription_manager_.setSubscription(name, std::move(fcds_subscription));
   }
 
   new_listener_ref.initialize();
@@ -954,6 +1024,8 @@ bool ListenerManagerImpl::removeListenerInternal(const std::string& name,
     ENVOY_LOG(debug, "unknown/locked listener '{}'. no remove", name);
     return false;
   }
+
+  fcds_subscription_manager_.removeSubscription(name);
 
   // Destroy a warming listener directly.
   if (existing_warming_listener != warming_listeners_.end()) {
@@ -1305,6 +1377,16 @@ void ListenerManagerImpl::maybeCloseSocketsForListener(ListenerImpl& listener) {
 
 ApiListenerOptRef ListenerManagerImpl::apiListener() {
   return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
+}
+
+absl::optional<uint64_t> ListenerManagerImpl::activeListenerTagByName(const std::string& name) {
+  auto existing_active_listener = getListenerByName(active_listeners_, name);
+  if (existing_active_listener == active_listeners_.end()) {
+    return absl::nullopt;
+  }
+
+  RELEASE_ASSERT(*existing_active_listener != nullptr, "listener is null");
+  return (*existing_active_listener)->listenerTag();
 }
 
 REGISTER_FACTORY(DefaultListenerManagerFactoryImpl, ListenerManagerFactory);
