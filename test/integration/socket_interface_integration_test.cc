@@ -196,6 +196,132 @@ TEST_P(IoUringSocketInterfaceIntegrationTest, Basic) {
   ASSERT_TRUE(connection->run());
   EXPECT_EQ("hello", response);
 }
+
+TEST_P(IoUringSocketInterfaceIntegrationTest, BasicIoUringMode) {
+  // Test basic io_uring functionality with default mode
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* extensions = bootstrap.mutable_bootstrap_extensions();
+    extensions->Clear();
+    auto* socket_interface = extensions->Add();
+    socket_interface->set_name(
+        "envoy.extensions.network.socket_interface.default_socket_interface");
+
+    envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+    auto* io_uring_options = config.mutable_io_uring_options();
+    io_uring_options->set_mode(envoy::extensions::network::socket_interface::v3::READ_WRITEV);
+    io_uring_options->mutable_io_uring_size()->set_value(1000);
+
+    socket_interface->mutable_typed_config()->PackFrom(config);
+    bootstrap.set_default_socket_interface(
+        "envoy.extensions.network.socket_interface.default_socket_interface");
+  });
+
+  BaseIntegrationTest::initialize();
+  std::string response;
+  auto connection = createConnectionDriver(
+      lookupPort("listener_0"), "hello",
+      [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        conn.close(Network::ConnectionCloseType::FlushWrite);
+      });
+  ASSERT_TRUE(connection->run());
+  EXPECT_EQ("hello", response);
+}
+
+TEST_P(IoUringSocketInterfaceIntegrationTest, SendRecvMode) {
+  // Test io_uring with SEND_RECV mode for performance improvement
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* extensions = bootstrap.mutable_bootstrap_extensions();
+    extensions->Clear();
+    auto* socket_interface = extensions->Add();
+    socket_interface->set_name(
+        "envoy.extensions.network.socket_interface.default_socket_interface");
+
+    envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+    auto* io_uring_options = config.mutable_io_uring_options();
+    io_uring_options->set_mode(envoy::extensions::network::socket_interface::v3::SEND_RECV);
+    io_uring_options->mutable_io_uring_size()->set_value(2000);
+    io_uring_options->mutable_read_buffer_size()->set_value(16384);
+
+    socket_interface->mutable_typed_config()->PackFrom(config);
+    bootstrap.set_default_socket_interface(
+        "envoy.extensions.network.socket_interface.default_socket_interface");
+  });
+
+  BaseIntegrationTest::initialize();
+  std::string response;
+  auto connection = createConnectionDriver(
+      lookupPort("listener_0"), "send_recv_test",
+      [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        conn.close(Network::ConnectionCloseType::FlushWrite);
+      });
+  ASSERT_TRUE(connection->run());
+  EXPECT_EQ("send_recv_test", response);
+}
+
+TEST_P(IoUringSocketInterfaceIntegrationTest, SendmsgRecvmsgMode) {
+  // Test io_uring with SENDMSG_RECVMSG mode for maximum performance
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* extensions = bootstrap.mutable_bootstrap_extensions();
+    extensions->Clear();
+    auto* socket_interface = extensions->Add();
+    socket_interface->set_name(
+        "envoy.extensions.network.socket_interface.default_socket_interface");
+
+    envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+    auto* io_uring_options = config.mutable_io_uring_options();
+    io_uring_options->set_mode(envoy::extensions::network::socket_interface::v3::SENDMSG_RECVMSG);
+    io_uring_options->mutable_io_uring_size()->set_value(2000);
+    io_uring_options->mutable_read_buffer_size()->set_value(16384);
+
+    socket_interface->mutable_typed_config()->PackFrom(config);
+    bootstrap.set_default_socket_interface(
+        "envoy.extensions.network.socket_interface.default_socket_interface");
+  });
+
+  BaseIntegrationTest::initialize();
+  std::string response;
+  auto connection = createConnectionDriver(
+      lookupPort("listener_0"), "sendmsg_recvmsg_test",
+      [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        conn.close(Network::ConnectionCloseType::FlushWrite);
+      });
+  ASSERT_TRUE(connection->run());
+  EXPECT_EQ("sendmsg_recvmsg_test", response);
+}
+
+TEST_P(IoUringSocketInterfaceIntegrationTest, BackwardCompatibilityNoModeSpecified) {
+  // Test that not specifying mode defaults to READ_WRITEV
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* extensions = bootstrap.mutable_bootstrap_extensions();
+    extensions->Clear();
+    auto* socket_interface = extensions->Add();
+    socket_interface->set_name(
+        "envoy.extensions.network.socket_interface.default_socket_interface");
+
+    envoy::extensions::network::socket_interface::v3::DefaultSocketInterface config;
+    auto* io_uring_options = config.mutable_io_uring_options();
+    // Not setting mode field should default to READ_WRITEV
+    io_uring_options->mutable_io_uring_size()->set_value(1000);
+
+    socket_interface->mutable_typed_config()->PackFrom(config);
+    bootstrap.set_default_socket_interface(
+        "envoy.extensions.network.socket_interface.default_socket_interface");
+  });
+
+  BaseIntegrationTest::initialize();
+  std::string response;
+  auto connection = createConnectionDriver(
+      lookupPort("listener_0"), "backward_compat_test",
+      [&response](Network::ClientConnection& conn, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        conn.close(Network::ConnectionCloseType::FlushWrite);
+      });
+  ASSERT_TRUE(connection->run());
+  EXPECT_EQ("backward_compat_test", response);
+}
 #endif
 
 } // namespace
