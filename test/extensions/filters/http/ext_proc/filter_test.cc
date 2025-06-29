@@ -3548,12 +3548,13 @@ TEST_F(HttpFilterTest, ReplaceCompleteResponseBuffered) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-// Using the default configuration, test the filter with a processor that
+// With failure_mode_allow set to true, tests the filter with a processor that
 // replies to the request_headers message incorrectly by sending a
 // request_body message, which should result in the stream being closed
 // and ignored.
-TEST_F(HttpFilterTest, OutOfOrder) {
+TEST_F(HttpFilterTest, OutOfOrderFailOpen) {
   initialize(R"EOF(
+  failure_mode_allow: true
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
@@ -3568,6 +3569,7 @@ TEST_F(HttpFilterTest, OutOfOrder) {
 
   // Return an out-of-order message. The server should close the stream
   // and continue as if nothing happened.
+  // failure_mode_allowed_ stats counter is incremented by 1.
   EXPECT_CALL(decoder_callbacks_, continueDecoding());
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   resp1->mutable_request_body();
@@ -3588,6 +3590,41 @@ TEST_F(HttpFilterTest, OutOfOrder) {
   EXPECT_EQ(1, config_->stats().streams_started_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().spurious_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+// With failure_mode_allow set to false, i.e, default case, tests the filter with
+// a processor that replies to the request_headers message incorrectly by sending
+// a request_body message, which should result in local reply being sent.
+TEST_F(HttpFilterTest, OutOfOrderFailClose) {
+  initialize(R"EOF(
+  failure_mode_allow: false
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_FALSE(last_request_.observability_mode());
+  ASSERT_TRUE(last_request_.has_request_headers());
+
+  // Return an out-of-order message. Spurious message stats counter is
+  // incremented by 1. Failure mode stats counter is not incremented.
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  resp1->mutable_request_body();
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().spurious_msgs_received_.value());
+  EXPECT_EQ(0, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
@@ -4932,6 +4969,7 @@ TEST_F(HttpFilterTest, SendNormalBodyMutationTestWithFilterConfigDuplexStreamed)
   grpc_service:
     envoy_grpc:
       cluster_name: "ext_proc_server"
+  failure_mode_allow: true
   processing_mode:
     response_body_mode: "FULL_DUPLEX_STREAMED"
     response_trailer_mode: "SEND"

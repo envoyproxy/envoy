@@ -172,13 +172,22 @@ message ExternalProcessor {
   // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
   // is set to ``FULL_DUPLEX_STREAMED``, ``failure_mode_allow`` can not be set to true.
   //
-  // Otherwise, by default, if the gRPC stream cannot be established, or if it is closed
-  // prematurely with an error, the filter will fail. Specifically, if the
-  // response headers have not yet been delivered, then it will return a 500
-  // error downstream. If they have been delivered, then instead the HTTP stream to the
-  // downstream client will be reset.
-  // With this parameter set to true, however, then if the gRPC stream is prematurely closed
-  // or could not be opened, processing continues without error.
+  // Otherwise, by default, if in the following cases:
+  //
+  // 1. The gRPC stream cannot be established.
+  //
+  // 2. The gRPC stream is closed prematurely with an error.
+  //
+  // 3. The external processing timeouts.
+  //
+  // 4. The ext_proc server sends back spurious response messages.
+  //
+  // The filter will fail and a local reply with error code
+  // 504(for timeout case) or 500(for all other cases), will be sent to the downstream.
+  //
+  // However, with this parameter set to true and if the above cases happen, the processing
+  // continues without error.
+  //
   bool failure_mode_allow = 2;
 
   // Specifies default options for how HTTP headers, trailers, and bodies are

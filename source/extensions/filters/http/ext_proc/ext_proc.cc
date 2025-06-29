@@ -1264,6 +1264,19 @@ void Filter::setDecoderDynamicMetadata(const ProcessingResponse& response) {
   setDynamicMetadata(decoder_callbacks_, decoding_state_, response);
 }
 
+// If an error response is received, sends an immediate response with an error message.
+void Filter::handleErrorResponse(absl::Status processing_status) {
+  ENVOY_STREAM_LOG(debug, "Sending immediate response: {}", *decoder_callbacks_,
+                   processing_status.message());
+  processing_complete_ = true;
+  onFinishProcessorCalls(processing_status.raw_code());
+  closeStream();
+  ImmediateResponse invalid_mutation_response;
+  invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
+  invalid_mutation_response.set_details(std::string(processing_status.message()));
+  sendImmediateResponse(invalid_mutation_response);
+}
+
 namespace {
 
 // DEFAULT header modes in a ProcessingResponse mode_override have no effect (they are considered
@@ -1424,27 +1437,27 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // Processing code uses this specific error code in the case that a
     // message was received out of order.
     stats_.spurious_msgs_received_.inc();
-    // When a message is received out of order, ignore it and also
-    // ignore the stream for the rest of this filter instance's lifetime
-    // to protect us from a malformed server.
     ENVOY_STREAM_LOG(warn, "Spurious response message {} received on gRPC stream",
                      *decoder_callbacks_, static_cast<int>(response->response_case()));
-    closeStream();
-    clearAsyncState();
-    processing_complete_ = true;
+    if (config_->failureModeAllow() ||
+        !Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_proc_fail_close_spurious_resp")) {
+      // When a message is received out of order,and fail open is configured,
+      // ignore it and also ignore the stream for the rest of this filter
+      // instance's lifetime to protect us from a malformed server.
+      stats_.failure_mode_allowed_.inc();
+      closeStream();
+      clearAsyncState();
+      processing_complete_ = true;
+    } else {
+      // Send an immediate response if fail close is configured.
+      handleErrorResponse(processing_status);
+    }
   } else {
     // Any other error results in an immediate response with an error message.
     // This could happen, for example, after a header mutation is rejected.
-    ENVOY_STREAM_LOG(debug, "Sending immediate response: {}", *decoder_callbacks_,
-                     processing_status.message());
     stats_.stream_msgs_received_.inc();
-    processing_complete_ = true;
-    onFinishProcessorCalls(processing_status.raw_code());
-    closeStream();
-    ImmediateResponse invalid_mutation_response;
-    invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
-    invalid_mutation_response.set_details(std::string(processing_status.message()));
-    sendImmediateResponse(invalid_mutation_response);
+    handleErrorResponse(processing_status);
   }
 }
 
