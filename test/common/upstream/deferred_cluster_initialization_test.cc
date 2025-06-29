@@ -21,8 +21,6 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-using testing::_;
-
 using ClusterType = absl::variant<envoy::config::cluster::v3::Cluster::DiscoveryType,
                                   envoy::config::cluster::v3::Cluster::CustomClusterType>;
 
@@ -59,19 +57,15 @@ envoy::config::cluster::v3::Cluster parseClusterFromV3Yaml(const std::string& ya
 class DeferredClusterInitializationTest : public testing::TestWithParam<bool> {
 protected:
   DeferredClusterInitializationTest()
-      : ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()),
-        http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
-        router_context_(factory_.stats_.symbolTable()) {}
+      : ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()) {}
 
   void create(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Replace the adsMux to have mocked GrpcMux object that will allow invoking
     // methods when creating the cluster-manager.
-    ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
+    ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
 
-    cluster_manager_ = TestClusterManagerImpl::createTestClusterManager(
-        bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
-        factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-        *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
+    cluster_manager_ = TestClusterManagerImpl::createTestClusterManager(bootstrap, factory_,
+                                                                        factory_.server_context_);
     ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
     THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 
@@ -121,14 +115,7 @@ protected:
   NiceMock<TestClusterManagerFactory> factory_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
-  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
-  AccessLog::MockAccessLogManager log_manager_;
-  NiceMock<Server::MockAdmin> admin_;
-  Http::ContextImpl http_context_;
-  Grpc::ContextImpl grpc_context_;
-  Router::ContextImpl router_context_;
-  NiceMock<Server::MockInstance> server_;
 };
 
 class StaticClusterTest : public DeferredClusterInitializationTest {};
@@ -438,7 +425,7 @@ protected:
       const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     const auto decoded_resources =
         TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
-    EXPECT_TRUE(xds_manager_.subscription_factory_.callbacks_
+    EXPECT_TRUE(factory_.server_context_.xds_manager_.subscription_factory_.callbacks_
                     ->onConfigUpdate(decoded_resources.refvec_, {}, "")
                     .ok());
   }

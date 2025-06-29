@@ -124,10 +124,9 @@ public:
     }
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-        *server_.server_factory_context_, server_.stats(), server_.threadLocal(),
-        server_.httpContext(),
+        server_factory_context_,
         [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-        ssl_context_manager_, server_.quic_stat_names_, server_);
+        server_.quic_stat_names_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
