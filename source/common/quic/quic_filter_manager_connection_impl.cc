@@ -145,9 +145,17 @@ void QuicFilterManagerConnectionImpl::updateBytesBuffered(uint64_t old_buffered_
   const uint64_t bytes_to_send_old = bytes_to_send_;
   bytes_to_send_ += delta;
   if (delta < 0) {
-    ENVOY_BUG(bytes_to_send_old > bytes_to_send_, "Underflowed");
+    ENVOY_BUG(bytes_to_send_old > bytes_to_send_,
+              fmt::format("Underflowed, bytes_to_send_old {}, old_buffered_bytes {}, "
+                          "new_buffered_bytes {}, high watermark limit {}",
+                          bytes_to_send_old, old_buffered_bytes, new_buffered_bytes,
+                          write_buffer_watermark_simulation_.highWatermark()));
   } else {
-    ENVOY_BUG(bytes_to_send_old <= bytes_to_send_, "Overflowed");
+    ENVOY_BUG(bytes_to_send_old <= bytes_to_send_,
+              fmt::format("Overflowed, bytes_to_send_old {}, old_buffered_bytes {}, "
+                          "new_buffered_bytes {}, high watermark limit {}",
+                          bytes_to_send_old, old_buffered_bytes, new_buffered_bytes,
+                          write_buffer_watermark_simulation_.highWatermark()));
   }
   write_buffer_watermark_simulation_.checkHighWatermark(bytes_to_send_);
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);

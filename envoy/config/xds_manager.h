@@ -47,6 +47,30 @@ public:
   initializeAdsConnections(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   /**
+   * Subscription to a singleton resource.
+   * This will create a subscription to a singleton resource, based on the resource_name and the
+   * config source. If an xDS-TP based resource name is given, then the config sources defined in
+   * the Bootstrap config_sources/default_config_source may be used.
+   *
+   * @param resource_name absl::string_view the resource to subscribe to.
+   * @param config OptRef<const envoy::config::core::v3::ConfigSource> an optional config source to
+   * use.
+   * @param type_url type URL for the resource being subscribed to.
+   * @param scope stats scope for any stats tracked by the subscription.
+   * @param callbacks the callbacks needed by all Subscription objects, to deliver config updates.
+   *                  The callbacks must not result in the deletion of the Subscription object.
+   * @param resource_decoder how incoming opaque resource objects are to be decoded.
+   * @param options subscription options.
+   *
+   * @return SubscriptionPtr subscription object corresponding for config and type_url or error
+   * status.
+   */
+  virtual absl::StatusOr<SubscriptionPtr> subscribeToSingletonResource(
+      absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
+      absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
+
+  /**
    * Shuts down the xDS-Manager and all the configured connections to the config
    * servers.
    */
