@@ -20,8 +20,8 @@ public:
   virtual ~ClusterSpecifierPlugin() = default;
 
   /**
-   * Validate if the clusters are valid in the cluster manager. This
-   * is optional.
+   * Validate if the clusters are valid in the cluster manager. The derived class
+   * should override it if the validation is needed.
    *
    * @param cm cluster manager.
    * @return absl::Status status.

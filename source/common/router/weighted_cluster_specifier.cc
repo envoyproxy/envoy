@@ -7,6 +7,8 @@ namespace Envoy {
 namespace Router {
 
 absl::Status validateWeightedClusterSpecifier(const ClusterWeightProto& cluster) {
+  // If one and only one of name or cluster_header is specified. The empty() of name
+  // and cluster_header will be different values.
   if (cluster.name().empty() != cluster.cluster_header().empty()) {
     return absl::OkStatus();
   }
