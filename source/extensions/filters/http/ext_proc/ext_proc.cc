@@ -409,7 +409,7 @@ Filter::StreamOpenState Filter::openStream() {
     return StreamOpenState::IgnoreError;
   }
 
-  if (!config().grpcService().has_value()) {
+  if (!grpc_service_.has_envoy_grpc() && !grpc_service_.has_google_grpc()) {
     return StreamOpenState::Ok;
   }
 
@@ -425,7 +425,7 @@ Filter::StreamOpenState Filter::openStream() {
                        .setSampled(absl::nullopt)
                        .setRemoteCloseTimeout(config_->remoteCloseTimeout());
 
-    ExternalProcessorClient* grpc_client = dynamic_cast<ExternalProcessorClient*>(client_.get());
+    ExternalProcessorClient* grpc_client = static_cast<ExternalProcessorClient*>(client_.get());
     ExternalProcessorStreamPtr stream_object =
         grpc_client->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
@@ -442,7 +442,7 @@ Filter::StreamOpenState Filter::openStream() {
 }
 
 void Filter::closeStream() {
-  if (!config_->grpcService().has_value()) {
+  if (!grpc_service_.has_envoy_grpc() && !grpc_service_.has_google_grpc()) {
     return;
   }
 
@@ -459,7 +459,7 @@ void Filter::closeStream() {
 }
 
 void Filter::halfCloseAndWaitForRemoteClose() {
-  if (!config_->grpcService().has_value()) {
+  if (!grpc_service_.has_envoy_grpc() && !grpc_service_.has_google_grpc()) {
     return;
   }
 
@@ -488,7 +488,7 @@ void Filter::onDestroy() {
   decoding_state_.stopMessageTimer();
   encoding_state_.stopMessageTimer();
 
-  if (!config_->grpcService().has_value()) {
+  if (!grpc_service_.has_envoy_grpc() && !grpc_service_.has_google_grpc()) {
     client_->cancel();
     return;
   }

@@ -54,9 +54,11 @@ public:
        const uint64_t stream_id,
        CommonExtProc::RequestCallbacks<envoy::service::network_ext_proc::v3::ProcessingResponse>*
            callbacks,
-       CommonExtProc::StreamBase* stream));
-  MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const));
+       (CommonExtProc::StreamBase<envoy::service::network_ext_proc::v3::ProcessingRequest,
+                                  envoy::service::network_ext_proc::v3::ProcessingResponse> *
+        stream)));
+  MOCK_METHOD(void, cancel, (), (override));
+  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const, override));
 };
 
 class NetworkExtProcFilterTest : public testing::Test {

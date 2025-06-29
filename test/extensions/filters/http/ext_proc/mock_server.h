@@ -24,11 +24,12 @@ public:
   MOCK_METHOD(void, sendRequest,
               (envoy::service::ext_proc::v3::ProcessingRequest&&, bool, const uint64_t,
                CommonExtProc::RequestCallbacks<envoy::service::ext_proc::v3::ProcessingResponse>*,
-               CommonExtProc::StreamBase*),
+               (CommonExtProc::StreamBase<envoy::service::ext_proc::v3::ProcessingRequest,
+                                          envoy::service::ext_proc::v3::ProcessingResponse>*)),
               (override));
-  MOCK_METHOD(void, cancel, ());
+  MOCK_METHOD(void, cancel, (), (override));
 
-  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const));
+  MOCK_METHOD(const Envoy::StreamInfo::StreamInfo*, getStreamInfo, (), (const, override));
 };
 
 class MockStream : public ExternalProcessorStream {

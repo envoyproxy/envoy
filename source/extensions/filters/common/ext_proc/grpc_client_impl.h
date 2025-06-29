@@ -235,10 +235,10 @@ public:
   }
 
   void sendRequest(RequestType&& request, bool end_stream, const uint64_t,
-                   RequestCallbacks<ResponseType>*, StreamBase* stream) override {
-    auto* grpc_stream = dynamic_cast<ProcessorStream<RequestType, ResponseType>*>(stream);
-    if (grpc_stream != nullptr) {
-      grpc_stream->send(std::move(request), end_stream);
+                   RequestCallbacks<ResponseType>*,
+                   StreamBase<RequestType, ResponseType>* stream) override {
+    if (stream != nullptr) {
+      stream->send(std::move(request), end_stream);
     }
   };
 

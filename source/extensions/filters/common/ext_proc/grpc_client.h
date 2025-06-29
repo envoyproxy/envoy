@@ -27,16 +27,10 @@ public:
  * A stream to an external processing server. This uses a bidirectional gRPC stream to send
  * requests and receive responses.
  */
-template <typename RequestType, typename ResponseType> class ProcessorStream : public StreamBase {
+template <typename RequestType, typename ResponseType>
+class ProcessorStream : public StreamBase<RequestType, ResponseType> {
 public:
   ~ProcessorStream() override = default;
-  virtual void send(RequestType&& request, bool end_stream) PURE;
-  // Idempotent close. Return true if it actually closed.
-  virtual bool close() PURE;
-  virtual bool halfCloseAndDeleteOnRemoteClose() PURE;
-  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
-  virtual StreamInfo::StreamInfo& streamInfo() PURE;
-  virtual void notifyFilterDestroy() PURE;
 };
 
 template <typename RequestType, typename ResponseType>
