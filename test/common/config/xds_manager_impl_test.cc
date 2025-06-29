@@ -81,6 +81,15 @@ public:
   }
 };
 
+// A ConfigSubscriptionFactory for the xDS-TP based config-sources.
+// Returns a MockSubscriptionFactory instance when trying to instantiate a mux for the
+// `envoy.config_subscription.ads` type.
+class MockAdsConfigSubscriptionFactory : public ConfigSubscriptionFactory {
+public:
+  std::string name() const override { return "envoy.config_subscription.ads"; }
+  MOCK_METHOD(Config::SubscriptionPtr, create, (SubscriptionData & data), (override));
+};
+
 class XdsManagerImplTest : public testing::Test {
 public:
   XdsManagerImplTest()
@@ -786,18 +795,69 @@ TEST_F(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
 class XdsManagerImplXdstpConfigSourcesTest : public testing::Test {
 public:
   XdsManagerImplXdstpConfigSourcesTest()
-      : xds_manager_impl_(dispatcher_, api_, stats_, local_info_, validation_context_, server_) {
+      : grpc_mux_registry_(grpc_mux_factory_),
+        xds_manager_impl_(dispatcher_, api_, stats_, local_info_, validation_context_, server_) {
     ON_CALL(validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
   }
 
-  void initialize(const std::string& bootstrap_yaml = "") {
+  void initialize(const std::string& bootstrap_yaml = "", bool enable_authority_a = false,
+                  bool enable_authority_b = false, bool enable_default_authority = false) {
     if (!bootstrap_yaml.empty()) {
       TestUtility::loadFromYaml(bootstrap_yaml, server_.bootstrap_);
     }
+
+    if (enable_authority_a) {
+      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
+          .WillOnce(Invoke(
+              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+                  Random::RandomGenerator&, Stats::Scope&,
+                  const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+                  std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                  OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                  bool) -> std::shared_ptr<Config::GrpcMux> {
+                EXPECT_NE(primary_async_client, nullptr);
+                return authority_A_mux_;
+              }));
+    }
+    if (enable_authority_b) {
+      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
+          .WillOnce(Invoke(
+              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+                  Random::RandomGenerator&, Stats::Scope&,
+                  const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+                  std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                  OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                  bool) -> std::shared_ptr<Config::GrpcMux> {
+                EXPECT_NE(primary_async_client, nullptr);
+                return authority_B_mux_;
+              }));
+    }
+    if (enable_default_authority) {
+      EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
+          .WillOnce(Invoke(
+              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+                  Random::RandomGenerator&, Stats::Scope&,
+                  const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
+                  std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
+                  OptRef<Config::XdsConfigTracker>, OptRef<Config::XdsResourcesDelegate>,
+                  bool) -> std::shared_ptr<Config::GrpcMux> {
+                EXPECT_NE(primary_async_client, nullptr);
+                return default_mux_;
+              }));
+    }
+
     ASSERT_OK(xds_manager_impl_.initialize(server_.bootstrap_, &cm_));
+    if (enable_authority_a || enable_authority_b || enable_default_authority) {
+      ASSERT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+    }
   }
 
+  NiceMock<MockGrpcMuxFactory> grpc_mux_factory_;
+  Registry::InjectFactory<MuxFactory> grpc_mux_registry_;
   NiceMock<Server::MockInstance> server_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
@@ -811,28 +871,14 @@ public:
   std::shared_ptr<NiceMock<MockGrpcMux>> default_mux_{std::make_shared<NiceMock<MockGrpcMux>>()};
   std::shared_ptr<NiceMock<MockGrpcMux>> authority_A_mux_{
       std::make_shared<NiceMock<MockGrpcMux>>()};
+  std::shared_ptr<NiceMock<MockGrpcMux>> authority_B_mux_{
+      std::make_shared<NiceMock<MockGrpcMux>>()};
 };
 
 // Validates that when only a default config source defined with no authority, a gRPC connection is
 // established.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoAuthority) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
-              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
-              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
-              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
-              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            return default_mux_;
-          }));
-
   // Have a single default_config_source with no authorities in it.
   initialize(R"EOF(
   default_config_source:
@@ -857,16 +903,17 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoAuthority) {
                 socket_address:
                   address: 127.0.0.1
                   port_value: 11001
-  )EOF");
-  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  )EOF",
+             false, false, true);
 }
 
 // Validates that when a default config source that is not gRPC based is
 // rejected as this is currently not supported.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceSotwNonGrpc) {
-  // Remove the gRPC mux factory.
-  MockGrpcMuxFactory mux_factory;
-  Registry::FactoryCategoryRegistry::disableFactory(mux_factory.category(), mux_factory.name());
+  // Temporarily remove the config mux factories.
+  auto saved_factories = Registry::FactoryRegistry<MuxFactory>::factories();
+  Registry::FactoryRegistry<MuxFactory>::factories().clear();
+  Registry::InjectFactory<MuxFactory>::resetTypeMappings();
   // Have a single default_config_source configured with ADS.
   initialize(R"EOF(
   default_config_source:
@@ -895,14 +942,18 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceSotwNonGrpc) {
   const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(res.message(), HasSubstr("envoy.config_mux.grpc_mux_factory not found"));
+  // Restore the mux factories.
+  Registry::FactoryRegistry<MuxFactory>::factories() = saved_factories;
+  Registry::InjectFactory<MuxFactory>::resetTypeMappings();
 }
 
 // Validates that when a default config source that is not gRPC based is
 // rejected as this is currently not supported.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceDeltaNonGrpc) {
-  // Remove the gRPC mux factory.
-  MockGrpcMuxFactory mux_factory;
-  Registry::FactoryCategoryRegistry::disableFactory(mux_factory.category(), mux_factory.name());
+  // Temporarily remove the config mux factories.
+  auto saved_factories = Registry::FactoryRegistry<MuxFactory>::factories();
+  Registry::FactoryRegistry<MuxFactory>::factories().clear();
+  Registry::InjectFactory<MuxFactory>::resetTypeMappings();
   // Have a single default_config_source configured with ADS.
   initialize(R"EOF(
   default_config_source:
@@ -931,6 +982,9 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceDeltaNonGrpc) {
   const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_THAT(res.message(), HasSubstr("envoy.config_mux.new_grpc_mux_factory not found"));
+  // Restore the mux factories.
+  Registry::FactoryRegistry<MuxFactory>::factories() = saved_factories;
+  Registry::InjectFactory<MuxFactory>::resetTypeMappings();
 }
 
 // Validates that a default config source is used but the gRPC extension
@@ -966,23 +1020,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceNoExtensionLinke
 
 // Test only a default config source defined with two authorities.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceTwoAuthorities) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
-              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
-              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
-              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
-              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            return default_mux_;
-          }));
-
   // Have a single default_config_source with two authorities in it.
   initialize(R"EOF(
   default_config_source:
@@ -1010,17 +1048,14 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceTwoAuthorities) 
                 socket_address:
                   address: 127.0.0.1
                   port_value: 11001
-  )EOF");
-  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  )EOF",
+             false, false, true);
+  ////EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
 }
 
 // Test only a default config source with wrong api_type.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceWrongApi) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-
   // Have a single default_config_source with non-aggregated api type.
   initialize(R"EOF(
   default_config_source:
@@ -1056,11 +1091,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceWrongApi) {
 
 // Test a non-default only config source with repeated authority (invalid).
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceRepeatedAuthority) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-
   // Have a single default_config_source with repeated authority_D1.com in it.
   initialize(R"EOF(
   default_config_source:
@@ -1098,11 +1129,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultConfigSourceRepeatedAuthorit
 
 // Test only a non-default config source defined with no authority (should fail).
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceNoAuthority) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-
   // Have a single config_source with no authorities in it.
   initialize(R"EOF(
   config_sources:
@@ -1136,11 +1163,10 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceNoAuthority) 
 
 // Test only a non-default config source with an authority using AGGREGATED_DELTA_GRPC.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
+  // Replace the created GrpcMux mock with a delta-xDS one.
   NiceMock<MockGrpcMuxFactory> factory("envoy.config_mux.new_grpc_mux_factory");
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce(Invoke(
           [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
@@ -1185,23 +1211,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
 
 // Test only a non-default config source defined with two authorities.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceTwoAuthorities) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
-              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
-              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
-              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
-              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            return authority_A_mux_;
-          }));
-
   // Have a single config_source with two authorities in it.
   initialize(R"EOF(
   config_sources:
@@ -1229,40 +1239,13 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceTwoAuthoritie
                 socket_address:
                   address: 127.0.0.1
                   port_value: 11001
-  )EOF");
-  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  )EOF",
+             true);
 }
 
 // Test a non-default and default config source (valid) with the same authority in both.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultConfigSources) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-  // Replace the created GrpcMux mock.
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
-              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
-              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
-              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
-              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            return authority_A_mux_;
-          }));
-  EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
-      .WillOnce(Invoke(
-          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
-              Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
-              const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
-              BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,
-              OptRef<Config::XdsResourcesDelegate>, bool) -> std::shared_ptr<Config::GrpcMux> {
-            EXPECT_NE(primary_async_client, nullptr);
-            return default_mux_;
-          }));
-
   // Have a config-source and default_config_source with authority_2.com in each of them.
   initialize(R"EOF(
   config_sources:
@@ -1312,17 +1295,13 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultConfigSources) 
                 socket_address:
                   address: 127.0.0.1
                   port_value: 11002
-  )EOF");
-  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+  )EOF",
+             true, false, true);
 }
 
 // Test a default only config source with repeated authority (invalid).
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceRepeatedAuthority) {
-  TestScopedRuntime scoped_runtime;
   testing::InSequence s;
-  NiceMock<MockGrpcMuxFactory> factory;
-  Registry::InjectFactory<Config::MuxFactory> registry(factory);
-
   // Have a single config_source option with repeated authorities in it.
   initialize(R"EOF(
   config_sources:
@@ -1356,6 +1335,918 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceRepeatedAutho
   EXPECT_THAT(res.message(),
               HasSubstr("xdstp-based config source authority authority_1.com is configured more "
                         "than once in an xdstp-based config source."));
+}
+
+// Validates that when a single valid config source is defined, a subscription to a resource
+// under that authority uses the config source's gRPC mux.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SubscribeSingleValidConfigSource) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_A.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF",
+             true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name = "xdstp://authority_A.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
+      XdsResourceIdentifier::decodeUrn(resource_name);
+  ASSERT_TRUE(resource_urn_or_error.ok());
+  xds::core::v3::ResourceName resource_urn = resource_urn_or_error.value();
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+  ON_CALL(config_sub_factory, create(_))
+      .WillByDefault(testing::Invoke(
+          [this, &mock_subscription](
+              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+            EXPECT_EQ(data.ads_grpc_mux_, authority_A_mux_);
+            SubscriptionPtr mock_subscription_ptr(mock_subscription);
+            return mock_subscription_ptr;
+          }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that when multiple config sources are defined and the first one is valid
+// for the resource's authority, that first config source's gRPC mux is used.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseFirstConfigSource) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_A.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_A_cluster
+  - authorities:
+    - name: authority_B.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_B_cluster
+  static_resources:
+    clusters:
+    - name: config_source_A_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_A_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: config_source_B_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_B_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF",
+             true, true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  // Resource is under authority_A.com.
+  const std::string resource_name = "xdstp://authority_A.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
+      XdsResourceIdentifier::decodeUrn(resource_name);
+  ASSERT_TRUE(resource_urn_or_error.ok());
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+  ON_CALL(config_sub_factory, create(_))
+      .WillByDefault(testing::Invoke(
+          [this, &mock_subscription](
+              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+            // Expect the subscription to use authority_A_mux_.
+            EXPECT_EQ(data.ads_grpc_mux_, authority_A_mux_);
+            SubscriptionPtr mock_subscription_ptr(mock_subscription);
+            return mock_subscription_ptr;
+          }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that when multiple config sources are defined and the first one is NOT valid
+// for the resource's authority, but a subsequent one IS, that subsequent config source's
+// gRPC mux is used.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesUseSecondConfigSource) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  config_sources:
+  - authorities: # Config source for authority_A
+    - name: authority_A.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_A_cluster
+  - authorities: # Config source for authority_B
+    - name: authority_B.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_B_cluster
+  static_resources:
+    clusters:
+    - name: config_source_A_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_A_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: config_source_B_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_B_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF",
+             true, true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  // Resource is under authority_B.com, so authority_A_mux should be skipped.
+  const std::string resource_name = "xdstp://authority_B.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
+      XdsResourceIdentifier::decodeUrn(resource_name);
+  ASSERT_TRUE(resource_urn_or_error.ok());
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+  ON_CALL(config_sub_factory, create(_))
+      .WillByDefault(testing::Invoke(
+          [this, &mock_subscription](
+              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+            // Expect the subscription to use authority_B_mux_.
+            EXPECT_EQ(data.ads_grpc_mux_, authority_B_mux_);
+            SubscriptionPtr mock_subscription_ptr(mock_subscription);
+            return mock_subscription_ptr;
+          }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that when multiple config sources are defined and non are valid for the resource's
+// authority, then the non-xDS-TP based subscription is used.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, MultipleConfigSourcesNonMatching) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  config_sources:
+  - authorities: # Config source for authority_A
+    - name: authority_A.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_A_cluster
+  - authorities: # Config source for authority_B
+    - name: authority_B.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_B_cluster
+  static_resources:
+    clusters:
+    - name: config_source_A_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_A_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: config_source_B_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_B_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF",
+             true, true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  // Resource is under authority_C.com, so authority_A_mux and authority_b_mux should be skipped.
+  const std::string resource_name = "xdstp://authority_C.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
+      XdsResourceIdentifier::decodeUrn(resource_name);
+  ASSERT_TRUE(resource_urn_or_error.ok());
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+  ON_CALL(config_sub_factory, create(_))
+      .WillByDefault(testing::Invoke(
+          [&mock_subscription](
+              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+            // Expect the subscription to create the non-grpc_mux version.
+            EXPECT_EQ(data.ads_grpc_mux_, nullptr);
+            SubscriptionPtr mock_subscription_ptr(mock_subscription);
+            return mock_subscription_ptr;
+          }));
+
+  envoy::config::core::v3::ConfigSource config_source_proto;
+  // For this test, we'll use a basic ADS config source.
+  // The key is that subscribeToSingletonResource should call subscriptionFromConfigSource.
+  config_source_proto.mutable_ads();
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, makeOptRef(config_source_proto), type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that when config_sources is empty and a valid default_config_source is provided,
+// a subscription to a resource matching the default authority uses the default_config_source's mux.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenConfigSourcesIsEmpty) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  default_config_source:
+    authorities:
+    - name: default_authority.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: default_config_source_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11003 # Different port for clarity
+  )EOF",
+             false, false, true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  // Resource is under default_authority.com
+  const std::string resource_name = "xdstp://default_authority.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
+      XdsResourceIdentifier::decodeUrn(resource_name);
+  ASSERT_TRUE(resource_urn_or_error.ok());
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+  ON_CALL(config_sub_factory, create(_))
+      .WillByDefault(testing::Invoke(
+          [this, &mock_subscription](
+              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+            // Expect the subscription to use default_mux_
+            EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
+            SubscriptionPtr mock_subscription_ptr(mock_subscription);
+            return mock_subscription_ptr;
+          }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that when config_sources has entries but none match the resource's authority,
+// and a valid default_config_source IS provided and matches, the default_config_source's mux is
+// used.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultSourceUsedWhenAllConfigSourcesAreInvalid) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_A.com # Does not match resource
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_A_cluster
+  - authorities:
+    - name: authority_B.com # Does not match resource
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_B_cluster
+  default_config_source:
+    authorities:
+    - name: default_authority.com # Matches resource
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source_A_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_A_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: config_source_B_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source_B_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+    - name: default_config_source_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11003
+  )EOF",
+             true, true, true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  // Resource is under default_authority.com.
+  const std::string resource_name = "xdstp://default_authority.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
+      XdsResourceIdentifier::decodeUrn(resource_name);
+  ASSERT_TRUE(resource_urn_or_error.ok());
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+  ON_CALL(config_sub_factory, create(_))
+      .WillByDefault(testing::Invoke(
+          [this, &mock_subscription](
+              ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+            // Expect the subscription to use default_mux_.
+            EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
+            SubscriptionPtr mock_subscription_ptr(mock_subscription);
+            return mock_subscription_ptr;
+          }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that if config_sources is empty (or all invalid) and default_config_source is also
+// not present or invalid for the resource, the subscription fails with NotFoundError.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, SubscriptionFailsIfNoValidSourceIncludingDefault) {
+  // Bootstrap with no config_sources and no default_config_source.
+  initialize(R"EOF(
+  static_resources:
+    clusters:
+    - name: some_other_cluster # Needed to pass bootstrap validation
+      connect_timeout: 0.250s
+      type: static
+      load_assignment:
+        cluster_name: some_other_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11004
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name = "xdstp://non_existent_authority.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kNotFound);
+  EXPECT_THAT(
+      result.status().message(),
+      HasSubstr(fmt::format("No valid authority was found for the given xDS-TP resource {}.",
+                            resource_name)));
+}
+
+// Validates that an xdstp resource subscription fails with NotFoundError when there are
+// config_sources defined, but none match the authority, and no default_config_source is present.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest,
+       XdstpResourceNoMatchingAuthorityAndNoDefaultConfigSource) {
+  // Bootstrap with a config_source for "authority_A.com" but no default_config_source.
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_A.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source_A_cluster
+  static_resources:
+    clusters:
+    - name: config_source_A_cluster # Needed for the config_source
+      connect_timeout: 0.250s
+      type: static
+      load_assignment:
+        cluster_name: config_source_A_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: some_other_cluster # Needed to pass bootstrap validation if no ADS
+      connect_timeout: 0.250s
+      type: static
+      load_assignment:
+        cluster_name: some_other_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11004
+  )EOF",
+             true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  // Request a resource under "authority_X.com", which is not configured.
+  const std::string resource_name = "xdstp://authority_X.com/some/resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kNotFound);
+  EXPECT_THAT(
+      result.status().message(),
+      HasSubstr(fmt::format("No valid authority was found for the given xDS-TP resource {}.",
+                            resource_name)));
+}
+
+// Validates that a non-xdstp resource subscription uses the SubscriptionFactory directly.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceSubscription) {
+  // No GrpcMuxFactory needed for this type of subscription if not using ADS for it.
+  // Initialize with a basic bootstrap.
+  initialize(R"EOF(
+  static_resources:
+    clusters:
+    - name: some_cluster # Needed to pass bootstrap validation
+      connect_timeout: 0.250s
+      type: STATIC
+      load_assignment:
+        cluster_name: some_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11005
+  )EOF");
+  // This call is still needed to initialize the subscription_factory_.
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name = "my_legacy_resource"; // Not an xdstp:// URN
+  const std::string type_url = "type.googleapis.com/some.legacy.Type";
+
+  envoy::config::core::v3::ConfigSource config_source_proto;
+  // For this test, we'll use a basic ADS config source.
+  // The key is that subscribeToSingletonResource should call subscriptionFromConfigSource.
+  config_source_proto.mutable_ads();
+
+  // The XdsManagerImpl creates its own SubscriptionFactoryImpl.
+  // SubscriptionFactoryImpl then uses registered factories (like MockAdsConfigSubscriptionFactory)
+  // when subscriptionFromConfigSource is called with a ConfigSource that specifies ADS.
+  NiceMock<MockAdsConfigSubscriptionFactory> ads_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> ads_sub_registry(ads_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+
+  EXPECT_CALL(ads_sub_factory, create(_))
+      .WillOnce(
+          Invoke([&](ConfigSubscriptionFactory::SubscriptionData& data) -> Config::SubscriptionPtr {
+            EXPECT_EQ(data.config_.config_source_specifier_case(),
+                      envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds);
+            EXPECT_EQ(data.type_url_, type_url);
+            // Check other relevant fields if necessary, e.g., scope, callbacks, resource_decoder,
+            // options
+            return std::unique_ptr<MockSubscription>(mock_subscription);
+          }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, makeOptRef(config_source_proto), type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  ASSERT_NE(result.value(), nullptr);
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that when an xdstp resource is subscribed with a peer ConfigSource
+// that has a matching authority, an UnimplementedError is returned.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest,
+       XdstpResourceWithMatchingPeerConfigSourceAuthorityReturnsUnimplemented) {
+  // Initialize with a basic bootstrap. The bootstrap config_sources are not used in this path.
+  initialize(R"EOF(
+  static_resources:
+    clusters:
+    - name: some_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      load_assignment:
+        cluster_name: some_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11006
+  )EOF");
+  EXPECT_OK(xds_manager_impl_.initializeAdsConnections(server_.bootstrap_));
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name = "xdstp://peer_authority.com/path/to/resource";
+  const std::string type_url = "type.googleapis.com/some.xdstp.Type";
+
+  envoy::config::core::v3::ConfigSource peer_config_source;
+  peer_config_source.add_authorities()->set_name("peer_authority.com");
+  // Set a basic api_config_source, though it won't be used as it hits the unimplemented path first.
+  peer_config_source.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  peer_config_source.mutable_api_config_source()
+      ->add_grpc_services()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("some_cluster_for_peer_cs");
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, makeOptRef(peer_config_source), type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kUnimplemented);
+  EXPECT_THAT(result.status().message(),
+              HasSubstr("Dynamically using non-bootstrap defined xDS-TP config sources is not yet "
+                        "supported."));
+}
+
+// Validates that when a peer ConfigSource is provided with non-matching authorities
+// for an xdstp resource, and bootstrap config_sources also don't match,
+// the subscription falls back to the bootstrap default_config_source.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest,
+       PeerConfigSourceAuthoritiesDontMatchResourceFallsBackToBootstrapDefault) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  config_sources: [] # Empty, or could have irrelevant authorities
+  default_config_source:
+    authorities:
+    - name: target_authority.com # This authority matches the resource
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_cs_cluster
+  static_resources:
+    clusters:
+    - name: default_cs_cluster
+      connect_timeout: 0.250s
+      type: STATIC
+      load_assignment:
+        cluster_name: default_cs_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address: { address: 127.0.0.1, port_value: 11009 }
+    - name: peer_specific_cluster # Cluster for the peer_config_source
+      connect_timeout: 0.250s
+      type: STATIC
+      load_assignment:
+        cluster_name: peer_specific_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address: { address: 127.0.0.1, port_value: 11010 }
+  )EOF",
+             false, false, true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name = "xdstp://target_authority.com/path/to/resource";
+  const std::string type_url = "type.googleapis.com/some.Type.v0";
+
+  envoy::config::core::v3::ConfigSource peer_config_source;
+  // This authority in peer_config_source does NOT match the resource_name's authority.
+  peer_config_source.add_authorities()->set_name("some_other_unrelated_authority.com");
+  peer_config_source.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  peer_config_source.mutable_api_config_source()
+      ->add_grpc_services()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("peer_specific_cluster");
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+
+  EXPECT_CALL(config_sub_factory, create(_))
+      .WillOnce(Invoke([this, mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
+                           -> Config::SubscriptionPtr {
+        // Expect the subscription to use default_mux_ (from bootstrap's default_config_source)
+        EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
+        // The config used should be the one from the default_config_source in bootstrap.
+        EXPECT_EQ(data.config_.authorities(0).name(), "target_authority.com");
+        EXPECT_EQ(data.config_.api_config_source().grpc_services(0).envoy_grpc().cluster_name(),
+                  "default_cs_cluster");
+        return SubscriptionPtr(mock_subscription);
+      }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, makeOptRef(peer_config_source), type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  ASSERT_NE(result.value(), nullptr);
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that when a peer ConfigSource is provided with non-matching authorities
+// for an xdstp resource, the subscription falls back to bootstrap config sources (default in this
+// case).
+TEST_F(XdsManagerImplXdstpConfigSourcesTest,
+       PeerConfigSourceAuthoritiesDontMatchResourceFallsBackToDefault) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  # config_sources is empty
+  default_config_source:
+    authorities:
+    - name: default_authority.com # This should be used
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: default_config_source_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11007
+    - name: peer_cs_cluster # Cluster for the peer_config_source, not expected to be used for mux
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: peer_cs_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11008
+  )EOF",
+             false, false, true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name =
+      "xdstp://default_authority.com/path/to/resource"; // Resource authority matches default
+  const std::string type_url = "type.googleapis.com/some.xdstp.Type.vN";
+
+  envoy::config::core::v3::ConfigSource peer_config_source;
+  peer_config_source.add_authorities()->set_name(
+      "authority_X.com"); // This authority does NOT match resource_name
+  peer_config_source.mutable_api_config_source()->set_api_type(
+      envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC);
+  peer_config_source.mutable_api_config_source()
+      ->add_grpc_services()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("peer_cs_cluster");
+
+  NiceMock<MockAdsConfigSubscriptionFactory> config_sub_factory;
+  Registry::InjectFactory<ConfigSubscriptionFactory> config_sub_registry(config_sub_factory);
+  testing::NiceMock<MockSubscription>* mock_subscription =
+      new testing::NiceMock<MockSubscription>();
+
+  EXPECT_CALL(config_sub_factory, create(_))
+      .WillOnce(Invoke([this, mock_subscription](ConfigSubscriptionFactory::SubscriptionData& data)
+                           -> Config::SubscriptionPtr {
+        // Expect the subscription to use default_mux_ from bootstrap
+        EXPECT_EQ(data.ads_grpc_mux_, default_mux_);
+        // The config used should be the one from the default_config_source in bootstrap,
+        // NOT the peer_config_source passed in the call.
+        EXPECT_EQ(data.config_.authorities(0).name(), "default_authority.com");
+        EXPECT_EQ(data.config_.api_config_source().grpc_services(0).envoy_grpc().cluster_name(),
+                  "default_config_source_cluster");
+        return SubscriptionPtr(mock_subscription);
+      }));
+
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, makeOptRef(peer_config_source), type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_OK(result.status());
+  ASSERT_NE(result.value(), nullptr);
+  EXPECT_EQ(result.value().get(), mock_subscription);
+}
+
+// Validates that when a non-xDS-TP resource is passed, then config_source must be passed.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonXdstpResourceRequiresConfigSource) {
+  testing::InSequence s;
+  initialize(R"EOF(
+  default_config_source:
+    authorities:
+    - name: default_authority.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: default_config_source_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11003 # Different port for clarity
+  )EOF",
+             false, false, true);
+
+  NiceMock<MockSubscriptionCallbacks> callbacks;
+  SubscriptionOptions options;
+  const std::string resource_name = "non-xdstp-resource";
+  const std::string type_url = "type.googleapis.com/some.Type";
+
+  // Pass the non-xdstp resource name without a config.
+  auto result = xds_manager_impl_.subscribeToSingletonResource(
+      resource_name, {}, type_url, *stats_.rootScope(), callbacks,
+      std::make_shared<NiceMock<MockOpaqueResourceDecoder>>(), options);
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(
+      result.status().message(),
+      HasSubstr(fmt::format("Given subscrption to resource {} must either have an xDS-TP based "
+                            "resource or a config must be provided.",
+                            resource_name)));
 }
 
 } // namespace
