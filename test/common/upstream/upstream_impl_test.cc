@@ -1642,9 +1642,9 @@ TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
                                                              false);
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       auto x = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
-      EnvoyException, "Invalid duration: Expected positive duration: seconds: -1\n");
+      EnvoyException, "(?s)Invalid duration: Expected positive duration:.*seconds: -1\n");
 }
 TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
