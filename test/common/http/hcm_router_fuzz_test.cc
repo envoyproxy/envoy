@@ -314,7 +314,7 @@ public:
   bool allows_early_data_for_request_{true};
 
   Router::MockRoute* mock_route_;
-  Router::VirtualHostConstSharedPtr vhost_;
+  Router::VHostConstSharedPtr vhost_;
   Router::RouteConstSharedPtr route_;
 
   bool maintenance_{false};
@@ -377,7 +377,7 @@ public:
     }
   }
 
-  Router::RouteResult route(const Http::RequestHeaderMap& request_map) {
+  Router::VHostRoute route(const Http::RequestHeaderMap& request_map) {
     absl::string_view path = request_map.Path()->value().getStringView();
     FuzzCluster* cluster = selectClusterByName(path);
     if (!cluster) {

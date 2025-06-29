@@ -1269,7 +1269,7 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
 
   auto mock_route_0 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(Router::RouteResult{mock_route_0->virtual_host_, mock_route_0}));
+      .WillOnce(Return(Router::VHostRoute{mock_route_0->virtual_host_, mock_route_0}));
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
@@ -1294,7 +1294,7 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
 
   // Refresh cached route after cache is cleared.
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(Router::RouteResult{mock_route_1->virtual_host_, mock_route_1}));
+      .WillOnce(Return(Router::VHostRoute{mock_route_1->virtual_host_, mock_route_1}));
   EXPECT_EQ(filter->callbacks_->route().get(), mock_route_1.get());
 
   auto mock_route_2 = std::make_shared<NiceMock<Router::MockRoute>>();
@@ -1351,10 +1351,10 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
       std::make_shared<NiceMock<Router::MockVirtualHost>>();
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(Router::RouteResult{route1->virtual_host_, route1}))
-      .WillOnce(Return(Router::RouteResult{route2->virtual_host_, route2}))
-      .WillOnce(Return(Router::RouteResult{mock_virtual_host, nullptr}))
-      .WillOnce(Return(Router::RouteResult{}));
+      .WillOnce(Return(Router::VHostRoute{route1->virtual_host_, route1}))
+      .WillOnce(Return(Router::VHostRoute{route2->virtual_host_, route2}))
+      .WillOnce(Return(Router::VHostRoute{mock_virtual_host, nullptr}))
+      .WillOnce(Return(Router::VHostRoute{}));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -1426,7 +1426,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   // (cached_route_.has_value() becomes true).
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
       .Times(1)
-      .WillOnce(Return(Router::RouteResult{route1->virtual_host_, route1}));
+      .WillOnce(Return(Router::VHostRoute{route1->virtual_host_, route1}));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {

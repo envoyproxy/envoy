@@ -492,7 +492,7 @@ public:
   absl::InlinedVector<ResponseFlag, 4> response_flags_;
   std::string custom_flags_;
   Router::RouteConstSharedPtr route_;
-  Router::VirtualHostConstSharedPtr vhost_;
+  Router::VHostConstSharedPtr vhost_;
   envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr filter_state_;
 
