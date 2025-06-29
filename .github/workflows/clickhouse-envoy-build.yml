@@ -1,0 +1,187 @@
+name: Envoy Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Build target (default: //source/exe:envoy-static)'
+        required: false
+        default: '//source/exe:envoy-static'
+        type: string
+      jobs:
+        description: 'Number of parallel jobs (default: 28)'
+        required: false
+        default: '28'
+        type: string
+      disable_wasm:
+        description: 'Disable WASM runtime (default: true)'
+        required: false
+        default: true
+        type: boolean
+      use_docker:
+        description: 'Use Docker build container (recommended)'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup user.bazelrc
+      run: |
+        # Ensure user.bazelrc contains the required libc++ configuration
+        if ! grep -q "build --config=libc++" user.bazelrc; then
+          echo "build --config=libc++" >> user.bazelrc
+        fi
+        echo "Current user.bazelrc content:"
+        cat user.bazelrc
+
+    - name: Build with Docker (recommended)
+      if: inputs.use_docker == true
+      env:
+        ENVOY_DOCKER_BUILD_DIR: /tmp/envoy-docker-build
+        BUILD_DIR: /build
+        ENVOY_SRCDIR: /source
+        ENVOY_BUILD_TARGET: ${{ inputs.build_target }}
+        ENVOY_BUILD_DEBUG_INFORMATION: ${{ inputs.build_target }}.dwp
+        ENVOY_STDLIB: libc++
+        NUM_CPUS: ${{ inputs.jobs }}
+      run: |
+        # Install Docker if not available
+        if ! command -v docker &> /dev/null; then
+          sudo apt-get update
+          sudo apt-get install -y docker.io
+          sudo systemctl start docker
+          sudo usermod -aG docker $USER
+        fi
+        
+        # Create build directory
+        mkdir -p /tmp/envoy-docker-build
+        
+        # Get the Envoy build image from .bazelrc
+        ENVOY_BUILD_IMAGE=$(grep envoyproxy/envoy-build-ubuntu .bazelrc | sed -e 's#.*envoyproxy/envoy-build-ubuntu:\(.*\)#envoyproxy/envoy-build-ubuntu:\1#' | head -1)
+        echo "Using Envoy build image: $ENVOY_BUILD_IMAGE"
+        
+        # Pull the image
+        docker pull "$ENVOY_BUILD_IMAGE"
+        
+        # Build command for release
+        BUILD_CMD="ci/do_ci.sh release.server_only"
+        
+        # Add WASM disable flag if needed
+        if [[ "${{ inputs.disable_wasm }}" == "true" ]]; then
+          BUILD_CMD="$BUILD_CMD --@envoy//source/extensions/wasm_runtime/v8:enabled=false"
+        fi
+        
+        echo "Running: $BUILD_CMD"
+        
+        # Run the build in Docker
+        docker run --rm \
+          -v /tmp/envoy-docker-build:/build \
+          -v $PWD:/source \
+          -e BUILD_DIR=/build \
+          -e ENVOY_SRCDIR=/source \
+          -e ENVOY_BUILD_TARGET \
+          -e ENVOY_BUILD_DEBUG_INFORMATION \
+          -e ENVOY_STDLIB \
+          -e NUM_CPUS \
+          -e BAZEL_BUILD_EXTRA_OPTIONS="--jobs ${{ inputs.jobs }}" \
+          "$ENVOY_BUILD_IMAGE" \
+          bash -c "cd /source && $BUILD_CMD"
+        
+        echo "Build completed successfully!"
+        echo "Binary location: /tmp/envoy-docker-build/envoy/envoy"
+
+    - name: Build without Docker (fallback)
+      if: inputs.use_docker == false
+      run: |
+        # Install system dependencies
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          git \
+          libtool \
+          ninja-build \
+          pkg-config \
+          python3 \
+          python3-pip \
+          wget \
+          curl \
+          unzip \
+          software-properties-common \
+          apt-transport-https \
+          ca-certificates \
+          gnupg \
+          lsb-release
+
+        # Install Bazel
+        curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg
+        sudo mv bazel.gpg /etc/apt/trusted.gpg.d/
+        echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+        sudo apt-get update
+        sudo apt-get install -y bazel
+
+        # Install Clang 18.1
+        wget https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.0/clang+llvm-18.1.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        tar -xf clang+llvm-18.1.0-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        sudo mv clang+llvm-18.1.0-x86_64-linux-gnu-ubuntu-20.04 /opt/llvm-18.1
+        
+        # Set up environment variables
+        export PATH=/opt/llvm-18.1/bin:$PATH
+        export LD_LIBRARY_PATH=/opt/llvm-18.1/lib:$LD_LIBRARY_PATH
+        export CC=/opt/llvm-18.1/bin/clang
+        export CXX=/opt/llvm-18.1/bin/clang++
+        
+        # Release build command
+        BUILD_CMD="bazel build --config=libc++ -c opt --stripopt=--strip-all ${{ inputs.build_target }}"
+        
+        BUILD_CMD="$BUILD_CMD --@envoy//source/extensions/wasm_runtime/v8:enabled=false"
+        
+        echo "Running: $BUILD_CMD"
+        eval $BUILD_CMD
+        
+        echo "Build completed successfully!"
+        echo "Binary location: $(bazel info bazel-bin)/source/exe/envoy-static"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: envoy-release-binary
+        path: |
+          /tmp/envoy-docker-build/envoy/envoy
+          bazel-bin/source/exe/envoy-static
+        retention-days: 7
+
+    - name: Build info
+      if: success()
+      run: |
+        echo "=== Build Information ==="
+        echo "Build type: release"
+        echo "Build target: ${{ inputs.build_target }}"
+        echo "Jobs: ${{ inputs.jobs }}"
+        echo "WASM disabled: ${{ inputs.disable_wasm }}"
+        echo "Used Docker: ${{ inputs.use_docker }}"
+        
+        if [[ "${{ inputs.use_docker }}" == "true" ]]; then
+          echo "Binary size (Docker):"
+          ls -lh /tmp/envoy-docker-build/envoy/envoy || echo "Binary not found in Docker build"
+        else
+          echo "Binary size (Local):"
+          ls -lh bazel-bin/source/exe/envoy-static || echo "Binary not found in local build"
+        fi 
