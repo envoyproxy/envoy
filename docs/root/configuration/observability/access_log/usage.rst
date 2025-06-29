@@ -346,7 +346,7 @@ The following command operators are supported:
     Number of header bytes sent to the upstream by the http stream.
 
   TCP
-    Total number of HTTP header bytes sent to the upstream stream, For TCP tunneling flows. Not supported for non-tunneling.
+    Total number of HTTP header bytes sent to the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
 
   UDP
     Total number of HTTP header bytes sent to the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
