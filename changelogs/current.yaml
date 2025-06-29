@@ -293,7 +293,8 @@ new_features:
     setting may now be overridden on a per-route basis.
 - area: matcher
   change: |
-    added support for :ref:`ServerNameMatcher <en- area: dfp
+    added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
+- area: dfp
   change: |
     Added :ref:`allow_dynamic_host_from_filter_state
     <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
