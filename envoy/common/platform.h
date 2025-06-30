@@ -213,6 +213,7 @@ constexpr bool win32SupportsOriginalDestination() {
 
 #if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
+#include <linux/in6.h>
 #endif
 
 #define PACKED_STRUCT(definition, ...) definition, ##__VA_ARGS__ __attribute__((packed))
@@ -236,6 +237,14 @@ constexpr bool win32SupportsOriginalDestination() {
 
 #ifndef IPPROTO_MPTCP
 #define IPPROTO_MPTCP 262
+#endif
+
+#ifndef IPV6_FLOWINFO
+#define IPV6_FLOWINFO 11
+#endif
+
+#ifndef IPV6_FLOWINFO_FLOWLABEL
+#define IPV6_FLOWINFO_FLOWLABEL 0x000fffff
 #endif
 
 typedef int os_fd_t;            // NOLINT(modernize-use-using)

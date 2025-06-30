@@ -484,6 +484,34 @@ TEST_P(QuicHttpIntegrationTest, AdminDrainDrainsListeners) {
   testAdminDrain(Http::CodecType::HTTP1);
 }
 
+TEST_P(QuicHttpIntegrationTest, FlowLabel) {
+  config_helper_.addConfigModifier([=](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_udp_listener_config()
+        ->mutable_quic_options()
+        ->set_enable_black_hole_avoidance_via_flow_label(true);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  EXPECT_TRUE(codec_client_->connected());
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  quic::QuicConnection* connection = static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->connection();
+
+  if (connection->peer_address().host().IsIPv6()) {
+    EXPECT_NE(0, connection->last_received_flow_label());
+  }
+}
+
 TEST_P(QuicHttpIntegrationTest, CertVerificationFailure) {
   san_to_match_ = "www.random_domain.com";
   initialize();

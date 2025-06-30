@@ -328,6 +328,17 @@ absl::optional<uint8_t> maybeGetTosFromHeader(const cmsghdr& cmsg) {
   return absl::nullopt;
 }
 
+absl::optional<uint32_t> maybeGetFlowLabelFromHeader(const cmsghdr& cmsg) {
+  if (cmsg.cmsg_level == IPPROTO_IPV6 && cmsg.cmsg_type == IPV6_FLOWINFO) {
+    absl::optional<uint32_t> flow_label =  maybeGetUnsignedIntFromHeader<uint32_t>(cmsg);
+    if (flow_label) {
+      *flow_label = IPV6_FLOWINFO_FLOWLABEL & ntohl(*flow_label);
+    }
+    return flow_label;
+  }
+  return absl::nullopt;
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
                                                     const UdpSaveCmsgConfig& save_cmsg_config,
