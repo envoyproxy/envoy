@@ -185,7 +185,7 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
 }
 
 void XdsManagerImpl::startXdstpAdsMuxes() {
-  // Start the ADS muxes that were defined in `config_sources`.
+  // Start the ADS mux objects that were defined in `config_sources`.
   for (AuthorityData& authority : authorities_) {
     authority.grpc_mux_->start();
   }

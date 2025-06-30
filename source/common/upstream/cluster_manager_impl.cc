@@ -478,7 +478,7 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   // clusters have already initialized. (E.g., if all static).
   init_helper_.onStaticLoadComplete();
 
-  // Initialize the ADS and xDS-TP config based cpnnections.
+  // Initialize the ADS and xDS-TP config based connections.
   if (!has_ads_cluster) {
     // There is no ADS cluster, so we won't be starting the ADS mux after a cluster has finished
     // initializing, so we must start ADS here.

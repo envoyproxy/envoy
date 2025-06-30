@@ -1337,7 +1337,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceRepeatedAutho
                         "than once in an xdstp-based config source."));
 }
 
-// Validate that both the non-default and default config source muxes are
+// Validate that both the non-default and default config source mux objects are
 // started.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultMuxesStarted) {
   testing::InSequence s;
@@ -1392,7 +1392,7 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultMuxesStarted) {
   )EOF",
              true, false, true);
 
-  // Validate that start() is called on all muxes.
+  // Validate that start() is invoked on all mux objects.
   EXPECT_CALL(*authority_A_mux_, start());
   EXPECT_CALL(*default_mux_, start());
   xds_manager_impl_.startXdstpAdsMuxes();
