@@ -27,6 +27,8 @@ namespace Envoy {
 namespace Router {
 class Route;
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
+class VirtualHost;
+using VHostConstSharedPtr = std::shared_ptr<const VirtualHost>;
 } // namespace Router
 
 namespace Upstream {
@@ -841,6 +843,11 @@ public:
    * @return const Router::RouteConstSharedPtr Get the route selected for this request.
    */
   virtual Router::RouteConstSharedPtr route() const PURE;
+
+  /**
+   * @return OptRef<const Router::VirtualHost> Get the virtual host selected for this request.
+   */
+  virtual const Router::VHostConstSharedPtr& vhost() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
