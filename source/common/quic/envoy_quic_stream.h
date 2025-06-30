@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -110,7 +111,19 @@ public:
       send_buffer_simulation_.checkHighWatermark(new_buffered_bytes);
     } else {
       send_buffer_simulation_.checkLowWatermark(new_buffered_bytes);
+      ENVOY_BUG(
+          old_buffered_bytes - new_buffered_bytes <= reported_buffered_bytes_,
+          fmt::format("Quic stream {} previously reported {} bytes buffered to connection, which "
+                      "is insufficient to be subtracted from for the current drain of {} bytes.",
+                      quic_stream_.id(), reported_buffered_bytes_,
+                      (old_buffered_bytes - new_buffered_bytes)));
     }
+    // This value can momentarily be inconsistent with new_buffered_bytes when
+    // the buffer goes below low watermark and triggers a write in the
+    // onBelowWriteBufferLowWatermark() callstack. In this case, any buffered data from the nested
+    // write will increase reported_buffered_bytes_ and the connection level bookkeeping before the
+    // reduction of the value in the nesting call to be reported.
+    reported_buffered_bytes_ += (new_buffered_bytes - old_buffered_bytes);
     filter_manager_connection_.updateBytesBuffered(old_buffered_bytes, new_buffered_bytes);
   }
 
@@ -270,6 +283,9 @@ private:
   size_t received_content_bytes_{0};
   http2::adapter::HeaderValidator header_validator_;
   size_t received_metadata_bytes_{0};
+  // Track the buffered bytes reported to connection in the
+  // most recent call of updateBytesBuffered().
+  uint64_t reported_buffered_bytes_{0u};
 };
 
 // Object used for updating a BytesMeter to track bytes sent on a QuicStream since this object was

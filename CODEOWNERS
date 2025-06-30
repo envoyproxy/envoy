@@ -126,6 +126,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/wasm_runtime/ @mpwarres @kyessenov @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
+/*/extensions/common/matcher/domain_matcher @agrawroh @kyessenov
 /*/extensions/common/proxy_protocol @ggreenway @wez470
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @kbaichoo

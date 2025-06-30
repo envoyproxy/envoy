@@ -21,6 +21,7 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
