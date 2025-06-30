@@ -398,6 +398,8 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithMaxCacheSize) {
 
   // Verify only 2 spans were sent (not 3), confirming the third was discarded
   EXPECT_EQ(2U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+  // Verify the third span was discarded
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_dropped").value());
 }
 
 // Verifies the export happens after a timeout

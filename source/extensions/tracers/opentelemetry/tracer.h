@@ -25,7 +25,8 @@ namespace OpenTelemetry {
 
 #define OPENTELEMETRY_TRACER_STATS(COUNTER)                                                        \
   COUNTER(spans_sent)                                                                              \
-  COUNTER(timer_flushed)
+  COUNTER(timer_flushed)                                                                           \
+  COUNTER(spans_dropped)                                                                           \
 
 struct OpenTelemetryTracerStats {
   OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
