@@ -116,7 +116,7 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
 SubscriptionPtr
 AdsConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionData& data) {
   return std::make_unique<GrpcSubscriptionImpl>(
-      data.cm_.adsMux(), data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,
+      data.ads_grpc_mux_, data.callbacks_, data.resource_decoder_, data.stats_, data.type_url_,
       data.dispatcher_, Utility::configSourceInitialFetchTimeout(data.config_), true,
       data.options_);
 }

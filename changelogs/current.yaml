@@ -70,6 +70,9 @@ minor_behavior_changes:
   change: |
     :ref:`Credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>` is no longer
     a work in progress field.
+- area: http3
+  change: |
+    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -107,11 +110,6 @@ bug_fixes:
   change: |
     Fixes a bug where the TLS inspector filter would not correctly report ``client_hello_too_large`` stat for too big client hello messages
     i.e bigger than 16kb.
-
-
-- area: http3
-  change: |
-    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -159,6 +157,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: build
+  change: |
+    Upgraded Envoy to build with C++20; Envoy developers can use C++20 features now.
 - area: redis
   change: |
     Added support for ``scan`` and ``info``.
@@ -286,5 +287,12 @@ new_features:
     Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
     They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
     and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
+- area: ext_proc
+  change: |
+    The :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`
+    setting may now be overridden on a per-route basis.
+- area: matcher
+  change: |
+    added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
 
 deprecated:

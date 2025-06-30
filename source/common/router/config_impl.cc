@@ -174,7 +174,7 @@ getHeaderParsers(const HeaderParser* global_route_config_header_parser,
 class NullClusterSpecifierPlugin : public ClusterSpecifierPlugin {
 public:
   RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr, const Http::RequestHeaderMap&,
-                            const StreamInfo::StreamInfo&) const override {
+                            const StreamInfo::StreamInfo&, uint64_t) const override {
     return nullptr;
   }
 };
@@ -1390,7 +1390,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMa
       // TODO(wbpcode): make the weighted clusters an implementation of the
       // cluster specifier plugin.
       ASSERT(cluster_specifier_plugin_ != nullptr);
-      return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info);
+      return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info,
+                                              random_value);
     }
   }
   return pickWeightedCluster(headers, random_value);

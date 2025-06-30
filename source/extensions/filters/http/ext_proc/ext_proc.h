@@ -382,6 +382,7 @@ public:
   const absl::optional<const std::vector<std::string>>& untypedReceivingMetadataNamespaces() const {
     return untyped_receiving_namespaces_;
   }
+  const absl::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
 
 private:
   const bool disabled_;
@@ -393,6 +394,7 @@ private:
   const absl::optional<const std::vector<std::string>> untyped_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
+  const absl::optional<bool> failure_mode_allow_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
@@ -424,7 +426,8 @@ public:
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
                         config->untypedReceivingMetadataNamespaces()),
-        on_processing_response_(config->createOnProcessingResponse()) {}
+        on_processing_response_(config->createOnProcessingResponse()),
+        failure_mode_allow_(config->failureModeAllow()) {}
 
   const FilterConfig& config() const { return *config_; }
   const envoy::config::core::v3::GrpcService& grpcServiceConfig() const {
@@ -578,6 +581,10 @@ private:
   ExternalProcessorStream* stream_ = nullptr;
 
   std::unique_ptr<OnProcessingResponse> on_processing_response_;
+
+  // The effective failure_mode_allow setting, considering both the main config and per-route
+  // overrides.
+  bool failure_mode_allow_;
 
   // Set to true when no more messages need to be sent to the processor.
   // This happens when the processor has closed the stream, or when it has

@@ -41,3 +41,24 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "domain_matcher_test",
+    srcs = ["domain_matcher_test.cc"],
+    deps = [
+        "//source/common/matcher:matcher_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network/matching:data_impl_lib",
+        "//source/common/network/matching:inputs_lib",
+        "//source/extensions/common/matcher:domain_matcher_lib",
+        "//source/extensions/matching/network/application_protocol:config",
+        "//test/common/matcher:test_utility_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/matcher:matcher_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:registry_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
