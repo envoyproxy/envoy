@@ -113,6 +113,9 @@ new_features:
   change: |
     Add counter in transport tap for streaming and buffer trace.
     streamed trace can sent tapped message based on configured size.
+- area: udp sink
+  change: |
+    Enhance udp sink to support the single message which the size is bigger than 64K
 - area: load_balancing
   change: |
     Added Override Host Load Balancing policy. See
