@@ -12,6 +12,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "library/common/mobile_process_wide.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
@@ -393,15 +394,12 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
       connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
     }
   }
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
-    Http::HttpServerPropertiesCacheManager& cache_manager =
-        server_->httpServerPropertiesCacheManager();
+  Http::HttpServerPropertiesCacheManager& cache_manager =
+      server_->httpServerPropertiesCacheManager();
 
-    Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
-        [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
-    cache_manager.forEachThreadLocalCache(clear_brokenness);
-  }
+  Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+      [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+  cache_manager.forEachThreadLocalCache(clear_brokenness);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
     Http::HttpServerPropertiesCacheManager& cache_manager =
         server_->httpServerPropertiesCacheManager();

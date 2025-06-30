@@ -20,15 +20,25 @@ using Protobuf::field_extraction::FieldValueExtractorFactory;
 
 } // namespace
 
-absl::Status ExtractorImpl::init() {
-  FieldValueExtractorFactory extractor_factory(type_finder_);
-  for (const auto& it : field_extractions_.request_field_extractions()) {
-    auto extractor = extractor_factory.Create(request_type_url_, it.first);
-    if (!extractor.ok()) {
-      return extractor.status();
-    }
+absl::StatusOr<ExtractorImpl> ExtractorImpl::create(
+    const TypeFinder& type_finder, absl::string_view request_type_url,
+    const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
+        field_extractions) {
+  ExtractorImpl extractor;
+  const absl::Status status = extractor.init(type_finder, request_type_url, field_extractions);
+  RETURN_IF_NOT_OK(status);
+  return extractor;
+}
 
-    per_field_extractors_.emplace(it.first, std::move(extractor.value()));
+absl::Status ExtractorImpl::init(
+    const TypeFinder& type_finder, absl::string_view request_type_url,
+    const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
+        field_extractions) {
+  FieldValueExtractorFactory extractor_factory(type_finder);
+  for (const auto& it : field_extractions.request_field_extractions()) {
+    auto extractor_or_error = extractor_factory.Create(request_type_url, it.first);
+    RETURN_IF_NOT_OK(extractor_or_error.status());
+    per_field_extractors_.emplace(it.first, std::move(extractor_or_error.value()));
   }
   return absl::OkStatus();
 }

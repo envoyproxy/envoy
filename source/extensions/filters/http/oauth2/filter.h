@@ -144,6 +144,7 @@ public:
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
+  const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
   const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
   }
@@ -161,6 +162,10 @@ public:
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
+  }
+  std::chrono::seconds getCsrfTokenExpiresIn() const { return csrf_token_expires_in_; }
+  std::chrono::seconds getCodeVerifierTokenExpiresIn() const {
+    return code_verifier_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
@@ -205,6 +210,7 @@ private:
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
+  const std::string end_session_endpoint_;
   const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
@@ -221,6 +227,8 @@ private:
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
+  const std::chrono::seconds csrf_token_expires_in_;
+  const std::chrono::seconds code_verifier_token_expires_in_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;

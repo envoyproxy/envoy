@@ -19,12 +19,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Wasm]
 // [#extension: envoy.bootstrap.wasm]
 
-// If there is a fatal error on the VM (e.g. exception, abort()), then the policy will be applied.
+// If there is a fatal error on the VM (e.g. exception, ``abort()``), then the policy will be applied.
 enum FailurePolicy {
   // No policy is specified. The default policy will be used. The default policy is ``FAIL_CLOSED``.
   UNSPECIFIED = 0;
 
-  // New plugin instance will be created for the new request if the VM is failed. Note this only
+  // New plugin instance will be created for the new request if the VM is failed. Note this will only
   // be applied to the following failures:
   //
   // * ``proxy_wasm::FailState::RuntimeError``
@@ -64,7 +64,8 @@ message CapabilityRestrictionConfig {
 
 // Configuration for sanitization of inputs to an allowed capability.
 //
-// NOTE: This is currently unimplemented.
+// .. note::
+//   This is currently unimplemented.
 message SanitizationConfig {
 }
 
@@ -109,14 +110,16 @@ message VmConfig {
   config.core.v3.AsyncDataSource code = 3;
 
   // The Wasm configuration used in initialization of a new VM
-  // (proxy_on_start). ``google.protobuf.Struct`` is serialized as JSON before
+  // (``proxy_on_start``). ``google.protobuf.Struct`` is serialized as JSON before
   // passing it to the plugin. ``google.protobuf.BytesValue`` and
   // ``google.protobuf.StringValue`` are passed directly without the wrapper.
   google.protobuf.Any configuration = 4;
 
   // Allow the wasm file to include pre-compiled code on VMs which support it.
-  // Warning: this should only be enable for trusted sources as the precompiled code is not
-  // verified.
+  //
+  // .. warning::
+  //   This should only be enabled for trusted sources as the precompiled code is not
+  //   verified.
   bool allow_precompiled = 5;
 
   // If true and the code needs to be remotely fetched and it is not in the cache then NACK the configuration
@@ -129,7 +132,9 @@ message VmConfig {
   // are generally called implicitly by your language's standard library. Therefore, you do not
   // need to call them directly. You can access environment variables in the same way you would
   // on native platforms.
-  // Warning: Envoy rejects the configuration if there's conflict of key space.
+  //
+  // .. warning::
+  //   Envoy rejects the configuration if there's conflict of key space.
   EnvironmentVariables environment_variables = 7;
 }
 
@@ -168,11 +173,14 @@ message PluginConfig {
   // ``google.protobuf.StringValue`` are passed directly without the wrapper.
   google.protobuf.Any configuration = 4;
 
-  // If there is a fatal error on the VM (e.g. exception, abort(), on_start or on_configure return false),
+  // If there is a fatal error on the VM (e.g. exception, ``abort()``, ``on_start`` or ``on_configure`` return false),
   // then all plugins associated with the VM will either fail closed (by default), e.g. by returning an HTTP 503 error,
-  // or fail open (if 'fail_open' is set to true) by bypassing the filter. Note: when on_start or on_configure return false
-  // during xDS updates the xDS configuration will be rejected and when on_start or on_configuration return false on initial
-  // startup the proxy will not start.
+  // or fail open (if 'fail_open' is set to true) by bypassing the filter.
+  //
+  // .. note::
+  //   When ``on_start`` or ``on_configure`` return ``false`` during xDS updates the xDS configuration will be rejected and when ``on_start`` or ``on_configure`` return ``false`` on
+  //   initial startup the proxy will not start.
+  //
   // This field is deprecated in favor of the ``failure_policy`` field.
   bool fail_open = 5 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 

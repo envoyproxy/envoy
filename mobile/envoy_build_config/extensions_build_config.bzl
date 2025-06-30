@@ -17,6 +17,7 @@ EXTENSIONS = {
     "envoy.filters.http.route_cache_reset":                "@envoy_mobile//library/common/extensions/filters/http/route_cache_reset:config",
     "envoy.filters.http.router":                           "//source/extensions/filters/http/router:config",
     "envoy.filters.network.http_connection_manager":       "//source/extensions/filters/network/http_connection_manager:config",
+    "envoy.http_api_listener":                             "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
     "envoy.http.original_ip_detection.xff":                "//source/extensions/http/original_ip_detection/xff:config",
     "envoy.key_value.platform":                            "@envoy_mobile//library/common/extensions/key_value/platform:config",
     "envoy.network.dns_resolver.apple":                    "//source/extensions/network/dns_resolver/apple:config",

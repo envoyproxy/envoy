@@ -38,7 +38,9 @@ envoy_cc_library(
     deps = [
         ":config_utility_lib",
         ":context_lib",
+        ":header_cluster_specifier_lib",
         ":header_parser_lib",
+        ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
         ":reset_header_parser_lib",
         ":retry_state_lib",
@@ -73,7 +75,6 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:retry_factory_lib",
         "//source/extensions/early_data:default_early_data_policy_lib",
-        "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/rewrite/uri_template:config",
         "@com_google_absl//absl/types:optional",
@@ -82,6 +83,20 @@ envoy_cc_library(
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
+    ],
+    alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "matcher_visitor_lib",
+    srcs = ["matcher_visitor.cc"],
+    hdrs = ["matcher_visitor.h"],
+    deps = [
+        "//source/common/http/matching:inputs_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
+        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
 )
@@ -123,9 +138,8 @@ envoy_cc_library(
     srcs = ["debug_config.cc"],
     hdrs = ["debug_config.h"],
     deps = [
-        "//envoy/http:header_map_interface",
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
-        "//source/common/common:macros",
     ],
 )
 
@@ -495,5 +509,15 @@ envoy_cc_library(
     deps = [
         "//envoy/router:router_interface",
         "//source/common/config:metadata_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_cluster_specifier_lib",
+    srcs = ["header_cluster_specifier.cc"],
+    hdrs = ["header_cluster_specifier.h"],
+    deps = [
+        ":delegating_route_lib",
+        "//envoy/router:cluster_specifier_plugin_interface",
     ],
 )

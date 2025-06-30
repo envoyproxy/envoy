@@ -20,3 +20,14 @@ envoy_pytool_binary(
         requirement("slack_sdk"),
     ],
 )
+
+envoy_pytool_binary(
+    name = "security_notify",
+    srcs = ["security_notify.py"],
+    visibility = ["//visibility:public"],
+    deps = [
+        requirement("aio.run.runner"),
+        requirement("aiohttp"),
+        requirement("slack_sdk"),
+    ],
+)

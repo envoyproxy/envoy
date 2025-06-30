@@ -174,24 +174,28 @@ template <class ProtoType> class CorsPolicyImplBase : public CorsPolicy {
 public:
   CorsPolicyImplBase(const ProtoType& config,
                      Server::Configuration::CommonFactoryContext& factory_context)
-      : config_(config), loader_(factory_context.runtime()), allow_methods_(config.allow_methods()),
+      : filter_enabled_(
+            config.has_filter_enabled()
+                ? std::make_unique<const envoy::config::core::v3::RuntimeFractionalPercent>(
+                      config.filter_enabled())
+                : nullptr),
+        shadow_enabled_(
+            config.has_shadow_enabled()
+                ? std::make_unique<const envoy::config::core::v3::RuntimeFractionalPercent>(
+                      config.shadow_enabled())
+                : nullptr),
+        loader_(factory_context.runtime()), allow_methods_(config.allow_methods()),
         allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
-        max_age_(config.max_age()) {
+        max_age_(config.max_age()),
+        allow_credentials_(PROTOBUF_GET_OPTIONAL_WRAPPED(config, allow_credentials)),
+        allow_private_network_access_(
+            PROTOBUF_GET_OPTIONAL_WRAPPED(config, allow_private_network_access)),
+        forward_not_matching_preflights_(
+            PROTOBUF_GET_OPTIONAL_WRAPPED(config, forward_not_matching_preflights)) {
+    allow_origins_.reserve(config.allow_origin_string_match().size());
     for (const auto& string_match : config.allow_origin_string_match()) {
-      allow_origins_.push_back(
+      allow_origins_.emplace_back(
           std::make_unique<Matchers::StringMatcherImpl>(string_match, factory_context));
-    }
-    if (config.has_allow_credentials()) {
-      allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
-    }
-    if (config.has_allow_private_network_access()) {
-      allow_private_network_access_ =
-          PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_private_network_access);
-    }
-
-    if (config.has_forward_not_matching_preflights()) {
-      forward_not_matching_preflights_ =
-          PROTOBUF_GET_WRAPPED_REQUIRED(config, forward_not_matching_preflights);
     }
   }
 
@@ -208,18 +212,16 @@ public:
     return allow_private_network_access_;
   };
   bool enabled() const override {
-    if (config_.has_filter_enabled()) {
-      const auto& filter_enabled = config_.filter_enabled();
-      return loader_.snapshot().featureEnabled(filter_enabled.runtime_key(),
-                                               filter_enabled.default_value());
+    if (filter_enabled_ != nullptr) {
+      return loader_.snapshot().featureEnabled(filter_enabled_->runtime_key(),
+                                               filter_enabled_->default_value());
     }
     return true;
   };
   bool shadowEnabled() const override {
-    if (config_.has_shadow_enabled()) {
-      const auto& shadow_enabled = config_.shadow_enabled();
-      return loader_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
-                                               shadow_enabled.default_value());
+    if (shadow_enabled_ != nullptr) {
+      return loader_.snapshot().featureEnabled(shadow_enabled_->runtime_key(),
+                                               shadow_enabled_->default_value());
     }
     return false;
   };
@@ -228,16 +230,17 @@ public:
   }
 
 private:
-  const ProtoType config_;
+  const std::unique_ptr<const envoy::config::core::v3::RuntimeFractionalPercent> filter_enabled_;
+  const std::unique_ptr<const envoy::config::core::v3::RuntimeFractionalPercent> shadow_enabled_;
   Runtime::Loader& loader_;
   std::vector<Matchers::StringMatcherPtr> allow_origins_;
   const std::string allow_methods_;
   const std::string allow_headers_;
   const std::string expose_headers_;
   const std::string max_age_;
-  absl::optional<bool> allow_credentials_{};
-  absl::optional<bool> allow_private_network_access_{};
-  absl::optional<bool> forward_not_matching_preflights_{};
+  absl::optional<bool> allow_credentials_;
+  absl::optional<bool> allow_private_network_access_;
+  absl::optional<bool> forward_not_matching_preflights_;
 };
 using CorsPolicyImpl = CorsPolicyImplBase<envoy::config::route::v3::CorsPolicy>;
 
@@ -388,13 +391,11 @@ private:
  */
 class VirtualHostImpl : Logger::Loggable<Logger::Id::router> {
 public:
-  VirtualHostImpl(
-      const envoy::config::route::v3::VirtualHost& virtual_host,
-      const CommonConfigSharedPtr& global_route_config,
-      Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
-      ProtobufMessage::ValidationVisitor& validator,
-      const absl::optional<Upstream::ClusterManager::ClusterInfoMaps>& validation_clusters,
-      absl::Status& creation_status);
+  VirtualHostImpl(const envoy::config::route::v3::VirtualHost& virtual_host,
+                  const CommonConfigSharedPtr& global_route_config,
+                  Server::Configuration::ServerFactoryContext& factory_context, Stats::Scope& scope,
+                  ProtobufMessage::ValidationVisitor& validator, bool validate_clusters,
+                  absl::Status& creation_status);
 
   RouteConstSharedPtr getRouteFromEntries(const RouteCallback& cb,
                                           const Http::RequestHeaderMap& headers,
@@ -487,7 +488,7 @@ private:
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
   absl::optional<std::chrono::milliseconds> base_interval_;
   absl::optional<std::chrono::milliseconds> max_interval_;
-  std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
+  std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{300000};
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
@@ -666,12 +667,12 @@ public:
 
   bool matchRoute(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
                   uint64_t random_value) const;
-  absl::Status
-  validateClusters(const Upstream::ClusterManager::ClusterInfoMaps& cluster_info_maps) const;
+  absl::Status validateClusters(const Upstream::ClusterManager& cluster_manager) const;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override;
+  void refreshRouteCluster(const Http::RequestHeaderMap&,
+                           const StreamInfo::StreamInfo&) const override {}
   const RouteStatsContextOptRef routeStatsContext() const override {
     if (route_stats_context_ != nullptr) {
       return *route_stats_context_;
@@ -696,7 +697,7 @@ public:
   }
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
                               const StreamInfo::StreamInfo& stream_info,
-                              bool insert_envoy_original_path) const override;
+                              bool keep_original_host_or_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
@@ -836,11 +837,14 @@ public:
     DynamicRouteEntry(const RouteEntryAndRoute* parent, RouteConstSharedPtr owner,
                       const std::string& name)
         : parent_(parent), owner_(std::move(owner)), cluster_name_(name) {}
+    DynamicRouteEntry(RouteEntryAndRouteConstSharedPtr parent, absl::string_view name)
+        : parent_(parent.get()), owner_(parent), cluster_name_(name) {}
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
-    const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override {
-      return parent_->getRequestHostValue(headers);
+    void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                             const StreamInfo::StreamInfo& stream_info) const override {
+      return parent_->refreshRouteCluster(headers, stream_info);
     }
     Http::Code clusterNotFoundResponseCode() const override {
       return parent_->clusterNotFoundResponseCode();
@@ -1097,6 +1101,7 @@ protected:
 
   bool case_sensitive() const { return case_sensitive_; }
   RouteConstSharedPtr clusterEntry(const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
                                    uint64_t random_value) const;
 
   /**
@@ -1111,14 +1116,16 @@ protected:
   void finalizePathHeader(Http::RequestHeaderMap& headers, absl::string_view matched_path,
                           bool insert_envoy_original_path) const;
 
+  void finalizeHostHeader(Http::RequestHeaderMap& headers, bool keep_old_host) const;
+
   absl::optional<std::string>
   currentUrlPathAfterRewriteWithMatchedPath(const Http::RequestHeaderMap& headers,
                                             absl::string_view matched_path) const;
 
 private:
   struct RuntimeData {
-    std::string fractional_runtime_key_{};
-    envoy::type::v3::FractionalPercent fractional_runtime_default_{};
+    std::string fractional_runtime_key_;
+    envoy::type::v3::FractionalPercent fractional_runtime_default_;
   };
 
   /**
@@ -1183,11 +1190,11 @@ private:
   }
 
   absl::StatusOr<PathMatcherSharedPtr>
-  buildPathMatcher(envoy::config::route::v3::Route route,
+  buildPathMatcher(const envoy::config::route::v3::Route& route,
                    ProtobufMessage::ValidationVisitor& validator) const;
 
   absl::StatusOr<PathRewriterSharedPtr>
-  buildPathRewriter(envoy::config::route::v3::Route route,
+  buildPathRewriter(const envoy::config::route::v3::Route& route,
                     ProtobufMessage::ValidationVisitor& validator) const;
 
   RouteConstSharedPtr
@@ -1210,7 +1217,6 @@ private:
   const std::string host_rewrite_path_regex_substitution_;
   const std::string cluster_name_;
   RouteStatsContextPtr route_stats_context_;
-  const Http::LowerCaseString cluster_header_name_;
   ClusterSpecifierPluginSharedPtr cluster_specifier_plugin_;
   const std::chrono::milliseconds timeout_;
   const OptionalTimeouts optional_timeouts_;
