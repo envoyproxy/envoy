@@ -34,15 +34,21 @@ TypedRingHashLbConfig::TypedRingHashLbConfig(const CommonLbConfigProto& common_l
   }
 }
 
-TypedRingHashLbConfig::TypedRingHashLbConfig(const RingHashLbProto& lb_config)
-    : lb_config_(lb_config) {}
+TypedRingHashLbConfig::TypedRingHashLbConfig(const RingHashLbProto& lb_config,
+                                             Regex::Engine& regex_engine,
+                                             absl::Status& creation_status)
+    : TypedHashLbConfigBase(lb_config.consistent_hashing_lb_config().hash_policy(), regex_engine,
+                            creation_status),
+      lb_config_(lb_config) {}
 
-RingHashLoadBalancer::RingHashLoadBalancer(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-    const envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash& config)
+RingHashLoadBalancer::RingHashLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats,
+                                           Stats::Scope& scope, Runtime::Loader& runtime,
+                                           Random::RandomGenerator& random,
+                                           uint32_t healthy_panic_threshold,
+                                           const RingHashLbProto& config,
+                                           HashPolicySharedPtr hash_policy)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold,
-                                  config.has_locality_weighted_lb_config()),
+                                  config.has_locality_weighted_lb_config(), std::move(hash_policy)),
       scope_(scope.createScope("ring_hash_lb.")), stats_(generateStats(*scope_)),
       min_ring_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, minimum_ring_size, DefaultMinRingSize)),

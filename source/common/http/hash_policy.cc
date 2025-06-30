@@ -5,6 +5,7 @@
 #include "envoy/common/hashable.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
+#include "source/common/common/hex.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/regex.h"
 #include "source/common/http/utility.h"
@@ -29,89 +30,99 @@ class HeaderHashMethod : public HashMethodImplBase {
 public:
   HeaderHashMethod(const envoy::config::route::v3::RouteAction::HashPolicy::Header& header,
                    bool terminal, Regex::Engine& regex_engine, absl::Status& creation_status)
-      : HashMethodImplBase(terminal), header_name_(header.header_name()) {
+      : HashMethodImplBase(terminal), header_name_(header.header_name()),
+        regex_rewrite_substitution_(header.regex_rewrite().substitution()) {
     if (header.has_regex_rewrite()) {
-      const auto& rewrite_spec = header.regex_rewrite();
-      auto regex_or_error = Regex::Utility::parseRegex(rewrite_spec.pattern(), regex_engine);
+      auto regex_or_error =
+          Regex::Utility::parseRegex(header.regex_rewrite().pattern(), regex_engine);
       SET_AND_RETURN_IF_NOT_OK(regex_or_error.status(), creation_status);
       regex_rewrite_ = std::move(*regex_or_error);
-      regex_rewrite_substitution_ = rewrite_spec.substitution();
     }
   }
 
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
-                                    const RequestHeaderMap& headers,
-                                    const HashPolicy::AddCookieCallback,
-                                    const StreamInfo::FilterStateSharedPtr) const override {
-    absl::optional<uint64_t> hash;
-
-    const auto header = headers.get(header_name_);
-    if (!header.empty()) {
-      absl::InlinedVector<absl::string_view, 1> header_values;
-      size_t num_headers_to_hash = header.size();
-      header_values.reserve(num_headers_to_hash);
-
-      for (size_t i = 0; i < num_headers_to_hash; i++) {
-        header_values.push_back(header[i]->value().getStringView());
-      }
-
-      absl::InlinedVector<std::string, 1> rewritten_header_values;
-      if (regex_rewrite_ != nullptr) {
-        rewritten_header_values.reserve(num_headers_to_hash);
-        for (auto& value : header_values) {
-          rewritten_header_values.push_back(
-              regex_rewrite_->replaceAll(value, regex_rewrite_substitution_));
-          value = rewritten_header_values.back();
-        }
-      }
-
-      // Ensure generating same hash value for different order header values.
-      // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
-      std::sort(header_values.begin(), header_values.end());
-      hash = HashUtil::xxHash64(absl::MakeSpan(header_values));
+  absl::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap> headers,
+                                    OptRef<const StreamInfo::StreamInfo>,
+                                    HashPolicy::AddCookieCallback) const override {
+    if (!headers.has_value()) {
+      return absl::nullopt;
     }
-    return hash;
+
+    const auto header = headers->get(header_name_);
+    if (header.empty()) {
+      return absl::nullopt;
+    }
+
+    absl::InlinedVector<absl::string_view, 1> header_values;
+    const size_t num_headers_to_hash = header.size();
+    header_values.reserve(num_headers_to_hash);
+
+    for (size_t i = 0; i < num_headers_to_hash; i++) {
+      header_values.push_back(header[i]->value().getStringView());
+    }
+
+    absl::InlinedVector<std::string, 1> rewritten_header_values;
+    if (regex_rewrite_ != nullptr) {
+      rewritten_header_values.reserve(num_headers_to_hash);
+      for (absl::string_view& value : header_values) {
+        rewritten_header_values.push_back(
+            regex_rewrite_->replaceAll(value, regex_rewrite_substitution_));
+        value = rewritten_header_values.back();
+      }
+    }
+
+    // Ensure generating same hash value for different order header values.
+    // For example, generates the same hash value for {"foo","bar"} and {"bar","foo"}
+    std::sort(header_values.begin(), header_values.end());
+    return HashUtil::xxHash64(absl::MakeSpan(header_values));
   }
 
 private:
   const LowerCaseString header_name_;
-  Regex::CompiledMatcherPtr regex_rewrite_{};
-  std::string regex_rewrite_substitution_{};
+  Regex::CompiledMatcherPtr regex_rewrite_;
+  const std::string regex_rewrite_substitution_;
 };
 
 class CookieHashMethod : public HashMethodImplBase {
 public:
-  CookieHashMethod(const std::string& key, const std::string& path,
-                   const absl::optional<std::chrono::seconds>& ttl, bool terminal,
-                   const CookieAttributeRefVector attributes)
-      : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl) {
-    for (const auto& attribute : attributes) {
-      attributes_.push_back(attribute);
+  CookieHashMethod(const envoy::config::route::v3::RouteAction::HashPolicy::Cookie& cookie,
+                   bool terminal)
+      : HashMethodImplBase(terminal), name_(cookie.name()), path_(cookie.path()),
+        ttl_(cookie.has_ttl() ? absl::optional<std::chrono::seconds>(cookie.ttl().seconds())
+                              : absl::nullopt) {
+    attributes_.reserve(cookie.attributes().size());
+    for (const auto& attribute : cookie.attributes()) {
+      attributes_.push_back(CookieAttribute{attribute.name(), attribute.value()});
     }
   }
 
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
-                                    const RequestHeaderMap& headers,
-                                    const HashPolicy::AddCookieCallback add_cookie,
-                                    const StreamInfo::FilterStateSharedPtr) const override {
-    absl::optional<uint64_t> hash;
-    std::string value = Utility::parseCookieValue(headers, key_);
-    if (value.empty() && ttl_.has_value()) {
-      CookieAttributeRefVector attributes;
-      for (const auto& attribute : attributes_) {
-        attributes.push_back(attribute);
-      }
-      value = add_cookie(key_, path_, ttl_.value(), attributes);
-      hash = HashUtil::xxHash64(value);
-
-    } else if (!value.empty()) {
-      hash = HashUtil::xxHash64(value);
+  absl::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap> headers,
+                                    OptRef<const StreamInfo::StreamInfo>,
+                                    HashPolicy::AddCookieCallback add_cookie) const override {
+    if (!headers.has_value()) {
+      return absl::nullopt;
     }
-    return hash;
+
+    const std::string exist_value = Utility::parseCookieValue(*headers, name_);
+    if (!exist_value.empty()) {
+      return HashUtil::xxHash64(exist_value);
+    }
+
+    // If the cookie is not found, try to generate a new cookie.
+
+    // If one of the conditions happens, skip generating a new cookie:
+    // 1. The cookie has no TTL.
+    // 2. The cookie generation callback is null.
+    if (!ttl_.has_value() || add_cookie == nullptr) {
+      return absl::nullopt;
+    }
+
+    const std::string new_value = add_cookie(name_, path_, ttl_.value(), attributes_);
+    return new_value.empty() ? absl::nullopt
+                             : absl::optional<uint64_t>(HashUtil::xxHash64(new_value));
   }
 
 private:
-  const std::string key_;
+  const std::string name_;
   const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
   std::vector<CookieAttribute> attributes_;
@@ -121,9 +132,16 @@ class IpHashMethod : public HashMethodImplBase {
 public:
   IpHashMethod(bool terminal) : HashMethodImplBase(terminal) {}
 
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
-                                    const RequestHeaderMap&, const HashPolicy::AddCookieCallback,
-                                    const StreamInfo::FilterStateSharedPtr) const override {
+  absl::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap>,
+                                    OptRef<const StreamInfo::StreamInfo> info,
+                                    HashPolicy::AddCookieCallback) const override {
+    if (!info.has_value()) {
+      return absl::nullopt;
+    }
+
+    const auto& conn = info->downstreamAddressProvider();
+    const auto& downstream_addr = conn.remoteAddress();
+
     if (downstream_addr == nullptr) {
       return absl::nullopt;
     }
@@ -144,22 +162,20 @@ public:
   QueryParameterHashMethod(const std::string& parameter_name, bool terminal)
       : HashMethodImplBase(terminal), parameter_name_(parameter_name) {}
 
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
-                                    const RequestHeaderMap& headers,
-                                    const HashPolicy::AddCookieCallback,
-                                    const StreamInfo::FilterStateSharedPtr) const override {
-    absl::optional<uint64_t> hash;
-
-    const HeaderEntry* header = headers.Path();
-    if (header) {
-      Http::Utility::QueryParamsMulti query_parameters =
-          Http::Utility::QueryParamsMulti::parseQueryString(header->value().getStringView());
-      const auto val = query_parameters.getFirstValue(parameter_name_);
-      if (val.has_value()) {
-        hash = HashUtil::xxHash64(val.value());
-      }
+  absl::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap> headers,
+                                    OptRef<const StreamInfo::StreamInfo>,
+                                    HashPolicy::AddCookieCallback) const override {
+    if (!headers.has_value()) {
+      return absl::nullopt;
     }
-    return hash;
+
+    const Utility::QueryParamsMulti query_parameters =
+        Utility::QueryParamsMulti::parseQueryString(headers->getPathValue());
+    const auto val = query_parameters.getFirstValue(parameter_name_);
+    if (val.has_value()) {
+      return HashUtil::xxHash64(val.value());
+    }
+    return absl::nullopt;
   }
 
 private:
@@ -171,14 +187,15 @@ public:
   FilterStateHashMethod(const std::string& key, bool terminal)
       : HashMethodImplBase(terminal), key_(key) {}
 
-  absl::optional<uint64_t>
-  evaluate(const Network::Address::Instance*, const RequestHeaderMap&,
-           const HashPolicy::AddCookieCallback,
-           const StreamInfo::FilterStateSharedPtr filter_state) const override {
-    if (auto typed_state = filter_state->getDataReadOnly<Hashable>(key_); typed_state != nullptr) {
-      return typed_state->hash();
+  absl::optional<uint64_t> evaluate(OptRef<const RequestHeaderMap>,
+                                    OptRef<const StreamInfo::StreamInfo> info,
+                                    HashPolicy::AddCookieCallback) const override {
+    if (!info.has_value()) {
+      return absl::nullopt;
     }
-    return absl::nullopt;
+
+    auto filter_state = info->filterState().getDataReadOnly<Hashable>(key_);
+    return filter_state != nullptr ? filter_state->hash() : absl::nullopt;
   }
 
 private:
@@ -210,21 +227,8 @@ HashPolicyImpl::HashPolicyImpl(
       }
       break;
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::kCookie: {
-      absl::optional<std::chrono::seconds> ttl;
-      if (hash_policy->cookie().has_ttl()) {
-        ttl = std::chrono::seconds(hash_policy->cookie().ttl().seconds());
-      }
-      std::vector<CookieAttribute> attributes;
-      for (const auto& attribute : hash_policy->cookie().attributes()) {
-        attributes.push_back({attribute.name(), attribute.value()});
-      }
-      CookieAttributeRefVector ref_attributes;
-      for (const auto& attribute : attributes) {
-        ref_attributes.push_back(attribute);
-      }
-      hash_impls_.emplace_back(new CookieHashMethod(hash_policy->cookie().name(),
-                                                    hash_policy->cookie().path(), ttl,
-                                                    hash_policy->terminal(), ref_attributes));
+      hash_impls_.emplace_back(
+          new CookieHashMethod(hash_policy->cookie(), hash_policy->terminal()));
       break;
     }
     case envoy::config::route::v3::RouteAction::HashPolicy::PolicySpecifierCase::
@@ -249,13 +253,12 @@ HashPolicyImpl::HashPolicyImpl(
 }
 
 absl::optional<uint64_t>
-HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
-                             const RequestHeaderMap& headers, const AddCookieCallback add_cookie,
-                             const StreamInfo::FilterStateSharedPtr filter_state) const {
+HashPolicyImpl::generateHash(OptRef<const RequestHeaderMap> headers,
+                             OptRef<const StreamInfo::StreamInfo> info,
+                             HashPolicy::AddCookieCallback add_cookie) const {
   absl::optional<uint64_t> hash;
   for (const HashMethodPtr& hash_impl : hash_impls_) {
-    const absl::optional<uint64_t> new_hash =
-        hash_impl->evaluate(downstream_addr, headers, add_cookie, filter_state);
+    const absl::optional<uint64_t> new_hash = hash_impl->evaluate(headers, info, add_cookie);
     if (new_hash) {
       // Rotating the old value prevents duplicate hash rules from cancelling each other out
       // and preserves all of the entropy

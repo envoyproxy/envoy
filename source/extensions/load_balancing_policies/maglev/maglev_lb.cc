@@ -73,7 +73,11 @@ TypedMaglevLbConfig::TypedMaglevLbConfig(const CommonLbConfigProto& common_lb_co
   }
 }
 
-TypedMaglevLbConfig::TypedMaglevLbConfig(const MaglevLbProto& lb_config) : lb_config_(lb_config) {}
+TypedMaglevLbConfig::TypedMaglevLbConfig(const MaglevLbProto& lb_config,
+                                         Regex::Engine& regex_engine, absl::Status& creation_status)
+    : TypedHashLbConfigBase(lb_config.consistent_hashing_lb_config().hash_policy(), regex_engine,
+                            creation_status),
+      lb_config_(lb_config) {}
 
 ThreadAwareLoadBalancerBase::HashingLoadBalancerSharedPtr
 MaglevLoadBalancer::createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
@@ -292,12 +296,13 @@ uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
   return (entry.offset_ + (entry.skip_ * entry.next_)) % table_size_;
 }
 
-MaglevLoadBalancer::MaglevLoadBalancer(
-    const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-    Runtime::Loader& runtime, Random::RandomGenerator& random, uint32_t healthy_panic_threshold,
-    const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config)
+MaglevLoadBalancer::MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats,
+                                       Stats::Scope& scope, Runtime::Loader& runtime,
+                                       Random::RandomGenerator& random,
+                                       uint32_t healthy_panic_threshold,
+                                       const MaglevLbProto& config, HashPolicySharedPtr hash_policy)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold,
-                                  config.has_locality_weighted_lb_config()),
+                                  config.has_locality_weighted_lb_config(), std::move(hash_policy)),
       scope_(scope.createScope("maglev_lb.")), stats_(generateStats(*scope_)),
       table_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, table_size, MaglevTable::DefaultTableSize)),
