@@ -42,10 +42,12 @@ envoy_cc_library(
         ":header_parser_lib",
         ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
+        ":per_filter_config_lib",
         ":reset_header_parser_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
+        ":weighted_cluster_specifier_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
@@ -99,6 +101,35 @@ envoy_cc_library(
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "per_filter_config_lib",
+    srcs = ["per_filter_config.cc"],
+    hdrs = ["per_filter_config.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:filter_config_interface",
+        "//source/common/config:utility_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "weighted_cluster_specifier_lib",
+    srcs = ["weighted_cluster_specifier.cc"],
+    hdrs = ["weighted_cluster_specifier.h"],
+    deps = [
+        ":config_utility_lib",
+        ":delegating_route_lib",
+        ":header_parser_lib",
+        ":metadatamatchcriteria_lib",
+        ":per_filter_config_lib",
+        "//envoy/router:cluster_specifier_plugin_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/config:well_known_names",
+    ],
 )
 
 envoy_cc_library(

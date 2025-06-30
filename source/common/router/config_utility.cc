@@ -137,5 +137,19 @@ Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
+void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
+  dest.headers_to_append_or_add.insert(dest.headers_to_append_or_add.end(),
+                                       src.headers_to_append_or_add.begin(),
+                                       src.headers_to_append_or_add.end());
+  dest.headers_to_overwrite_or_add.insert(dest.headers_to_overwrite_or_add.end(),
+                                          src.headers_to_overwrite_or_add.begin(),
+                                          src.headers_to_overwrite_or_add.end());
+  dest.headers_to_add_if_absent.insert(dest.headers_to_add_if_absent.end(),
+                                       src.headers_to_add_if_absent.begin(),
+                                       src.headers_to_add_if_absent.end());
+  dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
+                                src.headers_to_remove.end());
+}
+
 } // namespace Router
 } // namespace Envoy
