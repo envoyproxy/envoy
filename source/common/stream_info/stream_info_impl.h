@@ -299,15 +299,11 @@ struct StreamInfoImpl : public StreamInfo {
     return *downstream_connection_info_provider_;
   }
 
-  OptRef<const Router::VirtualHost> vhost() const override {
+  const Router::VHostConstSharedPtr& vhost() const override {
     // TODO(wbpcode): There is an edge case where the route and virtual host be override
     // by the setRoute() of HTTP filter callbacks. But in that case the virtual host stored
-    // in the stream info will not be updated. So, we use the virtual host from the route
-    // as priority.
-    if (route_ != nullptr) {
-      return route_->virtualHost();
-    }
-    return makeOptRefFromPtr(vhost_.get());
+    // in the stream info will not be updated.
+    return vhost_;
   }
 
   Router::RouteConstSharedPtr route() const override { return route_; }
@@ -429,6 +425,7 @@ struct StreamInfoImpl : public StreamInfo {
                            other_response_flags.end());
     health_check_request_ = info.healthCheck();
     route_ = info.route();
+    vhost_ = info.vhost();
     metadata_ = info.dynamicMetadata();
     filter_state_ = info.filterState();
     request_headers_ = request_headers;

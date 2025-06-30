@@ -913,8 +913,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
-          EXPECT_EQ(default_route->virtual_host_.get(),
-                    decoder_filters_[0]->callbacks_->streamInfo().vhost().ptr());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[0]->callbacks_->streamInfo().vhost());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
           Router::RouteConstSharedPtr route =
@@ -969,8 +969,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
-          EXPECT_EQ(default_route->virtual_host_.get(),
-                    decoder_filters_[0]->callbacks_->streamInfo().vhost().ptr());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[0]->callbacks_->streamInfo().vhost());
 
           return FilterHeadersStatus::Continue;
         }));
@@ -999,8 +999,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(default_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
-          EXPECT_EQ(default_route->virtual_host_.get(),
-                    decoder_filters_[1]->callbacks_->streamInfo().vhost().ptr());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[1]->callbacks_->streamInfo().vhost());
 
           int ctr = 0;
           const Router::RouteCallback& cb =
@@ -1030,8 +1030,8 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           EXPECT_EQ(foo_bar_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
-          EXPECT_EQ(foo_bar_route->virtual_host_.get(),
-                    decoder_filters_[1]->callbacks_->streamInfo().vhost().ptr());
+          EXPECT_EQ(foo_bar_route->virtual_host_,
+                    decoder_filters_[1]->callbacks_->streamInfo().vhost());
 
           return FilterHeadersStatus::Continue;
         }));

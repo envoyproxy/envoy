@@ -57,8 +57,8 @@ public:
       : ::Envoy::Formatter::MetadataFormatter(filter_namespace, path, max_length,
                                               [](const StreamInfo::StreamInfo& stream_info)
                                                   -> const envoy::config::core::v3::Metadata* {
-                                                const auto vhost = stream_info.vhost();
-                                                if (!vhost.has_value()) {
+                                                const auto& vhost = stream_info.vhost();
+                                                if (vhost == nullptr) {
                                                   return nullptr;
                                                 }
                                                 return &vhost->metadata();
