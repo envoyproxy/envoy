@@ -1,7 +1,9 @@
 #include "source/extensions/filters/http/basic_auth/config.h"
 
 #include "source/common/config/datasource.h"
+#include "source/common/config/utility.h"
 #include "source/extensions/filters/http/basic_auth/basic_auth_filter.h"
+#include "source/extensions/hash/factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,8 +15,11 @@ using envoy::extensions::filters::http::basic_auth::v3::BasicAuthPerRoute;
 
 namespace {
 
+constexpr absl::string_view kPrefixSHA = "{SHA}";
+
 UserMap readHtpasswd(const std::string& htpasswd) {
   UserMap users;
+  absl::flat_hash_map<std::string, Hash::AlgorithmProviderSharedPtr> algorithm_providers;
 
   std::istringstream htpsswd_ss(htpasswd);
   std::string line;
@@ -43,17 +48,34 @@ UserMap readHtpasswd(const std::string& htpasswd) {
       throw EnvoyException("basic auth: duplicate users");
     }
 
-    if (!absl::StartsWith(hash, "{SHA}")) {
+    std::string factory_name;
+    int hash_prefix_length;
+
+    if (absl::StartsWith(hash, kPrefixSHA)) {
+      factory_name = "envoy.hash.sha1";
+      hash_prefix_length = kPrefixSHA.length();
+    } else {
       throw EnvoyException("basic auth: unsupported htpasswd format: please use {SHA}");
     }
 
-    hash = hash.substr(5);
-    // The base64 encoded SHA1 hash is 28 bytes long
-    if (hash.length() != 28) {
-      throw EnvoyException("basic auth: invalid htpasswd format, invalid SHA hash length");
+    auto algorithm_provider = algorithm_providers[factory_name];
+    if (algorithm_provider == nullptr) {
+      auto* factory = Envoy::Config::Utility::getFactoryByName<
+          Envoy::Extensions::Hash::NamedAlgorithmProviderConfigFactory>(factory_name);
+      if (factory == nullptr) {
+        throw EnvoyException(
+            absl::StrCat("basic auth: did not find factory named '", factory_name, "'"));
+      }
+      algorithm_provider = factory->createAlgorithmProvider();
+      algorithm_providers[factory_name] = algorithm_provider;
     }
 
-    users.insert({name, {name, hash}});
+    hash = hash.substr(hash_prefix_length);
+    if (hash.length() != algorithm_provider->base64EncodedHashLength()) {
+      throw EnvoyException("basic auth: invalid htpasswd format, invalid hash length");
+    }
+
+    users.insert({name, {name, hash, algorithm_providers[factory_name]}});
   }
 
   return users;
