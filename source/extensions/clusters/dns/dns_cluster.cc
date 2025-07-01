@@ -290,7 +290,7 @@ DnsClusterImpl::ResolveTarget::createLogicalDnsHosts(
   auto address_list = DnsUtils::generateAddressList(response, port_);
   auto logical_host_or_error =
       LogicalHost::create(parent_.info_, hostname_, new_address, address_list,
-                          locality_lb_endpoints_, lb_endpoint_, nullptr, parent_.time_source_);
+                          locality_lb_endpoints_, lb_endpoint_, nullptr);
 
   RETURN_IF_NOT_OK(logical_host_or_error.status());
 
@@ -324,7 +324,7 @@ DnsClusterImpl::ResolveTarget::createStrictDnsHosts(
             locality_lb_endpoints_.metadata()),
         lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints_.locality(),
         lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints_.priority(),
-        lb_endpoint_.health_status(), parent_.time_source_);
+        lb_endpoint_.health_status());
 
     RETURN_IF_NOT_OK(host_or_error.status());
 

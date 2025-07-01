@@ -102,9 +102,8 @@ protected:
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver_; };
-    auto status_or_cluster = ClusterFactoryImplBase::create(
-        cluster_config, server_context_, server_context_.cluster_manager_, resolver_fn,
-        ssl_context_manager_, nullptr, false);
+    auto status_or_cluster = ClusterFactoryImplBase::create(cluster_config, server_context_,
+                                                            resolver_fn, nullptr, false);
     if (status_or_cluster.ok()) {
       if (Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.enable_new_dns_implementation")) {
@@ -274,7 +273,6 @@ protected:
   Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
-  Ssl::MockContextManager ssl_context_manager_;
 
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
@@ -945,8 +943,8 @@ TEST_P(LogicalDnsImplementationsTest, NegativeDnsJitter) {
                     address: foo.bar.com
                     port_value: 443
   )EOF";
-  EXPECT_THROW_WITH_MESSAGE(setupFromV3Yaml(yaml, false), EnvoyException,
-                            "Invalid duration: Expected positive duration: seconds: -1\n");
+  EXPECT_THROW_WITH_REGEX(setupFromV3Yaml(yaml, false), EnvoyException,
+                          "(?s)Invalid duration: Expected positive duration:.*seconds: -1\n");
 }
 
 TEST_P(LogicalDnsImplementationsTest, ExtremeJitter) {

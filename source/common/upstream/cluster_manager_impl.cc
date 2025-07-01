@@ -359,8 +359,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   }
 
   // Now that the async-client manager is set, the xDS-Manager can be initialized.
-  absl::Status status = xds_manager_.initialize(bootstrap, this);
-  SET_AND_RETURN_IF_NOT_OK(status, creation_status);
+  SET_AND_RETURN_IF_NOT_OK(xds_manager_.initialize(bootstrap, this), creation_status);
 }
 
 absl::Status
@@ -498,7 +497,7 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0);
+        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
     RETURN_IF_NOT_OK_REF(factory_or_error.status());
     absl::StatusOr<Grpc::RawAsyncClientPtr> client_or_error =
         factory_or_error.value()->createUncachedRawAsyncClient();
@@ -846,7 +845,7 @@ ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& clust
                                 ClusterMap& cluster_map, const bool avoid_cds_removal) {
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
       new_cluster_pair_or_error =
-          factory_.clusterFromProto(cluster, *this, outlier_event_logger_, added_via_api);
+          factory_.clusterFromProto(cluster, outlier_event_logger_, added_via_api);
 
   if (!new_cluster_pair_or_error.ok()) {
     return absl::InvalidArgumentError(std::string(new_cluster_pair_or_error.status().message()));
@@ -2195,7 +2194,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::ConnectivityGrid>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache, coptions,
-        quic_stat_names_, *stats_.rootScope(), *quic_info, network_observer_registry);
+        quic_stat_names_, *stats_.rootScope(), *quic_info, network_observer_registry,
+        server_.overloadManager());
 #else
     (void)quic_info;
     (void)network_observer_registry;
@@ -2214,12 +2214,14 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     ASSERT(contains(protocols, {Http::Protocol::Http11, Http::Protocol::Http2}));
     return std::make_unique<Http::HttpConnPoolImplMixed>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
-        transport_socket_options, state, origin, alternate_protocols_cache);
+        transport_socket_options, state, origin, alternate_protocols_cache,
+        server_.overloadManager());
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state, origin,
+                                         priority, options, transport_socket_options, state,
+                                         server_.overloadManager(), origin,
                                          alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
@@ -2228,10 +2230,10 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     if (quic_info == nullptr) {
       quic_info = Quic::createPersistentQuicInfoForCluster(dispatcher, host->cluster());
     }
-    return Http::Http3::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
-                                         priority, options, transport_socket_options, state,
-                                         quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info,
-                                         network_observer_registry);
+    return Http::Http3::allocateConnPool(
+        dispatcher, context_.api().randomGenerator(), host, priority, options,
+        transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info,
+        network_observer_registry, server_.overloadManager(), false);
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.
@@ -2240,7 +2242,8 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   }
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
   return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
-                                       options, transport_socket_options, state);
+                                       options, transport_socket_options, state,
+                                       server_.overloadManager());
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
@@ -2250,17 +2253,17 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
     ClusterConnectivityState& state,
     absl::optional<std::chrono::milliseconds> tcp_pool_idle_timeout) {
   ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
-  return std::make_unique<Tcp::ConnPoolImpl>(
-      dispatcher, host, priority, options, transport_socket_options, state, tcp_pool_idle_timeout);
+  return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
+                                             transport_socket_options, state, tcp_pool_idle_timeout,
+                                             server_.overloadManager());
 }
 
 absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ProdClusterManagerFactory::clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
-                                            ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
                                             bool added_via_api) {
-  return ClusterFactoryImplBase::create(cluster, context_, cm, dns_resolver_fn_,
-                                        ssl_context_manager_, outlier_event_logger, added_via_api);
+  return ClusterFactoryImplBase::create(cluster, context_, dns_resolver_fn_, outlier_event_logger,
+                                        added_via_api);
 }
 
 absl::StatusOr<CdsApiPtr>

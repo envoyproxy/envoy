@@ -18,6 +18,7 @@ constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
 constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
 constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
+constexpr std::chrono::seconds MAX_CACHE_JITTER{30};
 
 /**
  * AWS credentials containers
@@ -190,7 +191,9 @@ public:
   }
 
   void add(const CredentialsProviderSharedPtr& credentials_provider) {
-    providers_.emplace_back(credentials_provider);
+    if (credentials_provider != nullptr) {
+      providers_.emplace_back(credentials_provider);
+    }
   }
 
   // Store a callback if credentials are pending from a credential provider, to be called when
