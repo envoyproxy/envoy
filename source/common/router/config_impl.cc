@@ -46,6 +46,7 @@
 #include "source/common/router/matcher_visitor.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
+#include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -125,31 +126,6 @@ public:
 namespace {
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
-
-void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
-  dest.headers_to_append_or_add.insert(dest.headers_to_append_or_add.end(),
-                                       src.headers_to_append_or_add.begin(),
-                                       src.headers_to_append_or_add.end());
-  dest.headers_to_overwrite_or_add.insert(dest.headers_to_overwrite_or_add.end(),
-                                          src.headers_to_overwrite_or_add.begin(),
-                                          src.headers_to_overwrite_or_add.end());
-  dest.headers_to_add_if_absent.insert(dest.headers_to_add_if_absent.end(),
-                                       src.headers_to_add_if_absent.begin(),
-                                       src.headers_to_add_if_absent.end());
-  dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
-                                src.headers_to_remove.end());
-}
-
-absl::Status validateWeightedClusterSpecifier(
-    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
-  if (!cluster.name().empty() && !cluster.cluster_header().empty()) {
-    return absl::InvalidArgumentError("Only one of name or cluster_header can be specified");
-  } else if (cluster.name().empty() && cluster.cluster_header().empty()) {
-    return absl::InvalidArgumentError(
-        "At least one of name or cluster_header need to be specified");
-  }
-  return absl::OkStatus();
-}
 
 // Returns a vector of header parsers, sorted by specificity. The `specificity_ascend` parameter
 // specifies whether the returned parsers will be sorted from least specific to most specific
@@ -660,47 +636,12 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
     shadow_policies_ = vhost->shadowPolicies();
   }
 
-  // If this is a weighted_cluster, we create N internal route entries
-  // (called WeightedClusterEntry), such that each object is a simple
-  // single cluster, pointing back to the parent. Metadata criteria
-  // from the weighted cluster (if any) are merged with and override
-  // the criteria from the route.
-  if (route.route().cluster_specifier_case() ==
-      envoy::config::route::v3::RouteAction::ClusterSpecifierCase::kWeightedClusters) {
-    uint64_t total_weight = 0UL;
-    const std::string& runtime_key_prefix = route.route().weighted_clusters().runtime_key_prefix();
-
-    std::vector<WeightedClusterEntrySharedPtr> weighted_clusters;
-    weighted_clusters.reserve(route.route().weighted_clusters().clusters().size());
-    for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      auto cluster_entry = THROW_OR_RETURN_VALUE(
-          WeightedClusterEntry::create(this, runtime_key_prefix + "." + cluster.name(),
-                                       factory_context, validator, cluster),
-          std::unique_ptr<WeightedClusterEntry>);
-      weighted_clusters.emplace_back(std::move(cluster_entry));
-      total_weight += weighted_clusters.back()->clusterWeight(loader_);
-      if (total_weight > std::numeric_limits<uint32_t>::max()) {
-        creation_status = absl::InvalidArgumentError(
-            fmt::format("The sum of weights of all weighted clusters of route {} exceeds {}",
-                        route_name_, std::numeric_limits<uint32_t>::max()));
-        return;
-      }
-    }
-
-    // Reject the config if the total_weight of all clusters is 0.
-    if (total_weight == 0) {
-      creation_status = absl::InvalidArgumentError(
-          "Sum of weights in the weighted_cluster must be greater than 0.");
-      return;
-    }
-
-    weighted_clusters_config_ = std::make_unique<WeightedClustersConfig>(
-        std::move(weighted_clusters), total_weight, route.route().weighted_clusters().header_name(),
-        route.route().weighted_clusters().runtime_key_prefix());
-
-  } else if (route.route().cluster_specifier_case() ==
-             envoy::config::route::v3::RouteAction::ClusterSpecifierCase::
-                 kInlineClusterSpecifierPlugin) {
+  if (route.route().has_weighted_clusters()) {
+    cluster_specifier_plugin_ = std::make_shared<WeightedClusterSpecifierPlugin>(
+        route.route().weighted_clusters(), metadata_match_criteria_.get(), route_name_,
+        factory_context, creation_status);
+    RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+  } else if (route.route().has_inline_cluster_specifier_plugin()) {
     auto plugin_or_error = getClusterSpecifierPluginByTheProto(
         route.route().inline_cluster_specifier_plugin(), validator, factory_context);
     SET_AND_RETURN_IF_NOT_OK(plugin_or_error.status(), creation_status);
@@ -1362,178 +1303,23 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const {
   }
 }
 
-RouteConstSharedPtr RouteEntryImplBase::pickClusterViaClusterHeader(
-    const Http::LowerCaseString& cluster_header_name, const Http::HeaderMap& headers,
-    const RouteEntryAndRoute* route_selector_override) const {
-  const auto entry = headers.get(cluster_header_name);
-  std::string final_cluster_name;
-  if (!entry.empty()) {
-    // This is an implicitly untrusted header, so per the API documentation only
-    // the first value is used.
-    final_cluster_name = std::string(entry[0]->value().getStringView());
-  }
-
-  return std::make_shared<DynamicRouteEntry>(route_selector_override ? route_selector_override
-                                                                     : this,
-                                             shared_from_this(), final_cluster_name);
-}
-
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::RequestHeaderMap& headers,
                                                      const StreamInfo::StreamInfo& stream_info,
                                                      uint64_t random_value) const {
-  // Gets the route object chosen from the list of weighted clusters
-  // (if there is one) or returns self.
-  if (weighted_clusters_config_ == nullptr) {
-    if (!cluster_name_.empty() || isDirectResponse()) {
-      return shared_from_this();
-    } else {
-      // TODO(wbpcode): make the weighted clusters an implementation of the
-      // cluster specifier plugin.
-      ASSERT(cluster_specifier_plugin_ != nullptr);
-      return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info,
-                                              random_value);
-    }
+  if (cluster_specifier_plugin_ != nullptr) {
+    return cluster_specifier_plugin_->route(shared_from_this(), headers, stream_info, random_value);
   }
-  return pickWeightedCluster(headers, random_value);
+  return shared_from_this();
 }
 
-// Selects a cluster depending on weight parameters from configuration or from headers.
-// This function takes into account the weights set through configuration or through
-// runtime parameters.
-// Returns selected cluster, or nullptr if weighted configuration is invalid.
-RouteConstSharedPtr RouteEntryImplBase::pickWeightedCluster(const Http::HeaderMap& headers,
-                                                            const uint64_t random_value) const {
-  absl::optional<uint64_t> random_value_from_header;
-  // Retrieve the random value from the header if corresponding header name is specified.
-  // weighted_clusters_config_ is known not to be nullptr here. If it were, pickWeightedCluster
-  // would not be called.
-  ASSERT(weighted_clusters_config_ != nullptr);
-  if (!weighted_clusters_config_->random_value_header_name_.empty()) {
-    const auto header_value = headers.get(
-        Envoy::Http::LowerCaseString(weighted_clusters_config_->random_value_header_name_));
-    if (!header_value.empty() && header_value.size() == 1) {
-      // We expect single-valued header here, otherwise it will potentially cause inconsistent
-      // weighted cluster picking throughout the process because different values are used to
-      // compute the selected value. So, we treat multi-valued header as invalid input and fall back
-      // to use internally generated random number.
-      uint64_t random_value = 0;
-      if (absl::SimpleAtoi(header_value[0]->value().getStringView(), &random_value)) {
-        random_value_from_header = random_value;
-      }
-    }
-
-    if (!random_value_from_header.has_value()) {
-      // Random value should be found here. But if it is not set due to some errors, log the
-      // information and fallback to the random value that is set by stream id.
-      ENVOY_LOG(debug, "The random value can not be found from the header and it will fall back to "
-                       "the value that is set by stream id");
-    }
-  }
-
-  auto runtime_key_prefix_configured =
-      (weighted_clusters_config_->runtime_key_prefix_.length() ? true : false);
-  uint32_t total_cluster_weight = weighted_clusters_config_->total_cluster_weight_;
-  absl::InlinedVector<uint32_t, 4> cluster_weights;
-
-  // if runtime config is used, we need to recompute total_weight
-  if (runtime_key_prefix_configured) {
-    // Temporary storage to hold consistent cluster weights. Since cluster weight
-    // can be changed with runtime keys, we need a way to gather all the weight
-    // and aggregate the total without a change in between.
-    // The InlinedVector will be able to handle at least 4 cluster weights
-    // without allocation. For cases when more clusters are needed, it is
-    // reserved to ensure at most a single allocation.
-    cluster_weights.reserve(weighted_clusters_config_->weighted_clusters_.size());
-
-    total_cluster_weight = 0;
-    for (const WeightedClusterEntrySharedPtr& cluster :
-         weighted_clusters_config_->weighted_clusters_) {
-      auto cluster_weight = cluster->clusterWeight(loader_);
-      cluster_weights.push_back(cluster_weight);
-      if (cluster_weight > std::numeric_limits<uint32_t>::max() - total_cluster_weight) {
-        IS_ENVOY_BUG("Sum of weight cannot overflow 2^32");
-        return nullptr;
-      }
-      total_cluster_weight += cluster_weight;
-    }
-  }
-
-  if (total_cluster_weight == 0) {
-    IS_ENVOY_BUG("Sum of weight cannot be zero");
-    return nullptr;
-  }
-  const uint64_t selected_value =
-      (random_value_from_header.has_value() ? random_value_from_header.value() : random_value) %
-      total_cluster_weight;
-  uint64_t begin = 0;
-  uint64_t end = 0;
-  auto cluster_weight = cluster_weights.begin();
-
-  // Find the right cluster to route to based on the interval in which
-  // the selected value falls. The intervals are determined as
-  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const WeightedClusterEntrySharedPtr& cluster :
-       weighted_clusters_config_->weighted_clusters_) {
-
-    if (runtime_key_prefix_configured) {
-      end = begin + *cluster_weight++;
-    } else {
-      end = begin + cluster->clusterWeight(loader_);
-    }
-
-    if (selected_value >= begin && selected_value < end) {
-      if (!cluster->clusterHeaderName().get().empty() &&
-          !headers.get(cluster->clusterHeaderName()).empty()) {
-        return pickClusterViaClusterHeader(cluster->clusterHeaderName(), headers,
-                                           static_cast<RouteEntryAndRoute*>(cluster.get()));
-      }
-      // The WeightedClusterEntry does not contain reference to the RouteEntryImplBase to
-      // avoid circular reference. To ensure that the RouteEntryImplBase is not destructed
-      // before the WeightedClusterEntry, additional wrapper is used to hold the reference
-      // to the RouteEntryImplBase.
-      return std::make_shared<DynamicRouteEntry>(cluster.get(), shared_from_this(),
-                                                 cluster->clusterName());
-    }
-    begin = end;
-  }
-
-  IS_ENVOY_BUG("unexpected");
-  return nullptr;
-}
-
-absl::Status
-RouteEntryImplBase::validateClusters(const Upstream::ClusterManager& cluster_manager) const {
-  if (isDirectResponse()) {
-    return absl::OkStatus();
-  }
-
-  // Currently, we verify that the cluster exists in the CM if we have an explicit cluster or
-  // weighted cluster rule. We obviously do not verify a cluster_header rule. This means that
-  // trying to use all CDS clusters with a static route table will not work. In the upcoming RDS
-  // change we will make it so that dynamically loaded route tables do *not* perform CM checks.
-  // In the future we might decide to also have a config option that turns off checks for static
-  // route tables. This would enable the all CDS with static route table case.
+absl::Status RouteEntryImplBase::validateClusters(const Upstream::ClusterManager& cm) const {
   if (!cluster_name_.empty()) {
-    if (!cluster_manager.hasCluster(cluster_name_)) {
-      return absl::InvalidArgumentError(fmt::format("route: unknown cluster '{}'", cluster_name_));
-    }
-  } else if (weighted_clusters_config_ != nullptr) {
-    for (const WeightedClusterEntrySharedPtr& cluster :
-         weighted_clusters_config_->weighted_clusters_) {
-      if (!cluster->clusterName().empty()) {
-        if (!cluster_manager.hasCluster(cluster->clusterName())) {
-          return absl::InvalidArgumentError(
-              fmt::format("route: unknown weighted cluster '{}'", cluster->clusterName()));
-        }
-      }
-      // For weighted clusters with `cluster_header_name`, we only verify that this field is
-      // not empty because the cluster name is not set yet at config time (hence the validation
-      // here).
-      else if (cluster->clusterHeaderName().get().empty()) {
-        return absl::InvalidArgumentError(
-            "route: unknown weighted cluster with no cluster_header field");
-      }
-    }
+    return !cm.hasCluster(cluster_name_) ? absl::InvalidArgumentError(fmt::format(
+                                               "route: unknown cluster '{}'", cluster_name_))
+                                         : absl::OkStatus();
+  }
+  if (cluster_specifier_plugin_ != nullptr) {
+    return cluster_specifier_plugin_->validateClusters(cm);
   }
   return absl::OkStatus();
 }
@@ -1564,84 +1350,6 @@ const envoy::config::core::v3::Metadata& RouteEntryImplBase::metadata() const {
 const Envoy::Config::TypedMetadata& RouteEntryImplBase::typedMetadata() const {
   return metadata_ != nullptr ? metadata_->typed_metadata_
                               : DefaultRouteMetadataPack::get().typed_metadata_;
-}
-
-absl::StatusOr<std::unique_ptr<RouteEntryImplBase::WeightedClusterEntry>>
-RouteEntryImplBase::WeightedClusterEntry::create(
-    const RouteEntryImplBase* parent, const std::string& runtime_key,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator,
-    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster) {
-  RETURN_IF_NOT_OK(validateWeightedClusterSpecifier(cluster));
-  return std::unique_ptr<WeightedClusterEntry>(
-      new WeightedClusterEntry(parent, runtime_key, factory_context, validator, cluster));
-}
-
-RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
-    const RouteEntryImplBase* parent, const std::string& runtime_key,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator,
-    const envoy::config::route::v3::WeightedCluster::ClusterWeight& cluster)
-    : DynamicRouteEntry(parent, nullptr, cluster.name()), runtime_key_(runtime_key),
-      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
-      per_filter_configs_(THROW_OR_RETURN_VALUE(
-          PerFilterConfigs::create(cluster.typed_per_filter_config(), factory_context, validator),
-          std::unique_ptr<PerFilterConfigs>)),
-      host_rewrite_(cluster.host_rewrite_literal()),
-      cluster_header_name_(cluster.cluster_header()) {
-  if (!cluster.request_headers_to_add().empty() || !cluster.request_headers_to_remove().empty()) {
-    request_headers_parser_ =
-        THROW_OR_RETURN_VALUE(HeaderParser::configure(cluster.request_headers_to_add(),
-                                                      cluster.request_headers_to_remove()),
-                              Router::HeaderParserPtr);
-  }
-  if (!cluster.response_headers_to_add().empty() || !cluster.response_headers_to_remove().empty()) {
-    response_headers_parser_ =
-        THROW_OR_RETURN_VALUE(HeaderParser::configure(cluster.response_headers_to_add(),
-                                                      cluster.response_headers_to_remove()),
-                              Router::HeaderParserPtr);
-  }
-
-  if (cluster.has_metadata_match()) {
-    const auto filter_it = cluster.metadata_match().filter_metadata().find(
-        Envoy::Config::MetadataFilters::get().ENVOY_LB);
-    if (filter_it != cluster.metadata_match().filter_metadata().end()) {
-      if (parent->metadata_match_criteria_) {
-        cluster_metadata_match_criteria_ =
-            parent->metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
-      } else {
-        cluster_metadata_match_criteria_ =
-            std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
-      }
-    }
-  }
-}
-
-Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::requestHeaderTransforms(
-    const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
-  auto transforms = requestHeaderParser().getHeaderTransforms(stream_info, do_formatting);
-  mergeTransforms(transforms,
-                  DynamicRouteEntry::requestHeaderTransforms(stream_info, do_formatting));
-  return transforms;
-}
-
-Http::HeaderTransforms RouteEntryImplBase::WeightedClusterEntry::responseHeaderTransforms(
-    const StreamInfo::StreamInfo& stream_info, bool do_formatting) const {
-  auto transforms = responseHeaderParser().getHeaderTransforms(stream_info, do_formatting);
-  mergeTransforms(transforms,
-                  DynamicRouteEntry::responseHeaderTransforms(stream_info, do_formatting));
-  return transforms;
-}
-
-RouteSpecificFilterConfigs
-RouteEntryImplBase::WeightedClusterEntry::perFilterConfigs(absl::string_view filter_name) const {
-
-  auto result = DynamicRouteEntry::perFilterConfigs(filter_name);
-  const auto* cfg = per_filter_configs_->get(filter_name);
-  if (cfg != nullptr) {
-    result.push_back(cfg);
-  }
-  return result;
 }
 
 UriTemplateMatcherRouteEntryImpl::UriTemplateMatcherRouteEntryImpl(
@@ -2432,130 +2140,6 @@ const envoy::config::core::v3::Metadata& NullConfigImpl::metadata() const {
 }
 const Envoy::Config::TypedMetadata& NullConfigImpl::typedMetadata() const {
   return DefaultRouteMetadataPack::get().typed_metadata_;
-}
-
-absl::StatusOr<std::unique_ptr<PerFilterConfigs>>
-PerFilterConfigs::create(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-                         Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator) {
-  absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<PerFilterConfigs>(
-      new PerFilterConfigs(typed_configs, factory_context, validator, creation_status));
-  RETURN_IF_NOT_OK(creation_status);
-  return ret;
-}
-
-absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr>
-PerFilterConfigs::createRouteSpecificFilterConfig(
-    const std::string& name, const ProtobufWkt::Any& typed_config, bool is_optional,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator) {
-  Server::Configuration::NamedHttpFilterConfigFactory* factory =
-      Envoy::Config::Utility::getFactoryByType<Server::Configuration::NamedHttpFilterConfigFactory>(
-          typed_config);
-  if (factory == nullptr) {
-    if (is_optional) {
-      ENVOY_LOG(warn,
-                "Can't find a registered implementation for http filter '{}' with type URL: '{}'",
-                name, Envoy::Config::Utility::getFactoryType(typed_config));
-      return nullptr;
-    } else {
-      return absl::InvalidArgumentError(
-          fmt::format("Didn't find a registered implementation for '{}' with type URL: '{}'", name,
-                      Envoy::Config::Utility::getFactoryType(typed_config)));
-    }
-  }
-
-  ProtobufTypes::MessagePtr proto_config = factory->createEmptyRouteConfigProto();
-  RETURN_IF_NOT_OK(
-      Envoy::Config::Utility::translateOpaqueConfig(typed_config, validator, *proto_config));
-  auto object_status_or_error =
-      factory->createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
-  RETURN_IF_NOT_OK(object_status_or_error.status());
-  auto object = std::move(*object_status_or_error);
-  if (object == nullptr) {
-    if (is_optional) {
-      ENVOY_LOG(
-          debug,
-          "The filter {} doesn't support virtual host or route specific configurations, and it is "
-          "optional, so ignore it.",
-          name);
-    } else {
-      return absl::InvalidArgumentError(fmt::format(
-          "The filter {} doesn't support virtual host or route specific configurations", name));
-    }
-  }
-  return object;
-}
-
-PerFilterConfigs::PerFilterConfigs(
-    const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status) {
-
-  std::string filter_config_type(
-      envoy::config::route::v3::FilterConfig::default_instance().GetTypeName());
-
-  for (const auto& per_filter_config : typed_configs) {
-    const std::string& name = per_filter_config.first;
-    absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr> config_or_error;
-
-    if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
-        filter_config_type) {
-      envoy::config::route::v3::FilterConfig filter_config;
-      creation_status = Envoy::Config::Utility::translateOpaqueConfig(per_filter_config.second,
-                                                                      validator, filter_config);
-      if (!creation_status.ok()) {
-        return;
-      }
-
-      // The filter is marked as disabled explicitly and the config is ignored directly.
-      if (filter_config.disabled()) {
-        configs_.emplace(name, FilterConfig{nullptr, true});
-        continue;
-      }
-
-      // If the field `config` is not configured, we treat it as configuration error.
-      if (!filter_config.has_config()) {
-        creation_status = absl::InvalidArgumentError(
-            fmt::format("Empty route/virtual host per filter configuration for {} filter", name));
-        return;
-      }
-
-      // If the field `config` is configured but is empty, we treat the filter is enabled
-      // explicitly.
-      if (filter_config.config().type_url().empty()) {
-        configs_.emplace(name, FilterConfig{nullptr, false});
-        continue;
-      }
-
-      config_or_error = createRouteSpecificFilterConfig(
-          name, filter_config.config(), filter_config.is_optional(), factory_context, validator);
-    } else {
-      config_or_error = createRouteSpecificFilterConfig(name, per_filter_config.second, false,
-                                                        factory_context, validator);
-    }
-    SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
-
-    // If a filter is explicitly configured we treat it as enabled.
-    // The config may be nullptr because the filter could be optional.
-    configs_.emplace(name, FilterConfig{std::move(config_or_error.value()), false});
-  }
-}
-
-const RouteSpecificFilterConfig* PerFilterConfigs::get(absl::string_view name) const {
-  auto it = configs_.find(name);
-  return it == configs_.end() ? nullptr : it->second.config_.get();
-}
-
-absl::optional<bool> PerFilterConfigs::disabled(absl::string_view name) const {
-  // Quick exit if there are no configs.
-  if (configs_.empty()) {
-    return absl::nullopt;
-  }
-
-  const auto it = configs_.find(name);
-  return it != configs_.end() ? absl::optional<bool>{it->second.disabled_} : absl::nullopt;
 }
 
 Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(

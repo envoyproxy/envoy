@@ -66,6 +66,12 @@ minor_behavior_changes:
   change: |
     :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
     providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
+- area: ext_proc
+  change: |
+    If ext_proc server sends spurious response message to Envoy, Envoy now performs fail-open or fail-close action based on
+    :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`
+    configuration. This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_fail_close_spurious_resp`` to ``false``.
 - area: filters
   change: |
     :ref:`Credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>` is no longer
