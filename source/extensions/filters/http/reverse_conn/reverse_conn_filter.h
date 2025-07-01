@@ -11,8 +11,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/bootstrap/reverse_connection_socket_interface/downstream_reverse_socket_interface.h"
-#include "source/extensions/bootstrap/reverse_connection_socket_interface/upstream_reverse_socket_interface.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_initiator.h"
 
 #include "absl/types/optional.h"
 
@@ -137,9 +137,9 @@ private:
     }
 
     auto* upstream_socket_interface =
-        dynamic_cast<const ReverseConnection::UpstreamReverseSocketInterface*>(upstream_interface);
+        dynamic_cast<const ReverseConnection::ReverseTunnelAcceptor*>(upstream_interface);
     if (!upstream_socket_interface) {
-      ENVOY_LOG(error, "Failed to cast to UpstreamReverseSocketInterface");
+      ENVOY_LOG(error, "Failed to cast to ReverseTunnelAcceptor");
       return nullptr;
     }
 
@@ -153,7 +153,7 @@ private:
   }
 
   // Get the downstream socket interface (for initiator role)
-  const ReverseConnection::DownstreamReverseSocketInterface* getDownstreamSocketInterface() {
+  const ReverseConnection::ReverseTunnelInitiator* getDownstreamSocketInterface() {
     auto* downstream_interface = Network::socketInterface(
         "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface");
     if (!downstream_interface) {
@@ -162,14 +162,33 @@ private:
     }
 
     auto* downstream_socket_interface =
-        dynamic_cast<const ReverseConnection::DownstreamReverseSocketInterface*>(
-            downstream_interface);
+        dynamic_cast<const ReverseConnection::ReverseTunnelInitiator*>(downstream_interface);
     if (!downstream_socket_interface) {
-      ENVOY_LOG(error, "Failed to cast to DownstreamReverseSocketInterface");
+      ENVOY_LOG(error, "Failed to cast to ReverseTunnelInitiator");
       return nullptr;
     }
 
     return downstream_socket_interface;
+  }
+
+  // Get the upstream socket interface extension for production cross-thread aggregation
+  ReverseConnection::ReverseTunnelAcceptorExtension* getUpstreamSocketInterfaceExtension() {
+    auto* upstream_interface = Network::socketInterface(
+        "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+    if (!upstream_interface) {
+      ENVOY_LOG(debug, "Upstream reverse socket interface not found");
+      return nullptr;
+    }
+
+    auto* upstream_socket_interface =
+        dynamic_cast<const ReverseConnection::ReverseTunnelAcceptor*>(upstream_interface);
+    if (!upstream_socket_interface) {
+      ENVOY_LOG(error, "Failed to cast to ReverseTunnelAcceptor");
+      return nullptr;
+    }
+
+    // Get the extension which provides cross-thread aggregation capabilities
+    return upstream_socket_interface->getExtension();
   }
 
   // Determine the role of this envoy instance based on available socket interfaces

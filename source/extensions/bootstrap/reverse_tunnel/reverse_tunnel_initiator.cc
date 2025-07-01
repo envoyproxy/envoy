@@ -1,4 +1,4 @@
-#include "source/extensions/bootstrap/reverse_connection_socket_interface/downstream_reverse_socket_interface.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_initiator.h"
 
 #include <sys/socket.h>
 
@@ -21,7 +21,8 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/bootstrap/reverse_connection_socket_interface/reverse_connection_address.h"
+#include "source/common/reverse_connection/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_address.h"
 
 #include "google/protobuf/empty.pb.h"
 
@@ -30,9 +31,47 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-// Forward declaration
+/**
+ * Custom IoHandle for downstream reverse connections that owns a ConnectionSocket.
+ */
+class DownstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
+public:
+  /**
+   * Constructor that takes ownership of the socket.
+   */
+  explicit DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket)
+      : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), owned_socket_(std::move(socket)) {
+    ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {}",
+              fd_);
+  }
+
+  ~DownstreamReverseConnectionIOHandle() override {
+    ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: destroying handle for FD: {}", fd_);
+  }
+
+  // Network::IoHandle overrides.
+  Api::IoCallUint64Result close() override {
+    ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: closing handle for FD: {}", fd_);
+    // Reset the owned socket to properly close the connection.
+    if (owned_socket_) {
+      owned_socket_.reset();
+    }
+    return IoSocketHandleImpl::close();
+  }
+
+  /**
+   * Get the owned socket for read-only access.
+   */
+  const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
+
+private:
+  // The socket that this IOHandle owns and manages lifetime for.
+  Network::ConnectionSocketPtr owned_socket_;
+};
+
+// Forward declaration.
 class ReverseConnectionIOHandle;
-class DownstreamReverseSocketInterface;
+class ReverseTunnelInitiator;
 
 /**
  * RCConnectionWrapper manages the lifecycle of a ClientConnectionPtr for reverse connections.
@@ -46,27 +85,54 @@ public:
                       Upstream::HostDescriptionConstSharedPtr host)
       : parent_(parent), connection_(std::move(connection)), host_(std::move(host)) {}
 
-  ~RCConnectionWrapper() override = default;
+  ~RCConnectionWrapper() override {
+    ENVOY_LOG(debug, "Performing graceful connection cleanup.");
+    shutdown();
+  }
 
-  // Network::ConnectionCallbacks
+  // Network::ConnectionCallbacks.
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
-  // Initiate the reverse connection handshake
+  // Initiate the reverse connection handshake.
   std::string connect(const std::string& src_tenant_id, const std::string& src_cluster_id,
                       const std::string& src_node_id);
-  // Process the handshake response
+  // Process the handshake response.
   void onData(const std::string& error);
-  // Clean up on failure
+  // Clean up on failure. Use graceful shutdown.
   void onFailure() {
-    if (connection_) {
-      connection_->removeConnectionCallbacks(*this);
+    ENVOY_LOG(debug,
+              "RCConnectionWrapper::onFailure - initiating graceful shutdown due to failure");
+    shutdown();
+  }
+
+  void shutdown() {
+    if (!connection_) {
+      ENVOY_LOG(debug, "Connection already null.");
+      return;
     }
+
+    ENVOY_LOG(debug, "Connection ID: {}, state: {}.", connection_->id(),
+              static_cast<int>(connection_->state()));
+
+    connection_->removeConnectionCallbacks(*this);
+
+    if (connection_->state() == Network::Connection::State::Open) {
+      ENVOY_LOG(debug, "Closing open connection gracefully.");
+      connection_->close(Network::ConnectionCloseType::FlushWrite);
+    } else if (connection_->state() == Network::Connection::State::Closing) {
+      ENVOY_LOG(debug, "Connection already closing, waiting.");
+    } else {
+      ENVOY_LOG(debug, "Connection already closed.");
+    }
+
+    connection_.reset();
+    ENVOY_LOG(debug, "Completed graceful shutdown.");
   }
 
   Network::ClientConnection* getConnection() { return connection_.get(); }
   Upstream::HostDescriptionConstSharedPtr getHost() { return host_; }
-  // Release the connection when handshake succeeds
+  // Release the connection when handshake succeeds.
   Network::ClientConnectionPtr releaseConnection() { return std::move(connection_); }
 
 private:
@@ -100,16 +166,16 @@ private:
 
       const std::string data = buffer.toString();
 
-      // Handle ping messages from cloud side - both raw and HTTP embedded
-      if (data == "RPING" || data.find("RPING") != std::string::npos) {
-        ENVOY_LOG(debug, "Received RPING (raw or in HTTP), echoing back raw RPING");
-        Buffer::OwnedImpl ping_response("RPING");
-        parent_->connection_->write(ping_response, false);
-        buffer.drain(buffer.length()); // Consume the ping message
+      // Handle ping messages.
+      if (::Envoy::ReverseConnection::ReverseConnectionUtility::isPingMessage(data)) {
+        ENVOY_LOG(debug, "Received RPING message, using utility to echo back");
+        ::Envoy::ReverseConnection::ReverseConnectionUtility::sendPingResponse(
+            *parent_->connection_);
+        buffer.drain(buffer.length()); // Consume the ping message.
         return Network::FilterStatus::Continue;
       }
 
-      // Handle HTTP response parsing for handshake
+      // Handle HTTP response parsing for handshake.
       response_buffer_string_ += buffer.toString();
       ENVOY_LOG(debug, "Current response buffer: '{}'", response_buffer_string_);
       const size_t headers_end_index = response_buffer_string_.find(DOUBLE_CRLF);
@@ -134,10 +200,10 @@ private:
                                                  content_length_str)) {
           continue; // Header doesn't start with Content-Length
         }
-        // Check if it's exactly "Content-Length:" followed by value
+        // Check if it's exactly "Content-Length:" followed by value.
         if (header[content_length_str.length()] == ':') {
           length_header = header;
-          break; // Found the Content-Length header
+          break; // Found the Content-Length header.
         }
       }
 
@@ -169,7 +235,7 @@ private:
         return Network::FilterStatus::Continue;
       }
 
-      // Handle case where body_size is 0
+      // Handle case where body_size is 0.
       if (body_size == 0) {
         ENVOY_LOG(debug, "Received response with zero-length body - treating as empty protobuf");
         envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeRet ret;
@@ -210,7 +276,7 @@ void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
     ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, found connection {} remote closed",
               connection_->id(), connectionKey);
     onFailure();
-    // Notify parent of connection closure
+    // Notify parent of connection closure.
     parent_.onConnectionDone("Connection closed", this, true);
   }
 }
@@ -218,11 +284,11 @@ void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
 std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
                                          const std::string& src_cluster_id,
                                          const std::string& src_node_id) {
-  // Register connection callbacks
+  // Register connection callbacks.
   ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, adding connection callbacks",
             connection_->id());
   connection_->addConnectionCallbacks(*this);
-  // Add read filter to handle response
+  // Add read filter to handle response.
   ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, adding read filter", connection_->id());
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new ConnReadFilter(this)});
   connection_->connect();
@@ -258,7 +324,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
               "using address as host header",
               connection_->id());
   }
-  // Build HTTP request with protobuf body
+  // Build HTTP request with protobuf body.
   Buffer::OwnedImpl reverse_connection_request(
       fmt::format("POST /reverse_connections/request HTTP/1.1\r\n"
                   "Host: {}\r\n"
@@ -278,10 +344,11 @@ void RCConnectionWrapper::onData(const std::string& error) {
   parent_.onConnectionDone(error, this, false);
 }
 
-ReverseConnectionIOHandle::ReverseConnectionIOHandle(
-    os_fd_t fd, const ReverseConnectionSocketConfig& config,
-    Upstream::ClusterManager& cluster_manager,
-    const DownstreamReverseSocketInterface& socket_interface, Stats::Scope& scope)
+ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
+                                                     const ReverseConnectionSocketConfig& config,
+                                                     Upstream::ClusterManager& cluster_manager,
+                                                     const ReverseTunnelInitiator& socket_interface,
+                                                     Stats::Scope& scope)
     : IoSocketHandleImpl(fd), config_(config), cluster_manager_(cluster_manager),
       socket_interface_(socket_interface) {
   ENVOY_LOG(debug, "Created ReverseConnectionIOHandle: fd={}, src_node={}, num_clusters={}", fd_,
@@ -292,7 +359,7 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(
             config_.src_cluster_id, config_.src_node_id, config_.health_check_interval_ms,
             config_.connection_timeout_ms);
   initializeStats(scope);
-  // Create trigger pipe
+  // Create trigger pipe.
   createTriggerPipe();
   // Defer actual connection initiation until listen() is called on a worker thread.
 }
@@ -304,17 +371,27 @@ ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
 
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG(debug, "Starting cleanup of reverse connection resources");
-  // Cancel the retry timer
+  // Cancel the retry timer.
   if (rev_conn_retry_timer_) {
     rev_conn_retry_timer_->disableTimer();
     ENVOY_LOG(debug, "Cancelled retry timer");
   }
-  // Cleanup connection wrappers
-  ENVOY_LOG(debug, "Closing {} connection wrappers", connection_wrappers_.size());
-  connection_wrappers_.clear(); // Destructors will handle cleanup
+  // Graceful shutdown of connection wrappers following best practices.
+  ENVOY_LOG(debug, "Gracefully shutting down {} connection wrappers", connection_wrappers_.size());
+
+  // Step 1: Signal all connections to close gracefully.
+  for (auto& wrapper : connection_wrappers_) {
+    if (wrapper) {
+      ENVOY_LOG(debug, "Initiating graceful shutdown for connection wrapper");
+      wrapper->shutdown();
+    }
+  }
+
+  // Step 2: Clear the vector. Connections are now safely closed.
+  connection_wrappers_.clear();
   conn_wrapper_to_host_map_.clear();
 
-  // Clear cluster to hosts mapping
+  // Clear cluster to hosts mapping.
   cluster_to_resolved_hosts_map_.clear();
   host_to_conn_info_map_.clear();
 
@@ -328,21 +405,18 @@ void ReverseConnectionIOHandle::cleanup() {
       }
     }
   }
-  // Clear socket cache
-  {
-    ENVOY_LOG(debug, "Clearing {} cached sockets", socket_cache_.size());
-    socket_cache_.clear();
-  }
 
   // Cleanup trigger pipe.
   if (trigger_pipe_read_fd_ != -1) {
     ::close(trigger_pipe_read_fd_);
     trigger_pipe_read_fd_ = -1;
   }
+
   if (trigger_pipe_write_fd_ != -1) {
     ::close(trigger_pipe_write_fd_);
     trigger_pipe_write_fd_ = -1;
   }
+  
   ENVOY_LOG(debug, "Completed cleanup of reverse connection resources");
 }
 
@@ -388,29 +462,45 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         auto connection = std::move(established_connections_.front());
         established_connections_.pop();
         // Fill in address information for the reverse tunnel "client"
-        // TODO(ROHIT): Use actual client address if available
+        // Use actual client address from established connection
         if (addr && addrlen) {
-          // Use the remote address from the connection if available
           const auto& remote_addr = connection->connectionInfoProvider().remoteAddress();
 
           if (remote_addr) {
-            ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - getting sockAddr");
+            ENVOY_LOG(debug,
+                      "ReverseConnectionIOHandle::accept() - using actual client address: {}",
+                      remote_addr->asString());
             const sockaddr* sock_addr = remote_addr->sockAddr();
             socklen_t addr_len = remote_addr->sockAddrLen();
 
             if (*addrlen >= addr_len) {
               memcpy(addr, sock_addr, addr_len);
               *addrlen = addr_len;
+              ENVOY_LOG(trace,
+                        "ReverseConnectionIOHandle::accept() - copied {} bytes of address data",
+                        addr_len);
+            } else {
+              ENVOY_LOG(warn,
+                        "ReverseConnectionIOHandle::accept() - buffer too small for address: "
+                        "need {} bytes, have {}",
+                        addr_len, *addrlen);
+              *addrlen = addr_len; // Still set the required length
             }
           } else {
-            ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - using synthetic address");
-            // Fallback to synthetic address
+            ENVOY_LOG(warn, "ReverseConnectionIOHandle::accept() - no remote address available, "
+                            "using synthetic localhost address");
+            // Fallback to synthetic address only when remote address is unavailable
             auto synthetic_addr =
                 std::make_shared<Envoy::Network::Address::Ipv4Instance>("127.0.0.1", 0);
             const sockaddr* sock_addr = synthetic_addr->sockAddr();
             socklen_t addr_len = synthetic_addr->sockAddrLen();
             if (*addrlen >= addr_len) {
               memcpy(addr, sock_addr, addr_len);
+              *addrlen = addr_len;
+            } else {
+              ENVOY_LOG(
+                  error,
+                  "ReverseConnectionIOHandle::accept() - buffer too small for synthetic address");
               *addrlen = addr_len;
             }
           }
@@ -426,19 +516,10 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - got fd: {}. Creating IoHandle",
                   conn_fd);
 
-        // Cache the socket object so it doesn't go out of scope.
-        // TODO(Basu/Rohit): This cache is needed because if the socket goes out of scope,
-        // the FD is closed that accept() returned is closed. But this cache can grow
-        // indefinitely. Find a way around this.
-        {
-          socket_cache_[connection_key] = std::move(socket);
-          ENVOY_LOG(debug,
-                    "ReverseConnectionIOHandle::accept() - cached socket for connection key: {}",
-                    connection_key);
-        }
-
-        auto io_handle = std::make_unique<Envoy::Network::IoSocketHandleImpl>(conn_fd);
-        ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - IoHandle created");
+        // Create RAII-based IoHandle that owns the socket, eliminating need for external cache
+        auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(std::move(socket));
+        ENVOY_LOG(debug,
+                  "ReverseConnectionIOHandle::accept() - RAII IoHandle created with owned socket");
 
         connection->close(Network::ConnectionCloseType::NoFlush);
 
@@ -478,9 +559,8 @@ ReverseConnectionIOHandle::connect(Envoy::Network::Address::InstanceConstSharedP
   return IoSocketHandleImpl::connect(address);
 }
 
-// TODO(Basu): Since we return a new IoSocketHandleImpl with the FD, this will not be called
-// on reverse connection closure. Find a way to link the returned IoSocketHandleImpl to this
-// so that connections can be re-initiated.
+// Note: This close method is called when the ReverseConnectionIOHandle itself is closed.
+// Individual connections are managed via DownstreamReverseConnectionIOHandle RAII ownership.
 Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
   ENVOY_LOG(debug, "ReverseConnectionIOHandle::close() - performing graceful shutdown");
   return IoSocketHandleImpl::close();
@@ -1020,7 +1100,8 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   } catch (const std::exception& e) {
     ENVOY_LOG(error, "Exception creating reverse connection to host {} in cluster {}: {}",
               host_address, cluster_name, e.what());
-    // TODO(Basu): Decrement the CannotConnect stats when the state changes to Connecting?
+    // Stats are automatically managed by updateConnectionState: CannotConnect gauge is
+    // incremented here and will be decremented when state changes to Connecting on retry
     updateConnectionState(host_address, cluster_name, temp_connection_key,
                           ReverseConnectionState::CannotConnect);
     return false;
@@ -1193,29 +1274,23 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
   }
 }
 
-// DownstreamReverseSocketInterface implementation
-DownstreamReverseSocketInterface::DownstreamReverseSocketInterface(
-    Server::Configuration::ServerFactoryContext& context)
+// ReverseTunnelInitiator implementation
+ReverseTunnelInitiator::ReverseTunnelInitiator(Server::Configuration::ServerFactoryContext& context)
     : extension_(nullptr), context_(&context) {
-  ENVOY_LOG(debug, "Created DownstreamReverseSocketInterface");
+  ENVOY_LOG(debug, "Created ReverseTunnelInitiator.");
 }
 
-DownstreamSocketThreadLocal* DownstreamReverseSocketInterface::getLocalRegistry() const {
+DownstreamSocketThreadLocal* ReverseTunnelInitiator::getLocalRegistry() const {
   if (!extension_ || !extension_->getLocalRegistry()) {
     return nullptr;
   }
   return extension_->getLocalRegistry();
 }
 
-// DownstreamReverseSocketInterfaceExtension implementation
-void DownstreamReverseSocketInterfaceExtension::onServerInitialized() {
-  ENVOY_LOG(debug, "DownstreamReverseSocketInterfaceExtension::onServerInitialized - creating "
+// ReverseTunnelInitiatorExtension implementation
+void ReverseTunnelInitiatorExtension::onServerInitialized() {
+  ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::onServerInitialized - creating "
                    "thread local slot");
-
-  // Set the extension reference in the socket interface
-  if (socket_interface_) {
-    socket_interface_->extension_ = this;
-  }
 
   // Create thread local slot to store dispatcher for each worker thread
   tls_slot_ =
@@ -1227,12 +1302,10 @@ void DownstreamReverseSocketInterfaceExtension::onServerInitialized() {
   });
 }
 
-DownstreamSocketThreadLocal* DownstreamReverseSocketInterfaceExtension::getLocalRegistry() const {
-  ENVOY_LOG(debug, "DownstreamReverseSocketInterfaceExtension::getLocalRegistry()");
+DownstreamSocketThreadLocal* ReverseTunnelInitiatorExtension::getLocalRegistry() const {
+  ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::getLocalRegistry()");
   if (!tls_slot_) {
-    ENVOY_LOG(
-        debug,
-        "DownstreamReverseSocketInterfaceExtension::getLocalRegistry() - no thread local slot");
+    ENVOY_LOG(debug, "ReverseTunnelInitiatorExtension::getLocalRegistry() - no thread local slot");
     return nullptr;
   }
 
@@ -1243,48 +1316,17 @@ DownstreamSocketThreadLocal* DownstreamReverseSocketInterfaceExtension::getLocal
   return nullptr;
 }
 
-Envoy::Network::IoHandlePtr DownstreamReverseSocketInterface::socket(
-    Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
-    Envoy::Network::Address::IpVersion version, bool socket_v6only,
-    const Envoy::Network::SocketCreationOptions& options) const {
+Envoy::Network::IoHandlePtr
+ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
+                               Envoy::Network::Address::Type addr_type,
+                               Envoy::Network::Address::IpVersion version, bool socket_v6only,
+                               const Envoy::Network::SocketCreationOptions& options) const {
   (void)socket_v6only;
   (void)options;
-  ENVOY_LOG(debug, "DownstreamReverseSocketInterface::socket() - type={}, addr_type={}",
+  ENVOY_LOG(debug, "ReverseTunnelInitiator::socket() - type={}, addr_type={}",
             static_cast<int>(socket_type), static_cast<int>(addr_type));
-  // For stream sockets on IP addresses, create our reverse connection IOHandle.
-  if (socket_type == Envoy::Network::Socket::Type::Stream &&
-      addr_type == Envoy::Network::Address::Type::Ip) {
-    // Create socket file descriptor using system calls.
-    int domain = (version == Envoy::Network::Address::IpVersion::v4) ? AF_INET : AF_INET6;
-    int sock_fd = ::socket(domain, SOCK_STREAM, 0);
-    if (sock_fd == -1) {
-      ENVOY_LOG(error, "Failed to create socket: {}", strerror(errno));
-      return nullptr;
-    }
-    if (!temp_rc_config_) {
-      ENVOY_LOG(error, "No reverse connection configuration available");
-      ::close(sock_fd);
-      return nullptr;
-    }
-    ENVOY_LOG(debug, "Created socket fd={}, wrapping with ReverseConnectionIOHandle", sock_fd);
-    // Use the temporary config and then clear it
-    auto config = std::move(*temp_rc_config_);
-    temp_rc_config_.reset();
 
-    // Get the scope from thread local registry, fallback to context scope
-    Stats::Scope* scope_ptr = &context_->scope();
-    auto* tls_registry = getLocalRegistry();
-    if (tls_registry) {
-      scope_ptr = &tls_registry->scope();
-    }
-
-    // Create ReverseConnectionIOHandle with cluster manager from context and scope
-    return std::make_unique<ReverseConnectionIOHandle>(sock_fd, config, context_->clusterManager(),
-                                                       *this, *scope_ptr);
-  }
-  // For all other socket types, we create a default socket handle.
-  // We can't call SocketInterfaceImpl directly since we don't inherit from it
-  // So we'll create a basic IoSocketHandleImpl for now.
+  // This method is called without reverse connection config, so create a regular socket
   int domain;
   if (addr_type == Envoy::Network::Address::Type::Ip) {
     domain = (version == Envoy::Network::Address::IpVersion::v4) ? AF_INET : AF_INET6;
@@ -1301,16 +1343,55 @@ Envoy::Network::IoHandlePtr DownstreamReverseSocketInterface::socket(
   return std::make_unique<Envoy::Network::IoSocketHandleImpl>(sock_fd);
 }
 
-Envoy::Network::IoHandlePtr DownstreamReverseSocketInterface::socket(
-    Envoy::Network::Socket::Type socket_type,
-    const Envoy::Network::Address::InstanceConstSharedPtr addr,
-    const Envoy::Network::SocketCreationOptions& options) const {
+/**
+ * Thread-safe helper method to create reverse connection socket with config.
+ */
+Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocket(
+    Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
+    Envoy::Network::Address::IpVersion version, const ReverseConnectionSocketConfig& config) const {
+
+  ENVOY_LOG(debug, "Creating reverse connection socket for cluster: {}",
+            config.remote_clusters.empty() ? "unknown" : config.remote_clusters[0].cluster_name);
+
+  // For stream sockets on IP addresses, create our reverse connection IOHandle.
+  if (socket_type == Envoy::Network::Socket::Type::Stream &&
+      addr_type == Envoy::Network::Address::Type::Ip) {
+    // Create socket file descriptor using system calls.
+    int domain = (version == Envoy::Network::Address::IpVersion::v4) ? AF_INET : AF_INET6;
+    int sock_fd = ::socket(domain, SOCK_STREAM, 0);
+    if (sock_fd == -1) {
+      ENVOY_LOG(error, "Failed to create socket: {}", strerror(errno));
+      return nullptr;
+    }
+
+    ENVOY_LOG(debug, "Created socket fd={}, wrapping with ReverseConnectionIOHandle", sock_fd);
+
+    // Get the scope from thread local registry, fallback to context scope
+    Stats::Scope* scope_ptr = &context_->scope();
+    auto* tls_registry = getLocalRegistry();
+    if (tls_registry) {
+      scope_ptr = &tls_registry->scope();
+    }
+
+    // Create ReverseConnectionIOHandle with cluster manager from context and scope
+    return std::make_unique<ReverseConnectionIOHandle>(sock_fd, config, context_->clusterManager(),
+                                                       *this, *scope_ptr);
+  }
+
+  // Fall back to regular socket for non-stream or non-IP sockets
+  return socket(socket_type, addr_type, version, false, Envoy::Network::SocketCreationOptions{});
+}
+
+Envoy::Network::IoHandlePtr
+ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
+                               const Envoy::Network::Address::InstanceConstSharedPtr addr,
+                               const Envoy::Network::SocketCreationOptions& options) const {
 
   // Extract reverse connection configuration from address
   const auto* reverse_addr = dynamic_cast<const ReverseConnectionAddress*>(addr.get());
   if (reverse_addr) {
     // Get the reverse connection config from the address
-    ENVOY_LOG(debug, "DownstreamReverseSocketInterface::socket() - reverse_addr: {}",
+    ENVOY_LOG(debug, "ReverseTunnelInitiator::socket() - reverse_addr: {}",
               reverse_addr->asString());
     const auto& config = reverse_addr->reverseConnectionConfig();
 
@@ -1324,40 +1405,52 @@ Envoy::Network::IoHandlePtr DownstreamReverseSocketInterface::socket(
     RemoteClusterConnectionConfig cluster_config(config.remote_cluster, config.connection_count);
     socket_config.remote_clusters.push_back(cluster_config);
 
-    // HACK: Store the reverse connection socket config temporarility for socket() to consume
-    // TODO(Basu): Find a cleaner way to do this.
-    temp_rc_config_ = std::make_unique<ReverseConnectionSocketConfig>(std::move(socket_config));
+    // Thread-safe: Pass config directly to helper method
+    return createReverseConnectionSocket(
+        socket_type, addr->type(),
+        addr->ip() ? addr->ip()->version() : Envoy::Network::Address::IpVersion::v4, socket_config);
   }
-  // Delegate to the other socket() method
+
+  // Delegate to the other socket() method for non-reverse-connection addresses
   return socket(socket_type, addr->type(),
                 addr->ip() ? addr->ip()->version() : Envoy::Network::Address::IpVersion::v4, false,
                 options);
 }
 
-bool DownstreamReverseSocketInterface::ipFamilySupported(int domain) {
+bool ReverseTunnelInitiator::ipFamilySupported(int domain) {
   return domain == AF_INET || domain == AF_INET6;
 }
 
-Server::BootstrapExtensionPtr DownstreamReverseSocketInterface::createBootstrapExtension(
+Server::BootstrapExtensionPtr ReverseTunnelInitiator::createBootstrapExtension(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
-  ENVOY_LOG(debug, "DownstreamReverseSocketInterface::createBootstrapExtension()");
+  ENVOY_LOG(debug, "ReverseTunnelInitiator::createBootstrapExtension()");
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
           DownstreamReverseConnectionSocketInterface&>(config, context.messageValidationVisitor());
   context_ = &context;
-  // Return a SocketInterfaceExtension that wraps this socket interface
-  return std::make_unique<DownstreamReverseSocketInterfaceExtension>(*this, context, message);
+  // Create the bootstrap extension and store reference to it
+  auto extension = std::make_unique<ReverseTunnelInitiatorExtension>(context, message);
+  extension_ = extension.get();
+  return extension;
 }
 
-ProtobufTypes::MessagePtr DownstreamReverseSocketInterface::createEmptyConfigProto() {
+ProtobufTypes::MessagePtr ReverseTunnelInitiator::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
                               DownstreamReverseConnectionSocketInterface>();
 }
 
-REGISTER_FACTORY(DownstreamReverseSocketInterface,
-                 Server::Configuration::BootstrapExtensionFactory);
+// ReverseTunnelInitiatorExtension constructor implementation
+ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
+    Server::Configuration::ServerFactoryContext& context,
+    const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+        DownstreamReverseConnectionSocketInterface& config)
+    : context_(context), config_(config) {
+  ENVOY_LOG(debug, "Created ReverseTunnelInitiatorExtension");
+}
 
-size_t DownstreamReverseSocketInterface::getConnectionCount(const std::string& target) const {
+REGISTER_FACTORY(ReverseTunnelInitiator, Server::Configuration::BootstrapExtensionFactory);
+
+size_t ReverseTunnelInitiator::getConnectionCount(const std::string& target) const {
   // For the downstream (initiator) side, we need to check the number of active connections
   // to a specific target cluster. This would typically involve checking the connection
   // wrappers in the ReverseConnectionIOHandle for each cluster.
@@ -1377,7 +1470,7 @@ size_t DownstreamReverseSocketInterface::getConnectionCount(const std::string& t
   return 0;
 }
 
-std::vector<std::string> DownstreamReverseSocketInterface::getEstablishedConnections() const {
+std::vector<std::string> ReverseTunnelInitiator::getEstablishedConnections() const {
   ENVOY_LOG(debug, "Getting list of established connections");
 
   // For the downstream (initiator) side, return the list of clusters we have

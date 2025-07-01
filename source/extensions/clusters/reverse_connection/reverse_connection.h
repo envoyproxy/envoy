@@ -74,22 +74,21 @@ public:
   absl::string_view addressType() const override { return "default"; }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
 
-  // Override socketInterface to use the UpstreamReverseSocketInterface
+  // Override socketInterface to use the ReverseTunnelAcceptor
   const Network::SocketInterface& socketInterface() const override {
     ENVOY_LOG(debug, "UpstreamReverseConnectionAddress: socketInterface() called for cluster: {}",
               cluster_id_);
     auto* upstream_interface = Network::socketInterface(
         "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
     if (upstream_interface) {
-      ENVOY_LOG(
-          debug,
-          "UpstreamReverseConnectionAddress: Using UpstreamReverseSocketInterface for cluster: {}",
-          cluster_id_);
+      ENVOY_LOG(debug,
+                "UpstreamReverseConnectionAddress: Using ReverseTunnelAcceptor for cluster: {}",
+                cluster_id_);
       return *upstream_interface;
     }
     // Fallback to default socket interface if upstream interface is not available
     ENVOY_LOG(debug,
-              "UpstreamReverseConnectionAddress: UpstreamReverseSocketInterface not available, "
+              "UpstreamReverseConnectionAddress: ReverseTunnelAcceptor not available, "
               "falling back to default for cluster: {}",
               cluster_id_);
     return *Network::socketInterface(

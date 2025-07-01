@@ -33,9 +33,9 @@ envoy_cc_extension(
 )
 
 envoy_cc_extension(
-    name = "downstream_reverse_socket_interface_lib",
-    srcs = ["downstream_reverse_socket_interface.cc"],
-    hdrs = ["downstream_reverse_socket_interface.h"],
+    name = "reverse_tunnel_initiator_lib",
+    srcs = ["reverse_tunnel_initiator.cc"],
+    hdrs = ["reverse_tunnel_initiator.h"],
     visibility = ["//visibility:public"],
     deps = [
         ":reverse_connection_address_lib",
@@ -56,6 +56,7 @@ envoy_cc_extension(
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf",
+        "//source/common/reverse_connection:reverse_connection_utility_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/reverse_conn/v3:pkg_cc_proto",
@@ -64,9 +65,9 @@ envoy_cc_extension(
 )
 
 envoy_cc_extension(
-    name = "upstream_reverse_socket_interface_lib",
-    srcs = ["upstream_reverse_socket_interface.cc"],
-    hdrs = ["upstream_reverse_socket_interface.h"],
+    name = "reverse_tunnel_acceptor_lib",
+    srcs = ["reverse_tunnel_acceptor.cc"],
+    hdrs = ["reverse_tunnel_acceptor.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/common:random_generator_interface",
@@ -84,6 +85,7 @@ envoy_cc_extension(
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/protobuf",
+        "//source/common/reverse_connection:reverse_connection_utility_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
     ],
     alwayslink = 1,

@@ -28,8 +28,8 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 // Forward declarations
-class UpstreamReverseSocketInterface;
-class UpstreamReverseSocketInterfaceExtension;
+class ReverseTunnelAcceptor;
+class ReverseTunnelAcceptorExtension;
 class UpstreamSocketManager;
 
 /**
@@ -51,17 +51,19 @@ struct USMStats {
 using USMStatsPtr = std::unique_ptr<USMStats>;
 
 /**
- * Custom IoHandle for upstream reverse connections that wrap over FDs from pre-established
- * TCP connections.
+ * Custom IoHandle for upstream reverse connections that properly owns a ConnectionSocket.
+ * This class uses RAII principles to manage socket lifetime without requiring external storage.
  */
 class UpstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
 public:
   /**
    * Constructor for UpstreamReverseConnectionIOHandle.
-   * @param fd the file descriptor for the reverse connection socket.
+   * Takes ownership of the socket and manages its lifetime properly.
+   * @param socket the reverse connection socket to own and manage.
    * @param cluster_name the name of the cluster this connection belongs to.
    */
-  UpstreamReverseConnectionIOHandle(os_fd_t fd, const std::string& cluster_name);
+  UpstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
+                                    const std::string& cluster_name);
 
   ~UpstreamReverseConnectionIOHandle() override;
 
@@ -77,30 +79,27 @@ public:
 
   /**
    * Override of close method for reverse connections.
-   * Cleans up the socket reference and calls the parent close method.
+   * Cleans up the owned socket and calls the parent close method.
    * @return IoCallUint64Result indicating the result of the close operation.
    */
   Api::IoCallUint64Result close() override;
 
   /**
-   * Add a socket to the used connections map to prevent it from going out of scope.
-   * This is necessary because the IOHandle is created with just the FD, and if the socket
-   * goes out of scope, the FD will be deallocated.
-   * @param fd the file descriptor of the socket.
-   * @param socket the socket to store.
+   * Get the owned socket. This should only be used for read-only operations.
+   * @return const reference to the owned socket.
    */
-  void addUsedSocket(int fd, Network::ConnectionSocketPtr socket);
+  const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
 
 private:
   // The name of the cluster this reverse connection belongs to.
   std::string cluster_name_;
-  // Map from file descriptor to socket object to prevent sockets from going out of scope.
-  // This prevents premature deallocation of the file descriptor.
-  std::unordered_map<int, Network::ConnectionSocketPtr> used_reverse_connections_;
+  // The socket that this IOHandle owns and manages lifetime for.
+  // This eliminates the need for external storage hacks.
+  Network::ConnectionSocketPtr owned_socket_;
 };
 
 /**
- * Thread local storage for UpstreamReverseSocketInterface.
+ * Thread local storage for ReverseTunnelAcceptor.
  * Stores the thread-local dispatcher and socket manager for each worker thread.
  */
 class UpstreamSocketThreadLocal : public ThreadLocal::ThreadLocalObject {
@@ -110,10 +109,12 @@ public:
    * Creates a new socket manager instance for the given dispatcher and scope.
    * @param dispatcher the thread-local dispatcher.
    * @param scope the stats scope for this thread's socket manager.
+   * @param extension the upstream extension for stats integration.
    */
-  UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher, Stats::Scope& scope)
+  UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher, Stats::Scope& scope,
+                            ReverseTunnelAcceptorExtension* extension = nullptr)
       : dispatcher_(dispatcher),
-        socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, scope)) {}
+        socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, scope, extension)) {}
 
   /**
    * @return reference to the thread-local dispatcher.
@@ -124,6 +125,7 @@ public:
    * @return pointer to the thread-local socket manager.
    */
   UpstreamSocketManager* socketManager() { return socket_manager_.get(); }
+  const UpstreamSocketManager* socketManager() const { return socket_manager_.get(); }
 
 private:
   // The thread-local dispatcher.
@@ -138,16 +140,15 @@ private:
  * functionality for upstream connections. It manages cached reverse TCP connections
  * and provides them when requested by an incoming request.
  */
-class UpstreamReverseSocketInterface
-    : public Envoy::Network::SocketInterfaceBase,
-      public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
+class ReverseTunnelAcceptor : public Envoy::Network::SocketInterfaceBase,
+                              public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
   /**
    * @param context the server factory context for this socket interface.
    */
-  UpstreamReverseSocketInterface(Server::Configuration::ServerFactoryContext& context);
+  ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context);
 
-  UpstreamReverseSocketInterface() : extension_(nullptr), context_(nullptr) {}
+  ReverseTunnelAcceptor() : extension_(nullptr), context_(nullptr) {}
 
   // SocketInterface overrides
   /**
@@ -209,7 +210,12 @@ public:
     return "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface";
   }
 
-  UpstreamReverseSocketInterfaceExtension* extension_{nullptr};
+  /**
+   * @return pointer to the extension for accessing cross-thread aggregation functionality.
+   */
+  ReverseTunnelAcceptorExtension* getExtension() const { return extension_; }
+
+  ReverseTunnelAcceptorExtension* extension_{nullptr};
 
 private:
   Server::Configuration::ServerFactoryContext* context_;
@@ -220,7 +226,7 @@ private:
  * This class extends SocketInterfaceExtension and initializes the upstream reverse socket
  * interface.
  */
-class UpstreamReverseSocketInterfaceExtension
+class ReverseTunnelAcceptorExtension
     : public Envoy::Network::SocketInterfaceExtension,
       public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
@@ -229,15 +235,15 @@ public:
    * @param context the server factory context.
    * @param config the configuration for this extension.
    */
-  UpstreamReverseSocketInterfaceExtension(
+  ReverseTunnelAcceptorExtension(
       Envoy::Network::SocketInterface& sock_interface,
       Server::Configuration::ServerFactoryContext& context,
       const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
           UpstreamReverseConnectionSocketInterface& config)
       : Envoy::Network::SocketInterfaceExtension(sock_interface), context_(context),
-        socket_interface_(static_cast<UpstreamReverseSocketInterface*>(&sock_interface)) {
+        socket_interface_(static_cast<ReverseTunnelAcceptor*>(&sock_interface)) {
     ENVOY_LOG(debug,
-              "UpstreamReverseSocketInterfaceExtension: creating upstream reverse connection "
+              "ReverseTunnelAcceptorExtension: creating upstream reverse connection "
               "socket interface with stat_prefix: {}",
               stat_prefix_);
     stat_prefix_ =
@@ -266,12 +272,76 @@ public:
    */
   const std::string& statPrefix() const { return stat_prefix_; }
 
+  /**
+   * Aggregate connection statistics from all worker threads.
+   * @return map of node_id to total connection count across all threads.
+   */
+  absl::flat_hash_map<std::string, size_t> getAggregatedConnectionStats();
+
+  /**
+   * Aggregate socket count statistics from all worker threads.
+   * @return map of cluster_id to total socket count across all threads.
+   */
+  absl::flat_hash_map<std::string, size_t> getAggregatedSocketCountMap();
+
+  /**
+   * Production-ready cross-thread connection aggregation for multi-tenant reporting.
+   * Uses Envoy's runOnAllThreads pattern to safely collect data from all worker threads.
+   * @param callback function called with aggregated results when collection completes
+   */
+  void
+  getMultiTenantConnectionStats(std::function<void(const absl::flat_hash_map<std::string, size_t>&,
+                                                   const std::vector<std::string>&)>
+                                    callback);
+
+  /**
+   * Synchronous version for admin API endpoints that require immediate response.
+   * Uses blocking aggregation with timeout for production reliability.
+   * @param timeout_ms maximum time to wait for aggregation completion
+   * @return pair of <connected_nodes, accepted_connections> or empty if timeout
+   */
+  std::pair<std::vector<std::string>, std::vector<std::string>>
+  getConnectionStatsSync(std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(5000));
+
+  /**
+   * Production-ready multi-tenant connection tracking using Envoy's stats system.
+   * This integrates with Envoy's proven cross-thread stats aggregation infrastructure.
+   * @return map of connection statistics across all worker threads
+   */
+  absl::flat_hash_map<std::string, uint64_t> getMultiTenantConnectionStatsViaStats();
+
+  /**
+   * Register connection stats with Envoy's stats system for automatic cross-thread aggregation.
+   * This ensures consistent reporting across all threads without manual thread coordination.
+   * @param node_id the node identifier for the connection
+   * @param cluster_id the cluster identifier for the connection
+   * @param increment whether to increment (true) or decrement (false) the connection count
+   */
+  void updateConnectionStatsRegistry(const std::string& node_id, const std::string& cluster_id,
+                                     bool increment);
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   // Thread-local slot for storing the socket manager per worker thread.
   std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> tls_slot_;
-  UpstreamReverseSocketInterface* socket_interface_;
+  ReverseTunnelAcceptor* socket_interface_;
   std::string stat_prefix_;
+
+  /**
+   * Internal helper for cross-thread data aggregation.
+   * Follows Envoy's thread-safe aggregation patterns.
+   */
+  struct ConnectionAggregationState {
+    absl::flat_hash_map<std::string, size_t> connection_stats;
+    std::vector<std::string> connected_nodes;
+    std::vector<std::string> accepted_connections;
+    std::atomic<uint32_t> pending_threads{0};
+    std::function<void(const absl::flat_hash_map<std::string, size_t>&,
+                       const std::vector<std::string>&)>
+        completion_callback;
+    absl::Mutex mutex;
+    bool completed{false};
+  };
 };
 
 /**
@@ -281,9 +351,10 @@ private:
 class UpstreamSocketManager : public ThreadLocal::ThreadLocalObject,
                               public Logger::Loggable<Logger::Id::filter> {
 public:
-  UpstreamSocketManager(Event::Dispatcher& dispatcher, Stats::Scope& scope);
+  UpstreamSocketManager(Event::Dispatcher& dispatcher, Stats::Scope& scope,
+                        ReverseTunnelAcceptorExtension* extension = nullptr);
 
-  static const std::string ping_message;
+  // RPING message now handled by ReverseConnectionUtility
 
   /** Add the accepted connection and remote cluster mapping to UpstreamSocketManager maps.
    * @param node_id node_id of initiating node.
@@ -318,11 +389,13 @@ public:
    * @return the cluster -> reverse conn count mapping.
    */
   absl::flat_hash_map<std::string, size_t> getSocketCountMap();
+  absl::flat_hash_map<std::string, size_t> getSocketCountMap() const;
 
   /**
    * @return the node -> reverse conn count mapping.
    */
   absl::flat_hash_map<std::string, size_t> getConnectionStats();
+  absl::flat_hash_map<std::string, size_t> getConnectionStats() const;
 
   /** Mark the connection socket dead and remove it from internal maps.
    * @param fd the FD for the socket to be marked dead.
@@ -384,6 +457,12 @@ public:
    */
   bool deleteStatsByCluster(const std::string& cluster_id);
 
+  /**
+   * Get the upstream extension for stats integration.
+   * @return pointer to the upstream extension or nullptr if not available.
+   */
+  ReverseTunnelAcceptorExtension* getUpstreamExtension() const { return extension_; }
+
 private:
   // Pointer to the thread local Dispatcher instance.
   Event::Dispatcher& dispatcher_;
@@ -418,9 +497,12 @@ private:
   Stats::ScopeSharedPtr usm_scope_;
   Event::TimerPtr ping_timer_;
   std::chrono::seconds ping_interval_{0};
+
+  // Pointer to the upstream extension for stats integration
+  ReverseTunnelAcceptorExtension* extension_;
 };
 
-DECLARE_FACTORY(UpstreamReverseSocketInterface);
+DECLARE_FACTORY(ReverseTunnelAcceptor);
 
 } // namespace ReverseConnection
 } // namespace Bootstrap
