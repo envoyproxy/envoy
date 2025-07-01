@@ -51,8 +51,6 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           http3_protocol_options:
             allow_extended_connect: true
-          upgrade_configs:
-          - upgrade_type: CONNECT-UDP
   clusters:
   - name: service_google
     type: LOGICAL_DNS

@@ -126,7 +126,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 23]
+// [#next-free-field: 26]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -145,6 +145,14 @@ message OAuth2Config {
 
   // The endpoint redirect to for authorization in response to unauthorized requests.
   string authorization_endpoint = 2 [(validate.rules).string = {min_len: 1}];
+
+  // The endpoint at the authorization server to request the user be logged out of the Authorization server.
+  // This field is optional and should be set only if openid is in the auth_scopes and the authorization server
+  // supports the OpenID Connect RP-Initiated Logout specification.
+  // For more information, see https://openid.net/specs/openid-connect-rpinitiated-1_0.html
+  //
+  // If configured, the OAuth2 filter will redirect users to this endpoint when they access the signout_path.
+  string end_session_endpoint = 23;
 
   // Credentials used for OAuth.
   OAuth2Credentials credentials = 3 [(validate.rules).message = {required: true}];
@@ -234,6 +242,18 @@ message OAuth2Config {
 
   // Optional additional prefix to use when emitting statistics.
   string stat_prefix = 22;
+
+  // Optional expiration time for the CSRF protection token cookie.
+  // The CSRF token prevents cross-site request forgery attacks during the OAuth2 flow.
+  // If not specified, defaults to ``600s`` (10 minutes), which should provide sufficient time
+  // for users to complete the OAuth2 authorization flow.
+  google.protobuf.Duration csrf_token_expires_in = 24;
+
+  // Optional expiration time for the code verifier cookie.
+  // The code verifier is stored in a secure, HTTP-only cookie during the OAuth2 authorization process.
+  // If not specified, defaults to ``600s`` (10 minutes), which should provide sufficient time
+  // for users to complete the OAuth2 authorization flow.
+  google.protobuf.Duration code_verifier_token_expires_in = 25;
 }
 
 // Filter config.

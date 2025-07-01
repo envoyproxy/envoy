@@ -312,7 +312,11 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
                              config.overrides().grpc_initial_metadata().end()),
       untyped_forwarding_namespaces_(initUntypedForwardingNamespaces(config)),
       typed_forwarding_namespaces_(initTypedForwardingNamespaces(config)),
-      untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)) {}
+      untyped_receiving_namespaces_(initUntypedReceivingNamespaces(config)),
+      failure_mode_allow_(
+          config.overrides().has_failure_mode_allow()
+              ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
+              : absl::nullopt) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
@@ -329,7 +333,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
                                        : less_specific.typedForwardingMetadataNamespaces()),
       untyped_receiving_namespaces_(more_specific.untypedReceivingMetadataNamespaces().has_value()
                                         ? more_specific.untypedReceivingMetadataNamespaces()
-                                        : less_specific.untypedReceivingMetadataNamespaces()) {}
+                                        : less_specific.untypedReceivingMetadataNamespaces()),
+      failure_mode_allow_(more_specific.failureModeAllow().has_value()
+                              ? more_specific.failureModeAllow()
+                              : less_specific.failureModeAllow()) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -374,7 +381,7 @@ void Filter::onError() {
     return;
   }
 
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // The user would like a none-200-ok response to not cause message processing to fail.
     // Close the external processing.
     processing_complete_ = true;
@@ -775,8 +782,8 @@ void Filter::encodeProtocolConfig(ProcessingRequest& req) {
   ENVOY_STREAM_LOG(debug, "Trying to encode filter protocol configurations", *decoder_callbacks_);
   if (!protocol_config_encoded_ && !config_->observabilityMode()) {
     auto* protocol_config = req.mutable_protocol_config();
-    protocol_config->set_request_body_mode(config_->processingMode().request_body_mode());
-    protocol_config->set_response_body_mode(config_->processingMode().response_body_mode());
+    protocol_config->set_request_body_mode(decoding_state_.bodyMode());
+    protocol_config->set_response_body_mode(encoding_state_.bodyMode());
     protocol_config->set_send_body_without_waiting_for_header_response(
         config_->sendBodyWithoutWaitingForHeaderResponse());
     protocol_config_encoded_ = true;
@@ -1257,6 +1264,19 @@ void Filter::setDecoderDynamicMetadata(const ProcessingResponse& response) {
   setDynamicMetadata(decoder_callbacks_, decoding_state_, response);
 }
 
+// If an error response is received, sends an immediate response with an error message.
+void Filter::handleErrorResponse(absl::Status processing_status) {
+  ENVOY_STREAM_LOG(debug, "Sending immediate response: {}", *decoder_callbacks_,
+                   processing_status.message());
+  processing_complete_ = true;
+  onFinishProcessorCalls(processing_status.raw_code());
+  closeStream();
+  ImmediateResponse invalid_mutation_response;
+  invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
+  invalid_mutation_response.set_details(std::string(processing_status.message()));
+  sendImmediateResponse(invalid_mutation_response);
+}
+
 namespace {
 
 // DEFAULT header modes in a ProcessingResponse mode_override have no effect (they are considered
@@ -1417,27 +1437,27 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     // Processing code uses this specific error code in the case that a
     // message was received out of order.
     stats_.spurious_msgs_received_.inc();
-    // When a message is received out of order, ignore it and also
-    // ignore the stream for the rest of this filter instance's lifetime
-    // to protect us from a malformed server.
     ENVOY_STREAM_LOG(warn, "Spurious response message {} received on gRPC stream",
                      *decoder_callbacks_, static_cast<int>(response->response_case()));
-    closeStream();
-    clearAsyncState();
-    processing_complete_ = true;
+    if (config_->failureModeAllow() ||
+        !Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.ext_proc_fail_close_spurious_resp")) {
+      // When a message is received out of order,and fail open is configured,
+      // ignore it and also ignore the stream for the rest of this filter
+      // instance's lifetime to protect us from a malformed server.
+      stats_.failure_mode_allowed_.inc();
+      closeStream();
+      clearAsyncState();
+      processing_complete_ = true;
+    } else {
+      // Send an immediate response if fail close is configured.
+      handleErrorResponse(processing_status);
+    }
   } else {
     // Any other error results in an immediate response with an error message.
     // This could happen, for example, after a header mutation is rejected.
-    ENVOY_STREAM_LOG(debug, "Sending immediate response: {}", *decoder_callbacks_,
-                     processing_status.message());
     stats_.stream_msgs_received_.inc();
-    processing_complete_ = true;
-    onFinishProcessorCalls(processing_status.raw_code());
-    closeStream();
-    ImmediateResponse invalid_mutation_response;
-    invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
-    invalid_mutation_response.set_details(std::string(processing_status.message()));
-    sendImmediateResponse(invalid_mutation_response);
+    handleErrorResponse(processing_status);
   }
 }
 
@@ -1449,7 +1469,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     return;
   }
 
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // Ignore this and treat as a successful close
     onGrpcClose();
     stats_.failure_mode_allowed_.inc();
@@ -1483,7 +1503,7 @@ void Filter::onMessageTimeout() {
   ENVOY_STREAM_LOG(debug, "message timeout reached", *decoder_callbacks_);
   logStreamInfo();
   stats_.message_timeouts_.inc();
-  if (config_->failureModeAllow()) {
+  if (failure_mode_allow_) {
     // The user would like a timeout to not cause message processing to fail.
     // However, we don't know if the external processor will send a response later,
     // and we can't wait any more. So, as we do for a spurious message, ignore
@@ -1642,6 +1662,12 @@ void Filter::mergePerRouteConfig() {
         *decoder_callbacks_);
     decoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
     encoding_state_.setUntypedReceivingMetadataNamespaces(untyped_receiving_namespaces_);
+  }
+
+  if (merged_config->failureModeAllow().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting new failureModeAllow from per-route configuration",
+                     *decoder_callbacks_);
+    failure_mode_allow_ = merged_config->failureModeAllow().value();
   }
 }
 

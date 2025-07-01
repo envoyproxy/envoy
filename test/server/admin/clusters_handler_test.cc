@@ -248,7 +248,7 @@ fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
 TEST_P(AdminInstanceTest, TestSetHealthFlag) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Event::MockDispatcher dispatcher;
-  auto host = Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource());
+  auto host = Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000");
   envoy::admin::v3::HostHealthStatus health_status;
 
   // FAILED_ACTIVE_HC
