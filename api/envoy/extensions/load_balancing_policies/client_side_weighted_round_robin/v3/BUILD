@@ -8,5 +8,5 @@ api_proto_package(
     deps = [
         "//envoy/extensions/load_balancing_policies/common/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
-    ]
+    ],
 )
