@@ -22,6 +22,8 @@ build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
 build --java_runtime_version=remotejdk_11
 build --tool_java_runtime_version=remotejdk_11
+build --java_language_version=11
+build --tool_java_language_version=11
 build --platform_mappings=bazel/platform_mappings
 # silence absl logspam.
 build --copt=-DABSL_MIN_LOG_LEVEL=4

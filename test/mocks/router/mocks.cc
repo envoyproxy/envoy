@@ -217,7 +217,7 @@ MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
 }
 
 MockClusterSpecifierPlugin::MockClusterSpecifierPlugin() {
-  ON_CALL(*this, route(_, _, _)).WillByDefault(Return(nullptr));
+  ON_CALL(*this, route(_, _, _, _)).WillByDefault(Return(nullptr));
 }
 
 MockClusterSpecifierPluginFactoryConfig::MockClusterSpecifierPluginFactoryConfig() {

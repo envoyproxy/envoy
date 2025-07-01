@@ -4,6 +4,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/lua/lua.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -13,7 +15,7 @@ namespace Lua {
 namespace {
 
 // Helper function to push string to Lua stack
-inline void pushLuaString(lua_State* state, const std::string& str) {
+inline void pushLuaString(lua_State* state, absl::string_view str) {
   lua_pushlstring(state, str.data(), str.size());
 }
 
@@ -260,13 +262,13 @@ int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
   const ProtobufWkt::Any& any_message = it->second;
 
   // Extract the type name from the type URL
-  const std::string& type_url = any_message.type_url();
+  absl::string_view type_url = any_message.type_url();
   const size_t pos = type_url.find_last_of('/');
   if (pos == std::string::npos || pos >= type_url.length() - 1) {
     lua_pushnil(state);
     return 1;
   }
-  const absl::string_view type_name = absl::string_view(type_url).substr(pos + 1);
+  const absl::string_view type_name = type_url.substr(pos + 1);
 
   // Get the descriptor pool to find the message type
   const auto* descriptor =

@@ -117,6 +117,7 @@ paths:
     - source/common/json/json_internal.cc
     - source/common/router/scoped_rds.cc
     - source/common/router/config_impl.cc
+    - source/common/router/weighted_cluster_specifier.cc
     - source/common/router/scoped_config_impl.cc
     - source/common/common/utility.cc
     - source/exe/stripped_main_base.cc

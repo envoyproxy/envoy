@@ -5672,8 +5672,9 @@ TEST_P(ExtProcIntegrationTest, DuplexStreamedInBothDirection) {
   verifyDownstreamResponse(*response, 200);
 }
 
-// The ext_proc server sends out-of-order response causing Envoy to shutdown the external
-// processing.
+// With FULL_DUPLEX_STREAMED mode configured, failure_mode_allow can only be false.
+// If the ext_proc server sends out-of-order response, it causes Envoy to send
+// local reply to the client, and reset the HTTP stream.
 TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
   const std::string body_sent(8 * 1024, 's');
   // Enable FULL_DUPLEX_STREAMED body processing in both directions.
@@ -5683,20 +5684,11 @@ TEST_P(ExtProcIntegrationTest, ServerSendOutOfOrderResponseDuplexStreamed) {
   ProcessingRequest header_request;
   serverReceiveHeaderDuplexStreamed(header_request);
   uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
-
-  // The ext_proc server should send header response, but it sends back the body response,
-  // which is out-of-order. This cause Envoy to shut down the external processing, and
-  // send the buffered HTTP request headers to the upstream.
+  // The ext_proc server sends back the body response, which is wrong.
   processor_stream_->startGrpcStream();
   serverSendBodyRespDuplexStreamed(total_req_body_msg);
-
-  // The backend server processes the request and sends back a 400 response.
-  handleUpstreamRequest(false, 400);
-  // The body received by upstream server is expected to be empty.
-  EXPECT_EQ(upstream_request_->body().toString(), "");
-  // As the external processing is shut down, the response messages are not sent
-  // to the ext_proc server. Instead it is sent to the downstream directly.
-  verifyDownstreamResponse(*response, 400);
+  // Envoy sends 500 response code to the client.
+  verifyDownstreamResponse(*response, 500);
 }
 
 // The ext_proc server failed to send response in time trigger Envoy HCM stream_idle_timeout.
@@ -5719,6 +5711,35 @@ TEST_P(ExtProcIntegrationTest, ServerWaitTooLongBeforeSendRespDuplexStreamed) {
   // HCM stream_idle_timeout is triggered, and local reply is sent to downstream.
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(12000));
   verifyDownstreamResponse(*response, 504);
+}
+
+// Testing the case that when the client does not send trailers, if the ext_proc server sends
+// back a synthesized trailer, it is ignored by Envoy and never reaches the upstream server.
+TEST_P(ExtProcIntegrationTest, DuplexStreamedServerResponseWithSynthesizedTrailer) {
+  const std::string body_sent(64 * 1024, 's');
+  IntegrationStreamDecoderPtr response = initAndSendDataDuplexStreamedMode(body_sent, true);
+
+  // The ext_proc server receives the headers.
+  ProcessingRequest header_request;
+  serverReceiveHeaderDuplexStreamed(header_request);
+  // The ext_proc server receives the body.
+  uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
+
+  // The ext_proc server sends back the header response.
+  serverSendHeaderRespDuplexStreamed();
+  // The ext_proc server sends back the body response.
+  uint32_t total_resp_body_msg = 2 * total_req_body_msg;
+  const std::string body_upstream(total_resp_body_msg, 'r');
+  // The end_of_stream of the last body response is false.
+  serverSendBodyRespDuplexStreamed(total_resp_body_msg, false, false);
+  // The ext_proc server sends back a synthesized trailer response.
+  serverSendTrailerRespDuplexStreamed();
+
+  handleUpstreamRequest();
+  EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+  EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+  EXPECT_EQ(upstream_request_->trailers(), nullptr);
+  verifyDownstreamResponse(*response, 200);
 }
 
 TEST_P(ExtProcIntegrationTest, ModeOverrideAllowed) {

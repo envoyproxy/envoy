@@ -4,6 +4,7 @@
 
 #include "source/common/common/thread.h"
 #include "source/common/config/subscription_factory_impl.h"
+#include "source/common/config/xds_resource.h"
 
 namespace Envoy {
 namespace Config {
@@ -22,6 +23,10 @@ public:
                           Upstream::ClusterManager* cm) override;
   absl::Status
   initializeAdsConnections(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) override;
+  absl::StatusOr<SubscriptionPtr> subscribeToSingletonResource(
+      absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
+      absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
   void shutdown() override { ads_mux_.reset(); }
   absl::Status
   setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) override;
@@ -32,10 +37,12 @@ public:
 private:
   class AuthorityData {
   public:
-    AuthorityData(absl::flat_hash_set<std::string>&& authority_names, GrpcMuxSharedPtr&& grpc_mux)
-        : authority_names_(std::move(authority_names)), grpc_mux_(std::move(grpc_mux)) {}
+    AuthorityData(const envoy::config::core::v3::ConfigSource& config,
+                  absl::flat_hash_set<std::string>&& authority_names, GrpcMuxSharedPtr&& grpc_mux)
+        : config_(config), authority_names_(std::move(authority_names)),
+          grpc_mux_(std::move(grpc_mux)) {}
 
-  private:
+    const envoy::config::core::v3::ConfigSource config_;
     // The set of authority names this config-source supports.
     // Note that only the `default_config_source` may have an empty list of authority names.
     absl::flat_hash_set<std::string> authority_names_;

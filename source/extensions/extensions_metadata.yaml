@@ -219,7 +219,7 @@ envoy.filters.http.aws_lambda:
   - envoy.filters.http
   - envoy.filters.http.upstream
   security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
+  status: stable
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_lambda.v3.Config
@@ -229,7 +229,7 @@ envoy.filters.http.aws_request_signing:
   - envoy.filters.http
   - envoy.filters.http.upstream
   security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
+  status: stable
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning
@@ -1700,6 +1700,14 @@ envoy.matching.inputs.subject:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.ssl.v3.SubjectInput
+envoy.matching.custom_matchers.domain_matcher:
+  categories:
+  - envoy.matching.http.custom_matchers
+  - envoy.matching.network.custom_matchers
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - xds.type.matcher.v3.ServerNameMatcher
 envoy.matching.custom_matchers.trie_matcher:
   categories:
   - envoy.matching.http.custom_matchers
