@@ -1685,8 +1685,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
     }
   }
 
-  filter_manager_.streamInfo().vhost_ = std::move(route_result.vhost);
-  setRoute(std::move(route_result.route));
+  setVHostRoute(std::move(route_result));
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
@@ -2104,6 +2103,15 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
   return cached_route_.value();
 }
 
+void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
+  Router::VHostRoute vhost_route;
+  if (route != nullptr) {
+    vhost_route.vhost = route->virtualHost();
+    vhost_route.route = std::move(route);
+  }
+  setVHostRoute(std::move(vhost_route));
+}
+
 /**
  * Sets the cached route to the RouteConstSharedPtr argument passed in. Handles setting the
  * cached_route_/cached_cluster_info_ ActiveStream attributes, the FilterManager streamInfo, tracing
@@ -2112,14 +2120,14 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
  * Declared as a StreamFilterCallbacks member function for filters to call directly, but also
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
-void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
+void ConnectionManagerImpl::ActiveStream::setVHostRoute(Router::VHostRoute vhost_route) {
   // If the cached route is blocked then any attempt to clear it or refresh it
   // will be ignored.
-  // setRoute() may be called directly by the interface of DownstreamStreamFilterCallbacks,
-  // so check for routeCacheBlocked() here again.
   if (routeCacheBlocked()) {
     return;
   }
+
+  Router::RouteConstSharedPtr route = std::move(vhost_route.route);
 
   // Update the cached route.
   setCachedRoute({route});
@@ -2132,8 +2140,10 @@ void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr r
     cached_cluster_info_ = (nullptr == cluster) ? nullptr : cluster->info();
   }
 
-  // Update route and cluster info in the filter manager's stream info.
-  filter_manager_.streamInfo().route_ = std::move(route); // Now can move route here safely.
+  // Update route, vhost and cluster info in the filter manager's stream info.
+  // Now can move route here safely.
+  filter_manager_.streamInfo().route_ = std::move(route);
+  filter_manager_.streamInfo().vhost_ = std::move(vhost_route.vhost);
   filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
 
   refreshCachedTracingCustomTags();

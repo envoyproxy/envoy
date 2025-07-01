@@ -172,12 +172,12 @@ protected:
   }
 
   std::string virtualHostName(const Route* route) {
-    Stats::StatName name = route->virtualHost().statName();
+    Stats::StatName name = route->virtualHost()->statName();
     return factory_context_.scope().symbolTable().toString(name);
   }
 
   std::string virtualClusterName(const Route* route, Http::TestRequestHeaderMapImpl& headers) {
-    Stats::StatName name = route->virtualHost().virtualCluster(headers)->statName();
+    Stats::StatName name = route->virtualHost()->virtualCluster(headers)->statName();
     return factory_context_.scope().symbolTable().toString(name);
   }
 
@@ -3557,9 +3557,9 @@ virtual_hosts:
     route->routeEntry()->rateLimitPolicy();
     route->routeEntry()->retryPolicy();
     route->routeEntry()->shadowPolicies();
-    route->virtualHost().virtualCluster(headers);
+    route->virtualHost()->virtualCluster(headers);
     route->virtualHost();
-    route->virtualHost().rateLimitPolicy();
+    route->virtualHost()->rateLimitPolicy();
     route->routeEntry()->pathMatchCriterion();
     route->routeEntry()->hedgePolicy();
     route->routeEntry()->maxGrpcTimeout();
@@ -4199,7 +4199,7 @@ virtual_hosts:
 
   EXPECT_TRUE(config.route(genHeaders("www.example.com", "/foo", "GET"), 0)
                   ->virtualHost()
-                  .includeIsTimeoutRetryHeader());
+                  ->includeIsTimeoutRetryHeader());
 }
 
 TEST_F(RouteMatcherTest, NoIsTimeoutRetryHeader) {
@@ -4219,7 +4219,7 @@ virtual_hosts:
 
   EXPECT_FALSE(config.route(genHeaders("www.example.com", "/foo", "GET"), 0)
                    ->virtualHost()
-                   .includeIsTimeoutRetryHeader());
+                   ->includeIsTimeoutRetryHeader());
 }
 
 TEST_F(RouteMatcherTest, ClusterNotFoundResponseCode) {
@@ -7223,7 +7223,7 @@ virtual_hosts:
                         creation_status_);
 
   const Router::CorsPolicy* cors_policy =
-      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->virtualHost().corsPolicy();
+      config.route(genHeaders("api.lyft.com", "/api", "GET"), 0)->virtualHost()->corsPolicy();
 
   EXPECT_EQ(cors_policy->enabled(), false);
   EXPECT_EQ(cors_policy->shadowEnabled(), true);
@@ -7923,12 +7923,12 @@ virtual_hosts:
   EXPECT_NE(nullptr, typed_metadata.get<Baz>(baz_factory.name()));
   EXPECT_EQ("bluh", typed_metadata.get<Baz>(baz_factory.name())->name);
 
-  EXPECT_EQ("bar", symbol_table_->toString(route->virtualHost().statName()));
-  EXPECT_EQ("foo", route->virtualHost().routeConfig().name());
+  EXPECT_EQ("bar", symbol_table_->toString(route->virtualHost()->statName()));
+  EXPECT_EQ("foo", route->virtualHost()->routeConfig().name());
 
   // Get metadata of virtual host.
-  const auto& vh_metadata = route->virtualHost().metadata();
-  const auto& vh_typed_metadata = route->virtualHost().typedMetadata();
+  const auto& vh_metadata = route->virtualHost()->metadata();
+  const auto& vh_typed_metadata = route->virtualHost()->typedMetadata();
 
   EXPECT_EQ(
       "test_vh_value",
@@ -7937,8 +7937,8 @@ virtual_hosts:
   EXPECT_EQ("vh_bluh", vh_typed_metadata.get<Baz>(baz_factory.name())->name);
 
   // Get metadata of route configuration.
-  const auto& config_metadata = route->virtualHost().routeConfig().metadata();
-  const auto& config_typed_metadata = route->virtualHost().routeConfig().typedMetadata();
+  const auto& config_metadata = route->virtualHost()->routeConfig().metadata();
+  const auto& config_typed_metadata = route->virtualHost()->routeConfig().typedMetadata();
 
   EXPECT_EQ("test_config_value",
             Envoy::Config::Metadata::metadataValue(&config_metadata, "com.bar.foo", "baz")
@@ -11600,7 +11600,7 @@ virtual_hosts:
                         creation_status_);
 
   const auto& shared_config = dynamic_cast<const CommonConfigImpl&>(
-      config.route(genHeaders("bat.com", "/", "GET"), 0)->virtualHost().routeConfig());
+      config.route(genHeaders("bat.com", "/", "GET"), 0)->virtualHost()->routeConfig());
 
   EXPECT_EQ(config.mostSpecificHeaderMutationsWins(),
             shared_config.mostSpecificHeaderMutationsWins());

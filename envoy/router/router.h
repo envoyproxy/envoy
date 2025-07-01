@@ -1268,9 +1268,11 @@ public:
   virtual const std::string& routeName() const PURE;
 
   /**
-   * @return const VirtualHost& the virtual host that owns the route.
+   * @return const VHostConstSharedPtr& the virtual host that owns the route.
+   *
+   * NOTE: This MUST not be null.
    */
-  virtual const VirtualHost& virtualHost() const PURE;
+  virtual const VHostConstSharedPtr& virtualHost() const PURE;
 };
 
 using RouteConstSharedPtr = std::shared_ptr<const Route>;

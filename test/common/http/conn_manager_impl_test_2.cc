@@ -1444,9 +1444,8 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->route());
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
 
-        // TODO(wbpcode): the setRoute() could not be used to update virtual host for now.
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().route());
-        EXPECT_EQ(route1->virtual_host_, decoder_filters_[1]->callbacks_->streamInfo().vhost());
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().vhost());
 
         return FilterHeadersStatus::StopIteration;
       }));

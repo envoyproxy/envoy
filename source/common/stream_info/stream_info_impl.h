@@ -299,12 +299,7 @@ struct StreamInfoImpl : public StreamInfo {
     return *downstream_connection_info_provider_;
   }
 
-  const Router::VHostConstSharedPtr& vhost() const override {
-    // TODO(wbpcode): There is an edge case where the route and virtual host be override
-    // by the setRoute() of HTTP filter callbacks. But in that case the virtual host stored
-    // in the stream info will not be updated.
-    return vhost_;
-  }
+  const Router::VHostConstSharedPtr& vhost() const override { return vhost_; }
 
   Router::RouteConstSharedPtr route() const override { return route_; }
 

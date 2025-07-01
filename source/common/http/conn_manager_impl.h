@@ -307,6 +307,7 @@ private:
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
+    void setVHostRoute(Router::VHostRoute route);
     // Set cached route. This method should never be called directly. This is only called in the
     // setRoute(), clearRouteCache(), and refreshCachedRoute() methods.
     void setCachedRoute(absl::optional<Router::RouteConstSharedPtr>&& route);

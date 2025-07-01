@@ -205,7 +205,7 @@ virtual_hosts:
   ON_CALL(Const(stream_info_), route()).WillByDefault(testing::Return(route));
 
   std::vector<std::reference_wrapper<const RateLimitPolicyEntry>> rate_limits =
-      route->virtualHost().rateLimitPolicy().getApplicableRateLimit(0);
+      route->virtualHost()->rateLimitPolicy().getApplicableRateLimit(0);
   EXPECT_EQ(1U, rate_limits.size());
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;

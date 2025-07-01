@@ -107,7 +107,7 @@ using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
 
 class SslRedirectRoute : public Route {
 public:
-  SslRedirectRoute(CommonVirtualHostSharedPtr virtual_host) : virtual_host_(virtual_host) {}
+  SslRedirectRoute(VHostConstSharedPtr virtual_host) : virtual_host_(std::move(virtual_host)) {}
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
@@ -122,10 +122,10 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const std::string& routeName() const override { return EMPTY_STRING; }
-  const VirtualHost& virtualHost() const override;
+  const VHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
 
 private:
-  CommonVirtualHostSharedPtr virtual_host_;
+  const VHostConstSharedPtr virtual_host_;
 
   static const SslRedirector SSL_REDIRECTOR;
   static const envoy::config::core::v3::Metadata metadata_;
@@ -749,7 +749,12 @@ public:
     return getOptionalTimeout<OptionalTimeoutNames::GrpcTimeoutOffset>();
   }
 
-  const VirtualHost& virtualHost() const override { return *vhost_; }
+  const VHostConstSharedPtr& virtualHost() const override {
+    // The method cannot return the vhost_ directly because the vhost_ has different type with
+    // the VHostConstSharedPtr and will create a temporary copy implicitly and result in error
+    // of returning reference to local temporary object.
+    return vhost_copy_;
+  }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool appendXfh() const override { return append_xfh_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -915,6 +920,9 @@ private:
   // Keep an copy of the shared pointer to the shared part of the virtual host. This is needed
   // to keep the shared part alive while the route is alive.
   const CommonVirtualHostSharedPtr vhost_;
+  // Same with vhost_ but this could be returned as reference. vhost_ is kept to access the
+  // methods that not exposed in the VirtualHost.
+  const VHostConstSharedPtr vhost_copy_;
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
   const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
   const std::string host_rewrite_path_regex_substitution_;

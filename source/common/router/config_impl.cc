@@ -521,7 +521,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
           THROW_OR_RETURN_VALUE(buildPathMatcher(route, validator), PathMatcherSharedPtr)),
       path_rewriter_(
           THROW_OR_RETURN_VALUE(buildPathRewriter(route, validator), PathRewriterSharedPtr)),
-      host_rewrite_(route.route().host_rewrite_literal()), vhost_(vhost),
+      host_rewrite_(route.route().host_rewrite_literal()), vhost_(vhost), vhost_copy_(vhost),
       auto_host_rewrite_header_(!route.route().host_rewrite_header().empty()
                                     ? absl::optional<Http::LowerCaseString>(Http::LowerCaseString(
                                           route.route().host_rewrite_header()))
@@ -1756,8 +1756,6 @@ VirtualHostImpl::VirtualHostImpl(const envoy::config::route::v3::VirtualHost& vi
     }
   }
 }
-
-const VirtualHost& SslRedirectRoute::virtualHost() const { return *virtual_host_; }
 
 RouteConstSharedPtr VirtualHostImpl::getRouteFromRoutes(
     const RouteCallback& cb, const Http::RequestHeaderMap& headers,
