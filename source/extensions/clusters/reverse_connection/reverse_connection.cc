@@ -145,8 +145,7 @@ absl::string_view RevConCluster::getHostIdValue(const Http::RequestHeaderMap* re
 RevConCluster::RevConCluster(
     const envoy::config::cluster::v3::Cluster& config, Upstream::ClusterFactoryContext& context,
     absl::Status& creation_status,
-    const envoy::extensions::clusters::reverse_connection::v3::RevConClusterConfig&
-        rev_con_config)
+    const envoy::extensions::clusters::reverse_connection::v3::RevConClusterConfig& rev_con_config)
     : ClusterImplBase(config, context, creation_status),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       cleanup_interval_(std::chrono::milliseconds(

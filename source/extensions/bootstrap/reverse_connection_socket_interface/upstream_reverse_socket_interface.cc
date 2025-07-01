@@ -216,8 +216,10 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
                                                 Network::ConnectionSocketPtr socket,
                                                 const std::chrono::seconds& ping_interval,
                                                 bool rebalanced) {
-  (void)rebalanced;
+  ENVOY_LOG(info, "DEBUG: addConnectionSocket called with node_id='{}' cluster_id='{}'", node_id,
+            cluster_id);
 
+  (void)rebalanced;
   const int fd = socket->ioHandle().fdDoNotUse();
   const std::string& connectionKey = socket->connectionInfoProvider().localAddress()->asString();
 
@@ -265,7 +267,9 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   accepted_reverse_connections_[node_id].push_back(std::move(socket));
   Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[node_id].back();
 
+  ENVOY_LOG(info, "DEBUG: About to set fd_to_node_map_[{}] = '{}'", fd, node_id);
   fd_to_node_map_[fd] = node_id;
+  ENVOY_LOG(info, "DEBUG: fd_to_node_map_[{}] is now set to '{}'", fd, fd_to_node_map_[fd]);
 
   // onPingResponse() expects a ping reply on the socket.
   fd_to_event_map_[fd] = dispatcher_.createFileEvent(
@@ -378,38 +382,77 @@ size_t UpstreamSocketManager::getNumberOfSocketsByNode(const std::string& node_i
   return stats->reverse_conn_cx_idle_.value();
 }
 
-absl::flat_hash_map<std::string, size_t> UpstreamSocketManager::getSocketCountMap() {
-  absl::flat_hash_map<std::string, size_t> response;
-  for (auto& itr : usm_node_stats_map_) {
-    response[itr.first] = usm_node_stats_map_[itr.first]->reverse_conn_cx_total_.value();
+bool UpstreamSocketManager::deleteStatsByNode(const std::string& node_id) {
+  const auto& iter = usm_node_stats_map_.find(node_id);
+  if (iter == usm_node_stats_map_.end()) {
+    return false;
   }
-  return response;
+  usm_node_stats_map_.erase(iter);
+  return true;
+}
+
+bool UpstreamSocketManager::deleteStatsByCluster(const std::string& cluster_id) {
+  const auto& iter = usm_cluster_stats_map_.find(cluster_id);
+  if (iter == usm_cluster_stats_map_.end()) {
+    return false;
+  }
+  usm_cluster_stats_map_.erase(iter);
+  return true;
 }
 
 absl::flat_hash_map<std::string, size_t> UpstreamSocketManager::getConnectionStats() {
-  absl::flat_hash_map<std::string, size_t> response;
-
-  for (auto& itr : accepted_reverse_connections_) {
-    ENVOY_LOG(debug, "UpstreamSocketManager: found {} accepted connections for {}",
-              itr.second.size(), itr.first);
-    response[itr.first] = itr.second.size();
+  absl::flat_hash_map<std::string, size_t> node_stats;
+  for (const auto& node_entry : accepted_reverse_connections_) {
+    const std::string& node_id = node_entry.first;
+    size_t connection_count = node_entry.second.size();
+    if (connection_count > 0) {
+      node_stats[node_id] = connection_count;
+    }
   }
+  ENVOY_LOG(debug, "UpstreamSocketManager::getConnectionStats returning {} nodes",
+            node_stats.size());
+  return node_stats;
+}
 
-  return response;
+absl::flat_hash_map<std::string, size_t> UpstreamSocketManager::getSocketCountMap() {
+  absl::flat_hash_map<std::string, size_t> cluster_stats;
+  for (const auto& cluster_entry : cluster_to_node_map_) {
+    const std::string& cluster_id = cluster_entry.first;
+    size_t total_connections = 0;
+
+    // Sum up connections for all nodes in this cluster
+    for (const std::string& node_id : cluster_entry.second) {
+      const auto& node_conn_iter = accepted_reverse_connections_.find(node_id);
+      if (node_conn_iter != accepted_reverse_connections_.end()) {
+        total_connections += node_conn_iter->second.size();
+      }
+    }
+
+    if (total_connections > 0) {
+      cluster_stats[cluster_id] = total_connections;
+    }
+  }
+  ENVOY_LOG(debug, "UpstreamSocketManager::getSocketCountMap returning {} clusters",
+            cluster_stats.size());
+  return cluster_stats;
 }
 
 void UpstreamSocketManager::markSocketDead(const int fd, const bool used) {
+  ENVOY_LOG(info, "DEBUG: markSocketDead called with fd={}, checking fd_to_node_map", fd);
+
   auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end()) {
     ENVOY_LOG(debug, "UpstreamSocketManager: FD {} not found in fd_to_node_map_", fd);
     return;
   }
 
-  const std::string& node_id = node_it->second;
+  const std::string node_id = node_it->second; // Make a COPY, not a reference
+  ENVOY_LOG(info, "DEBUG: Retrieved node_id='{}' for fd={} from fd_to_node_map", node_id, fd);
+
   std::string cluster_id = (node_to_cluster_map_.find(node_id) != node_to_cluster_map_.end())
                                ? node_to_cluster_map_[node_id]
                                : "";
-  fd_to_node_map_.erase(fd);
+  fd_to_node_map_.erase(fd); // Now it's safe to erase since node_id is a copy
 
   // If this is a used connection, we update the stats and return.
   if (used) {
@@ -615,24 +658,6 @@ USMStats* UpstreamSocketManager::getStatsByCluster(const std::string& cluster_id
   usm_cluster_stats_map_[cluster_id] = std::make_unique<USMStats>(
       USMStats{ALL_USM_STATS(POOL_GAUGE_PREFIX(*usm_scope_, final_prefix))});
   return usm_cluster_stats_map_[cluster_id].get();
-}
-
-bool UpstreamSocketManager::deleteStatsByNode(const std::string& node_id) {
-  const auto& iter = usm_node_stats_map_.find(node_id);
-  if (iter == usm_node_stats_map_.end()) {
-    return false;
-  }
-  usm_node_stats_map_.erase(iter);
-  return true;
-}
-
-bool UpstreamSocketManager::deleteStatsByCluster(const std::string& cluster_id) {
-  const auto& iter = usm_cluster_stats_map_.find(cluster_id);
-  if (iter == usm_cluster_stats_map_.end()) {
-    return false;
-  }
-  usm_cluster_stats_map_.erase(iter);
-  return true;
 }
 
 REGISTER_FACTORY(UpstreamReverseSocketInterface, Server::Configuration::BootstrapExtensionFactory);

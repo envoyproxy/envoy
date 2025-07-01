@@ -36,8 +36,8 @@ envoy_cc_extension(
         "//source/common/json:json_loader_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/bootstrap/reverse_connection_socket_interface:upstream_reverse_socket_interface_lib",
         "//source/extensions/bootstrap/reverse_connection_socket_interface:downstream_reverse_socket_interface_lib",
+        "//source/extensions/bootstrap/reverse_connection_socket_interface:upstream_reverse_socket_interface_lib",
         "@envoy_api//envoy/extensions/filters/http/reverse_conn/v3:pkg_cc_proto",
     ],
 )

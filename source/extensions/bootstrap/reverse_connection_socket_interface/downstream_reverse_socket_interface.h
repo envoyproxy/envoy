@@ -519,6 +519,19 @@ public:
     return "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface";
   }
 
+  /**
+   * Get the number of established reverse connections to a specific target (cluster or node).
+   * @param target the cluster or node name to check connections for
+   * @return number of established connections to the target
+   */
+  size_t getConnectionCount(const std::string& target) const;
+
+  /**
+   * Get a list of all clusters that have established reverse connections.
+   * @return vector of cluster names with active reverse connections
+   */
+  std::vector<std::string> getEstablishedConnections() const;
+
   DownstreamReverseSocketInterfaceExtension* extension_{nullptr};
 
 private:
