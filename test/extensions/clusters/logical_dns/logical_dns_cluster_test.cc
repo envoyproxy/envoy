@@ -60,8 +60,7 @@ protected:
     NiceMock<MockClusterManager> cm;
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+        server_context_, nullptr, nullptr, false);
     absl::StatusOr<std::unique_ptr<ClusterImplBase>> status_or_cluster;
 
     envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
