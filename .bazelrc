@@ -17,7 +17,6 @@ fetch --color=yes
 run --color=yes
 
 build --color=yes
-build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
 build --java_runtime_version=remotejdk_11
