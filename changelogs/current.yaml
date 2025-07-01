@@ -76,7 +76,7 @@ minor_behavior_changes:
 - area: formatter
   change: |
     Now the ``METADATA`` and ``CEL`` substitution formatters could access or log the metadata of
-    virtual host at the case where the route is not matched but the virtual host is found.
+    virtual host in case the route is not matched but the virtual host is found.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

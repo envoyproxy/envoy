@@ -204,6 +204,7 @@ public:
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
   std::string stream_flags_;
+  Router::VHostConstSharedPtr virtual_host_;
 };
 
 } // namespace StreamInfo

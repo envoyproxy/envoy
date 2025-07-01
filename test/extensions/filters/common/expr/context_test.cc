@@ -932,7 +932,8 @@ TEST(Context, XDSAttributes) {
   info.upstreamInfo()->setUpstreamHost(upstream_host);
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
   EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
-  EXPECT_CALL(info, vhost()).WillRepeatedly(ReturnRef(route->virtual_host_));
+  info.virtual_host_ = route->virtual_host_;
+
   const std::string chain_name = "fake_filter_chain_name";
 
   auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();

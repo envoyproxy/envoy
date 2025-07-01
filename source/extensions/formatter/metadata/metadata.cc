@@ -58,10 +58,8 @@ public:
                                               [](const StreamInfo::StreamInfo& stream_info)
                                                   -> const envoy::config::core::v3::Metadata* {
                                                 const auto& vhost = stream_info.vhost();
-                                                if (vhost == nullptr) {
-                                                  return nullptr;
-                                                }
-                                                return &vhost->metadata();
+                                                return vhost != nullptr ? &vhost->metadata()
+                                                                        : nullptr;
                                               }) {}
 };
 
