@@ -1,6 +1,6 @@
 #include "source/extensions/clusters/dns/dns_cluster.h"
 
-// The purpose of these two headers is purely for beackward compatibility.
+// The purpose of these two headers is purely for backward compatibility.
 // Never create new dependencies to symbols declared in these headers!
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"

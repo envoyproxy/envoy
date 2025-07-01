@@ -173,9 +173,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 
 // TODO(grnmeira):
-// Enables the new DNS implmentation, a merged implementation of
+// Enables the new DNS implementation, a merged implementation of
 // strict and logical DNS clusters. This new implementation will
-// take over the splited ones, and will be used as a base for the
+// take over the split ones, and will be used as a base for the
 // implementation of on-demand DNS.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 
