@@ -1,12 +1,12 @@
 # Socket Interfaces
 
-## Downstream Socket Interface
+## Reverse Tunnel Initiator
 
-This document explains how the DownstreamReverseSocketInterface works, including thread-local entities and the reverse connection establishment process.
+This document explains how the ReverseTunnelInitiator works, including thread-local entities and the reverse connection establishment process.
 
 ## Overview
 
-The DownstreamReverseSocketInterface manages the initiation of reverse connections from on-premises Envoy instances to cloud-based instances. It uses thread-local storage to manage connection pools and handles the establishment of reverse TCP connections.
+The ReverseTunnelInitiator manages the initiation of reverse connections from on-premises Envoy instances to cloud-based instances. It uses thread-local storage to manage connection pools and handles the establishment of reverse TCP connections.
 
 ## Sequence Diagram
 
@@ -14,12 +14,12 @@ The following diagram shows the flow from ListenerFactory to reverse connection 
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Downstream Side                                   │
+│                           Initiator Side                                    │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐ │
-│  │ ListenerFactory │    │ DownstreamReverse   │    │   Worker Thread     │ │
-│  │                 │    │ SocketInterface     │    │                     │ │
+│  │ ListenerFactory │    │ ReverseTunnel       │    │   Worker Thread     │ │
+│  │                 │    │ Initiator           │    │                     │ │
 │  │ • detects       │───▶│                     │───▶│ • socket() called   │ │
 │  │   ReverseConn   │    │ • registered as     │    │ • creates           │ │
 │  │   Address       │    │   bootstrap ext     │    │   ReverseConnIO     │ │
@@ -230,13 +230,13 @@ The system uses a pipe with two file descriptors:
 
 This allows us to cleanly cache a previously established connection.
 
-## Upstream Socket Interface
+## Reverse Tunnel Acceptor
 
-The UpstreamReverseSocketInterface manages accepted reverse connections on the cloud side. It uses thread-local SocketManagers to maintain connection caches and mappings.
+The ReverseTunnelAcceptor manages accepted reverse connections on the cloud side. It uses thread-local socket managers to maintain connection caches and mappings.
 
 ### Thread-Local Socket Management
 
-Each worker thread has its own SocketManager that:
+Each worker thread has its own socket manager that:
 - **Node Caching**: Maintains `node_id -> cached_sockets` mapping for connection retrieval
 - **Cluster Mapping**: Stores `cluster_id -> node_ids` mappings. This is used to return cached sockets for different nodes in a load balanced fashion for requests intended to a specific downstream cluster.
 

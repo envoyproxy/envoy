@@ -20,17 +20,7 @@ ReverseConnectionConfigFactory::createListenerFilterFactoryFromProto(
       const envoy::extensions::filters::listener::reverse_connection::v3::ReverseConnection&>(
       message, context.messageValidationVisitor());
 
-  // TODO(Basu): Remove dependency on ReverseConnRegistry singleton
-  // Retrieve the ReverseConnRegistry singleton and acecss the thread local slot
-  // std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry =
-  //     context.serverFactoryContext()
-  //         .singletonManager()
-  //         .getTyped<ReverseConnection::ReverseConnRegistry>("reverse_conn_registry_singleton");
-  // if (reverse_conn_registry == nullptr) {
-  //   throw EnvoyException(
-  //       "Cannot create reverse connection listener filter. Reverse connection registry not
-  //       found");
-  // }
+  // Create the configuration from the protobuf message
 
   Config config(proto_config);
   return [listener_filter_matcher, config](Network::ListenerFilterManager& filter_manager) -> void {

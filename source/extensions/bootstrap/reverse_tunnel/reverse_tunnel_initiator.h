@@ -39,16 +39,14 @@ namespace ReverseConnection {
 
 // Forward declarations
 class RCConnectionWrapper;
-class DownstreamReverseSocketInterface;
-class DownstreamReverseSocketInterfaceExtension;
+class ReverseTunnelInitiator;
+class ReverseTunnelInitiatorExtension;
 
 static const char CRLF[] = "\r\n";
 static const char DOUBLE_CRLF[] = "\r\n\r\n";
 
 /**
- * All ReverseConnectionDownstreamSocketInterface stats. @see stats_macros.h
- * This encompasses the stats for all reverse connections managed by the downstream socket
- * interface.
+ * All reverse connection downstream stats. @see stats_macros.h
  */
 #define ALL_REVERSE_CONNECTION_DOWNSTREAM_STATS(GAUGE)                                             \
   GAUGE(reverse_conn_connecting, NeverImport)                                                      \
@@ -71,7 +69,7 @@ enum class ReverseConnectionState {
 };
 
 /**
- * Struct definition for all ReverseConnectionDownstreamSocketInterface stats. @see stats_macros.h
+ * Struct definition for all reverse connection downstream stats. @see stats_macros.h
  */
 struct ReverseConnectionDownstreamStats {
   ALL_REVERSE_CONNECTION_DOWNSTREAM_STATS(GENERATE_GAUGE_STRUCT)
@@ -134,8 +132,7 @@ public:
    */
   ReverseConnectionIOHandle(os_fd_t fd, const ReverseConnectionSocketConfig& config,
                             Upstream::ClusterManager& cluster_manager,
-                            const DownstreamReverseSocketInterface& socket_interface,
-                            Stats::Scope& scope);
+                            const ReverseTunnelInitiator& socket_interface, Stats::Scope& scope);
 
   ~ReverseConnectionIOHandle() override;
 
@@ -392,7 +389,7 @@ private:
   // Core components
   const ReverseConnectionSocketConfig config_; // Configuration for reverse connections
   Upstream::ClusterManager& cluster_manager_;
-  const DownstreamReverseSocketInterface& socket_interface_;
+  const ReverseTunnelInitiator& socket_interface_;
 
   // Connection wrapper management
   std::vector<std::unique_ptr<RCConnectionWrapper>>
@@ -415,7 +412,7 @@ private:
 
   // Socket cache to prevent socket objects from going out of scope
   // Maps connection key to socket object.
-  std::unordered_map<std::string, Envoy::Network::ConnectionSocketPtr> socket_cache_;
+  // Socket cache removed - sockets are now managed via RAII in DownstreamReverseConnectionIOHandle
 
   // Stats tracking per cluster and host
   absl::flat_hash_map<std::string, ReverseConnectionDownstreamStatsPtr> cluster_stats_map_;
@@ -429,7 +426,7 @@ private:
 };
 
 /**
- * Thread local storage for DownstreamReverseSocketInterface.
+ * Thread local storage for ReverseTunnelInitiator.
  * Stores the thread-local dispatcher and stats scope for each worker thread.
  */
 class DownstreamSocketThreadLocal : public ThreadLocal::ThreadLocalObject {
@@ -458,14 +455,13 @@ private:
  * functionality for downstream connections. It manages the establishment and maintenance
  * of reverse TCP connections to remote clusters.
  */
-class DownstreamReverseSocketInterface
-    : public Envoy::Network::SocketInterfaceBase,
-      public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
+class ReverseTunnelInitiator : public Envoy::Network::SocketInterfaceBase,
+                               public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
-  DownstreamReverseSocketInterface(Server::Configuration::ServerFactoryContext& context);
+  ReverseTunnelInitiator(Server::Configuration::ServerFactoryContext& context);
 
   // Default constructor for registry
-  DownstreamReverseSocketInterface() : extension_(nullptr), context_(nullptr) {}
+  ReverseTunnelInitiator() : extension_(nullptr), context_(nullptr) {}
 
   /**
    * Create a ReverseConnectionIOHandle and kick off the reverse connection establishment.
@@ -498,23 +494,25 @@ public:
   DownstreamSocketThreadLocal* getLocalRegistry() const;
 
   /**
-   * Create a bootstrap extension for this socket interface.
-   * @param config the configuration for the extension
-   * @param context the server factory context
-   * @return BootstrapExtensionPtr for the socket interface extension
+   * Thread-safe helper method to create reverse connection socket with config.
+   * @param socket_type the type of socket to create
+   * @param addr_type the address type
+   * @param version the IP version
+   * @param config the reverse connection configuration
+   * @return IoHandlePtr for the reverse connection socket
    */
+  Envoy::Network::IoHandlePtr
+  createReverseConnectionSocket(Envoy::Network::Socket::Type socket_type,
+                                Envoy::Network::Address::Type addr_type,
+                                Envoy::Network::Address::IpVersion version,
+                                const ReverseConnectionSocketConfig& config) const;
+
+  // Server::Configuration::BootstrapExtensionFactory
   Server::BootstrapExtensionPtr
   createBootstrapExtension(const Protobuf::Message& config,
                            Server::Configuration::ServerFactoryContext& context) override;
 
-  /**
-   * @return MessagePtr containing the empty configuration
-   */
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
-  /**
-   * @return the extension name.
-   */
   std::string name() const override {
     return "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface";
   }
@@ -532,48 +530,23 @@ public:
    */
   std::vector<std::string> getEstablishedConnections() const;
 
-  DownstreamReverseSocketInterfaceExtension* extension_{nullptr};
-
 private:
+  ReverseTunnelInitiatorExtension* extension_;
   Server::Configuration::ServerFactoryContext* context_;
-
-  // Temporary storage for config extracted from address
-  mutable std::unique_ptr<ReverseConnectionSocketConfig> temp_rc_config_;
 };
 
 /**
- * Socket interface extension for reverse connections.
+ * Bootstrap extension for ReverseTunnelInitiator.
  */
-class DownstreamReverseSocketInterfaceExtension
-    : public Envoy::Network::SocketInterfaceExtension,
-      public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
+class ReverseTunnelInitiatorExtension : public Server::BootstrapExtension,
+                                        public Logger::Loggable<Logger::Id::connection> {
 public:
-  DownstreamReverseSocketInterfaceExtension(
-      Envoy::Network::SocketInterface& sock_interface,
+  ReverseTunnelInitiatorExtension(
       Server::Configuration::ServerFactoryContext& context,
       const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
-          DownstreamReverseConnectionSocketInterface& config)
-      : Envoy::Network::SocketInterfaceExtension(sock_interface), context_(context),
-        socket_interface_(static_cast<DownstreamReverseSocketInterface*>(&sock_interface)) {
-    ENVOY_LOG(debug,
-              "DownstreamReverseSocketInterfaceExtension: creating downstream reverse connection "
-              "socket interface with stat_prefix: {}",
-              stat_prefix_);
-    stat_prefix_ =
-        PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "downstream_reverse_connection");
-  }
+          DownstreamReverseConnectionSocketInterface& config);
 
-  // Server::BootstrapExtension (inherited from SocketInterfaceExtension)
-  /**
-   * Called when the server is initialized.
-   * Sets up thread-local storage for the socket interface.
-   */
   void onServerInitialized() override;
-
-  /**
-   * Called when a worker thread is initialized.
-   * No-op for this extension.
-   */
   void onWorkerThreadInitialized() override {}
 
   /**
@@ -581,19 +554,14 @@ public:
    */
   DownstreamSocketThreadLocal* getLocalRegistry() const;
 
-  /**
-   * @return the stat prefix.
-   */
-  const std::string& statPrefix() const { return stat_prefix_; }
-
 private:
   Server::Configuration::ServerFactoryContext& context_;
-  std::unique_ptr<ThreadLocal::TypedSlot<DownstreamSocketThreadLocal>> tls_slot_;
-  DownstreamReverseSocketInterface* socket_interface_;
-  std::string stat_prefix_;
+  const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface config_;
+  ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
 };
 
-DECLARE_FACTORY(DownstreamReverseSocketInterface);
+DECLARE_FACTORY(ReverseTunnelInitiator);
 
 /**
  * Custom load balancer context for reverse connections. This class enables the

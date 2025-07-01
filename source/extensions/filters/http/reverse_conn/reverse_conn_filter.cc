@@ -242,51 +242,73 @@ ReverseConnFilter::handleResponderInfo(ReverseConnection::UpstreamSocketManager*
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  ENVOY_LOG(debug, "Getting all reverse connection info with responder role");
-  // The default case: send the full node/cluster list.
-  // TEMPORARY FIX: Since we know from ping logs that thread [14561945] has the connections,
-  // let's hardcode the response based on the ping activity until we implement proper cross-thread
-  // aggregation
+  ENVOY_LOG(debug,
+            "Getting all reverse connection info with responder role - production stats-based");
+
+  // Production-ready cross-thread aggregation for multi-tenant reporting
+  // First try the production stats-based approach for cross-thread aggregation
+  auto* upstream_extension = getUpstreamSocketInterfaceExtension();
+  if (upstream_extension) {
+    ENVOY_LOG(debug,
+              "Using production stats-based cross-thread aggregation for multi-tenant reporting");
+
+    // Use the production stats-based approach with Envoy's proven stats system
+    auto [connected_nodes, accepted_connections] =
+        upstream_extension->getConnectionStatsSync(std::chrono::milliseconds(1000));
+
+    // Convert vectors to lists for JSON serialization
+    std::list<std::string> accepted_connections_list(accepted_connections.begin(),
+                                                     accepted_connections.end());
+    std::list<std::string> connected_nodes_list(connected_nodes.begin(), connected_nodes.end());
+
+    ENVOY_LOG(debug,
+              "Stats-based aggregation completed: {} connected nodes, {} accepted connections",
+              connected_nodes.size(), accepted_connections.size());
+
+    // Create production-ready JSON response for multi-tenant environment
+    std::string response = fmt::format("{{\"accepted\":{},\"connected\":{}}}",
+                                       Json::Factory::listAsJsonString(accepted_connections_list),
+                                       Json::Factory::listAsJsonString(connected_nodes_list));
+
+    ENVOY_LOG(info, "handleResponderInfo production stats-based response: {}", response);
+    decoder_callbacks_->sendLocalReply(Http::Code::OK, response, nullptr, absl::nullopt, "");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // Fallback to current thread approach (for backward compatibility)
+  ENVOY_LOG(warn,
+            "No upstream extension available, falling back to current thread data collection");
+
   std::list<std::string> accepted_rc_nodes;
   std::list<std::string> connected_rc_clusters;
 
   auto node_stats = socket_manager->getConnectionStats();
   auto cluster_stats = socket_manager->getSocketCountMap();
-  ENVOY_LOG(info, "DEBUG: API thread got {} nodes and {} clusters", node_stats.size(),
+
+  ENVOY_LOG(debug, "Fallback stats collected: {} nodes, {} clusters", node_stats.size(),
             cluster_stats.size());
 
-  // If we have no stats on this thread but we know connections exist (from our debugging),
-  // hardcode the response as a temporary fix
-  if (node_stats.empty() && cluster_stats.empty()) {
-    ENVOY_LOG(
-        info,
-        "DEBUG: No stats on current thread, using hardcoded response based on ping observations");
-    accepted_rc_nodes.push_back("on-prem-node");
-    connected_rc_clusters.push_back("on-prem");
-  } else {
-    // Use actual stats if available
-    for (auto const& node : node_stats) {
-      auto node_id = node.first;
-      size_t rc_conn_count = node.second;
-      ENVOY_LOG(info, "DEBUG: Node '{}' has {} connections", node_id, rc_conn_count);
-      if (rc_conn_count > 0) {
-        accepted_rc_nodes.push_back(node_id);
-      }
-    }
-    for (auto const& cluster : cluster_stats) {
-      auto cluster_id = cluster.first;
-      size_t rc_conn_count = cluster.second;
-      ENVOY_LOG(info, "DEBUG: Cluster '{}' has {} connections", cluster_id, rc_conn_count);
-      if (rc_conn_count > 0) {
-        connected_rc_clusters.push_back(cluster_id);
-      }
+  // Process current thread's data
+  for (const auto& [node_id, rc_conn_count] : node_stats) {
+    if (rc_conn_count > 0) {
+      accepted_rc_nodes.push_back(node_id);
+      ENVOY_LOG(trace, "Fallback: Node '{}' has {} connections", node_id, rc_conn_count);
     }
   }
 
+  for (const auto& [cluster_id, rc_conn_count] : cluster_stats) {
+    if (rc_conn_count > 0) {
+      connected_rc_clusters.push_back(cluster_id);
+      ENVOY_LOG(trace, "Fallback: Cluster '{}' has {} connections", cluster_id, rc_conn_count);
+    }
+  }
+
+  // Create fallback JSON response
   std::string response = fmt::format("{{\"accepted\":{},\"connected\":{}}}",
                                      Json::Factory::listAsJsonString(accepted_rc_nodes),
                                      Json::Factory::listAsJsonString(connected_rc_clusters));
-  ENVOY_LOG(info, "handleResponderInfo response: {}", response);
+
+  ENVOY_LOG(info, "handleResponderInfo fallback response: {}", response);
   decoder_callbacks_->sendLocalReply(Http::Code::OK, response, nullptr, absl::nullopt, "");
   return Http::FilterHeadersStatus::StopIteration;
 }

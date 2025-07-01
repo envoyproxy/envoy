@@ -8,17 +8,13 @@
 
 #include "absl/strings/string_view.h"
 
-// TODO(Basu): Remove dependency on reverse_conn_global_registry and reverse_connection_manager
-// #include "contrib/reverse_connection/bootstrap/source/reverse_conn_global_registry.h"
-// #include "contrib/reverse_connection/bootstrap/source/reverse_connection_manager.h"
+// Configuration header for reverse connection listener filter
 #include "source/extensions/filters/listener/reverse_connection/config.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace ReverseConnection {
-
-// namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
 enum class ReadOrParseState { Done, TryAgainLater, Error };
 
@@ -36,29 +32,16 @@ public:
   Network::FilterStatus onData(Network::ListenerFilterBuffer&) override;
   void onClose() override;
 
-  // TODO(Basu): Remove getRCManager dependency and use socket interface directly
-  // ReverseConnection::ReverseConnectionManager& reverseConnectionManager() {
-  //   ReverseConnection::RCThreadLocalRegistry* thread_local_registry =
-  //       reverse_conn_registry_->getLocalRegistry();
-  //   if (thread_local_registry == nullptr) {
-  //     throw EnvoyException(
-  //         "Cannot get ReverseConnectionManager. Thread local reverse connection registry is
-  //         null");
-  //   }
-  //   return thread_local_registry->getRCManager();
-  // }
+  // Helper method to get file descriptor
+  int fd();
 
 private:
-  static const absl::string_view RPING_MSG;
-  static const absl::string_view PROXY_MSG;
+  // RPING/PROXY messages now handled by ReverseConnectionUtility
 
   void onPingWaitTimeout();
-  int fd();
   ReadOrParseState parseBuffer(Network::ListenerFilterBuffer&);
 
   Config config_;
-  // TODO(Basu): Remove dependency on ReverseConnRegistry
-  // std::shared_ptr<ReverseConnection::ReverseConnRegistry> reverse_conn_registry_;
 
   Network::ListenerFilterCallbacks* cb_{};
   Event::FileEventPtr file_event_;

@@ -13,6 +13,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/reverse_connection/reverse_connection_utility.h"
 
 // #include "source/common/network/io_socket_handle_impl.h"
 
@@ -21,8 +22,8 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace ReverseConnection {
 
-const absl::string_view Filter::RPING_MSG = "RPING";
-const absl::string_view Filter::PROXY_MSG = "PROXY";
+// Use centralized constants from utility
+using ::Envoy::ReverseConnection::ReverseConnectionUtility;
 
 Filter::Filter(const Config& config) : config_(config) {
   ENVOY_LOG(debug, "reverse_connection: ping_wait_timeout is {}",
@@ -70,7 +71,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   return Network::FilterStatus::StopIteration;
 }
 
-size_t Filter::maxReadBytes() const { return RPING_MSG.length(); }
+size_t Filter::maxReadBytes() const { return ReverseConnectionUtility::PING_MESSAGE.length(); }
 
 void Filter::onPingWaitTimeout() {
   ENVOY_LOG(debug, "reverse_connection: timed out waiting for ping request");
@@ -82,8 +83,7 @@ void Filter::onPingWaitTimeout() {
             fd(), connectionKey,
             cb_->socket().connectionInfoProvider().remoteAddress()->asStringView());
 
-  // TODO(Basu): Remove dependency on getRCManager and use socket interface directly
-  // reverseConnectionManager().notifyConnectionClose(connectionKey, false);
+  // Connection timed out waiting for data - close and continue filter chain
 
   cb_->continueFilterChain(false);
 }
@@ -97,13 +97,11 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     return Network::FilterStatus::StopIteration;
   case ReadOrParseState::Done:
     ENVOY_LOG(debug, "reverse_connection: marking the socket ready for use, fd {}", fd());
-    // TODO(Basu): Remove dependency on getRCManager and use socket interface directly
-    // Call the RC Manager to update the RCManager Stats and log the connection used.
+    // Mark the connection as used and continue with normal processing
     const std::string& connectionKey =
         cb_->socket().connectionInfoProvider().localAddress()->asString();
     ENVOY_LOG(debug, "reverse_connection: marking the socket ready for use, connectionKey: {}",
               connectionKey);
-    // reverseConnectionManager().markConnUsed(connectionKey);
     connection_used_ = true;
     return Network::FilterStatus::Continue;
   }
@@ -120,36 +118,26 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
     return ReadOrParseState::Error;
   }
 
-  // We will compare the received bytes with the expected "RPING" msg. If,
-  // we found that the received bytes are not "RPING", this means, that peer
-  // socket is assigned to an upstream cluster. Otherwise, we will send "RPING"
-  // as a response.
-  // Check for both raw RPING and HTTP-embedded RPING
-  bool is_ping = false;
-  if (!memcmp(buf.data(), RPING_MSG.data(), RPING_MSG.length())) {
-    is_ping = true;
-  } else if (buf.find("RPING") != absl::string_view::npos) {
-    // Handle HTTP-embedded RPING messages
-    is_ping = true;
-    ENVOY_LOG(debug, "reverse_connection: Found RPING in HTTP response on fd {}", fd());
-  }
+  // Use utility to check for RPING messages (raw or HTTP-embedded)
+  if (ReverseConnectionUtility::isPingMessage(buf)) {
+    ENVOY_LOG(debug, "reverse_connection: Received RPING msg on fd {}", fd());
 
-  if (is_ping) {
-    ENVOY_LOG(debug, "reverse_connection: Received {} msg on fd {}", RPING_MSG, fd());
     if (!buffer.drain(buf.length())) {
       ENVOY_LOG(error, "reverse_connection: could not drain buffer for ping message");
     }
 
-    // Echo the RPING message back.
-    Buffer::OwnedImpl rping_buf(RPING_MSG);
-    const Api::IoCallUint64Result write_result = cb_->socket().ioHandle().write(rping_buf);
+    // Use utility to send RPING response
+    const Api::IoCallUint64Result write_result =
+        ReverseConnectionUtility::sendPingResponse(cb_->socket().ioHandle());
+
     if (write_result.ok()) {
-      ENVOY_LOG(trace, "reverse_connection: fd {} send ping response rc:{}", fd(),
+      ENVOY_LOG(trace, "reverse_connection: fd {} sent ping response, bytes: {}", fd(),
                 write_result.return_value_);
     } else {
-      ENVOY_LOG(trace, "reverse_connection: fd {} send ping response rc:{} errno {}", fd(),
-                write_result.return_value_, write_result.err_->getErrorDetails());
+      ENVOY_LOG(trace, "reverse_connection: fd {} failed to send ping response, error: {}", fd(),
+                write_result.err_->getErrorDetails());
     }
+
     ping_wait_timer_->enableTimer(config_.pingWaitTimeout());
     // Return a status to wait for data.
     return ReadOrParseState::TryAgainLater;
