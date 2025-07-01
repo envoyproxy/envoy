@@ -11,8 +11,8 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/filter_impl.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/extensions/bootstrap/reverse_connection_socket_interface/upstream_reverse_socket_interface.h"
 #include "source/extensions/bootstrap/reverse_connection_socket_interface/downstream_reverse_socket_interface.h"
+#include "source/extensions/bootstrap/reverse_connection_socket_interface/upstream_reverse_socket_interface.h"
 
 #include "absl/types/optional.h"
 
@@ -97,14 +97,14 @@ private:
   // object with the full list of nodes/clusters with which reverse connections are present
   // in the format: {"accepted": ["cluster_1", "cluster_2"], "connected": ["cluster_3"]}.
   Http::FilterHeadersStatus getReverseConnectionInfo();
-  
+
   // Handle reverse connection info for responder role (uses upstream socket manager)
-  Http::FilterHeadersStatus handleResponderInfo(ReverseConnection::UpstreamSocketManager* socket_manager,
-                                                const std::string& remote_node, 
-                                                const std::string& remote_cluster);
-  
+  Http::FilterHeadersStatus
+  handleResponderInfo(ReverseConnection::UpstreamSocketManager* socket_manager,
+                      const std::string& remote_node, const std::string& remote_cluster);
+
   // Handle reverse connection info for initiator role (uses downstream socket interface)
-  Http::FilterHeadersStatus handleInitiatorInfo(const std::string& remote_node, 
+  Http::FilterHeadersStatus handleInitiatorInfo(const std::string& remote_node,
                                                 const std::string& remote_cluster);
   // API to accept a reverse connection request. The handler obtains the cluster, tenant, etc
   // from the query parameters from the request and calls the UpstreamSocketManager to cache
@@ -162,7 +162,8 @@ private:
     }
 
     auto* downstream_socket_interface =
-        dynamic_cast<const ReverseConnection::DownstreamReverseSocketInterface*>(downstream_interface);
+        dynamic_cast<const ReverseConnection::DownstreamReverseSocketInterface*>(
+            downstream_interface);
     if (!downstream_socket_interface) {
       ENVOY_LOG(error, "Failed to cast to DownstreamReverseSocketInterface");
       return nullptr;
@@ -175,7 +176,7 @@ private:
   std::string determineRole() {
     auto* upstream_manager = getUpstreamSocketManager();
     auto* downstream_interface = getDownstreamSocketInterface();
-    
+
     if (upstream_manager && !downstream_interface) {
       return "responder"; // Cloud envoy - accepts reverse connections
     } else if (!upstream_manager && downstream_interface) {

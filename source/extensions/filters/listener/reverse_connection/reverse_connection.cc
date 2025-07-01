@@ -124,9 +124,19 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
   // we found that the received bytes are not "RPING", this means, that peer
   // socket is assigned to an upstream cluster. Otherwise, we will send "RPING"
   // as a response.
+  // Check for both raw RPING and HTTP-embedded RPING
+  bool is_ping = false;
   if (!memcmp(buf.data(), RPING_MSG.data(), RPING_MSG.length())) {
-    ENVOY_LOG(debug, "reverse_connection: Revceived {} msg on fd {}", RPING_MSG, fd());
-    if (!buffer.drain(RPING_MSG.length())) {
+    is_ping = true;
+  } else if (buf.find("RPING") != absl::string_view::npos) {
+    // Handle HTTP-embedded RPING messages
+    is_ping = true;
+    ENVOY_LOG(debug, "reverse_connection: Found RPING in HTTP response on fd {}", fd());
+  }
+
+  if (is_ping) {
+    ENVOY_LOG(debug, "reverse_connection: Received {} msg on fd {}", RPING_MSG, fd());
+    if (!buffer.drain(buf.length())) {
       ENVOY_LOG(error, "reverse_connection: could not drain buffer for ping message");
     }
 
