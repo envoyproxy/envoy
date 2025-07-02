@@ -298,6 +298,66 @@ int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
   return 1;
 }
 
+void ProtobufConverterUtils::pushLuaValueFromMessage(lua_State* state,
+                                                     const Protobuf::Message& message) {
+  // Handle common protobuf wrapper types by extracting their simple values.
+  const std::string& type_name = message.GetTypeName();
+
+  if (type_name == "google.protobuf.StringValue") {
+    const auto* string_value = dynamic_cast<const ProtobufWkt::StringValue*>(&message);
+    if (string_value != nullptr) {
+      const std::string& value = string_value->value();
+      lua_pushlstring(state, value.data(), value.size());
+      return;
+    }
+  } else if (type_name == "google.protobuf.BoolValue") {
+    const auto* bool_value = dynamic_cast<const ProtobufWkt::BoolValue*>(&message);
+    if (bool_value != nullptr) {
+      lua_pushboolean(state, bool_value->value());
+      return;
+    }
+  } else if (type_name == "google.protobuf.UInt64Value") {
+    const auto* uint64_value = dynamic_cast<const ProtobufWkt::UInt64Value*>(&message);
+    if (uint64_value != nullptr) {
+      lua_pushnumber(state, uint64_value->value());
+      return;
+    }
+  } else if (type_name == "google.protobuf.Int64Value") {
+    const auto* int64_value = dynamic_cast<const ProtobufWkt::Int64Value*>(&message);
+    if (int64_value != nullptr) {
+      lua_pushnumber(state, int64_value->value());
+      return;
+    }
+  } else if (type_name == "google.protobuf.UInt32Value") {
+    const auto* uint32_value = dynamic_cast<const ProtobufWkt::UInt32Value*>(&message);
+    if (uint32_value != nullptr) {
+      lua_pushnumber(state, uint32_value->value());
+      return;
+    }
+  } else if (type_name == "google.protobuf.Int32Value") {
+    const auto* int32_value = dynamic_cast<const ProtobufWkt::Int32Value*>(&message);
+    if (int32_value != nullptr) {
+      lua_pushnumber(state, int32_value->value());
+      return;
+    }
+  } else if (type_name == "google.protobuf.FloatValue") {
+    const auto* float_value = dynamic_cast<const ProtobufWkt::FloatValue*>(&message);
+    if (float_value != nullptr) {
+      lua_pushnumber(state, float_value->value());
+      return;
+    }
+  } else if (type_name == "google.protobuf.DoubleValue") {
+    const auto* double_value = dynamic_cast<const ProtobufWkt::DoubleValue*>(&message);
+    if (double_value != nullptr) {
+      lua_pushnumber(state, double_value->value());
+      return;
+    }
+  }
+
+  // For complex messages, convert to Lua table using the existing converter.
+  pushLuaTableFromMessage(state, message);
+}
+
 } // namespace Lua
 } // namespace Common
 } // namespace Filters
