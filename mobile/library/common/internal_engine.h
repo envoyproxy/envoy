@@ -17,6 +17,7 @@
 #include "library/common/http/client.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
+#include "library/common/network/network_types.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {

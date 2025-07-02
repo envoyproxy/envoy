@@ -38,5 +38,4 @@ enum class ConnectionType : int {
   CONNECTION_5G = 8,
 };
 
-
 } // namespace Envoy
