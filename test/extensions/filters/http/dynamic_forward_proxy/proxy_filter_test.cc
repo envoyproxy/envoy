@@ -1,6 +1,10 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+#include "envoy/router/string_accessor.h"
+#include "envoy/stream_info/uint32_accessor.h"
 
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
@@ -17,7 +21,9 @@ using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Eq;
 using testing::InSequence;
+using testing::Invoke;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -412,7 +418,7 @@ TEST_F(ProxyFilterTest, HostRewriteViaHeader) {
   EXPECT_CALL(callbacks_, streamInfo());
   EXPECT_CALL(callbacks_, dispatcher());
   EXPECT_CALL(callbacks_, streamInfo());
-  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar:82"), 80, _, _))
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("bar"), 82, _, _))
       .WillOnce(Return(
           MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
 
@@ -753,6 +759,334 @@ TEST_F(ProxySettingsProxyFilterTest, HttpWithProxySettings) {
             mock_filter_->decodeHeaders(request_headers_, false));
 
   mock_filter_->onDestroy();
+}
+
+class ProxyFilterWithFilterStateHostTest : public ProxyFilterTest {
+public:
+  void setupFilter() override {
+    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+
+    Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+        *factory_context_.server_factory_context_.singleton_manager_);
+    envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
+    // Set allow_dynamic_host_from_filter_state to test filter state functionality
+    proto_config.set_allow_dynamic_host_from_filter_state(true);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        this->get(), cluster_store_factory, factory_context_);
+    filter_ = std::make_unique<ProxyFilter>(filter_config_);
+
+    filter_->setDecoderFilterCallbacks(callbacks_);
+
+    ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+        .WillByDefault(Return(
+            &factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+    ON_CALL(*transport_socket_factory_, implementsSecureTransport()).WillByDefault(Return(false));
+    ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+        .WillByDefault(Return(circuit_breaker_.get()));
+    ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(callbacks_.stream_info_));
+    ON_CALL(callbacks_.stream_info_, filterState()).WillByDefault(ReturnRef(filter_state_));
+  }
+
+protected:
+  // Create a shared filter state to be used in tests.
+  std::shared_ptr<StreamInfo::FilterState> filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  // Circuit breaker for tests.
+  std::unique_ptr<Upstream::ResourceAutoIncDec> circuit_breaker_ =
+      std::make_unique<Upstream::ResourceAutoIncDec>(pending_requests_);
+};
+
+TEST_F(ProxyFilterWithFilterStateHostTest, NoFilterStatePresent) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+
+  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillByDefault(Return(circuit_breakers_));
+
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport())
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(false));
+
+  // Use empty filter state (no filter state values set).
+
+  // Should use "foo" from host header when no filter state found.
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+
+  filter_->decodeHeaders(request_headers_, false);
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostPresent) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+
+  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillByDefault(Return(circuit_breakers_));
+
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport())
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(false));
+
+  // Create a filter state with a custom host value.
+  const std::string filter_state_host = "filter-state-host.example.com";
+  filter_state_->setData("envoy.upstream.dynamic_host",
+                         std::make_unique<Router::StringAccessorImpl>(filter_state_host),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Should use the value from filter state, not host header.
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq(filter_state_host), 80, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+
+  filter_->decodeHeaders(request_headers_, false);
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+class ProxyFilterWithFilterStateHostDisabledTest : public ProxyFilterTest {
+public:
+  void setupFilter() override {
+    EXPECT_CALL(*dns_cache_manager_, getCache(_));
+
+    Common::DynamicForwardProxy::DFPClusterStoreFactory cluster_store_factory(
+        *factory_context_.server_factory_context_.singleton_manager_);
+    envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig proto_config;
+    // Test default behavior where the flag is false, so filter state should not be checked.
+    proto_config.set_allow_dynamic_host_from_filter_state(false);
+    filter_config_ = std::make_shared<ProxyFilterConfig>(
+        proto_config, dns_cache_manager_->getCache(proto_config.dns_cache_config()).value(),
+        this->get(), cluster_store_factory, factory_context_);
+    filter_ = std::make_unique<ProxyFilter>(filter_config_);
+
+    filter_->setDecoderFilterCallbacks(callbacks_);
+
+    ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
+    ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+        .WillByDefault(Return(
+            &factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+    ON_CALL(*transport_socket_factory_, implementsSecureTransport()).WillByDefault(Return(false));
+    ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+        .WillByDefault(Return(circuit_breaker_.get()));
+
+    ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(callbacks_.stream_info_));
+    ON_CALL(callbacks_.stream_info_, filterState()).WillByDefault(ReturnRef(filter_state_));
+  }
+
+protected:
+  // Create a shared filter state to be used in tests.
+  std::shared_ptr<StreamInfo::FilterState> filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+  // Circuit breaker for tests.
+  std::unique_ptr<Upstream::ResourceAutoIncDec> circuit_breaker_ =
+      std::make_unique<Upstream::ResourceAutoIncDec>(pending_requests_);
+};
+
+TEST_F(ProxyFilterWithFilterStateHostDisabledTest, DoesNotUseFilterStateWhenFlagDisabled) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+
+  // Create a filter state with a dynamic host value that should be ignored.
+  const std::string filter_state_host = "filter-state-host.example.com";
+  filter_state_->setData("envoy.upstream.dynamic_host",
+                         std::make_unique<Router::StringAccessorImpl>(filter_state_host),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  ON_CALL(callbacks_, streamInfo()).WillByDefault(ReturnRef(callbacks_.stream_info_));
+
+  EXPECT_CALL(callbacks_, dispatcher());
+
+  // Should use host header "foo", not filter state, when the flag is disabled
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStateHostWhenFlagDisabled) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+
+  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillByDefault(Return(circuit_breakers_));
+
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport())
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(false));
+
+  // Create a filter state with a custom host value.
+  const std::string filter_state_host = "filter-state-host.example.com";
+  filter_state_->setData("envoy.upstream.dynamic_host",
+                         std::make_unique<Router::StringAccessorImpl>(filter_state_host),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Should use host header "foo", not filter state, when the flag is disabled.
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+
+  filter_->decodeHeaders(request_headers_, false);
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStatePortPresent) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+
+  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillByDefault(Return(circuit_breakers_));
+
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport())
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(false));
+
+  // Create a filter state with a custom port value.
+  constexpr uint32_t filter_state_port = 9999;
+  filter_state_->setData("envoy.upstream.dynamic_port",
+                         std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Should use "foo" from host header but port from filter state.
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_,
+              loadDnsCacheEntry_(Eq("foo"), filter_state_port, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+
+  filter_->decodeHeaders(request_headers_, false);
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+TEST_F(ProxyFilterWithFilterStateHostTest, WithFilterStateHostAndPortPresent) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+
+  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillByDefault(Return(circuit_breakers_));
+
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport())
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(false));
+
+  // Create a filter state with both custom host and port values.
+  const std::string filter_state_host = "filter-state-host.example.com";
+  constexpr uint32_t filter_state_port = 9999;
+  filter_state_->setData("envoy.upstream.dynamic_host",
+                         std::make_unique<Router::StringAccessorImpl>(filter_state_host),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_->setData("envoy.upstream.dynamic_port",
+                         std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Should use both host and port from filter state.
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_,
+              loadDnsCacheEntry_(Eq(filter_state_host), filter_state_port, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+
+  filter_->decodeHeaders(request_headers_, false);
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStatePortWhenFlagDisabled) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+
+  ON_CALL(callbacks_, route()).WillByDefault(Return(callbacks_.route_));
+  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+      .WillByDefault(
+          Return(&factory_context_.server_factory_context_.cluster_manager_.thread_local_cluster_));
+  ON_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillByDefault(Return(circuit_breakers_));
+
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport())
+      .Times(AnyNumber())
+      .WillRepeatedly(Return(false));
+
+  // Create a filter state with both custom host and port values.
+  const std::string filter_state_host = "filter-state-host.example.com";
+  constexpr uint32_t filter_state_port = 9999;
+  filter_state_->setData("envoy.upstream.dynamic_host",
+                         std::make_unique<Router::StringAccessorImpl>(filter_state_host),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state_->setData("envoy.upstream.dynamic_port",
+                         std::make_unique<StreamInfo::UInt32AccessorImpl>(filter_state_port),
+                         StreamInfo::FilterState::StateType::ReadOnly,
+                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Should use "foo" from host header and default port 80, ignoring filter state.
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("foo"), 80, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+
+  filter_->decodeHeaders(request_headers_, false);
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
 }
 
 } // namespace
