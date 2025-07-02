@@ -300,5 +300,10 @@ new_features:
 - area: matcher
   change: |
     added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
+- area: lua
+  change: |
+    Added ``virtualHostMetadata()`` API to the HTTP Lua filter, enabling Lua scripts to access metadata configured at the
+    virtual host level. This reduces duplication of metadata across routes within the same virtual host and improves scripting
+    flexibility.
 
 deprecated:

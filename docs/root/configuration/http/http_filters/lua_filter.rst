@@ -494,7 +494,7 @@ Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_c
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
 ``virtualHostMetadata()``
-^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: lua
 
