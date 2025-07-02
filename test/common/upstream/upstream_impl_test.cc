@@ -30,7 +30,6 @@
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 
-// #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -4172,7 +4171,7 @@ class ClusterInfoImplTest : public testing::Test, public UpstreamImplTestBase {
 public:
   ClusterInfoImplTest() { ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_)); }
 
-  std::shared_ptr<DnsClusterImpl> makeCluster(const std::string& yaml) {
+  std::shared_ptr<ClusterImplBase> makeCluster(const std::string& yaml) {
     cluster_config_ = parseClusterFromV3Yaml(yaml);
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
@@ -4181,7 +4180,7 @@ public:
     DnsClusterFactory factory{};
     auto status_or_cluster = factory.create(cluster_config_, factory_context);
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
-    return std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
+    return std::dynamic_pointer_cast<ClusterImplBase>(status_or_cluster->first);
   }
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
@@ -4197,12 +4196,19 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_ = Api::createApiForTest(stats_, random_);
   NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
+  TestScopedRuntime scoped_runtime_;
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
 
   ReadyWatcher initialized_;
   envoy::config::cluster::v3::Cluster cluster_config_;
 };
+
+class ParametrizedClusterInfoImplTest : public ClusterInfoImplTest,
+                                        public testing::WithParamInterface<const char*> {};
+
+INSTANTIATE_TEST_SUITE_P(DnsImplementations, ParametrizedClusterInfoImplTest,
+                        testing::ValuesIn({"true", "false"}));
 
 struct Foo : public Envoy::Config::TypedMetadata::Object {};
 
@@ -4230,7 +4236,9 @@ public:
 };
 
 // Cluster metadata and common config retrieval.
-TEST_F(ClusterInfoImplTest, Metadata) {
+TEST_P(ParametrizedClusterInfoImplTest, Metadata) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4265,7 +4273,7 @@ TEST_F(ClusterInfoImplTest, Metadata) {
 }
 
 // Verify retry budget default values are honored.
-TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
+TEST_P(ParametrizedClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4328,7 +4336,7 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   EXPECT_EQ(min_retry_concurrency, 123UL);
 }
 
-TEST_F(ClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
+TEST_P(ParametrizedClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
   std::string yaml = R"EOF(
     name: name
     type: STRICT_DNS
@@ -4344,7 +4352,7 @@ TEST_F(ClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
                             "load_stats_config can be specified");
 }
 
-TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
+TEST_P(ParametrizedClusterInfoImplTest, UnsupportedPerHostFields) {
   std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4364,7 +4372,7 @@ TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
 }
 
 // Eds service_name is populated.
-TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
+TEST_P(ParametrizedClusterInfoImplTest, EdsServiceNamePopulation) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4411,7 +4419,7 @@ TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
 }
 
 // Typed metadata loading throws exception.
-TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
+TEST_P(ParametrizedClusterInfoImplTest, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4439,7 +4447,7 @@ TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.
-TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
+TEST_P(ParametrizedClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4465,7 +4473,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
                             "protocol options implementation for name: 'no_such_filter'");
 }
 
-TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
+TEST_P(ParametrizedClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4489,7 +4497,7 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
                             "protocol options implementation for name: 'no_such_filter'");
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   const std::string yaml_disabled = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4524,7 +4532,7 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackRequestResponseSizes) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4545,7 +4553,7 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rs_body_size_.unit());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4592,7 +4600,7 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(4U, high_remaining_retries.value());
 }
 
-TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
+TEST_P(ParametrizedClusterInfoImplTest, DefaultConnectTimeout) {
   const std::string yaml = R"EOF(
   name: cluster1
   type: STRICT_DNS
@@ -4606,7 +4614,7 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
   EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
 }
 
-TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
+TEST_P(ParametrizedClusterInfoImplTest, MaxConnectionDurationTest) {
   constexpr absl::string_view yaml_base = R"EOF(
   name: {}
   type: STRICT_DNS
@@ -4635,7 +4643,7 @@ TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
   EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
 }
 
-TEST_F(ClusterInfoImplTest, Timeouts) {
+TEST_P(ParametrizedClusterInfoImplTest, Timeouts) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4726,7 +4734,7 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   }
 }
 
-TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
+TEST_P(ParametrizedClusterInfoImplTest, TcpPoolIdleTimeout) {
   constexpr absl::string_view yaml_base = R"EOF(
   name: {}
   type: STRICT_DNS
@@ -4752,7 +4760,7 @@ TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
   EXPECT_EQ(absl::nullopt, cluster3->info()->tcpPoolIdleTimeout());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -4788,7 +4796,7 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
   EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackTimeoutBudgets) {
   // Check that with the flag, the histogram is created.
   const std::string yaml = R"EOF(
     name: name
@@ -4809,7 +4817,7 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
             tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
-TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
+TEST_P(ParametrizedClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -4843,7 +4851,7 @@ TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld))
 }
 
 // Validates HTTP2 SETTINGS config.
-TEST_F(ClusterInfoImplTest, Http2ProtocolOptions) {
+TEST_P(ParametrizedClusterInfoImplTest, Http2ProtocolOptions) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -5083,7 +5091,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 
   // This vector is used to gather clusters with extension_protocol_options from the different
   // types of extension factories (network, http).
-  std::vector<std::shared_ptr<DnsClusterImpl>> clusters;
+  std::vector<std::shared_ptr<ClusterImplBase>> clusters;
 
   {
     // Get the cluster with extension_protocol_options for a network filter factory.
