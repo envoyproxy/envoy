@@ -29,7 +29,6 @@
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
-
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -4208,7 +4207,7 @@ class ParametrizedClusterInfoImplTest : public ClusterInfoImplTest,
                                         public testing::WithParamInterface<const char*> {};
 
 INSTANTIATE_TEST_SUITE_P(DnsImplementations, ParametrizedClusterInfoImplTest,
-                        testing::ValuesIn({"true", "false"}));
+                         testing::ValuesIn({"true", "false"}));
 
 struct Foo : public Envoy::Config::TypedMetadata::Object {};
 
