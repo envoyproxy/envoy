@@ -97,6 +97,12 @@ public:
   virtual const ProtobufWkt::Struct& metadata() const PURE;
 
   /**
+   * @return const ProtobufWkt::Struct& the value of metadata inside the lua filter scope of current
+   * virtual host.
+   */
+  virtual const ProtobufWkt::Struct& virtualHostMetadata() const PURE;
+
+  /**
    * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
    * accommodate write API e.g. setDynamicMetadata().
    */
@@ -190,6 +196,7 @@ public:
             {"bodyChunks", static_luaBodyChunks},
             {"trailers", static_luaTrailers},
             {"metadata", static_luaMetadata},
+            {"virtualHostMetadata", static_luaVirtualHostMetadata},
             {"httpCall", static_luaHttpCall},
             {"respond", static_luaRespond},
             {"streamInfo", static_luaStreamInfo},
@@ -257,6 +264,11 @@ private:
    * @return a handle to the metadata.
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
+
+  /**
+   * @return a handle to the virtual host metadata.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVirtualHostMetadata);
 
   /**
    * @return a handle to the stream info.
@@ -358,6 +370,7 @@ private:
     body_wrapper_.reset();
     trailers_wrapper_.reset();
     metadata_wrapper_.reset();
+    virtual_host_metadata_wrapper_.reset();
     filter_context_wrapper_.reset();
     stream_info_wrapper_.reset();
     connection_wrapper_.reset();
@@ -386,6 +399,8 @@ private:
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>
+      virtual_host_metadata_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>
       filter_context_wrapper_;
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
@@ -551,6 +566,7 @@ private:
                  lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override;
+    const ProtobufWkt::Struct& virtualHostMetadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
@@ -584,6 +600,7 @@ private:
                  lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override;
+    const ProtobufWkt::Struct& virtualHostMetadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();

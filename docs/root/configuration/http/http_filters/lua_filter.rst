@@ -54,8 +54,8 @@ A simple example of configuring the Lua HTTP filter that contains only :ref:`def
 
 .. literalinclude:: _include/lua-filter.yaml
     :language: yaml
-    :lines: 34-46
-    :lineno-start: 34
+    :lines: 41-53
+    :lineno-start: 41
     :linenos:
     :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
@@ -486,8 +486,31 @@ Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_c
 
 .. literalinclude:: _include/lua-filter.yaml
     :language: yaml
-    :lines: 26-32
-    :lineno-start: 26
+    :lines: 30-36
+    :lineno-start: 30
+    :linenos:
+    :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
+
+Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
+
+``virtualHostMetadata()``
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local vhost_metadata = handle:virtualHostMetadata()
+
+Returns the current virtual host metadata. Note that the metadata should be specified
+under the :ref:`filter config name
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+If no entry could be found by the filter config name, a nil will be returned.
+
+Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.VirtualHost>`.
+
+.. literalinclude:: _include/lua-filter.yaml
+    :language: yaml
+    :lines: 20-26
+    :lineno-start: 20
     :linenos:
     :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
