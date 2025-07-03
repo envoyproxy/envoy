@@ -40,14 +40,17 @@ class ReverseIterator {
 private:
     std::shared_ptr<Node<K, T>> node;
     LeafNode<K, T>* iterLeafNode;
+    int iterCounter;
     K key;
 
 public:
     ReverseIterator(std::shared_ptr<Node<K, T>> n) : node(n) {
         if (node) {
             iterLeafNode = node->maxLeaf;
+            iterCounter = node->leaves_in_subtree;
         } else {
             iterLeafNode = nullptr;
+            iterCounter = 0;
         }
     }
 
@@ -56,12 +59,15 @@ public:
         key = prefix;
         auto n = node;
         K search = prefix;
+        iterLeafNode = node->maxLeaf;
+        iterCounter = node->leaves_in_subtree;
         
         while (n) {
             // Check for key exhaustion
             if (search.empty()) {
                 node = n;
                 iterLeafNode = node->maxLeaf;
+                iterCounter = node->leaves_in_subtree;
                 return;
             }
 
@@ -70,6 +76,7 @@ public:
             if (!nextNode) {
                 node = nullptr;
                 iterLeafNode = nullptr;
+                iterCounter = 0;
                 return;
             }
 
@@ -79,10 +86,12 @@ public:
             } else if (hasPrefix(nextNode->prefix, search)) {
                 node = nextNode;
                 iterLeafNode = node->maxLeaf;
+                iterCounter = node->leaves_in_subtree;
                 return;
             } else {
                 node = nullptr;
                 iterLeafNode = nullptr;
+                iterCounter = 0;
                 return;
             }
             
@@ -100,7 +109,9 @@ public:
         IteratorResult<K, T> result;
         result.found = false;
 
-        if (iterLeafNode) {
+        if (iterCounter > 0 && iterLeafNode) {
+            iterCounter--;
+            
             result.key = iterLeafNode->key;
             result.val = iterLeafNode->val;
             result.found = true;
