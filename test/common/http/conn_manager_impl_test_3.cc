@@ -1298,7 +1298,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
       std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
   EXPECT_CALL(cluster_manager_, getThreadLocalCluster(_)).WillOnce(Return(fake_cluster1.get()));
   EXPECT_CALL(*route_config_, route(_, _, _, _))
-      .WillOnce(Return(Router::VHostRoute{route1->virtual_host_, route1}));
+      .WillOnce(Return(Router::VirtualHostRoute{route1->virtual_host_, route1}));
   // First no-scope-found request will be handled by decoder_filters_[0].
   setupFilterChain(1, 0);
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
@@ -1306,7 +1306,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
         EXPECT_EQ(nullptr, decoder_filters_[0]->callbacks_->route());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().vhost(), nullptr);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(), nullptr);
         EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), nullptr);
 
         // Clear route and next call on callbacks_->route() will trigger a re-snapping of the
@@ -1318,7 +1318,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsUpdate) {
         EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().vhost(), route1->virtual_host_);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(),
+                  route1->virtual_host_);
         EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), route1);
 
         return FilterHeadersStatus::StopIteration;
@@ -1344,9 +1345,9 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
   std::shared_ptr<Router::MockRoute> route1 = std::make_shared<NiceMock<Router::MockRoute>>();
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*route_config1, route(_, _, _, _))
-      .WillRepeatedly(Return(Router::VHostRoute{route1->virtual_host_, route1}));
+      .WillRepeatedly(Return(Router::VirtualHostRoute{route1->virtual_host_, route1}));
   EXPECT_CALL(*route_config2, route(_, _, _, _))
-      .WillRepeatedly(Return(Router::VHostRoute{route2->virtual_host_, route2}));
+      .WillRepeatedly(Return(Router::VirtualHostRoute{route2->virtual_host_, route2}));
   EXPECT_CALL(*static_cast<const Router::MockScopeKeyBuilder*>(scopeKeyBuilder().ptr()),
               computeScopeKey(_))
       .Times(3)
@@ -1386,7 +1387,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().vhost(), route1->virtual_host_);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(),
+                  route1->virtual_host_);
         EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), route1);
 
         auto& test_headers = dynamic_cast<TestRequestHeaderMapImpl&>(headers);
@@ -1404,7 +1406,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsCrossScopeReroute) {
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().vhost(), route2->virtual_host_);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(),
+                  route2->virtual_host_);
         EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), route2);
 
         return FilterHeadersStatus::StopIteration;
@@ -1439,7 +1442,7 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
       *static_cast<const Router::MockConfig*>(
           scopedRouteConfigProvider()->config<Router::MockScopedConfig>()->route_config_.get()),
       route(_, _, _, _))
-      .WillOnce(Return(Router::VHostRoute{route1->virtual_host_, route1}));
+      .WillOnce(Return(Router::VirtualHostRoute{route1->virtual_host_, route1}));
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> Http::Status {
     decoder_ = &conn_manager_->newStream(response_encoder_);
     RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
@@ -1454,7 +1457,8 @@ TEST_F(HttpConnectionManagerImplTest, TestSrdsRouteFound) {
         EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().vhost(), route1->virtual_host_);
+        EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().virtualHost(),
+                  route1->virtual_host_);
         EXPECT_EQ(decoder_filters_[0]->callbacks_->streamInfo().route(), route1);
 
         return FilterHeadersStatus::StopIteration;
@@ -2783,7 +2787,7 @@ TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteClusterWithoutRouteCache) 
       }));
 
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(Router::VHostRoute{}));
+      .WillOnce(Return(Router::VirtualHostRoute{}));
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
@@ -2791,7 +2795,7 @@ TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteClusterWithoutRouteCache) 
         filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(filter->callbacks_->streamInfo().vhost(), nullptr);
+        EXPECT_EQ(filter->callbacks_->streamInfo().virtualHost(), nullptr);
         EXPECT_EQ(filter->callbacks_->streamInfo().route(), nullptr);
 
         return FilterHeadersStatus::StopIteration;
@@ -2828,7 +2832,7 @@ TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteCluster) {
 
   auto mock_route_0 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(Router::VHostRoute{mock_route_0->virtual_host_, mock_route_0}));
+      .WillOnce(Return(Router::VirtualHostRoute{mock_route_0->virtual_host_, mock_route_0}));
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([&](RequestHeaderMap&, bool) -> FilterHeadersStatus {
@@ -2840,7 +2844,7 @@ TEST_F(HttpConnectionManagerImplTest, TestRefreshRouteCluster) {
         EXPECT_CALL(cluster_manager_, getThreadLocalCluster("cluster_after_refrsh"));
 
         // The virtual host and the route will be stored in the stream info.
-        EXPECT_EQ(filter->callbacks_->streamInfo().vhost(), mock_route_0->virtual_host_);
+        EXPECT_EQ(filter->callbacks_->streamInfo().virtualHost(), mock_route_0->virtual_host_);
         EXPECT_EQ(filter->callbacks_->streamInfo().route(), mock_route_0);
 
         filter->callbacks_->downstreamCallbacks()->refreshRouteCluster();

@@ -116,7 +116,7 @@ RouteMatcherImpl::RouteMatcherImpl(const ProtoRouteConfiguration& route_config,
 
   // TODO(wbpcode): maybe share the same code with common/router/config_impl.cc by using template.
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
-    VirtualHostSharedPtr virtual_host =
+    VirtualHostImplSharedPtr virtual_host =
         std::make_shared<VirtualHostImpl>(virtual_host_config, context, validate_clusters);
     for (const std::string& host_name : virtual_host_config.hosts()) {
       if (host_name.empty()) {

@@ -107,7 +107,8 @@ using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
 
 class SslRedirectRoute : public Route {
 public:
-  SslRedirectRoute(VHostConstSharedPtr virtual_host) : virtual_host_(std::move(virtual_host)) {}
+  SslRedirectRoute(VirtualHostConstSharedPtr virtual_host)
+      : virtual_host_(std::move(virtual_host)) {}
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
@@ -122,10 +123,10 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const std::string& routeName() const override { return EMPTY_STRING; }
-  const VHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
+  const VirtualHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
 
 private:
-  const VHostConstSharedPtr virtual_host_;
+  const VirtualHostConstSharedPtr virtual_host_;
 
   static const SslRedirector SSL_REDIRECTOR;
   static const envoy::config::core::v3::Metadata metadata_;
@@ -374,7 +375,7 @@ public:
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
-  VHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
+  VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
 
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
@@ -388,7 +389,7 @@ private:
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 
-using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
+using VirtualHostImplSharedPtr = std::shared_ptr<VirtualHostImpl>;
 
 /**
  * Implementation of RetryPolicy that reads from the proto route or virtual host config.
@@ -749,9 +750,9 @@ public:
     return getOptionalTimeout<OptionalTimeoutNames::GrpcTimeoutOffset>();
   }
 
-  const VHostConstSharedPtr& virtualHost() const override {
+  const VirtualHostConstSharedPtr& virtualHost() const override {
     // The method cannot return the vhost_ directly because the vhost_ has different type with
-    // the VHostConstSharedPtr and will create a temporary copy implicitly and result in error
+    // the VirtualHostConstSharedPtr and will create a temporary copy implicitly and result in error
     // of returning reference to local temporary object.
     return vhost_copy_;
   }
@@ -922,7 +923,7 @@ private:
   const CommonVirtualHostSharedPtr vhost_;
   // Same with vhost_ but this could be returned as reference. vhost_ is kept to access the
   // methods that not exposed in the VirtualHost.
-  const VHostConstSharedPtr vhost_copy_;
+  const VirtualHostConstSharedPtr vhost_copy_;
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
   const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
   const std::string host_rewrite_path_regex_substitution_;
@@ -1241,8 +1242,8 @@ public:
          Server::Configuration::ServerFactoryContext& factory_context,
          ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
-  VHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                   const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
+  VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
 
@@ -1254,7 +1255,7 @@ private:
                absl::Status& creation_status);
 
   using WildcardVirtualHosts =
-      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
+      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostImplSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
@@ -1262,10 +1263,10 @@ private:
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   Stats::ScopeSharedPtr vhost_scope_;
-  absl::node_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
+  absl::node_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
-  // A note on using an unordered_map versus a vector of (string, VirtualHostSharedPtr) pairs:
+  // A note on using an unordered_map versus a vector of (string, VirtualHostImplSharedPtr) pairs:
   //
   // Based on local benchmarks, each vector entry costs around 20ns for recall and (string)
   // comparison with a fixed cost of about 25ns. For unordered_map, the empty map costs about 65ns
@@ -1275,7 +1276,7 @@ private:
   WildcardVirtualHosts wildcard_virtual_host_suffixes_;
   WildcardVirtualHosts wildcard_virtual_host_prefixes_;
 
-  VirtualHostSharedPtr default_virtual_host_;
+  VirtualHostImplSharedPtr default_virtual_host_;
   const bool ignore_port_in_host_matching_{false};
 };
 
@@ -1366,12 +1367,14 @@ public:
   }
 
   // Router::Config
-  VHostRoute route(const Http::RequestHeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
-                   uint64_t random_value) const override {
+  VirtualHostRoute route(const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info,
+                         uint64_t random_value) const override {
     return route(nullptr, headers, stream_info, random_value);
   }
-  VHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                   const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const override;
+  VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info,
+                         uint64_t random_value) const override;
   const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return shared_config_->internalOnlyHeaders();
   }
@@ -1413,13 +1416,13 @@ private:
 class NullConfigImpl : public Config {
 public:
   // Router::Config
-  VHostRoute route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
-                   uint64_t) const override {
+  VirtualHostRoute route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+                         uint64_t) const override {
     return {};
   }
 
-  VHostRoute route(const RouteCallback&, const Http::RequestHeaderMap&,
-                   const StreamInfo::StreamInfo&, uint64_t) const override {
+  VirtualHostRoute route(const RouteCallback&, const Http::RequestHeaderMap&,
+                         const StreamInfo::StreamInfo&, uint64_t) const override {
     return {};
   }
 

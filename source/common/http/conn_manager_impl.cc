@@ -1671,7 +1671,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
     return;
   }
 
-  Router::VHostRoute route_result;
+  Router::VirtualHostRoute route_result;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_->isRoutable() &&
         connection_manager_.config_->scopedRouteConfigProvider() != nullptr &&
@@ -1685,7 +1685,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
     }
   }
 
-  setVHostRoute(std::move(route_result));
+  setVirtualHostRoute(std::move(route_result));
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
@@ -2104,12 +2104,12 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
 }
 
 void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
-  Router::VHostRoute vhost_route;
+  Router::VirtualHostRoute vhost_route;
   if (route != nullptr) {
     vhost_route.vhost = route->virtualHost();
     vhost_route.route = std::move(route);
   }
-  setVHostRoute(std::move(vhost_route));
+  setVirtualHostRoute(std::move(vhost_route));
 }
 
 /**
@@ -2120,7 +2120,8 @@ void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr r
  * Declared as a StreamFilterCallbacks member function for filters to call directly, but also
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
-void ConnectionManagerImpl::ActiveStream::setVHostRoute(Router::VHostRoute vhost_route) {
+void ConnectionManagerImpl::ActiveStream::setVirtualHostRoute(
+    Router::VirtualHostRoute vhost_route) {
   // If the cached route is blocked then any attempt to clear it or refresh it
   // will be ignored.
   if (routeCacheBlocked()) {

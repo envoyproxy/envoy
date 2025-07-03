@@ -12,7 +12,7 @@ const Router::InternalRedirectPolicyImpl RouteEntryImpl::internal_redirect_polic
 const Router::PathMatcherSharedPtr RouteEntryImpl::path_matcher_;
 const Router::PathRewriterSharedPtr RouteEntryImpl::path_rewriter_;
 const std::vector<Router::ShadowPolicyPtr> RouteEntryImpl::shadow_policies_;
-const Router::VHostConstSharedPtr NullRouteImpl::virtual_host_ =
+const Router::VirtualHostConstSharedPtr NullRouteImpl::virtual_host_ =
     std::make_shared<NullVirtualHost>();
 const NullRateLimitPolicy NullVirtualHost::rate_limit_policy_;
 const NullCommonConfig NullVirtualHost::route_configuration_;

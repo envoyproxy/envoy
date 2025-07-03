@@ -458,7 +458,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto& vhost = wrapper.info_->vhost();
+             const auto& vhost = wrapper.info_->virtualHost();
              if (vhost == nullptr) {
                return {};
              }
@@ -469,7 +469,7 @@ const XDSLookupValues& XDSLookupValues::get() {
              if (wrapper.info_ == nullptr) {
                return {};
              }
-             const auto& vhost = wrapper.info_->vhost();
+             const auto& vhost = wrapper.info_->virtualHost();
              if (vhost == nullptr) {
                return {};
              }

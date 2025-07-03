@@ -1890,7 +1890,7 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
           factory_context.routerContext().virtualClusterStatNames().vhost_)),
       ignore_port_in_host_matching_(route_config.ignore_port_in_host_matching()) {
   for (const auto& virtual_host_config : route_config.virtual_hosts()) {
-    VirtualHostSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
+    VirtualHostImplSharedPtr virtual_host = std::make_shared<VirtualHostImpl>(
         virtual_host_config, global_route_config, factory_context, *vhost_scope_, validator,
         validate_clusters, creation_status);
     SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
@@ -1975,10 +1975,10 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   return default_virtual_host_.get();
 }
 
-VHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                               const StreamInfo::StreamInfo& stream_info,
-                               uint64_t random_value) const {
-  VHostRoute route_result;
+VirtualHostRoute RouteMatcher::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                     const StreamInfo::StreamInfo& stream_info,
+                                     uint64_t random_value) const {
+  VirtualHostRoute route_result;
   const VirtualHostImpl* virtual_host = findVirtualHost(headers);
   if (virtual_host) {
     route_result.vhost = virtual_host->virtualHost();
@@ -2127,9 +2127,9 @@ ConfigImpl::ConfigImpl(const envoy::config::route::v3::RouteConfiguration& confi
   route_matcher_ = std::move(matcher_or_error.value());
 }
 
-VHostRoute ConfigImpl::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                             const StreamInfo::StreamInfo& stream_info,
-                             uint64_t random_value) const {
+VirtualHostRoute ConfigImpl::route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   uint64_t random_value) const {
   return route_matcher_->route(cb, headers, stream_info, random_value);
 }
 

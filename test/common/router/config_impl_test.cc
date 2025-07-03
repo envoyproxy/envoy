@@ -87,27 +87,27 @@ public:
     }
   }
 
-  VHostRoute route(const Http::RequestHeaderMap& headers,
-                   const Envoy::StreamInfo::StreamInfo& stream_info,
-                   uint64_t random_value) const override {
+  VirtualHostRoute route(const Http::RequestHeaderMap& headers,
+                         const Envoy::StreamInfo::StreamInfo& stream_info,
+                         uint64_t random_value) const override {
 
     setupRouteConfig(headers, random_value);
     return ConfigImpl::route(headers, stream_info, random_value);
   }
 
-  VHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                   const StreamInfo::StreamInfo& stream_info,
-                   uint64_t random_value) const override {
+  VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info,
+                         uint64_t random_value) const override {
 
     setupRouteConfig(headers, random_value);
     return ConfigImpl::route(cb, headers, stream_info, random_value);
   }
 
-  VHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers) const {
+  VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers) const {
     return route(cb, headers, NiceMock<Envoy::StreamInfo::MockStreamInfo>(), 0);
   }
 
-  VHostRoute route(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
+  VirtualHostRoute route(const Http::RequestHeaderMap& headers, uint64_t random_value) const {
     return route(headers, NiceMock<Envoy::StreamInfo::MockStreamInfo>(), random_value);
   }
 

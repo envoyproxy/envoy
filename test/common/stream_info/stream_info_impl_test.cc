@@ -322,7 +322,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_TRUE(stream_info.healthCheck());
 
     EXPECT_EQ(nullptr, stream_info.route());
-    EXPECT_EQ(nullptr, stream_info.vhost());
+    EXPECT_EQ(nullptr, stream_info.virtualHost());
 
     std::shared_ptr<NiceMock<Router::MockVirtualHost>> vhost =
         std::make_shared<NiceMock<Router::MockVirtualHost>>();
@@ -330,7 +330,7 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.vhost_ = vhost;
 
     // If the route is invalid then the vhost will be used.
-    EXPECT_EQ(vhost, stream_info.vhost());
+    EXPECT_EQ(vhost, stream_info.virtualHost());
 
     std::shared_ptr<NiceMock<Router::MockRoute>> route =
         std::make_shared<NiceMock<Router::MockRoute>>();

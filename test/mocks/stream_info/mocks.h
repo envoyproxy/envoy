@@ -139,7 +139,7 @@ public:
   MOCK_METHOD(void, healthCheck, (bool is_health_check));
   MOCK_METHOD(const Network::ConnectionInfoProvider&, downstreamAddressProvider, (), (const));
   MOCK_METHOD(Router::RouteConstSharedPtr, route, (), (const));
-  MOCK_METHOD(const Router::VHostConstSharedPtr&, vhost, (), (const));
+  MOCK_METHOD(const Router::VirtualHostConstSharedPtr&, virtualHost, (), (const));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
@@ -204,7 +204,7 @@ public:
   DownstreamTiming downstream_timing_;
   std::string downstream_transport_failure_reason_;
   std::string stream_flags_;
-  Router::VHostConstSharedPtr virtual_host_;
+  Router::VirtualHostConstSharedPtr virtual_host_;
 };
 
 } // namespace StreamInfo
