@@ -845,7 +845,8 @@ public:
   virtual Router::RouteConstSharedPtr route() const PURE;
 
   /**
-   * @return OptRef<const Router::VirtualHost> Get the virtual host selected for this request.
+   * @return const Router::VirtualHostConstSharedPtr& Get the virtual host selected for this
+   * request.
    */
   virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
 
