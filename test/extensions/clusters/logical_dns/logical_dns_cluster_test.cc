@@ -478,6 +478,8 @@ TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRate) {
 }
 
 TEST_P(LogicalDnsImplementationsTest, BadConfig) {
+  scoped_runtime_.mergeValues(
+    {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string multiple_hosts_yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -729,6 +731,8 @@ TEST_P(LogicalDnsImplementationsTest, BadConfig) {
 
 // Test using both types of names in the cluster type.
 TEST_P(LogicalDnsImplementationsTest, UseDnsExtension) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   cluster_type:
@@ -766,6 +770,8 @@ TEST_P(LogicalDnsImplementationsTest, UseDnsExtension) {
 }
 
 TEST_P(LogicalDnsImplementationsTest, TypedConfigBackcompat) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   cluster_type:
@@ -800,6 +806,8 @@ TEST_P(LogicalDnsImplementationsTest, TypedConfigBackcompat) {
 }
 
 TEST_P(LogicalDnsImplementationsTest, Basic) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string basic_yaml_hosts = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -853,6 +861,8 @@ TEST_P(LogicalDnsImplementationsTest, Basic) {
 }
 
 TEST_P(LogicalDnsImplementationsTest, DontWaitForDNSOnInit) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -887,6 +897,8 @@ TEST_P(LogicalDnsImplementationsTest, DontWaitForDNSOnInit) {
 }
 
 TEST_P(LogicalDnsImplementationsTest, DNSRefreshHasJitter) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -927,6 +939,8 @@ TEST_P(LogicalDnsImplementationsTest, DNSRefreshHasJitter) {
 }
 
 TEST_P(LogicalDnsImplementationsTest, NegativeDnsJitter) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -947,6 +961,8 @@ TEST_P(LogicalDnsImplementationsTest, NegativeDnsJitter) {
 }
 
 TEST_P(LogicalDnsImplementationsTest, ExtremeJitter) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   // When random returns large values, they were being reinterpreted as very negative values causing
   // negative refresh rates.
   const std::string jitter_yaml = R"EOF(
@@ -987,6 +1003,8 @@ TEST_P(LogicalDnsImplementationsTest, ExtremeJitter) {
 // primary address of a host, but also the following addresses returned by
 // the DNS response. This is important for Happy Eyeballs.
 TEST_P(LogicalDnsImplementationsTest, LogicalDnsUpdatesEntireAddressList) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   cluster_type:
