@@ -62,10 +62,20 @@ minor_behavior_changes:
    :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
    :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
    will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
+- area: tracing
+  change: |
+    Add :ref:`max_cache_size <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.max_cache_size>`
+    to the OpenTelemetry tracer config. This limits the number of spans that can be cached before flushing.
 - area: aws
   change: |
     :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
     providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
+- area: ext_proc
+  change: |
+    If ext_proc server sends spurious response message to Envoy, Envoy now performs fail-open or fail-close action based on
+    :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`
+    configuration. This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_fail_close_spurious_resp`` to ``false``.
 - area: filters
   change: |
     :ref:`Credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>` is no longer
@@ -302,5 +312,8 @@ new_features:
 - area: matcher
   change: |
     added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
+- area: stateful_session
+  change: |
+    Added support for cookie attributes to stateful session cookie.
 
 deprecated:

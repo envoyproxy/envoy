@@ -237,7 +237,7 @@ class FastFailOrderingTest : public OrderingTest {
 
 // A call with a totally crazy response
 TEST_F(OrderingTest, TotallyInvalidResponse) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -581,7 +581,7 @@ TEST_F(OrderingTest, ImmediateResponseOnResponse) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -598,7 +598,7 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply) {
 // headers message -- should close stream and stop sending, but otherwise
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
@@ -616,6 +616,7 @@ TEST_F(OrderingTest, IncorrectRequestHeadersReply2) {
 // continue without error.
 TEST_F(OrderingTest, IncorrectRequestBodyReply) {
   initialize([](ExternalProcessor& cfg) {
+    cfg.set_failure_mode_allow(true);
     auto* pm = cfg.mutable_processing_mode();
     pm->set_request_body_mode(ProcessingMode::BUFFERED);
     pm->set_response_body_mode(ProcessingMode::BUFFERED);
@@ -645,7 +646,7 @@ TEST_F(OrderingTest, IncorrectRequestBodyReply) {
 // Receive a request headers reply in response to the response
 // headers message -- should continue without error.
 TEST_F(OrderingTest, IncorrectResponseHeadersReply) {
-  initialize(absl::nullopt);
+  initialize([](ExternalProcessor& cfg) { cfg.set_failure_mode_allow(true); });
 
   EXPECT_CALL(stream_delegate_, send(_, false));
   sendRequestHeadersGet(true);
