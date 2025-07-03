@@ -126,7 +126,7 @@ private:
   std::string name_;
   Matcher::MatchTreeSharedPtr<MatchInput> matcher_;
 };
-using VirtualHostImplSharedPtr = std::shared_ptr<VirtualHostImpl>;
+using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
 
 class RouteMatcherImpl : public RouteMatcher, Logger::Loggable<Envoy::Logger::Id::filter> {
 public:
@@ -142,7 +142,7 @@ public:
 
 private:
   using WildcardVirtualHosts =
-      std::map<int64_t, absl::flat_hash_map<std::string, VirtualHostImplSharedPtr>, std::greater<>>;
+      std::map<int64_t, absl::flat_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
@@ -150,10 +150,10 @@ private:
 
   std::string name_;
 
-  absl::flat_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
+  absl::flat_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
-  // A note on using an unordered_map versus a vector of (string, VirtualHostImplSharedPtr) pairs:
+  // A note on using an unordered_map versus a vector of (string, VirtualHostSharedPtr) pairs:
   //
   // Based on local benchmarks, each vector entry costs around 20ns for recall and (string)
   // comparison with a fixed cost of about 25ns. For unordered_map, the empty map costs about 65ns
@@ -163,7 +163,7 @@ private:
   WildcardVirtualHosts wildcard_virtual_host_suffixes_;
   WildcardVirtualHosts wildcard_virtual_host_prefixes_;
 
-  VirtualHostImplSharedPtr default_virtual_host_;
+  VirtualHostSharedPtr default_virtual_host_;
 };
 
 } // namespace GenericProxy
