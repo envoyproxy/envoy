@@ -197,10 +197,10 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
       if (!socket_address.resolver_name().empty()) {
-        creation_status =
-            absl::InvalidArgumentError(all_addresses_in_single_endpoint_
-                                          ? "LOGICAL_DNS clusters must NOT have a custom resolver name set"
-                                          : "STRICT_DNS clusters must NOT have a custom resolver name set");
+        creation_status = absl::InvalidArgumentError(
+            all_addresses_in_single_endpoint_
+                ? "LOGICAL_DNS clusters must NOT have a custom resolver name set"
+                : "STRICT_DNS clusters must NOT have a custom resolver name set");
         return;
       }
 
