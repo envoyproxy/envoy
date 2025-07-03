@@ -479,7 +479,7 @@ TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRate) {
 
 TEST_P(LogicalDnsImplementationsTest, BadConfig) {
   scoped_runtime_.mergeValues(
-    {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string multiple_hosts_yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
