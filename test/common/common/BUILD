@@ -452,7 +452,7 @@ envoy_cc_benchmark_binary(
     srcs = ["trie_lookup_table_speed_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/common:trie_lookup_table_lib",
+        "//source/common/common:radix_tree_lib",
         "@com_github_google_benchmark//:benchmark",
         "@com_google_absl//absl/strings",
     ],

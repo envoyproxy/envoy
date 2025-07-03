@@ -484,6 +484,13 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "radix_tree_lib",
+    deps = [
+        "//source/common/common/radix:radix_tree_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],

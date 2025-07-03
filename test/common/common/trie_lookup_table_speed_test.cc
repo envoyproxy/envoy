@@ -5,7 +5,7 @@
 
 #include "envoy/http/header_map.h"
 
-#include "source/common/common/trie_lookup_table.h"
+#include "source/common/common/radix/tree.hpp"
 #include "source/common/http/headers.h"
 
 #include "benchmark/benchmark.h"
@@ -18,9 +18,10 @@ template <class TableType>
 static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>& keys) {
   std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
   std::uniform_int_distribution<size_t> keyindex_distribution(0, keys.size() - 1);
-  TableType trie;
+  TableType tree;
   for (const std::string& key : keys) {
-    trie.add(key, nullptr);
+    auto [newTree, oldVal, didUpdate] = tree.insert(key, nullptr);
+    tree = newTree;
   }
   std::vector<size_t> key_selections;
   for (size_t i = 0; i < 1024; i++) {
@@ -29,12 +30,12 @@ static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>
 
   // key_index indexes into key_selections which is a pre-selected
   // random ordering of 1024 indexes into the existing keys. This
-  // way we read from all over the trie, without spending time during
+  // way we read from all over the tree, without spending time during
   // the performance test generating these random choices.
   size_t key_index = 0;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    auto v = trie.find(keys[key_selections[key_index++]]);
+    auto v = tree.Get(keys[key_selections[key_index++]]);
     // Reset key_index to 0 whenever it reaches 1024.
     key_index &= 1023;
     benchmark::DoNotOptimize(v);
@@ -67,19 +68,19 @@ template <class TableType> static void typedBmTrieLookups(benchmark::State& stat
 }
 
 static void bmTrieLookups(benchmark::State& s) {
-  typedBmTrieLookups<TrieLookupTable<const void*>>(s);
+  typedBmTrieLookups<Tree<std::string, const void*>>(s);
 }
 
 #define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
 static void bmTrieLookupsRequestHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<TrieLookupTable<const void*>>(s, keys);
+  typedBmTrieLookups<Tree<std::string, const void*>>(s, keys);
 }
 static void bmTrieLookupsResponseHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<TrieLookupTable<const void*>>(s, keys);
+  typedBmTrieLookups<Tree<std::string, const void*>>(s, keys);
 }
 
 BENCHMARK(bmTrieLookupsRequestHeaders);
