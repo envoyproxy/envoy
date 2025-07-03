@@ -304,5 +304,8 @@ new_features:
 - area: matcher
   change: |
     added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
+- area: stateful_session
+  change: |
+    Added support for cookie attributes to stateful session cookie.
 
 deprecated:
