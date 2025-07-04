@@ -123,199 +123,78 @@ public:
     }
 };
 
-// LowerBoundIterator class for finding the smallest key >= given key
+// PrefixIterator class for walking down the tree following a path
 template<typename K, typename T>
-class LowerBoundIterator {
+class PrefixIterator {
 private:
-    std::shared_ptr<Node<K, T>> node;
-    LeafNode<K, T>* iterLeafNode;
-    int iterCounter;
-    K key;
-    std::vector<std::shared_ptr<Node<K, T>>> stack;
-    std::vector<int> stackIndices;
+    std::shared_ptr<Node<K, T>> rootNode;
+    K searchPath;
+    std::vector<std::shared_ptr<Node<K, T>>> nodeStack;
+    size_t stackIndex;
+    bool initialized;
 
 public:
-    LowerBoundIterator(std::shared_ptr<Node<K, T>> n) : node(n) {
-        if (node) {
-            iterLeafNode = node->minLeaf;
-            iterCounter = node->leaves_in_subtree;
-        } else {
-            iterLeafNode = nullptr;
-            iterCounter = 0;
-        }
-    }
+    PrefixIterator(std::shared_ptr<Node<K, T>> n, const K& path)
+        : rootNode(n), searchPath(path), stackIndex(0), initialized(false) {}
 
-    // Seeks the iterator to the smallest key that is greater or equal to the given key
-    void seekLowerBound(const K& searchKey) {
-        // Wipe the stack
-        stack.clear();
-        stackIndices.clear();
-        
-        // Reset iterLeafNode to nullptr initially
-        iterLeafNode = nullptr;
-        
-        // i.node starts off in the common case as pointing to the root node of the
-        // tree. By the time we return we have either found a lower bound and setup
-        // the stack to traverse all larger keys, or we have not and the stack and
-        // node should both be nil to prevent the iterator from assuming it is just
-        // iterating the whole tree from the root node. Either way this needs to end
-        // up as nil so just set it here.
-        auto n = node;
-        node = nullptr;
-        K search = searchKey;
-
-        auto found = [this](std::shared_ptr<Node<K, T>> foundNode) {
-            // If the found node has a leaf, set it as the initial iterLeafNode
-            if (foundNode->leaf) {
-                iterLeafNode = foundNode->leaf.get();
-            } else {
-                // If no leaf, find the minimum leaf in this subtree
-                auto minLeaf = findMinLeaf(foundNode);
-                if (minLeaf) {
-                    iterLeafNode = minLeaf;
-                }
-            }
-            stack.push_back(foundNode);
-        };
-
-        auto findMin = [this, &found](std::shared_ptr<Node<K, T>> n) {
-            auto minNode = recurseMin(n);
-            if (minNode) {
-                found(minNode);
-                return;
-            }
-        };
-
-        while (true) {
-            // Compare current prefix with the search key's same-length prefix.
-            int prefixCmp;
-            if (n->prefix.size() < search.size()) {
-                K searchPrefix(search.begin(), search.begin() + n->prefix.size());
-                prefixCmp = n->prefix.compare(searchPrefix);
-            } else {
-                K nodePrefix(n->prefix.begin(), n->prefix.begin() + search.size());
-                prefixCmp = nodePrefix.compare(search);
-            }
-
-            if (prefixCmp > 0) {
-                // Prefix is larger, that means the lower bound is greater than the search
-                // and from now on we need to follow the minimum path to the smallest
-                // leaf under this subtree.
-                findMin(n);
-                return;
-            }
-
-            if (prefixCmp < 0) {
-                // Prefix is smaller than search prefix, that means there is no lower
-                // bound
-                node = nullptr;
-                iterLeafNode = nullptr;
-                return;
-            }
-
-            // Prefix is equal, we are still heading for an exact match. If this is a
-            // leaf and an exact match we're done.
-            if (n->leaf && n->leaf->key == searchKey) {
-                found(n);
-                return;
-            }
-
-            // Consume the search prefix if the current node has one. Note that this is
-            // safe because if n.prefix is longer than the search slice prefixCmp would
-            // have been > 0 above and the method would have already returned.
-            if (n->prefix.size() <= search.size()) {
-                search = K(search.begin() + n->prefix.size(), search.end());
-            }
-
-            if (search.empty()) {
-                // We've exhausted the search key, but the current node is not an exact
-                // match or not a leaf. That means that the leaf value if it exists, and
-                // all child nodes must be strictly greater, the smallest key in this
-                // subtree must be the lower bound.
-                findMin(n);
-                return;
-            }
-
-            // Otherwise, take the lower bound next edge.
-            int idx;
-            auto lbNode = n->getLowerBoundEdge(search[0], &idx);
-            if (!lbNode) {
-                iterLeafNode = nullptr;
-                return;
-            }
-
-            // Create stack edges for the all strictly higher edges in this node.
-            for (size_t i = idx + 1; i < n->edges.size(); i++) {
-                stack.push_back(n->edges[i].node);
-                stackIndices.push_back(0);
-            }
-
-            // Recurse
-            n = lbNode;
-        }
-    }
-
-    // Returns the next node in order
+    // Returns the next node in order along the path
     IteratorResult<K, T> next() {
         IteratorResult<K, T> result;
         result.found = false;
 
-        // If we have a current leaf node, return it and move to next
-        if (iterLeafNode) {
-            result.key = iterLeafNode->key;
-            result.val = iterLeafNode->val;
-            result.found = true;
-            iterLeafNode = iterLeafNode->nextLeaf;
-            return result;
+        // Initialize the path walk if not done yet
+        if (!initialized) {
+            initializePath();
+            initialized = true;
         }
 
-        // If we have nodes in the stack, process them
-        while (!stack.empty()) {
-            auto currentNode = stack.back();
-            stack.pop_back();
-            
+        // Return the next leaf from the stack
+        while (stackIndex < nodeStack.size()) {
+            auto currentNode = nodeStack[stackIndex];
+            stackIndex++;
+
             if (currentNode->leaf) {
                 result.key = currentNode->leaf->key;
                 result.val = currentNode->leaf->val;
                 result.found = true;
-                iterLeafNode = currentNode->leaf->nextLeaf;
                 return result;
-            }
-
-            // Add all children to stack in reverse order (so we process them in order)
-            for (int i = currentNode->edges.size() - 1; i >= 0; i--) {
-                stack.push_back(currentNode->edges[i].node);
             }
         }
 
         return result;
     }
 
-    // Get the current iterLeafNode for external access
-    LeafNode<K, T>* getIterLeafNode() const {
-        return iterLeafNode;
-    }
-
 private:
-    // Helper method to find the minimum leaf in a subtree
-    std::shared_ptr<Node<K, T>> recurseMin(std::shared_ptr<Node<K, T>> n) {
-        if (!n) return nullptr;
-        
-        if (n->leaf) {
-            return n;
+    void initializePath() {
+        if (!rootNode) return;
+
+        auto currentNode = rootNode;
+        K remainingPath = searchPath;
+
+        // Start with the root node
+        nodeStack.push_back(currentNode);
+
+        // Walk down the tree following the path
+        while (currentNode && !remainingPath.empty()) {
+            // Look for an edge that matches the next character
+            auto nextNode = currentNode->getEdge(remainingPath[0]);
+
+            if (!nextNode) {
+                break;
+            }
+
+            // Check if the node's prefix matches the remaining path
+            if (hasPrefix(remainingPath, nextNode->prefix)) {
+                // Add this node to the stack
+                nodeStack.push_back(nextNode);
+
+                // Consume the prefix
+                remainingPath = K(remainingPath.begin() + nextNode->prefix.size(), remainingPath.end());
+                currentNode = nextNode;
+            } else {
+                break;
+            }
         }
-        
-        if (n->edges.empty()) {
-            return nullptr;
-        }
-        
-        return recurseMin(n->edges[0].node);
-    }
-    
-    // Helper method to find the minimum leaf node in a subtree
-    LeafNode<K, T>* findMinLeaf(std::shared_ptr<Node<K, T>> n) {
-        if (!n) return nullptr;
-        return n->minLeaf;
     }
 };
 
@@ -366,7 +245,7 @@ public:
         K search = prefix;
         iterLeafNode = node->minLeaf;
         iterCounter = node->leaves_in_subtree;
-        
+
         while (n) {
             // Check for key exhaustion
             if (search.empty()) {
@@ -399,7 +278,7 @@ public:
                 iterCounter = 0;
                 return;
             }
-            
+
             n = nextNode;
         }
     }
@@ -409,22 +288,20 @@ public:
         seekPrefixWatch(prefix);
     }
 
-    // Seeks the iterator to the smallest key that is greater or equal to the given key
+    // Seeks the iterator to a given key
     void seekLowerBound(const K& key) {
-        // This method is kept for compatibility but the actual implementation
-        // would need to be updated to work with the leaf-based approach
-        // For now, we'll use the prefix seek as a fallback
-        seekPrefix(key);
+        seekLowerBoundFlag = true;
+        seekPrefixWatch(key);
     }
 
-    // Returns the next node in order
+    // Returns the next element in order
     IteratorResult<K, T> next() {
         IteratorResult<K, T> result;
         result.found = false;
 
         if (iterCounter > 0 && iterLeafNode) {
             iterCounter--;
-            
+
             result.key = iterLeafNode->key;
             result.val = iterLeafNode->val;
             result.found = true;
@@ -434,26 +311,22 @@ public:
 
         return result;
     }
-
-    friend class ReverseIterator<K, T>;
 };
 
-// Helper function to create an iterator from a node
+// Helper functions to create iterators
 template<typename K, typename T>
 Iterator<K, T> createIterator(std::shared_ptr<Node<K, T>> node) {
     return Iterator<K, T>(node);
 }
 
-// Helper function to create a reverse iterator from a node
 template<typename K, typename T>
 ReverseIterator<K, T> createReverseIterator(std::shared_ptr<Node<K, T>> node) {
     return ReverseIterator<K, T>(node);
 }
 
-// Helper function to create a lower bound iterator from a node
 template<typename K, typename T>
-LowerBoundIterator<K, T> createLowerBoundIterator(std::shared_ptr<Node<K, T>> node) {
-    return LowerBoundIterator<K, T>(node);
+PrefixIterator<K, T> createPrefixIterator(std::shared_ptr<Node<K, T>> node, const K& path) {
+    return PrefixIterator<K, T>(node, path);
 }
 
 #endif // ITERATOR_H
