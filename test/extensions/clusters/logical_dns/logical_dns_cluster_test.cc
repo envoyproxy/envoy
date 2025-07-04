@@ -80,8 +80,13 @@ protected:
 
     // Here we tell the DnsClusterImpl it's going to behave like a logic DNS cluster:
     dns_cluster.set_all_addresses_in_single_endpoint(true);
-    status_or_cluster =
-        DnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+      status_or_cluster =
+          DnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    } else {
+      status_or_cluster =
+          LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    }
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
     cluster_ = std::move(*status_or_cluster);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -150,6 +155,16 @@ protected:
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
+    const auto previous_update_no_rebuild =
+        cluster_->info()->configUpdateStats().update_no_rebuild_.value();
+
+    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                  TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+
+    EXPECT_EQ(previous_update_no_rebuild + 1,
+              cluster_->info()->configUpdateStats().update_no_rebuild_.value());
+
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
     EXPECT_EQ(1UL,
@@ -176,8 +191,9 @@ protected:
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
 
-    // Should not cause any changes.
-    EXPECT_CALL(membership_updated_, ready());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+      EXPECT_CALL(membership_updated_, ready());
+    }
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
@@ -219,7 +235,9 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
-    EXPECT_CALL(membership_updated_, ready());
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+      EXPECT_CALL(membership_updated_, ready());
+    }
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
@@ -727,6 +745,20 @@ TEST_P(LogicalDnsImplementationsTest, BadConfig) {
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_cluster_type_yaml).message(),
             "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+
+  const std::string no_load_assignment_yaml = R"EOF(
+    name: name
+    cluster_type:
+      name: abc
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        all_addresses_in_single_endpoint: true
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    )EOF";
+
+  EXPECT_EQ(factorySetupFromV3Yaml(no_load_assignment_yaml).message(),
+            "LOGICAL_DNS clusters must have a single host");
 }
 
 // Test using both types of names in the cluster type.

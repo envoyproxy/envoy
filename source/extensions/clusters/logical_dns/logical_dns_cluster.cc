@@ -180,6 +180,8 @@ void LogicalDnsCluster::startResolve() {
             // Make sure that we have an updated address for admin display, health
             // checking, and creating real host connections.
             logical_host_->setNewAddresses(new_address, address_list, lbEndpoint());
+          } else {
+            info_->configUpdateStats().update_no_rebuild_.inc();
           }
 
           // reset failure backoff strategy because there was a success.

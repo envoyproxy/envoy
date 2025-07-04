@@ -179,7 +179,7 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
                                        "locality_lb_endpoint and a single lb_endpoint");
       } else {
         creation_status =
-            absl::InvalidArgumentError("LOGICAL_DNS clusters must have at least a single host");
+            absl::InvalidArgumentError("LOGICAL_DNS clusters must have a single host");
       }
       return;
     }
