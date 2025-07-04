@@ -23,6 +23,10 @@ class Node;
 template<typename K, typename T>
 class LeafNode;
 
+// Forward declaration for LowerBoundIterator
+template<typename K, typename T>
+class LowerBoundIterator;
+
 // Simple object pool for reducing allocations
 template<typename T>
 class ObjectPool {
@@ -143,8 +147,8 @@ public:
             }
 
             // Determine longest prefix of the search key on match
-            int commonPrefix = longestPrefix(search, child->prefix);
-            if (commonPrefix == static_cast<int>(child->prefix.size())) {
+            size_t commonPrefix = longestPrefix(search, child->prefix);
+            if (commonPrefix == child->prefix.size()) {
                 K newSearch(search.begin() + commonPrefix, search.end());
                 auto [newChild, oldVal, didUpdate] = insert(child, k, newSearch, v);
                 if (newChild) {
@@ -223,7 +227,7 @@ public:
         }
 
         DeleteResult<K, T> del(std::shared_ptr<Node<K, T>> parent, std::shared_ptr<Node<K, T>> n, const K& search) {
-            (void)parent;
+            (void)parent; // Suppress unused parameter warning
             DeleteResult<K, T> result;
             result.node = nullptr;
             result.leaf = nullptr;
@@ -498,6 +502,55 @@ public:
 
     Iterator<K, T> end() const {
         return Iterator<K, T>(nullptr);
+    }
+
+    // LowerBoundIterator returns an iterator that finds the smallest key >= given key
+    LowerBoundIterator<K, T> lowerBoundIterator(const K& key) const {
+        (void)key; // Suppress unused parameter warning
+        return LowerBoundIterator<K, T>(root);
+    }
+
+    // findMatchingPrefixes finds all keys that are prefixes of the given key
+    // using LowerBoundIterator and traversing backwards through the doubly linked list
+    std::vector<std::pair<K, T>> findMatchingPrefixes(const K& searchKey) const {
+        std::vector<std::pair<K, T>> results;
+        
+        if (searchKey.empty()) {
+            return results;
+        }
+        
+        // Use LowerBoundIterator to find the lower bound
+        auto lbIter = lowerBoundIterator(searchKey);
+        lbIter.seekLowerBound(searchKey);
+        
+        // Get the iterLeafNode from the iterator
+        LeafNode<K, T>* currentLeaf = lbIter.getIterLeafNode();
+        
+        if (!currentLeaf) {
+            return results;
+        }
+        
+        // Traverse backwards through the doubly linked list
+        // to find all keys that are prefixes of the search key
+        LeafNode<K, T>* leaf = currentLeaf;
+        
+        while (leaf) {
+            // Check if this key is a prefix of the search key
+            if (hasPrefix(searchKey, leaf->key)) {
+                results.push_back({leaf->key, leaf->val});
+            } else {
+                // If not a prefix, break since we're going backwards in sorted order
+                break;
+            }
+            
+            // Move to the previous leaf
+            leaf = leaf->prevLeaf;
+        }
+        
+        // Reverse the results to get them in ascending order
+        std::reverse(results.begin(), results.end());
+        
+        return results;
     }
 };
 

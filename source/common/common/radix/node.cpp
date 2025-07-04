@@ -226,7 +226,6 @@ bool Node<K, T>::Get(const K& search, T& result) const {
         return false;
     }
 
-    // Use binary search like getEdge does instead of linear search
     int idx;
     auto child = getEdge(search[0], &idx);
     if (child && hasPrefix(search, child->prefix)) {
@@ -313,11 +312,11 @@ template class Node<std::string, int>;
 template class Node<std::string, double>;
 template class Node<std::vector<uint8_t>, std::string>;
 template class Node<std::string, const void*>;
+template class LeafNode<std::string, const void*>;
 template class LeafNode<std::string, std::string>;
 template class LeafNode<std::string, int>;
 template class LeafNode<std::string, double>;
 template class LeafNode<std::vector<uint8_t>, std::string>;
-template class LeafNode<std::string, const void*>;
 
 template bool hasPrefix<std::string>(const std::string&, const std::string&);
 template bool hasPrefix<std::vector<uint8_t>>(const std::vector<uint8_t>&, const std::vector<uint8_t>&);
