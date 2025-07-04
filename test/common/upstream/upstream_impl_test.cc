@@ -453,7 +453,13 @@ protected:
       std::make_shared<Network::MockDnsResolver>();
 };
 
-TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
+class StrictDnsClusterImplParamTest : public StrictDnsClusterImplTest,
+                                      public testing::WithParamInterface<const char*> {};
+
+INSTANTIATE_TEST_SUITE_P(DnsImplementations, StrictDnsClusterImplParamTest,
+                         testing::ValuesIn({"true", "false"}));
+
+TEST_P(StrictDnsClusterImplParamTest, ZeroHostsIsInializedImmediately) {
   ReadyWatcher initialized;
 
   const std::string yaml = R"EOF(
@@ -481,7 +487,7 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
 }
 
 // Resolve zero hosts, while using health checking.
-TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
+TEST_P(StrictDnsClusterImplParamTest, ZeroHostsHealthChecker) {
   ReadyWatcher initialized;
 
   const std::string yaml = R"EOF(
@@ -523,7 +529,7 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
+TEST_P(StrictDnsClusterImplParamTest, DontWaitForDNSOnInit) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -575,7 +581,7 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
                          TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 }
 
-TEST_F(StrictDnsClusterImplTest, Basic) {
+TEST_P(StrictDnsClusterImplParamTest, Basic) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver1(*dns_resolver_, server_context_.dispatcher_);
@@ -779,7 +785,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
 // Verifies that host removal works correctly when hosts are being health checked
 // but the cluster is configured to always remove hosts
-TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
+TEST_P(StrictDnsClusterImplParamTest, HostRemovalActiveHealthSkipped) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -839,7 +845,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
 
 // Verify that a host is not removed if it is removed from DNS but still passing active health
 // checking.
-TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
+TEST_P(StrictDnsClusterImplParamTest, HostRemovalAfterHcFail) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -918,7 +924,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   }
 }
 
-TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
+TEST_P(StrictDnsClusterImplParamTest, HostUpdateWithDisabledACEndpoint) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -986,7 +992,7 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
   }
 }
 
-TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
+TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver3(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
@@ -1251,7 +1257,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
               cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
-TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
+TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasicMultiplePriorities) {
   ResolverData resolver3(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver1(*dns_resolver_, server_context_.dispatcher_);
@@ -1395,7 +1401,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 }
 
 // Verifies that specifying a custom resolver when using STRICT_DNS fails
-TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
+TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -1431,7 +1437,7 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
   }
 }
 
-TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+TEST_P(StrictDnsClusterImplParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1480,7 +1486,7 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
                          TestUtility::makeDnsResponse({}));
 }
 
-TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig) {
+TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfig) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1519,7 +1525,7 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig) {
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
 }
 
-TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
+TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfig2) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1561,7 +1567,7 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
 }
 
-TEST_F(StrictDnsClusterImplTest, ClusterTypeConfigTypedDnsResolverConfig) {
+TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfigTypedDnsResolverConfig) {
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
   EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, _)).WillOnce(Return(dns_resolver_));
@@ -1601,7 +1607,7 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfigTypedDnsResolverConfig) {
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, nullptr);
 }
 
-TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
+TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateNoJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1656,7 +1662,7 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
-TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
+TEST_P(StrictDnsClusterImplParamTest, NegativeDnsJitter) {
   const std::string yaml = R"EOF(
     name: name
     type: STRICT_DNS
@@ -1679,7 +1685,8 @@ TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
       auto x = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
       EnvoyException, "(?s)Invalid duration: Expected positive duration:.*seconds: -1\n");
 }
-TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
+
+TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateYesJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1721,7 +1728,7 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(ttl_s)));
 }
 
-TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
+TEST_P(StrictDnsClusterImplParamTest, ExtremeJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1755,7 +1762,7 @@ TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
 }
 
 // Ensures that HTTP/2 user defined SETTINGS parameter validation is enforced on clusters.
-TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
+TEST_P(StrictDnsClusterImplParamTest, Http2UserDefinedSettingsParametersValidation) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
