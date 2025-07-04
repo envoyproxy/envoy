@@ -15,11 +15,7 @@ namespace Envoy {
 
 // NOLINT(namespace-envoy)
 
-// Check if we should use radix tree based on environment variable
-bool useRadixTree() {
-  const char* flag = std::getenv("envoy.reloadable_features.use_radix_tree_for_trie_lookup");
-  return flag && std::string(flag) == "true";
-}
+
 
 template <class TableType>
 static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>& keys) {
@@ -75,14 +71,7 @@ template <class TableType> static void typedBmTrieLookups(benchmark::State& stat
 }
 
 static void bmTrieLookups(benchmark::State& s) {
-  if (useRadixTree()) {
-    typedBmTrieLookups<Tree<std::string, const void*>>(s);
-  } else {
-    // Use original trie lookup table implementation
-    // This would need to include the original trie lookup table header
-    // For now, we'll use the radix tree as fallback
-    typedBmTrieLookups<Tree<std::string, const void*>>(s);
-  }
+  typedBmTrieLookups<Tree<std::string, const void*>>(s);
 }
 
 #define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
