@@ -29,7 +29,7 @@ static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>
 
   // key_index indexes into key_selections which is a pre-selected
   // random ordering of 1024 indexes into the existing keys. This
-  // way we read from all over the tree, without spending time during
+  // way we read from all over the trie, without spending time during
   // the performance test generating these random choices.
   size_t key_index = 0;
   for (auto _ : state) {
