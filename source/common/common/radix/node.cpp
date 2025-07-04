@@ -79,10 +79,15 @@ std::shared_ptr<Node<K, T>> Node<K, T>::getEdge(typename K::value_type label, in
 
 template<typename K, typename T>
 void Node<K, T>::replaceEdge(const Edge<K, T>& e) {
-    auto it = std::find_if(edges.begin(), edges.end(), 
-        [&e](const Edge<K, T>& edge) { return edge.label == e.label; });
-    
-    if (it != edges.end()) {
+    if (edges.empty()) {
+        addEdge(e);
+        return;
+    }
+
+    auto it = std::lower_bound(edges.begin(), edges.end(), e.label,
+        [](const Edge<K, T>& edge, typename K::value_type label) { return edge.label < label; });
+
+    if (it != edges.end() && it->label == e.label) {
         *it = e;
     } else {
         addEdge(e);
@@ -91,10 +96,14 @@ void Node<K, T>::replaceEdge(const Edge<K, T>& e) {
 
 template<typename K, typename T>
 void Node<K, T>::delEdge(typename K::value_type label) {
-    auto it = std::find_if(edges.begin(), edges.end(), 
-        [label](const Edge<K, T>& e) { return e.label == label; });
-    
-    if (it != edges.end()) {
+    if (edges.empty()) {
+        return;
+    }
+
+    auto it = std::lower_bound(edges.begin(), edges.end(), label,
+        [](const Edge<K, T>& edge, typename K::value_type l) { return edge.label < l; });
+
+    if (it != edges.end() && it->label == label) {
         edges.erase(it);
     }
 }
