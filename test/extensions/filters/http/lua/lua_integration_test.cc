@@ -2027,6 +2027,9 @@ typed_config:
 }
 
 #ifdef NDEBUG
+// This test is only run in release mode because in debug mode,
+// the code reaches ENVOY_BUG() which triggers a forced abort
+// that stops execution.
 TEST_P(LuaIntegrationTest, ModifyResponseBodyAndRemoveStatusHeader) {
   if (downstream_protocol_ != Http::CodecType::HTTP1) {
     GTEST_SKIP() << "This is a test that only supports http1";
@@ -2034,6 +2037,9 @@ TEST_P(LuaIntegrationTest, ModifyResponseBodyAndRemoveStatusHeader) {
   if (!testing_downstream_filter_) {
     GTEST_SKIP() << "This is a local reply test that does not go upstream";
   }
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.validate_required_response_headers_in_cleanup", "true"}});
   const std::string filter_config =
       R"EOF(
 name: lua
@@ -2048,7 +2054,7 @@ typed_config:
       end
 )EOF";
 
-  std::string route_config =
+  const std::string route_config =
       R"EOF(
 name: basic_lua_routes
 virtual_hosts:
