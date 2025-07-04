@@ -65,10 +65,10 @@ std::shared_ptr<Node<K, T>> Node<K, T>::getEdge(typename K::value_type label, in
         return nullptr;
     }
 
-    auto it = std::find_if(edges.begin(), edges.end(), 
-        [label](const Edge<K, T>& e) { return e.label == label; });
+    auto it = std::lower_bound(edges.begin(), edges.end(), label,
+        [](const Edge<K, T>& e, typename K::value_type l) { return e.label < l; });
     
-    if (it != edges.end()) {
+    if (it != edges.end() && it->label == label) {
         if (out_index) *out_index = std::distance(edges.begin(), it);
         return it->node;
     }
