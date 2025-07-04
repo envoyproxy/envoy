@@ -31,7 +31,7 @@ static_resources:
                   # Filter that services reverse conn APIs
                   - name: envoy.filters.http.reverse_conn
                     typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3alpha.ReverseConn
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -70,7 +70,7 @@ static_resources:
       cluster_type:
         name: envoy.clusters.reverse_connection
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3alpha.RevConClusterConfig
+          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
           # The following headers are expected in downstream requests
           # to be sent over reverse connections
           http_header_names:
@@ -87,7 +87,7 @@ admin:
   address:
     socket_address:
       address: 0.0.0.0
-      port_value: '8888'
+      port_value: 8888
 layered_runtime:
   layers:
   - name: layer
@@ -97,5 +97,5 @@ layered_runtime:
 bootstrap_extensions:
 - name: envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection_socket_interface.v3alpha.UpstreamReverseConnectionSocketInterface
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.UpstreamReverseConnectionSocketInterface
     stat_prefix: "upstream_reverse_connection"

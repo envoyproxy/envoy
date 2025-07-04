@@ -75,6 +75,27 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
+envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+envoy.clusters.reverse_connection:
+  categories:
+  - envoy.cluster
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
 envoy.extensions.http.cache.file_system_http_cache:
   categories:
   - envoy.http.cache
@@ -569,6 +590,13 @@ envoy.filters.http.router:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.router.v3.Router
+envoy.filters.http.reverse_conn:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
 envoy.filters.http.set_metadata:
   categories:
   - envoy.filters.http
@@ -659,6 +687,13 @@ envoy.filters.listener.tls_inspector:
   status: stable
   type_urls:
   - envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+envoy.filters.listener.reverse_connection:
+  categories:
+  - envoy.filters.listener
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.listener.reverse_connection.v3.ReverseConnection
 envoy.filters.network.connection_limit:
   categories:
   - envoy.filters.network
