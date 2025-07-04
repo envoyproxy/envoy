@@ -7,7 +7,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/trie_lookup_table.h"
-#include "source/common/common/radix/tree.hpp"
 #include "source/common/config/config_provider_impl.h"
 #include "source/common/network/utility.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
@@ -124,9 +123,7 @@ private:
 
   mutable DnsFilterStats stats_;
 
-  // Use either radix tree or trie lookup table based on feature flag
-  Tree<std::string, DnsVirtualDomainConfigSharedPtr> radix_tree_;
-  TrieLookupTable<DnsVirtualDomainConfigSharedPtr> trie_lookup_table_;
+  TrieLookupTable<DnsVirtualDomainConfigSharedPtr> dns_lookup_trie_;
   absl::flat_hash_map<std::string, std::chrono::seconds> domain_ttl_;
   bool forward_queries_;
   uint64_t retry_count_;
