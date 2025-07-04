@@ -22,6 +22,10 @@ public:
   absl::StatusOr<bool> addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                            const std::string& version_info,
                                            bool added_via_api) override;
+  absl::Status updateDynamicFilterChains(
+      const std::string& listener_name, absl::optional<std::string>& version_info,
+      const FilterChainRefVector& added_filter_chains,
+      const absl::flat_hash_set<absl::string_view>& removed_filter_chains) override;
   void createLdsApi(const envoy::config::core::v3::ConfigSource&,
                     const xds::core::v3::ResourceLocator*) override {}
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners(ListenerState) override {

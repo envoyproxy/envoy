@@ -2440,6 +2440,36 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test_library(
+    name = "fcds_integration_lib",
+    hdrs = [
+        "fcds_integration.h",
+    ],
+    deps = [
+        ":ads_integration_lib",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/integration/filters:test_network_filter_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "fcds_integration_test",
+    size = "large",
+    srcs = ["fcds_integration_test.cc"],
+    rbe_pool = "6gig",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":fcds_integration_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_test(
     name = "cx_limit_integration_test",
     size = "large",

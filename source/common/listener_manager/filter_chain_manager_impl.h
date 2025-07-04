@@ -155,15 +155,30 @@ public:
                                               const StreamInfo::StreamInfo& info) const override;
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
-  // should be called at most once.
+  // should be called at most once. This overload of addFilterChains should be called when creating
+  // a new listener and/or when updating a listener using LDS update.
   absl::Status addFilterChains(
       const xds::type::matcher::v3::Matcher* filter_chain_matcher,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
       FilterChainFactoryContextCreator& context_creator);
+  // Apply delta filter chain update. This overload of addFilterChains should be called when
+  // updating a listener using FCDS update. This uses the origin filter chain manager as
+  // the baseline for the update, and clones its filter chains.
+  absl::Status addFilterChains(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                               const FilterChainRefVector& added_filter_chains,
+                               const absl::flat_hash_set<absl::string_view>& removed_filter_chains,
+                               const envoy::config::listener::v3::FilterChain* default_filter_chain,
+                               FilterChainFactoryBuilder& filter_chain_factory_builder,
+                               FilterChainFactoryContextCreator& context_creator);
 
   static bool isWildcardServerName(const std::string& name);
+
+  const absl::optional<std::list<Network::DrainableFilterChainSharedPtr>>&
+  drainingFilterChains() const {
+    return draining_filter_chains_;
+  }
 
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
   // listener to calculate the intersection of filter chains with another listener.
@@ -350,6 +365,10 @@ private:
 
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
+
+  // Used to hint listener which filter chains it should drain. This is useful to avoid running
+  // complete filter chains diff when the listener is updated.
+  mutable absl::optional<std::list<Network::DrainableFilterChainSharedPtr>> draining_filter_chains_;
 };
 
 namespace FilterChain {
