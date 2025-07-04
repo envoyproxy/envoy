@@ -8,6 +8,7 @@
 #include "source/common/network/dns_resolver/dns_factory_util.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,6 +17,9 @@ namespace DnsFilter {
 
 static constexpr std::chrono::milliseconds DEFAULT_RESOLVER_TIMEOUT{500};
 static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
+
+// Feature flag to control which trie implementation to use
+#define USE_RADIX_TREE_FOR_TRIE_LOOKUP "envoy.reloadable_features.use_radix_tree_for_trie_lookup"
 
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
@@ -67,25 +71,48 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       DnsEndpointConfig endpoint_config{};
 
       // Check whether the trie contains an entry for this domain
-      auto virtual_domains = dns_lookup_trie_.find(suffix);
-      if (virtual_domains != nullptr) {
-        // The suffix already has a node in the trie
+      if (Runtime::runtimeFeatureEnabled(USE_RADIX_TREE_FOR_TRIE_LOOKUP)) {
+        auto virtual_domains = radix_tree_.Get(suffix);
+        if (virtual_domains.has_value()) {
+          // The suffix already has a node in the trie
 
-        auto existing_endpoint_config = virtual_domains->find(virtual_domain_name);
-        if (existing_endpoint_config != virtual_domains->end()) {
-          // Update the existing endpoint config with the new addresses
+          auto existing_endpoint_config = virtual_domains->find(virtual_domain_name);
+          if (existing_endpoint_config != virtual_domains->end()) {
+            // Update the existing endpoint config with the new addresses
 
-          auto& addr_vec = existing_endpoint_config->second.address_list.value();
-          addr_vec.reserve(addr_vec.size() + addrs.size());
-          std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
+            auto& addr_vec = existing_endpoint_config->second.address_list.value();
+            addr_vec.reserve(addr_vec.size() + addrs.size());
+            std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
+          } else {
+            // Add a new endpoint config for the new domain
+            endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
+            virtual_domains->emplace(std::string(virtual_domain_name), std::move(endpoint_config));
+          }
         } else {
-          // Add a new endpoint config for the new domain
           endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
-          virtual_domains->emplace(std::string(virtual_domain_name), std::move(endpoint_config));
+          addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
         }
       } else {
-        endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
-        addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
+        auto virtual_domains = trie_lookup_table_.find(suffix);
+        if (virtual_domains != nullptr) {
+          // The suffix already has a node in the trie
+
+          auto existing_endpoint_config = virtual_domains->find(virtual_domain_name);
+          if (existing_endpoint_config != virtual_domains->end()) {
+            // Update the existing endpoint config with the new addresses
+
+            auto& addr_vec = existing_endpoint_config->second.address_list.value();
+            addr_vec.reserve(addr_vec.size() + addrs.size());
+            std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
+          } else {
+            // Add a new endpoint config for the new domain
+            endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
+            virtual_domains->emplace(std::string(virtual_domain_name), std::move(endpoint_config));
+          }
+        } else {
+          endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
+          addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
+        }
       }
     }
 
@@ -133,9 +160,16 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         endpoint_config.service_list =
             absl::make_optional<DnsSrvRecordPtr>(std::move(service_record_ptr));
 
-        auto virtual_domains = dns_lookup_trie_.find(suffix);
-        if (virtual_domains != nullptr) {
-          virtual_domains->emplace(full_service_name, std::move(endpoint_config));
+        if (Runtime::runtimeFeatureEnabled(USE_RADIX_TREE_FOR_TRIE_LOOKUP)) {
+          auto virtual_domains = radix_tree_.Get(suffix);
+          if (virtual_domains.has_value()) {
+            virtual_domains->emplace(full_service_name, std::move(endpoint_config));
+          }
+        } else {
+          auto virtual_domains = trie_lookup_table_.find(suffix);
+          if (virtual_domains != nullptr) {
+            virtual_domains->emplace(full_service_name, std::move(endpoint_config));
+          }
         }
       }
     }
@@ -147,14 +181,27 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       endpoint_config.cluster_name = absl::make_optional<std::string>(cluster_name);
 
       // See if there's a suffix already configured
-      auto virtual_domains = dns_lookup_trie_.find(suffix);
-      if (virtual_domains == nullptr) {
-        addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
+      if (Runtime::runtimeFeatureEnabled(USE_RADIX_TREE_FOR_TRIE_LOOKUP)) {
+        auto virtual_domains = radix_tree_.Get(suffix);
+        if (!virtual_domains.has_value()) {
+          addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
+        } else {
+          // A domain can be redirected to one cluster. If it appears multiple times, the first
+          // entry is the only one used
+          if (virtual_domains->find(virtual_domain_name) == virtual_domains->end()) {
+            virtual_domains->emplace(virtual_domain_name, std::move(endpoint_config));
+          }
+        }
       } else {
-        // A domain can be redirected to one cluster. If it appears multiple times, the first
-        // entry is the only one used
-        if (virtual_domains->find(virtual_domain_name) == virtual_domains->end()) {
-          virtual_domains->emplace(virtual_domain_name, std::move(endpoint_config));
+        auto virtual_domains = trie_lookup_table_.find(suffix);
+        if (virtual_domains == nullptr) {
+          addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
+        } else {
+          // A domain can be redirected to one cluster. If it appears multiple times, the first
+          // entry is the only one used
+          if (virtual_domains->find(virtual_domain_name) == virtual_domains->end()) {
+            virtual_domains->emplace(virtual_domain_name, std::move(endpoint_config));
+          }
         }
       }
     }
@@ -188,8 +235,13 @@ void DnsFilterEnvoyConfig::addEndpointToSuffix(const absl::string_view suffix,
   DnsVirtualDomainConfigSharedPtr virtual_domains = std::make_shared<DnsVirtualDomainConfig>();
   virtual_domains->emplace(std::string(domain_name), std::move(endpoint_config));
 
-  auto success = dns_lookup_trie_.add(suffix, std::move(virtual_domains), false);
-  ASSERT(success, "Unable to overwrite existing suffix in dns_filter trie");
+  if (Runtime::runtimeFeatureEnabled(USE_RADIX_TREE_FOR_TRIE_LOOKUP)) {
+    auto success = radix_tree_.insert(suffix, std::move(virtual_domains));
+    ASSERT(std::get<2>(success), "Unable to overwrite existing suffix in dns_filter trie");
+  } else {
+    auto success = trie_lookup_table_.add(suffix, std::move(virtual_domains), false);
+    ASSERT(success, "Unable to overwrite existing suffix in dns_filter trie");
+  }
 }
 
 bool DnsFilterEnvoyConfig::loadServerConfig(

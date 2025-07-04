@@ -3,13 +3,12 @@
 #include <vector>
 
 #include "source/common/common/assert.h"
-
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 
 /**
- * A trie used for faster lookup with lookup time at most equal to the size of the key.
+ * A trie data structure for efficient string prefix matching.
  *
  * Type of Value must be empty-constructible and moveable, e.g. smart pointers and POD types.
  */
@@ -187,6 +186,22 @@ public:
       }
     }
     return nodes_[result].value_;
+  }
+
+  /**
+   * Get the size of the trie
+   * @return the number of entries in the trie
+   */
+  size_t size() const {
+    return nodes_.size();
+  }
+
+  /**
+   * Clear all entries
+   */
+  void clear() {
+    nodes_.clear();
+    nodes_.emplace_back();
   }
 
 private:
