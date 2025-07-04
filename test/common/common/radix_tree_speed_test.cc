@@ -88,6 +88,6 @@ static void bmTrieLookupsResponseHeaders(benchmark::State& s) {
 
 BENCHMARK(bmTrieLookupsRequestHeaders);
 BENCHMARK(bmTrieLookupsResponseHeaders);
-BENCHMARK(bmTrieLookups)->ArgsProduct({{10, 100, 1000, 10000, 100000}, {0, 8, 128}});
+BENCHMARK(bmTrieLookups)->ArgsProduct({{10, 100, 1000, 10000}, {0, 8, 128}});
 
 } // namespace Envoy 
