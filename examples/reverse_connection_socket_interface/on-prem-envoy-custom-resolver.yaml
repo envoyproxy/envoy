@@ -7,34 +7,34 @@ node:
 bootstrap_extensions:
 - name: envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection_socket_interface.v3alpha.DownstreamReverseConnectionSocketInterface
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.DownstreamReverseConnectionSocketInterface
     stat_prefix: "downstream_reverse_connection"
 
 static_resources:
   listeners:
     # Services reverse conn APIs
-    # - name: rev_conn_api_listener
-    #   address:
-    #     socket_address:
-    #       address: 0.0.0.0
-    #       port_value: 9000
-    #   filter_chains:
-    #     - filters:
-    #         - name: envoy.filters.network.http_connection_manager
-    #           typed_config:
-    #             "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-    #             stat_prefix: rev_conn_api
-    #             codec_type: AUTO
-    #             route_config:
-    #               name: rev_conn_api_route
-    #               virtual_hosts: []
-    #             http_filters:
-    #               - name: envoy.filters.http.reverse_conn
-    #                 typed_config:
-    #                   "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3alpha.ReverseConn
-    #               - name: envoy.filters.http.router
-    #                 typed_config:
-    #                   "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+    - name: rev_conn_api_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: rev_conn_api
+                codec_type: AUTO
+                route_config:
+                  name: rev_conn_api_route
+                  virtual_hosts: []
+                http_filters:
+                  - name: envoy.filters.http.reverse_conn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
     # Forwards incoming http requests to backend
     - name: ingress_http_listener
@@ -71,14 +71,14 @@ static_resources:
         # Filter that responds to keepalives on reverse connection sockets
         - name: envoy.filters.listener.reverse_connection
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.listener.reverse_connection.v3alpha.ReverseConnection
+            "@type": type.googleapis.com/envoy.extensions.filters.listener.reverse_connection.v3.ReverseConnection
             ping_wait_timeout: 120
       # Use custom address with reverse connection metadata encoded in URL format
       address:
         socket_address:
           # This encodes: src_node_id=on-prem-node, src_cluster_id=on-prem, src_tenant_id=on-prem
           # and remote clusters: cloud with 1 connection
-          address: "rc://on-prem-node:on-prem:on-prem@cloud:2"
+          address: "rc://on-prem-node:on-prem:on-prem@cloud:1"
           port_value: 0
           # Use custom resolver that can parse reverse connection metadata
           resolver_name: "envoy.resolvers.reverse_connection"

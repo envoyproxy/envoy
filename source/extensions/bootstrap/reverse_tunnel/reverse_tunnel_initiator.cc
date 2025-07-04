@@ -116,7 +116,7 @@ public:
               static_cast<int>(connection_->state()));
 
     connection_->removeConnectionCallbacks(*this);
-
+    connection_->getSocket()->ioHandle().resetFileEvents();
     if (connection_->state() == Network::Connection::State::Open) {
       ENVOY_LOG(debug, "Closing open connection gracefully.");
       connection_->close(Network::ConnectionCloseType::FlushWrite);
@@ -196,8 +196,9 @@ private:
         if (header.length() <= content_length_str.length()) {
           continue; // Header is too short to contain Content-Length
         }
-        if (StringUtil::CaseInsensitiveCompare()(header.substr(0, content_length_str.length()),
-                                                 content_length_str)) {
+        if (!StringUtil::CaseInsensitiveCompare()(header.substr(0, content_length_str.length()),
+                                                  content_length_str)) {
+          ENVOY_LOG(debug, "Header doesn't start with Content-Length");
           continue; // Header doesn't start with Content-Length
         }
         // Check if it's exactly "Content-Length:" followed by value.
