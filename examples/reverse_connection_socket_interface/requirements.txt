@@ -1,0 +1,5 @@
+requests>=2.25.0
+PyYAML>=5.4.0
+grpcio>=1.43.0
+grpcio-tools>=1.43.0
+protobuf>=3.19.0 

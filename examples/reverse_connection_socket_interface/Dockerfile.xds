@@ -1,0 +1,150 @@
+FROM ubuntu:20.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+# Install Python and pip
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install dependencies
+RUN pip3 install requests pyyaml
+
+# Create a simple xDS server script
+RUN echo '#!/usr/bin/env python3\n\
+import json\n\
+import time\n\
+import threading\n\
+import http.server\n\
+import socketserver\n\
+import logging\n\
+\n\
+logging.basicConfig(level=logging.INFO)\n\
+logger = logging.getLogger(__name__)\n\
+\n\
+class XDSServer:\n\
+    def __init__(self):\n\
+        self.listeners = {}\n\
+        self.version = 1\n\
+        self._lock = threading.Lock()\n\
+        self.server = None\n\
+    \n\
+    def start(self, port):\n\
+        class XDSHandler(http.server.BaseHTTPRequestHandler):\n\
+            def do_POST(self):\n\
+                if self.path == "/v3/discovery:listeners":\n\
+                    content_length = int(self.headers["Content-Length"])\n\
+                    post_data = self.rfile.read(content_length)\n\
+                    response_data = self.server.xds_server.handle_lds_request(post_data)\n\
+                    self.send_response(200)\n\
+                    self.send_header("Content-type", "application/json")\n\
+                    self.end_headers()\n\
+                    self.wfile.write(response_data.encode())\n\
+                elif self.path == "/add_listener":\n\
+                    content_length = int(self.headers["Content-Length"])\n\
+                    post_data = self.rfile.read(content_length)\n\
+                    data = json.loads(post_data.decode())\n\
+                    self.server.xds_server.add_listener(data["name"], data["config"])\n\
+                    self.send_response(200)\n\
+                    self.send_header("Content-type", "application/json")\n\
+                    self.end_headers()\n\
+                    self.wfile.write(json.dumps({"status": "success"}).encode())\n\
+                elif self.path == "/remove_listener":\n\
+                    content_length = int(self.headers["Content-Length"])\n\
+                    post_data = self.rfile.read(content_length)\n\
+                    data = json.loads(post_data.decode())\n\
+                    success = self.server.xds_server.remove_listener(data["name"])\n\
+                    if success:\n\
+                        self.send_response(200)\n\
+                        self.send_header("Content-type", "application/json")\n\
+                        self.end_headers()\n\
+                        self.wfile.write(json.dumps({"status": "success"}).encode())\n\
+                    else:\n\
+                        self.send_response(404)\n\
+                        self.send_header("Content-type", "application/json")\n\
+                        self.end_headers()\n\
+                        self.wfile.write(json.dumps({"status": "not_found"}).encode())\n\
+                elif self.path == "/state":\n\
+                    state = self.server.xds_server.get_state()\n\
+                    self.send_response(200)\n\
+                    self.send_header("Content-type", "application/json")\n\
+                    self.end_headers()\n\
+                    self.wfile.write(json.dumps(state).encode())\n\
+                else:\n\
+                    self.send_response(404)\n\
+                    self.end_headers()\n\
+            \n\
+            def log_message(self, format, *args):\n\
+                pass\n\
+        \n\
+        class XDSServer(socketserver.TCPServer):\n\
+            def __init__(self, server_address, RequestHandlerClass, xds_server):\n\
+                self.xds_server = xds_server\n\
+                super().__init__(server_address, RequestHandlerClass)\n\
+        \n\
+        self.server = XDSServer(("0.0.0.0", port), XDSHandler, self)\n\
+        self.server_thread = threading.Thread(target=self.server.serve_forever)\n\
+        self.server_thread.daemon = True\n\
+        self.server_thread.start()\n\
+        logger.info(f"xDS server started on port {port}")\n\
+    \n\
+    def handle_lds_request(self, request_data):\n\
+        with self._lock:\n\
+            response = {\n\
+                "version_info": str(self.version),\n\
+                "resources": [],\n\
+                "type_url": "type.googleapis.com/envoy.config.listener.v3.Listener"\n\
+            }\n\
+            for listener_name, listener_config in self.listeners.items():\n\
+                # Wrap the listener config in a proper Any message\n\
+                wrapped_config = {\n\
+                    "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",\n\
+                    **listener_config\n\
+                }\n\
+                response["resources"].append(wrapped_config)\n\
+            return json.dumps(response)\n\
+    \n\
+    def add_listener(self, listener_name, listener_config):\n\
+        with self._lock:\n\
+            self.listeners[listener_name] = listener_config\n\
+            self.version += 1\n\
+            logger.info(f"Added listener {listener_name}, version {self.version}")\n\
+    \n\
+    def remove_listener(self, listener_name):\n\
+        with self._lock:\n\
+            if listener_name in self.listeners:\n\
+                del self.listeners[listener_name]\n\
+                self.version += 1\n\
+                logger.info(f"Removed listener {listener_name}, version {self.version}")\n\
+                return True\n\
+            return False\n\
+\n\
+    def get_state(self):\n\
+        with self._lock:\n\
+            return {\n\
+                "version": self.version,\n\
+                "listeners": list(self.listeners.keys())\n\
+            }\n\
+\n\
+if __name__ == "__main__":\n\
+    xds_server = XDSServer()\n\
+    xds_server.start(18000)\n\
+    try:\n\
+        while True:\n\
+            time.sleep(1)\n\
+    except KeyboardInterrupt:\n\
+        print("Shutting down xDS server...")\n\
+' > /app/xds_server.py
+
+# Make the script executable
+RUN chmod +x /app/xds_server.py
+
+# Expose the xDS server port
+EXPOSE 18000
+
+# Run the xDS server
+CMD ["python3", "/app/xds_server.py"] 

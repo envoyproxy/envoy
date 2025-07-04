@@ -284,6 +284,12 @@ public:
                              const std::string& connection_key);
 
   /**
+   * Handle downstream connection closure and trigger re-initiation.
+   * @param connection_key the unique key identifying the closed connection
+   */
+  void onDownstreamConnectionClosed(const std::string& connection_key);
+
+  /**
    * Increment the gauge for a specific connection state.
    * @param cluster_stats pointer to cluster-level stats
    * @param host_stats pointer to host-level stats

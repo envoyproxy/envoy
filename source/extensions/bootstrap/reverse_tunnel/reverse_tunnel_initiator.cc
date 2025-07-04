@@ -39,10 +39,15 @@ public:
   /**
    * Constructor that takes ownership of the socket.
    */
-  explicit DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket)
-      : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), owned_socket_(std::move(socket)) {
+  explicit DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
+                                              const std::string& connection_key,
+                                              ReverseConnectionIOHandle* parent)
+      : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), 
+        owned_socket_(std::move(socket)),
+        connection_key_(connection_key),
+        parent_(parent) {
     ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {}",
-              fd_);
+              fd_, connection_key_);
   }
 
   ~DownstreamReverseConnectionIOHandle() override {
@@ -52,6 +57,12 @@ public:
   // Network::IoHandle overrides.
   Api::IoCallUint64Result close() override {
     ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: closing handle for FD: {}", fd_);
+    // Notify parent of connection closure for re-initiation
+    if (parent_) {
+      ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: Marking connection as closed");
+      parent_->onDownstreamConnectionClosed(connection_key_);
+    }
+    
     // Reset the owned socket to properly close the connection.
     if (owned_socket_) {
       owned_socket_.reset();
@@ -67,6 +78,10 @@ public:
 private:
   // The socket that this IOHandle owns and manages lifetime for.
   Network::ConnectionSocketPtr owned_socket_;
+  // Connection key for identifying this connection
+  std::string connection_key_;
+  // Pointer to parent ReverseConnectionIOHandle
+  ReverseConnectionIOHandle* parent_;
 };
 
 // Forward declaration.
@@ -517,8 +532,9 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - got fd: {}. Creating IoHandle",
                   conn_fd);
 
-        // Create RAII-based IoHandle that owns the socket, eliminating need for external cache
-        auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(std::move(socket));
+        // Create RAII-based IoHandle with connection key and parent reference
+        auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
+            std::move(socket), connection_key, this);
         ENVOY_LOG(debug,
                   "ReverseConnectionIOHandle::accept() - RAII IoHandle created with owned socket");
 
@@ -949,6 +965,47 @@ void ReverseConnectionIOHandle::removeConnectionState(const std::string& host_ad
 
   ENVOY_LOG(debug, "Removed connection {} state for host {} in cluster {}", connection_key,
             host_address, cluster_name);
+}
+
+void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& connection_key) {
+  ENVOY_LOG(debug, "Downstream connection closed: {}", connection_key);
+  
+  // Find the host for this connection key
+  std::string host_address;
+  std::string cluster_name;
+  
+  // Search through host_to_conn_info_map_ to find which host this connection belongs to
+  for (const auto& [host, host_info] : host_to_conn_info_map_) {
+    if (host_info.connection_keys.find(connection_key) != host_info.connection_keys.end()) {
+      host_address = host;
+      cluster_name = host_info.cluster_name;
+      break;
+    }
+  }
+  
+  if (host_address.empty()) {
+    ENVOY_LOG(warn, "Could not find host for connection key: {}", connection_key);
+    return;
+  }
+  
+  ENVOY_LOG(debug, "Found connection {} belongs to host {} in cluster {}", 
+            connection_key, host_address, cluster_name);
+  
+  // Remove the connection key from the host's connection set
+  auto host_it = host_to_conn_info_map_.find(host_address);
+  if (host_it != host_to_conn_info_map_.end()) {
+    host_it->second.connection_keys.erase(connection_key);
+    ENVOY_LOG(debug, "Removed connection key {} from host {} (remaining: {})", 
+              connection_key, host_address, host_it->second.connection_keys.size());
+  }
+  
+  // Remove connection state tracking
+  removeConnectionState(host_address, cluster_name, connection_key);
+  
+  // The next call to maintainClusterConnections() will detect the missing connection
+  // and re-initiate it automatically
+  ENVOY_LOG(debug, "Connection closure recorded for host {} in cluster {}. "
+            "Next maintenance cycle will re-initiate if needed.", host_address, cluster_name);
 }
 
 void ReverseConnectionIOHandle::incrementStateGauge(ReverseConnectionDownstreamStats* cluster_stats,
