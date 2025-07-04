@@ -145,7 +145,8 @@ private:
                                       ConnectionManagerConfig& config);
   static void sanitizeTEHeader(RequestHeaderMap& request_headers);
   static void cleanInternalHeaders(RequestHeaderMap& request_headers, bool edge_request,
-                                   const std::vector<Http::LowerCaseString>& internal_only_headers);
+                                   const std::vector<Http::LowerCaseString>& internal_only_headers,
+                                   const ConnectionManagerConfig& config);
 };
 
 } // namespace Http

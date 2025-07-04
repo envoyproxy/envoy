@@ -100,6 +100,11 @@ public:
    * for HTTP protocol tracing.
    */
   virtual uint32_t maxPathTagLength() const PURE;
+
+  /**
+   * @return the name of the header used to force tracing. If empty, defaults to "x-envoy-force-trace".
+   */
+  virtual const std::string& forceTraceHeader() const PURE;
 };
 
 using ConnectionManagerTracingConfigPtr = std::unique_ptr<ConnectionManagerTracingConfig>;

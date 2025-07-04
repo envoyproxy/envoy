@@ -217,6 +217,11 @@ message HttpConnectionManager {
     //
     // The default value is false for now for backward compatibility.
     google.protobuf.BoolValue spawn_upstream_span = 10;
+
+    // The name of the header to use for forcing tracing. If not specified, defaults to
+    // ``x-envoy-force-trace``. This header allows clients to force tracing for specific requests.
+    // The header value is not used; only the presence of the header is checked.
+    string force_trace_header = 11 [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
   }
 
   message InternalAddressConfig {
