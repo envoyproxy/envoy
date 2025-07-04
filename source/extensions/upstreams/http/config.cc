@@ -237,6 +237,18 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
       use_http2_(useHttp2(options)), use_http3_(useHttp3(options)),
       use_alpn_(options.has_auto_config()) {
   ASSERT(Http2::Utility::initializeAndValidateOptions(http2_options_).status().ok());
+  // Build outlier detection config
+  if (options.has_outlier_detection()) {
+    if (options.outlier_detection().has_http_events()) {
+      buildMatcher(options.outlier_detection().http_events().match(),
+                   outlier_detection_http_events_matcher_, server_context);
+    }
+
+    if (options.outlier_detection().has_locally_originated_events()) {
+      const auto& event = options.outlier_detection().locally_originated_events();
+      outlier_detection_locally_originated_events_ = event.enable();
+    }
+  }
 }
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(

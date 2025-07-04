@@ -476,3 +476,5 @@ visibility_excludes:
 - source/extensions/load_balancing_policies/cluster_provided/
 - source/extensions/filters/http/match_delegate/
 - source/extensions/transport_sockets/tls/
+- source/extensions/outlier_detection_monitors/common/BUILD
+- source/extensions/outlier_detection_monitors/consecutive_errors/BUILD

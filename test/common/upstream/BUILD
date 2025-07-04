@@ -446,6 +446,8 @@ envoy_cc_test(
         "//source/common/upstream:outlier_detection_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
+        "//source/extensions/outlier_detection_monitors/common:outlier_detection_monitors_lib",
+        "//source/extensions/outlier_detection_monitors/consecutive_errors:consecutive_errors_monitor_lib",
         "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",

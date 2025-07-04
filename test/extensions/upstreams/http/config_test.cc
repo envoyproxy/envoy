@@ -394,6 +394,65 @@ TEST_F(ConfigTest, TranslateExplicitH2LegacyConfigToDefaultHeaderValidatorConfig
 #endif
 }
 
+TEST_F(ConfigTest, OutlierDetectionConfig) {
+  const std::string yaml_string = R"EOF(
+  use_downstream_protocol_config:
+    http2_protocol_options: {}
+  outlier_detection:        
+    http_events:                                                      
+      match:          
+        or_match:                                                     
+          rules:                                                      
+          - http_response_headers_match:
+              headers:
+                - name: ":status"   
+                  range_match:
+                    start: 200
+                    end: 305  
+          - http_response_headers_match:
+              headers:                                                
+                - name: "set-cookie"
+                  string_match:                                       
+                    contains: "envoy="
+    locally_originated_events:
+      enable: false
+  )EOF";
+  // Enable UHV runtime flag to test config translation
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_universal_header_validator", "true"}});
+
+  ::envoy::extensions::http::header_validators::envoy_default::v3::HeaderValidatorConfig
+      proto_config;
+  TestUtility::loadFromYamlAndValidate(yaml_string, options_);
+  DefaultHeaderValidatorFactoryConfigOverride factory(proto_config);
+  Registry::InjectFactory<::Envoy::Http::HeaderValidatorFactoryConfig> registration(factory);
+  NiceMock<::Envoy::Http::MockHeaderValidatorStats> stats;
+#ifdef ENVOY_ENABLE_UHV
+  std::shared_ptr<ProtocolOptionsConfigImpl> config =
+      ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_).value();
+  // Verify that the HTTP matcher has been created.
+  ASSERT_THAT(1, config.outlier_detection_http_events_matcher_.size());
+  // Create response headers which match the configured matcher.
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "301"}});
+  ASSERT_TRUE(config.outlier_detection_http_events_matcher_[0]->match(response_headers));
+  // Change response headers to not to match the configured matcher.
+  response_headers.setReference(":status", "306");
+  ASSERT_FALSE(config.outlier_detection_http_events_matcher_[0]->match(response_headers));
+
+  // The default value for outlier_detection_locally_originated_events_ is true, so
+  // if config processing works fine, this value should be false.
+  ASSERT_FALSE(config.outlier_detection_locally_originated_events_);
+#else
+  // If UHV is disabled but envoy.reloadable_features.enable_universal_header_validator is set, the
+  // config is rejected
+  EXPECT_FALSE(ProtocolOptionsConfigImpl::createProtocolOptionsConfig(options_, server_context_)
+                   .status()
+                   .ok());
+#endif
+}
+
 } // namespace Http
 } // namespace Upstreams
 } // namespace Extensions

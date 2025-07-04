@@ -32,6 +32,7 @@ Extensions
   geoip_provider/geoip_provider
   trace/trace
   internal_redirect/internal_redirect
+  outlier_detection_monitors/outlier_detection_monitors
   path/match/path_matcher
   path/rewrite/path_rewriter
   quic/quic_extensions

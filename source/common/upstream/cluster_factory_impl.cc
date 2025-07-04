@@ -132,7 +132,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   auto detector_or_error = Outlier::DetectorImplFactory::createForCluster(
       *new_cluster_pair.first, cluster, server_context.mainThreadDispatcher(),
       server_context.runtime(), context.outlierEventLogger(),
-      server_context.api().randomGenerator());
+      server_context.api().randomGenerator(), context.messageValidationVisitor());
   RETURN_IF_NOT_OK_REF(detector_or_error.status());
   new_cluster_pair.first->setOutlierDetector(detector_or_error.value());
 

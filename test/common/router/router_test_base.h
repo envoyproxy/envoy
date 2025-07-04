@@ -14,6 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 
@@ -64,7 +65,9 @@ public:
                  bool suppress_grpc_request_failure_code_stats,
                  bool flush_upstream_log_on_upstream_stream,
                  Protobuf::RepeatedPtrField<std::string> strict_headers_to_check);
+  RouterTestBase(const envoy::extensions::filters::http::router::v3::Router& config);
 
+  void init();
   void expectResponseTimerCreate();
   void expectPerTryTimerCreate();
   void expectPerTryIdleTimerCreate(std::chrono::milliseconds timeout);
@@ -95,10 +98,11 @@ public:
   envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   Stats::StatNamePool pool_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
-  NiceMock<Upstream::MockClusterManager>& cm_{factory_context_.cluster_manager_};
-  NiceMock<Runtime::MockLoader>& runtime_{factory_context_.runtime_loader_};
-  NiceMock<Random::MockRandomGenerator>& random_{factory_context_.api_.random_};
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+  NiceMock<Upstream::MockClusterManager>& cm_{server_factory_context_.cluster_manager_};
+  NiceMock<Runtime::MockLoader>& runtime_{server_factory_context_.runtime_loader_};
+  NiceMock<Random::MockRandomGenerator>& random_{server_factory_context_.api_.random_};
   Envoy::ConnectionPool::MockCancellable cancellable_;
   Http::ContextImpl http_context_;
   Router::ContextImpl router_context_;

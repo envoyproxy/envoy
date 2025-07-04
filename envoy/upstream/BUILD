@@ -71,6 +71,7 @@ envoy_cc_library(
         ":resource_manager_interface",
         "//envoy/network:address_interface",
         "//envoy/network:transport_socket_interface",
+        "//envoy/protobuf:message_validator_interface",
         "//envoy/stats:primitive_stats_macros",
         "//envoy/stats:stats_macros",
         "@com_github_cncf_xds//xds/data/orca/v3:pkg_cc_proto",
