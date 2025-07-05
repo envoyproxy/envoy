@@ -1,5 +1,5 @@
 load("@envoy_toolshed//:macros.bzl", "json_data")
-load("@io_bazel_rules_go//proto:compiler.bzl", "go_proto_compiler")
+load("@rules_go//proto:compiler.bzl", "go_proto_compiler")
 load(
     ":external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
