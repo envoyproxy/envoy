@@ -12,10 +12,11 @@ public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
     envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config;
     config.mutable_minimum_ring_size()->set_value(min_ring_size);
-    ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, stats_scope_,
-                                                           runtime_, random_, 50, config);
+    ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(
+        priority_set_, stats_, stats_scope_, runtime_, random_, 50, config, hash_policy_);
   }
 
+  std::shared_ptr<TestHashPolicy> hash_policy_ = std::make_shared<TestHashPolicy>();
   std::unique_ptr<RingHashLoadBalancer> ring_hash_lb_;
 };
 
@@ -67,7 +68,7 @@ void benchmarkRingHashLoadBalancerChooseHost(::benchmark::State& state) {
     // TODO(mattklein123): When Maglev is a real load balancer, further share code with the
     //                     other test.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = hashInt(i);
+      tester.hash_policy_->hash_key_ = hashInt(i);
       hit_counter[lb->chooseHost(&context).host->address()->asString()] += 1;
     }
 
@@ -104,7 +105,7 @@ void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = hashInt(i);
+      tester.hash_policy_->hash_key_ = hashInt(i);
       hosts.push_back(lb->chooseHost(&context).host);
     }
 
@@ -113,7 +114,7 @@ void benchmarkRingHashLoadBalancerHostLoss(::benchmark::State& state) {
     lb = tester2.ring_hash_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = hashInt(i);
+      tester.hash_policy_->hash_key_ = hashInt(i);
       hosts2.push_back(lb->chooseHost(&context).host);
     }
 

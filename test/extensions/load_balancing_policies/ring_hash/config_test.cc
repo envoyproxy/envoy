@@ -76,6 +76,10 @@ TEST(RingHashConfigTest, Validate) {
     config.set_name("envoy.load_balancing_policies.ring_hash");
     envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config_msg;
     config_msg.mutable_minimum_ring_size()->set_value(0);
+    auto* hash_policy = config_msg.mutable_consistent_hashing_lb_config()->add_hash_policy();
+    *hash_policy->mutable_cookie()->mutable_name() = "test-cookie-name";
+    *hash_policy->mutable_cookie()->mutable_path() = "/test/path";
+    hash_policy->mutable_cookie()->mutable_ttl()->set_seconds(1000);
 
     config.mutable_typed_config()->PackFrom(config_msg);
 

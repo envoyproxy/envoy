@@ -27,6 +27,7 @@ envoy_extension_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/mocks:common_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:host_set_mocks",
