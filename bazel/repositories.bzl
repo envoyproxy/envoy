@@ -164,7 +164,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
-    _com_github_grpc_grpc()
+    _grpc()
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
@@ -754,9 +754,9 @@ def _org_llvm_releases_compiler_rt():
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
-def _com_github_grpc_grpc():
+def _grpc():
     external_http_archive(
-        name = "com_github_grpc_grpc",
+        name = "grpc",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {"@openssl": "@boringssl"},
@@ -788,7 +788,7 @@ def _com_github_grpc_grpc():
 
     native.bind(
         name = "grpc",
-        actual = "@com_github_grpc_grpc//:grpc++",
+        actual = "@grpc//:grpc++",
     )
 
     native.bind(
@@ -798,17 +798,17 @@ def _com_github_grpc_grpc():
 
     native.bind(
         name = "grpc_alts_fake_handshaker_server",
-        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
+        actual = "@grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
     )
 
     native.bind(
         name = "grpc_alts_handshaker_proto",
-        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
+        actual = "@grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
     )
 
     native.bind(
         name = "grpc_alts_transport_security_common_proto",
-        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
+        actual = "@grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
     )
 
 def _rules_proto_grpc():

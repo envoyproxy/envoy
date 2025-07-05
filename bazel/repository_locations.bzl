@@ -417,7 +417,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "BSD-3-Clause",
         license_url = "https://github.com/gperftools/gperftools/blob/gperftools-{version}/COPYING",
     ),
-    com_github_grpc_grpc = dict(
+    grpc = dict(
         project_name = "gRPC",
         project_desc = "gRPC C core library",
         project_url = "https://grpc.io",
