@@ -63,7 +63,7 @@ def _default_envoy_build_config_impl(ctx):
     ctx.file("BUILD.bazel", "")
     ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
 
-_default_envoy_build_config = repository_rule(
+default_envoy_build_config = repository_rule(
     implementation = _default_envoy_build_config_impl,
     attrs = {
         "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
@@ -118,7 +118,7 @@ def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
-        _default_envoy_build_config(name = "envoy_build_config")
+        default_envoy_build_config(name = "envoy_build_config")
 
     # Setup Bazel shell rules
     external_http_archive(name = "rules_shell")
