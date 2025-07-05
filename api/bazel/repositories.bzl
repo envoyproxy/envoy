@@ -98,8 +98,8 @@ go_proto_library(
 
 # Aligned target names with https://github.com/bazelbuild/bazel-central-registry/tree/main/modules/opentelemetry-proto
 OPENTELEMETRY_BUILD_CONTENT = """
-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
-load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
+load("@grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
