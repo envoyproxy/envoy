@@ -142,6 +142,8 @@ typed_config:
                   protocol: UDP
                   address: 127.0.0.1
                   port_value: 8089
+                udp_sent_buffer_bytes: 307200
+                udp_max_send_msg_size_bytes: 61440
 )EOF";
 
   // Define UDP server.

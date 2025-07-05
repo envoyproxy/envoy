@@ -1,5 +1,4 @@
 #pragma once
-
 #include "envoy/config/tap/v3/common.pb.h"
 
 #include "source/common/network/socket_impl.h"
@@ -29,6 +28,7 @@ public:
     return std::make_unique<UdpTapSinkHandle>(*this, trace_id);
   }
   bool isUdpPacketWriterCreated(void) { return (udp_packet_writer_ != nullptr); }
+  uint32_t getUdpMaxSendMsgSize(void) { return udp_max_send_msg_size_bytes_; }
 
 private:
   struct UdpTapSinkHandle : public TapCommon::PerTapSinkHandle {
@@ -39,6 +39,16 @@ private:
     void submitTrace(TapCommon::TraceWrapperPtr&& trace,
                      envoy::config::tap::v3::OutputSink::Format format) override;
 
+    bool shouldHandleBigUdpMessage(const envoy::config::tap::v3::OutputSink::Format format,
+                                   const envoy::data::tap::v3::SocketEvent& event);
+    void setStreamedTraceUdpDataAndSendUdpMsg(
+        int32_t new_trace_cnt,
+        const envoy::data::tap::v3::SocketStreamedTraceSegment& src_streamed_trace,
+        bool is_read_event, size_t copy_offset, size_t copy_total_bytes,
+        envoy::config::tap::v3::OutputSink::Format format);
+    void handleBigUdpMsg(TapCommon::TraceWrapperPtr&& trace,
+                         envoy::config::tap::v3::OutputSink::Format format);
+
     UdpTapSink& parent_;
     const uint64_t trace_id_;
   };
@@ -46,6 +56,13 @@ private:
   const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink config_;
   // Store the configured UDP address and port.
   Network::Address::InstanceConstSharedPtr udp_server_address_ = nullptr;
+
+  // Default value of sending buff size.
+  static constexpr uint32_t default_udp_send_buff_size_bytes = 212992;
+
+  // Configured value of max sending msg size per UDP transmission.
+  uint32_t udp_max_send_msg_size_bytes_{63488};
+
   // UDP client socket.
   Network::SocketPtr udp_socket_ = nullptr;
 

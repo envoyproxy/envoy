@@ -57,6 +57,8 @@ TEST_F(UdpTapSinkConfigTest, AddTestConfigHttpContextForUdpSink) {
               protocol: UDP
               address: 127.0.0.1
               port_value: 8089
+            udp_sent_buffer_bytes: 307200
+            udp_max_send_msg_size_bytes: 61440
 )EOF";
   envoy::config::tap::v3::TapConfig tap_config;
   TestUtility::loadFromYaml(tap_config_yaml, tap_config);
@@ -81,6 +83,8 @@ TEST_F(UdpTapSinkConfigTest, AddTestConfigTransportSocketContextForUdpSink) {
               protocol: UDP
               address: 127.0.0.1
               port_value: 8089
+            udp_sent_buffer_bytes: 307200
+            udp_max_send_msg_size_bytes: 61440
 )EOF";
   envoy::config::tap::v3::TapConfig tap_config;
   TestUtility::loadFromYaml(tap_config_yaml, tap_config);
