@@ -247,6 +247,12 @@ void GetAddrInfoDnsResolver::resolveThreadRoutine() {
   ENVOY_LOG(trace, "getaddrinfo resolver thread exiting");
 }
 
+ActiveDnsQuery*
+GetAddrInfoDnsResolver::resolveSrv(const std::string& dns_name ABSL_ATTRIBUTE_UNUSED,
+                                   ResolveCb callback ABSL_ATTRIBUTE_UNUSED) {
+  ENVOY_LOG(error, "getaddrinfo resolver does not support SRV records");
+  return nullptr;
+}
 // Register the CaresDnsResolverFactory
 REGISTER_FACTORY(GetAddrInfoDnsResolverFactory, DnsResolverFactory);
 
