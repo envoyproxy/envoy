@@ -455,18 +455,25 @@ const XDSLookupValues& XDSLookupValues::get() {
            }},
           {VirtualHostName,
            [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
-             if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
+             if (wrapper.info_ == nullptr) {
                return {};
              }
-             return CelValue::CreateString(&wrapper.info_->route()->virtualHost().name());
+             const auto& vhost = wrapper.info_->virtualHost();
+             if (vhost == nullptr) {
+               return {};
+             }
+             return CelValue::CreateString(&vhost->name());
            }},
           {VirtualHostMetadata,
            [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {
-             if (wrapper.info_ == nullptr || !wrapper.info_->route()) {
+             if (wrapper.info_ == nullptr) {
                return {};
              }
-             return CelProtoWrapper::CreateMessage(
-                 &wrapper.info_->route()->virtualHost().metadata(), &wrapper.arena_);
+             const auto& vhost = wrapper.info_->virtualHost();
+             if (vhost == nullptr) {
+               return {};
+             }
+             return CelProtoWrapper::CreateMessage(&vhost->metadata(), &wrapper.arena_);
            }},
           {UpstreamHostMetadata,
            [](const XDSWrapper& wrapper) -> absl::optional<CelValue> {

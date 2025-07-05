@@ -104,12 +104,12 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   case VhRateLimitOptions::Ignore:
     break;
   case VhRateLimitOptions::Include:
-    populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
+    populateRateLimitDescriptorsForPolicy(route_->virtualHost()->rateLimitPolicy(), descriptors,
                                           headers, on_stream_done);
     break;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
+      populateRateLimitDescriptorsForPolicy(route_->virtualHost()->rateLimitPolicy(), descriptors,
                                             headers, on_stream_done);
     }
   }

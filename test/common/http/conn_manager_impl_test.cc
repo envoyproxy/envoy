@@ -735,7 +735,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
       .WillOnce(Invoke([&](const Router::RouteCallback&, const Http::RequestHeaderMap& header_map,
                            const StreamInfo::StreamInfo&, uint64_t) {
         EXPECT_EQ(normalized_path, header_map.getPathValue());
-        return route;
+        return Router::VirtualHostRoute{route->virtual_host_, route};
       }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainManager&) -> bool { return false; }));
@@ -904,14 +904,17 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
   {
     InSequence seq;
     EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-        .WillOnce(Return(default_route));
+        .WillOnce(Return(Router::VirtualHostRoute{default_route->virtual_host_, default_route}));
 
     // This filter iterates through all possible route matches and choose the last matched route
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[0]->callbacks_->streamInfo().virtualHost());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
           Router::RouteConstSharedPtr route =
@@ -963,27 +966,30 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
           EXPECT_EQ(default_route, route);
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[0]->callbacks_->streamInfo().virtualHost());
 
           return FilterHeadersStatus::Continue;
         }));
 
     // This route config expected to be invoked for all matching routes
     EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-        .WillOnce(Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
-                             const Envoy::StreamInfo::StreamInfo&,
-                             uint64_t) -> Router::RouteConstSharedPtr {
-          EXPECT_EQ(cb(foo_bar_baz_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Continue);
-          EXPECT_EQ(cb(foo_bar_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Continue);
-          EXPECT_EQ(cb(foo_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Continue);
-          EXPECT_EQ(cb(default_route, Router::RouteEvalStatus::NoMoreRoutes),
-                    Router::RouteMatchStatus::Accept);
-          return default_route;
-        }));
+        .WillOnce(
+            Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
+                       const Envoy::StreamInfo::StreamInfo&, uint64_t) -> Router::VirtualHostRoute {
+              EXPECT_EQ(cb(foo_bar_baz_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Continue);
+              EXPECT_EQ(cb(foo_bar_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Continue);
+              EXPECT_EQ(cb(foo_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Continue);
+              EXPECT_EQ(cb(default_route, Router::RouteEvalStatus::NoMoreRoutes),
+                        Router::RouteMatchStatus::Accept);
+              return Router::VirtualHostRoute{default_route->virtual_host_, default_route};
+            }));
 
     EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
@@ -991,8 +997,11 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
+
+          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
 
           int ctr = 0;
           const Router::RouteCallback& cb =
@@ -1019,23 +1028,26 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           decoder_filters_[1]->callbacks_->downstreamCallbacks()->route(cb);
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(foo_bar_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
+
+          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
+          EXPECT_EQ(foo_bar_route->virtual_host_,
+                    decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
 
           return FilterHeadersStatus::Continue;
         }));
 
     // This route config expected to be invoked for first two matching routes
     EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-        .WillOnce(Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
-                             const Envoy::StreamInfo::StreamInfo&,
-                             uint64_t) -> Router::RouteConstSharedPtr {
-          EXPECT_EQ(cb(foo_bar_baz_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Continue);
-          EXPECT_EQ(cb(foo_bar_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Accept);
-          return foo_bar_route;
-        }));
+        .WillOnce(
+            Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
+                       const Envoy::StreamInfo::StreamInfo&, uint64_t) -> Router::VirtualHostRoute {
+              EXPECT_EQ(cb(foo_bar_baz_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Continue);
+              EXPECT_EQ(cb(foo_bar_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Accept);
+              return Router::VirtualHostRoute{foo_bar_route->virtual_host_, foo_bar_route};
+            }));
 
     EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   }
@@ -1085,7 +1097,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
 
   // Route config mock
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(default_route));
+      .WillOnce(Return(Router::VirtualHostRoute{default_route->virtual_host_, default_route}));
 
   // Filter that performs setRoute (sets cached_route_ & cached_cluster_info_)
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
@@ -1166,7 +1178,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
       std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
       .Times(1)
-      .WillRepeatedly(Return(default_route));
+      .WillRepeatedly(
+          Return(Router::VirtualHostRoute{default_route->virtual_host_, default_route}));
   EXPECT_CALL(default_route->route_entry_, clusterName())
       .Times(1)
       .WillRepeatedly(ReturnRef(default_cluster_name));
@@ -1266,13 +1279,13 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->maxGrpcTimeout());
         EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
                   delegating_route_foo->routeEntry()->grpcTimeoutOffset());
-        EXPECT_EQ(default_route->virtualHost().virtualCluster(test_req_headers),
-                  delegating_route_foo->virtualHost().virtualCluster(test_req_headers));
+        EXPECT_EQ(default_route->virtualHost()->virtualCluster(test_req_headers),
+                  delegating_route_foo->virtualHost()->virtualCluster(test_req_headers));
 
-        EXPECT_EQ(default_route->virtualHost().corsPolicy(),
-                  delegating_route_foo->virtualHost().corsPolicy());
-        EXPECT_EQ(default_route->virtualHost().rateLimitPolicy().empty(),
-                  delegating_route_foo->virtualHost().rateLimitPolicy().empty());
+        EXPECT_EQ(default_route->virtualHost()->corsPolicy(),
+                  delegating_route_foo->virtualHost()->corsPolicy());
+        EXPECT_EQ(default_route->virtualHost()->rateLimitPolicy().empty(),
+                  delegating_route_foo->virtualHost()->rateLimitPolicy().empty());
 
         EXPECT_EQ(default_route->routeEntry()->autoHostRewrite(),
                   delegating_route_foo->routeEntry()->autoHostRewrite());
@@ -1404,7 +1417,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
       .WillOnce(Invoke([&](const Router::RouteCallback&, const Http::RequestHeaderMap& header_map,
                            const StreamInfo::StreamInfo&, uint64_t) {
         EXPECT_EQ(normalized_host, header_map.getHostValue());
-        return route;
+        return Router::VirtualHostRoute{route->virtual_host_, route};
       }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainManager&) -> bool { return false; }));

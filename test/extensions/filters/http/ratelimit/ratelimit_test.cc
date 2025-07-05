@@ -71,8 +71,8 @@ public:
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.clear();
     filter_callbacks_.route_->route_entry_.rate_limit_policy_.rate_limit_policy_entry_.emplace_back(
         route_rate_limit_);
-    filter_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_.clear();
-    filter_callbacks_.route_->virtual_host_.rate_limit_policy_.rate_limit_policy_entry_
+    filter_callbacks_.route_->virtual_host_->rate_limit_policy_.rate_limit_policy_entry_.clear();
+    filter_callbacks_.route_->virtual_host_->rate_limit_policy_.rate_limit_policy_entry_
         .emplace_back(vh_rate_limit_);
 
     if (!route_config_yaml.empty()) {
@@ -311,7 +311,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponse) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -424,7 +424,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithHeaders) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -480,7 +480,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithFilterHeaders) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1360,7 +1360,7 @@ TEST_F(HttpRateLimitFilterTest, InternalRequestType) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1403,7 +1403,7 @@ TEST_F(HttpRateLimitFilterTest, ExternalRequestType) {
   EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _))
       .WillOnce(SetArgReferee<0>(descriptor_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1455,7 +1455,8 @@ TEST_F(HttpRateLimitFilterTest, DEPRECATED_FEATURE_TEST(ExcludeVirtualHost)) {
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1505,7 +1506,8 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithRouteRateLimitSet) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(false));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1553,7 +1555,7 @@ TEST_F(HttpRateLimitFilterTest, OverrideVHRateLimitOptionWithoutRouteRateLimit) 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_.rate_limit_policy_, empty())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1601,7 +1603,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithOnlyVHRateLimitSet) 
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1651,7 +1653,7 @@ TEST_F(HttpRateLimitFilterTest, IncludeVHRateLimitOptionWithRouteAndVHRateLimitS
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_,
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
               getApplicableRateLimit(0));
 
   EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _))
@@ -1701,7 +1703,8 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithRouteRateLimitSet) {
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(*client_, limit(_, "foo",
@@ -1746,7 +1749,8 @@ TEST_F(HttpRateLimitFilterTest, IgnoreVHRateLimitOptionWithOutRouteRateLimit) {
   EXPECT_CALL(*filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
       .WillOnce(Return(&per_route_config_));
 
-  EXPECT_CALL(filter_callbacks_.route_->virtual_host_.rate_limit_policy_, getApplicableRateLimit(0))
+  EXPECT_CALL(filter_callbacks_.route_->virtual_host_->rate_limit_policy_,
+              getApplicableRateLimit(0))
       .Times(0);
 
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
