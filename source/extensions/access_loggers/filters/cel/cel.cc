@@ -9,23 +9,25 @@ namespace CEL {
 namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
 CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
-    const ::Envoy::LocalInfo::LocalInfo& local_info, Expr::BuilderInstanceSharedPtr builder,
-    const google::api::expr::v1alpha1::Expr& input_expr)
+    const ::Envoy::LocalInfo::LocalInfo& local_info,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+    const cel::expr::Expr& input_expr)
     : local_info_(local_info), builder_(builder), parsed_expr_(input_expr) {
-  compiled_expr_ = Expr::createExpression(builder_->builder(), parsed_expr_);
+  compiled_expr_ =
+      Extensions::Filters::Common::Expr::createExpression(builder_->builder(), parsed_expr_);
 }
 
 bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext& log_context,
                                            const StreamInfo::StreamInfo& stream_info) const {
-  Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(*compiled_expr_, arena, &local_info_, stream_info,
-                                    &log_context.requestHeaders(), &log_context.responseHeaders(),
-                                    &log_context.responseTrailers());
-  if (!eval_status.has_value() || eval_status.value().IsError()) {
+  ProtobufWkt::Arena arena;
+  const auto result = Extensions::Filters::Common::Expr::evaluate(
+      *compiled_expr_.get(), arena, &local_info_, stream_info, &log_context.requestHeaders(),
+      &log_context.responseHeaders(), &log_context.responseTrailers());
+  if (!result.has_value() || result.value().IsError()) {
     return false;
   }
-  auto result = eval_status.value();
-  return result.IsBool() ? result.BoolOrDie() : false;
+  auto eval_result = result.value();
+  return eval_result.IsBool() ? eval_result.BoolOrDie() : false;
 }
 
 } // namespace CEL
