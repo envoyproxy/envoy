@@ -13,6 +13,7 @@
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
 
+#include "absl/cleanup/cleanup.h"
 #include "matching/data_impl.h"
 
 namespace Envoy {
@@ -1224,6 +1225,37 @@ void FilterManager::maybeContinueEncoding(StreamEncoderFilters::Iterator continu
 
 void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHeaderMap& headers,
                                   bool end_stream) {
+
+  // Flag to control early return
+  bool should_exit = false;
+
+  // This is registered as a cleanup action to ensure the required response
+  // headers check runs even if iteration is halted via early return paths.
+  auto validate_required_headers = absl::MakeCleanup([&]() {
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.validate_required_response_headers_in_cleanup")) {
+      if (filter_manager_callbacks_.responseHeaders().has_value()) {
+        // Check if the filter chain above did not remove critical headers or set malformed header
+        // values. We could do this at the codec in order to prevent other places than the filter
+        // chain from removing critical headers, but it will come with the implementation
+        // complexity. See the previous attempt (#15658) for detail, and for now we choose to
+        // protect only against filter chains.
+        const auto status = HeaderUtility::checkRequiredResponseHeaders(
+            filter_manager_callbacks_.responseHeaders().ref());
+        if (!status.ok() && !state_.local_reply_sent_) {
+          // If the check failed, then we reply with BadGateway, and stop the further processing.
+          state_.local_reply_sent_ = true;
+          sendLocalReply(
+              Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+              absl::StrCat(
+                  StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders, "{",
+                  StringUtil::replaceAllEmptySpace(status.message()), "}"));
+          should_exit = true;
+        }
+      }
+    }
+  });
+
   // See encodeHeaders() comments in envoy/http/filter.h for why the 1xx precondition holds.
   ASSERT(!CodeUtility::is1xx(Utility::getResponseStatus(headers)) ||
          Utility::getResponseStatus(headers) == enumToInt(Http::Code::SwitchingProtocols));
@@ -1285,19 +1317,20 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
     }
   }
 
-  // Check if the filter chain above did not remove critical headers or set malformed header values.
-  // We could do this at the codec in order to prevent other places than the filter chain from
-  // removing critical headers, but it will come with the implementation complexity.
-  // See the previous attempt (#15658) for detail, and for now we choose to protect only against
-  // filter chains.
-  const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
-  if (!status.ok()) {
-    // If the check failed, then we reply with BadGateway, and stop the further processing.
-    sendLocalReply(
-        Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
-        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
-                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
-    return;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.validate_required_response_headers_in_cleanup")) {
+    std::move(validate_required_headers).Invoke();
+    if (should_exit)
+      return;
+  } else {
+    const auto status = HeaderUtility::checkRequiredResponseHeaders(headers);
+    if (!status.ok()) {
+      // If the check failed, then we reply with BadGateway, and stop the further processing.
+      sendLocalReply(
+          Http::Code::BadGateway, status.message(), nullptr, absl::nullopt,
+          absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredResponseHeaders,
+                       "{", StringUtil::replaceAllEmptySpace(status.message()), "}"));
+    }
   }
 
   const bool modified_end_stream = (end_stream && continue_data_entry == encoder_filters_.end());
