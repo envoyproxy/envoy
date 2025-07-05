@@ -240,6 +240,10 @@ new_features:
 - area: local_ratelimit
   change: |
     ``local_ratelimit`` will return ``x-ratelimit-reset`` header when the rate limit is exceeded.
+- area: load_reporting
+  change: |
+    Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
+    endpoint statistics and metrics, but only for endpoints with updated stats, optimizing report size and efficiency.
 - area: oauth2
   change: |
     Added :ref:`end_session_endpoint <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.end_session_endpoint>`
