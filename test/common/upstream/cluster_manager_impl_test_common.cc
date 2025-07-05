@@ -36,18 +36,13 @@ class MockedUpdatedClusterManagerImpl : public TestClusterManagerImpl {
 public:
   using TestClusterManagerImpl::TestClusterManagerImpl;
 
-  MockedUpdatedClusterManagerImpl(
-      const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-      Server::Configuration::CommonFactoryContext& factory_context, Stats::Store& stats,
-      ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-      AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-      Server::Admin& admin, Api::Api& api, MockLocalClusterUpdate& local_cluster_update,
-      MockLocalHostsRemoved& local_hosts_removed, Http::Context& http_context,
-      Grpc::Context& grpc_context, Router::Context& router_context, Server::Instance& server,
-      Config::XdsManager& xds_manager, absl::Status& creation_status)
-      : TestClusterManagerImpl(bootstrap, factory, factory_context, stats, tls, runtime, local_info,
-                               log_manager, main_thread_dispatcher, admin, api, http_context,
-                               grpc_context, router_context, server, xds_manager, creation_status),
+  MockedUpdatedClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                  ClusterManagerFactory& factory,
+                                  Server::Configuration::ServerFactoryContext& factory_context,
+                                  MockLocalClusterUpdate& local_cluster_update,
+                                  MockLocalHostsRemoved& local_hosts_removed,
+                                  absl::Status& creation_status)
+      : TestClusterManagerImpl(bootstrap, factory, factory_context, creation_status),
         local_cluster_update_(local_cluster_update), local_hosts_removed_(local_hosts_removed) {}
 
 protected:
@@ -67,22 +62,16 @@ protected:
   MockLocalHostsRemoved& local_hosts_removed_;
 };
 
-ClusterManagerImplTest::ClusterManagerImplTest()
-    : http_context_(factory_.stats_.symbolTable()), grpc_context_(factory_.stats_.symbolTable()),
-      router_context_(factory_.stats_.symbolTable()),
-      registered_dns_factory_(dns_resolver_factory_) {
+ClusterManagerImplTest::ClusterManagerImplTest() : registered_dns_factory_(dns_resolver_factory_) {
   // Using the NullGrpcMuxImpl by default making the calls a no-op.
-  ON_CALL(xds_manager_, adsMux())
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux())
       .WillByDefault(Return(std::make_shared<Config::NullGrpcMuxImpl>()));
 }
 
 void ClusterManagerImplTest::create(const Bootstrap& bootstrap) {
   // Override the bootstrap used by the mock Server::Instance object.
-  server_.bootstrap_.CopyFrom(bootstrap);
-  cluster_manager_ = TestClusterManagerImpl::createTestClusterManager(
-      bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
-      factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-      *factory_.api_, http_context_, grpc_context_, router_context_, server_, xds_manager_);
+  cluster_manager_ = TestClusterManagerImpl::createTestClusterManager(bootstrap, factory_,
+                                                                      factory_.server_context_);
   ON_CALL(factory_.server_context_, clusterManager()).WillByDefault(ReturnRef(*cluster_manager_));
   THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 
@@ -150,11 +139,9 @@ static_resources:
   const auto& bootstrap = parseBootstrapFromV3Yaml(yaml);
   absl::Status creation_status = absl::OkStatus();
   cluster_manager_ = std::make_unique<MockedUpdatedClusterManagerImpl>(
-      bootstrap, factory_, factory_.server_context_, factory_.stats_, factory_.tls_,
-      factory_.runtime_, factory_.local_info_, log_manager_, factory_.dispatcher_, admin_,
-      *factory_.api_, local_cluster_update_, local_hosts_removed_, http_context_, grpc_context_,
-      router_context_, server_, xds_manager_, creation_status);
-  THROW_IF_NOT_OK(creation_status);
+      bootstrap, factory_, factory_.server_context_, local_cluster_update_, local_hosts_removed_,
+      creation_status);
+  THROW_IF_NOT_OK_REF(creation_status);
   THROW_IF_NOT_OK(cluster_manager_->initialize(bootstrap));
 }
 
@@ -175,7 +162,9 @@ void ClusterManagerImplTest::checkStats(uint64_t added, uint64_t modified, uint6
 
 void ClusterManagerImplTest::checkConfigDump(const std::string& expected_dump_yaml,
                                              const Matchers::StringMatcher& name_matcher) {
-  auto message_ptr = admin_.config_tracker_.config_tracker_callbacks_["clusters"](name_matcher);
+  auto message_ptr =
+      factory_.server_context_.admin_.config_tracker_.config_tracker_callbacks_["clusters"](
+          name_matcher);
   const auto& clusters_config_dump =
       dynamic_cast<const envoy::admin::v3::ClustersConfigDump&>(*message_ptr);
 
