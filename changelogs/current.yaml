@@ -54,6 +54,12 @@ minor_behavior_changes:
   change: |
     Allow ``getaddrinfo`` to be configured to run by a thread pool, controlled by :ref:`num_resolver_threads
     <envoy_v3_api_field_extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig.num_resolver_threads>`.
+- area: dns
+  change: |
+    Honor the default DNS resolver configuration in the bootstrap config
+    :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>`
+    if the DNS cache configuration in the dynamic forward proxy filter is empty
+    :ref:`dns_cache_config <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.dns_cache_config>`.
 - area: grpc-json-transcoding
   change: |
     Add SSE style message framing for streamed responses in :ref:`gRPC JSON transcoder filter <config_http_filters_grpc_json_transcoder>`.
