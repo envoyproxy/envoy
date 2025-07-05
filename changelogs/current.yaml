@@ -80,6 +80,10 @@ minor_behavior_changes:
   change: |
     :ref:`Credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>` is no longer
     a work in progress field.
+- area: oauth2
+  change: |
+    The access token, id token and refresh token in the cookies are now encrypted using the HMAC secret. This behavior can
+    be reverted by setting the runtime guard ``envoy.reloadable_features.oauth2_encrypt_tokens`` to ``false``.
 - area: http3
   change: |
     Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
