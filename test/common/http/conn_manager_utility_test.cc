@@ -1970,6 +1970,90 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
   EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(request_headers));
 }
 
+// Test custom force trace header functionality
+TEST_F(ConnectionManagerUtilityTest, CustomForceTraceHeader) {
+  // Set up a custom force trace header name
+  auto custom_tracing_config = std::make_unique<Http::TracingConnectionManagerConfig>(
+      Tracing::OperationName::Ingress, Tracing::CustomTagMap{}, envoy::type::v3::FractionalPercent{},
+      envoy::type::v3::FractionalPercent{}, envoy::type::v3::FractionalPercent{}, false, 256, "x-custom-force-trace");
+  ON_CALL(config_, tracingConfig()).WillByDefault(Return(custom_tracing_config.get()));
+  
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  
+  // Internal request with custom force trace header should be traceable
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"},
+                                   {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
+                                   {"x-custom-force-trace", "true"}};
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*request_id_extension_,
+              setTraceReason(testing::Ref(headers), Tracing::Reason::ServiceForced));
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::ServiceForced}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(Tracing::Reason::ServiceForced, request_id_extension_->getTraceReason(headers));
+  
+  // The default x-envoy-force-trace header should NOT trigger tracing with custom config
+  TestRequestHeaderMapImpl headers_default{{"x-forwarded-for", "10.0.0.1"},
+                                           {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a29"},
+                                           {"x-envoy-force-trace", "true"}};
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_CALL(*request_id_extension_, setTraceReason(_, _)).Times(0);
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers_default, Protocol::Http2));
+  EXPECT_EQ(Tracing::Reason::NotTraceable, request_id_extension_->getTraceReason(headers_default));
+}
+
+// Test custom force trace header in response functionality
+TEST_F(ConnectionManagerUtilityTest, CustomForceTraceHeaderResponse) {
+  // Set up a custom force trace header name
+  auto custom_tracing_config = std::make_unique<Http::TracingConnectionManagerConfig>(
+      Tracing::OperationName::Ingress, Tracing::CustomTagMap{}, envoy::type::v3::FractionalPercent{},
+      envoy::type::v3::FractionalPercent{}, envoy::type::v3::FractionalPercent{}, false, 256, "x-custom-force-trace");
+  ON_CALL(config_, tracingConfig()).WillByDefault(Return(custom_tracing_config.get()));
+  
+  TestResponseHeaderMapImpl response_headers;
+  TestRequestHeaderMapImpl request_headers{{"x-request-id", "request-id"},
+                                           {"x-custom-force-trace", "true"}};
+
+  EXPECT_CALL(*request_id_extension_,
+              setInResponse(testing::Ref(response_headers), testing::Ref(request_headers)));
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, &request_headers, config_, "",
+                                                  connection_.stream_info_, node_id_);
+  EXPECT_EQ("request-id", response_headers.get_("x-request-id"));
+}
+
+// Test empty custom force trace header falls back to default
+TEST_F(ConnectionManagerUtilityTest, EmptyCustomForceTraceHeaderFallback) {
+  // Set up an empty custom force trace header name (should fall back to default)
+  auto custom_tracing_config = std::make_unique<Http::TracingConnectionManagerConfig>(
+      Tracing::OperationName::Ingress, Tracing::CustomTagMap{}, envoy::type::v3::FractionalPercent{},
+      envoy::type::v3::FractionalPercent{}, envoy::type::v3::FractionalPercent{}, false, 256, "");
+  ON_CALL(config_, tracingConfig()).WillByDefault(Return(custom_tracing_config.get()));
+  
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  
+  // Internal request with default force trace header should be traceable when custom header is empty
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"},
+                                   {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
+                                   {"x-envoy-force-trace", "true"}};
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("tracing.global_enabled", An<const envoy::type::v3::FractionalPercent&>(), _))
+      .WillOnce(Return(true));
+  EXPECT_CALL(*request_id_extension_,
+              setTraceReason(testing::Ref(headers), Tracing::Reason::ServiceForced));
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true, Tracing::Reason::ServiceForced}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(Tracing::Reason::ServiceForced, request_id_extension_->getTraceReason(headers));
+}
+
 TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
   Http::TestRequestHeaderMapImpl request_headers{{}};
   Http::TestResponseHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
