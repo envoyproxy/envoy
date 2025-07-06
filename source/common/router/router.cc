@@ -83,9 +83,8 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            const envoy::extensions::filters::http::router::v3::Router& config,
                            absl::Status& creation_status)
     : FilterConfig(
-          context.serverFactoryContext(), stat_prefix, context.serverFactoryContext().localInfo(),
-          context.scope(), context.serverFactoryContext().clusterManager(),
-          context.serverFactoryContext().runtime(),
+          context.serverFactoryContext(), stat_prefix, context.scope(),
+          context.serverFactoryContext().clusterManager(), context.serverFactoryContext().runtime(),
           context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
           config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),

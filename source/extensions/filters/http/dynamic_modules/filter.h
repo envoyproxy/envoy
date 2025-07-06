@@ -130,6 +130,17 @@ public:
   }
 
   /**
+   * Helper to get the connection information
+   */
+  OptRef<const Network::Connection> connection() {
+    auto cb = callbacks();
+    if (cb == nullptr) {
+      return {};
+    }
+    return cb->connection();
+  }
+
+  /**
    * This is called when an event is scheduled via DynamicModuleHttpFilterScheduler::commit.
    */
   void onScheduled(uint64_t event_id);

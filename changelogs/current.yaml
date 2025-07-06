@@ -28,6 +28,9 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: geoip
+  change: |
+    The lookup for asn information is fetched from ``asn_db`` if asn_db_path is defined and from ``isb_db`` if asn_db_path is not defined.
 - area: lua
   change: |
     The ``metadata()`` of lua filter now will search the metadata by the :ref:`filter config name
@@ -59,10 +62,31 @@ minor_behavior_changes:
    :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
    :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
    will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
+- area: tracing
+  change: |
+    Add :ref:`max_cache_size <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.max_cache_size>`
+    to the OpenTelemetry tracer config. This limits the number of spans that can be cached before flushing.
 - area: aws
   change: |
     :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
     providers, allowing complete customisation of the credential provider chain when using AWS request signing extension.
+- area: ext_proc
+  change: |
+    If ext_proc server sends spurious response message to Envoy, Envoy now performs fail-open or fail-close action based on
+    :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`
+    configuration. This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.ext_proc_fail_close_spurious_resp`` to ``false``.
+- area: filters
+  change: |
+    :ref:`Credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>` is no longer
+    a work in progress field.
+- area: oauth2
+  change: |
+    The access token, id token and refresh token in the cookies are now encrypted using the HMAC secret. This behavior can
+    be reverted by setting the runtime guard ``envoy.reloadable_features.oauth2_encrypt_tokens`` to ``false``.
+- area: http3
+  change: |
+    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -96,10 +120,10 @@ bug_fixes:
     Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
     chain. This fix addresses this issue by rejecting such configuration with empty value. This behavior can be reverted by setting
     the runtime guard ``envoy.reloadable_features.reject_empty_trusted_ca_file`` to ``false``.
-
-- area: http3
+- area: tls_inspector
   change: |
-    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
+    Fixes a bug where the TLS inspector filter would not correctly report ``client_hello_too_large`` stat for too big client hello messages
+    i.e bigger than 16kb.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -147,6 +171,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
 
 new_features:
+- area: build
+  change: |
+    Upgraded Envoy to build with C++20; Envoy developers can use C++20 features now.
 - area: redis
   change: |
     Added support for ``scan`` and ``info``.
@@ -269,5 +296,20 @@ new_features:
     Added a new ``failure_mode_deny_percent`` field of type ``Envoy::Runtime::FractionalPercent`` attached to the rate limit filter
     to configure the failure mode for rate limit service errors in runtime.
     It acts as an override for the existing ``failure_mode_deny`` field in the filter config.
+- area: tls
+  change: |
+    Added new metric for emitting seconds since UNIX epoch of expirations of TLS and CA certificates.
+    They are rooted at ``cluster.<cluster_name>.ssl.certificate.<cert_name>.``
+    and at ``listener.<address>.ssl.certificate.<cert_name>.`` namespace.
+- area: ext_proc
+  change: |
+    The :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`
+    setting may now be overridden on a per-route basis.
+- area: matcher
+  change: |
+    added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
+- area: stateful_session
+  change: |
+    Added support for cookie attributes to stateful session cookie.
 
 deprecated:

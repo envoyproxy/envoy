@@ -11,7 +11,8 @@ public:
 
   RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
                             const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info) const override;
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random) const override;
 
 private:
   const Http::LowerCaseString cluster_header_;

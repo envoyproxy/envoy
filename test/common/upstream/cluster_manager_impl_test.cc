@@ -634,7 +634,7 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
           ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
               "envoy.load_balancing_policies.cluster_provided")));
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
                             "cluster manager: cluster provided LB specified but cluster "
@@ -648,7 +648,7 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "cluster_0";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, new MockThreadAwareLoadBalancer())));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
                             "cluster manager: cluster provided LB not specified but cluster "

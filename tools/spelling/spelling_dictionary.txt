@@ -92,6 +92,7 @@ ETX
 FS
 FIXME
 fc
+decrypted
 gperf
 HEXDIG
 HEXDIGIT
