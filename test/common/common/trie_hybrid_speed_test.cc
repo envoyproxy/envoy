@@ -1,5 +1,5 @@
 #include "source/common/common/radix/trie_hybrid.hpp"
-#include "source/common/common/trie_lookup_table.hpp"
+#include "source/common/common/trie_lookup_table.h"
 #include "test/test_common/test_base.h"
 #include <benchmark/benchmark.h>
 #include <random>
