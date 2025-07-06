@@ -184,13 +184,4 @@ BENCHMARK(BM_TrieHybridLookups);
 BENCHMARK(BM_TrieHybridLongestPrefix);
 BENCHMARK(BM_TrieHybridFindMatchingPrefixes);
 BENCHMARK(BM_TrieHybridVsTrieLookupShortKeys);
-BENCHMARK(BM_TrieHybridVsTrieLookupLongKeys);
-
-} // namespace Common
-} // namespace Envoy
-
-int main(int argc, char** argv) {
-    benchmark::Initialize(&argc, argv);
-    benchmark::RunSpecifiedBenchmarks();
-    return 0;
-} 
+BENCHMARK(BM_TrieHybridVsTrieLookupLongKeys); 
