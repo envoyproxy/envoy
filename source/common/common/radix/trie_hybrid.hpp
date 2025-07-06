@@ -112,20 +112,6 @@ public:
         return results;
     }
 
-
-
-    // Get total size
-    int len() const {
-        // TrieLookupTable doesn't have a size method, so we'll just return radix tree size
-        return radix_tree.len();
-    }
-
-    // Get leaves in subtree
-    int GetLeavesInSubtree() const {
-        // TrieLookupTable doesn't have this method, so we'll just return radix tree count
-        return radix_tree.GetLeavesInSubtree();
-    }
-
     // Get trie table (for debugging/testing)
     const Envoy::TrieLookupTable<T>& getTrieTable() const {
         return trie_table;
