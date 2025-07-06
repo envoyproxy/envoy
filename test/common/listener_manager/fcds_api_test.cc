@@ -79,7 +79,7 @@ public:
     EXPECT_CALL(listener_manager_,
                 updateDynamicFilterChains(listener_name, _, _, removed_filter_chains))
         .WillOnce(Invoke([result, expected_added_count](
-                             const std::string&, absl::optional<std::string>&,
+                             const std::string&, absl::optional<absl::string_view>&,
                              const Server::FilterChainRefVector& added,
                              const absl::flat_hash_set<absl::string_view>&) -> absl::Status {
           EXPECT_EQ(expected_added_count, added.size());

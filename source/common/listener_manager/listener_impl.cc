@@ -503,8 +503,8 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
 
 ListenerImpl::ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& added_filter_chains,
                            const absl::flat_hash_set<absl::string_view>& removed_filter_chains,
-                           absl::optional<std::string>& fcds_version_info, bool workers_started,
-                           absl::Status& creation_status)
+                           absl::optional<absl::string_view>& fcds_version_info,
+                           bool workers_started, absl::Status& creation_status)
     : parent_(origin.parent_), addresses_(origin.addresses_), socket_type_(origin.socket_type_),
       bind_to_port_(origin.bind_to_port_), mptcp_enabled_(origin.mptcp_enabled_),
       hand_off_restored_destination_connections_(origin.hand_off_restored_destination_connections_),
@@ -1240,7 +1240,8 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
 }
 
 absl::StatusOr<std::unique_ptr<ListenerImpl>> ListenerImpl::newListenerWithFilterChain(
-    absl::optional<std::string>& fcds_version_info, const FilterChainRefVector& added_filter_chains,
+    absl::optional<absl::string_view>& fcds_version_info,
+    const FilterChainRefVector& added_filter_chains,
     const absl::flat_hash_set<absl::string_view>& removed_filter_chains, bool workers_started) {
   absl::Status creation_status = absl::OkStatus();
   // Use WrapUnique since the constructor is private.

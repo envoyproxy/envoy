@@ -23,7 +23,7 @@ public:
                                            const std::string& version_info,
                                            bool added_via_api) override;
   absl::Status updateDynamicFilterChains(
-      const std::string& listener_name, absl::optional<std::string>& version_info,
+      const std::string& listener_name, absl::optional<absl::string_view>& version_info,
       const FilterChainRefVector& added_filter_chains,
       const absl::flat_hash_set<absl::string_view>& removed_filter_chains) override;
   void createLdsApi(const envoy::config::core::v3::ConfigSource&,

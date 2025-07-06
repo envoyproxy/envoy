@@ -397,7 +397,7 @@ protected:
       removed_set.insert(removed_filter_chain.value());
     }
 
-    absl::optional<std::string> version = {};
+    absl::optional<absl::string_view> version = {};
     auto status_or_error =
         manager_->updateDynamicFilterChains(listener_name, version, added_vec, removed_set);
     if (status_or_error.ok()) {

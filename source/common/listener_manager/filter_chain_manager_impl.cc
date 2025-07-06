@@ -166,7 +166,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   const auto* origin = origin_.value();
   Cleanup origin_cleanup([this]() { origin_ = absl::nullopt; });
   Cleanup draining_cleanup([origin]() { origin->draining_filter_chains_ = absl::nullopt; });
-  origin->draining_filter_chains_ = std::list<Network::DrainableFilterChainSharedPtr>{};
+  origin->draining_filter_chains_ = std::vector<Network::DrainableFilterChainSharedPtr>{};
 
   uint32_t filter_chains_remove_count = 0;
   uint32_t filter_chains_update_count = 0;

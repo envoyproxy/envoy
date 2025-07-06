@@ -228,7 +228,7 @@ public:
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                              bool workers_started, uint64_t hash);
   absl::StatusOr<std::unique_ptr<ListenerImpl>>
-  newListenerWithFilterChain(absl::optional<std::string>& fcds_version_info,
+  newListenerWithFilterChain(absl::optional<absl::string_view>& fcds_version_info,
                              const FilterChainRefVector& added_filter_chains,
                              const absl::flat_hash_set<absl::string_view>& removed_filter_chains,
                              bool workers_started);
@@ -416,7 +416,7 @@ private:
    */
   ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& added_filter_chains,
                const absl::flat_hash_set<absl::string_view>& removed_filter_chains,
-               absl::optional<std::string>& fcds_version_info, bool workers_started,
+               absl::optional<absl::string_view>& fcds_version_info, bool workers_started,
                absl::Status& creation_status);
 
   // Helpers for constructor.

@@ -40,12 +40,13 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
                             const std::string& system_version_info) {
   std::string error_message;
 
-  absl::optional<std::string> version = absl::nullopt;
+  absl::optional<absl::string_view> version = absl::nullopt;
   if (!added_resources.empty()) {
     version = added_resources[0].get().version();
   }
 
   FilterChainRefVector added_filter_chains;
+  added_filter_chains.reserve(added_resources.size());
   for (const auto& resource : added_resources) {
     if (!resource.get().hasResource()) {
       continue;
@@ -58,7 +59,7 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
   absl::flat_hash_set<absl::string_view> removed_filter_chains;
   removed_filter_chains.reserve(removed_resources.size());
   for (const auto& resource : removed_resources) {
-    removed_filter_chains.insert(resource);
+    removed_filter_chains.insert(absl::string_view(resource));
   }
 
   TRY_ASSERT_MAIN_THREAD {

@@ -224,7 +224,7 @@ public:
    * @return absl::Status OK if the update succeeded, otherwise an error status.
    */
   virtual absl::Status updateDynamicFilterChains(
-      const std::string& listener_name, absl::optional<std::string>& version_info,
+      const std::string& listener_name, absl::optional<absl::string_view>& version_info,
       const FilterChainRefVector& added_filter_chains,
       const absl::flat_hash_set<absl::string_view>& removed_filter_chains) PURE;
 
