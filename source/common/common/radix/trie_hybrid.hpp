@@ -77,31 +77,21 @@ public:
             }
         }
         
-        // If key size doesn't match the tree, try the other tree
-        if (search.size() <= 8) {
-            return radix_tree.Get(search);
-        } else {
-            auto result = trie_table.find(search);
-            if (result != nullptr) {
-                return std::optional<T>(result);
-            }
-        }
-        
         return std::nullopt;
     }
 
     // Longest prefix match - search both trie and radix tree
     LongestPrefixResult<K, T> LongestPrefix(const K& search) const {
         LongestPrefixResult<K, T> radix_result = radix_tree.LongestPrefix(search);
-        
-        // For trie lookup table, we need to implement longest prefix manually
-        // since it doesn't have a built-in longest prefix method
-        T zero{};
         if (radix_result.found) {
             return radix_result;
-        } else {
-            return {K{}, zero, false};
         }
+        auto trie_result = trie_table.findLongestPrefix(search);
+        if (trie_result != nullptr) {
+            return {search, trie_result, true};
+        }
+        T zero{};
+        return {K{}, zero, false};
     }
 
     // Find all matching prefixes - search both trie and radix tree
@@ -122,18 +112,7 @@ public:
         return results;
     }
 
-    // Get value at index
-    std::tuple<K, T, bool> GetAtIndex(int index) const {
-        // Try radix tree first
-        auto radix_result = radix_tree.GetAtIndex(index);
-        if (std::get<2>(radix_result)) {
-            return radix_result;
-        }
-        
-        // TrieLookupTable doesn't support index-based access
-        T zero{};
-        return {K{}, zero, false};
-    }
+
 
     // Get total size
     int len() const {
