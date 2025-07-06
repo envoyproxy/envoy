@@ -1,6 +1,5 @@
 #include "source/common/common/radix/trie_hybrid.hpp"
 #include "source/common/common/trie_lookup_table.h"
-#include "test/test_common/test_base.h"
 #include <benchmark/benchmark.h>
 #include <random>
 
@@ -122,7 +121,7 @@ static void BM_TrieHybridFindMatchingPrefixes(benchmark::State& state) {
 // Benchmark comparing TrieHybrid vs TrieLookupTable for short keys
 static void BM_TrieHybridVsTrieLookupShortKeys(benchmark::State& state) {
     TrieHybrid<std::string, std::string> hybrid;
-    TrieLookupTable<std::string, std::string> trieTable;
+    TrieLookupTable<std::string> trieTable;
     
     // Pre-populate both with short keys
     for (int i = 0; i < 1000; ++i) {
@@ -152,7 +151,7 @@ static void BM_TrieHybridVsTrieLookupShortKeys(benchmark::State& state) {
 // Benchmark comparing TrieHybrid vs TrieLookupTable for long keys
 static void BM_TrieHybridVsTrieLookupLongKeys(benchmark::State& state) {
     TrieHybrid<std::string, std::string> hybrid;
-    TrieLookupTable<std::string, std::string> trieTable;
+    TrieLookupTable<std::string> trieTable;
     
     // Pre-populate both with long keys
     for (int i = 0; i < 1000; ++i) {
