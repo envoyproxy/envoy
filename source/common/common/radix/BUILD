@@ -14,11 +14,13 @@ envoy_cc_library(
         "tree.cpp",
         "node.cpp",
         "iterator.cpp",
+        "trie_hybrid.cpp",
     ],
     hdrs = [
         "tree.hpp",
         "node.hpp",
         "iterator.cpp",
+        "trie_hybrid.hpp",
     ],
     deps = [
         "//source/common/common:assert_lib",
