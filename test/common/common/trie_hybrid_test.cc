@@ -1,12 +1,12 @@
 #include "source/common/common/radix/trie_hybrid.hpp"
-#include "test/test_common/test_base.h"
+
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Common {
 
-class TrieHybridTest : public TestBase {};
-
-TEST_F(TrieHybridTest, BasicOperations) {
+TEST(TrieHybridTest, BasicOperations) {
     TrieHybrid<std::string, std::string> hybrid;
     
     // Test insertion of short keys (<= 8) - should go to trie
@@ -46,7 +46,7 @@ TEST_F(TrieHybridTest, BasicOperations) {
     EXPECT_EQ(matches[0].second, "value1");
 }
 
-TEST_F(TrieHybridTest, CrossTreeOperations) {
+TEST(TrieHybridTest, CrossTreeOperations) {
     TrieHybrid<std::string, std::string> hybrid;
     
     // Insert keys in both trees
