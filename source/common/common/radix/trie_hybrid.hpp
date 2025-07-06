@@ -11,6 +11,7 @@
 #include <vector>
 #include <optional>
 #include <tuple>
+#include <algorithm>
 
 // Forward declarations
 template<typename K, typename T>
@@ -102,12 +103,16 @@ public:
         auto radix_matches = radix_tree.findMatchingPrefixes(searchKey);
         results.insert(results.end(), radix_matches.begin(), radix_matches.end());
         
-        // For trie lookup table, we can only find exact matches
-        // since it doesn't have a findMatchingPrefixes method
-        auto trie_result = trie_table.find(searchKey);
-        if (trie_result != nullptr) {
-            results.emplace_back(searchKey, trie_result);
+        // Get matches from trie lookup table
+        auto trie_matches = trie_table.findMatchingPrefixes(searchKey);
+        for (const auto& trie_result : trie_matches) {
+            if (trie_result != nullptr) {
+                results.emplace_back(searchKey, trie_result);
+            }
         }
+        
+        // Sort results
+        std::sort(results.begin(), results.end());
         
         return results;
     }
