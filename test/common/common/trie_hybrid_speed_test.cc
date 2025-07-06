@@ -121,7 +121,7 @@ static void BM_TrieHybridFindMatchingPrefixes(benchmark::State& state) {
 // Benchmark comparing TrieHybrid vs TrieLookupTable for short keys
 static void BM_TrieHybridVsTrieLookupShortKeys(benchmark::State& state) {
     TrieHybrid<std::string, std::string> hybrid;
-    TrieLookupTable<std::string> trieTable;
+    TrieLookupTable<const char*> trieTable;
     
     // Pre-populate both with short keys
     for (int i = 0; i < 1000; ++i) {
@@ -130,7 +130,7 @@ static void BM_TrieHybridVsTrieLookupShortKeys(benchmark::State& state) {
         
         auto [newHybrid, _, __] = hybrid.insert(key, value);
         hybrid = newHybrid;
-        trieTable.insert(key, value);
+        trieTable.add(key, value.c_str());
     }
     
     std::random_device rd;
@@ -151,7 +151,7 @@ static void BM_TrieHybridVsTrieLookupShortKeys(benchmark::State& state) {
 // Benchmark comparing TrieHybrid vs TrieLookupTable for long keys
 static void BM_TrieHybridVsTrieLookupLongKeys(benchmark::State& state) {
     TrieHybrid<std::string, std::string> hybrid;
-    TrieLookupTable<std::string> trieTable;
+    TrieLookupTable<const char*> trieTable;
     
     // Pre-populate both with long keys
     for (int i = 0; i < 1000; ++i) {
@@ -160,7 +160,7 @@ static void BM_TrieHybridVsTrieLookupLongKeys(benchmark::State& state) {
         
         auto [newHybrid, _, __] = hybrid.insert(key, value);
         hybrid = newHybrid;
-        trieTable.insert(key, value);
+        trieTable.add(key, value.c_str());
     }
     
     std::random_device rd;
