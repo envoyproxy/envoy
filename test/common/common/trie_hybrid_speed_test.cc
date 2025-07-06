@@ -184,4 +184,6 @@ BENCHMARK(BM_TrieHybridLookups);
 BENCHMARK(BM_TrieHybridLongestPrefix);
 BENCHMARK(BM_TrieHybridFindMatchingPrefixes);
 BENCHMARK(BM_TrieHybridVsTrieLookupShortKeys);
-BENCHMARK(BM_TrieHybridVsTrieLookupLongKeys); 
+BENCHMARK(BM_TrieHybridVsTrieLookupLongKeys);
+} // namespace Common
+} // namespace Envoy 
