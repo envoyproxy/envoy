@@ -45,7 +45,10 @@ public:
             // Use radix tree for keys > 8
             auto [newRadix, oldVal, didUpdate] = radix_tree.insert(k, v);
             radix_tree = newRadix;
-            return {*this, oldVal, didUpdate};
+            // Radix tree's didUpdate: false=new insertion, true=overwrite
+            // TrieLookupTable returns true for successful insertions
+            // So we need to invert the logic: return true for new insertions, false for overwrites
+            return {*this, oldVal, !didUpdate};
         }
     }
 
@@ -83,14 +86,20 @@ public:
 
     // Longest prefix match - search both trie and radix tree
     LongestPrefixResult<K, T> LongestPrefix(const K& search) const {
-        LongestPrefixResult<K, T> radix_result = radix_tree.LongestPrefix(search);
-        if (radix_result.found) {
-            return radix_result;
+        // First try radix tree for long keys
+        if (search.size() > 8) {
+            LongestPrefixResult<K, T> radix_result = radix_tree.LongestPrefix(search);
+            if (radix_result.found) {
+                return radix_result;
+            }
         }
+        
+        // Then try trie lookup table for short keys
         auto trie_result = trie_table.findLongestPrefix(search);
         if (trie_result != nullptr) {
             return {search, trie_result, true};
         }
+        
         T zero{};
         return {K{}, zero, false};
     }
