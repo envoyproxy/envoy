@@ -24,6 +24,7 @@ envoy_cc_library(
     ],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/common:trie_lookup_table_lib",
         "@com_google_absl//absl/strings",
     ],
 ) 
