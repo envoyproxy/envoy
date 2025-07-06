@@ -16,6 +16,9 @@ common --noenable_bzlmod
 fetch --color=yes
 run --color=yes
 
+# Make hermetic rules_python play nice with other rules
+common --@rules_python//python/config_settings:bootstrap_impl=script
+
 build --color=yes
 build --jobs=HOST_CPUS-1
 build --workspace_status_command="bash bazel/get_workspace_status"
