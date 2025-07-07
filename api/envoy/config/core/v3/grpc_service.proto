@@ -115,6 +115,9 @@ message GrpcService {
 
         // [#not-implemented-hide:]
         XdsCredentials xds_credentials = 4;
+
+        // [#not-implemented-hide:]
+        google.protobuf.Empty insecure_credentials = 5;
       }
     }
 
