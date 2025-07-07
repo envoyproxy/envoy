@@ -264,6 +264,46 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
                   .ok());
 }
 
+TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+
+  for (int i = 0; i < 3; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+
+  auto filter_chain_1 = std::make_shared<Network::MockFilterChain>();
+  auto filter_chain_2 = std::make_shared<Network::MockFilterChain>();
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(filter_chain_1))
+      .WillOnce(Return(filter_chain_2));
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                        &filter_chain_messages[0], &filter_chain_messages[1]},
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                  .ok());
+
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
+  EXPECT_TRUE(new_filter_chain_manager
+                  .addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                   std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                       &filter_chain_messages[2]},
+                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager)
+                  .ok());
+
+  // The new filter chain manager is based on the previous filter chain manager, but it has a new
+  // filter chain that is not in the previous filter chain manager, so we expect the previous
+  // filter chains to be drained.
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains().size(), 2);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()[0], filter_chain_1);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()[1], filter_chain_2);
+}
+
 TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependentDrainClose) {
   std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
   for (int i = 0; i < 3; i++) {
