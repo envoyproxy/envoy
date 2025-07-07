@@ -165,8 +165,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   ASSERT(origin_.has_value());
   const auto* origin = origin_.value();
   Cleanup origin_cleanup([this]() { origin_ = absl::nullopt; });
-  Cleanup draining_cleanup([origin]() { origin->draining_filter_chains_ = absl::nullopt; });
-  origin->draining_filter_chains_ = std::vector<Network::DrainableFilterChainSharedPtr>{};
+  std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chains;
 
   uint32_t filter_chains_remove_count = 0;
   uint32_t filter_chains_update_count = 0;
@@ -195,7 +194,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
                         filter_chain.name()));
       }
 
-      origin->draining_filter_chains_->push_back(filter_chain_impl);
+      draining_filter_chains.push_back(filter_chain_impl);
       filter_chains_remove_count++;
       continue;
     }
@@ -210,7 +209,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
                           filter_chain.name()));
         }
 
-        origin->draining_filter_chains_->push_back(filter_chain_impl);
+        draining_filter_chains.push_back(filter_chain_impl);
         filter_chains_update_count++;
         continue;
       }
@@ -252,7 +251,7 @@ absl::Status FilterChainManagerImpl::addFilterChains(
             filter_chains_remove_count, filter_chains_update_count,
             added_filter_chain_map.size() - filter_chains_update_count);
 
-  draining_cleanup.cancel();
+  origin->draining_filter_chains_ = std::move(draining_filter_chains);
   return absl::OkStatus();
 }
 
