@@ -42,7 +42,7 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
 
   absl::optional<absl::string_view> version = absl::nullopt;
   if (!added_resources.empty()) {
-    version = added_resources[0].get().version();
+    version = absl::string_view(added_resources[0].get().version());
   }
 
   FilterChainRefVector added_filter_chains;
