@@ -1255,21 +1255,8 @@ absl::StatusOr<std::unique_ptr<ListenerImpl>> ListenerImpl::newListenerWithFilte
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
-  auto known_draining_filter_chains = filter_chain_manager_->drainingFilterChains();
-  if (known_draining_filter_chains) {
-    ENVOY_LOG(debug, "skipping filter chain diff as draining filter chains are known");
-    for (const auto& draining_filter_chain : known_draining_filter_chains.value()) {
-      callback(*draining_filter_chain);
-    }
-  } else {
-    for (const auto& message_and_filter_chain : filter_chain_manager_->filterChainsByMessage()) {
-      if (another_listener.filter_chain_manager_->filterChainsByMessage().find(
-              message_and_filter_chain.first) ==
-          another_listener.filter_chain_manager_->filterChainsByMessage().end()) {
-        // The filter chain exists in `this` listener but not in the listener passed in.
-        callback(*message_and_filter_chain.second);
-      }
-    }
+  for (const auto& draining_filter_chain : filter_chain_manager_->drainingFilterChains()) {
+    callback(*draining_filter_chain);
   }
 
   // Filter chain manager maintains an optional default filter chain besides the filter chains

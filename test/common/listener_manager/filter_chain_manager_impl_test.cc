@@ -410,9 +410,8 @@ TEST_P(FilterChainManagerImplTest, UpdateFilterChainMarksForDraining) {
       filter_chain_factory_builder_, new_filter_chain_manager);
 
   EXPECT_TRUE(status.ok());
-  EXPECT_TRUE(filter_chain_manager_->drainingFilterChains().has_value());
-  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()->size(), 1);
-  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()->front(), filter_chain);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains().size(), 1);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains().front(), filter_chain);
 }
 
 TEST_P(FilterChainManagerImplTest, RemoveFilterChainMarksForDraining) {
@@ -443,9 +442,8 @@ TEST_P(FilterChainManagerImplTest, RemoveFilterChainMarksForDraining) {
       new_filter_chain_manager);
 
   EXPECT_TRUE(status.ok());
-  EXPECT_TRUE(filter_chain_manager_->drainingFilterChains().has_value());
-  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()->size(), 1);
-  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()->front(), filter_chain);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains().size(), 1);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains().front(), filter_chain);
 }
 
 TEST_P(FilterChainManagerImplTest, FailToAddFilterChainWithDuplicateMatcherByDeltaUpdate) {

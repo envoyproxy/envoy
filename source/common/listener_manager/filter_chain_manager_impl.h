@@ -175,8 +175,7 @@ public:
 
   static bool isWildcardServerName(const std::string& name);
 
-  const absl::optional<std::vector<Network::DrainableFilterChainSharedPtr>>&
-  drainingFilterChains() const {
+  const std::vector<Network::DrainableFilterChainSharedPtr>& drainingFilterChains() const {
     return draining_filter_chains_;
   }
 
@@ -366,10 +365,8 @@ private:
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
 
-  // Used to hint listener which filter chains it should drain. This is useful to avoid running
-  // complete filter chains diff when the listener is updated.
-  mutable absl::optional<std::vector<Network::DrainableFilterChainSharedPtr>>
-      draining_filter_chains_;
+  // Used to hint listener which filter chains it should drain.
+  mutable std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chains_;
 };
 
 namespace FilterChain {
