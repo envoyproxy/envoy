@@ -91,6 +91,12 @@ message GrpcService {
           "envoy.api.v2.core.GrpcService.GoogleGrpc.GoogleLocalCredentials";
     }
 
+    // xDS credentials.
+    // [#not-implemented-hide:]
+    message XdsCredentials {
+      ChannelCredentials fallback_credentials = 1;
+    }
+
     // See https://grpc.io/docs/guides/auth.html#credential-types to understand Channel and Call
     // credential types.
     message ChannelCredentials {
@@ -106,6 +112,9 @@ message GrpcService {
         google.protobuf.Empty google_default = 2;
 
         GoogleLocalCredentials local_credentials = 3;
+
+        // [#not-implemented-hide:]
+        XdsCredentials xds_credentials = 4;
       }
     }
 
