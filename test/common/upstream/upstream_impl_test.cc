@@ -454,13 +454,18 @@ protected:
 };
 
 class StrictDnsClusterImplParamTest : public StrictDnsClusterImplTest,
-                                      public testing::WithParamInterface<const char*> {};
+                                      public testing::WithParamInterface<const char*> {
+public:
+  TestScopedRuntime scoped_runtime;
+};
 
 INSTANTIATE_TEST_SUITE_P(DnsImplementations, StrictDnsClusterImplParamTest,
                          testing::ValuesIn({"true", "false"}));
 
 TEST_P(StrictDnsClusterImplParamTest, ZeroHostsIsInializedImmediately) {
   ReadyWatcher initialized;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
 
   const std::string yaml = R"EOF(
     name: name
@@ -489,6 +494,8 @@ TEST_P(StrictDnsClusterImplParamTest, ZeroHostsIsInializedImmediately) {
 // Resolve zero hosts, while using health checking.
 TEST_P(StrictDnsClusterImplParamTest, ZeroHostsHealthChecker) {
   ReadyWatcher initialized;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
 
   const std::string yaml = R"EOF(
     name: name
@@ -530,6 +537,8 @@ TEST_P(StrictDnsClusterImplParamTest, ZeroHostsHealthChecker) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, DontWaitForDNSOnInit) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -582,6 +591,8 @@ TEST_P(StrictDnsClusterImplParamTest, DontWaitForDNSOnInit) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, Basic) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver1(*dns_resolver_, server_context_.dispatcher_);
@@ -786,6 +797,9 @@ TEST_P(StrictDnsClusterImplParamTest, Basic) {
 // Verifies that host removal works correctly when hosts are being health checked
 // but the cluster is configured to always remove hosts
 TEST_P(StrictDnsClusterImplParamTest, HostRemovalActiveHealthSkipped) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -846,6 +860,9 @@ TEST_P(StrictDnsClusterImplParamTest, HostRemovalActiveHealthSkipped) {
 // Verify that a host is not removed if it is removed from DNS but still passing active health
 // checking.
 TEST_P(StrictDnsClusterImplParamTest, HostRemovalAfterHcFail) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -925,6 +942,9 @@ TEST_P(StrictDnsClusterImplParamTest, HostRemovalAfterHcFail) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, HostUpdateWithDisabledACEndpoint) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -993,6 +1013,9 @@ TEST_P(StrictDnsClusterImplParamTest, HostUpdateWithDisabledACEndpoint) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver3(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
@@ -1258,6 +1281,9 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasicMultiplePriorities) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver3(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver1(*dns_resolver_, server_context_.dispatcher_);
@@ -1402,6 +1428,9 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasicMultiplePriorities) {
 
 // Verifies that specifying a custom resolver when using STRICT_DNS fails
 TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -1438,6 +1467,9 @@ TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1487,6 +1519,9 @@ TEST_P(StrictDnsClusterImplParamTest, FailureRefreshRateBackoffResetsWhenSuccess
 }
 
 TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfig) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1526,6 +1561,9 @@ TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfig) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfig2) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1608,6 +1646,9 @@ TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfigTypedDnsResolverConfig) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateNoJitter) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1663,6 +1704,9 @@ TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateNoJitter) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, NegativeDnsJitter) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     type: STRICT_DNS
@@ -1687,6 +1731,9 @@ TEST_P(StrictDnsClusterImplParamTest, NegativeDnsJitter) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateYesJitter) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1729,6 +1776,9 @@ TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateYesJitter) {
 }
 
 TEST_P(StrictDnsClusterImplParamTest, ExtremeJitter) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1763,6 +1813,9 @@ TEST_P(StrictDnsClusterImplParamTest, ExtremeJitter) {
 
 // Ensures that HTTP/2 user defined SETTINGS parameter validation is enforced on clusters.
 TEST_P(StrictDnsClusterImplParamTest, Http2UserDefinedSettingsParametersValidation) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
