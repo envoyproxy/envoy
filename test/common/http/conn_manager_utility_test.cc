@@ -233,6 +233,9 @@ TEST_F(ConnectionManagerUtilityTest, DetermineNextProtocol) {
 // Verify external request and XFF is set when we are using remote address and the address is
 // external.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddress) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -247,6 +250,9 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenNotLocalHostRemoteAddre
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -257,6 +263,9 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUrlInvalid) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -273,6 +282,9 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMultipleEntriesAreFound) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfFragmentIsFound) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -283,6 +295,9 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfFragmentIsFound) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMalformedPath) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -293,6 +308,9 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfMalformedPath) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUserinfoIncluded) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -303,6 +321,9 @@ TEST_F(ConnectionManagerUtilityTest, RemoveRefererIfUserinfoIncluded) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -314,6 +335,9 @@ TEST_F(ConnectionManagerUtilityTest, ValidRefererPassesSanitization) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, AlphaNumCharRefererPassesSanitization) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -325,6 +349,9 @@ TEST_F(ConnectionManagerUtilityTest, AlphaNumCharRefererPassesSanitization) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ValidPathOnlyRefererPassesSanitization) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -336,6 +363,9 @@ TEST_F(ConnectionManagerUtilityTest, ValidPathOnlyRefererPassesSanitization) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, ValidFileOnlyRefererPassesSanitization) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -349,6 +379,9 @@ TEST_F(ConnectionManagerUtilityTest, ValidFileOnlyRefererPassesSanitization) {
 // Verify that we don't append XFF when skipXffAppend(), even if using remote
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
@@ -363,6 +396,9 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
 // Verify that we pass-thru XFF when skipXffAppend(), even if using remote
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
@@ -375,6 +411,9 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   TestScopedRuntime scoped_runtime;
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -396,6 +435,9 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -411,6 +453,9 @@ TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
 }
 
 TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternalButSetScheme) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   TestScopedRuntime scoped_runtime;
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -429,6 +474,9 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternalButSetSch
 }
 
 TEST_F(ConnectionManagerUtilityTest, SchemeIsRespected) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -463,6 +511,9 @@ TEST_F(ConnectionManagerUtilityTest, SchemeOverwrite) {
 // Verify internal request and XFF is set when we are using remote address and the address is
 // internal according to user configuration.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAddress) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   auto config = std::make_unique<NiceMock<MockInternalAddressConfig>>();
   ON_CALL(*config, isInternalAddress).WillByDefault(Return(true));
   config_.internal_address_config_ = std::move(config);
@@ -482,6 +533,9 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAdd
 
 // Verify internal request and XFF is set when we are using remote address the address is internal.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"));
   Network::Address::Ipv4Instance local_address("10.3.2.1");
@@ -496,6 +550,9 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenLocalHostRemoteAddress)
 
 // Verify that we trust Nth address from XFF when using remote address with xff_num_trusted_hops.
 TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("203.0.113.128"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -639,11 +696,11 @@ TEST_F(ConnectionManagerUtilityTest, DocumentationExample1) {
   const auto modifiedXFFHeader = "203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5";
   const auto envoyInternal = false;
 
-  detection_extensions_.clear();
-  detection_extensions_.push_back(getXFFExtension(xffNumTrustedHops, false));
+  std::vector<Http::OriginalIPDetectionSharedPtr>
+      extensions; // No extensions for useRemoteAddress=true
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
 
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(xffNumTrustedHops));
-  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>(downstreamIPAddress));
@@ -928,6 +985,9 @@ TEST_F(ConnectionManagerUtilityTest, PreserveHopByHop) {
 
 // Verify that we don't set the via header on requests/responses when empty.
 TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -945,6 +1005,9 @@ TEST_F(ConnectionManagerUtilityTest, ViaEmpty) {
 
 // Verify that we append a non-empty via header on requests/responses.
 TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   via_ = "foo";
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
@@ -967,6 +1030,9 @@ TEST_F(ConnectionManagerUtilityTest, ViaAppend) {
 
 // Verify that we don't set user agent when it is already set.
 TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -981,6 +1047,9 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentDontSet) {
 
 // Verify that we do set user agent when it is empty.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -1113,6 +1182,9 @@ TEST_F(ConnectionManagerUtilityTest, ExternalRequestPreserveRequestIdAndDownstre
 // Verify that we don't overwrite user agent, but do set x-envoy-downstream-service-cluster
 // correctly.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -1131,6 +1203,9 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetIncomingUserAgent) {
 
 // Verify that we set both user agent and x-envoy-downstream-service-cluster.
 TEST_F(ConnectionManagerUtilityTest, UserAgentSetNoIncomingUserAgent) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -1169,6 +1244,9 @@ TEST_F(ConnectionManagerUtilityTest, RequestIdGeneratedWhenItsNotPresent) {
 
 // Make sure we do not overwrite x-request-id if the request is internal.
 TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternalRequest) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -1182,6 +1260,9 @@ TEST_F(ConnectionManagerUtilityTest, DoNotOverrideRequestIdIfPresentWhenInternal
 
 // Make sure that we do overwrite x-request-id for "edge" external requests.
 TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -1196,6 +1277,9 @@ TEST_F(ConnectionManagerUtilityTest, OverrideRequestIdForExternalRequests) {
 // A request that uses remote address and is from an external address should be treated as an
 // external request with all internal only headers cleaned.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressExternalRequestUseRemote) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("50.0.0.1"));
   EXPECT_CALL(config_, useRemoteAddress()).WillRepeatedly(Return(true));
@@ -1300,6 +1384,9 @@ TEST_F(ConnectionManagerUtilityTest, PipeAddressInvalidXFFtDontUseRemote) {
 // includes only internal addresses. Note that this is legacy behavior. See the comments
 // in mutateRequestHeaders() for more info.
 TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -1313,6 +1400,9 @@ TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest)
 // A request that is from an internal address and uses remote address should be an internal request.
 // It should also preserve x-envoy-external-address.
 TEST_F(ConnectionManagerUtilityTest, ExternalAddressInternalRequestUseRemote) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -2309,6 +2399,9 @@ TEST_F(ConnectionManagerUtilityTest, RedirectAfterAllOtherNormalizations) {
 
 // test preserve_external_request_id true does not reset the passed requestId if passed
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -2324,6 +2417,9 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
 
 // test preserve_external_request_id true but generates new request id when not passed
 TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -2357,6 +2453,9 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGener
 
 // Test preserve_external_request_id false and edge_request true.
 TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGenerateRequestId) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
@@ -2523,6 +2622,9 @@ TEST_F(ConnectionManagerUtilityTest, IgnoreAppendingXForwardedPortIfHasBeenSet) 
 // Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from trusted hop
 // will be preserved.
 TEST_F(ConnectionManagerUtilityTest, PreserveXForwardedPortFromTrustedHop) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
   ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
@@ -2537,6 +2639,9 @@ TEST_F(ConnectionManagerUtilityTest, PreserveXForwardedPortFromTrustedHop) {
 // Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from untrusted hop
 // will be overwritten.
 TEST_F(ConnectionManagerUtilityTest, OverwriteXForwardedPortFromUntrustedHop) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
   ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true));
@@ -2551,6 +2656,9 @@ TEST_F(ConnectionManagerUtilityTest, OverwriteXForwardedPortFromUntrustedHop) {
 // Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header from untrusted
 // hop will not be overwritten.
 TEST_F(ConnectionManagerUtilityTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // No extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
   ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(false));
@@ -2585,6 +2693,57 @@ TEST_F(ConnectionManagerUtilityTest, DiscardTEHeaderWithoutTrailers) {
   callMutateRequestHeaders(headers, Protocol::Http2);
 
   EXPECT_EQ("", headers.getTEValue());
+}
+
+// Test the combination of useRemoteAddress=true with extensions configured
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressTrueWithExtensions) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions;
+  extensions.push_back(getXFFExtension(2, false));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "203.0.113.1,203.0.113.2"}};
+
+  EXPECT_EQ((MutateRequestRet{"203.0.113.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("203.0.113.1,203.0.113.2,10.0.0.1", headers.get_(Headers::get().ForwardedFor));
+}
+
+// Test useRemoteAddress=true with extensions, extensions should detect IP
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressTrueWithExtensionsDetectsIP) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions;
+  extensions.push_back(getXFFExtension(0, false));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "203.0.113.5"}};
+
+  EXPECT_EQ((MutateRequestRet{"203.0.113.5:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("203.0.113.5,192.168.1.1", headers.get_(Headers::get().ForwardedFor));
+  EXPECT_EQ("203.0.113.5", headers.get_("x-envoy-external-address"));
+}
+
+// Test useRemoteAddress=false with NO extensions (should get downstream address)
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressFalseNoExtensions) {
+  std::vector<Http::OriginalIPDetectionSharedPtr> extensions; // Empty extensions
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "203.0.113.5"}};
+
+  EXPECT_EQ((MutateRequestRet{"192.168.1.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("203.0.113.5", headers.get_(Headers::get().ForwardedFor));
 }
 
 } // namespace Http

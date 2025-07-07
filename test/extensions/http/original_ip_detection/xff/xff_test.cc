@@ -139,6 +139,22 @@ TEST_F(XffTrustedCidrsTest, XFFHasTooManyEntries) {
   ASSERT_EQ(result.detected_remote_address, nullptr);
 }
 
+TEST_F(XffNumTrustedHopsTest, UseRemoteAddressTrueUsesNumMinus1Hops) {
+  // Test with xff_num_trusted_hops = 2, use_remote_address = true
+  // Should use 2 - 1 = 1 hop to skip
+  envoy::extensions::http::original_ip_detection::xff::v3::XffConfig config;
+  config.set_xff_num_trusted_hops(2);
+  auto extension = *XffIPDetection::create(config);
+
+  // XFF = "client,proxy1,proxy2" with 1 hop to skip should return "proxy1" (middle address)
+  Envoy::Http::TestRequestHeaderMapImpl headers{{"x-forwarded-for", "1.2.3.4,5.6.7.8,9.10.11.12"}};
+  Envoy::Http::OriginalIPDetectionParams params = {headers, nullptr, true};
+  auto result = extension->detect(params);
+
+  EXPECT_EQ("5.6.7.8:0", result.detected_remote_address->asString());
+  EXPECT_FALSE(result.allow_trusted_address_checks);
+}
+
 TEST(XffInvalidConfigTest, InvalidConfig) {
   envoy::extensions::http::original_ip_detection::xff::v3::XffConfig config;
   config.set_xff_num_trusted_hops(1);

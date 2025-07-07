@@ -2759,9 +2759,13 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithUse
       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(
-      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-      "Original IP detection extensions and use_remote_address may not be mixed");
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_TRUE(config.useRemoteAddress());
+  EXPECT_EQ(1, config.originalIpDetectionExtensions().size());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithNumTrustedHops) {
@@ -2784,6 +2788,32 @@ TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionMixedWithNum
   EXPECT_THROW_WITH_REGEX(
       createHttpConnectionManagerConfig(yaml_string), EnvoyException,
       "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
+}
+
+TEST_F(HttpConnectionManagerConfigTest, OriginalIPDetectionExtensionWithUseRemoteAddress) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  use_remote_address: true
+  original_ip_detection_extensions:
+  - name: envoy.http.original_ip_detection.custom_header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig
+      header_name: x-ip-header
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_TRUE(config.useRemoteAddress());
+  EXPECT_EQ(1, config.originalIpDetectionExtensions().size());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, DynamicFilterWarmingNoDefault) {
