@@ -1458,7 +1458,7 @@ TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
     EXPECT_FALSE(cluster_or_error.ok());
     EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(cluster_or_error.status().message(),
-              "DNS clusters must NOT have a custom resolver name set");
+              "STRICT_DNS clusters must NOT have a custom resolver name set");
   } else {
     EXPECT_THROW_WITH_MESSAGE(
         auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
