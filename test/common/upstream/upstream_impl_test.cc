@@ -2339,9 +2339,8 @@ TEST_F(StaticClusterImplTest, UpstreamBindConfigWithNetns) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml_base);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
 #if defined(__linux__)
   constexpr bool is_linux = true;
