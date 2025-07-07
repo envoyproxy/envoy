@@ -174,8 +174,6 @@ Network::ClientConnectionPtr DispatcherImpl::createClientConnection(
   // TODO(lambdai): Return a closed connection if the factory is not found. Note that the caller
   // expects a non-null connection as of today so we cannot gracefully handle unsupported address
   // type.
-
-  Network::ClientConnectionPtr conn;
 #if defined(__linux__)
   // For Linux, the source address' network namespace is relevant for client connections, since that
   // is where the netns would be specified.
