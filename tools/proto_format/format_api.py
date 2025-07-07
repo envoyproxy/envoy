@@ -3,7 +3,6 @@
 # Mangle protoxform and protoprint artifacts.
 
 import argparse
-from collections import defaultdict
 import os
 import pathlib
 import re
@@ -93,70 +92,6 @@ class RequiresReformatError(ProtoSyncError):
         super(RequiresReformatError, self).__init__(
             '%s; either run ./ci/do_ci.sh fix_proto_format or ./tools/proto_format/proto_format.sh fix to reformat.\n'
             % message)
-
-
-def get_directory_from_package(package):
-    """Get directory path from package name or full qualified message name
-
-    Args:
-        package: the full qualified name of package or message.
-    """
-    return '/'.join(s for s in package.split('.') if s and s[0].islower())
-
-
-def get_destination_path(src):
-    """Obtain destination path from a proto file path by reading its package statement.
-
-    Args:
-        src: source path
-    """
-    src_path = pathlib.Path(src)
-    contents = src_path.read_text(encoding='utf8')
-    matches = PACKAGE_REGEX.findall(contents)
-    if len(matches) != 1:
-        raise RequiresReformatError(
-            f"Expect {src} has only one package declaration but has {len(matches)}\n{contents}")
-    package = matches[0]
-    dst_path = pathlib.Path(
-        get_directory_from_package(package)).joinpath(src_path.name.split('.')[0] + ".proto")
-    # contrib API files have the standard namespace but are in a contrib folder for clarity.
-    # The following prepends contrib for contrib packages so we wind up with the real final path.
-    if 'contrib' in src:
-        if 'v3alpha' not in package and 'v4alpha' not in package and package not in CONTRIB_V3_ALLOW_LIST:
-            raise ProtoSyncError(
-                "contrib extension package '{}' does not use v3alpha namespace. "
-                "Add to CONTRIB_V3_ALLOW_LIST with an explanation if this is on purpose.".format(
-                    package))
-
-        dst_path = pathlib.Path('contrib').joinpath(dst_path)
-    # Non-contrib can not use alpha.
-    if not 'contrib' in src:
-        if (not 'v2alpha' in package and not 'v1alpha1' in package) and 'alpha' in package:
-            raise ProtoSyncError(
-                "package '{}' uses an alpha namespace. This is not allowed. Instead mark with "
-                "(xds.annotations.v3.file_status).work_in_progress or related annotation.".format(
-                    package))
-    return dst_path
-
-
-def sync_proto_file(srcs, dst):
-    """Pretty-print a proto descriptor from protoxform.py Bazel cache artifacts."
-
-    Args:
-        dst_srcs: destination/sources path tuple.
-    """
-    assert (len(srcs) > 0)
-    # If we only have one candidate source for a destination, just pretty-print.
-    if len(srcs) == 1:
-        src = srcs[0]
-    else:
-        # We should only see an active and next major version candidate from
-        # previous version today.
-        assert (len(srcs) == 2)
-        src = [s for s in srcs if s.endswith('active_or_frozen.proto')][0]
-    shutil.copy(src, dst)
-    rel_dst_path = get_destination_path(src)
-    return ['//%s:pkg' % str(rel_dst_path.parent)]
 
 
 def get_import_deps(proto_path):
@@ -295,7 +230,7 @@ def find_pkgs(package_version_status, api_root):
     return set([os.path.dirname(p)[len(api_root) + 1:] for p in api_protos])
 
 
-def format_api(mode, outfile, xformed, printed, build_file):
+def format_api(mode, outfile, printed, build_file):
 
     with tempfile.TemporaryDirectory() as tmp:
         dst_dir = pathlib.Path(tmp)
@@ -304,27 +239,13 @@ def format_api(mode, outfile, xformed, printed, build_file):
         with tarfile.open(printed) as tar:
             tar.extractall(printed_dir)
 
-        xformed_dir = dst_dir.joinpath("xformed")
-        xformed_dir.mkdir()
-        with tarfile.open(xformed) as tar:
-            tar.extractall(xformed_dir)
-
-        paths = []
-        dst_src_paths = defaultdict(list)
-
         for label in data["proto_targets"]:
             _label = label[len('@@envoy_api//'):].replace(':', '/')
-            for suffix in ["active_or_frozen", "next_major_version_candidate"]:
-                xpath = xformed_dir.joinpath(f"pkg/{_label}.{suffix}.proto")
-                path = printed_dir.joinpath(f"{_label}.proto")
+            source = printed_dir.joinpath(f"{_label}.proto")
+            target = dst_dir.joinpath(_label)
+            target.parent.mkdir(exist_ok=True, parents=True)
+            shutil.copy(source, target)
 
-                if xpath.exists() and os.stat(xpath).st_size > 0:
-                    target = dst_dir.joinpath(_label)
-                    target.parent.mkdir(exist_ok=True, parents=True)
-                    dst_src_paths[str(target)].append(str(path))
-
-        for k, v in dst_src_paths.items():
-            sync_proto_file(v, k)
         sync_build_files(mode, dst_dir)
 
         # Add the build files
@@ -339,7 +260,6 @@ def format_api(mode, outfile, xformed, printed, build_file):
                 active_pkgs=deps_format(active_pkgs), frozen_pkgs=deps_format(frozen_pkgs)))
 
         shutil.rmtree(str(printed_dir))
-        shutil.rmtree(str(xformed_dir))
         with tarfile.open(outfile, "w:gz") as tar:
             tar.add(dst_dir, arcname=".")
 
@@ -349,11 +269,9 @@ if __name__ == '__main__':
     parser.add_argument('--mode', choices=['check', 'fix'])
     parser.add_argument('--outfile')
     parser.add_argument('--protoprinted')
-    parser.add_argument('--xformed')
     parser.add_argument('--build_file')
     args = parser.parse_args()
 
     format_api(
-        args.mode, str(pathlib.Path(args.outfile).absolute()),
-        str(pathlib.Path(args.xformed).absolute()), args.protoprinted,
+        args.mode, str(pathlib.Path(args.outfile).absolute()), args.protoprinted,
         pathlib.Path(args.build_file))
