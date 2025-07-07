@@ -478,11 +478,17 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
   // clusters have already initialized. (E.g., if all static).
   init_helper_.onStaticLoadComplete();
 
+  // Initialize the ADS and xDS-TP config based connections.
   if (!has_ads_cluster) {
     // There is no ADS cluster, so we won't be starting the ADS mux after a cluster has finished
     // initializing, so we must start ADS here.
     xds_manager_.adsMux()->start();
   }
+  // TODO(adisuissa): to ensure parity with the non-xdstp-config-based ADS
+  // we need to change this to only be invoked for Envoy-based clusters when
+  // they are ready (this is needed to avoid early connection attempts in the
+  // DNS based clusters).
+  xds_manager_.startXdstpAdsMuxes();
   return absl::OkStatus();
 }
 

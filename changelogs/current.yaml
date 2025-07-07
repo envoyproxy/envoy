@@ -62,6 +62,10 @@ minor_behavior_changes:
    :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
    :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
    will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
+- area: tracing
+  change: |
+    Add :ref:`max_cache_size <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.max_cache_size>`
+    to the OpenTelemetry tracer config. This limits the number of spans that can be cached before flushing.
 - area: aws
   change: |
     :ref:`AwsCredentialProvider <envoy_v3_api_msg_extensions.common.aws.v3.AwsCredentialProvider>` now supports all defined credential
@@ -76,6 +80,10 @@ minor_behavior_changes:
   change: |
     :ref:`Credential injector filter <envoy_v3_api_msg_extensions.filters.http.credential_injector.v3.CredentialInjector>` is no longer
     a work in progress field.
+- area: oauth2
+  change: |
+    The access token, id token and refresh token in the cookies are now encrypted using the HMAC secret. This behavior can
+    be reverted by setting the runtime guard ``envoy.reloadable_features.oauth2_encrypt_tokens`` to ``false``.
 - area: http3
   change: |
     Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
@@ -300,6 +308,9 @@ new_features:
 - area: matcher
   change: |
     added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
+- area: stateful_session
+  change: |
+    Added support for cookie attributes to stateful session cookie.
 - area: ratelimit
   change: |
     Add the :ref:`rate_limits

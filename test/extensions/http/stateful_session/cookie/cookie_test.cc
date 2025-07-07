@@ -231,6 +231,57 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStatePathMatchTest) {
   }
 }
 
+TEST(CookieBasedSessionStateFactoryTest, CookieAttributesTest) {
+  Event::SimulatedTimeSystem time_simulator;
+  {
+    // Test cookie generation without attributes (baseline)
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("test_cookie");
+    CookieBasedSessionStateFactory factory(config, time_simulator);
+    Envoy::Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    auto session_state = factory.create(request_headers);
+    Envoy::Http::TestResponseHeaderMapImpl response_headers;
+    session_state->onUpdate("10.0.0.1:8080", response_headers);
+
+    std::string actual_cookie = response_headers.get_("set-cookie");
+    // Should only have HttpOnly (added by makeSetCookieValue by default)
+    EXPECT_NE(actual_cookie.find("HttpOnly"), std::string::npos);
+    // Should not have any custom attributes
+    EXPECT_EQ(actual_cookie.find("SameSite"), std::string::npos);
+    EXPECT_EQ(actual_cookie.find("Domain"), std::string::npos);
+  }
+  {
+    // Test cookie with multiple attributes
+    CookieBasedSessionStateProto config;
+    config.mutable_cookie()->set_name("multi_attr_cookie");
+    // Add SameSite attribute
+    auto* attr1 = config.mutable_cookie()->add_attributes();
+    attr1->set_name("SameSite");
+    attr1->set_value("Lax");
+    // Add Secure attribute (boolean - empty value)
+    auto* attr2 = config.mutable_cookie()->add_attributes();
+    attr2->set_name("Secure");
+    attr2->set_value("");
+    // Add Domain attribute
+    auto* attr3 = config.mutable_cookie()->add_attributes();
+    attr3->set_name("Domain");
+    attr3->set_value("example.com");
+    CookieBasedSessionStateFactory factory(config, time_simulator);
+    Envoy::Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+    auto session_state = factory.create(request_headers);
+    Envoy::Http::TestResponseHeaderMapImpl response_headers;
+    session_state->onUpdate("10.1.1.1:443", response_headers);
+
+    std::string actual_cookie = response_headers.get_("set-cookie");
+    // Should have HttpOnly (added by makeSetCookieValue by default)
+    EXPECT_NE(actual_cookie.find("HttpOnly"), std::string::npos);
+    // Should also have custom attributes
+    EXPECT_NE(actual_cookie.find("SameSite=Lax"), std::string::npos);
+    EXPECT_NE(actual_cookie.find("Secure"), std::string::npos);
+    EXPECT_NE(actual_cookie.find("Domain=example.com"), std::string::npos);
+  }
+}
+
 } // namespace
 } // namespace Cookie
 } // namespace StatefulSession

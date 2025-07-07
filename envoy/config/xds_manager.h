@@ -47,6 +47,13 @@ public:
   initializeAdsConnections(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   /**
+   * Start all xDS-TP config-based gRPC muxes (if any).
+   * This includes both the servers defined in the `config_sources`, and
+   * `default_config_source` in the bootstrap.
+   */
+  virtual void startXdstpAdsMuxes() PURE;
+
+  /**
    * Subscription to a singleton resource.
    * This will create a subscription to a singleton resource, based on the resource_name and the
    * config source. If an xDS-TP based resource name is given, then the config sources defined in

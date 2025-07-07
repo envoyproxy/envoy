@@ -352,6 +352,56 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithBuffer) {
   EXPECT_EQ(2U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+// Verifies that spans beyond max_cache_size are discarded
+TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithMaxCacheSize) {
+  // Set up driver with custom max_cache_size = 2
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    max_cache_size: 2
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+  setup(opentelemetry_config);
+
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  // set min_flush_spans to 10 avoid automatic flushing.
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(2)
+      .WillRepeatedly(Return(10));
+
+  // Create first span - should be cached (1/2)
+  Tracing::SpanPtr span1 = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                              operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span1.get(), nullptr);
+  span1->finishSpan();
+
+  // Create second span - should be cached (2/2, at max capacity)
+  Tracing::SpanPtr span2 = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                              operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_NE(span2.get(), nullptr);
+  span2->finishSpan();
+
+  // Create another span to trigger flush
+  Tracing::SpanPtr trigger_span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::Sampling, true});
+  EXPECT_NE(trigger_span.get(), nullptr);
+
+  // Should only see 2 spans exported (third span was discarded)
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _));
+  trigger_span->finishSpan();
+
+  // Verify only 2 spans were sent (not 3), confirming the third was discarded
+  EXPECT_EQ(2U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+  // Verify the third span was discarded
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_dropped").value());
+}
+
 // Verifies the export happens after a timeout
 TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanWithFlushTimeout) {
   timer_ =
@@ -928,6 +978,7 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
   EXPECT_NE(span.get(), nullptr);
 
+  // Check that spans are buffered and flushed properly with max cache size.
   // Flush after a single span.
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)

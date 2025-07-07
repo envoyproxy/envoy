@@ -3,12 +3,14 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/trace/v3/opentelemetry.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 
+#include "source/common/json/json_loader.h"
 #include "source/extensions/filters/http/ext_proc/config.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
@@ -5863,6 +5865,192 @@ TEST_P(ExtProcIntegrationTest, BufferedModeOverSizeRequestLocalReply) {
   codec_client_->sendData(*request_encoder_, body_sent, true);
   // Envoy sends 413: payload_too_large local reply.
   verifyDownstreamResponse(*response, 413);
+}
+
+TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_response_trailer_mode(ProcessingMode::SEND);
+
+  auto access_log_path = TestEnvironment::temporaryPath("ext_proc_filter_state_access.log");
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    // Test all three serialization modes.
+    (*json_format->mutable_fields())["ext_proc_plain"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:PLAIN)%");
+    (*json_format->mutable_fields())["ext_proc_typed"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:TYPED)%");
+
+    // Test field extraction for coverage.
+    (*json_format->mutable_fields())["field_request_header_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_latency_us)%");
+    (*json_format->mutable_fields())["field_request_header_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
+    (*json_format->mutable_fields())["field_request_body_calls"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_call_count)%");
+    (*json_format->mutable_fields())["field_request_body_total_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_total_latency_us)%");
+    (*json_format->mutable_fields())["field_request_body_max_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_max_latency_us)%");
+    (*json_format->mutable_fields())["field_request_body_last_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_request_trailer_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_latency_us)%");
+    (*json_format->mutable_fields())["field_request_trailer_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_response_header_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_latency_us)%");
+    (*json_format->mutable_fields())["field_response_header_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_header_call_status)%");
+    (*json_format->mutable_fields())["field_response_body_calls"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_call_count)%");
+    (*json_format->mutable_fields())["field_response_body_total_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_total_latency_us)%");
+    (*json_format->mutable_fields())["field_response_body_max_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_max_latency_us)%");
+    (*json_format->mutable_fields())["field_response_body_last_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_body_last_call_status)%");
+    (*json_format->mutable_fields())["field_response_trailer_latency"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_latency_us)%");
+    (*json_format->mutable_fields())["field_response_trailer_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:response_trailer_call_status)%");
+    (*json_format->mutable_fields())["field_bytes_sent"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_sent)%");
+    (*json_format->mutable_fields())["field_bytes_received"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:bytes_received)%");
+
+    // Test non-existent field for coverage
+    (*json_format->mutable_fields())["field_non_existent"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:non_existent_field)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  // Send request with body and trailers to trigger all processing phases.
+  const std::string request_body = "Hello, World!";
+  auto response = sendDownstreamRequestWithBodyAndTrailer(request_body);
+
+  processRequestHeadersMessage(*grpc_upstreams_[0], true, absl::nullopt);
+  processRequestBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  handleUpstreamRequestWithTrailer();
+
+  processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
+
+  verifyDownstreamResponse(*response, 200);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  ENVOY_LOG_MISC(info, "Comprehensive access log result: {}", log_result);
+
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+
+  // Verify PLAIN format contains all processing phases.
+  auto plain_value = json_log->getString("ext_proc_plain");
+  EXPECT_TRUE(plain_value.ok());
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rh:[0-9]+:[0-9]+"));        // request header
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rb:[0-9]+:[0-9]+:[0-9]+")); // request body
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("rt:[0-9]+:[0-9]+"));        // request trailer
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("sh:[0-9]+:[0-9]+"));        // response header
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("sb:[0-9]+:[0-9]+:[0-9]+")); // response body
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("st:[0-9]+:[0-9]+"));        // response trailer
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("bs:[0-9]+"));               // bytes sent
+  EXPECT_THAT(*plain_value, testing::ContainsRegex("br:[0-9]+"));               // bytes received
+
+  // Verify TYPED format is valid JSON.
+  auto typed_obj = json_log->getObject("ext_proc_typed");
+  EXPECT_TRUE(typed_obj.ok());
+  auto typed_json_str = (*typed_obj)->asJsonString();
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_header_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_call_count\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_total_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_max_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_body_last_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"request_trailer_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_header_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_call_count\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_total_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_max_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_body_last_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_latency_us\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"response_trailer_call_status\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_sent\""));
+  EXPECT_THAT(typed_json_str, testing::ContainsRegex("\"bytes_received\""));
+
+  // Test individual field extraction.
+  auto validateField = [&](const std::string& field_name) {
+    auto field_value = json_log->getString(field_name);
+    EXPECT_TRUE(field_value.ok()) << "Field " << field_name << " should be accessible";
+    if (field_value.ok()) {
+      EXPECT_THAT(*field_value, testing::MatchesRegex("[0-9]+"))
+          << "Field " << field_name << " should be numeric, got: " << *field_value;
+    }
+  };
+
+  // Validate all individual fields can be extracted.
+  validateField("field_request_header_latency");
+  validateField("field_request_header_status");
+  validateField("field_request_body_calls");
+  validateField("field_request_body_total_latency");
+  validateField("field_request_body_max_latency");
+  validateField("field_request_body_last_status");
+  validateField("field_request_trailer_latency");
+  validateField("field_request_trailer_status");
+  validateField("field_response_header_latency");
+  validateField("field_response_header_status");
+  validateField("field_response_body_calls");
+  validateField("field_response_body_total_latency");
+  validateField("field_response_body_max_latency");
+  validateField("field_response_body_last_status");
+  validateField("field_response_trailer_latency");
+  validateField("field_response_trailer_status");
+  validateField("field_bytes_sent");
+  validateField("field_bytes_received");
+
+  // Test non-existent field handling (coverage for getField fallback).
+  // When a field doesn't exist, it's not included in the JSON output at all.
+  auto non_existent = json_log->getString("field_non_existent");
+  EXPECT_FALSE(non_existent.ok()); // Should fail to find the key
+  EXPECT_THAT(non_existent.status().message(),
+              testing::HasSubstr("key 'field_non_existent' missing"));
+
+  // Bytes are only populated for Envoy gRPC, not Google gRPC.
+  auto bytes_sent = json_log->getString("field_bytes_sent");
+  auto bytes_received = json_log->getString("field_bytes_received");
+  if (IsEnvoyGrpc()) {
+    EXPECT_THAT(*bytes_sent, testing::Not(testing::Eq("0")));
+    EXPECT_THAT(*bytes_received, testing::Not(testing::Eq("0")));
+  } else {
+    EXPECT_EQ(*bytes_sent, "0");
+    EXPECT_EQ(*bytes_received, "0");
+  }
+
+  // Verify all three serialization methods produce different output.
+  EXPECT_NE(*plain_value, typed_json_str);
+  EXPECT_NE(*plain_value, *bytes_sent);
+  EXPECT_NE(typed_json_str, *bytes_sent);
+
+  ENVOY_LOG_MISC(info, "All serialization formats validated successfully:");
+  ENVOY_LOG_MISC(info, "PLAIN: {}", *plain_value);
+  ENVOY_LOG_MISC(info, "TYPED: {}", typed_json_str);
+  ENVOY_LOG_MISC(info, "Sample FIELD: bytes_sent={}", *bytes_sent);
 }
 
 } // namespace Envoy

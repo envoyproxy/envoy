@@ -1337,6 +1337,67 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceRepeatedAutho
                         "than once in an xdstp-based config source."));
 }
 
+// Validate that both the non-default and default config source mux objects are
+// started.
+TEST_F(XdsManagerImplXdstpConfigSourcesTest, DefaultAndNonDefaultMuxesStarted) {
+  testing::InSequence s;
+  // Have a config-source and default_config_source.
+  initialize(R"EOF(
+  config_sources:
+  - authorities:
+    - name: authority_1.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: config_source1_cluster
+  default_config_source:
+    authorities:
+    - name: authority_2.com
+    api_config_source:
+      api_type: AGGREGATED_GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: default_config_source_cluster
+  static_resources:
+    clusters:
+    - name: config_source1_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: config_source1_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+    - name: default_config_source_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: default_config_source_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11002
+  )EOF",
+             true, false, true);
+
+  // Validate that start() is invoked on all mux objects.
+  EXPECT_CALL(*authority_A_mux_, start());
+  EXPECT_CALL(*default_mux_, start());
+  xds_manager_impl_.startXdstpAdsMuxes();
+}
+
 // Validates that when a single valid config source is defined, a subscription to a resource
 // under that authority uses the config source's gRPC mux.
 TEST_F(XdsManagerImplXdstpConfigSourcesTest, SubscribeSingleValidConfigSource) {

@@ -25,7 +25,8 @@ namespace OpenTelemetry {
 
 #define OPENTELEMETRY_TRACER_STATS(COUNTER)                                                        \
   COUNTER(spans_sent)                                                                              \
-  COUNTER(timer_flushed)
+  COUNTER(timer_flushed)                                                                           \
+  COUNTER(spans_dropped)
 
 struct OpenTelemetryTracerStats {
   OPENTELEMETRY_TRACER_STATS(GENERATE_COUNTER_STRUCT)
@@ -39,7 +40,7 @@ public:
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler);
+         SamplerSharedPtr sampler, uint64_t max_cache_size);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -74,6 +75,7 @@ private:
   OpenTelemetryTracerStats tracing_stats_;
   const ResourceConstSharedPtr resource_;
   SamplerSharedPtr sampler_;
+  uint64_t max_cache_size_;
 };
 
 /**
