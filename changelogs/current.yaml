@@ -205,6 +205,14 @@ new_features:
   change: |
     Added Override Host Load Balancing policy. See
     :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
+- area: load_balancing
+  change: |
+    Added :ref:`hash policy support
+    <envoy_v3_api_field_extensions.load_balancing_policies.common.v3.ConsistentHashingLbConfig.hash_policy>`
+    to the ring hash and maglev load balancing policies. If the hash policy in the load balancer is
+    configured, the
+    :ref:`route level hash policy <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
+    will be ignored.
 - area: lua
   change: |
     Added support for accessing filter context.
