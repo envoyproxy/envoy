@@ -354,6 +354,8 @@ public:
   UpstreamSocketManager(Event::Dispatcher& dispatcher, Stats::Scope& scope,
                         ReverseTunnelAcceptorExtension* extension = nullptr);
 
+  ~UpstreamSocketManager();
+
   // RPING message now handled by ReverseConnectionUtility
 
   /** Add the accepted connection and remote cluster mapping to UpstreamSocketManager maps.
@@ -399,10 +401,8 @@ public:
 
   /** Mark the connection socket dead and remove it from internal maps.
    * @param fd the FD for the socket to be marked dead.
-   * @param used is true, when the connection the fd belongs to has been used for servicing a
-   * request.
    */
-  void markSocketDead(const int fd, const bool used);
+  void markSocketDead(const int fd);
 
   /** Ping all active reverse connections to check their health and maintain keepalive.
    * Sends ping messages to all accepted reverse connections and sets up response timeouts.
