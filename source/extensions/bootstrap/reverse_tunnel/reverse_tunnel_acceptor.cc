@@ -577,6 +577,7 @@ UpstreamSocketManager::getConnectionSocket(const std::string& key) {
 
   cleanStaleNodeEntry(node_id);
 
+  // Update stats
   USMStats* node_stats = this->getStatsByNode(node_id);
   node_stats->reverse_conn_cx_idle_.dec();
   node_stats->reverse_conn_cx_used_.inc();
@@ -669,6 +670,7 @@ absl::flat_hash_map<std::string, size_t> UpstreamSocketManager::getSocketCountMa
 
 void UpstreamSocketManager::markSocketDead(const int fd) {
   ENVOY_LOG(debug, "UpstreamSocketManager: markSocketDead called for fd {}", fd);
+
   auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end()) {
     ENVOY_LOG(debug, "UpstreamSocketManager: FD {} not found in fd_to_node_map_", fd);
@@ -696,6 +698,7 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
                 "UpstreamSocketManager: decremented stats registry for node '{}' cluster '{}'",
                 node_id, cluster_id);
     }
+
     USMStats* stats = this->getStatsByNode(node_id);
     if (stats) {
       stats->reverse_conn_cx_used_.dec();

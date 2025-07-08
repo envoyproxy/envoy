@@ -17,11 +17,11 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
       config_(std::make_shared<FilterConfig>(
-          factory_context_, pool_.add("test"), factory_context_.local_info_,
-          *stats_store_.rootScope(), cm_, runtime_, random_, ShadowWriterPtr{shadow_writer_}, true,
-          start_child_span, suppress_envoy_headers, false, suppress_grpc_request_failure_code_stats,
-          flush_upstream_log_on_upstream_stream, std::move(strict_headers_to_check),
-          test_time_.timeSystem(), http_context_, router_context_)),
+          factory_context_, pool_.add("test"), *stats_store_.rootScope(), cm_, runtime_, random_,
+          ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers, false,
+          suppress_grpc_request_failure_code_stats, flush_upstream_log_on_upstream_stream,
+          std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_,
+          router_context_)),
       router_(std::make_unique<RouterTestFilter>(config_, config_->default_stats_)) {
   router_->setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");

@@ -630,16 +630,16 @@ class ReverseConnectionTester:
                 raise Exception("Reverse connections failed to re-establish within timeout")
             
             # # Step 10: Remove reverse_conn_listener from on-prem via xDS
-            # logger.info("Removing reverse_conn_listener from on-prem via xDS")
-            # if not self.remove_reverse_conn_listener_via_xds():
-            #     raise Exception("Failed to remove reverse_conn_listener via xDS")
+            logger.info("Removing reverse_conn_listener from on-prem via xDS")
+            if not self.remove_reverse_conn_listener_via_xds():
+                raise Exception("Failed to remove reverse_conn_listener via xDS")
             
             # # Step 11: Verify reverse connections are torn down
-            # logger.info("Verifying reverse connections are torn down")
-            # time.sleep(10)  # Wait for connections to be torn down
-            # if self.check_reverse_connections(CONFIG['cloud_api_port']):  # cloud-envoy's API port
-            #     raise Exception("Reverse connections should be torn down after removing listener")
-            # logger.info("✓ Reverse connections are correctly torn down")
+            logger.info("Verifying reverse connections are torn down")
+            time.sleep(10)  # Wait for connections to be torn down
+            if self.check_reverse_connections(CONFIG['cloud_api_port']):  # cloud-envoy's API port
+                raise Exception("Reverse connections should be torn down after removing listener")
+            logger.info("✓ Reverse connections are correctly torn down")
             
             logger.info("Test completed successfully!")
             return True
