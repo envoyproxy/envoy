@@ -56,7 +56,12 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  populateRateLimitDescriptors(descriptors, headers, false);
+  if (config_.get()->hasRateLimitConfigs()) {
+    cluster_ = callbacks_->clusterInfo();
+    config_.get()->populateDescriptors(headers, callbacks_->streamInfo(), descriptors);
+  } else {
+    populateRateLimitDescriptors(descriptors, headers, false);
+  }
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
