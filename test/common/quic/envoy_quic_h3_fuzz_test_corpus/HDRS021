@@ -40,10 +40,6 @@ frames {
               value: "application/grpc-web"
             }
             headers {
-              key: "x-squash-debug"
-              value: "empty"
-            }
-            headers {
               key: "-decorator-operation"
               value: "empty"
             }

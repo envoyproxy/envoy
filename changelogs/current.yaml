@@ -25,6 +25,10 @@ behavior_changes:
     Removed the clang-libstdc++ toolchain setup as this is no longer used or tested by the project.
     Consolidated clang and gcc toolchains which can be used with ``--config=clang`` or ``--config=gcc``.
     These use libc++ and libstdc++ respectively.
+- area: squash_filter
+  change: |
+    The squash http filter in ``contrib`` has been deleted. The project it provided integration with has been idle for five years
+    and appears abandoned.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
