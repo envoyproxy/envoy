@@ -333,6 +333,6 @@ new_features:
   change: |
     Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_connection_flow_control_for_streams, an experimental
     support for disabling connection level flow control for streams. This can be useful for decoupling flow control among streams on the
-    same connection at a non-frontline proxy.  
+    same connection at a non-frontline proxy.
 
 deprecated:
