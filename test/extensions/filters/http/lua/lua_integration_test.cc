@@ -7,7 +7,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/registry.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -2038,9 +2037,6 @@ TEST_P(LuaIntegrationTest, ModifyResponseBodyAndRemoveStatusHeader) {
   if (!testing_downstream_filter_) {
     GTEST_SKIP() << "This is a local reply test that does not go upstream";
   }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.validate_required_response_headers_in_cleanup", "true"}});
   const std::string filter_config =
       R"EOF(
 name: lua

@@ -110,11 +110,6 @@ bug_fixes:
   change: |
     Fixes a bug where the TLS inspector filter would not correctly report ``client_hello_too_large`` stat for too big client hello messages
     i.e bigger than 16kb.
-- area: lua
-  change: |
-    Fixes a segmentation fault in the Lua filter when a script removes the ``:status`` header and sets a response body. Required response
-    header validation is now performed using a cleanup callback to ensure it runs even when iteration ends early. This behavior can be
-    reverted by setting the runtime guard ``envoy.reloadable_features.validate_required_response_headers_in_cleanup`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

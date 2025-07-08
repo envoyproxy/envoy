@@ -963,8 +963,6 @@ protected:
     bool saw_downstream_reset_{};
     // True when the stream was recreated.
     bool recreated_stream_{};
-    // True when sendLocalReply has been called for this stream.
-    bool local_reply_sent_{};
 
     // The following 3 members are booleans rather than part of the space-saving bitfield as they
     // are passed as arguments to functions expecting bools. Extend State using the bitfield
