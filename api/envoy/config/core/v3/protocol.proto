@@ -711,7 +711,7 @@ message Http3ProtocolOptions {
   bool disable_qpack = 7;
 
   // Disables connection level flow control for HTTP/3 streams. This is useful such that streams share the same connection but originated
-  // from different end-clients can make progress independently at non-frontline proxies.
+  // from different end-clients can make progress independently at non-front-line proxies.
   bool disable_connection_flow_control_for_streams = 8;
 }
 
