@@ -58,7 +58,7 @@ and verifies that the route with the matching dynamic metadata condition is sele
   tests:
   - test_name: dynamic_metadata_test
     input:
-      authority: edge.example.net
+      authority: api.lyft.com
       path: /example
       method: GET
       dynamic_metadata:
@@ -76,7 +76,7 @@ The corresponding route configuration would need to include a dynamic metadata m
   virtual_hosts:
   - name: default
     domains:
-    - 'edge.example.net'
+    - 'api.lyft.com'
     routes:
     - route:
         cluster: cluster2
@@ -84,7 +84,7 @@ The corresponding route configuration would need to include a dynamic metadata m
         path: /example
         dynamic_metadata:
           - filter: example.meta
-            path: 
+            path:
              - key: foo
             value:
               string_match:

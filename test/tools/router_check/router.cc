@@ -237,8 +237,8 @@ Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) 
 
 void RouterCheckTool::applyDynamicMetadata(
     Envoy::StreamInfo::StreamInfoImpl& stream_info,
-    const google::protobuf::RepeatedPtrField<envoy::extensions::filters::http::set_metadata::v3::Metadata>&
-        dynamic_metadata) {
+    const Envoy::Protobuf::RepeatedPtrField<
+        envoy::extensions::filters::http::set_metadata::v3::Metadata>& dynamic_metadata) {
   if (dynamic_metadata.empty()) {
     return;
   }
@@ -247,7 +247,7 @@ void RouterCheckTool::applyDynamicMetadata(
     if (metadata.has_value()) {
       auto& mut_untyped_metadata = *stream_info.dynamicMetadata().mutable_filter_metadata();
       const std::string& metadata_namespace = metadata.metadata_namespace();
-      
+
       if (!mut_untyped_metadata.contains(metadata_namespace)) {
         // Insert the new entry.
         mut_untyped_metadata[metadata_namespace] = metadata.value();
@@ -263,7 +263,7 @@ void RouterCheckTool::applyDynamicMetadata(
     } else if (metadata.has_typed_value()) {
       auto& mut_typed_metadata = *stream_info.dynamicMetadata().mutable_typed_filter_metadata();
       const std::string& metadata_namespace = metadata.metadata_namespace();
-      
+
       if (!mut_typed_metadata.contains(metadata_namespace)) {
         // Insert the new entry.
         mut_typed_metadata[metadata_namespace] = metadata.typed_value();
@@ -296,10 +296,10 @@ RouterCheckTool::compareEntries(const std::string& expected_routes) {
         Envoy::Http::Protocol::Http11, factory_context_->mainThreadDispatcher().timeSource(),
         connection_info_provider, StreamInfo::FilterState::LifeSpan::FilterChain);
     ToolConfig tool_config = ToolConfig::create(check_config);
-    
+
     // Apply dynamic metadata to stream_info before routing
     applyDynamicMetadata(stream_info, check_config.input().dynamic_metadata());
-    
+
     tool_config.route_ =
         config_->route(*tool_config.request_headers_, stream_info, tool_config.random_value_);
 
