@@ -32,6 +32,7 @@ static_resources:
                   - name: envoy.filters.http.reverse_conn
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
+                      ping_interval: 30
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -130,7 +131,7 @@ static_resources:
             - endpoint:
                 address:
                   socket_address:
-                    address: on-prem-service
+                    address: 127.0.0.1
                     port_value: 7070
 
 admin:
