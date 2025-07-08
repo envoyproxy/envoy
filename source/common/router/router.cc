@@ -398,7 +398,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         config_->empty_stat_name_,
         response_status_code,
         internal_request,
-        route_->virtualHost().statName(),
+        route_->virtualHost()->statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -532,7 +532,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
-  request_vcluster_ = route_->virtualHost().virtualCluster(headers);
+  request_vcluster_ = route_->virtualHost()->virtualCluster(headers);
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
@@ -803,7 +803,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   const bool can_send_early_data =
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
-  include_timeout_retry_header_in_request_ = route_->virtualHost().includeIsTimeoutRetryHeader();
+  include_timeout_retry_header_in_request_ = route_->virtualHost()->includeIsTimeoutRetryHeader();
 
   // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
   // For retries etc, HTTP/3 usability may transition from true to false, but
@@ -1844,7 +1844,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         response_time,
         upstream_request.upstreamCanary(),
         internal_request,
-        route_->virtualHost().statName(),
+        route_->virtualHost()->statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
