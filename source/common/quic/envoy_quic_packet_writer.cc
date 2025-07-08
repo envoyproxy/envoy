@@ -41,9 +41,8 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(
   Network::Address::InstanceConstSharedPtr remote_addr =
       quicAddressToEnvoyAddressInstance(peer_address);
 
-  params.flow_label;
   Api::IoCallUint64Result result = envoy_udp_packet_writer_->writePacket(
-      buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
+      buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr, params.flow_label);
 
   return convertToQuicWriteResult(result);
 }

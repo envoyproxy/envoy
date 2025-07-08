@@ -17,7 +17,7 @@ public:
 
   // Following writePacket utilizes Utility::writeToSocket() implementation
   Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer, const Address::Ip* local_ip,
-                                      const Address::Instance& peer_address) override;
+                                      const Address::Instance& peer_address, uint32_t ipv6_flow_label) override;
 
   bool isWriteBlocked() const override { return write_blocked_; }
   void setWritable() override { write_blocked_ = false; }
@@ -44,6 +44,7 @@ class UdpDefaultWriterFactory : public Network::UdpPacketWriterFactory {
 public:
   Network::UdpPacketWriterPtr createUdpPacketWriter(Network::IoHandle& io_handle,
                                                     Stats::Scope&) override {
+    std::cerr << fmt::format("XXX : creating default writer\n");
     return std::make_unique<UdpDefaultWriter>(io_handle);
   }
 };

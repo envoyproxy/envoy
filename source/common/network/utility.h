@@ -309,10 +309,12 @@ public:
    */
   static Api::IoCallUint64Result writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,
                                                uint64_t num_slices, const Address::Ip* local_ip,
-                                               const Address::Instance& peer_address);
+                                               const Address::Instance& peer_address,
+                                               uint32_t ipv6_flow_label = 0);
   static Api::IoCallUint64Result writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
                                                const Address::Ip* local_ip,
-                                               const Address::Instance& peer_address);
+                                               const Address::Instance& peer_address,
+                                               uint32_t ipv6_flow_label = 0);
 
   /**
    * Read a packet from a given UDP socket and pass the packet to given UdpPacketProcessor.

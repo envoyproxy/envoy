@@ -40,11 +40,15 @@ Api::IoCallUint64Result convertQuicWriteResult(quic::WriteResult quic_result, si
 
 // Initialize QuicGsoBatchWriter, set io_handle_ and stats_
 UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope& scope)
-    : quic::QuicGsoBatchWriter(io_handle.fdDoNotUse()), stats_(generateStats(scope)) {}
+    : quic::QuicGsoBatchWriter(io_handle.fdDoNotUse()), stats_(generateStats(scope)) {
+  std::cerr << fmt::format("XXX : UdpGsoBatchWriter::UdpGsoBatchWriter\n");
+}
 
 Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
-                               const Network::Address::Instance& peer_address) {
+                               const Network::Address::Instance& peer_address,
+                               uint32_t ipv6_flow_label) {
+  std::cerr << fmt::format("XXX : UdpGsoBatchWriter::writePacket\n");
   // Convert received parameters to relevant forms
   quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
   quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
@@ -54,6 +58,7 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
   // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
   // specify this parameter here at a later stage.
   quic::QuicPacketWriterParams params;
+  params.flow_label = ipv6_flow_label;
   quic::WriteResult quic_result = WritePacket(static_cast<char*>(buffer.frontSlice().mem_),
                                               payload_len, self_addr.host(), peer_addr,
                                               /*quic::PerPacketOptions=*/nullptr, params);
@@ -104,6 +109,7 @@ UdpGsoBatchWriterStats UdpGsoBatchWriter::generateStats(Stats::Scope& scope) {
 
 Network::UdpPacketWriterPtr
 UdpGsoBatchWriterFactory::createUdpPacketWriter(Network::IoHandle& io_handle, Stats::Scope& scope) {
+  std::cerr << fmt::format("XXX : creating gso writer\n");
   return std::make_unique<UdpGsoBatchWriter>(io_handle, scope);
 }
 

@@ -529,14 +529,17 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
                                                const Address::Ip* local_ip,
-                                               const Address::Instance& peer_address) {
+                                               const Address::Instance& peer_address,
+                                               uint32_t /*ipv6_flow_label*/) {
+      std::cerr << fmt::format("XXX : write to socket handle {} ", static_cast<void*>(&handle)) << "\n";
   Buffer::RawSliceVector slices = buffer.getRawSlices();
   return writeToSocket(handle, slices.data(), slices.size(), local_ip, peer_address);
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,
                                                uint64_t num_slices, const Address::Ip* local_ip,
-                                               const Address::Instance& peer_address) {
+                                               const Address::Instance& peer_address,
+                                               uint32_t /*ipv6_flow_label*/) {
   Api::IoCallUint64Result send_result(
       /*rc=*/0, /*err=*/Api::IoError::none());
 
@@ -545,8 +548,13 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
     if (is_connected) {
       // The socket is already connected, so the local and peer addresses should not be specified.
       // Instead, a writev is called.
+      std::cerr << fmt::format("XXX : writev handle {} ", static_cast<void*>(&handle)) << "\n";
+      ENVOY_LOG_MISC(info, fmt::format("XXX : writev handle {} ", static_cast<void*>(&handle)));
+      //IS_ENVOY_BUG("xxxx");
       send_result = handle.writev(slices, num_slices);
     } else {
+      std::cerr << "XXXX : sendmsg";
+      ENVOY_LOG_MISC(info, "XXX : sendmsg");
       // For non-connected sockets(), calling sendmsg with the peer address specified ensures the
       // connection happens first.
       send_result = handle.sendmsg(slices, num_slices, 0, local_ip, peer_address);

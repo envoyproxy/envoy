@@ -649,7 +649,7 @@ public:
 
   MOCK_METHOD(Api::IoCallUint64Result, writePacket,
               (const Buffer::Instance& buffer, const Address::Ip* local_ip,
-               const Address::Instance& peer_address));
+               const Address::Instance& peer_address, uint32_t ipv6_flow_label));
   MOCK_METHOD(bool, isWriteBlocked, (), (const));
   MOCK_METHOD(void, setWritable, ());
   MOCK_METHOD(uint64_t, getMaxPacketSize, (const Address::Instance& peer_address), (const));
