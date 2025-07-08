@@ -514,7 +514,7 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
   fd_to_timer_map_[fd] =
-      dispatcher_.createTimer([this, fd]() { markSocketDead(fd, false /* used */); });
+      dispatcher_.createTimer([this, fd]() { markSocketDead(fd); });
 
   // Initiate ping keepalives on the socket.
   tryEnablePingTimer(std::chrono::seconds(ping_interval.count()));
@@ -572,13 +572,11 @@ UpstreamSocketManager::getConnectionSocket(const std::string& key) {
             "cluster: {}",
             fd, remoteConnectionKey, node_id, actual_cluster_id);
 
-  fd_to_node_map_.erase(fd);
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
 
   cleanStaleNodeEntry(node_id);
 
-  // Update stats
   USMStats* node_stats = this->getStatsByNode(node_id);
   node_stats->reverse_conn_cx_idle_.dec();
   node_stats->reverse_conn_cx_used_.inc();
@@ -669,9 +667,8 @@ absl::flat_hash_map<std::string, size_t> UpstreamSocketManager::getSocketCountMa
   return cluster_stats;
 }
 
-void UpstreamSocketManager::markSocketDead(const int fd, const bool used) {
+void UpstreamSocketManager::markSocketDead(const int fd) {
   ENVOY_LOG(debug, "UpstreamSocketManager: markSocketDead called for fd {}", fd);
-
   auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end()) {
     ENVOY_LOG(debug, "UpstreamSocketManager: FD {} not found in fd_to_node_map_", fd);
@@ -686,10 +683,19 @@ void UpstreamSocketManager::markSocketDead(const int fd, const bool used) {
                                : "";
   fd_to_node_map_.erase(fd); // Now it's safe to erase since node_id is a copy
 
-  // If this is a used connection, we update the stats and return.
-  if (used) {
-    ENVOY_LOG(debug, "UpstreamSocketManager: Marking used socket dead. node: {} cluster: {} FD: {}",
-              node_id, cluster_id, fd);
+  // Check if this is a used connection by looking for node_id in accepted_reverse_connections_
+  auto& sockets = accepted_reverse_connections_[node_id];
+  if (sockets.empty()) {
+    // This is a used connection (not in the idle pool)
+    ENVOY_LOG(debug, "UpstreamSocketManager: Marking used socket dead. node: {} cluster: {} FD: {}", node_id, cluster_id, fd);
+    // Update Envoy's stats system for production multi-tenant tracking
+    // This ensures stats are decremented when connections are removed
+    if (auto extension = getUpstreamExtension()) {
+      extension->updateConnectionStatsRegistry(node_id, cluster_id, false /* decrement */);
+      ENVOY_LOG(debug,
+                "UpstreamSocketManager: decremented stats registry for node '{}' cluster '{}'",
+                node_id, cluster_id);
+    }
     USMStats* stats = this->getStatsByNode(node_id);
     if (stats) {
       stats->reverse_conn_cx_used_.dec();
@@ -698,7 +704,7 @@ void UpstreamSocketManager::markSocketDead(const int fd, const bool used) {
     return;
   }
 
-  auto& sockets = accepted_reverse_connections_[node_id];
+  // This is an idle connection, find and remove it from the pool
   bool socket_found = false;
   for (auto itr = sockets.begin(); itr != sockets.end(); itr++) {
     if (fd == itr->get()->ioHandle().fdDoNotUse()) {
@@ -805,7 +811,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   if (!result.ok()) {
     ENVOY_LOG(debug, "UpstreamSocketManager: Read error on FD: {}: error - {}", fd,
               result.err_->getErrorDetails());
-    markSocketDead(fd, false /* used */);
+    markSocketDead(fd);
     return;
   }
 
@@ -813,7 +819,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
   // peer in a graceful manner, unlike a connection refused, or a reset.
   if (result.return_value_ == 0) {
     ENVOY_LOG(debug, "UpstreamSocketManager: FD: {}: reverse connection closed", fd);
-    markSocketDead(fd, false /* used */);
+    markSocketDead(fd);
     return;
   }
 
@@ -824,7 +830,7 @@ void UpstreamSocketManager::onPingResponse(Network::IoHandle& io_handle) {
 
   if (!::Envoy::ReverseConnection::ReverseConnectionUtility::isPingMessage(buffer.toString())) {
     ENVOY_LOG(debug, "UpstreamSocketManager: FD: {}: response is not RPING", fd);
-    markSocketDead(fd, false /* used */);
+    markSocketDead(fd);
     return;
   }
   ENVOY_LOG(trace, "UpstreamSocketManager: FD: {}: received ping response", fd);
@@ -900,6 +906,40 @@ USMStats* UpstreamSocketManager::getStatsByCluster(const std::string& cluster_id
   usm_cluster_stats_map_[cluster_id] = std::make_unique<USMStats>(
       USMStats{ALL_USM_STATS(POOL_GAUGE_PREFIX(*usm_scope_, final_prefix))});
   return usm_cluster_stats_map_[cluster_id].get();
+}
+
+UpstreamSocketManager::~UpstreamSocketManager() {
+  ENVOY_LOG(debug, "UpstreamSocketManager destructor called");
+  
+  // Clean up all active file events and timers first
+  for (auto& [fd, event] : fd_to_event_map_) {
+    ENVOY_LOG(debug, "UpstreamSocketManager: cleaning up file event for FD: {}", fd);
+    event.reset(); // This will cancel the file event
+  }
+  fd_to_event_map_.clear();
+  
+  for (auto& [fd, timer] : fd_to_timer_map_) {
+    ENVOY_LOG(debug, "UpstreamSocketManager: cleaning up timer for FD: {}", fd);
+    timer.reset(); // This will cancel the timer
+  }
+  fd_to_timer_map_.clear();
+  
+  // Now mark all sockets as dead
+  std::vector<int> fds_to_cleanup;
+  for (const auto& [fd, node_id] : fd_to_node_map_) {
+    fds_to_cleanup.push_back(fd);
+  }
+  
+  for (int fd : fds_to_cleanup) {
+    ENVOY_LOG(debug, "UpstreamSocketManager: marking socket dead in destructor for FD: {}", fd);
+    markSocketDead(fd); // false = not used, just cleanup
+  }
+  
+  // Clear the ping timer
+  if (ping_timer_) {
+    ping_timer_->disableTimer();
+    ping_timer_.reset();
+  }
 }
 
 REGISTER_FACTORY(ReverseTunnelAcceptor, Server::Configuration::BootstrapExtensionFactory);

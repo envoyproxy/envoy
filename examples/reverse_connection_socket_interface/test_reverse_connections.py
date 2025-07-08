@@ -10,8 +10,8 @@ This script:
 5. Adds the reverse_conn_listener to on-prem via xDS
 6. Verifies reverse connections are established
 7. Tests request routing through reverse connections
-8. Removes the reverse_conn_listener via xDS
-9. Verifies reverse connections are torn down
+8. Stops and restarts cloud Envoy to test connection recovery
+9. Verifies reverse connections are re-established
 """
 
 import json
@@ -23,12 +23,8 @@ import tempfile
 import os
 import signal
 import sys
-import threading
-import socket
-from typing import Dict, Any, Optional, List
-from contextlib import contextmanager
 import logging
-# Note: Using HTTP-based xDS server instead of gRPC
+from typing import Optional
 
 # Configuration
 CONFIG = {
@@ -43,18 +39,14 @@ CONFIG = {
     'cloud_api_port': 9001,
     'cloud_egress_port': 8081,
     'on_prem_admin_port': 8889,
-    'on_prem_api_port': 9002,
-    'on_prem_ingress_port': 8080,
     'xds_server_port': 18000,  # Port for our xDS server
     
     # Container names
     'cloud_container': 'cloud-envoy',
     'on_prem_container': 'on-prem-envoy',
-    'backend_container': 'on-prem-service',
     
     # Timeouts
     'envoy_startup_timeout': 30,
-    'reverse_conn_timeout': 60,
     'docker_startup_delay': 10,
 }
 
@@ -62,149 +54,14 @@ CONFIG = {
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class XDSServer:
-    """Simple xDS server for dynamic listener management."""
-    
-    def __init__(self):
-        self.listeners = {}
-        self.version = 1
-        self._lock = threading.Lock()
-        self.server = None
-    
-    def start(self, port: int):
-        """Start the xDS server."""
-        # Create a simple HTTP server that serves xDS responses
-        import http.server
-        import socketserver
-        
-        class XDSHandler(http.server.BaseHTTPRequestHandler):
-            def do_POST(self):
-                if self.path == '/v3/discovery:listeners':
-                    content_length = int(self.headers['Content-Length'])
-                    post_data = self.rfile.read(content_length)
-                    
-                    # Parse the request and send response
-                    response_data = self.server.xds_server.handle_lds_request(post_data)
-                    
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(response_data.encode())
-                else:
-                    self.send_response(404)
-                    self.end_headers()
-            
-            def log_message(self, format, *args):
-                # Suppress HTTP server logs
-                pass
-        
-        class XDSServer(socketserver.TCPServer):
-            def __init__(self, server_address, RequestHandlerClass, xds_server):
-                self.xds_server = xds_server
-                super().__init__(server_address, RequestHandlerClass)
-        
-        self.server = XDSServer(('0.0.0.0', port), XDSHandler, self)
-        self.server_thread = threading.Thread(target=self.server.serve_forever)
-        self.server_thread.daemon = True
-        self.server_thread.start()
-        logger.info(f"xDS server started on port {port}")
-    
-    def stop(self):
-        """Stop the xDS server."""
-        if self.server:
-            self.server.shutdown()
-            self.server.server_close()
-    
-    def handle_lds_request(self, request_data: bytes) -> str:
-        """Handle LDS request and return response."""
-        with self._lock:
-            # Create a simple LDS response
-            response = {
-                "version_info": str(self.version),
-                "resources": [],
-                "type_url": "type.googleapis.com/envoy.config.listener.v3.Listener"
-            }
-            
-            # Add all current listeners
-            for listener_name, listener_config in self.listeners.items():
-                response["resources"].append(listener_config)
-            
-            return json.dumps(response)
-    
-    def add_listener(self, listener_name: str, listener_config: dict):
-        """Add a listener to the xDS server."""
-        with self._lock:
-            self.listeners[listener_name] = listener_config
-            self.version += 1
-            logger.info(f"Added listener {listener_name}, version {self.version}")
-    
-    def remove_listener(self, listener_name: str) -> bool:
-        """Remove a listener from the xDS server."""
-        with self._lock:
-            if listener_name in self.listeners:
-                del self.listeners[listener_name]
-                self.version += 1
-                logger.info(f"Removed listener {listener_name}, version {self.version}")
-                return True
-            return False
-
-class EnvoyProcess:
-    """Represents a running Envoy process."""
-    def __init__(self, process, config_file, name, admin_port, api_port):
-        self.process = process
-        self.config_file = config_file
-        self.name = name
-        self.admin_port = admin_port
-        self.api_port = api_port
-
-class BackendProcess:
-    """Represents a running backend service."""
-    def __init__(self, process, name, port):
-        self.process = process
-        self.name = name
-        self.port = port
-
 class ReverseConnectionTester:
     def __init__(self):
-        self.on_prem_process: Optional[EnvoyProcess] = None
-        self.cloud_process: Optional[EnvoyProcess] = None
-        self.backend_process: Optional[BackendProcess] = None
         self.docker_compose_process: Optional[subprocess.Popen] = None
-        self.xds_server: Optional[XDSServer] = None
         self.temp_dir = tempfile.mkdtemp()
         self.docker_compose_dir = CONFIG['script_dir']
+        self.current_compose_file = None  # Track which compose file is being used
+        self.current_compose_cwd = None   # Track which directory to run from
         
-    def create_on_prem_config_without_reverse_conn(self) -> str:
-        """Create on-prem Envoy config without the reverse_conn_listener."""
-        # Load the original config
-        with open(CONFIG['on_prem_config_file'], 'r') as f:
-            config = yaml.safe_load(f)
-        
-        # Remove the reverse_conn_listener
-        listeners = config['static_resources']['listeners']
-        config['static_resources']['listeners'] = [
-            listener for listener in listeners 
-            if listener['name'] != 'reverse_conn_listener'
-        ]
-        
-        # Update the on-prem-service cluster to point to on-prem-service container
-        for cluster in config['static_resources']['clusters']:
-            if cluster['name'] == 'on-prem-service':
-                cluster['load_assignment']['endpoints'][0]['lb_endpoints'][0]['endpoint']['address']['socket_address']['address'] = 'on-prem-service'
-                cluster['load_assignment']['endpoints'][0]['lb_endpoints'][0]['endpoint']['address']['socket_address']['port_value'] = 80
-        
-        # Update the cloud cluster to point to cloud-envoy container
-        for cluster in config['static_resources']['clusters']:
-            if cluster['name'] == 'cloud':
-                cluster['load_assignment']['endpoints'][0]['lb_endpoints'][0]['endpoint']['address']['socket_address']['address'] = CONFIG['cloud_container']
-                cluster['load_assignment']['endpoints'][0]['lb_endpoints'][0]['endpoint']['address']['socket_address']['port_value'] = CONFIG['cloud_api_port']
-        
-        config_file = os.path.join(self.temp_dir, "on-prem-envoy-no-reverse.yaml")
-        with open(config_file, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
-        
-        return config_file
-    
     def create_on_prem_config_with_xds(self) -> str:
         """Create on-prem Envoy config with xDS for dynamic listener management."""
         # Load the original config
@@ -272,12 +129,6 @@ class ReverseConnectionTester:
         
         return config_file
     
-    def start_xds_server(self):
-        """Start the xDS server."""
-        # The xDS server is now running in Docker, so we don't need to start it locally
-        logger.info("xDS server will be started by Docker Compose")
-        return True
-    
     def start_docker_compose(self, on_prem_config: str = None) -> bool:
         """Start Docker Compose services."""
         logger.info("Starting Docker Compose services")
@@ -327,6 +178,8 @@ class ReverseConnectionTester:
                 cwd=self.temp_dir,
                 universal_newlines=True
             )
+            self.current_compose_file = compose_file
+            self.current_compose_cwd = self.temp_dir
         else:
             # Run from original directory
             self.docker_compose_process = subprocess.Popen(
@@ -334,6 +187,8 @@ class ReverseConnectionTester:
                 cwd=self.docker_compose_dir,
                 universal_newlines=True
             )
+            self.current_compose_file = compose_file
+            self.current_compose_cwd = self.docker_compose_dir
         
         # Wait a moment for containers to be ready
         time.sleep(CONFIG['docker_startup_delay'])
@@ -474,62 +329,221 @@ class ReverseConnectionTester:
             logger.error(f"Failed to add reverse_conn_listener via xDS: {e}")
             return False
     
-    def check_xds_server_state(self) -> dict:
-        """Check the current state of the xDS server."""
+    def get_container_name(self, service_name: str) -> str:
+        """Get the actual container name for a service, handling Docker Compose suffixes."""
         try:
-            response = requests.get(
-                f"http://localhost:{CONFIG['xds_server_port']}/state",
-                timeout=5
+            result = subprocess.run(
+                ['docker', 'ps', '--filter', f'name={service_name}', '--format', '{{.Names}}'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                timeout=10
             )
-            if response.status_code == 200:
-                return response.json()
+            if result.returncode == 0 and result.stdout.strip():
+                container_name = result.stdout.strip()
+                logger.info(f"Found container name for service {service_name}: {container_name}")
+                return container_name
             else:
-                logger.error(f"Failed to get xDS server state: {response.status_code}")
-                return {}
+                logger.error(f"Failed to find container for service {service_name}: {result.stderr}")
+                return service_name  # Fallback to service name
         except Exception as e:
-            logger.error(f"Error checking xDS server state: {e}")
-            return {}
-
-    def remove_reverse_conn_listener_via_xds(self) -> bool:
-        """Remove reverse_conn_listener via xDS."""
-        logger.info("Removing reverse_conn_listener via xDS")
-        
+            logger.error(f"Error finding container name for {service_name}: {e}")
+            return service_name  # Fallback to service name
+    
+    def check_container_network_status(self) -> bool:
+        """Check the network status of containers to help debug DNS issues."""
+        logger.info("Checking container network status")
         try:
-            # Check state before removal
-            logger.info("xDS server state before removal:")
-            state_before = self.check_xds_server_state()
-            logger.info(f"Current listeners: {state_before.get('listeners', [])}")
-            logger.info(f"Current version: {state_before.get('version', 'unknown')}")
+            # Check if containers are running and their network info
+            cmd = [
+                'docker', 'ps', '--filter', 'name=envoy', '--format', 
+                'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+            ]
             
-            # Send request to xDS server running in Docker
-            response = requests.post(
-                f"http://localhost:{CONFIG['xds_server_port']}/remove_listener",
-                json={
-                    'name': 'reverse_conn_listener'
-                },
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
                 timeout=10
             )
             
-            if response.status_code == 200:
-                logger.info("✓ reverse_conn_listener removed via xDS")
-                
-                # Check state after removal
-                logger.info("xDS server state after removal:")
-                state_after = self.check_xds_server_state()
-                logger.info(f"Current listeners: {state_after.get('listeners', [])}")
-                logger.info(f"Current version: {state_after.get('version', 'unknown')}")
-                
-                # Wait a bit longer for Envoy to poll and pick up the change
-                logger.info("Waiting for Envoy to pick up the listener removal...")
-                time.sleep(20)  # Increased wait time
-                
+            if result.returncode == 0:
+                logger.info("Container status:")
+                logger.info(result.stdout)
+            else:
+                logger.error(f"Failed to get container status: {result.stderr}")
+            
+            # Check network info for the envoy-network
+            cmd = ['docker', 'network', 'inspect', 'envoy-network']
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                logger.info("Network info:")
+                logger.info(result.stdout)
+            else:
+                logger.error(f"Failed to get network info: {result.stderr}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error checking container network status: {e}")
+            return False
+
+    def check_network_connectivity(self) -> bool:
+        """Check network connectivity from on-prem container to cloud container."""
+        logger.info("Checking network connectivity from on-prem to cloud container")
+        try:
+            # First check container network status
+            self.check_container_network_status()
+            
+            # Get the on-prem container name
+            on_prem_container = self.get_container_name(CONFIG['on_prem_container'])
+            
+            # Test DNS resolution first
+            logger.info("Testing DNS resolution...")
+            dns_cmd = [
+                'docker', 'exec', on_prem_container, 'sh', '-c',
+                'nslookup cloud-envoy'
+            ]
+            
+            dns_result = subprocess.run(
+                dns_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                timeout=15
+            )
+            
+            logger.info(f"DNS resolution result: {dns_result.stdout}")
+            if dns_result.stderr:
+                logger.error(f"DNS resolution error: {dns_result.stderr}")
+            
+            # Test ping connectivity
+            logger.info("Testing ping connectivity...")
+            ping_cmd = [
+                'docker', 'exec', on_prem_container, 'sh', '-c',
+                'ping -c 1 cloud-envoy'
+            ]
+            
+            ping_result = subprocess.run(
+                ping_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                timeout=15
+            )
+            
+            logger.info(f"Ping result: {ping_result.stdout}")
+            if ping_result.stderr:
+                logger.error(f"Ping error: {ping_result.stderr}")
+            
+            # Test TCP connectivity to the specific port
+            logger.info("Testing TCP connectivity to cloud-envoy:9000...")
+            tcp_cmd = [
+                'docker', 'exec', on_prem_container, 'sh', '-c',
+                'nc -z cloud-envoy 9000'
+            ]
+            
+            tcp_result = subprocess.run(
+                tcp_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                timeout=15
+            )
+            
+            logger.info(f"TCP connectivity result: {tcp_result.stdout}")
+            if tcp_result.stderr:
+                logger.error(f"TCP connectivity error: {tcp_result.stderr}")
+            
+            # Consider it successful if at least DNS resolution works
+            if dns_result.returncode == 0:
+                logger.info("✓ DNS resolution is working")
                 return True
             else:
-                logger.error(f"Failed to remove listener via xDS: {response.status_code}")
+                logger.error("✗ DNS resolution failed")
                 return False
                 
         except Exception as e:
-            logger.error(f"Failed to remove reverse_conn_listener via xDS: {e}")
+            logger.error(f"Error checking network connectivity: {e}")
+            return False
+
+    def start_cloud_envoy(self) -> bool:
+        """Start the cloud Envoy container."""
+        logger.info("Starting cloud Envoy container")
+        try:
+            # Use the same docker-compose file and directory that was used in start_docker_compose
+            # This ensures the container is started with the same configuration
+            if self.current_compose_file and self.current_compose_cwd:
+                logger.info(f"Using stored compose file: {self.current_compose_file}")
+                logger.info(f"Using stored compose directory: {self.current_compose_cwd}")
+                compose_file = self.current_compose_file
+                compose_cwd = self.current_compose_cwd
+            else:
+                logger.warn("No stored compose file found, using default")
+                compose_file = CONFIG['docker_compose_file']
+                compose_cwd = self.docker_compose_dir
+            
+            logger.info("Using docker-compose up to start cloud-envoy with consistent network config")
+            result = subprocess.run(
+                ['docker-compose', '-f', compose_file, 'up', '-d', CONFIG['cloud_container']],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                timeout=60,
+                cwd=compose_cwd
+            )
+            
+            if result.returncode == 0:
+                logger.info("✓ Cloud Envoy container started")
+                
+                # Add a small delay to ensure network is properly established
+                logger.info("Waiting for network to be established...")
+                time.sleep(3)
+                
+                # Check network connectivity
+                if not self.check_network_connectivity():
+                    logger.warn("Network connectivity check failed, but continuing...")
+                
+                # Wait for cloud Envoy to be ready
+                if not self.wait_for_envoy_ready(CONFIG['cloud_admin_port'], "cloud", CONFIG['envoy_startup_timeout']):
+                    logger.error("Cloud Envoy failed to become ready after restart")
+                    return False
+                logger.info("✓ Cloud Envoy is ready after restart")
+                return True
+            else:
+                logger.error(f"Failed to start cloud Envoy: {result.stderr}")
+                return False
+        except Exception as e:
+            logger.error(f"Error starting cloud Envoy: {e}")
+            return False
+    
+    def stop_cloud_envoy(self) -> bool:
+        """Stop the cloud Envoy container."""
+        logger.info("Stopping cloud Envoy container")
+        try:
+            container_name = self.get_container_name(CONFIG['cloud_container'])
+            result = subprocess.run(
+                ['docker', 'stop', container_name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                logger.info("✓ Cloud Envoy container stopped")
+                return True
+            else:
+                logger.error(f"Failed to stop cloud Envoy: {result.stderr}")
+                return False
+        except Exception as e:
+            logger.error(f"Error stopping cloud Envoy: {e}")
             return False
     
     def run_test(self):
@@ -537,35 +551,31 @@ class ReverseConnectionTester:
         try:
             logger.info("Starting reverse connection test")
             
-            # Step 0: Start xDS server
-            if not self.start_xds_server():
-                raise Exception("Failed to start xDS server")
-            
-            # Step 1: Start Docker Compose services with xDS config
+            # Step 0: Start Docker Compose services with xDS config
             on_prem_config_with_xds = self.create_on_prem_config_with_xds()
             if not self.start_docker_compose(on_prem_config_with_xds):
                 raise Exception("Failed to start Docker Compose services")
             
-            # Step 2: Wait for Envoy instances to be ready
+            # Step 1: Wait for Envoy instances to be ready
             if not self.wait_for_envoy_ready(CONFIG['cloud_admin_port'], "cloud", CONFIG['envoy_startup_timeout']):
                 raise Exception("Cloud Envoy failed to start")
             
             if not self.wait_for_envoy_ready(CONFIG['on_prem_admin_port'], "on-prem", CONFIG['envoy_startup_timeout']):
                 raise Exception("On-prem Envoy failed to start")
             
-            # Step 3: Verify reverse connections are NOT established
+            # Step 2: Verify reverse connections are NOT established
             logger.info("Verifying reverse connections are NOT established")
             time.sleep(5)  # Give some time for any potential connections
             if self.check_reverse_connections(CONFIG['cloud_api_port']):  # cloud-envoy's API port
                 raise Exception("Reverse connections should not be established without reverse_conn_listener")
             logger.info("✓ Reverse connections are correctly not established")
             
-            # Step 4: Add reverse_conn_listener to on-prem via xDS
+            # Step 3: Add reverse_conn_listener to on-prem via xDS
             logger.info("Adding reverse_conn_listener to on-prem via xDS")
             if not self.add_reverse_conn_listener_via_xds():
                 raise Exception("Failed to add reverse_conn_listener via xDS")
             
-            # Step 5: Wait for reverse connections to be established
+            # Step 4: Wait for reverse connections to be established
             logger.info("Waiting for reverse connections to be established")
             max_wait = 60
             start_time = time.time()
@@ -578,18 +588,53 @@ class ReverseConnectionTester:
             else:
                 raise Exception("Reverse connections failed to establish within timeout")
             
-            # Step 6: Test request through reverse connection
+            # Step 5: Test request through reverse connection
             logger.info("Testing request through reverse connection")
             if not self.test_reverse_connection_request(CONFIG['cloud_egress_port']):  # cloud-envoy's egress port
                 raise Exception("Reverse connection request failed")
             logger.info("✓ Reverse connection request successful")
             
-            # # Step 7: Remove reverse_conn_listener from on-prem via xDS
+            # Step 6: Stop cloud Envoy and verify reverse connections are down
+            logger.info("Step 6: Stopping cloud Envoy to test connection recovery")
+            if not self.stop_cloud_envoy():
+                raise Exception("Failed to stop cloud Envoy")
+            
+            # Verify reverse connections are down
+            logger.info("Verifying reverse connections are down after stopping cloud Envoy")
+            time.sleep(2)  # Give some time for connections to be detected as down
+            if self.check_reverse_connections(CONFIG['cloud_api_port']):
+                logger.warn("Reverse connections still appear active after stopping cloud Envoy")
+            else:
+                logger.info("✓ Reverse connections are correctly down after stopping cloud Envoy")
+            
+            # Step 7: Wait for > drain timer (3s) and then start cloud Envoy
+            logger.info("Step 7: Waiting for drain timer (3s) before starting cloud Envoy")
+            time.sleep(15)  # Wait more than the reverse conn retry timer for the connections
+            # to be drained.
+            
+            logger.info("Starting cloud Envoy to test reverse connection re-establishment")
+            if not self.start_cloud_envoy():
+                raise Exception("Failed to start cloud Envoy")
+            
+            # Step 8: Verify reverse connections are re-established
+            logger.info("Step 8: Verifying reverse connections are re-established")
+            max_wait = 60
+            start_time = time.time()
+            while time.time() - start_time < max_wait:
+                if self.check_reverse_connections(CONFIG['cloud_api_port']):
+                    logger.info("✓ Reverse connections are re-established after cloud Envoy restart")
+                    break
+                logger.info("Waiting for reverse connections to be re-established")
+                time.sleep(1)
+            else:
+                raise Exception("Reverse connections failed to re-establish within timeout")
+            
+            # # Step 10: Remove reverse_conn_listener from on-prem via xDS
             # logger.info("Removing reverse_conn_listener from on-prem via xDS")
             # if not self.remove_reverse_conn_listener_via_xds():
             #     raise Exception("Failed to remove reverse_conn_listener via xDS")
             
-            # # Step 8: Verify reverse connections are torn down
+            # # Step 11: Verify reverse connections are torn down
             # logger.info("Verifying reverse connections are torn down")
             # time.sleep(10)  # Wait for connections to be torn down
             # if self.check_reverse_connections(CONFIG['cloud_api_port']):  # cloud-envoy's API port
@@ -608,10 +653,6 @@ class ReverseConnectionTester:
     def cleanup(self):
         """Clean up processes and temporary files."""
         logger.info("Cleaning up")
-        
-        # Stop xDS server
-        if self.xds_server:
-            self.xds_server.stop()
         
         # Stop Docker Compose services
         if self.docker_compose_process:

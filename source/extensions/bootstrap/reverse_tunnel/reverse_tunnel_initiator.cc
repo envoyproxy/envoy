@@ -734,12 +734,15 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
       continue;
     }
     // Get current number of successful connections to this host
-    uint32_t current_connections = 0;
-    for (const auto& [wrapper, mapped_host] : conn_wrapper_to_host_map_) {
-      if (mapped_host == host_address) {
-        current_connections++;
-      }
-    }
+    // uint32_t current_connections = 0;
+    // for (const auto& [wrapper, mapped_host] : conn_wrapper_to_host_map_) {
+    //   if (mapped_host == host_address) {
+    //     current_connections++;
+    //   }
+    // }
+
+    uint32_t current_connections = host_to_conn_info_map_[host_address].connection_keys.size();
+
     ENVOY_LOG(info,
               "Number of reverse connections to host {} of cluster {}: "
               "Current: {}, Required: {}",
@@ -1257,7 +1260,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
 
     // Track failure for backoff
     trackConnectionFailure(host_address, cluster_name);
-    conn_wrapper_to_host_map_.erase(wrapper);
+    // conn_wrapper_to_host_map_.erase(wrapper);
   } else {
     // Connection succeeded
     ENVOY_LOG(debug, "Reverse connection handshake succeeded for host {}", host_address);
@@ -1316,6 +1319,9 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
   }
 
   ENVOY_LOG(trace, "Removing wrapper from connection_wrappers_ vector");
+
+  conn_wrapper_to_host_map_.erase(wrapper);
+
   // CRITICAL FIX: Use deferred deletion to safely clean up the wrapper
   // Find and remove the wrapper from connection_wrappers_ vector using deferred deletion pattern
   auto wrapper_vector_it = std::find_if(
