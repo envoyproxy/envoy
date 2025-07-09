@@ -773,6 +773,8 @@ TEST_F(StaticLoaderImplTest, ProtoParsingRuntimeFeaturePrefix) {
 }
 
 // Test that legacy names do not result in an ENVOY_BUG and the values can be fetched correctly.
+// Success for this test relies on no ENVOY_BUG triggering, which means this would only fail
+// in a debug build if the bug was present.
 TEST_F(StaticLoaderImplTest, ProtoParsingRuntimeFeaturePrefixLegacy) {
   // Validate proto parsing sanity.
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
