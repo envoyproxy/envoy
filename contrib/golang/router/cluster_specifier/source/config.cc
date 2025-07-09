@@ -8,7 +8,7 @@ namespace Golang {
 
 ClusterSpecifierPluginSharedPtr
 GolangClusterSpecifierPluginFactoryConfig::createClusterSpecifierPlugin(
-    const Protobuf::Message& config, Server::Configuration::CommonFactoryContext&) {
+    const Protobuf::Message& config, Server::Configuration::ServerFactoryContext&) {
   const auto& typed_config = dynamic_cast<const GolangClusterProto&>(config);
   auto cluster_config = std::make_shared<ClusterConfig>(typed_config);
   return std::make_shared<GolangClusterSpecifierPlugin>(cluster_config);

@@ -79,10 +79,23 @@ index 9d020bd..f466edb 100644
 -            npm_package_lock = "@emscripten_bin_win//:emscripten/package-lock.json",
 -        )
 diff --git a/bazel/emscripten_toolchain/BUILD.bazel b/bazel/emscripten_toolchain/BUILD.bazel
-index a989450..4cfa098 100644
+index a989450..4f1c213 100644
 --- a/bazel/emscripten_toolchain/BUILD.bazel
 +++ b/bazel/emscripten_toolchain/BUILD.bazel
-@@ -43,12 +43,25 @@ filegroup(
+@@ -1,3 +1,4 @@
++load("@python3_12//:defs.bzl", "py_binary")
+ load(":toolchain.bzl", "emscripten_cc_toolchain_config_rule")
+ 
+ package(default_visibility = ["//visibility:public"])
+@@ -9,6 +10,7 @@ filegroup(
+         "env.sh",
+         "env.bat",
+         "@nodejs//:node_files",
++        "@python3_12//:files",
+     ],
+ )
+ 
+@@ -43,12 +45,25 @@ filegroup(
      ],
  )
  
@@ -108,7 +121,20 @@ index a989450..4cfa098 100644
      ],
  )
  
-@@ -75,7 +88,7 @@ cc_toolchain(
+@@ -63,9 +78,9 @@ emscripten_cc_toolchain_config_rule(
+     em_config = "@emscripten_cache//:emscripten_config",
+     emscripten_binaries = "@emsdk//:compiler_files",
+     nodejs_bin = "@nodejs//:node",
+-    script_extension = select({
+-        "@bazel_tools//src/conditions:host_windows": "bat",
+-        "//conditions:default": "sh",
++    is_windows = select({
++        "@bazel_tools//src/conditions:host_windows": True,
++        "//conditions:default": False,
+     }),
+ )
+ 
+@@ -75,7 +90,7 @@ cc_toolchain(
      ar_files = ":ar_files",
      as_files = ":empty",
      compiler_files = ":compiler_files",
@@ -117,6 +143,126 @@ index a989450..4cfa098 100644
      linker_files = ":linker_files",
      objcopy_files = ":empty",
      strip_files = ":empty",
+diff --git a/bazel/emscripten_toolchain/dwp.bat b/bazel/emscripten_toolchain/dwp.bat
+new file mode 100644
+index 0000000..85ed4b5
+--- /dev/null
++++ b/bazel/emscripten_toolchain/dwp.bat
+@@ -0,0 +1,4 @@
++@echo off
++REM Dummy dwp script for emscripten toolchain
++REM Since wasm doesn't support split debug info, this is a no-op
++exit /b 0
+diff --git a/bazel/emscripten_toolchain/dwp.sh b/bazel/emscripten_toolchain/dwp.sh
+new file mode 100644
+index 0000000..50a1d80
+--- /dev/null
++++ b/bazel/emscripten_toolchain/dwp.sh
+@@ -0,0 +1,8 @@
++#!/bin/bash
++
++# Dummy dwp script for emscripten toolchain
++# Since wasm doesn't support split debug info, this is a no-op
++# Just echo the command for debugging and exit successfully
++
++echo "DWP called with args: $@" >&2
++exit 0
+diff --git a/bazel/emscripten_toolchain/emar.bat b/bazel/emscripten_toolchain/emar.bat
+index b8e9125..844c378 100644
+--- a/bazel/emscripten_toolchain/emar.bat
++++ b/bazel/emscripten_toolchain/emar.bat
+@@ -2,4 +2,4 @@
+ 
+ call external\emsdk\emscripten_toolchain\env.bat
+ 
+-py -3 %EMSCRIPTEN%\emar.py %*
++%EMSDK_PYTHON% %EMSCRIPTEN%\emar.py %*
+diff --git a/bazel/emscripten_toolchain/emar.sh b/bazel/emscripten_toolchain/emar.sh
+index b4ead6e..d57222f 100755
+--- a/bazel/emscripten_toolchain/emar.sh
++++ b/bazel/emscripten_toolchain/emar.sh
+@@ -2,4 +2,11 @@
+ 
+ source $(dirname $0)/env.sh
+ 
+-exec python3 $EMSCRIPTEN/emar.py "$@"
++if [[ "$EMSDK_PYTHON" != /* ]]; then
++    EMSDK_PYTHON="$ROOT_DIR/$EMSDK_PYTHON"
++fi
++
++PYBINPATH="$(dirname "${EMSDK_PYTHON}")"
++export PATH=$PYBINPATH:$PATH
++
++exec $EMSDK_PYTHON $EMSCRIPTEN/emar.py "$@"
+diff --git a/bazel/emscripten_toolchain/emcc.bat b/bazel/emscripten_toolchain/emcc.bat
+index aba66f4..b302736 100644
+--- a/bazel/emscripten_toolchain/emcc.bat
++++ b/bazel/emscripten_toolchain/emcc.bat
+@@ -2,4 +2,4 @@
+ 
+ call external\emsdk\emscripten_toolchain\env.bat
+ 
+-py -3 %EMSCRIPTEN%\emcc.py %*
++%EMSDK_PYTHON% %EMSCRIPTEN%\emcc.py %*
+diff --git a/bazel/emscripten_toolchain/emcc.sh b/bazel/emscripten_toolchain/emcc.sh
+index 5fdaf9c..f0f36ab 100755
+--- a/bazel/emscripten_toolchain/emcc.sh
++++ b/bazel/emscripten_toolchain/emcc.sh
+@@ -1,5 +1,12 @@
+-#!/bin/bash
++#!/bin/bash -e
+ 
+ source $(dirname $0)/env.sh
+ 
+-exec python3 $EMSCRIPTEN/emcc.py "$@"
++if [[ "$EMSDK_PYTHON" != /* ]]; then
++    EMSDK_PYTHON="$ROOT_DIR/$EMSDK_PYTHON"
++fi
++
++PYBINPATH="$(dirname "${EMSDK_PYTHON}")"
++export PATH=$PYBINPATH:$PATH
++
++exec $EMSDK_PYTHON $EMSCRIPTEN/emcc.py "$@"
+diff --git a/bazel/emscripten_toolchain/emcc_base.sh b/bazel/emscripten_toolchain/emcc_base.sh
+new file mode 100755
+index 0000000..e9ddd2c
+--- /dev/null
++++ b/bazel/emscripten_toolchain/emcc_base.sh
+@@ -0,0 +1,7 @@
++#!/bin/bash
++
++source $(dirname $0)/env.sh
++
++PYTHON3="${PYTHON3:-python3}"
++
++exec $PYTHON3 $EMSCRIPTEN/emcc.py "$@"
+diff --git a/bazel/emscripten_toolchain/emcc_link.bat b/bazel/emscripten_toolchain/emcc_link.bat
+index 8e5a6eb..fef6501 100644
+--- a/bazel/emscripten_toolchain/emcc_link.bat
++++ b/bazel/emscripten_toolchain/emcc_link.bat
+@@ -2,4 +2,4 @@
+ 
+ call external\emsdk\emscripten_toolchain\env.bat
+ 
+-py -3 external\emsdk\emscripten_toolchain\link_wrapper.py %*
++%EMSDK_PYTHON% external\emsdk\emscripten_toolchain\link_wrapper.py %*
+diff --git a/bazel/emscripten_toolchain/emcc_link.sh b/bazel/emscripten_toolchain/emcc_link.sh
+index 44f3235..950e529 100755
+--- a/bazel/emscripten_toolchain/emcc_link.sh
++++ b/bazel/emscripten_toolchain/emcc_link.sh
+@@ -2,4 +2,11 @@
+ 
+ source $(dirname $0)/env.sh
+ 
+-exec python3 $(dirname $0)/link_wrapper.py "$@"
++if [[ "$EMSDK_PYTHON" != /* ]]; then
++    EMSDK_PYTHON="$ROOT_DIR/$EMSDK_PYTHON"
++fi
++
++PYBINPATH="$(dirname "${EMSDK_PYTHON}")"
++export PATH=$PYBINPATH:$PATH
++
++exec $EMSDK_PYTHON $(dirname $0)/link_wrapper.py "$@"
 diff --git a/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux.sh b/bazel/emscripten_toolchain/emdwp-emscripten_bin_linux.sh
 new file mode 100755
 index 0000000..513feee
@@ -197,11 +343,32 @@ index 0000000..3cb1f2e
 +@ECHO OFF
 +
 +call external\emscripten_bin_win\bin\llvm-dwp %*
+diff --git a/bazel/emscripten_toolchain/link_wrapper.py b/bazel/emscripten_toolchain/link_wrapper.py
+index 6a6fe2f..6dcacf8 100644
+--- a/bazel/emscripten_toolchain/link_wrapper.py
++++ b/bazel/emscripten_toolchain/link_wrapper.py
+@@ -1,4 +1,3 @@
+-#!/usr/bin/env python
+ """wrapper around emcc link step.
+ 
+ This wrapper currently serves the following purposes.
 diff --git a/bazel/emscripten_toolchain/toolchain.bzl b/bazel/emscripten_toolchain/toolchain.bzl
-index c8cec07..01943c7 100644
+index c8cec07..9559cd1 100644
 --- a/bazel/emscripten_toolchain/toolchain.bzl
 +++ b/bazel/emscripten_toolchain/toolchain.bzl
-@@ -72,12 +72,14 @@ def _impl(ctx):
+@@ -54,6 +54,11 @@ CROSSTOOL_DEFAULT_WARNINGS = [
+     "-Wall",
+ ]
+ 
++def _os_path(ctx, path):
++    if ctx.attr.is_windows:
++        path = path.replace("/", "\\")
++    return path
++
+ def _impl(ctx):
+     target_cpu = ctx.attr.cpu
+     toolchain_identifier = "emscripten-" + target_cpu
+@@ -72,12 +77,15 @@ def _impl(ctx):
  
      emscripten_dir = ctx.attr.emscripten_binaries.label.workspace_root
      nodejs_path = ctx.file.nodejs_bin.path
@@ -209,14 +376,18 @@ index c8cec07..01943c7 100644
  
      builtin_sysroot = emscripten_dir + "/emscripten/cache/sysroot"
  
-     emcc_script = "emcc.%s" % ctx.attr.script_extension
-     emcc_link_script = "emcc_link.%s" % ctx.attr.script_extension
-     emar_script = "emar.%s" % ctx.attr.script_extension
-+    emdwp_script = "emdwp-%s.%s" % (emscripten_name, ctx.attr.script_extension)
+-    emcc_script = "emcc.%s" % ctx.attr.script_extension
+-    emcc_link_script = "emcc_link.%s" % ctx.attr.script_extension
+-    emar_script = "emar.%s" % ctx.attr.script_extension
++    script_extension = "bat" if ctx.attr.is_windows else "sh"
++    emcc_script = "emcc.%s" % script_extension
++    emcc_link_script = "emcc_link.%s" % script_extension
++    emar_script = "emar.%s" % script_extension
++    emdwp_script = "emdwp-%s.%s" % (emscripten_name, script_extension)
  
      ################################################################
      # Tools
-@@ -99,6 +101,7 @@ def _impl(ctx):
+@@ -99,6 +107,7 @@ def _impl(ctx):
          tool_path(name = "nm", path = "NOT_USED"),
          tool_path(name = "objdump", path = "/bin/false"),
          tool_path(name = "strip", path = "NOT_USED"),
@@ -224,12 +395,12 @@ index c8cec07..01943c7 100644
      ]
  
      ################################################################
-@@ -460,6 +463,49 @@ def _impl(ctx):
+@@ -460,6 +469,49 @@ def _impl(ctx):
          feature(
              name = "wasm_standalone",
          ),
 +        # Support for debug fission. In short, debugging fission should:
-+        #   * reduce linking time, RAM usage and disk usage  
++        #   * reduce linking time, RAM usage and disk usage
 +        #   * speed up incremental builds
 +        #   * speed up debugger work (reduce startup and breakpoint time)
 +        # (to use this, follow the --fission=yes flag)
@@ -274,6 +445,44 @@ index c8cec07..01943c7 100644
      ]
  
      crosstool_default_flag_sets = [
+@@ -1046,6 +1098,16 @@ def _impl(ctx):
+         ),
+     ]
+ 
++    python_files = ctx.attr._python_interpreter[DefaultInfo].files.to_list()
++    python_bin_path = None
++    for f in python_files:
++        if f.basename == "python3" or f.path.endswith("/bin/python3"):
++            python_bin_path = f.path
++            break
++
++    if not python_bin_path:
++        fail("Could not find python3 binary in " + str(ctx.attr._python_interpreter))
++
+     crosstool_default_env_sets = [
+         # Globals
+         env_set(
+@@ -1065,6 +1127,10 @@ def _impl(ctx):
+                     key = "NODE_JS_PATH",
+                     value = nodejs_path,
+                 ),
++                env_entry(
++                    key = "EMSDK_PYTHON",
++                    value = _os_path(ctx, python_bin_path),
++                ),
+             ],
+         ),
+         # Use llvm backend.  Off by default, enabled via --features=llvm_backend
+@@ -1140,7 +1206,8 @@ emscripten_cc_toolchain_config_rule = rule(
+         "em_config": attr.label(mandatory = True, allow_single_file = True),
+         "emscripten_binaries": attr.label(mandatory = True, cfg = "exec"),
+         "nodejs_bin": attr.label(mandatory = True, allow_single_file = True),
+-        "script_extension": attr.string(mandatory = True, values = ["sh", "bat"]),
++        "is_windows": attr.bool(mandatory = True),
++        "_python_interpreter": attr.label(cfg = "exec", default = Label("@python3_12//:files")),
+     },
+     provides = [CcToolchainConfigInfo],
+ )
 diff --git a/bazel/emscripten_toolchain/wasm_binary.py b/bazel/emscripten_toolchain/wasm_binary.py
 index d7d6142..0da7f55 100644
 --- a/bazel/emscripten_toolchain/wasm_binary.py
@@ -308,7 +517,7 @@ index d7d6142..0da7f55 100644
    tar = tarfile.open(args.archive)
  
 diff --git a/bazel/emscripten_toolchain/wasm_cc_binary.bzl b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
-index 6ea4f12..c43037e 100644
+index 6ea4f12..fcc3391 100644
 --- a/bazel/emscripten_toolchain/wasm_cc_binary.bzl
 +++ b/bazel/emscripten_toolchain/wasm_cc_binary.bzl
 @@ -69,6 +69,7 @@ _ALLOW_OUTPUT_EXTNAMES = [
@@ -374,7 +583,7 @@ index 6ea4f12..c43037e 100644
      outputs = [
          ctx.outputs.loader,
          ctx.outputs.wasm,
-@@ -151,17 +160,23 @@ def _wasm_cc_binary_legacy_impl(ctx):
+@@ -151,20 +160,31 @@ def _wasm_cc_binary_legacy_impl(ctx):
          ctx.outputs.data,
          ctx.outputs.symbols,
          ctx.outputs.dwarf,
@@ -393,13 +602,22 @@ index 6ea4f12..c43037e 100644
 +        args.add("--dwp_file", dwp_file)
 +        inputs = inputs + [dwp_file]
 +
++    py_toolchain = ctx.toolchains["@rules_python//python:toolchain_type"]
++    python_path = py_toolchain.py3_runtime.interpreter.path
++    env = dict(ctx.configuration.default_shell_env)
++    env["PATH"] = "%s:/usr/bin:/bin" % python_path.rpartition("/")[0]
      ctx.actions.run(
 -        inputs = ctx.files.cc_target,
-+        inputs = inputs,
++        inputs = inputs + py_toolchain.py3_runtime.files.to_list(),
          outputs = outputs,
-         arguments = [args],
+-        arguments = [args],
          executable = ctx.executable._wasm_binary_extractor,
-@@ -202,6 +217,7 @@ def _wasm_binary_legacy_outputs(name, cc_target):
++        arguments = [args],
++        env = env,
+     )
+ 
+     return [
+@@ -202,6 +222,7 @@ def _wasm_binary_legacy_outputs(name, cc_target):
          "data": "{}/{}.data".format(name, basename),
          "symbols": "{}/{}.js.symbols".format(name, basename),
          "dwarf": "{}/{}.wasm.debug.wasm".format(name, basename),
@@ -407,3 +625,11 @@ index 6ea4f12..c43037e 100644
          "html": "{}/{}.html".format(name, basename),
          "audio_worklet": "{}/{}.aw.js".format(name, basename)
      }
+@@ -212,6 +233,7 @@ _wasm_cc_binary_legacy = rule(
+     implementation = _wasm_cc_binary_legacy_impl,
+     attrs = _WASM_BINARY_COMMON_ATTRS,
+     outputs = _wasm_binary_legacy_outputs,
++    toolchains = ["@rules_python//python:toolchain_type"],
+ )
+ 
+ # Wraps a C++ Blaze target, extracting the appropriate files.

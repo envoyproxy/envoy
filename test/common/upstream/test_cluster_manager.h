@@ -37,6 +37,7 @@
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/registry.h"
@@ -65,15 +66,15 @@ public:
   TestClusterManagerFactory() : api_(Api::createApiForTest(stats_, random_)) {
 
     ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
-    ON_CALL(*this, clusterFromProto_(_, _, _, _))
+    ON_CALL(*this, clusterFromProto_(_, _, _))
         .WillByDefault(Invoke(
-            [&](const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+            [&](const envoy::config::cluster::v3::Cluster& cluster,
                 Outlier::EventLoggerSharedPtr outlier_event_logger,
                 bool added_via_api) -> std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*> {
               auto result = ClusterFactoryImplBase::create(
-                  cluster, server_context_, cm,
+                  cluster, server_context_,
                   [this]() -> Network::DnsResolverSharedPtr { return this->dns_resolver_; },
-                  ssl_context_manager_, outlier_event_logger, added_via_api);
+                  outlier_event_logger, added_via_api);
               // Convert from load balancer unique_ptr -> raw pointer -> unique_ptr.
               if (!result.ok()) {
                 throw EnvoyException(std::string(result.status().message()));
@@ -92,9 +93,9 @@ public:
       const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options, TimeSource&,
       ClusterConnectivityState& state, Http::PersistentQuicInfoPtr& /*quic_info*/,
       OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry) override {
-    return Http::ConnectionPool::InstancePtr{allocateConnPool_(host, alternate_protocol_options,
-                                                               options, transport_socket_options,
-                                                               state, network_observer_registry)};
+    return Http::ConnectionPool::InstancePtr{
+        allocateConnPool_(host, alternate_protocol_options, options, transport_socket_options,
+                          state, network_observer_registry, overload_manager_)};
   }
 
   Tcp::ConnectionPool::InstancePtr
@@ -107,10 +108,10 @@ public:
   }
 
   absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger,
                    bool added_via_api) override {
-    auto result = clusterFromProto_(cluster, cm, outlier_event_logger, added_via_api);
+    auto result = clusterFromProto_(cluster, outlier_event_logger, added_via_api);
     return std::make_pair(result.first, ThreadAwareLoadBalancerPtr(result.second));
   }
 
@@ -133,10 +134,11 @@ public:
                    alternate_protocol_options,
                Network::ConnectionSocket::OptionsSharedPtr,
                Network::TransportSocketOptionsConstSharedPtr, ClusterConnectivityState&,
-               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry));
+               OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
+               Server::OverloadManager& overload_manager));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
   MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
-              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+              (const envoy::config::cluster::v3::Cluster& cluster,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
   MOCK_METHOD(CdsApi*, createCds_, ());
 
@@ -155,13 +157,14 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_;
   Server::MockOptions& options_ = server_context_.options_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 };
 
 // A test version of ClusterManagerImpl that provides a way to get a non-const handle to the
 // clusters, which is necessary in order to call updateHosts on the priority set.
 class TestClusterManagerImpl : public ClusterManagerImpl {
 public:
-  static std::unique_ptr<TestClusterManagerImpl> createAndInit(
+  static std::unique_ptr<TestClusterManagerImpl> createTestClusterManager(
       const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
       Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
       ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
@@ -174,7 +177,6 @@ public:
         main_thread_dispatcher, admin, api, http_context, grpc_context, router_context, server,
         xds_manager, creation_status)};
     THROW_IF_NOT_OK(creation_status);
-    THROW_IF_NOT_OK(cluster_manager->initialize(bootstrap));
     return cluster_manager;
   }
 

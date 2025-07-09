@@ -10,7 +10,9 @@ clang-format==18.1.8
 clang-tidy==18.1.8
 colorama
 coloredlogs
-cryptography>=43.0.1
+# NB: When updating this dep you _must_ strip out all the unused wheel hashes
+#  ie - only keep python3.9+ glibc2.28 for arm/x86 and macos
+cryptography>=44.0.1
 dependatool>=0.2.2
 envoy.base.utils>=0.5.10
 envoy.ci.report>=0.0.3

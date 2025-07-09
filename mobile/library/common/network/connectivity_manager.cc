@@ -14,6 +14,7 @@
 
 #include "fmt/ostream.h"
 #include "library/common/network/network_type_socket_option_impl.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/src_addr_socket_option_impl.h"
 
 // Used on Linux (requires root/CAP_NET_RAW)

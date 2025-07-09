@@ -325,7 +325,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   StreamDecoderFilters::Iterator entry() const { return entry_; }
 
   StreamDecoderFilterSharedPtr handle_;
-  StreamDecoderFilters::Iterator entry_{};
+  StreamDecoderFilters::Iterator entry_;
   bool is_grpc_request_{};
 };
 
@@ -383,7 +383,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   StreamEncoderFilters::Iterator entry() const { return entry_; }
 
   StreamEncoderFilterSharedPtr handle_;
-  StreamEncoderFilters::Iterator entry_{};
+  StreamEncoderFilters::Iterator entry_;
 };
 
 /**
@@ -972,7 +972,7 @@ protected:
     bool destroyed_{false};
 
     // Result of filter chain creation.
-    CreateChainResult create_chain_result_{};
+    CreateChainResult create_chain_result_;
 
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};

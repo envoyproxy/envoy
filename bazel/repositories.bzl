@@ -63,7 +63,7 @@ def _default_envoy_build_config_impl(ctx):
     ctx.file("BUILD.bazel", "")
     ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
 
-_default_envoy_build_config = repository_rule(
+default_envoy_build_config = repository_rule(
     implementation = _default_envoy_build_config_impl,
     attrs = {
         "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
@@ -118,7 +118,7 @@ def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
-        _default_envoy_build_config(name = "envoy_build_config")
+        default_envoy_build_config(name = "envoy_build_config")
 
     # Setup Bazel shell rules
     external_http_archive(name = "rules_shell")
@@ -221,9 +221,10 @@ def envoy_dependencies(skip_targets = []):
     external_http_archive("rules_license")
     external_http_archive("rules_pkg")
     external_http_archive("com_github_aignas_rules_shellcheck")
-
     external_http_archive(
         "aspect_bazel_lib",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:aspect.patch"],
     )
 
     _com_github_fdio_vpp_vcl()
@@ -260,6 +261,30 @@ def _boringssl_fips():
         build_file = "@envoy//bazel/external:boringssl_fips.BUILD",
         patches = ["@envoy//bazel:boringssl_fips.patch"],
         patch_args = ["-p1"],
+    )
+
+    NINJA_BUILD_CONTENT = "%s\nexports_files([\"configure.py\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_ninja",
+        build_file_content = NINJA_BUILD_CONTENT,
+    )
+    CMAKE_BUILD_CONTENT = "%s\nexports_files([\"bin/cmake\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_cmake_linux_x86_64",
+        build_file_content = CMAKE_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "fips_cmake_linux_aarch64",
+        build_file_content = CMAKE_BUILD_CONTENT,
+    )
+    GO_BUILD_CONTENT = "%s\nexports_files([\"bin/go\"])" % BUILD_ALL_CONTENT
+    external_http_archive(
+        name = "fips_go_linux_amd64",
+        build_file_content = GO_BUILD_CONTENT,
+    )
+    external_http_archive(
+        name = "fips_go_linux_arm64",
+        build_file_content = GO_BUILD_CONTENT,
     )
 
 def _aws_lc():
@@ -736,7 +761,11 @@ def _com_github_grpc_grpc():
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {"@openssl": "@boringssl"},
     )
-    external_http_archive("build_bazel_rules_apple")
+    external_http_archive(
+        "build_bazel_rules_apple",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_apple.patch"],
+    )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(

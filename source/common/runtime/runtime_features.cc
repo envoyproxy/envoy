@@ -41,6 +41,7 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_udp_proxy_outlier_detection);
 RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
+RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_filter_chain_aborted_can_not_continue);
 RUNTIME_GUARD(envoy_reloadable_features_gcp_authn_use_fixed_url);
 RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_num_retries);
@@ -65,6 +66,7 @@ RUNTIME_GUARD(envoy_reloadable_features_local_reply_traverses_filter_chain_after
 RUNTIME_GUARD(envoy_reloadable_features_mmdb_files_reload_enabled);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_normalize_rds_provider_config);
+RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_use_refresh_token);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
@@ -80,6 +82,7 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_al
 RUNTIME_GUARD(envoy_reloadable_features_quic_signal_headers_only_to_http1_backend);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
+RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_with_rq_issued);
 RUNTIME_GUARD(envoy_reloadable_features_report_stream_reset_error_code);
 RUNTIME_GUARD(envoy_reloadable_features_router_filter_resetall_on_local_reply);
@@ -105,6 +108,7 @@ RUNTIME_GUARD(envoy_restart_features_fix_dispatcher_approximate_now);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
+RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -149,6 +153,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 // TODO(renjietang): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
+// TODO(abeyad): Evaluate and make this a config knob or remove.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
 // TODO(fredyw): Remove after done with debugging.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
 // TODO(botengyao): flip to true after canarying the feature internally without problems.
@@ -164,6 +170,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_google_grpc_disable_tls_13);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
+
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
