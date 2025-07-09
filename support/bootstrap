@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Bootstraps the developer tools and development environment. This includess
+# Bootstraps the developer tools and development environment. This includes
 # copying project-standard git commit hooks that do things like ensure DCO
 # signoff is present during commit.
 
