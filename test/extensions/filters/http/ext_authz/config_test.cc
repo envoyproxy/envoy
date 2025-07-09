@@ -8,6 +8,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/filters/http/ext_authz/config.h"
+#include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/real_threads_test_helper.h"
@@ -27,6 +28,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ExtAuthz {
+
+using testing::NiceMock;
+using testing::Return;
+using testing::ReturnRef;
 
 class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
@@ -215,6 +220,140 @@ TEST_F(ExtAuthzFilterHttpTest, FilterWithServerContext) {
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfiguration) {
+  const std::string per_route_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      virtual_host: "my_virtual_host"
+      route_type: "high_qps"
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_high_qps"
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  auto route_config = factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                              context.messageValidationVisitor());
+  EXPECT_TRUE(route_config.ok());
+
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  EXPECT_FALSE(typed_config.disabled());
+  EXPECT_TRUE(typed_config.grpcService().has_value());
+
+  const auto& grpc_service = typed_config.grpcService().value();
+  EXPECT_TRUE(grpc_service.has_envoy_grpc());
+  EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_high_qps");
+
+  const auto& context_extensions = typed_config.contextExtensions();
+  EXPECT_EQ(context_extensions.at("virtual_host"), "my_virtual_host");
+  EXPECT_EQ(context_extensions.at("route_type"), "high_qps");
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationMerging) {
+  // Test merging of per-route configurations
+  const std::string less_specific_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      virtual_host: "my_virtual_host"
+      shared_setting: "from_less_specific"
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_default"
+  )EOF";
+
+  const std::string more_specific_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      route_type: "high_qps"
+      shared_setting: "from_more_specific"
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_high_qps"
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+
+  // Create less specific configuration
+  ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
+  FilterConfigPerRoute less_specific_config(
+      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+          less_specific_proto.get()));
+
+  // Create more specific configuration
+  ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
+  FilterConfigPerRoute more_specific_config(
+      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+          more_specific_proto.get()));
+
+  // Merge configurations
+  FilterConfigPerRoute merged_config(less_specific_config, more_specific_config);
+
+  // Check that more specific gRPC service is used
+  EXPECT_TRUE(merged_config.grpcService().has_value());
+  const auto& grpc_service = merged_config.grpcService().value();
+  EXPECT_TRUE(grpc_service.has_envoy_grpc());
+  EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_high_qps");
+
+  // Check that context extensions are properly merged
+  const auto& context_extensions = merged_config.contextExtensions();
+  EXPECT_EQ(context_extensions.at("virtual_host"), "my_virtual_host");
+  EXPECT_EQ(context_extensions.at("route_type"), "high_qps");
+  EXPECT_EQ(context_extensions.at("shared_setting"), "from_more_specific");
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationWithoutGrpcService) {
+  const std::string per_route_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      virtual_host: "my_virtual_host"
+    disable_request_body_buffering: true
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  auto route_config = factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                              context.messageValidationVisitor());
+  EXPECT_TRUE(route_config.ok());
+
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  EXPECT_FALSE(typed_config.disabled());
+  EXPECT_FALSE(typed_config.grpcService().has_value());
+
+  const auto& context_extensions = typed_config.contextExtensions();
+  EXPECT_EQ(context_extensions.at("virtual_host"), "my_virtual_host");
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationDisabled) {
+  const std::string per_route_config_yaml = R"EOF(
+  disabled: true
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  auto route_config = factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                              context.messageValidationVisitor());
+  EXPECT_TRUE(route_config.ok());
+
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  EXPECT_TRUE(typed_config.disabled());
+  EXPECT_FALSE(typed_config.grpcService().has_value());
 }
 
 class ExtAuthzFilterGrpcTest : public ExtAuthzFilterTest {
