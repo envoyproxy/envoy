@@ -10,11 +10,44 @@
 #include "absl/strings/numbers.h"
 #include "absl/time/time.h"
 
+#include "eval/public/cel_value.h"
+#include "eval/public/containers/container_backed_list_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace Expr {
+
+// A simple constant map for CEL use
+class ConstMap : public google::api::expr::runtime::CelMap {
+public:
+  using GetValueFunction = std::function<absl::optional<CelValue>(CelValue)>;
+  using SizeFunction = std::function<int()>;
+  using KeysFunction = std::function<std::vector<CelValue>()>;
+
+  ConstMap(GetValueFunction get_value, SizeFunction size_func, KeysFunction keys_func = nullptr)
+      : get_value_(std::move(get_value)), size_func_(std::move(size_func)), keys_func_(std::move(keys_func)) {}
+
+  absl::optional<CelValue> operator[](CelValue key) const override { return get_value_(key); }
+  int size() const override { return size_func_(); }
+  bool empty() const override { return size() == 0; }
+  
+  absl::StatusOr<const google::api::expr::runtime::CelList*> ListKeys() const override {
+    // Create a container-backed list with keys from the map
+    if (keys_func_ == nullptr) {
+      static const google::api::expr::runtime::ContainerBackedListImpl empty_list({});
+      return &empty_list;
+    }
+    auto keys = keys_func_();
+    return new google::api::expr::runtime::ContainerBackedListImpl(std::move(keys));
+  }
+
+private:
+  GetValueFunction get_value_;
+  SizeFunction size_func_;
+  KeysFunction keys_func_;
+};
 
 Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::RequestHeaders>
     referer_handle(Http::CustomHeaders::get().Referer);
@@ -89,6 +122,66 @@ const SslExtractorsValues& SslExtractorsValues::get() {
                                   return {};
                                 }
                                 return CelValue::CreateString(&info.sha256PeerCertificateDigest());
+                              }},
+                             {OidMapLocalCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                const auto& oid_map = info.oidMapLocalCertificate();
+                                if (oid_map.empty()) {
+                                  return {};
+                                }
+                                // Create a map of OID strings to their values
+                                auto cel_map = std::make_unique<ConstMap>(
+                                    [&oid_map](CelValue key) -> absl::optional<CelValue> {
+                                      if (!key.IsString()) {
+                                        return {};
+                                      }
+                                      auto str = std::string(key.StringOrDie().value());
+                                      auto it = oid_map.find(str);
+                                      if (it == oid_map.end()) {
+                                        return {};
+                                      }
+                                      return CelValue::CreateStringView(it->second);
+                                    },
+                                    [&oid_map]() -> int { return oid_map.size(); },
+                                    [&oid_map]() -> std::vector<CelValue> {
+                                      std::vector<CelValue> keys;
+                                      keys.reserve(oid_map.size());
+                                      for (const auto& pair : oid_map) {
+                                        keys.push_back(CelValue::CreateStringView(pair.first));
+                                      }
+                                      return keys;
+                                    });
+                                return CelValue::CreateMap(cel_map.release());
+                              }},
+                             {OidMapPeerCertificate,
+                              [](const Ssl::ConnectionInfo& info) -> absl::optional<CelValue> {
+                                const auto& oid_map = info.oidMapPeerCertificate();
+                                if (oid_map.empty()) {
+                                  return {};
+                                }
+                                // Create a map of OID strings to their values
+                                auto cel_map = std::make_unique<ConstMap>(
+                                    [&oid_map](CelValue key) -> absl::optional<CelValue> {
+                                      if (!key.IsString()) {
+                                        return {};
+                                      }
+                                      auto str = std::string(key.StringOrDie().value());
+                                      auto it = oid_map.find(str);
+                                      if (it == oid_map.end()) {
+                                        return {};
+                                      }
+                                      return CelValue::CreateStringView(it->second);
+                                    },
+                                    [&oid_map]() -> int { return oid_map.size(); },
+                                    [&oid_map]() -> std::vector<CelValue> {
+                                      std::vector<CelValue> keys;
+                                      keys.reserve(oid_map.size());
+                                      for (const auto& pair : oid_map) {
+                                        keys.push_back(CelValue::CreateStringView(pair.first));
+                                      }
+                                      return keys;
+                                    });
+                                return CelValue::CreateMap(cel_map.release());
                               }}});
 }
 

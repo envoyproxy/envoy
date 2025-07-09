@@ -457,6 +457,28 @@ const std::string& ConnectionInfoImplBase::sessionId() const {
   });
 }
 
+const std::map<std::string, std::string>& ConnectionInfoImplBase::oidMapPeerCertificate() const {
+  return getCachedValueOrCreate<std::map<std::string, std::string>>(
+      CachedValueTag::OidMapPeerCertificate, [](SSL* ssl) {
+        bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+        if (!cert) {
+          return std::map<std::string, std::string>{};
+        }
+        return Utility::getCertificateOidMap(*cert);
+      });
+}
+
+const std::map<std::string, std::string>& ConnectionInfoImplBase::oidMapLocalCertificate() const {
+  return getCachedValueOrCreate<std::map<std::string, std::string>>(
+      CachedValueTag::OidMapLocalCertificate, [](SSL* ssl) {
+        X509* cert = SSL_get_certificate(ssl);
+        if (!cert) {
+          return std::map<std::string, std::string>{};
+        }
+        return Utility::getCertificateOidMap(*cert);
+      });
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

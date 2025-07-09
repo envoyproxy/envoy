@@ -493,6 +493,35 @@ absl::string_view Utility::getCertificateExtensionValue(X509& cert,
           static_cast<absl::string_view::size_type>(octet_string_length)};
 }
 
+std::map<std::string, std::string> Utility::getCertificateOidMap(X509& cert) {
+  std::map<std::string, std::string> extension_map;
+  
+  int count = X509_get_ext_count(&cert);
+  for (int pos = 0; pos < count; pos++) {
+    X509_EXTENSION* extension = X509_get_ext(&cert, pos);
+    RELEASE_ASSERT(extension != nullptr, "");
+
+    char oid[MAX_OID_LENGTH];
+    int obj_len = OBJ_obj2txt(oid, MAX_OID_LENGTH, X509_EXTENSION_get_object(extension),
+                              1 /* always_return_oid */);
+    if (obj_len > 0 && obj_len < MAX_OID_LENGTH) {
+      const ASN1_OCTET_STRING* octet_string = X509_EXTENSION_get_data(extension);
+      RELEASE_ASSERT(octet_string != nullptr, "");
+
+      const unsigned char* octet_string_data = ASN1_STRING_get0_data(octet_string);
+      const int octet_string_length = ASN1_STRING_length(octet_string);
+
+      std::string oid_str(oid);
+      std::string value_str(reinterpret_cast<const char*>(octet_string_data), 
+                          static_cast<size_t>(octet_string_length));
+      
+      extension_map[oid_str] = value_str;
+    }
+  }
+  
+  return extension_map;
+}
+
 SystemTime Utility::getValidFrom(const X509& cert) {
   int days, seconds;
   int rc = ASN1_TIME_diff(&days, &seconds, &epochASN1Time(), X509_get0_notBefore(&cert));
