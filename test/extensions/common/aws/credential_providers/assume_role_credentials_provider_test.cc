@@ -629,10 +629,9 @@ TEST_F(AssumeRoleCredentialsProviderTest, Coverage) {
   timer_->invokeCallback();
 }
 
-
 TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  
+
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleResponse": {
@@ -652,7 +651,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider cred_provider = {};
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
   cred_provider.set_role_session_name("role-session-name");
-  cred_provider.mutable_session_duration()->set_seconds(3600); 
+  cred_provider.mutable_session_duration()->set_seconds(3600);
 
   mock_manager_ = std::make_shared<MockAwsClusterManager>();
   EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
@@ -667,8 +666,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
 
   defaults.mutable_environment_credential_provider()->CopyFrom(env_provider);
   auto credentials_provider_chain =
-      std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-          context_, "region", defaults);
+      std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context_, "region",
+                                                                                defaults);
   auto signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
@@ -679,8 +678,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);
       },
-      "region", MetadataFetcher::MetadataReceiver::RefreshState::Ready,
-      std::chrono::seconds(2), std::move(signer), cred_provider);
+      "region", MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
+      std::move(signer), cred_provider);
 
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
   EXPECT_CALL(*timer_, enableTimer(_, nullptr));
@@ -696,7 +695,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
 
 TEST_F(AssumeRoleCredentialsProviderTest, SigningFailure) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  
+
   ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider cred_provider = {};
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
@@ -707,18 +706,18 @@ TEST_F(AssumeRoleCredentialsProviderTest, SigningFailure) {
       .WillRepeatedly(Return("sts.region.amazonaws.com:443"));
 
   auto cluster_name = "credentials_provider_cluster";
-  
+
   // Create a signer with invalid credentials to trigger signing failure
   envoy::extensions::common::aws::v3::AwsCredentialProvider invalid_defaults;
   envoy::extensions::common::aws::v3::EnvironmentCredentialProvider invalid_env_provider;
   TestEnvironment::setEnvVar("AWS_ACCESS_KEY_ID", "", 1);
   TestEnvironment::setEnvVar("AWS_SECRET_ACCESS_KEY", "", 1);
   TestEnvironment::setEnvVar("AWS_SESSION_TOKEN", "", 1);
-  
+
   invalid_defaults.mutable_environment_credential_provider()->CopyFrom(invalid_env_provider);
   auto invalid_credentials_provider_chain =
-      std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
-          context_, "region", invalid_defaults);
+      std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(context_, "region",
+                                                                                invalid_defaults);
   auto mock_signer = std::make_unique<SigV4SignerImpl>(
       STS_SERVICE_NAME, "region", invalid_credentials_provider_chain, context_,
       Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
@@ -729,8 +728,8 @@ TEST_F(AssumeRoleCredentialsProviderTest, SigningFailure) {
         metadata_fetcher_.reset(raw_metadata_fetcher_);
         return std::move(metadata_fetcher_);
       },
-      "region", MetadataFetcher::MetadataReceiver::RefreshState::Ready,
-      std::chrono::seconds(2), std::move(mock_signer), cred_provider);
+      "region", MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
+      std::move(mock_signer), cred_provider);
 
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
 
@@ -742,10 +741,9 @@ TEST_F(AssumeRoleCredentialsProviderTest, SigningFailure) {
   EXPECT_FALSE(credentials.accessKeyId().has_value());
 }
 
-
 TEST_F(AssumeRoleCredentialsProviderTest, TimerDisableAndFetcherCancel) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  
+
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleResponse": {
@@ -761,7 +759,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, TimerDisableAndFetcherCancel) {
 )EOF"));
 
   setupProvider();
-  
+
   timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
   EXPECT_CALL(*timer_, enableTimer(_, nullptr));
 
@@ -773,10 +771,9 @@ TEST_F(AssumeRoleCredentialsProviderTest, TimerDisableAndFetcherCancel) {
   EXPECT_TRUE(credentials.accessKeyId().has_value());
 }
 
-
 TEST_F(AssumeRoleCredentialsProviderTest, AsyncCallbackSetup) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  
+
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleResponse": {
@@ -797,16 +794,15 @@ TEST_F(AssumeRoleCredentialsProviderTest, AsyncCallbackSetup) {
 
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   provider_friend.onClusterAddOrUpdate();
-  timer_->invokeCallback(); 
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_TRUE(credentials.accessKeyId().has_value());
 }
 
-
 TEST_F(AssumeRoleCredentialsProviderTest, CredentialsPendingFlag) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
-  
+
   expectDocument(200, std::move(R"EOF(
 {
   "AssumeRoleResponse": {
@@ -827,7 +823,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, CredentialsPendingFlag) {
 
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   provider_friend.onClusterAddOrUpdate();
-  timer_->invokeCallback(); 
+  timer_->invokeCallback();
 
   const auto credentials = provider_->getCredentials();
   EXPECT_TRUE(credentials.accessKeyId().has_value());
