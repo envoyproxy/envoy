@@ -6,7 +6,7 @@ cc_library(
         "include/**/*.h",
     ]),
     defines = [
-        "SPDLOG_FMT_EXTERNAL",
+        "SPDLOG_USE_STD_FORMAT",
         "SPDLOG_NO_EXCEPTIONS",
     ],
     includes = ["include"],
