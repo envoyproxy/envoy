@@ -111,11 +111,9 @@ ActiveQuicListener::ActiveQuicListener(
   // `EnvoyQuicPacketWriter` as an adapter.
   auto* quic_packet_writer = dynamic_cast<quic::QuicPacketWriter*>(udp_packet_writer.get());
   if (quic_packet_writer != nullptr) {
-    std::cerr << fmt::format("XXX : InitializeWithWriter()\n");
     quic_dispatcher_->InitializeWithWriter(quic_packet_writer);
     udp_packet_writer.release();
   } else {
-    std::cerr << fmt::format("XXX : InitializeWithWriter(new EnvoyQuicPacketWriter..\n");
     quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(std::move(udp_packet_writer)));
   }
 

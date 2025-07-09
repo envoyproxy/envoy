@@ -14,7 +14,6 @@ Api::IoCallUint64Result UdpDefaultWriter::writePacket(const Buffer::Instance& bu
                                                       const Address::Ip* local_ip,
                                                       const Address::Instance& peer_address,
                                                       uint32_t /*ipv6_flow_label*/) {
-  std::cerr << fmt::format("XXX : UdpDefaultWriter::writePacket\n");
   ASSERT(!write_blocked_, "Cannot write while IO handle is blocked.");
   Api::IoCallUint64Result result =
       Utility::writeToSocket(io_handle_, buffer, local_ip, peer_address);

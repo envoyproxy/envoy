@@ -164,7 +164,8 @@ public:
     last_local_address_ = local_address;
     last_peer_address_ = peer_address;
     EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
-                                             receive_time, tos, ipv6_flow_label, std::move(saved_cmsg));
+                                             receive_time, tos, ipv6_flow_label,
+                                             std::move(saved_cmsg));
   }
 
   Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {

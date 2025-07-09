@@ -96,8 +96,7 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   // ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
-  if (enable_black_hole_avoidance_via_flow_label_) {
-    std::cerr << "XXX buildIpV6FlowLabelOptions \n";
+  if (enable_black_hole_avoidance_via_flow_label_ && peer_address.host().IsIPv6()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildIpV6FlowLabelOptions());
   }
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(

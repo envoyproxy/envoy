@@ -505,7 +505,8 @@ TEST_P(QuicHttpIntegrationTest, FlowLabel) {
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  quic::QuicConnection* connection = static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->connection();
+  quic::QuicConnection* connection =
+      static_cast<EnvoyQuicClientSession*>(codec_client_->connection())->connection();
 
   if (connection->peer_address().host().IsIPv6()) {
     EXPECT_NE(0, connection->last_received_flow_label());

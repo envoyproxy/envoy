@@ -184,8 +184,8 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpRecvTosOptions() {
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpV6FlowLabelOptions() {
   auto options = std::make_unique<Socket::Options>();
   options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND,
-      Network::SocketOptionName(), ENVOY_SOCKET_IPV6_FLOWINFO, 1));
+      envoy::config::core::v3::SocketOption::STATE_PREBIND, Network::SocketOptionName(),
+      ENVOY_SOCKET_IPV6_FLOWINFO, 1));
   return options;
 }
 
