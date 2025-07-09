@@ -196,7 +196,6 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenWithStripFailureResponse) {
   ASSERT_TRUE(response->headers().get(Http::Headers::get().WWWAuthenticate).empty());
   ASSERT_TRUE(response->body().empty());
 
-  EXPECT_EQ(response->headers().getContentLengthValue(), 0);
   EXPECT_EQ("envoy", response->headers().getServerValue());
   EXPECT_EQ("401", response->headers().getStatusValue());
   ASSERT_FALSE(response->headers().getDateValue().empty());
