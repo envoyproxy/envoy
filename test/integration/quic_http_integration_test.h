@@ -160,11 +160,11 @@ public:
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                     Buffer::OwnedImpl saved_cmsg) override {
+                     uint32_t ipv6_flow_label, Buffer::OwnedImpl saved_cmsg) override {
     last_local_address_ = local_address;
     last_peer_address_ = peer_address;
     EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
-                                             receive_time, tos, std::move(saved_cmsg));
+                                             receive_time, tos, ipv6_flow_label, std::move(saved_cmsg));
   }
 
   Network::Address::InstanceConstSharedPtr getLastLocalAddress() const {

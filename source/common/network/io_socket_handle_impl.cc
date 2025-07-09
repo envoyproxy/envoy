@@ -332,7 +332,9 @@ absl::optional<uint32_t> maybeGetFlowLabelFromHeader(const cmsghdr& cmsg) {
   if (cmsg.cmsg_level == IPPROTO_IPV6 && cmsg.cmsg_type == IPV6_FLOWINFO) {
     absl::optional<uint32_t> flow_label =  maybeGetUnsignedIntFromHeader<uint32_t>(cmsg);
     if (flow_label) {
+      std::cerr << __FUNCTION__ << " label: " << *flow_label << "\n";
       *flow_label = IPV6_FLOWINFO_FLOWLABEL & ntohl(*flow_label);
+      std::cerr << __FUNCTION__ << " label: " << *flow_label << "\n";
     }
     return flow_label;
   }
@@ -428,6 +430,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       if (maybe_tos) {
         output.msg_[0].tos_ = *maybe_tos;
       }
+      absl::optional<uint8_t> maybe_flow_label = maybeGetFlowLabelFromHeader(*cmsg);
+      if (maybe_flow_label) {
+        output.msg_[0].flow_label_ = *maybe_flow_label;
+      }
     }
   }
 
@@ -516,6 +522,10 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
         if (maybe_tos) {
           output.msg_[0].tos_ = *maybe_tos;
           continue;
+        }
+        absl::optional<uint8_t> maybe_flow_label = maybeGetFlowLabelFromHeader(*cmsg);
+        if (maybe_flow_label) {
+          output.msg_[0].flow_label_ = *maybe_flow_label;
         }
         if (addr != nullptr) {
           // This is a IP packet info message.

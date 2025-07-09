@@ -97,7 +97,8 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
   if (enable_black_hole_avoidance_via_flow_label_) {
-      connection_socket->addOptions(Network::SocketOptionFactory::buildIpV6FlowLabelOptions());
+    std::cerr << "XXX buildIpV6FlowLabelOptions \n";
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpV6FlowLabelOptions());
   }
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr(),
