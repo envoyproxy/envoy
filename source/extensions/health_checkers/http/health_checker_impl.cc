@@ -326,7 +326,6 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   ENVOY_CONN_LOG(debug, "hc response_code={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-                 
   if (!parent_.receive_bytes_.empty()) {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
