@@ -2,6 +2,10 @@
 # By default, @envoyproxy/maintainers own everything.
 #*       @envoyproxy/maintainers
 
+# ci
+/.github/ @agrawroh @phlax
+/ci/ @agrawroh @phlax
+
 # api
 /api/ @envoyproxy/api-shepherds
 
@@ -122,6 +126,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/wasm_runtime/ @mpwarres @kyessenov @lizan
 # common matcher
 /*/extensions/common/matcher @mattklein123 @yangminzhu
+/*/extensions/common/matcher/domain_matcher @agrawroh @kyessenov
 /*/extensions/common/proxy_protocol @ggreenway @wez470
 /*/extensions/filters/http/grpc_http1_bridge @jose @mattklein123
 /*/extensions/filters/http/fault @rshriram @kbaichoo
@@ -411,7 +416,6 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/common/sqlutils/ @cpakulski @cpakulski
 /contrib/dynamo/ @UNOWNED @UNOWNED
 /contrib/golang/ @doujiang24 @wangfakang @StarryVae @spacewander @antJack
-/contrib/squash/ @yuval-k @UNOWNED
 /contrib/kafka/ @mattklein123 @adamkotwasinski
 /contrib/rocketmq_proxy/ @aaron-ai @lizhanhui
 /contrib/mysql_proxy/ @rshriram @venilnoronha

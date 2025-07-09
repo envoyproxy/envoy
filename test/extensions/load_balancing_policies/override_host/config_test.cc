@@ -214,8 +214,7 @@ TEST(OverrideHostLbonfigTest, FallbackLbCalledToChooseHost) {
   EXPECT_NE(thread_local_lb_factory, nullptr);
 
   MockHostSet* host_set = thread_local_priority_set.getMockHostSet(0);
-  host_set->hosts_ = {
-      Envoy::Upstream::makeTestHost(cluster_info, "tcp://127.0.0.1:80", context.time_system_)};
+  host_set->hosts_ = {Envoy::Upstream::makeTestHost(cluster_info, "tcp://127.0.0.1:80")};
   host_set->runCallbacks(host_set->hosts_, {});
   auto thread_local_lb = thread_local_lb_factory->create({thread_local_priority_set, nullptr});
   EXPECT_NE(thread_local_lb, nullptr);

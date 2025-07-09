@@ -529,16 +529,14 @@ Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
                                                const Address::Ip* local_ip,
-                                               const Address::Instance& peer_address,
-                                               uint32_t /*ipv6_flow_label*/) {
+                                               const Address::Instance& peer_address) {
   Buffer::RawSliceVector slices = buffer.getRawSlices();
   return writeToSocket(handle, slices.data(), slices.size(), local_ip, peer_address);
 }
 
 Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,
                                                uint64_t num_slices, const Address::Ip* local_ip,
-                                               const Address::Instance& peer_address,
-                                               uint32_t /*ipv6_flow_label*/) {
+                                               const Address::Instance& peer_address) {
   Api::IoCallUint64Result send_result(
       /*rc=*/0, /*err=*/Api::IoError::none());
 

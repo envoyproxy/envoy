@@ -38,6 +38,11 @@ CookieBasedSessionStateFactory::CookieBasedSessionStateFactory(
     throw EnvoyException("Cookie key cannot be empty for cookie based stateful sessions");
   }
 
+  // Extract attributes from proto config
+  for (const auto& proto_attr : config.cookie().attributes()) {
+    attributes_.push_back({proto_attr.name(), proto_attr.value()});
+  }
+
   // If no cookie path is specified or root cookie path is specified then this session state will
   // be enabled for any request.
   if (path_.empty() || path_ == "/") {
