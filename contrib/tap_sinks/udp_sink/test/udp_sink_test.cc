@@ -62,31 +62,6 @@ TEST_F(UdpTapSinkTest, TestConstructGoodUDPAddress) {
   EXPECT_TRUE(loc_udp_tap_sink.isUdpPacketWriterCreated());
 }
 
-TEST_F(UdpTapSinkTest, TestConstructGoodUDPAddressWithSendBuff) {
-  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
-  auto* socket_address = loc_udp_sink.mutable_udp_address();
-  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
-  socket_address->set_port_value(8080);
-  socket_address->set_address("127.0.0.1");
-  loc_udp_sink.mutable_udp_sent_buffer_bytes()->set_value(300000);
-  UdpTapSink loc_udp_tap_sink(loc_udp_sink);
-  EXPECT_TRUE(loc_udp_tap_sink.isUdpPacketWriterCreated());
-}
-
-TEST_F(UdpTapSinkTest, TestConstructGoodUDPAddressWithMaxSendMsgSize) {
-  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
-  auto* socket_address = loc_udp_sink.mutable_udp_address();
-  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
-  socket_address->set_port_value(8080);
-  socket_address->set_address("127.0.0.1");
-  uint32_t the_new_set_udp_max_send_msg_size_bytes = 1024;
-  loc_udp_sink.mutable_udp_max_send_msg_size_bytes()->set_value(
-      the_new_set_udp_max_send_msg_size_bytes);
-  UdpTapSink loc_udp_tap_sink(loc_udp_sink);
-  EXPECT_TRUE(loc_udp_tap_sink.isUdpPacketWriterCreated());
-  EXPECT_EQ(loc_udp_tap_sink.getUdpMaxSendMsgSize(), the_new_set_udp_max_send_msg_size_bytes);
-}
-
 TEST_F(UdpTapSinkTest, TestSubmitTraceNotUdpPacketWriter) {
   envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
   auto* socket_address = loc_udp_sink.mutable_udp_address();
@@ -270,10 +245,9 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForProtoBinaryReadEvForBigUdpMsg) {
   socket_address->set_port_value(8080);
   socket_address->set_address("127.0.0.1");
   // Set the buffer size limitation
-  uint32_t the_new_set_udp_max_send_msg_size_bytes = 16;
-  loc_udp_sink.mutable_udp_max_send_msg_size_bytes()->set_value(
-      the_new_set_udp_max_send_msg_size_bytes);
   UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  loc_udp_tap_sink.setUdpMaxSendMsgDataSizeAsBytes(16);
 
   std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
       std::make_unique<MockUdpPacketWriterNew>(true);
@@ -325,11 +299,9 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesReadEvForBigUdpMsg
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(8080);
   socket_address->set_address("127.0.0.1");
-  // Set the buffer size limitation
-  uint32_t the_new_set_udp_max_send_msg_size_bytes = 16;
-  loc_udp_sink.mutable_udp_max_send_msg_size_bytes()->set_value(
-      the_new_set_udp_max_send_msg_size_bytes);
   UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  loc_udp_tap_sink.setUdpMaxSendMsgDataSizeAsBytes(16);
 
   std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
       std::make_unique<MockUdpPacketWriterNew>(true);
@@ -381,11 +353,10 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteEvForBigUdpMs
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(8080);
   socket_address->set_address("127.0.0.1");
-  // Set the buffer size limitation
-  uint32_t the_new_set_udp_max_send_msg_size_bytes = 16;
-  loc_udp_sink.mutable_udp_max_send_msg_size_bytes()->set_value(
-      the_new_set_udp_max_send_msg_size_bytes);
+
   UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  loc_udp_tap_sink.setUdpMaxSendMsgDataSizeAsBytes(16);
 
   std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
       std::make_unique<MockUdpPacketWriterNew>(true);
@@ -437,11 +408,11 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteEvTwoForBigUd
   socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   socket_address->set_port_value(8080);
   socket_address->set_address("127.0.0.1");
-  // Set the buffer size limitation and make sure the data length is 20
-  uint32_t the_new_set_udp_max_send_msg_size_bytes = 10;
-  loc_udp_sink.mutable_udp_max_send_msg_size_bytes()->set_value(
-      the_new_set_udp_max_send_msg_size_bytes);
+
   UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  // Set the buffer size limitation and make sure the data length is 20
+  loc_udp_tap_sink.setUdpMaxSendMsgDataSizeAsBytes(10);
 
   std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
       std::make_unique<MockUdpPacketWriterNew>(true);
@@ -481,6 +452,230 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteEvTwoForBigUd
   std::string body_data("01234567890123456789");
   dst_streamed_trace.mutable_event()->mutable_write()->mutable_data()->set_as_bytes(
       body_data.data(), body_data.size());
+
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES);
+}
+
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsStringReadEvForBigUdpMsg) {
+  // Construct UdpTapSink object
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+  UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  loc_udp_tap_sink.setUdpMaxSendMsgDataSizeAsString(16);
+
+  std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
+      std::make_unique<MockUdpPacketWriterNew>(true);
+  loc_udp_tap_sink.replaceOrigUdpPacketWriter(std::move(local_UdpPacketWriter));
+
+  // Create UdpTapSinkHandle
+  TapCommon::PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
+
+  Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
+      Extensions::Common::Tap::makeTraceWrapper();
+  // Try to set value in streamed trace
+  envoy::data::tap::v3::SocketStreamedTraceSegment& dst_streamed_trace =
+      *local_buffered_trace->mutable_socket_streamed_trace_segment();
+  dst_streamed_trace.set_trace_id(99);
+
+  dst_streamed_trace.mutable_event()->mutable_timestamp()->set_seconds(1);
+  dst_streamed_trace.mutable_event()->mutable_timestamp()->set_nanos(1);
+
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_address("127.0.0.1");
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_address("127.0.0.1");
+
+  std::string body_data("01234567890123456789012345678901234567890123456789");
+  dst_streamed_trace.mutable_event()->mutable_read()->mutable_data()->set_as_string(
+      body_data.data(), body_data.size());
+
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
+}
+
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsStringWriteEvForBigUdpMsg) {
+  // Construct UdpTapSink object
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+
+  UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  loc_udp_tap_sink.setUdpMaxSendMsgDataSizeAsString(16);
+
+  std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
+      std::make_unique<MockUdpPacketWriterNew>(true);
+  loc_udp_tap_sink.replaceOrigUdpPacketWriter(std::move(local_UdpPacketWriter));
+
+  // Create UdpTapSinkHandle
+  TapCommon::PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
+
+  Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
+      Extensions::Common::Tap::makeTraceWrapper();
+  // Try to set value in streamed trace
+  envoy::data::tap::v3::SocketStreamedTraceSegment& dst_streamed_trace =
+      *local_buffered_trace->mutable_socket_streamed_trace_segment();
+  dst_streamed_trace.set_trace_id(99);
+
+  dst_streamed_trace.mutable_event()->mutable_timestamp()->set_seconds(1);
+  dst_streamed_trace.mutable_event()->mutable_timestamp()->set_nanos(1);
+
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_address("127.0.0.1");
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_address("127.0.0.1");
+
+  std::string body_data("01234567890123456789012345678901234567890123456789");
+  dst_streamed_trace.mutable_event()->mutable_write()->mutable_data()->set_as_string(
+      body_data.data(), body_data.size());
+
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING);
+}
+
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteEvForSmallUdpMsg) {
+  // Construct UdpTapSink object
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+
+  UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  loc_udp_tap_sink.setUdpMaxSendMsgDataSizeAsBytes(16);
+
+  std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
+      std::make_unique<MockUdpPacketWriterNew>(true);
+  loc_udp_tap_sink.replaceOrigUdpPacketWriter(std::move(local_UdpPacketWriter));
+
+  // Create UdpTapSinkHandle
+  TapCommon::PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
+
+  Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
+      Extensions::Common::Tap::makeTraceWrapper();
+  // Try to set value in streamed trace
+  envoy::data::tap::v3::SocketStreamedTraceSegment& dst_streamed_trace =
+      *local_buffered_trace->mutable_socket_streamed_trace_segment();
+  dst_streamed_trace.set_trace_id(99);
+
+  dst_streamed_trace.mutable_event()->mutable_timestamp()->set_seconds(1);
+  dst_streamed_trace.mutable_event()->mutable_timestamp()->set_nanos(1);
+
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_address("127.0.0.1");
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_address("127.0.0.1");
+
+  std::string body_data("012345678901");
+  dst_streamed_trace.mutable_event()->mutable_write()->mutable_data()->set_as_bytes(
+      body_data.data(), body_data.size());
+
+  local_handle->submitTrace(std::move(local_buffered_trace),
+                            envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES);
+}
+
+TEST_F(UdpTapSinkTest, TestSubmitTraceSendOkForJsonBodyAsBytesWriteEvents) {
+  // Construct UdpTapSink object
+  envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink loc_udp_sink;
+  auto* socket_address = loc_udp_sink.mutable_udp_address();
+  socket_address->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  socket_address->set_port_value(8080);
+  socket_address->set_address("127.0.0.1");
+
+  UtSpecialUdpTapSink loc_udp_tap_sink(loc_udp_sink);
+
+  loc_udp_tap_sink.setUdpMaxSendMsgDataSizeAsBytes(16);
+
+  std::unique_ptr<MockUdpPacketWriterNew> local_UdpPacketWriter =
+      std::make_unique<MockUdpPacketWriterNew>(true);
+  loc_udp_tap_sink.replaceOrigUdpPacketWriter(std::move(local_UdpPacketWriter));
+
+  // Create UdpTapSinkHandle
+  TapCommon::PerTapSinkHandlePtr local_handle =
+      loc_udp_tap_sink.createPerTapSinkHandle(99, ProtoOutputSink::OutputSinkTypeCase::kCustomSink);
+
+  Extensions::Common::Tap::TraceWrapperPtr local_buffered_trace =
+      Extensions::Common::Tap::makeTraceWrapper();
+  // Try to set value in streamed trace
+  envoy::data::tap::v3::SocketStreamedTraceSegment& dst_streamed_trace =
+      *local_buffered_trace->mutable_socket_streamed_trace_segment();
+  dst_streamed_trace.set_trace_id(99);
+
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_address("127.0.0.1");
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_protocol(envoy::config::core::v3::SocketAddress::UDP);
+  dst_streamed_trace.mutable_connection()
+      ->mutable_local_address()
+      ->mutable_socket_address()
+      ->set_address("127.0.0.1");
+
+  auto& event = *local_buffered_trace->mutable_socket_streamed_trace_segment()
+                     ->mutable_events()
+                     ->add_events();
+
+  event.mutable_timestamp()->set_seconds(1);
+  event.mutable_timestamp()->set_nanos(1);
+
+  std::cout << "before set\n";
+  std::string body_data("012345678901");
+  event.mutable_write()->mutable_data()->set_as_bytes(body_data.data(), body_data.size());
+  std::cout << "after set\n";
 
   local_handle->submitTrace(std::move(local_buffered_trace),
                             envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES);

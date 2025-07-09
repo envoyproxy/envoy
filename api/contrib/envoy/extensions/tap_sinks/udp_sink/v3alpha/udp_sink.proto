@@ -4,8 +4,6 @@ package envoy.extensions.tap_sinks.udp_sink.v3alpha;
 
 import "envoy/config/core/v3/address.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.tap_sinks.udp_sink.v3alpha";
@@ -21,14 +19,4 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message UdpSink {
   // Configure UDP Address.
   config.core.v3.SocketAddress udp_address = 1;
-
-  // Configure UDP client send buffer size
-  google.protobuf.UInt32Value udp_sent_buffer_bytes = 2;
-
-  // Don't consider receive buffer size because it doesn't get any message from server
-
-  // Configure UDP max sending message size in each UDP transmission.
-  // This setting allows users to set the maximum size sent based on system-specific constraints.
-  // If not set explicitly, the default value is 63,488 bytes (based on linux 65507 bytes).
-  google.protobuf.UInt32Value udp_max_send_msg_size_bytes = 3;
 }
