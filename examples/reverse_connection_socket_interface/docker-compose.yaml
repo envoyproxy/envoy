@@ -16,15 +16,19 @@ services:
       - ./on-prem-envoy-custom-resolver.yaml:/etc/on-prem-envoy.yaml
     command: envoy -c /etc/on-prem-envoy.yaml --concurrency 1 -l trace --drain-time-s 3
     ports:
-      - "8080:80"
-      - "9000:9000"
-      - "8889:8888"
+      # Admin interface
+      - "8888:8888"
+      # Reverse connection API listener
+      - "9001:9001"
+      # Ingress HTTP listener
+      - "6060:6060"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
       - envoy-network
     depends_on:
       - xds-server
+      - on-prem-service
 
   on-prem-service:
     image: nginxdemos/hello:plain-text
@@ -37,9 +41,12 @@ services:
       - ./cloud-envoy.yaml:/etc/cloud-envoy.yaml
     command: envoy -c /etc/cloud-envoy.yaml --concurrency 1 -l trace --drain-time-s 3
     ports:
-      - "8081:80"
-      - "9001:9000"
-      - "8888:8888"
+      # Admin interface
+      - "8878:8878"
+      # Reverse connection API listener
+      - "9000:9000"
+      # Egress listener
+      - "8085:8085"
     networks:
       - envoy-network
 

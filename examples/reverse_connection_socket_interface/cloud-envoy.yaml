@@ -8,7 +8,7 @@ static_resources:
     - name: rev_conn_api_listener
       address:
         socket_address:
-          address: 127.0.0.1
+          address: 0.0.0.0
           port_value: 9000
       filter_chains:
         - filters:
@@ -41,7 +41,7 @@ static_resources:
     - name: egress_listener
       address:
         socket_address:
-          address: 127.0.0.1
+          address: 0.0.0.0
           port_value: 8085
       filter_chains:
         - filters:
@@ -87,7 +87,7 @@ admin:
   access_log_path: "/dev/stdout"
   address:
     socket_address:
-      address: 127.0.0.1
+      address: 0.0.0.0
       port_value: 8878
 layered_runtime:
   layers:

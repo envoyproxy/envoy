@@ -16,7 +16,7 @@ static_resources:
     - name: rev_conn_api_listener
       address:
         socket_address:
-          address: 127.0.0.1
+          address: 0.0.0.0
           port_value: 9001
       filter_chains:
         - filters:
@@ -41,7 +41,7 @@ static_resources:
     - name: ingress_http_listener
       address:
         socket_address:
-          address: 127.0.0.1
+          address: 0.0.0.0
           port_value: 6060
       filter_chains:
         - filters:
@@ -116,7 +116,7 @@ static_resources:
           - endpoint:
               address:
                 socket_address:
-                  address: 127.0.0.1 # Container name of cloud-envoy in docker-compose
+                  address: cloud-envoy # Container name of cloud-envoy in docker-compose
                   port_value: 9000   # Port where cloud-envoy's rev_conn_api_listener listens
 
     # Backend HTTP service behind onprem which
@@ -131,15 +131,15 @@ static_resources:
             - endpoint:
                 address:
                   socket_address:
-                    address: 127.0.0.1
-                    port_value: 7070
+                    address: on-prem-service
+                    port_value: 80
 
 admin:
   access_log_path: "/dev/stdout"
   address:
     socket_address:
       protocol: TCP
-      address: 127.0.0.1
+      address: 0.0.0.0
       port_value: 8888
 
 layered_runtime:
