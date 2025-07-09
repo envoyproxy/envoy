@@ -255,6 +255,9 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     reuse_connection_ = parent_.reuse_connection_;
   }
 
+
+
+  
   Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
   request_in_flight_ = true;
