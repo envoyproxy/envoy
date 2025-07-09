@@ -25,6 +25,9 @@ bug_fixes:
   change: |
     Fixed an bug where the config validation server will crash when the configuration contains
     ``%CEL%`` or ``%METADATA%`` substitution formatter.
+- area: release
+  change: |
+    Container (Ubuntu) updates to resolve glibc vulnerabilities.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
