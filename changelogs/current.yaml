@@ -345,5 +345,12 @@ new_features:
     Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_connection_flow_control_for_streams, an experimental
     option for disabling connection level flow control for streams. This is useful in situations where the streams share the same
     connection but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
+- area: ext_authz
+  change: |
+    Added support for per-route gRPC service override in the ``ext_authz`` HTTP filter. This allows different routes
+    to use different external authorization backends by configuring a
+    :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.grpc_service>`
+    in the per-route ``check_settings``. Routes without this configuration continue to use the default
+    authorization service.
 
 deprecated:
