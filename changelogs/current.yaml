@@ -131,9 +131,9 @@ bug_fixes:
     Protected by runtime guard ``envoy.reloadable_features.quic_signal_headers_only_to_http1_backend``.
 - area: runtime
   change: |
-    Fixed a bug which resulted in an ENVOY_BUG being incorrectly triggered when runtime settings ``envoy.reloadable_features.max_request_headers_count``,
-    ``envoy.reloadable_features.max_response_headers_count``, ``envoy.reloadable_features.max_request_headers_size_kb``, or
-    ``envoy.reloadable_features.max_response_headers_size_kb`` were set.
+    Fixed a bug which resulted in an ENVOY_BUG being incorrectly triggered when runtime settings
+    ``envoy.reloadable_features.max_request_headers_count``, ``envoy.reloadable_features.max_response_headers_count``,
+    ``envoy.reloadable_features.max_request_headers_size_kb``, or ``envoy.reloadable_features.max_response_headers_size_kb`` were set.
 - area: tls
   change: |
     Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
