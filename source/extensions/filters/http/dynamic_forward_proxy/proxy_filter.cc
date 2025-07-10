@@ -198,7 +198,7 @@ bool ProxyFilter::isProxying() {
 
 Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
   Router::RouteConstSharedPtr route = decoder_callbacks_->route();
-  const Router::RouteEntry* route_entry;
+  const Router::RouteEntry* route_entry = route ? route->routeEntry() : nullptr;
   if (!route || !((route_entry = route->routeEntry()))) {
     return Http::FilterHeadersStatus::Continue;
   }
