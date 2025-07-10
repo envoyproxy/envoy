@@ -1,6 +1,7 @@
 #include "source/extensions/transport_sockets/alts/alts_channel_pool.h"
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <utility>
@@ -20,6 +21,13 @@ namespace Alts {
 
 // TODO(matthewstevenson88): Extend this to be configurable through API.
 constexpr std::size_t ChannelPoolSize = 10;
+const char kUseGrpcExperimentalAltsHandshakerKeepaliveParams[] =
+    "GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS";
+
+// 10 seconds
+constexpr int kExperimentalKeepAliveTimeoutMs = 10 * 1000;
+// 10 minutes
+constexpr int kExperimentalKeepAliveTimeMs = 10 * 60 * 1000;
 
 std::unique_ptr<AltsChannelPool>
 AltsChannelPool::create(absl::string_view handshaker_service_address) {
@@ -27,6 +35,11 @@ AltsChannelPool::create(absl::string_view handshaker_service_address) {
   channel_pool.reserve(ChannelPoolSize);
   grpc::ChannelArguments channel_args;
   channel_args.SetInt(GRPC_ARG_USE_LOCAL_SUBCHANNEL_POOL, 1);
+  const char* keep_alive = std::getenv(kUseGrpcExperimentalAltsHandshakerKeepaliveParams)
+  if (keep_alive != nullptr && std::strcmp(keep_alive, "true") == 0) {
+    channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, kExperimentalKeepAliveTimeoutMs);
+    channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, kExperimentalKeepAliveTimeMs);
+  }
   for (std::size_t i = 0; i < ChannelPoolSize; ++i) {
     channel_pool.push_back(grpc::CreateCustomChannel(
         std::string(handshaker_service_address), grpc::InsecureChannelCredentials(), channel_args));
