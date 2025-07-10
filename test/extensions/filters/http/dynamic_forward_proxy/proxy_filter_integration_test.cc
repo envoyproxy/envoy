@@ -173,8 +173,6 @@ name: stream-info-to-headers-filter
       config_helper_.prependFilter(stream_info_filter_config_str);
     }
 
-<<<<<<< HEAD
-=======
     config_helper_.prependFilter(fmt::format(R"EOF(
 name: stream-info-to-headers-filter
 )EOF"));
