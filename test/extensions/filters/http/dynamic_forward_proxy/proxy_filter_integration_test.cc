@@ -107,7 +107,7 @@ public:
   void initializeWithArgs(
       uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
       const std::string& override_auto_sni_header = "",
-      const std::string& typed_dns_resolver_config = typed_dns_resolver_config_,
+      absl::string_view typed_dns_resolver_config = typed_dns_resolver_config_,
       bool use_sub_cluster = false, double dns_query_timeout = 5,
       bool disable_dns_refresh_on_failure = false,
       bool allow_dynamic_host_from_filter_state = false,
