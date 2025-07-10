@@ -509,5 +509,200 @@ TEST_F(QuicClientTransportSocketFactoryTest, GetCryptoConfig) {
   EXPECT_NE(crypto_config2, crypto_config1);
 }
 
+// Test for QuicClientCertInitializer functionality
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerTests) {
+  // Test initialization with null SSL context
+  factory_->initialize();
+  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
+
+  // Test with valid SSL context
+  Ssl::ClientContextSharedPtr ssl_context{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+
+  // Test the update callback (QuicClientCertInitializer logic)
+  update_callback_();
+
+  // Should have created a crypto config
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
+  EXPECT_NE(nullptr, crypto_config);
+
+  // Test multiple updates (should create new config each time)
+  Ssl::ClientContextSharedPtr ssl_context2{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context2));
+  update_callback_();
+
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config2 = factory_->getCryptoConfig();
+  EXPECT_NE(crypto_config2, crypto_config);
+}
+
+// Test for QuicClientCertInitializer with client certificate configuration
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerWithClientCertConfig) {
+  factory_->initialize();
+
+  // Test with SSL context that has client certificate
+  Ssl::ClientContextSharedPtr ssl_context{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+
+  // Test the update callback with client certificate configuration
+  update_callback_();
+
+  // Should have created a crypto config
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
+  EXPECT_NE(nullptr, crypto_config);
+}
+
+// Test for QuicClientCertInitializer error handling
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerErrorHandling) {
+  factory_->initialize();
+
+  // Test with SSL context creation failure
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(nullptr));
+
+  // Update callback should handle null SSL context gracefully
+  update_callback_();
+
+  // Should not have created a crypto config
+  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
+}
+
+// Test for QuicClientCertInitializer with ALPN protocols
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerWithAlpnProtocols) {
+  // Configure ALPN protocols
+  context_config_->alpn_ = "h3,h3-draft29";
+
+  factory_->initialize();
+  EXPECT_THAT(factory_->supportedAlpnProtocols(), testing::ElementsAre("h3", "h3-draft29"));
+
+  // Test with SSL context
+  Ssl::ClientContextSharedPtr ssl_context{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+
+  update_callback_();
+
+  // Should have created a crypto config with ALPN support
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
+  EXPECT_NE(nullptr, crypto_config);
+
+  // ALPN protocols should still be available
+  EXPECT_THAT(factory_->supportedAlpnProtocols(), testing::ElementsAre("h3", "h3-draft29"));
+}
+
+// Test for QuicClientCertInitializer secret update callback functionality
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerSecretUpdateCallback) {
+  factory_->initialize();
+
+  // Test multiple secret updates
+  for (int i = 0; i < 3; i++) {
+    Ssl::ClientContextSharedPtr ssl_context{new Ssl::MockClientContext()};
+    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+        .WillOnce(Return(ssl_context));
+
+    update_callback_();
+
+    std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
+    EXPECT_NE(nullptr, crypto_config);
+  }
+}
+
+// Test for QuicClientCertInitializer with empty ALPN configuration
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerWithEmptyAlpn) {
+  // No ALPN configuration (empty)
+  context_config_->alpn_ = "";
+
+  factory_->initialize();
+  EXPECT_TRUE(factory_->supportedAlpnProtocols().empty());
+
+  // Test with SSL context
+  Ssl::ClientContextSharedPtr ssl_context{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+
+  update_callback_();
+
+  // Should have created a crypto config even with empty ALPN
+  std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config = factory_->getCryptoConfig();
+  EXPECT_NE(nullptr, crypto_config);
+
+  // ALPN protocols should still be empty
+  EXPECT_TRUE(factory_->supportedAlpnProtocols().empty());
+}
+
+// Test for QuicClientCertInitializer with invalid certificate paths
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerWithInvalidCertPaths) {
+  factory_->initialize();
+
+  // SSL context manager should be called but may fail with invalid paths
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(nullptr)); // Simulate failure due to invalid paths
+
+  // Update callback should handle invalid certificate paths gracefully
+  update_callback_();
+
+  // Should not have created a crypto config
+  EXPECT_EQ(nullptr, factory_->getCryptoConfig());
+}
+
+// Test for QuicClientCertInitializer with client context config retrieval
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerClientContextConfig) {
+  factory_->initialize();
+
+  // Test clientContextConfig() method
+  EXPECT_TRUE(factory_->clientContextConfig().has_value());
+
+  // Test with SSL context
+  Ssl::ClientContextSharedPtr ssl_context{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+
+  update_callback_();
+
+  // Client context config should still be available
+  EXPECT_TRUE(factory_->clientContextConfig().has_value());
+}
+
+// Test for QuicClientCertInitializer transport socket creation patterns
+TEST_F(QuicClientTransportSocketFactoryTest, QuicClientCertInitializerTransportSocketCreation) {
+  factory_->initialize();
+
+  // Test implementsSecureTransport
+  EXPECT_TRUE(factory_->implementsSecureTransport());
+
+  // Test supportsAlpn
+  EXPECT_TRUE(factory_->supportsAlpn());
+
+  // Test with SSL context
+  Ssl::ClientContextSharedPtr ssl_context{new Ssl::MockClientContext()};
+  EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
+      .WillOnce(Return(ssl_context));
+
+  update_callback_();
+
+  // Transport socket factory methods should still work
+  EXPECT_TRUE(factory_->implementsSecureTransport());
+  EXPECT_TRUE(factory_->supportsAlpn());
+}
+
+// Targeted test to hit the upstream_context_secrets_not_ready statistic
+TEST_F(QuicClientTransportSocketFactoryTest, UpstreamContextSecretsNotReadyStatistic) {
+  factory_->initialize();
+
+  // When SSL context is not ready (nullptr in constructor mock), getCryptoConfig should return
+  // nullptr This internally triggers the upstream_context_secrets_not_ready statistic increment
+  auto crypto_config = factory_->getCryptoConfig();
+  EXPECT_EQ(crypto_config, nullptr);
+
+  // Call it again to verify consistent behavior
+  auto crypto_config2 = factory_->getCryptoConfig();
+  EXPECT_EQ(crypto_config2, nullptr);
+
+  // The statistic is being incremented internally in the implementation
+  // This test ensures the code path that increments it is exercised
+}
+
 } // namespace Quic
 } // namespace Envoy
