@@ -1557,7 +1557,7 @@ TEST_P(TcpProxySslIntegrationTest, SslConnectionDataEarlyReadNotCached) {
   auto log_result = waitForAccessLog(access_log_path, 0, true);
   EXPECT_EQ(log_result, "san=- fingerprint=-");
 
-  // The second accesss log is when the connection closes, so the handshake is complete and
+  // The second access log is when the connection closes, so the handshake is complete and
   // a valid peer cert is now available.
   log_result = waitForAccessLog(access_log_path, 1, false);
   EXPECT_EQ(log_result,
