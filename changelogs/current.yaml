@@ -138,6 +138,9 @@ bug_fixes:
   change: |
     Fixes a bug where the TLS inspector filter would not correctly report ``client_hello_too_large`` stat for too big client hello messages
     i.e bigger than 16kb.
+- area: wasm
+  change: |
+    Fixed a bug where the WASM filter will hangs when the VM is crashed in the request callbacks.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
