@@ -181,6 +181,7 @@ TEST_F(BenchmarkTest, AddRequestHeaderAndClose) {
                             ->mutable_response()
                             ->mutable_header_mutation()
                             ->add_set_headers();
+        new_hdr->mutable_append()->set_value(false);
         new_hdr->mutable_header()->set_key("x-envoy-benchmark");
         new_hdr->mutable_header()->set_raw_value("true");
         stream->Write(header_resp);
@@ -207,10 +208,10 @@ TEST_F(BenchmarkTest, AddResponseHeaderAndClose) {
         auto* new_hdr = response_out.mutable_response_headers()
                             ->mutable_response()
                             ->mutable_header_mutation()
-                            ->add_set_headers()
-                            ->mutable_header();
-        new_hdr->set_key("x-envoy-benchmark");
-        new_hdr->set_raw_value("true");
+                            ->add_set_headers();
+        new_hdr->mutable_append()->set_value(false);
+        new_hdr->mutable_header()->set_key("x-envoy-benchmark");
+        new_hdr->mutable_header()->set_raw_value("true");
         stream->Write(response_out);
       });
   initialize();

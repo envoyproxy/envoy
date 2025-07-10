@@ -3,7 +3,12 @@
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.h"
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 
-#include "source/extensions/common/aws/credentials_provider_impl.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/common/aws/credential_provider_chains.h"
+#include "source/extensions/common/aws/credential_providers/config_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
+#include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {

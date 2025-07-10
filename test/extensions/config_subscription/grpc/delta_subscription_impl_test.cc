@@ -17,7 +17,7 @@ using ::testing::Return;
 class DeltaSubscriptionImplTest : public DeltaSubscriptionTestHarness,
                                   public testing::TestWithParam<LegacyOrUnified> {
 protected:
-  DeltaSubscriptionImplTest() : DeltaSubscriptionTestHarness(GetParam()){};
+  DeltaSubscriptionImplTest() : DeltaSubscriptionTestHarness(GetParam()) {};
 
   // We need to destroy the subscription before the test's destruction, because the subscription's
   // destructor removes its watch from the NewGrpcMuxImpl, and that removal process involves

@@ -37,6 +37,7 @@ Millicores
 NID
 NIST
 NORMALISATION
+SQLSTATE
 bm
 BSON
 BPF
@@ -90,6 +91,7 @@ ETB
 ETX
 FS
 FIXME
+decrypted
 gperf
 HEXDIG
 HEXDIGIT
@@ -367,6 +369,7 @@ PEM
 PERF
 PGV
 PID
+PKCE
 PKCS12
 PKTINFO
 PNG
@@ -622,6 +625,7 @@ cacert
 cacheable
 cacheability
 callee
+callout
 callsite
 callsites
 callstack
@@ -645,6 +649,7 @@ chunked
 ci
 ciphersuite
 ciphersuites
+ciphertext
 circllhist
 clientcert
 cloneable
@@ -772,6 +777,8 @@ enqueues
 enum
 enums
 environ
+eu
+euprod
 epoll
 errno
 etag
@@ -803,6 +810,7 @@ fdstat
 filename
 filenames
 fileno
+filepath
 filesystem
 firefox
 fixdate
@@ -1040,6 +1048,7 @@ netblocks
 netfilter
 netlink
 netmask
+netns
 NLB
 NLMSG
 nonblocking
@@ -1065,6 +1074,7 @@ oneof
 oneway
 oob
 opcode
+openid
 openssl
 opentracing
 optimizations
@@ -1101,6 +1111,7 @@ pcall
 pcap
 pchar
 pclose
+pdf
 performant
 pfctl
 pipelined
@@ -1200,6 +1211,7 @@ redis
 redispatch
 redistributions
 reentrant
+reentrants
 refactor
 refactored
 refcount
@@ -1213,6 +1225,10 @@ regexes
 reified
 reify
 reimplements
+reinitialization
+reinitializations
+reinitialize
+reinitializes
 rele
 releasor
 reloadable
@@ -1295,6 +1311,7 @@ sigactions
 sigaltstack
 siginfo
 signalstack
+signout
 sigv
 sigv4
 sigv4a

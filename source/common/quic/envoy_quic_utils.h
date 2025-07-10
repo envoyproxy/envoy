@@ -57,8 +57,12 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
 class HeaderValidator {
 public:
   virtual ~HeaderValidator() = default;
+  virtual void startHeaderBlock() = 0;
   virtual Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view name, absl::string_view header_value) = 0;
+  // Returns true if all required pseudo-headers and no extra pseudo-headers are
+  // present for the given header type.
+  virtual bool finishHeaderBlock(bool is_trailing_headers) = 0;
 };
 
 // The returned header map has all keys in lower case.
@@ -67,6 +71,7 @@ std::unique_ptr<T>
 quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidator& validator,
                           uint32_t max_headers_kb, uint32_t max_headers_allowed,
                           absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
+  validator.startHeaderBlock();
   auto headers = T::create(max_headers_kb, max_headers_allowed);
   for (const auto& entry : header_list) {
     if (max_headers_allowed == 0) {
@@ -96,6 +101,9 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
       }
     }
   }
+  if (!validator.finishHeaderBlock(/*is_trailing_headers=*/false)) {
+    return nullptr;
+  }
   return headers;
 }
 
@@ -111,6 +119,7 @@ http2HeaderBlockToEnvoyTrailers(const quiche::HttpHeaderBlock& header_block,
     rst = quic::QUIC_STREAM_EXCESSIVE_LOAD;
     return nullptr;
   }
+  validator.startHeaderBlock();
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with string_view.
     std::string key(entry.first);
@@ -135,6 +144,9 @@ http2HeaderBlockToEnvoyTrailers(const quiche::HttpHeaderBlock& header_block,
         headers->addCopy(Http::LowerCaseString(key), value);
       }
     }
+  }
+  if (!validator.finishHeaderBlock(/*is_trailing_headers=*/true)) {
+    return nullptr;
   }
   return headers;
 }

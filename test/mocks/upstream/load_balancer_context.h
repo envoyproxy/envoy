@@ -27,6 +27,7 @@ public:
               (const));
   MOCK_METHOD(absl::optional<OverrideHost>, overrideHostToSelect, (), (const));
   MOCK_METHOD(void, onAsyncHostSelection, (HostConstSharedPtr && host, std::string&& details));
+  MOCK_METHOD(void, setHeadersModifier, (std::function<void(Http::ResponseHeaderMap&)>));
 
 private:
   HealthyAndDegradedLoad priority_load_;

@@ -201,22 +201,17 @@ private:
 
       AccessLog::InstanceSharedPtrVector combined_log_handlers;
       combined_log_handlers.reserve(config_log_handlers.size() + filter_log_handlers.size());
-
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_access_loggers_first")) {
-        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
-                                     filter_log_handlers.end());
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
-                                     config_log_handlers.end());
-
-      } else {
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
-                                     config_log_handlers.end());
-        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
-                                     filter_log_handlers.end());
-      }
+      combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                   config_log_handlers.end());
+      combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                   filter_log_handlers.end());
       return combined_log_handlers;
     }
+
+    RequestDecoderHandlePtr getRequestDecoderHandle() override {
+      return std::make_unique<ActiveStreamHandle>(*this);
+    }
+
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later
     // (i.e. possibly after this stream has been destroyed).
     //
@@ -308,9 +303,11 @@ private:
     void setRoute(Router::RouteConstSharedPtr route) override;
     Router::RouteConstSharedPtr route(const Router::RouteCallback& cb) override;
     void clearRouteCache() override;
+    void refreshRouteCluster() override;
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
+    void setVirtualHostRoute(Router::VirtualHostRoute route);
     // Set cached route. This method should never be called directly. This is only called in the
     // setRoute(), clearRouteCache(), and refreshCachedRoute() methods.
     void setCachedRoute(absl::optional<Router::RouteConstSharedPtr>&& route);

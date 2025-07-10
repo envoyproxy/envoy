@@ -1,21 +1,17 @@
 #pragma once
 
+#include "envoy/common/matchers.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
-#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.validate.h"
-#include "envoy/http/message.h"
+#include "envoy/json/json_object.h"
 
-#include "source/common/common/matchers.h"
-#include "source/common/http/headers.h"
-#include "source/common/http/utility.h"
-#include "source/common/json/json_loader.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 
-class Utility {
+class Utility : public Logger::Loggable<Logger::Id::aws> {
 public:
   /**
    * Creates a canonicalized header map used in creating a AWS Signature V4 canonical request.
@@ -84,25 +80,23 @@ public:
   joinCanonicalHeaderNames(const std::map<std::string, std::string>& canonical_headers);
 
   /**
+   * Get the IAM Roles Anywhere Service endpoint for a given region:
+   * rolesanywhere.<region>.amazonaws.com See:
+   * https://docs.aws.amazon.com/rolesanywhere/latest/userguide/authentication-sign-process.html#authentication-task1
+   * @param trust_anchor_arn The configured roles anywhere trust anchor arn for the region to be
+   * extracted from
+   * @return an sts endpoint url.
+   */
+
+  static std::string getRolesAnywhereEndpoint(const std::string& trust_anchor_arn);
+
+  /**
    * Get the Security Token Service endpoint for a given region: sts.<region>.amazonaws.com
    * See: https://docs.aws.amazon.com/general/latest/gr/rande.html#sts_region
    * @param region An AWS region.
    * @return an sts endpoint url.
    */
   static std::string getSTSEndpoint(absl::string_view region);
-
-  /**
-   * Fetch AWS instance or task metadata with curl.
-   *
-   * @param message An HTTP request.
-   * @return Metadata document or nullopt in case if unable to fetch it.
-   *
-   * @note In case of an error, function will log ENVOY_LOG_MISC(debug) message.
-   *
-   * @note This is not main loop safe method as it is blocking. It is intended to be used from the
-   * gRPC auth plugins that are able to schedule blocking plugins on a different thread.
-   */
-  static absl::optional<std::string> fetchMetadataWithCurl(Http::RequestMessage& message);
 
   /**
    * @brief Creates the prototype for a static cluster towards a credentials provider

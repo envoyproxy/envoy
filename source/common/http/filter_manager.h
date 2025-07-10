@@ -325,7 +325,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   StreamDecoderFilters::Iterator entry() const { return entry_; }
 
   StreamDecoderFilterSharedPtr handle_;
-  StreamDecoderFilters::Iterator entry_{};
+  StreamDecoderFilters::Iterator entry_;
   bool is_grpc_request_{};
 };
 
@@ -383,7 +383,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   StreamEncoderFilters::Iterator entry() const { return entry_; }
 
   StreamEncoderFilterSharedPtr handle_;
-  StreamEncoderFilters::Iterator entry_{};
+  StreamEncoderFilters::Iterator entry_;
 };
 
 /**
@@ -659,6 +659,9 @@ public:
   }
   absl::string_view ja3Hash() const override {
     return StreamInfoImpl::downstreamAddressProvider().ja3Hash();
+  }
+  absl::string_view ja4Hash() const override {
+    return StreamInfoImpl::downstreamAddressProvider().ja4Hash();
   }
   const absl::optional<std::chrono::milliseconds>& roundTripTime() const override {
     return StreamInfoImpl::downstreamAddressProvider().roundTripTime();
@@ -969,7 +972,7 @@ protected:
     bool destroyed_{false};
 
     // Result of filter chain creation.
-    CreateChainResult create_chain_result_{};
+    CreateChainResult create_chain_result_;
 
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -1122,7 +1125,7 @@ private:
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
       std::make_shared<Network::Socket::Options>();
-  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
+  std::pair<std::string, bool> upstream_override_host_;
 
   // TODO(snowp): Once FM has been moved to its own file we'll make these private classes of FM,
   // at which point they no longer need to be friends.

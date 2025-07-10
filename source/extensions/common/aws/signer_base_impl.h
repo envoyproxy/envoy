@@ -1,7 +1,5 @@
 #pragma once
 
-#include <utility>
-
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
@@ -160,7 +158,7 @@ protected:
   TimeSource& time_source_;
   DateFormatter long_date_formatter_;
   DateFormatter short_date_formatter_;
-  const std::string blank_str_;
+  const std::string invalid_signature_ = "invalidSignature";
 };
 
 } // namespace Aws

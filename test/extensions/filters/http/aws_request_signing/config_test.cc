@@ -1,7 +1,6 @@
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
 
-#include "source/extensions/filters/http/aws_request_signing/aws_request_signing_filter.h"
 #include "source/extensions/filters/http/aws_request_signing/config.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -699,8 +698,9 @@ match_excluded_headers:
 
   AwsRequestSigningProtoConfig proto_config;
 
-  EXPECT_THROW_WITH_REGEX({ TestUtility::loadFromYamlAndValidate(yaml, proto_config); },
-                          EnvoyException, "Proto constraint validation failed");
+  EXPECT_THROW_WITH_REGEX(
+      { TestUtility::loadFromYamlAndValidate(yaml, proto_config); }, EnvoyException,
+      "Proto constraint validation failed");
 }
 
 TEST(AwsRequestSigningFilterConfigTest, InvalidHighExpirationTime) {
@@ -718,8 +718,9 @@ match_excluded_headers:
 
   AwsRequestSigningProtoConfig proto_config;
 
-  EXPECT_THROW_WITH_REGEX({ TestUtility::loadFromYamlAndValidate(yaml, proto_config); },
-                          EnvoyException, "Proto constraint validation failed");
+  EXPECT_THROW_WITH_REGEX(
+      { TestUtility::loadFromYamlAndValidate(yaml, proto_config); }, EnvoyException,
+      "Proto constraint validation failed");
 }
 
 } // namespace AwsRequestSigningFilter

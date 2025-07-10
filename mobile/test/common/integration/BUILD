@@ -51,6 +51,7 @@ envoy_cc_test_library(
         "//library/cc:engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
+        "//library/common/network:network_types_lib",
         "//library/common/types:c_types_lib",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/integration:http_integration_lib_light",
@@ -77,8 +78,8 @@ envoy_cc_test_library(
         "@envoy//source/exe:process_wide_lib",
         "@envoy//test/integration:autonomous_upstream_lib",
         "@envoy//test/integration:utility_lib",
+        "@envoy//test/mocks/server:factory_context_mocks",
         "@envoy//test/mocks/server:server_factory_context_mocks",
-        "@envoy//test/mocks/server:transport_socket_factory_context_mocks",
         "@envoy//test/test_common:environment_lib",
         "@envoy_build_config//:extension_registry",
     ] + envoy_select_signal_trace(

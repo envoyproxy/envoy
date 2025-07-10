@@ -233,6 +233,20 @@ public class JniLibrary {
    * A callback into the Envoy Engine when the default network was changed.
    */
   protected static native void onDefaultNetworkChanged(long engine, int networkType);
+  protected static native void onDefaultNetworkChangedV2(long engine, int connectionType,
+                                                         long net_id);
+
+  /**
+   * A callback into the Envoy Engine when the network with the given net_id gets disconnected.
+   */
+  protected static native void onNetworkDisconnect(long engine, long net_id);
+
+  /**
+   * A callback into the Envoy Engine when the network with the given net_id gets connected.
+   */
+  protected static native void onNetworkConnect(long engine, int connectionType, long net_id);
+
+  protected static native void purgeActiveNetworkList(long engine, long[] activeNetIds);
 
   /**
    * A more modern callback into the Envoy Engine when the default network was changed.
@@ -310,23 +324,16 @@ public class JniLibrary {
       long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
       long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
       boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
-      String http3ConnectionOptions, String http3ClientConnectionOptions, byte[][] quicHints,
-      byte[][] quicCanonicalSuffixes, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, int numTimeoutsToTriggerPortMigration,
-      boolean enableSocketTagging, boolean enableInterfaceBinding,
-      long h2ConnectionKeepaliveIdleIntervalMilliseconds, long h2ConnectionKeepaliveTimeoutSeconds,
-      long maxConnectionsPerHost, long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds,
-      String appVersion, String appId, boolean trustChainVerification, byte[][] filterChain,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
+      String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
+      boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
+      long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost,
+      long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
+      boolean trustChainVerification, byte[][] filterChain,
       boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
-      byte[][] cares_fallback_resolvers, long h3ConnectionKeepaliveInitialIntervalMilliseconds);
-
-  /**
-   * Initializes c-ares.
-   * See <a
-   * href="https://c-ares.org/docs/ares_library_init_android.html">ares_library_init_android</a>.
-   */
-  public static native void initCares(ConnectivityManager connectivityManager);
+      long h3ConnectionKeepaliveInitialIntervalMilliseconds);
 
   /**
    * Returns true if the runtime feature is enabled.

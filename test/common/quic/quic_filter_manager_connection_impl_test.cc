@@ -121,6 +121,11 @@ TEST_F(QuicFilterManagerConnectionImplTest, SetBufferLimits) {
   EXPECT_ENVOY_BUG(impl_.setBufferLimits(1), "unexpected call to setBufferLimits");
 }
 
+TEST_F(QuicFilterManagerConnectionImplTest, CloseConnection) {
+  EXPECT_ENVOY_BUG(impl_.closeConnection(Network::ConnectionCloseAction()),
+                   "unexpected call to closeConnection for QUIC");
+}
+
 TEST_F(QuicFilterManagerConnectionImplTest, GetWriteBuffer) {
   EXPECT_DEATH(impl_.getWriteBuffer(), "not implemented");
 }
@@ -138,6 +143,14 @@ TEST_F(QuicFilterManagerConnectionImplTest, StreamInfoConnectionId) {
   const absl::optional<uint64_t> id = impl_.connectionInfoProvider().connectionID();
   EXPECT_TRUE(id.has_value());
   EXPECT_NE(id.value_or(0), 0);
+}
+
+TEST_F(QuicFilterManagerConnectionImplTest, SetSocketOption) {
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(impl_.setSocketOption(sockopt_name, sockopt_val));
 }
 
 } // namespace Quic

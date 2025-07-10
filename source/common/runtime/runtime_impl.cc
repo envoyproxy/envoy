@@ -306,13 +306,8 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
   case ProtobufWkt::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.boolean_to_string_fix")) {
-        // Convert boolean to "true"/"false"
-        entry.raw_string_value_ = value.bool_value() ? "true" : "false";
-      } else {
-        // Use absl::StrCat for backward compatibility, which converts to "1"/"0"
-        entry.raw_string_value_ = absl::StrCat(value.bool_value());
-      }
+      // Convert boolean to "true"/"false"
+      entry.raw_string_value_ = value.bool_value() ? "true" : "false";
     }
     break;
   case ProtobufWkt::Value::kStructValue:
@@ -450,7 +445,7 @@ absl::Status ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
-    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
+    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix) && !isLegacyRuntimeFeature(prefix)) {
       IS_ENVOY_BUG(absl::StrCat(
           "Using a removed guard ", prefix,
           ". In future version of Envoy this will be treated as invalid configuration"));
@@ -666,7 +661,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
   return absl::OkStatus();
 }
 
-const Snapshot& LoaderImpl::snapshot() {
+const Snapshot& LoaderImpl::snapshot() const {
   ASSERT(tls_->currentThreadRegistered(),
          "snapshot can only be called from a worker thread or after the main thread is registered");
   return tls_->getTyped<Snapshot>();

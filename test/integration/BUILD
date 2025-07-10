@@ -103,6 +103,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
         "//test/mocks/http:stream_encoder_mock",
         "//test/server:utility_lib",
     ],
@@ -899,6 +900,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "parser_integration_test",
+    srcs = ["parser_integration_test.cc"],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
+    ],
+)
+
+envoy_cc_test(
     name = "multi_envoy_test",
     size = "large",
     srcs = envoy_select_admin_functionality([
@@ -1230,7 +1241,7 @@ envoy_cc_test_library(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -1303,6 +1314,8 @@ envoy_cc_test_library(
         "//source/common/thread_local:thread_local_lib",
         "//source/common/tls:context_lib",
         "//source/common/tls:server_context_config_lib",
+        "//source/extensions/http/header_validators/envoy_default:http1_header_validator",
+        "//source/extensions/http/header_validators/envoy_default:http2_header_validator",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server:drain_manager_lib",
         "//source/server:hot_restart_nop_lib",
@@ -1315,8 +1328,8 @@ envoy_cc_test_library(
         "//test/mocks:common_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
@@ -1435,6 +1448,7 @@ envoy_cc_test(
     size = "large",
     srcs = ["integration_test.cc"],
     rbe_pool = "6gig",
+    shard_count = 2,
     tags = [
         "cpu:3",
     ],
@@ -1475,16 +1489,16 @@ envoy_cc_test(
     shard_count = 2,
     tags = [
         "cpu:3",
-        "nofips",
     ],
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
-        "//test/integration/filters:pause_filter_for_quic_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
-    ],
+    ] + envoy_select_enable_http3([
+        "//test/integration/filters:pause_filter_for_quic_lib",
+    ]),
 )
 
 envoy_cc_test(
@@ -1957,9 +1971,7 @@ envoy_cc_test(
         ":http_integration_lib",
         ":http_protocol_integration_lib",
         ":tcp_tunneling_integration_lib",
-        "//source/extensions/filters/http/credential_injector:config",
         "//source/extensions/filters/network/tcp_proxy:config",
-        "//source/extensions/http/injected_credentials/generic:config",
         "//source/extensions/upstreams/http/tcp:config",
         "//test/integration/filters:add_header_filter_config_lib",
         "//test/integration/filters:add_header_filter_proto_cc_proto",
@@ -1967,7 +1979,6 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/credential_injector/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
     ],
@@ -2186,7 +2197,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/transport_sockets/tls:config",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
@@ -2549,7 +2560,6 @@ envoy_cc_test(
     shard_count = 16,
     tags = [
         "cpu:4",
-        "nofips",
     ],
     deps = select({
         "//bazel:disable_http3": [],
@@ -2568,10 +2578,10 @@ envoy_cc_test(
 
 envoy_cc_test_library(
     name = "quic_http_integration_test_lib",
-    hdrs = [
+    hdrs = envoy_select_enable_http3([
         "quic_http_integration_test.h",
-    ],
-    deps = [
+    ]),
+    deps = envoy_select_enable_http3([
         ":http_integration_lib",
         ":socket_interface_swap_lib",
         "//source/common/quic:client_connection_factory_lib",
@@ -2597,7 +2607,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/extensions/quic/connection_debug_visitor/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/quic/server_preferred_address/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/quic/v3:pkg_cc_proto",
-    ],
+    ]),
 )
 
 # TODO(mattklein123): Use target_compatible_with when we switch to Bazel 4.0 instead of multiple
@@ -2619,11 +2629,11 @@ envoy_cc_test(
     #   https://github.com/envoyproxy/envoy/pull/13713/files#r512160087
     # Each of these tests exceeds 20s;
     # QuicHttpIntegrationTests/QuicHttpIntegrationTest.MultipleQuicConnections[With|No]BPF*
+    shard_count = 5,
     tags = [
         "cpu:3",
         "fails_on_clang_cl",
         "fails_on_windows",
-        "nofips",
     ],
     deps = envoy_select_enable_http3([
         ":quic_http_integration_test_lib",
@@ -2660,6 +2670,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/extensions/formatter/cel:config",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
     ],

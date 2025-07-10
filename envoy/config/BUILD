@@ -160,6 +160,8 @@ envoy_cc_library(
     name = "xds_manager_interface",
     hdrs = ["xds_manager.h"],
     deps = [
+        ":grpc_mux_interface",
+        ":subscription_factory_interface",
         ":xds_config_tracker_interface",
         ":xds_resources_delegate_interface",
         "//envoy/upstream:cluster_manager_interface",

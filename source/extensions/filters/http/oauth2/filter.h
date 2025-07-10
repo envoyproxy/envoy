@@ -90,17 +90,20 @@ struct CookieNames {
                   cookie_names)
       : CookieNames(cookie_names.bearer_token(), cookie_names.oauth_hmac(),
                     cookie_names.oauth_expires(), cookie_names.id_token(),
-                    cookie_names.refresh_token(), cookie_names.oauth_nonce()) {}
+                    cookie_names.refresh_token(), cookie_names.oauth_nonce(),
+                    cookie_names.code_verifier()) {}
 
   CookieNames(const std::string& bearer_token, const std::string& oauth_hmac,
               const std::string& oauth_expires, const std::string& id_token,
-              const std::string& refresh_token, const std::string& oauth_nonce)
+              const std::string& refresh_token, const std::string& oauth_nonce,
+              const std::string& code_verifier)
       : bearer_token_(bearer_token.empty() ? BearerToken : bearer_token),
         oauth_hmac_(oauth_hmac.empty() ? OauthHMAC : oauth_hmac),
         oauth_expires_(oauth_expires.empty() ? OauthExpires : oauth_expires),
         id_token_(id_token.empty() ? IdToken : id_token),
         refresh_token_(refresh_token.empty() ? RefreshToken : refresh_token),
-        oauth_nonce_(oauth_nonce.empty() ? OauthNonce : oauth_nonce) {}
+        oauth_nonce_(oauth_nonce.empty() ? OauthNonce : oauth_nonce),
+        code_verifier_(code_verifier.empty() ? CodeVerifier : code_verifier) {}
 
   const std::string bearer_token_;
   const std::string oauth_hmac_;
@@ -108,6 +111,7 @@ struct CookieNames {
   const std::string id_token_;
   const std::string refresh_token_;
   const std::string oauth_nonce_;
+  const std::string code_verifier_;
 
   static constexpr absl::string_view OauthExpires = "OauthExpires";
   static constexpr absl::string_view BearerToken = "BearerToken";
@@ -115,6 +119,7 @@ struct CookieNames {
   static constexpr absl::string_view OauthNonce = "OauthNonce";
   static constexpr absl::string_view IdToken = "IdToken";
   static constexpr absl::string_view RefreshToken = "RefreshToken";
+  static constexpr absl::string_view CodeVerifier = "CodeVerifier";
 };
 
 /**
@@ -139,6 +144,7 @@ public:
   }
   const HttpUri& oauthTokenEndpoint() const { return oauth_token_endpoint_; }
   const Http::Utility::Url& authorizationEndpointUrl() const { return authorization_endpoint_url_; }
+  const std::string& endSessionEndpoint() const { return end_session_endpoint_; }
   const Http::Utility::QueryParamsMulti& authorizationQueryParams() const {
     return authorization_query_params_;
   }
@@ -156,6 +162,10 @@ public:
   std::chrono::seconds defaultExpiresIn() const { return default_expires_in_; }
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
+  }
+  std::chrono::seconds getCsrfTokenExpiresIn() const { return csrf_token_expires_in_; }
+  std::chrono::seconds getCodeVerifierTokenExpiresIn() const {
+    return code_verifier_token_expires_in_;
   }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
@@ -188,14 +198,19 @@ public:
     return refresh_token_cookie_settings_;
   }
   const CookieSettings& nonceCookieSettings() const { return nonce_cookie_settings_; }
+  const CookieSettings& codeVerifierCookieSettings() const {
+    return code_verifier_cookie_settings_;
+  }
 
 private:
-  static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+  static FilterStats generateStats(const std::string& prefix,
+                                   const std::string& filter_stats_prefix, Stats::Scope& scope);
 
   const HttpUri oauth_token_endpoint_;
   // Owns the data exposed by authorization_endpoint_url_.
   const std::string authorization_endpoint_;
   Http::Utility::Url authorization_endpoint_url_;
+  const std::string end_session_endpoint_;
   const Http::Utility::QueryParamsMulti authorization_query_params_;
   const std::string client_id_;
   const std::string redirect_uri_;
@@ -212,6 +227,8 @@ private:
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
+  const std::chrono::seconds csrf_token_expires_in_;
+  const std::chrono::seconds code_verifier_token_expires_in_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
@@ -225,6 +242,7 @@ private:
   const CookieSettings id_token_cookie_settings_;
   const CookieSettings refresh_token_cookie_settings_;
   const CookieSettings nonce_cookie_settings_;
+  const CookieSettings code_verifier_cookie_settings_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -250,13 +268,13 @@ public:
   virtual bool canUpdateTokenByRefreshToken() const PURE;
 };
 
-class OAuth2CookieValidator : public CookieValidator {
+class OAuth2CookieValidator : public CookieValidator, Logger::Loggable<Logger::Id::oauth2> {
 public:
   explicit OAuth2CookieValidator(TimeSource& time_source, const CookieNames& cookie_names,
                                  const std::string& cookie_domain)
       : time_source_(time_source), cookie_names_(cookie_names), cookie_domain_(cookie_domain) {}
 
-  const std::string& token() const override { return token_; }
+  const std::string& token() const override { return access_token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
@@ -266,7 +284,7 @@ public:
   bool canUpdateTokenByRefreshToken() const override;
 
 private:
-  std::string token_;
+  std::string access_token_;
   std::string id_token_;
   std::string refresh_token_;
   std::string expires_;
@@ -294,7 +312,7 @@ class OAuth2Filter : public Http::PassThroughFilter,
                      Logger::Loggable<Logger::Id::oauth2> {
 public:
   OAuth2Filter(FilterConfigSharedPtr config, std::unique_ptr<OAuth2Client>&& oauth_client,
-               TimeSource& time_source, Random::RandomGenerator& randomhmacCookieSettings);
+               TimeSource& time_source, Random::RandomGenerator& random);
 
   // Http::PassThroughFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -350,7 +368,7 @@ private:
   bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
   void redirectToOAuthServer(Http::RequestHeaderMap& headers);
 
-  Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
+  Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers) const;
 
   std::string getEncodedToken() const;
   std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
@@ -361,9 +379,12 @@ private:
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
-                                                 const absl::string_view path_str);
+                                                 const absl::string_view path_str) const;
   bool validateCsrfToken(const Http::RequestHeaderMap& headers,
                          const std::string& csrf_token) const;
+  void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
+  std::string encryptToken(const std::string& token) const;
+  std::string decryptToken(const std::string& encrypted_token) const;
 };
 
 } // namespace Oauth2

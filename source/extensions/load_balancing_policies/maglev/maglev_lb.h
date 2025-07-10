@@ -17,34 +17,21 @@ namespace Upstream {
 
 using MaglevLbProto = envoy::extensions::load_balancing_policies::maglev::v3::Maglev;
 using ClusterProto = envoy::config::cluster::v3::Cluster;
-using LegacyMaglevLbProto = ClusterProto::MaglevLbConfig;
 
-/**
- * Load balancer config that used to wrap legacy maglev config.
- */
-class LegacyMaglevLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  LegacyMaglevLbConfig(const ClusterProto& cluster);
-
-  OptRef<const LegacyMaglevLbProto> lbConfig() const {
-    if (lb_config_.has_value()) {
-      return lb_config_.value();
-    }
-    return {};
-  };
-
-private:
-  absl::optional<LegacyMaglevLbProto> lb_config_;
-};
+using CommonLbConfigProto = envoy::config::cluster::v3::Cluster::CommonLbConfig;
+using LegacyMaglevLbProto = envoy::config::cluster::v3::Cluster::MaglevLbConfig;
 
 /**
  * Load balancer config that used to wrap typed maglev config.
  */
-class TypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
+class TypedMaglevLbConfig : public Upstream::TypedHashLbConfigBase {
 public:
-  TypedMaglevLbConfig(const MaglevLbProto& config);
+  TypedMaglevLbConfig(const CommonLbConfigProto& common_lb_config,
+                      const LegacyMaglevLbProto& lb_config);
+  TypedMaglevLbConfig(const MaglevLbProto& config, Regex::Engine& regex_engine,
+                      absl::Status& creation_status);
 
-  const MaglevLbProto lb_config_;
+  MaglevLbProto lb_config_;
 };
 
 /**
@@ -80,6 +67,11 @@ public:
   static constexpr uint64_t DefaultTableSize = 65537;
   static constexpr uint64_t MaxNumberOfHostsForCompactMaglev = (static_cast<uint64_t>(1) << 32) - 1;
 
+  /**
+   * Log each entry of the maglev table (useful for debugging).
+   */
+  virtual void logMaglevTable(bool use_hostname_for_hashing) const PURE;
+
 protected:
   struct TableBuildEntry {
     TableBuildEntry(const HostConstSharedPtr& host, uint64_t offset, uint64_t skip, double weight)
@@ -112,11 +104,6 @@ private:
    */
   virtual void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
                                                 double max_normalized_weight) PURE;
-
-  /**
-   * Log each entry of the maglev table (useful for debugging).
-   */
-  virtual void logMaglevTable(bool use_hostname_for_hashing) const PURE;
 };
 
 /**
@@ -137,11 +124,12 @@ public:
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
   HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
+  void logMaglevTable(bool use_hostname_for_hashing) const override;
+
 private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
                                         double max_normalized_weight) override;
 
-  void logMaglevTable(bool use_hostname_for_hashing) const override;
   std::vector<HostConstSharedPtr> table_;
 };
 
@@ -161,10 +149,11 @@ public:
   // ThreadAwareLoadBalancerBase::HashingLoadBalancer
   HostSelectionResponse chooseHost(uint64_t hash, uint32_t attempt) const override;
 
+  void logMaglevTable(bool use_hostname_for_hashing) const override;
+
 private:
   void constructImplementationInternals(std::vector<TableBuildEntry>& table_build_entries,
                                         double max_normalized_weight) override;
-  void logMaglevTable(bool use_hostname_for_hashing) const override;
 
   // Leverage a BitArray to more compactly fit represent the MaglevTable.
   // The BitArray will index into the host_table_ which will provide the given
@@ -180,23 +169,19 @@ class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
   MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> config,
-                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
-
-  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-                     Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     uint32_t healthy_panic_threshold,
-                     const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config);
+                     uint32_t healthy_panic_threshold, const MaglevLbProto& config,
+                     HashPolicySharedPtr hash_policy);
 
   const MaglevLoadBalancerStats& stats() const { return stats_; }
   uint64_t tableSize() const { return table_size_; }
+
+  static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
 
 private:
   // ThreadAwareLoadBalancerBase
   HashingLoadBalancerSharedPtr
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double /* min_normalized_weight */, double max_normalized_weight) override;
-  static MaglevLoadBalancerStats generateStats(Stats::Scope& scope);
 
   Stats::ScopeSharedPtr scope_;
   MaglevLoadBalancerStats stats_;

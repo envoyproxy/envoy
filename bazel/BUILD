@@ -67,17 +67,6 @@ genrule(
     stamp = 1,
 )
 
-# A target to optionally link C++ standard library dynamically in sanitizer runs.
-# TSAN doesn't support libc/libstdc++ static linking per doc:
-#   http://releases.llvm.org/8.0.1/tools/clang/docs/ThreadSanitizer.html
-cc_library(
-    name = "dynamic_stdlib",
-    linkopts = envoy_select_force_libcpp(
-        ["-lc++"],
-        ["-lstdc++"],
-    ),
-)
-
 cc_library(
     name = "static_stdlib",
     linkopts = select({
@@ -298,7 +287,6 @@ selects.config_setting_group(
     name = "disable_http3",
     match_any = [
         ":disable_http3_setting",
-        ":boringssl_fips",
     ],
 )
 
@@ -535,6 +523,14 @@ selects.config_setting_group(
     ],
 )
 
+selects.config_setting_group(
+    name = "boringssl_fips_not_ppc",
+    match_all = [
+        ":boringssl_fips",
+        ":not_ppc",
+    ],
+)
+
 config_setting(
     name = "zlib_ng",
     constraint_values = [
@@ -581,7 +577,7 @@ alias(
     name = "boringssl",
     actual = select({
         "//bazel:boringssl_fips_ppc": "@aws_lc//:ssl",
-        "//bazel:boringssl_fips_x86": "@boringssl_fips//:ssl",
+        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:ssl",
         "//conditions:default": "@boringssl//:ssl",
     }),
 )
@@ -590,7 +586,7 @@ alias(
     name = "boringcrypto",
     actual = select({
         "//bazel:boringssl_fips_ppc": "@aws_lc//:crypto",
-        "//bazel:boringssl_fips_x86": "@boringssl_fips//:crypto",
+        "//bazel:boringssl_fips_not_ppc": "@boringssl_fips//:crypto",
         "//conditions:default": "@boringssl//:crypto",
     }),
 )
@@ -770,6 +766,22 @@ config_setting(
 )
 
 selects.config_setting_group(
+    name = "engflow_rbe_x86_64",
+    match_all = [
+        ":engflow_rbe",
+        ":linux_x86_64",
+    ],
+)
+
+selects.config_setting_group(
+    name = "engflow_rbe_aarch64",
+    match_all = [
+        ":engflow_rbe",
+        ":linux_aarch64",
+    ],
+)
+
+selects.config_setting_group(
     name = "apple",
     match_any = [
         ":darwin",
@@ -849,6 +861,14 @@ selects.config_setting_group(
         ":linux_aarch64",
         ":linux_mips64",
         ":linux_s390x",
+    ],
+)
+
+selects.config_setting_group(
+    name = "not_ppc",
+    match_any = [
+        ":not_x86_ppc",
+        ":x86",
     ],
 )
 
@@ -1033,4 +1053,43 @@ cc_library(
         ): ["@com_github_google_tcmalloc//tcmalloc"],
         "//conditions:default": ["//bazel/foreign_cc:gperftools"],
     }),
+)
+
+bool_flag(
+    name = "enable_liburing",
+    build_setting_default = True,
+)
+
+config_setting(
+    name = "liburing_enabled",
+    constraint_values = [
+        "@platforms//os:linux",
+    ],
+    flag_values = {
+        ":enable_liburing": "True",
+    },
+)
+
+bool_flag(
+    name = "libc++",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "libc++_enabled",
+    flag_values = {
+        ":libc++": "True",
+    },
+)
+
+bool_flag(
+    name = "libstdc++",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "libstdc++_enabled",
+    flag_values = {
+        ":libstdc++": "True",
+    },
 )

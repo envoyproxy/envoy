@@ -1,3 +1,4 @@
+#include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_impl_base_test.h"
@@ -13,15 +14,16 @@ using testing::Return;
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  LeastRequestLoadBalancer lb_{
-      priority_set_, nullptr, stats_, runtime_, random_, common_config_, least_request_lb_config_,
-      simTime()};
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest config_;
+
+  LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_,  runtime_,
+                               random_,       50,      config_, simTime()};
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr).host); }
 
 TEST_P(LeastRequestLoadBalancerTest, SingleHostAndPeek) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -33,7 +35,7 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHostAndPeek) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -68,8 +70,8 @@ TEST_P(LeastRequestLoadBalancerTest, SingleHost) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, Normal) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                              makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -85,10 +87,9 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, PNC) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime())};
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -98,13 +99,13 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
 
   // Creating various load balancer objects with different choice configs.
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
   lr_lb_config.mutable_choice_count()->set_value(5);
-  LeastRequestLoadBalancer lb_5{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_5{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
 
   // Verify correct number of choices.
 
@@ -139,11 +140,10 @@ TEST_P(LeastRequestLoadBalancerTest, DefaultSelectionMethod) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -167,11 +167,10 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanOneHostWithLeastRequests) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
-                              makeTestHost(info_, "tcp://127.0.0.1:84", simTime())};
+  hostSet().healthy_hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
 
@@ -223,8 +222,8 @@ TEST_P(LeastRequestLoadBalancerTest, FullScanMultipleHostsWithLeastRequests) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -266,16 +265,16 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalance) {
 // Validate that the load balancer defaults to an active request bias value of 1.0 if the runtime
 // value is invalid (less than 0.0).
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithInvalidActiveRequestBias) {
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(-1.0));
 
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
 
@@ -320,16 +319,16 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithInvalidActiveRequestBias
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias) {
   // Create a load balancer with a custom active request bias.
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
 
   EXPECT_CALL(runtime_.snapshot_, getDouble("ar_bias", 1.0)).WillRepeatedly(Return(0.0));
 
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -347,8 +346,8 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceWithCustomActiveRequestBias)
 }
 
 TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), 1),
-                              makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), 2)};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", 1),
+                              makeTestHost(info_, "tcp://127.0.0.1:81", 2)};
 
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
@@ -369,9 +368,9 @@ TEST_P(LeastRequestLoadBalancerTest, WeightImbalanceCallbacks) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
   const auto slow_start_window =
       EdfLoadBalancerBasePeer::slowStartWindow(static_cast<EdfLoadBalancerBase&>(lb_2));
   EXPECT_EQ(std::chrono::milliseconds(0), slow_start_window);
@@ -384,16 +383,16 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithDefaultParams) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(60);
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(1.0);
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
   simTime().advanceTimeWait(std::chrono::seconds(1));
 
   // As no healthcheck is configured, hosts would enter slow start immediately.
-  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
+  hostSet().healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {});
   // Host1 is 5 secs in slow start, its weight is scaled with max((5/60)^1, 0.1)=0.1 factor.
@@ -406,7 +405,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
   // Advance time, so that host is no longer in slow start.
   simTime().advanceTimeWait(std::chrono::seconds(56));
 
-  auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
+  auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90");
   hostSet().healthy_hosts_.push_back(host2);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   HostVector hosts_added;
@@ -450,18 +449,18 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartNoWait) {
 }
 
 TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+  envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
   lr_lb_config.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
   lr_lb_config.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
   lr_lb_config.mutable_slow_start_config()->mutable_aggression()->set_default_value(0.9);
   lr_lb_config.mutable_active_request_bias()->set_runtime_key("ar_bias");
   lr_lb_config.mutable_active_request_bias()->set_default_value(0.9);
 
-  LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,       runtime_,
-                                random_,       common_config_, lr_lb_config, simTime()};
+  LeastRequestLoadBalancer lb_2{priority_set_, nullptr, stats_,       runtime_,
+                                random_,       50,      lr_lb_config, simTime()};
 
   simTime().advanceTimeWait(std::chrono::seconds(1));
-  auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80", simTime());
+  auto host1 = makeTestHost(info_, "tcp://127.0.0.1:80");
   host1->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   host_set_.hosts_ = {host1};
   HostVector hosts_added;
@@ -474,7 +473,7 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
   simTime().advanceTimeWait(std::chrono::seconds(5));
 
   hosts_added.clear();
-  auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90", simTime());
+  auto host2 = makeTestHost(info_, "tcp://127.0.0.1:90");
   hosts_added.push_back(host2);
 
   hostSet().healthy_hosts_ = {host1, host2};
@@ -561,6 +560,82 @@ TEST_P(LeastRequestLoadBalancerTest, SlowStartWithActiveHC) {
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailoverAndLegacyOrNew, LeastRequestLoadBalancerTest,
                          ::testing::Values(LoadBalancerTestParam{true},
                                            LoadBalancerTestParam{false}));
+
+TEST(TypedLeastRequestLbConfigTest, TypedLeastRequestLbConfig) {
+  {
+    envoy::config::cluster::v3::Cluster::CommonLbConfig common;
+    envoy::config::cluster::v3::Cluster::LeastRequestLbConfig legacy;
+
+    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                           legacy);
+
+    EXPECT_FALSE(typed_config.lb_config_.has_locality_lb_config());
+    EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
+
+    EXPECT_FALSE(typed_config.lb_config_.has_choice_count());
+    EXPECT_FALSE(typed_config.lb_config_.has_active_request_bias());
+  }
+
+  {
+    envoy::config::cluster::v3::Cluster::CommonLbConfig common;
+    envoy::config::cluster::v3::Cluster::LeastRequestLbConfig legacy;
+
+    legacy.mutable_slow_start_config()->mutable_slow_start_window()->set_seconds(10);
+    legacy.mutable_slow_start_config()->mutable_aggression()->set_runtime_key("aggression");
+    legacy.mutable_slow_start_config()->mutable_aggression()->set_default_value(2.0);
+    legacy.mutable_slow_start_config()->mutable_min_weight_percent()->set_value(0.2);
+
+    legacy.mutable_choice_count()->set_value(233);
+    legacy.mutable_active_request_bias()->set_runtime_key("ar_bias");
+    legacy.mutable_active_request_bias()->set_default_value(0.5);
+
+    common.mutable_locality_weighted_lb_config();
+
+    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                           legacy);
+
+    EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
+    EXPECT_TRUE(typed_config.lb_config_.has_slow_start_config());
+
+    EXPECT_TRUE(typed_config.lb_config_.locality_lb_config().has_locality_weighted_lb_config());
+    EXPECT_FALSE(typed_config.lb_config_.locality_lb_config().has_zone_aware_lb_config());
+
+    EXPECT_TRUE(typed_config.lb_config_.slow_start_config().has_slow_start_window());
+    EXPECT_TRUE(typed_config.lb_config_.slow_start_config().has_aggression());
+    EXPECT_TRUE(typed_config.lb_config_.slow_start_config().has_min_weight_percent());
+    EXPECT_EQ(typed_config.lb_config_.slow_start_config().slow_start_window().seconds(), 10);
+    EXPECT_EQ(typed_config.lb_config_.slow_start_config().aggression().runtime_key(), "aggression");
+    EXPECT_DOUBLE_EQ(typed_config.lb_config_.slow_start_config().aggression().default_value(), 2.0);
+    EXPECT_DOUBLE_EQ(typed_config.lb_config_.slow_start_config().min_weight_percent().value(), 0.2);
+
+    EXPECT_EQ(typed_config.lb_config_.choice_count().value(), 233);
+    EXPECT_EQ(typed_config.lb_config_.active_request_bias().runtime_key(), "ar_bias");
+    EXPECT_DOUBLE_EQ(typed_config.lb_config_.active_request_bias().default_value(), 0.5);
+  }
+
+  {
+    envoy::config::cluster::v3::Cluster::CommonLbConfig common;
+    envoy::config::cluster::v3::Cluster::LeastRequestLbConfig legacy;
+
+    common.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(3);
+    common.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(23.0);
+    common.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
+
+    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig typed_config(common,
+                                                                                           legacy);
+
+    EXPECT_TRUE(typed_config.lb_config_.has_locality_lb_config());
+    EXPECT_FALSE(typed_config.lb_config_.has_slow_start_config());
+    EXPECT_FALSE(typed_config.lb_config_.locality_lb_config().has_locality_weighted_lb_config());
+    EXPECT_TRUE(typed_config.lb_config_.locality_lb_config().has_zone_aware_lb_config());
+
+    const auto& zone_aware_lb_config =
+        typed_config.lb_config_.locality_lb_config().zone_aware_lb_config();
+    EXPECT_EQ(zone_aware_lb_config.min_cluster_size().value(), 3);
+    EXPECT_DOUBLE_EQ(zone_aware_lb_config.routing_enabled().value(), 23.0);
+    EXPECT_TRUE(zone_aware_lb_config.fail_traffic_on_panic());
+  }
+}
 
 } // namespace
 } // namespace Upstream

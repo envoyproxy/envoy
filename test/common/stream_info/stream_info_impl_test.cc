@@ -42,11 +42,11 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 712 ||
+        sizeof(stream_info) == 728 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 720 ||
+        sizeof(stream_info) == 736 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 688)
+        sizeof(stream_info) == 704)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -303,6 +303,9 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     stream_info.setResponseCodeDetails(ResponseCodeDetails::get().ViaUpstream);
     ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
     EXPECT_EQ(ResponseCodeDetails::get().ViaUpstream, stream_info.responseCodeDetails().value());
+    stream_info.setResponseCodeDetails("response code details");
+    ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+    EXPECT_EQ("response code details", stream_info.responseCodeDetails().value());
 
     EXPECT_FALSE(stream_info.connectionTerminationDetails().has_value());
     stream_info.setConnectionTerminationDetails("access_denied");
@@ -319,6 +322,16 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_TRUE(stream_info.healthCheck());
 
     EXPECT_EQ(nullptr, stream_info.route());
+    EXPECT_EQ(nullptr, stream_info.virtualHost());
+
+    std::shared_ptr<NiceMock<Router::MockVirtualHost>> vhost =
+        std::make_shared<NiceMock<Router::MockVirtualHost>>();
+
+    stream_info.vhost_ = vhost;
+
+    // If the route is invalid then the vhost will be used.
+    EXPECT_EQ(vhost, stream_info.virtualHost());
+
     std::shared_ptr<NiceMock<Router::MockRoute>> route =
         std::make_shared<NiceMock<Router::MockRoute>>();
     stream_info.route_ = route;

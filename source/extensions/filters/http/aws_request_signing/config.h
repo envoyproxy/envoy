@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
-#include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.validate.h"
 
 #include "source/extensions/common/aws/signer.h"
 #include "source/extensions/filters/http/common/factory_base.h"

@@ -207,7 +207,7 @@ private:
   struct ThreadLocalData : public ThreadLocal::ThreadLocalObject {
     ThreadLocalData(std::chrono::milliseconds poll_delay, enum KeyType type, int keysize,
                     IppCryptoSharedPtr ipp, Event::Dispatcher& d, CryptoMbStats& stats)
-        : queue_(poll_delay, type, keysize, ipp, d, stats){};
+        : queue_(poll_delay, type, keysize, ipp, d, stats) {};
     CryptoMbQueue queue_;
   };
 

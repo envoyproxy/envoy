@@ -7,6 +7,7 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "source/common/common/base64.h"
+#include "source/common/crypto/utility.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/secret/sds_api.h"
 #include "source/common/stats/isolated_store_impl.h"
@@ -25,13 +26,15 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/secret/mocks.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "openssl/crypto.h"
 #include "openssl/x509v3.h"
 
 using Envoy::Protobuf::util::MessageDifferencer;
@@ -1033,7 +1036,8 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySdsNotReady) {
   EXPECT_CALL(factory_context_.server_context_, mainThreadDispatcher())
       .WillRepeatedly(ReturnRef(dispatcher));
   // EXPECT_CALL(factory_context_, random()).WillOnce(ReturnRef(random));
-  EXPECT_CALL(factory_context_, clusterManager()).WillOnce(ReturnRef(cluster_manager));
+  EXPECT_CALL(factory_context_.server_context_, clusterManager())
+      .WillOnce(ReturnRef(cluster_manager));
   EXPECT_CALL(factory_context_, initManager()).WillRepeatedly(ReturnRef(init_manager));
   auto* sds_secret_configs = tls_context.mutable_session_ticket_keys_sds_secret_config();
   sds_secret_configs->set_name("abc.com");
@@ -1063,7 +1067,7 @@ session_ticket_keys:
 )EOF";
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
 
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* server_cert =
@@ -1150,6 +1154,121 @@ TEST_F(SslServerContextImplTicketTest, VerifySanWithNoCA) {
   EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
                             "SAN-based verification of peer certificates without trusted CA "
                             "is insecure and not allowed");
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCA) {
+  const std::string empty_ca_path = TestEnvironment::writeStringToFileForTest("test_envoy", "");
+  const std::string yaml = fmt::format(R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          filename: "{}"
+  )EOF",
+                                       empty_ca_path);
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException,
+                            fmt::format("file {} is empty", empty_ca_path));
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineString) {
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          inline_string: ""
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException, "DataSource cannot be empty");
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineBytes) {
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          inline_bytes: ""
+  )EOF";
+  EXPECT_THROW_WITH_MESSAGE(loadConfigYaml(yaml), EnvoyException, "DataSource cannot be empty");
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
+  const std::string empty_ca_path = TestEnvironment::writeStringToFileForTest("test_envoy", "");
+  const std::string yaml = fmt::format(R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{{{ test_rundir }}}}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          filename: "{}"
+  )EOF",
+                                       empty_ca_path);
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineStringWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          inline_string: ""
+  )EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
+}
+
+TEST_F(SslServerContextImplTicketTest, EmptyTrustedCAInlineByteWhenRuntimeDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        trusted_ca:
+          inline_bytes: ""
+  )EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
+}
+
+TEST_F(SslServerContextImplTicketTest, ValidationContextWithPinnedCertificateHash) {
+  const std::string yaml = R"EOF(
+    common_tls_context:
+      tls_certificates:
+        certificate_chain:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"
+        private_key:
+          filename: "{{ test_rundir }}/test/common/tls/test_data/san_dns_key.pem"
+      validation_context:
+        verify_certificate_hash: "df6ff72fe9116521268f6f2dd4966f51df479883fe7037b39f75916ac3049d1a"
+  )EOF";
+  EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
 TEST_F(SslServerContextImplTicketTest, StatelessSessionResumptionEnabledByDefault) {
@@ -1349,14 +1468,11 @@ TEST_F(ClientContextConfigImplTest, RSA1024Cert) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
 
-  std::string error_msg(
-      "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA certificates "
-#ifdef BORINGSSL_FIPS
-      "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
-#else
-      "with 2048-bit or larger keys are supported"
-#endif
-  );
+  std::string error_msg(absl::StrCat(
+      "Failed to load certificate chain from .*selfsigned_rsa_1024_cert.pem, only RSA "
+      "certificates ",
+      (FIPS_mode() ? "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+                   : "with 2048-bit or larger keys are supported")));
   EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
                   .status()
                   .message(),
@@ -1375,14 +1491,11 @@ TEST_F(ClientContextConfigImplTest, RSA1024Pkcs12) {
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
   Stats::IsolatedStoreImpl store;
 
-  std::string error_msg("Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
-                        "only RSA certificates "
-#ifdef BORINGSSL_FIPS
-                        "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
-#else
-                        "with 2048-bit or larger keys are supported"
-#endif
-  );
+  std::string error_msg(absl::StrCat(
+      "Failed to load certificate chain from .*selfsigned_rsa_1024_certkey.p12, "
+      "only RSA certificates ",
+      (FIPS_mode() ? "with 2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode"
+                   : "with 2048-bit or larger keys are supported")));
   EXPECT_THAT(manager_.createSslClientContext(*store.rootScope(), *client_context_config)
                   .status()
                   .message(),
@@ -1625,7 +1738,7 @@ tls_certificate:
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_pem = "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem";
@@ -1659,7 +1772,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedTlsCertificates) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_pem = "{{ test_rundir "
@@ -1696,7 +1809,7 @@ TEST_F(ClientContextConfigImplTest, PasswordProtectedPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   const std::string cert_p12 = "{{ test_rundir "
@@ -1728,7 +1841,7 @@ TEST_F(ClientContextConfigImplTest, PasswordWrongPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1757,7 +1870,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedPkcs12) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1789,7 +1902,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
       ->Add()
       ->set_name("abc.com");
 
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
   auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
 
   Stats::IsolatedStoreImpl store;
@@ -1814,7 +1927,9 @@ TEST_F(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(tls_certificate_secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager()
+                  .addStaticSecret(tls_certificate_secret_config)
+                  .ok());
   envoy::extensions::transport_sockets::tls::v3::Secret
       certificate_validation_context_secret_config;
   const std::string certificate_validation_context_yaml = R"EOF(
@@ -1825,7 +1940,7 @@ TEST_F(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  EXPECT_TRUE(factory_context_.secretManager()
+  EXPECT_TRUE(factory_context_.server_context_.secretManager()
                   .addStaticSecret(certificate_validation_context_secret_config)
                   .ok());
 
@@ -1860,7 +1975,7 @@ tls_certificate:
 
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager().addStaticSecret(secret_config).ok());
 
   envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -1886,7 +2001,9 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  EXPECT_TRUE(factory_context_.secretManager().addStaticSecret(tls_certificate_secret_config).ok());
+  EXPECT_TRUE(factory_context_.server_context_.secretManager()
+                  .addStaticSecret(tls_certificate_secret_config)
+                  .ok());
   envoy::extensions::transport_sockets::tls::v3::Secret
       certificate_validation_context_secret_config;
   const std::string certificate_validation_context_yaml = R"EOF(
@@ -1897,7 +2014,7 @@ TEST_F(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   TestUtility::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  EXPECT_TRUE(factory_context_.secretManager()
+  EXPECT_TRUE(factory_context_.server_context_.secretManager()
                   .addStaticSecret(certificate_validation_context_secret_config)
                   .ok());
 
@@ -2105,7 +2222,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProvider) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   const std::string tls_context_yaml = R"EOF(
@@ -2130,7 +2248,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoProviderFallbac
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   NiceMock<Ssl::MockContextManager> context_manager;
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   const std::string tls_context_yaml = R"EOF(
@@ -2161,7 +2280,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadFailureNoMethod) {
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
   ContextManagerImpl manager(server_factory_context_);
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
@@ -2196,7 +2316,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodLoadSuccess) {
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
@@ -2225,7 +2346,8 @@ TEST_F(ServerContextConfigImplTest, PrivateKeyMethodFallback) {
   NiceMock<Ssl::MockPrivateKeyMethodManager> private_key_method_manager;
   auto private_key_method_provider_ptr =
       std::make_shared<NiceMock<Ssl::MockPrivateKeyMethodProvider>>();
-  EXPECT_CALL(factory_context_, sslContextManager()).WillOnce(ReturnRef(context_manager));
+  EXPECT_CALL(factory_context_.server_context_, sslContextManager())
+      .WillOnce(ReturnRef(context_manager));
   EXPECT_CALL(context_manager, privateKeyMethodManager())
       .WillOnce(ReturnRef(private_key_method_manager));
   EXPECT_CALL(private_key_method_manager, createPrivateKeyMethodProvider(_, _))
@@ -2428,6 +2550,142 @@ TEST_F(SslContextStatsTest, IncOnlyKnownCounters) {
   ASSERT_TRUE(stat.has_value());
   EXPECT_EQ(1, stat->get().value());
 #endif
+}
+
+class CertificateNamingTest : public SslCertsTest {};
+
+TEST_F(CertificateNamingTest, TlsCertificateInlineNaming) {
+  std::string cert_data = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"));
+
+  // Setup CommonTlsContext with inline certificate
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  auto* tls_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_inline_bytes(cert_data);
+  tls_cert->mutable_private_key()->set_inline_string("dummy_key");
+
+  // Calculate expected hash
+  Buffer::OwnedImpl buffer(cert_data);
+  std::string expected_hash =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer))
+          .substr(0, 8);
+
+  // Create and check the context config
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+
+  auto tls_certs = server_context_config->tlsCertificates();
+  ASSERT_EQ(1, tls_certs.size());
+  EXPECT_EQ("unnamed_cert_" + expected_hash, tls_certs[0].get().certificateName());
+}
+
+TEST_F(CertificateNamingTest, CACertificateInlineNaming) {
+  std::string ca_cert_data = TestEnvironment::readFileToStringForTest(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"));
+  std::string tls_cert_data = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"));
+  std::string key_data = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"));
+
+  // Setup context with both TLS cert and CA cert
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+
+  // Add TLS certificate first (required for server context)
+  auto* tls_cert = tls_context.mutable_common_tls_context()->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_inline_bytes(tls_cert_data);
+  tls_cert->mutable_private_key()->set_inline_bytes(key_data);
+
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->mutable_trusted_ca()
+      ->set_inline_bytes(ca_cert_data);
+
+  // Calculate expected hash
+  Buffer::OwnedImpl buffer(ca_cert_data);
+  std::string expected_hash =
+      Hex::encode(Envoy::Common::Crypto::UtilitySingleton::get().getSha256Digest(buffer))
+          .substr(0, 8);
+
+  // Create the context config
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+
+  // Verify the CA cert name
+  ASSERT_NE(nullptr, server_context_config->certificateValidationContext());
+  EXPECT_EQ("unnamed_ca_cert_" + expected_hash,
+            server_context_config->certificateValidationContext()->caCertName());
+}
+
+class CertificateExpirationMetricsTest : public SslCertsTest {
+public:
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
+};
+
+TEST_F(CertificateExpirationMetricsTest, ServerCertificateExpirationMetrics) {
+  const std::string yaml = R"EOF(
+common_tls_context:
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  Stats::TestUtil::TestStore store;
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+
+  auto tls_certs = server_context_config->tlsCertificates();
+  ASSERT_EQ(1, tls_certs.size());
+  std::string actual_cert_name = tls_certs[0].get().certificateName();
+
+  absl::Status creation_status = absl::OkStatus();
+  TestContextImpl context(*store.rootScope(), *server_context_config, server_factory_context_,
+                          creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  std::string expected_metric_name =
+      absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
+
+  auto gauge_opt = store.findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
+}
+
+TEST_F(CertificateExpirationMetricsTest, ClientCertificateExpirationMetrics) {
+  const std::string yaml = R"EOF(
+common_tls_context:
+  tls_certificates:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+)EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::UpstreamTlsContext tls_context;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml), tls_context);
+
+  Stats::TestUtil::TestStore store;
+  auto client_context_config = *ClientContextConfigImpl::create(tls_context, factory_context_);
+
+  auto tls_certs = client_context_config->tlsCertificates();
+  ASSERT_EQ(1, tls_certs.size());
+  std::string actual_cert_name = tls_certs[0].get().certificateName();
+
+  absl::Status creation_status = absl::OkStatus();
+  TestContextImpl context(*store.rootScope(), *client_context_config, server_factory_context_,
+                          creation_status);
+  ASSERT_TRUE(creation_status.ok());
+
+  std::string expected_metric_name =
+      absl::StrCat("ssl.certificate.", actual_cert_name, ".expiration_unix_time_seconds");
+
+  auto gauge_opt = store.findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  EXPECT_EQ(gauge_opt->get().value(), 1787339648);
 }
 
 } // namespace Tls

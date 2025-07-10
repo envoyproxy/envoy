@@ -19,9 +19,6 @@ public:
   MockClusterManagerFactory();
   ~MockClusterManagerFactory() override;
 
-  Secret::MockSecretManager& secretManager() override { return secret_manager_; };
-  Singleton::Manager& singletonManager() override { return singleton_manager_; }
-
   MOCK_METHOD(absl::StatusOr<ClusterManagerPtr>, clusterManagerFromProto,
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
 
@@ -44,16 +41,13 @@ public:
 
   MOCK_METHOD((absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>),
               clusterFromProto,
-              (const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+              (const envoy::config::cluster::v3::Cluster& cluster,
                Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
   MOCK_METHOD(absl::StatusOr<CdsApiPtr>, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config,
                const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm));
-
-private:
-  NiceMock<Secret::MockSecretManager> secret_manager_;
-  Singleton::ManagerImpl singleton_manager_;
 };
+
 } // namespace Upstream
 } // namespace Envoy

@@ -19,6 +19,8 @@ using absl::StatusCode;
 using Envoy::Protobuf::TextFormat;
 using Envoy::ProtobufWkt::Empty;
 
+using Envoy::Protobuf::util::MessageDifferencer;
+
 namespace Envoy {
 namespace {
 
@@ -130,8 +132,16 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, SimpleRequest) {
   expected_book.set_title("Kids book");
   expected_book.set_author("John Doe");
 
-  auto serialized_book = Grpc::Common::serializeToGrpcFrame(expected_book);
-  EXPECT_EQ(response->body(), serialized_book->toString());
+  Buffer::OwnedImpl transcoded_buffer{response->body()};
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(transcoded_buffer, frames);
+
+  bookstore::Book book;
+  book.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
 
   EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 
@@ -199,8 +209,15 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, HttpBodyRequestResponse) {
   expected_res.set_content_type(Http::Headers::get().ContentTypeValues.Html);
   expected_res.set_data(response_str);
 
-  auto serialized_res = Grpc::Common::serializeToGrpcFrame(expected_res);
-  EXPECT_EQ(response->body(), serialized_res->toString());
+  Buffer::OwnedImpl transcoded_buffer{response->body()};
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(transcoded_buffer, frames);
+
+  google::api::HttpBody transcoded_res;
+  transcoded_res.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 
   EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 
@@ -276,8 +293,15 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, NestedHttpBodyRequest) {
   expected_res.set_content_type(Http::Headers::get().ContentTypeValues.Html);
   expected_res.set_data(response_str);
 
-  auto serialized_res = Grpc::Common::serializeToGrpcFrame(expected_res);
-  EXPECT_EQ(response->body(), serialized_res->toString());
+  Buffer::OwnedImpl transcoded_buffer{response->body()};
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(transcoded_buffer, frames);
+
+  google::api::HttpBody transcoded_res;
+  transcoded_res.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 
   EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 
@@ -343,8 +367,16 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
   book->set_id(123);
   book->set_title("Kids book");
   book->set_author("John Doe");
-  auto serialized_res = Grpc::Common::serializeToGrpcFrame(expected_res);
-  EXPECT_EQ(response->body(), serialized_res->toString());
+
+  Buffer::OwnedImpl transcoded_buffer{response->body()};
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  std::ignore = decoder.decode(transcoded_buffer, frames);
+
+  bookstore::ListBooksResponse transcoded_res;
+  transcoded_res.ParseFromString(frames[0].data_->toString());
+
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 
   EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 

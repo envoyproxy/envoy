@@ -65,12 +65,13 @@ public:
       std::string ca_cert = "", absl::optional<uint32_t> verify_depth = absl::nullopt)
       : allow_expired_certificate_(allow_expired_certificate), api_(Api::createApiForTest()),
         custom_validator_config_(custom_config), san_matchers_(san_matchers), ca_cert_(ca_cert),
-        max_verify_depth_(verify_depth){};
+        max_verify_depth_(verify_depth) {};
   TestCertificateValidationContextConfig()
-      : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt){};
+      : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt) {};
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
+  const std::string& caCertName() const override { return ca_cert_name_; }
   const std::string& certificateRevocationList() const override {
     CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
@@ -115,6 +116,7 @@ private:
       san_matchers_{};
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
+  const std::string ca_cert_name_{"TEST_CA_CERT_NAME"};
   const absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
   const bool auto_sni_san_match_{false};
 };

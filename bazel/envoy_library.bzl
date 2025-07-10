@@ -17,6 +17,7 @@ load(
 )
 load(":envoy_mobile_defines.bzl", "envoy_mobile_defines")
 load(":envoy_pch.bzl", "envoy_pch_copts", "envoy_pch_deps")
+load(":sanitizers.bzl", "sanitizer_deps")
 
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
@@ -104,7 +105,7 @@ def envoy_cc_library(
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     exec_properties = exec_properties | select({
-        repository + "//bazel:engflow_rbe": {"Pool": rbe_pool} if rbe_pool else {},
+        repository + "//bazel:engflow_rbe_x86_64": {"Pool": rbe_pool} if rbe_pool else {},
         "//conditions:default": {},
     })
 
@@ -126,7 +127,8 @@ def envoy_cc_library(
         tags = tags,
         textual_hdrs = textual_hdrs,
         deps = deps + [envoy_external_dep_path(dep) for dep in external_deps] +
-               envoy_pch_deps(repository, "//source/common/common:common_pch"),
+               envoy_pch_deps(repository, "//source/common/common:common_pch") +
+               sanitizer_deps(),
         exec_properties = exec_properties,
         alwayslink = alwayslink,
         linkstatic = envoy_linkstatic(),

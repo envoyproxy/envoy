@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/circuit_breaker.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/address.pb.h"
@@ -55,7 +56,6 @@
 #include "source/common/stats/deferred_creation.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
-#include "source/extensions/filters/network/http_connection_manager/config.h"
 #include "source/server/transport_socket_config_impl.h"
 
 #include "absl/container/node_hash_set.h"
@@ -64,6 +64,18 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
+const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig&
+defaultHappyEyeballsConfig() {
+  CONSTRUCT_ON_FIRST_USE(
+      envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig, []() {
+        envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
+        default_config.set_first_address_family_version(
+            envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT);
+        default_config.mutable_first_address_family_count()->set_value(1);
+        return default_config;
+      }());
+}
+
 std::string addressToString(Network::Address::InstanceConstSharedPtr address) {
   if (!address) {
     return "";
@@ -418,11 +430,11 @@ absl::StatusOr<std::unique_ptr<HostDescriptionImpl>> HostDescriptionImpl::create
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
     MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, TimeSource& time_source, const AddressVector& address_list) {
+    uint32_t priority, const AddressVector& address_list) {
   absl::Status creation_status = absl::OkStatus();
   auto ret = std::unique_ptr<HostDescriptionImpl>(new HostDescriptionImpl(
       creation_status, cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
-      locality, health_check_config, priority, time_source, address_list));
+      locality, health_check_config, priority, address_list));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -432,10 +444,9 @@ HostDescriptionImpl::HostDescriptionImpl(
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
     MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, TimeSource& time_source, const AddressVector& address_list)
+    uint32_t priority, const AddressVector& address_list)
     : HostDescriptionImplBase(cluster, hostname, dest_address, endpoint_metadata, locality_metadata,
-                              locality, health_check_config, priority, time_source,
-                              creation_status),
+                              locality, health_check_config, priority, creation_status),
       address_(dest_address),
       address_list_or_null_(makeAddressListOrNull(dest_address, address_list)),
       health_check_address_(resolveHealthCheckAddress(health_check_config, dest_address)) {}
@@ -445,7 +456,7 @@ HostDescriptionImplBase::HostDescriptionImplBase(
     Network::Address::InstanceConstSharedPtr dest_address, MetadataConstSharedPtr endpoint_metadata,
     MetadataConstSharedPtr locality_metadata, const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
-    uint32_t priority, TimeSource& time_source, absl::Status& creation_status)
+    uint32_t priority, absl::Status& creation_status)
     : cluster_(cluster), hostname_(hostname),
       health_checks_hostname_(health_check_config.hostname()),
       canary_(Config::Metadata::metadataValue(endpoint_metadata.get(),
@@ -456,8 +467,7 @@ HostDescriptionImplBase::HostDescriptionImplBase(
       locality_(locality),
       locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
       priority_(priority),
-      socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())),
-      creation_time_(time_source.monotonicTime()) {
+      socket_factory_(resolveTransportSocketFactory(dest_address, endpoint_metadata_.get())) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
     // for a pipe address is a misconfiguration.
@@ -606,18 +616,16 @@ Host::CreateConnectionData HostImplBase::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
-    absl::optional<envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+    // TODO(adisuissa): convert from OptRef to reference once the runtime flag
+    // envoy.reloadable_features.use_config_in_happy_eyeballs is deprecated.
+    OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config;
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
       ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
       if (cluster.happyEyeballsConfig().has_value()) {
-        happy_eyeballs_config = *cluster.happyEyeballsConfig();
+        happy_eyeballs_config = cluster.happyEyeballsConfig();
       } else {
-        envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig default_config;
-        default_config.set_first_address_family_version(
-            envoy::config::cluster::v3::UpstreamConnectionOptions::DEFAULT);
-        default_config.mutable_first_address_family_count()->set_value(1);
-        happy_eyeballs_config = absl::make_optional(default_config);
+        happy_eyeballs_config = defaultHappyEyeballsConfig();
       }
     }
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
@@ -651,12 +659,11 @@ absl::StatusOr<std::unique_ptr<HostImpl>> HostImpl::create(
     const envoy::config::core::v3::Locality& locality,
     const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig& health_check_config,
     uint32_t priority, const envoy::config::core::v3::HealthStatus health_status,
-    TimeSource& time_source, const AddressVector& address_list) {
+    const AddressVector& address_list) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<HostImpl>(
-      new HostImpl(creation_status, cluster, hostname, address, endpoint_metadata,
-                   locality_metadata, initial_weight, locality, health_check_config, priority,
-                   health_status, time_source, address_list));
+  auto ret = std::unique_ptr<HostImpl>(new HostImpl(
+      creation_status, cluster, hostname, address, endpoint_metadata, locality_metadata,
+      initial_weight, locality, health_check_config, priority, health_status, address_list));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -1024,7 +1031,7 @@ ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope,
 absl::StatusOr<std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>>
 createOptions(const envoy::config::cluster::v3::Cluster& config,
               std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>&& options,
-              ProtobufMessage::ValidationVisitor& validation_visitor) {
+              Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   if (options) {
     return std::move(options);
   }
@@ -1048,7 +1055,8 @@ createOptions(const envoy::config::cluster::v3::Cluster& config,
                : absl::nullopt),
           config.protocol_selection() ==
               envoy::config::cluster::v3::Cluster::USE_DOWNSTREAM_PROTOCOL,
-          config.has_http2_protocol_options(), validation_visitor);
+          config.has_http2_protocol_options(), factory_context.serverFactoryContext(),
+          factory_context.messageValidationVisitor());
   RETURN_IF_NOT_OK_REF(options_or_error.status());
   return options_or_error.value();
 }
@@ -1164,7 +1172,7 @@ ClusterInfoImpl::ClusterInfoImpl(
           createOptions(config,
                         extensionProtocolOptionsTyped<HttpProtocolOptionsConfigImpl>(
                             "envoy.extensions.upstreams.http.v3.HttpProtocolOptions"),
-                        factory_context.messageValidationVisitor()),
+                        factory_context),
           std::shared_ptr<const ClusterInfoImpl::HttpProtocolOptionsConfigImpl>)),
       tcp_protocol_options_(extensionProtocolOptionsTyped<TcpProtocolOptionsConfigImpl>(
           "envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions")),
@@ -1178,25 +1186,32 @@ ClusterInfoImpl::ClusterInfoImpl(
       peekahead_ratio_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.preconnect_policy(),
                                                        predictive_preconnect_ratio, 0)),
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
-      traffic_stats_(generateStats(stats_scope_,
-                                   factory_context.clusterManager().clusterStatNames(),
-                                   server_context.statsConfig().enableDeferredCreationStats())),
-      config_update_stats_(factory_context.clusterManager().clusterConfigUpdateStatNames(),
-                           *stats_scope_),
-      lb_stats_(factory_context.clusterManager().clusterLbStatNames(), *stats_scope_),
-      endpoint_stats_(factory_context.clusterManager().clusterEndpointStatNames(), *stats_scope_),
+      traffic_stats_(generateStats(
+          stats_scope_, factory_context.serverFactoryContext().clusterManager().clusterStatNames(),
+          server_context.statsConfig().enableDeferredCreationStats())),
+      config_update_stats_(
+          factory_context.serverFactoryContext().clusterManager().clusterConfigUpdateStatNames(),
+          *stats_scope_),
+      lb_stats_(factory_context.serverFactoryContext().clusterManager().clusterLbStatNames(),
+                *stats_scope_),
+      endpoint_stats_(
+          factory_context.serverFactoryContext().clusterManager().clusterEndpointStatNames(),
+          *stats_scope_),
       load_report_stats_store_(stats_scope_->symbolTable()),
-      load_report_stats_(
-          generateLoadReportStats(*load_report_stats_store_.rootScope(),
-                                  factory_context.clusterManager().clusterLoadReportStatNames())),
-      optional_cluster_stats_((config.has_track_cluster_stats() || config.track_timeout_budgets())
-                                  ? std::make_unique<OptionalClusterStats>(
-                                        config, *stats_scope_, factory_context.clusterManager())
-                                  : nullptr),
+      load_report_stats_(generateLoadReportStats(
+          *load_report_stats_store_.rootScope(),
+          factory_context.serverFactoryContext().clusterManager().clusterLoadReportStatNames())),
+      optional_cluster_stats_(
+          (config.has_track_cluster_stats() || config.track_timeout_budgets())
+              ? std::make_unique<OptionalClusterStats>(
+                    config, *stats_scope_, factory_context.serverFactoryContext().clusterManager())
+              : nullptr),
       features_(ClusterInfoImpl::HttpProtocolOptionsConfigImpl::parseFeatures(
           config, *http_protocol_options_)),
       resource_managers_(config, runtime, name_, *stats_scope_,
-                         factory_context.clusterManager().clusterCircuitBreakersStatNames()),
+                         factory_context.serverFactoryContext()
+                             .clusterManager()
+                             .clusterCircuitBreakersStatNames()),
       maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       upstream_local_address_selector_(
           THROW_OR_RETURN_VALUE(createUpstreamLocalAddressSelector(config, bind_config),
@@ -1212,7 +1227,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                           ? std::make_unique<ClusterTypedMetadata>(config.metadata())
                           : nullptr),
       common_lb_config_(
-          factory_context.clusterManager().getCommonLbConfigPtr(config.common_lb_config())),
+          factory_context.serverFactoryContext().clusterManager().getCommonLbConfigPtr(
+              config.common_lb_config())),
       cluster_type_(config.has_cluster_type()
                         ? std::make_unique<envoy::config::cluster::v3::Cluster::CustomClusterType>(
                               config.cluster_type())
@@ -1388,8 +1404,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       filter_factories_.push_back(
           network_filter_config_provider_manager_->createDynamicFilterConfigProvider(
               proto_config.config_discovery(), proto_config.name(), server_context,
-              upstream_context_, factory_context.clusterManager(), is_terminal, "network",
-              nullptr));
+              upstream_context_, factory_context.serverFactoryContext().clusterManager(),
+              is_terminal, "network", nullptr));
       continue;
     }
 
@@ -1420,7 +1436,8 @@ ClusterInfoImpl::ClusterInfoImpl(
       Http::FilterChainHelper<Server::Configuration::UpstreamFactoryContext,
                               Server::Configuration::UpstreamHttpFilterConfigFactory>
           helper(*http_filter_config_provider_manager_, upstream_context_.serverFactoryContext(),
-                 factory_context.clusterManager(), upstream_context_, prefix);
+                 factory_context.serverFactoryContext().clusterManager(), upstream_context_,
+                 prefix);
       SET_AND_RETURN_IF_NOT_OK(helper.processFilters(http_protocol_options_->http_filters_,
                                                      "upstream http", "upstream http",
                                                      http_filter_factories_),
@@ -1577,9 +1594,9 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
       runtime_(cluster_context.serverFactoryContext().runtime()),
       wait_for_warm_on_init_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(cluster, wait_for_warm_on_init, true)),
       random_(cluster_context.serverFactoryContext().api().randomGenerator()),
-      time_source_(cluster_context.serverFactoryContext().timeSource()),
-      local_cluster_(cluster_context.clusterManager().localClusterName().value_or("") ==
-                     cluster.name()),
+      local_cluster_(
+          cluster_context.serverFactoryContext().clusterManager().localClusterName().value_or("") ==
+          cluster.name()),
       const_metadata_shared_pool_(Config::Metadata::getConstMetadataSharedPool(
           cluster_context.serverFactoryContext().singletonManager(),
           cluster_context.serverFactoryContext().mainThreadDispatcher())) {
@@ -1588,8 +1605,7 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   auto stats_scope = generateStatsScope(cluster, server_context.serverScope().store());
   transport_factory_context_ =
       std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
-          server_context, cluster_context.sslContextManager(), *stats_scope,
-          cluster_context.clusterManager(), cluster_context.messageValidationVisitor());
+          server_context, *stats_scope, cluster_context.messageValidationVisitor());
   transport_factory_context_->setInitManager(init_manager_);
 
   auto socket_factory_or_error = createTransportSocketFactory(cluster, *transport_factory_context_);
@@ -1603,10 +1619,11 @@ ClusterImplBase::ClusterImplBase(const envoy::config::cluster::v3::Cluster& clus
   auto socket_matcher = std::move(*socket_matcher_or_error);
   const bool matcher_supports_alpn = socket_matcher->allMatchesSupportAlpn();
   auto& dispatcher = server_context.mainThreadDispatcher();
-  auto info_or_error = ClusterInfoImpl::create(
-      init_manager_, server_context, cluster, cluster_context.clusterManager().bindConfig(),
-      runtime_, std::move(socket_matcher), std::move(stats_scope), cluster_context.addedViaApi(),
-      *transport_factory_context_);
+  auto info_or_error =
+      ClusterInfoImpl::create(init_manager_, server_context, cluster,
+                              cluster_context.serverFactoryContext().clusterManager().bindConfig(),
+                              runtime_, std::move(socket_matcher), std::move(stats_scope),
+                              cluster_context.addedViaApi(), *transport_factory_context_);
   SET_AND_RETURN_IF_NOT_OK(info_or_error.status(), creation_status);
   info_ = std::shared_ptr<const ClusterInfoImpl>(
       (*info_or_error).release(), [&dispatcher](const ClusterInfoImpl* self) {
@@ -2163,7 +2180,7 @@ void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const std::vector<Network::Address::InstanceConstSharedPtr>& address_list,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint, TimeSource& time_source) {
+    const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
   auto endpoint_metadata =
       lb_endpoint.has_metadata()
           ? parent_.constMetadataSharedPool()->getObject(lb_endpoint.metadata())
@@ -2176,8 +2193,7 @@ void PriorityStateManager::registerHostForPriority(
       HostImpl::create(parent_.info(), hostname, address, endpoint_metadata, locality_metadata,
                        lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                        lb_endpoint.endpoint().health_check_config(),
-                       locality_lb_endpoint.priority(), lb_endpoint.health_status(), time_source,
-                       address_list),
+                       locality_lb_endpoint.priority(), lb_endpoint.health_status(), address_list),
       std::unique_ptr<HostImpl>));
   registerHostForPriority(host, locality_lb_endpoint);
 }

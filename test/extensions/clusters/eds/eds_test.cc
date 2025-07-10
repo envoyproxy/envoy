@@ -130,9 +130,8 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               true);
     cluster_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
@@ -157,7 +156,6 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   bool initialized_{};
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
 
   envoy::config::cluster::v3::Cluster eds_cluster_;
   EdsClusterImplSharedPtr cluster_;
@@ -467,6 +465,47 @@ TEST_F(EdsTest, RejectNonIpAdditionalAddresses) {
   } catch (const EnvoyException& e) {
     EXPECT_STREQ("additional_addresses must be IP addresses.", e.what());
   }
+}
+
+// Verify that failure to initialize the base class results in an error not a crash.
+// Note that this test is depending on the current implementation of how EDS inherits from
+// `BaseDynamicClusterImpl` and how `BaseDynamicClusterImpl` does error handling to have a
+// failure occur in the base class constructor.
+// This is a regression https://github.com/envoyproxy/envoy/pull/39083.
+TEST_F(EdsTest, RejectBaseClassConstructorFailure) {
+  // Configure an invalid transport socket.
+  eds_cluster_ = parseClusterFromV3Yaml(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            api_type: REST
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            # Multiple certs are not allowed in a client context.
+            - certificate_chain: { filename: "invalid-path" }
+              private_key: { filename: "invalid-path" }
+            - certificate_chain: { filename: "invalid-path2" }
+              private_key: { filename: "invalid-path2" }
+ )EOF");
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  auto cluster_or_status = EdsClusterImpl::create(eds_cluster_, factory_context);
+
+  // The most important passing criteria is that the above didn't crash.
+
+  EXPECT_FALSE(cluster_or_status.ok());
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
@@ -2958,9 +2997,8 @@ public:
         .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
 
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               true);
     ON_CALL(server_context_.cluster_manager_, edsResourcesCache())
         .WillByDefault(
             Invoke([this]() -> Config::EdsResourcesCacheOptRef { return eds_resources_cache_; }));
@@ -3002,9 +3040,8 @@ public:
         }))
         .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               true);
     cluster_post_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     // EXPECT_EQ(initialize_phase, cluster_post_->initializePhase());
     eds_callbacks_post_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
@@ -3026,7 +3063,6 @@ public:
   bool initialized_{};
   bool initialized_post_{};
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<Random::MockRandomGenerator> random_;
   // TestScopedRuntime runtime_;

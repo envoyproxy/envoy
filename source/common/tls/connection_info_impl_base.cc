@@ -3,6 +3,8 @@
 #include <openssl/stack.h>
 
 #include "source/common/common/hex.h"
+#include "source/common/http/utility.h"
+#include "source/common/tls/cert_validator/san_matcher.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -15,6 +17,16 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+namespace {
+// There must be an version of this function for each type possible in variant `CachedValue`.
+bool shouldRecalculateCachedEntry(const std::string& str) { return str.empty(); }
+bool shouldRecalculateCachedEntry(const std::vector<std::string>& vec) { return vec.empty(); }
+bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return ptr == nullptr; }
+bool shouldRecalculateCachedEntry(const bssl::UniquePtr<GENERAL_NAMES>& ptr) {
+  return ptr == nullptr;
+}
+} // namespace
+
 template <typename ValueType>
 const ValueType&
 ConnectionInfoImplBase::getCachedValueOrCreate(CachedValueTag tag,
@@ -24,6 +36,16 @@ ConnectionInfoImplBase::getCachedValueOrCreate(CachedValueTag tag,
     const ValueType* val = absl::get_if<ValueType>(&it->second);
     ASSERT(val != nullptr, "Incorrect type in variant");
     if (val != nullptr) {
+
+      // Some values are retrieved too early, for example if properties of a peer certificate are
+      // retrieved before the handshake is complete, an empty value is cached. The value must be
+      // in the cache, so that we can return a valid reference, but in those cases if another caller
+      // later retrieves the same value, we must recalculate the value.
+      if (shouldRecalculateCachedEntry(*val)) {
+        it->second = create(ssl());
+        val = &absl::get<ValueType>(it->second);
+      }
+
       return *val;
     }
   }
@@ -176,8 +198,7 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificate()
         size_t length;
         RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
         absl::string_view pem(reinterpret_cast<const char*>(output), length);
-        return absl::StrReplaceAll(
-            pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
+        return Envoy::Http::Utility::PercentEncoding::urlEncode(pem);
       });
 }
 
@@ -201,13 +222,34 @@ const std::string& ConnectionInfoImplBase::urlEncodedPemEncodedPeerCertificateCh
           RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
 
           absl::string_view pem(reinterpret_cast<const char*>(output), length);
-          absl::StrAppend(
-              &result,
-              absl::StrReplaceAll(
-                  pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}}));
+          absl::StrAppend(&result, Envoy::Http::Utility::PercentEncoding::urlEncode(pem));
         }
         return result;
       });
+}
+
+bool ConnectionInfoImplBase::peerCertificateSanMatches(const Ssl::SanMatcher& matcher) const {
+  const bssl::UniquePtr<GENERAL_NAMES>& sans =
+      getCachedValueOrCreate<bssl::UniquePtr<GENERAL_NAMES>>(
+          CachedValueTag::PeerCertificateSanMatches,
+          [](SSL* ssl) -> bssl::UniquePtr<GENERAL_NAMES> {
+            bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl));
+            if (!cert) {
+              return nullptr;
+            }
+            return bssl::UniquePtr<GENERAL_NAMES>(static_cast<GENERAL_NAMES*>(
+                X509_get_ext_d2i(cert.get(), NID_subject_alt_name, nullptr, nullptr)));
+          });
+
+  if (sans != nullptr) {
+    for (const GENERAL_NAME* san : sans.get()) {
+      if (matcher.match(san)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 absl::Span<const std::string> ConnectionInfoImplBase::uriSanPeerCertificate() const {

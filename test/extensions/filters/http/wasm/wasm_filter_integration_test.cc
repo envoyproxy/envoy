@@ -237,6 +237,16 @@ TEST_P(WasmFilterIntegrationTest, BodyBufferedMultipleChunksManipulation) {
           "upstream_very_long_body.end");
 }
 
+TEST_P(WasmFilterIntegrationTest, PanicReturn503) {
+  setupWasmFilter("", "panic");
+  HttpIntegrationTest::initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("http"), "GET", "/", "", downstream_protocol_, version_);
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+}
+
 TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
   // TODO(wbpcode): upstream HTTP filter couldn't stop the iteration correctly.
   if (bool downstream = std::get<2>(GetParam()); !downstream) {

@@ -23,8 +23,8 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "quiche/common/platform/api/quiche_mem_slice.h"
 #include "quiche/common/platform/api/quiche_system_event_loop.h"
+#include "quiche/common/quiche_mem_slice.h"
 #include "quiche/common/quiche_mem_slice_storage.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
@@ -314,18 +314,21 @@ TEST_F(QuicPlatformTest, QuicheCheck) {
   QUICHE_CHECK(1 == 1);
   QUICHE_CHECK(1 == 1) << " 1 == 1 is forever true.";
 
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
-                     "Check failed:.* Supposed to fail in debug mode.");
+  EXPECT_DEBUG_DEATH(
+      { QUICHE_DCHECK(false) << " Supposed to fail in debug mode."; },
+      "Check failed:.* Supposed to fail in debug mode.");
   EXPECT_DEBUG_DEATH({ QUICHE_DCHECK(false); }, "Check failed");
 
-  EXPECT_DEATH({ QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
-               "Check failed:.* Supposed to fail in all modes.");
+  EXPECT_DEATH(
+      { QUICHE_CHECK(false) << " Supposed to fail in all modes."; },
+      "Check failed:.* Supposed to fail in all modes.");
   EXPECT_DEATH({ QUICHE_CHECK(false); }, "Check failed");
   EXPECT_DEATH({ QUICHE_CHECK_LT(1 + 1, 2); }, "Check failed: 1 \\+ 1 \\(=2\\) < 2 \\(=2\\)");
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(1 + 1, 2); },
-                     "Check failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
-  EXPECT_DEBUG_DEATH({ QUICHE_DCHECK_NE(nullptr, nullptr); },
-                     "Check failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
+  EXPECT_DEBUG_DEATH(
+      { QUICHE_DCHECK_NE(1 + 1, 2); }, "Check failed: 1 \\+ 1 \\(=2\\) != 2 \\(=2\\)");
+  EXPECT_DEBUG_DEATH(
+      { QUICHE_DCHECK_NE(nullptr, nullptr); },
+      "Check failed: nullptr \\(=\\(null\\)\\) != nullptr \\(=\\(null\\)\\)");
 }
 
 // Test the behaviors of the cross products of

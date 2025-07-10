@@ -94,23 +94,12 @@ TEST_P(QuicHttpIntegrationTest, RuntimeEnableDraft29) {
 }
 
 TEST_P(QuicHttpIntegrationTest, CertCompressionEnabled) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.quic_support_certificate_compression", "true");
   initialize();
 
   EXPECT_LOG_CONTAINS_ALL_OF(
       Envoy::ExpectedLogMessages(
           {{"trace", "Cert compression successful"}, {"trace", "Cert decompression successful"}}),
       { testRouterHeaderOnlyRequestAndResponse(); });
-}
-
-TEST_P(QuicHttpIntegrationTest, CertCompressionDisabled) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.quic_support_certificate_compression", "false");
-  initialize();
-
-  EXPECT_LOG_NOT_CONTAINS("trace", "Cert compression successful",
-                          { testRouterHeaderOnlyRequestAndResponse(); });
 }
 
 TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
@@ -225,45 +214,6 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_TRUE(quic_session->IsResumption());
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
-  // Close the second connection.
-  codec_client_->close();
-}
-
-// Envoy Mobile does not have listeners, so the above test is not applicable.
-// This test ensures that a mobile client can connect when early data is disabled on the QUICHE
-// layer.
-TEST_P(QuicHttpIntegrationTest, ClientEarlyDataDisabled) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_disable_client_early_data",
-                                    "true");
-  // Make sure all connections use the same PersistentQuicInfoImpl.
-  concurrency_ = 1;
-  initialize();
-  // Start the first connection.
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
-            codec_client_->connection()->requestedServerName());
-  // Send a complete request on the first connection.
-  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response1->waitForEndStream());
-  // Close the first connection.
-  codec_client_->close();
-
-  // Start a second connection.
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Send a complete request on the second connection.
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response2->waitForEndStream());
-  // Ensure the 2nd connection is using resumption ticket but doesn't accept early data.
-  EnvoyQuicClientSession* quic_session =
-      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
-  EXPECT_TRUE(quic_session->IsResumption());
-  EXPECT_FALSE(quic_session->EarlyDataAccepted());
-  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().EarlyData).empty());
-
   // Close the second connection.
   codec_client_->close();
 }
@@ -560,6 +510,24 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
   codec_client_->close();
 }
 
+// Test to ensure code coverage of the flag codepath.
+TEST_P(QuicHttpIntegrationTest, DoNotValidatePseudoHeaders) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.validate_http3_pseudo_headers",
+                                    "false");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  codec_client_->close();
+}
+
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
   config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
 
@@ -733,22 +701,22 @@ typed_config:
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
 
-  // Change the configured cert validation to defer 1s * TIMEOUT_FACTOR.
+  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
   auto* cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000 * TIMEOUT_FACTOR));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->setExpectedPeerAddress(fmt::format(
           "{}:{}", Network::Test::getLoopbackAddressUrlString(version_), lookupPort("http")));
-  // Change the handshake timeout to be 500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
   // validation is pending.
   quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(500 * TIMEOUT_FACTOR);
+      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -775,19 +743,19 @@ typed_config:
   )EOF"),
                             *custom_validator_config);
   ssl_client_option_.setCustomCertValidatorConfig(custom_validator_config.get());
-  // Change the configured cert validation to defer 1s * TIMEOUT_FACTOR.
+  // Change the configured cert validation to defer 3s * TIMEOUT_FACTOR.
   auto cert_validator_factory =
       Registry::FactoryRegistry<Extensions::TransportSockets::Tls::CertValidatorFactory>::
           getFactory("envoy.tls.cert_validator.timed_cert_validator");
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
       ->resetForTest();
   static_cast<Extensions::TransportSockets::Tls::TimedCertValidatorFactory*>(cert_validator_factory)
-      ->setValidationTimeOutMs(std::chrono::milliseconds(1000 * TIMEOUT_FACTOR));
+      ->setValidationTimeOutMs(std::chrono::milliseconds(3000 * TIMEOUT_FACTOR));
   initialize();
-  // Change the handshake timeout to be 500ms * TIMEOUT_FACTOR to fail the handshake while the cert
+  // Change the handshake timeout to be 1500ms * TIMEOUT_FACTOR to fail the handshake while the cert
   // validation is pending.
   quic::QuicTime::Delta connect_timeout =
-      quic::QuicTime::Delta::FromMilliseconds(500 * TIMEOUT_FACTOR);
+      quic::QuicTime::Delta::FromMilliseconds(1500 * TIMEOUT_FACTOR);
   auto& persistent_info = static_cast<PersistentQuicInfoImpl&>(*quic_connection_persistent_info_);
   persistent_info.quic_config_.set_max_idle_time_before_crypto_handshake(connect_timeout);
   persistent_info.quic_config_.set_max_time_before_crypto_handshake(connect_timeout);
@@ -1017,7 +985,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
 
-TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithEnvoyReset) {
+// TODO(RyanTheOptimist): Re-enable after figuring out how to cause this reset.
+TEST_P(QuicHttpIntegrationTest, DISABLED_DeferredLoggingWithEnvoyReset) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_act_upon_invalid_header",
       "false");
@@ -1227,6 +1196,22 @@ TEST_P(QuicHttpIntegrationTest, ConfigureAlpnProtocols) {
             codec_client_->connection()->requestedServerName());
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  codec_client_->close();
+}
+
+TEST_P(QuicHttpIntegrationTest, DisableQpack) {
+  initialize();
+
+  codec_client_ = makeRawHttp3Connection(makeClientConnection(lookupPort("http")), absl::nullopt,
+                                         /*wait_for_1rtt_key*/ true, /*disable_qpack*/ true);
+  auto headers = default_request_headers_;
+  headers.addCopy("cookie", "x;y");
+  auto response = codec_client_->makeHeaderOnlyRequest(headers);
+  waitForNextUpstreamRequest(0);
+  // Cookie crumbling is disabled along with QPACK.
+  EXPECT_THAT(upstream_request_->headers(), HeaderHasValueRef("cookie", "x;y"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();

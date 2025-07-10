@@ -62,6 +62,10 @@ public:
     close(type);
   }
 
+  void closeConnection(Network::ConnectionCloseAction) override {
+    IS_ENVOY_BUG("unexpected call to closeConnection for QUIC");
+  }
+
   Network::DetectedCloseType detectedCloseType() const override {
     return Network::DetectedCloseType::Normal;
   }
@@ -175,6 +179,8 @@ public:
 
   void incrementSentQuicResetStreamErrorStats(quic::QuicResetStreamError error, bool from_self,
                                               bool is_upstream);
+
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override;
 
 protected:
   // Propagate connection close to network_connection_callbacks_.

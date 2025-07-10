@@ -32,7 +32,6 @@
 #ifdef ENVOY_ENABLE_QUIC
 #include "quiche/common/platform/api/quiche_flags.h"
 #endif
-ABSL_DECLARE_FLAG(bool, envoy_reloadable_features_boolean_to_string_fix);
 
 using testing::_;
 using testing::Invoke;
@@ -761,6 +760,37 @@ TEST_F(StaticLoaderImplTest, ProtoParsing) {
       .createEntry(empty_value, "");
 }
 
+// Test that an ENVOY_BUG is emitted for a value with `envoy.reloadable_features` as a prefix which
+// isn't an actual feature flag.
+TEST_F(StaticLoaderImplTest, ProtoParsingRuntimeFeaturePrefix) {
+  // Validate proto parsing sanity.
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.not_a_feature: true
+  )EOF");
+  EXPECT_ENVOY_BUG(setup(),
+                   "Using a removed guard envoy.reloadable_features.not_a_feature. In future "
+                   "version of Envoy this will be treated as invalid configuration");
+}
+
+// Test that legacy names do not result in an ENVOY_BUG and the values can be fetched correctly.
+// Success for this test relies on no ENVOY_BUG triggering, which means this would only fail
+// in a debug build if the bug was present.
+TEST_F(StaticLoaderImplTest, ProtoParsingRuntimeFeaturePrefixLegacy) {
+  // Validate proto parsing sanity.
+  base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
+    envoy.reloadable_features.max_request_headers_count: 2
+    envoy.reloadable_features.max_response_headers_count: 3
+    envoy.reloadable_features.max_request_headers_size_kb: 4
+    envoy.reloadable_features.max_response_headers_size_kb: 5
+  )EOF");
+  setup();
+
+  EXPECT_EQ(2, loader_->snapshot().getInteger(Http::MaxRequestHeadersCountOverrideKey, 0));
+  EXPECT_EQ(3, loader_->snapshot().getInteger(Http::MaxResponseHeadersCountOverrideKey, 0));
+  EXPECT_EQ(4, loader_->snapshot().getInteger(Http::MaxRequestHeadersSizeOverrideKey, 0));
+  EXPECT_EQ(5, loader_->snapshot().getInteger(Http::MaxResponseHeadersSizeOverrideKey, 0));
+}
+
 TEST_F(StaticLoaderImplTest, InvalidNumerator) {
   base_ = TestUtility::parseYaml<ProtobufWkt::Struct>(R"EOF(
     invalid_numerator:
@@ -1261,10 +1291,8 @@ TEST_F(RtdsLoaderImplTest, BadConfigSource) {
                             "bad config");
 }
 
-TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
+TEST_F(RtdsLoaderImplTest, BooleanToStringConversion) {
   setup();
-
-  absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, true);
 
   auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_resource
@@ -1276,23 +1304,6 @@ TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagEnabled) {
   doOnConfigUpdateVerifyNoThrow(runtime);
 
   EXPECT_EQ("true", loader_->snapshot().get("toggle").value().get());
-}
-
-TEST_F(RtdsLoaderImplTest, BooleanToStringConversionWhenFlagDisabled) {
-  setup();
-
-  absl::SetFlag(&FLAGS_envoy_reloadable_features_boolean_to_string_fix, false);
-
-  auto runtime = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
-    name: some_resource
-    layer:
-      toggle: true
-  )EOF");
-
-  EXPECT_CALL(rtds_init_callback_, Call());
-  doOnConfigUpdateVerifyNoThrow(runtime);
-
-  EXPECT_EQ("1", loader_->snapshot().get("toggle").value().get()); // Assuming previous behavior
 }
 
 } // namespace

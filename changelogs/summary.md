@@ -1,31 +1,50 @@
 **Summary of changes**:
 
-* c-ares:
-  - [CVE-2024-25629](https://github.com/c-ares/c-ares/security/advisories/GHSA-mg26-v6qh-x48q) Out of bounds read in c-ares (DNS)
+* Security:
+  - Fixed TLS inspector handling of client hello messages larger than 16KB.
+  - Fixed bug where empty trusted CA files were accepted, causing validation of any certificate chain.
+
+* Build:
+  - **Major**: Upgraded to C++20, enabling modern C++ features throughout the codebase.
+  - Consolidated clang/gcc toolchains using ``--config=clang`` or ``--config=gcc``.
+  - **Breaking**: Removed ``grpc_credentials/aws_iam`` extension and contrib squash filter.
+
 * HTTP:
-  - RFC1918 addresses are no longer considered to be internal addresses by default. This addresses a security issue for Envoys in multi-tenant mesh environments.
-  - Shadow requests are now streamed in parallel with the original request.
-  - Local replies now traverse the filter chain if 1xx headers have been sent to the client.
-* Tracing:
-  - Removed support for (long deprecated) Opencensus tracing extension.
-* Wasm:
-  - The route cache will *not* be cleared by default if a Wasm extension modifies the request headers and the ABI version of wasm extension is larger than 0.2.1.
-  - Remove previously deprecated xDS attributes from `get_property`, use `xds` attributes instead.
-  - Added Wasm VM reload support and support for plugins writtin in Go.
-* Access log:
-  - New implementation of the JSON formatter is enabled by default.
-* CSRF:
-  - Increase the statistics counter `missing_source_origin` only for requests with a missing source origin.
-* DNS:
-  - Added nameserver rotation and query timeouts/retries to the c-ares resolver.
-* Formatter:
-  - `NaN` and `Infinity` values of float will be serialized to `null` and `inf` respectively in the metadata (`DYNAMIC_METADATA`, `CLUSTER_METADATA`, etc.) formatters.
-* OAuth2:
-  - `use_refresh_token` is now enabled by default.
-  - Implement the Signed Double-Submit Cookie pattern.
-* QUIC:
-  - Enable UDP GRO in QUIC client connections by default.
-* SDS:
-  - Relaxed the backing cluster validation for Secret Discovery Service (SDS).
-* TLS:
-  - Added support for P-384 and P-521 curves for server certificates, improved upstream SNI and SAN validation support.
+  - Added ``x-envoy-original-host`` header to record original host values before mutation.
+  - Added HTTP/3 pseudo header validation (disable via ``envoy.restart_features.validate_http3_pseudo_headers``).
+  - Fixed HTTP/1 parser to properly handle newlines between requests per RFC 9112.
+  - Added request/response trailer mutations support in header mutation filter.
+
+* Load balancing:
+  - Added override host load balancing policy.
+  - Added hash policy configuration directly to ring hash and maglev load balancers.
+  - Added matcher-based cluster specifier plugin for dynamic cluster selection.
+
+* External processing:
+  - Added ``FULL_DUPLEX_STREAMED`` body mode for bidirectional streaming.
+  - Implemented graceful gRPC side stream closing with timeout.
+  - Added per-route ``failure_mode_allow`` override support.
+
+* Authentication:
+  - Added OAuth2 token encryption, configurable token expiration, and OIDC logout support.
+  - Added API key auth filter with forwarding configuration.
+  - Added AWS IAM Roles Anywhere support.
+
+* Observability:
+  - Added TLS certificate expiration metrics.
+  - Enhanced transport tap with streaming trace capability.
+  - Added JA4 fingerprinting to TLS inspector.
+  - Added TCP tunneling access log substitution strings.
+
+* New features:
+  - Dynamic modules: Added support for ``LocalityLbEndpoints`` metadata and SSL connection info attributes.
+  - Stateful session cookie attributes and envelope mode support.
+  - Redis proxy AWS IAM authentication and ``scan``/``info`` command support.
+  - Lua filter access to filter context and typed metadata.
+  - ``ServerNameMatcher`` for trie-based domain matching.
+
+* Notable fixes:
+  - Fixed Wasm hang after VM crash in request callbacks.
+  - Fixed Lua filter crash when removing status header.
+  - Fixed connection pool capacity calculation issues.
+  - Improved TCP proxy retry logic to avoid connection issues.

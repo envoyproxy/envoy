@@ -32,7 +32,10 @@
 #include "source/common/http/utility.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/protobuf/utility.h"
+
+#ifdef ENVOY_ENABLE_QUIC
 #include "source/common/quic/server_connection_factory.h"
+#endif
 #include "source/common/router/route_provider_manager.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/tracing/custom_tag_impl.h"
@@ -367,8 +370,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           config.http3_protocol_options(), config.has_stream_error_on_invalid_http_message(),
           config.stream_error_on_invalid_http_message())),
       http1_settings_(Http::Http1::parseHttp1Settings(
-          config.http_protocol_options(), context.messageValidationVisitor(),
-          config.stream_error_on_invalid_http_message(),
+          config.http_protocol_options(), context.serverFactoryContext(),
+          context.messageValidationVisitor(), config.stream_error_on_invalid_http_message(),
           xff_num_trusted_hops_ == 0 && use_remote_address_)),
       max_request_headers_kb_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, max_request_headers_kb,
@@ -772,6 +775,7 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
         maxRequestHeadersKb(), maxRequestHeadersCount(), headersWithUnderscoresAction(),
         overload_manager);
   case CodecType::HTTP3:
+#ifdef ENVOY_ENABLE_QUIC
     return Config::Utility::getAndCheckFactoryByName<QuicHttpServerConnectionFactory>(
                "quic.http_server_connection.default")
         .createQuicHttpServerConnectionImpl(
@@ -779,6 +783,11 @@ Http::ServerConnectionPtr HttpConnectionManagerConfig::createCodec(
             Http::Http3::CodecStats::atomicGet(http3_codec_stats_, context_.scope()),
             http3_options_, maxRequestHeadersKb(), maxRequestHeadersCount(),
             headersWithUnderscoresAction());
+#else
+    // Should be blocked by configuration checking at an earlier point.
+    PANIC("unexpected");
+#endif
+    break;
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(),

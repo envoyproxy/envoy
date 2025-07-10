@@ -213,8 +213,9 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
-  if (!enable_ja3_fingerprinting) {
+std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting,
+                                             bool enable_ja4_fingerprinting) {
+  if (!enable_ja3_fingerprinting && !enable_ja4_fingerprinting) {
     return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
@@ -227,6 +228,7 @@ name: "envoy.filters.listener.tls_inspector"
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   enable_ja3_fingerprinting: true
+  enable_ja4_fingerprinting: true
 )EOF";
 }
 
@@ -337,29 +339,6 @@ name: health_check
 typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
-)EOF";
-}
-
-std::string ConfigHelper::defaultSquashFilter() {
-  return R"EOF(
-name: squash
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.squash.v3.Squash
-  cluster: squash
-  attachment_template:
-    spec:
-      attachment:
-        env: "{{ SQUASH_ENV_TEST }}"
-      match_request: true
-  attachment_timeout:
-    seconds: 1
-    nanos: 0
-  attachment_poll_period:
-    seconds: 2
-    nanos: 0
-  request_timeout:
-    seconds: 1
-    nanos: 0
 )EOF";
 }
 
@@ -672,7 +651,8 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
 }
 
 envoy::config::route::v3::RouteConfiguration
-ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster) {
+ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster,
+                               bool header_mutations) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
 #ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -686,10 +666,31 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
     )EOF",
                                         name, cluster),
                             route);
+
+  if (header_mutations) {
+    auto* route_entry = route.mutable_virtual_hosts(0)->mutable_routes(0);
+    auto* header1 = route_entry->add_request_headers_to_add();
+    *header1->mutable_header()->mutable_key() = "test-metadata";
+    *header1->mutable_header()->mutable_value() = "%METADATA(ROUTE:com.test.my_filter)%";
+
+    auto* header2 = route_entry->add_response_headers_to_add();
+    *header2->mutable_header()->mutable_key() = "test-cel";
+    *header2->mutable_header()->mutable_value() = "%CEL(request.headers['some-header'])%";
+
+    auto* header3 = route_entry->add_response_headers_to_add();
+    *header3->mutable_header()->mutable_key() = "test-other-command";
+    *header3->mutable_header()->mutable_value() = "%START_TIME%";
+
+    auto* header4 = route_entry->add_response_headers_to_add();
+    *header4->mutable_header()->mutable_key() = "test-plain";
+    *header4->mutable_header()->mutable_value() = "plain";
+  }
+
   return route;
 #else
   UNREFERENCED_PARAMETER(name);
   UNREFERENCED_PARAMETER(cluster);
+  UNREFERENCED_PARAMETER(header_mutations);
   PANIC("YAML support compiled out");
 #endif
 }
@@ -990,6 +991,15 @@ void ConfigHelper::setHttp2(envoy::config::cluster::v3::Cluster& cluster) {
   setProtocolOptions(cluster, protocol_options);
 }
 
+void ConfigHelper::setHttp2WithMaxConcurrentStreams(envoy::config::cluster::v3::Cluster& cluster,
+                                                    uint32_t max_concurrent_streams) {
+  HttpProtocolOptions protocol_options;
+  auto* http2_options =
+      protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+  http2_options->mutable_max_concurrent_streams()->set_value(max_concurrent_streams);
+  setProtocolOptions(cluster, protocol_options);
+}
+
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
   RELEASE_ASSERT(!finalized_, "");
 
@@ -1201,7 +1211,7 @@ void ConfigHelper::disableDelayClose() {
              hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
 }
 
-void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {
+void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint32_t max_requests_per_connection) {
   addConfigModifier(
       [max_requests_per_connection](
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&

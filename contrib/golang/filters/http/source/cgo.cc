@@ -37,10 +37,10 @@ std::vector<std::string> stringsFromGoSlice(void* slice_data, int slice_len) {
   if (slice_len == 0) {
     return list;
   }
-  auto strs = reinterpret_cast<char**>(slice_data);
+  auto strs = reinterpret_cast<GoString*>(slice_data);
   for (auto i = 0; i < slice_len; i += 2) {
-    auto key = std::string(strs[i + 0]);
-    auto value = std::string(strs[i + 1]);
+    auto key = std::string(strs[i + 0].p, strs[i + 0].n);
+    auto value = std::string(strs[i + 1].p, strs[i + 1].n);
     list.push_back(key);
     list.push_back(value);
   }
@@ -361,6 +361,15 @@ CAPIStatus envoyGoFilterHttpGetStringProperty(void* r, void* key_data, int key_l
                                      });
 }
 
+CAPIStatus envoyGoFilterHttpGetStringSecret(void* r, void* key_data, int key_len,
+                                            uint64_t* value_data, int* value_len) {
+  return envoyGoFilterHandlerWrapper(
+      r, [key_data, key_len, value_data, value_len](std::shared_ptr<Filter>& filter) -> CAPIStatus {
+        auto key_str = stringViewFromGoPointer(key_data, key_len);
+        return filter->getSecret(key_str, value_data, value_len);
+      });
+}
+
 CAPIStatus envoyGoFilterHttpDefineMetric(void* c, uint32_t metric_type, void* name_data,
                                          int name_len, uint32_t* metric_id) {
   return envoyGoConfigHandlerWrapper(
@@ -390,6 +399,17 @@ CAPIStatus envoyGoFilterHttpRecordMetric(void* c, uint32_t metric_id, uint64_t v
   return envoyGoConfigHandlerWrapper(
       c, [metric_id, value](std::shared_ptr<FilterConfig>& filter_config) -> CAPIStatus {
         return filter_config->recordMetric(metric_id, value);
+      });
+}
+
+CAPIStatus envoyGoFilterHttpSetUpstreamOverrideHost(void* s, void* host_data, int host_len,
+                                                    bool strict) {
+  return envoyGoFilterProcessStateHandlerWrapper(
+      s,
+      [host_data, host_len, strict](std::shared_ptr<Filter>& filter,
+                                    ProcessorState& state) -> CAPIStatus {
+        auto host_str = stringViewFromGoPointer(host_data, host_len);
+        return filter->setUpstreamOverrideHost(state, host_str, strict);
       });
 }
 

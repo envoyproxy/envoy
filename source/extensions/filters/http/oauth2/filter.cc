@@ -27,6 +27,7 @@
 #include "absl/strings/str_split.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/status.h"
+#include "openssl/rand.h"
 
 using namespace std::chrono_literals;
 
@@ -44,12 +45,17 @@ constexpr const char* CookieDeleteFormatString =
 constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
+constexpr const char* OIDCLogoutUrlFormatString =
+    "{0}?id_token_hint={1}&client_id={2}&post_logout_redirect_uri={3}";
+
 constexpr absl::string_view UnauthorizedBodyMessage = "OAuth flow failed.";
 
 constexpr absl::string_view queryParamsError = "error";
 constexpr absl::string_view queryParamsCode = "code";
 constexpr absl::string_view queryParamsState = "state";
 constexpr absl::string_view queryParamsRedirectUri = "redirect_uri";
+constexpr absl::string_view queryParamsCodeChallenge = "code_challenge";
+constexpr absl::string_view queryParamsCodeChallengeMethod = "code_challenge_method";
 
 constexpr absl::string_view stateParamsUrl = "url";
 constexpr absl::string_view stateParamsCsrfToken = "csrf_token";
@@ -59,11 +65,15 @@ constexpr absl::string_view REDIRECT_LOGGED_IN = "oauth.logged_in";
 constexpr absl::string_view REDIRECT_FOR_CREDENTIALS = "oauth.missing_credentials";
 constexpr absl::string_view SIGN_OUT = "oauth.sign_out";
 constexpr absl::string_view DEFAULT_AUTH_SCOPE = "user";
+constexpr absl::string_view OAUTH2_SCOPE_OPENID = "openid";
 
 constexpr absl::string_view SameSiteLax = ";SameSite=Lax";
 constexpr absl::string_view SameSiteStrict = ";SameSite=Strict";
 constexpr absl::string_view SameSiteNone = ";SameSite=None";
 constexpr absl::string_view HmacPayloadSeparator = "\n";
+
+constexpr int DEFAULT_CSRF_TOKEN_EXPIRES_IN = 600;
+constexpr int DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN = 600;
 
 template <class T>
 std::vector<Http::HeaderUtility::HeaderDataPtr>
@@ -102,7 +112,7 @@ authScopesList(const Protobuf::RepeatedPtrField<std::string>& auth_scopes_protos
 std::string encodeResourceList(const Protobuf::RepeatedPtrField<std::string>& resources_protos) {
   std::string result = "";
   for (const auto& resource : resources_protos) {
-    result += "&resource=" + Http::Utility::PercentEncoding::urlEncodeQueryParameter(resource);
+    result += "&resource=" + Http::Utility::PercentEncoding::urlEncode(resource);
   }
   return result;
 }
@@ -161,8 +171,7 @@ Http::Utility::QueryParamsMulti buildAutorizationQueryParams(
   query_params.overwrite("client_id", proto_config.credentials().client_id());
   query_params.overwrite("response_type", "code");
   std::string scopes_list = absl::StrJoin(authScopesList(proto_config.auth_scopes()), " ");
-  query_params.overwrite("scope",
-                         Http::Utility::PercentEncoding::urlEncodeQueryParameter(scopes_list));
+  query_params.overwrite("scope", Http::Utility::PercentEncoding::urlEncode(scopes_list));
   return query_params;
 }
 
@@ -228,6 +237,30 @@ bool validateCsrfTokenHmac(const std::string& hmac_secret, const std::string& cs
   return generateHmacBase64(hmac_secret_vec, token) == hmac;
 }
 
+// Generates a PKCE code verifier with 32 octets of randomness.
+// This follows recommendations in RFC 7636:
+// https://datatracker.ietf.org/doc/html/rfc7636#section-7.1
+std::string generateCodeVerifier(Random::RandomGenerator& random) {
+  MemBlockBuilder<uint64_t> mem_block(4);
+  // create 4 random uint64_t values to fill the buffer because RFC 7636 recommends 32 octets of
+  // randomness.
+  for (size_t i = 0; i < 4; i++) {
+    mem_block.appendOne(random.random());
+  }
+
+  std::unique_ptr<uint64_t[]> data = mem_block.release();
+  return Base64Url::encode(reinterpret_cast<char*>(data.get()), 4 * sizeof(uint64_t));
+}
+
+// Generates a PKCE code challenge from a code verifier.
+std::string generateCodeChallenge(const std::string& code_verifier) {
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  std::vector<uint8_t> sha256_digest =
+      crypto_util.getSha256Digest(Buffer::OwnedImpl(code_verifier));
+  std::string sha256_string(sha256_digest.begin(), sha256_digest.end());
+  return Base64Url::encode(sha256_string.data(), sha256_string.size());
+}
+
 /**
  * Encodes the state parameter for the OAuth2 flow.
  * The state parameter is a base64Url encoded JSON object containing the original request URL and a
@@ -242,6 +275,129 @@ std::string encodeState(const std::string& original_request_url, const std::stri
   return Base64Url::encode(json.data(), json.size());
 }
 
+/**
+ * Encrypt a plaintext string using AES-256-CBC.
+ */
+std::string encrypt(const std::string& plaintext, const std::string& secret,
+                    Random::RandomGenerator& random) {
+  // Generate the key from the secret using SHA-256
+  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH); // AES-256 requires 256-bit (32 bytes) key
+  SHA256(reinterpret_cast<const unsigned char*>(secret.c_str()), secret.size(), key.data());
+
+  // Generate a random IV
+  MemBlockBuilder<uint64_t> mem_block(4);
+  // create 2 random uint64_t values to fill the buffer because AES-256-CBC requires 16 bytes IV
+  for (size_t i = 0; i < 2; i++) {
+    mem_block.appendOne(random.random());
+  }
+
+  std::unique_ptr<uint64_t[]> data = mem_block.release();
+  const unsigned char* raw_data = reinterpret_cast<const unsigned char*>(data.get());
+
+  // AES uses 16-byte IV
+  std::vector<unsigned char> iv(16);
+  iv.assign(raw_data, raw_data + 16);
+
+  EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+  RELEASE_ASSERT(ctx, "Failed to create context");
+
+  std::vector<unsigned char> ciphertext(plaintext.size() + EVP_MAX_BLOCK_LENGTH);
+  int len = 0, ciphertext_len = 0;
+
+  // Initialize encryption operation
+  int result = EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data());
+  RELEASE_ASSERT(result == 1, "Encryption initialization failed");
+
+  // Encrypt the plaintext
+  result = EVP_EncryptUpdate(ctx, ciphertext.data(), &len,
+                             reinterpret_cast<const unsigned char*>(plaintext.c_str()),
+                             plaintext.size());
+  RELEASE_ASSERT(result == 1, "Encryption update failed");
+
+  ciphertext_len += len;
+
+  // Finalize encryption
+  result = EVP_EncryptFinal_ex(ctx, ciphertext.data() + len, &len);
+  RELEASE_ASSERT(result == 1, "Encryption finalization failed");
+
+  ciphertext_len += len;
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  // AES uses 16-byte IV
+  ciphertext.resize(ciphertext_len);
+
+  // Prepend the IV to the ciphertext
+  std::vector<unsigned char> combined(iv.size() + ciphertext.size());
+  std::copy(iv.begin(), iv.end(), combined.begin());
+  std::copy(ciphertext.begin(), ciphertext.end(), combined.begin() + iv.size());
+
+  // Base64Url encode the IV + ciphertext
+  return Base64Url::encode(reinterpret_cast<const char*>(combined.data()), combined.size());
+}
+
+struct DecryptResult {
+  std::string plaintext;
+  absl::optional<std::string> error;
+};
+
+/**
+ * Decrypt an AES-256-CBC encrypted string.
+ */
+DecryptResult decrypt(const std::string& encrypted, const std::string& secret) {
+  // Decode the Base64Url-encoded input
+  std::string decoded = Base64Url::decode(encrypted);
+  std::vector<unsigned char> combined(decoded.begin(), decoded.end());
+
+  if (combined.size() <= 16) {
+    return {"", "Invalid encrypted data"};
+  }
+
+  // Extract the IV (first 16 bytes)
+  std::vector<unsigned char> iv(combined.begin(), combined.begin() + 16);
+
+  // Extract the ciphertext (remaining bytes)
+  std::vector<unsigned char> ciphertext(combined.begin() + 16, combined.end());
+
+  // Generate the key from the secret using SHA-256
+  std::vector<unsigned char> key(SHA256_DIGEST_LENGTH);
+  SHA256(reinterpret_cast<const unsigned char*>(secret.c_str()), secret.size(), key.data());
+
+  EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+  RELEASE_ASSERT(ctx, "Failed to create context");
+
+  std::vector<unsigned char> plaintext(ciphertext.size() + EVP_MAX_BLOCK_LENGTH);
+  int len = 0, plaintext_len = 0;
+
+  // Initialize decryption operation
+  if (EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), nullptr, key.data(), iv.data()) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return {"", "failed to initialize decryption"};
+  }
+
+  // Decrypt the ciphertext
+  if (EVP_DecryptUpdate(ctx, plaintext.data(), &len, ciphertext.data(), ciphertext.size()) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return {"", "failed to decrypt data"};
+  }
+  plaintext_len += len;
+
+  // Finalize decryption
+  if (EVP_DecryptFinal_ex(ctx, plaintext.data() + len, &len) != 1) {
+    EVP_CIPHER_CTX_free(ctx);
+    return {"", "failed to finalize decryption"};
+  }
+
+  plaintext_len += len;
+
+  EVP_CIPHER_CTX_free(ctx);
+
+  // Resize to actual plaintext length
+  plaintext.resize(plaintext_len);
+
+  return {std::string(plaintext.begin(), plaintext.end()), std::nullopt};
+}
+
 } // namespace
 
 FilterConfig::FilterConfig(
@@ -251,12 +407,13 @@ FilterConfig::FilterConfig(
     const std::string& stats_prefix)
     : oauth_token_endpoint_(proto_config.token_endpoint()),
       authorization_endpoint_(proto_config.authorization_endpoint()),
+      end_session_endpoint_(proto_config.end_session_endpoint()),
       authorization_query_params_(buildAutorizationQueryParams(proto_config)),
       client_id_(proto_config.credentials().client_id()),
       redirect_uri_(proto_config.redirect_uri()),
       redirect_matcher_(proto_config.redirect_path_matcher(), context),
       signout_path_(proto_config.signout_path(), context), secret_reader_(secret_reader),
-      stats_(FilterConfig::generateStats(stats_prefix, scope)),
+      stats_(FilterConfig::generateStats(stats_prefix, proto_config.stat_prefix(), scope)),
       encoded_resource_query_params_(encodeResourceList(proto_config.resources())),
       pass_through_header_matchers_(headerMatchers(proto_config.pass_through_matcher(), context)),
       deny_redirect_header_matchers_(headerMatchers(proto_config.deny_redirect_matcher(), context)),
@@ -266,6 +423,10 @@ FilterConfig::FilterConfig(
       default_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_expires_in, 0)),
       default_refresh_token_expires_in_(
           PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, default_refresh_token_expires_in, 604800)),
+      csrf_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(proto_config, csrf_token_expires_in,
+                                                             DEFAULT_CSRF_TOKEN_EXPIRES_IN)),
+      code_verifier_token_expires_in_(PROTOBUF_GET_SECONDS_OR_DEFAULT(
+          proto_config, code_verifier_token_expires_in, DEFAULT_CODE_VERIFIER_TOKEN_EXPIRES_IN)),
       forward_bearer_token_(proto_config.forward_bearer_token()),
       preserve_authorization_header_(proto_config.preserve_authorization_header()),
       use_refresh_token_(FilterConfig::shouldUseRefreshToken(proto_config)),
@@ -301,6 +462,11 @@ FilterConfig::FilterConfig(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_oauth_nonce_cookie_config())
               ? CookieSettings(proto_config.cookie_configs().oauth_nonce_cookie_config())
+              : CookieSettings()),
+      code_verifier_cookie_settings_(
+          (proto_config.has_cookie_configs() &&
+           proto_config.cookie_configs().has_code_verifier_cookie_config())
+              ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
     throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
@@ -313,6 +479,19 @@ FilterConfig::FilterConfig(
         fmt::format("OAuth2 filter: invalid authorization endpoint URL '{}' in config.",
                     authorization_endpoint_));
   }
+  if (!end_session_endpoint_.empty()) {
+    bool is_oidc = false;
+    for (const auto& scope : proto_config.auth_scopes()) {
+      if (scope == OAUTH2_SCOPE_OPENID) {
+        is_oidc = true;
+        break;
+      }
+    }
+    if (!is_oidc) {
+      throw EnvoyException(
+          "OAuth2 filter: end session endpoint is only supported for OpenID Connect.");
+    }
+  }
 
   if (proto_config.has_retry_policy()) {
     retry_policy_ = Http::Utility::convertCoreToRouteRetryPolicy(
@@ -320,8 +499,11 @@ FilterConfig::FilterConfig(
   }
 }
 
-FilterStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+FilterStats FilterConfig::generateStats(const std::string& prefix,
+                                        const std::string& filter_stats_prefix,
+                                        Stats::Scope& scope) {
+  const std::string final_prefix = absl::StrCat(prefix, filter_stats_prefix);
+  return {ALL_OAUTH_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
 bool FilterConfig::shouldUseRefreshToken(
@@ -342,7 +524,7 @@ void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,
   });
 
   expires_ = findValue(cookies, cookie_names_.oauth_expires_);
-  token_ = findValue(cookies, cookie_names_.bearer_token_);
+  access_token_ = findValue(cookies, cookie_names_.bearer_token_);
   id_token_ = findValue(cookies, cookie_names_.id_token_);
   refresh_token_ = findValue(cookies, cookie_names_.refresh_token_);
   hmac_ = findValue(cookies, cookie_names_.oauth_hmac_);
@@ -358,9 +540,9 @@ bool OAuth2CookieValidator::hmacIsValid() const {
   if (!cookie_domain_.empty()) {
     cookie_domain = cookie_domain_;
   }
-  return ((encodeHmacBase64(secret_, cookie_domain, expires_, token_, id_token_, refresh_token_) ==
-           hmac_) ||
-          (encodeHmacHexBase64(secret_, cookie_domain, expires_, token_, id_token_,
+  return ((encodeHmacBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
+                            refresh_token_) == hmac_) ||
+          (encodeHmacHexBase64(secret_, cookie_domain, expires_, access_token_, id_token_,
                                refresh_token_) == hmac_));
 }
 
@@ -396,6 +578,12 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
+  // the request upstream.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
+    decryptAndUpdateOAuthTokenCookies(headers);
+  }
+
   // Skip Filter and continue chain if a Passthrough header is matching
   // Must be done before the sanitation of the authorization header,
   // otherwise the authorization header might be altered or removed
@@ -423,6 +611,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   const Http::HeaderEntry* path_header = headers.Path();
   ASSERT(path_header != nullptr);
   const absl::string_view path_str = path_header->value().getStringView();
+
+  // Save the request headers for later modification if needed.
+  request_headers_ = &headers;
 
   // We should check if this is a sign out request.
   if (config_->signoutPath().match(path_header->value().getStringView())) {
@@ -473,8 +664,6 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
     return Http::FilterHeadersStatus::Continue;
   }
 
-  // Save the request headers for later modification if needed.
-  request_headers_ = &headers;
   // If this isn't the callback URI, redirect to acquire credentials.
   //
   // The following conditional could be replaced with a regex pattern-match,
@@ -519,8 +708,27 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri =
       formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
+
+  std::string encrypted_code_verifier =
+      Http::Utility::parseCookieValue(headers, config_->cookieNames().code_verifier_);
+  if (encrypted_code_verifier.empty()) {
+    ENVOY_LOG(error, "code verifier cookie is missing in the request");
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  DecryptResult decrypt_result = decrypt(encrypted_code_verifier, config_->hmacSecret());
+  if (decrypt_result.error.has_value()) {
+    ENVOY_LOG(error, "failed to decrypt code verifier: {}, error: {}", encrypted_code_verifier,
+              decrypt_result.error.value());
+    sendUnauthorizedResponse();
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  std::string code_verifier = decrypt_result.plaintext;
+
   oauth_client_->asyncGetAccessToken(auth_code_, config_->clientId(), config_->clientSecret(),
-                                     redirect_uri, config_->authType());
+                                     redirect_uri, code_verifier, config_->authType());
 
   // pause while we await the next step from the OAuth server
   return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
@@ -553,6 +761,66 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
   return false;
 }
 
+// Decrypt the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
+// the request upstream.
+void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const {
+  absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
+  if (cookies.empty()) {
+    return;
+  }
+
+  const CookieNames& cookie_names = config_->cookieNames();
+
+  const std::string encrypted_access_token = findValue(cookies, cookie_names.bearer_token_);
+  const std::string encrypted_id_token = findValue(cookies, cookie_names.id_token_);
+  const std::string encrypted_refresh_token = findValue(cookies, cookie_names.refresh_token_);
+
+  if (!encrypted_access_token.empty()) {
+    cookies.insert_or_assign(cookie_names.bearer_token_, decryptToken(encrypted_access_token));
+  }
+
+  if (!encrypted_id_token.empty()) {
+    cookies.insert_or_assign(cookie_names.id_token_, decryptToken(encrypted_id_token));
+  }
+
+  if (!encrypted_refresh_token.empty()) {
+    cookies.insert_or_assign(cookie_names.refresh_token_, decryptToken(encrypted_refresh_token));
+  }
+
+  if (!encrypted_access_token.empty() || !encrypted_id_token.empty() ||
+      !encrypted_refresh_token.empty()) {
+    std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+    headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
+  }
+}
+
+std::string OAuth2Filter::encryptToken(const std::string& token) const {
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
+    return encrypt(token, config_->hmacSecret(), random_);
+  }
+  return token;
+}
+
+std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const {
+  if (encrypted_token.empty()) {
+    return EMPTY_STRING;
+  }
+
+  DecryptResult decrypt_result = decrypt(encrypted_token, config_->hmacSecret());
+  if (decrypt_result.error.has_value()) {
+    ENVOY_LOG(error, "failed to decrypt token: {}, error: {}", encrypted_token,
+              decrypt_result.error.value());
+    // There are two cases:
+    // 1. The token is a legacy unencrypted token.
+    // In this case, we return the token as-is to allow the request to proceed.
+    // 2. The token is encrypted, but the decryption failed due to the HMAC secret is changed.
+    // In this case, we return the original encrypted token, the HMAC validation will fail
+    // and the user will be redirected to the OAuth server for re-authentication.
+    return encrypted_token;
+  }
+  return decrypt_result.plaintext;
+}
+
 bool OAuth2Filter::canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const {
   for (const auto& matcher : config_->denyRedirectMatchers()) {
     if (matcher->matchesHeaders(headers)) {
@@ -581,25 +849,26 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
   // The CSRF token cookie contains the CSRF token that is used to prevent CSRF attacks for the
   // OAuth flow. It was named "oauth_nonce" because the CSRF token contains a generated nonce.
   // "oauth_csrf_token" would be a more accurate name for the cookie.
-  std::string csrf_token;
-  bool csrf_token_cookie_exists = false;
-  const auto csrf_token_cookie =
-      Http::Utility::parseCookies(headers, [this](absl::string_view key) {
-        return key == config_->cookieNames().oauth_nonce_;
-      });
-  if (csrf_token_cookie.find(config_->cookieNames().oauth_nonce_) != csrf_token_cookie.end()) {
-    csrf_token = csrf_token_cookie.at(config_->cookieNames().oauth_nonce_);
-    csrf_token_cookie_exists = true;
-  } else {
-    // Generate a CSRF token to prevent CSRF attacks.
-    csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
+  std::string csrf_token =
+      Http::Utility::parseCookieValue(headers, config_->cookieNames().oauth_nonce_);
+  bool csrf_token_cookie_exists = !csrf_token.empty();
+
+  // Validate the CSRF token HMAC if the CSRF token cookie exists.
+  // If the CSRF token HMAC is invalid, it might be that the HMAC secret has changed. Clear the
+  // token and regenerate it
+  if (csrf_token_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
+    csrf_token_cookie_exists = false;
+    csrf_token.clear();
   }
 
   // Set the CSRF token cookie if it does not exist.
   if (!csrf_token_cookie_exists) {
-    // Expire the CSRF token cookie in 10 minutes.
-    // This should be enough time for the user to complete the OAuth flow.
-    std::string csrf_expires = std::to_string(10 * 60);
+    // Generate a CSRF token to prevent CSRF attacks.
+    csrf_token = generateCsrfToken(config_->hmacSecret(), random_);
+
+    const std::chrono::seconds csrf_token_expires_in = config_->getCsrfTokenExpiresIn();
+    std::string csrf_expires = std::to_string(csrf_token_expires_in.count());
+
     std::string same_site = getSameSiteString(config_->nonceCookieSettings().same_site_);
     std::string cookie_tail_http_only =
         fmt::format(CookieTailHttpOnlyFormatString, csrf_expires, same_site);
@@ -612,13 +881,6 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
         absl::StrCat(config_->cookieNames().oauth_nonce_, "=", csrf_token, cookie_tail_http_only));
   }
 
-  // Validate the CSRF token HMAC if the CSRF token cookie exists.
-  if (csrf_token_cookie_exists && !validateCsrfTokenHmac(config_->hmacSecret(), csrf_token)) {
-    ENVOY_LOG(error, "csrf token validation failed");
-    sendUnauthorizedResponse();
-    return;
-  }
-
   const std::string state = encodeState(original_url, csrf_token);
   auto query_params = config_->authorizationQueryParams();
   query_params.overwrite(queryParamsState, state);
@@ -627,9 +889,31 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
       Formatter::FormatterImpl::create(config_->redirectUri()), Formatter::FormatterPtr);
   const auto redirect_uri =
       formatter->formatWithContext({&headers}, decoder_callbacks_->streamInfo());
-  const std::string escaped_redirect_uri =
-      Http::Utility::PercentEncoding::urlEncodeQueryParameter(redirect_uri);
+  const std::string escaped_redirect_uri = Http::Utility::PercentEncoding::urlEncode(redirect_uri);
   query_params.overwrite(queryParamsRedirectUri, escaped_redirect_uri);
+
+  // Generate a PKCE code verifier and challenge for the OAuth flow.
+  const std::string code_verifier = generateCodeVerifier(random_);
+
+  const std::chrono::seconds code_verifier_token_expires_in =
+      config_->getCodeVerifierTokenExpiresIn();
+  std::string expire_in = std::to_string(code_verifier_token_expires_in.count());
+
+  std::string same_site = getSameSiteString(config_->codeVerifierCookieSettings().same_site_);
+  std::string cookie_tail_http_only =
+      fmt::format(CookieTailHttpOnlyFormatString, expire_in, same_site);
+  if (!config_->cookieDomain().empty()) {
+    cookie_tail_http_only = absl::StrCat(
+        fmt::format(CookieDomainFormatString, config_->cookieDomain()), cookie_tail_http_only);
+  }
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(config_->cookieNames().code_verifier_, "=",
+                   encrypt(code_verifier, config_->hmacSecret(), random_), cookie_tail_http_only));
+
+  const std::string code_challenge = generateCodeChallenge(code_verifier);
+  query_params.overwrite(queryParamsCodeChallenge, code_challenge);
+  query_params.overwrite(queryParamsCodeChallengeMethod, "S256");
 
   // Copy the authorization endpoint URL to replace its query params.
   auto authorization_endpoint_url = config_->authorizationEndpointUrl();
@@ -647,12 +931,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 /**
  * Modifies the state of the filter by adding response headers to the decoder_callbacks
  */
-Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) {
+Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) const {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
-
-  const std::string new_path = absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
-
   std::string cookie_domain;
   if (!config_->cookieDomain().empty()) {
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
@@ -678,7 +959,26 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
       Http::Headers::get().SetCookie,
       absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_nonce_),
                    cookie_domain));
-  response_headers->setLocation(new_path);
+  response_headers->addReferenceKey(
+      Http::Headers::get().SetCookie,
+      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().code_verifier_),
+                   cookie_domain));
+
+  const std::string post_logout_redirect_url =
+      absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
+  // If the end session endpoint is set, redirect to it to log out the user from the OpenID
+  // provider.
+  if (!config_->endSessionEndpoint().empty()) {
+    const std::string id_token =
+        Http::Utility::parseCookieValue(headers, config_->cookieNames().id_token_);
+    const std::string oidc_logout_url = fmt::format(
+        OIDCLogoutUrlFormatString, config_->endSessionEndpoint(), id_token, config_->clientId(),
+        Http::Utility::PercentEncoding::encode(post_logout_redirect_url, ":/=&?"));
+    response_headers->setLocation(oidc_logout_url);
+  } else {
+    response_headers->setLocation(post_logout_redirect_url);
+  }
+
   decoder_callbacks_->encodeHeaders(std::move(response_headers), true, SIGN_OUT);
 
   return Http::FilterHeadersStatus::StopIteration;
@@ -699,11 +999,14 @@ void OAuth2Filter::updateTokens(const std::string& access_token, const std::stri
     // * omitting from HMAC computation (for setting, not for validating)
     id_token_ = id_token;
   }
-  if (!config_->disableRefreshTokenSetCookie()) {
+  // Only set the refresh token if use_refresh_token_ is enabled and it's not disabled by config
+  if (config_->useRefreshToken() && !config_->disableRefreshTokenSetCookie()) {
     // Preventing this here excludes all other Refresh Token functionality
     // * setting the cookie
     // * omitting from HMAC computation (for setting, not for validating)
     refresh_token_ = refresh_token;
+  } else {
+    refresh_token_ = "";
   }
 
   expires_in_ = std::to_string(expires_in.count());
@@ -809,9 +1112,6 @@ std::string OAuth2Filter::BuildCookieTail(int cookie_type) const {
     same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
     expires_time = expires_refresh_token_in_;
     break;
-  case 6: // OAUTH_NONCE TYPE
-    same_site = getSameSiteString(config_->refreshTokenCookieSettings().same_site_);
-    break;
   }
 
   std::string cookie_tail = fmt::format(CookieTailHttpOnlyFormatString, expires_time, same_site);
@@ -864,7 +1164,6 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   absl::flat_hash_map<std::string, std::string> cookies =
       Http::Utility::parseCookies(*request_headers_);
 
-  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
   cookies.insert_or_assign(cookie_names.oauth_expires_, new_expires_);
 
   if (!access_token_.empty()) {
@@ -875,7 +1174,13 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   }
   if (!refresh_token_.empty()) {
     cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
+  } else if (cookies.contains(cookie_names.refresh_token_)) {
+    // If we actually went through the refresh token flow, but we didn't get a new refresh token, we
+    // want to still ensure that the old one is set if it was sent in a cookie
+    refresh_token_ = findValue(cookies, cookie_names.refresh_token_);
   }
+
+  cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
 
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
   request_headers_->setReferenceKey(Http::Headers::get().Cookie, new_cookies);
@@ -914,22 +1219,46 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
                           absl::StrCat(cookie_names.oauth_expires_, "=", new_expires_,
                                        BuildCookieTail(3))); // OAUTH_EXPIRES
 
+  absl::flat_hash_map<std::string, std::string> request_cookies =
+      Http::Utility::parseCookies(*request_headers_);
+  std::string cookie_domain;
+  if (!config_->cookieDomain().empty()) {
+    cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
+  }
+
   if (!access_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(cookie_names.bearer_token_, "=", access_token_,
+                            absl::StrCat(cookie_names.bearer_token_, "=",
+                                         encryptToken(access_token_),
                                          BuildCookieTail(1))); // BEARER_TOKEN
+  } else if (request_cookies.contains(cookie_names.bearer_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+                     cookie_domain));
   }
 
   if (!id_token_.empty()) {
+    headers.addReferenceKey(Http::Headers::get().SetCookie,
+                            absl::StrCat(cookie_names.id_token_, "=", encryptToken(id_token_),
+                                         BuildCookieTail(4))); // ID_TOKEN
+  } else if (request_cookies.contains(cookie_names.id_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(cookie_names.id_token_, "=", id_token_, BuildCookieTail(4))); // ID_TOKEN
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+                     cookie_domain));
   }
 
   if (!refresh_token_.empty()) {
     headers.addReferenceKey(Http::Headers::get().SetCookie,
-                            absl::StrCat(cookie_names.refresh_token_, "=", refresh_token_,
+                            absl::StrCat(cookie_names.refresh_token_, "=",
+                                         encryptToken(refresh_token_),
                                          BuildCookieTail(5))); // REFRESH_TOKEN
+  } else if (request_cookies.contains(cookie_names.refresh_token_)) {
+    headers.addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+                     cookie_domain));
   }
 }
 
@@ -944,8 +1273,9 @@ void OAuth2Filter::sendUnauthorizedResponse() {
 // * Does the query parameters contain the code and state?
 // * Does the state contain the original request URL and the CSRF token?
 // * Does the CSRF token in the state match the one in the cookie?
-CallbackValidationResult OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
-                                                             const absl::string_view path_str) {
+CallbackValidationResult
+OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
+                                    const absl::string_view path_str) const {
   // Return 401 unauthorized if the query parameters contain an error response.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError).has_value()) {

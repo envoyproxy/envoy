@@ -7,11 +7,13 @@ import (
 	_ "example.com/test-data/basic"
 	_ "example.com/test-data/buffer"
 	_ "example.com/test-data/bufferinjectdata"
+	_ "example.com/test-data/destroyconfig"
 	_ "example.com/test-data/echo"
 	_ "example.com/test-data/metric"
 	_ "example.com/test-data/passthrough"
 	_ "example.com/test-data/property"
 	_ "example.com/test-data/routeconfig"
+	_ "example.com/test-data/secrets"
 	_ "example.com/test-data/websocket"
 )
 

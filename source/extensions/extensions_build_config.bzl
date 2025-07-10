@@ -50,7 +50,6 @@ EXTENSIONS = {
     #
 
     "envoy.grpc_credentials.file_based_metadata":       "//source/extensions/grpc_credentials/file_based_metadata:config",
-    "envoy.grpc_credentials.aws_iam":                   "//source/extensions/grpc_credentials/aws_iam:config",
 
     #
     # WASM
@@ -179,7 +178,7 @@ EXTENSIONS = {
     "envoy.filters.http.oauth2":                        "//source/extensions/filters/http/oauth2:config",
     "envoy.filters.http.on_demand":                     "//source/extensions/filters/http/on_demand:config",
     "envoy.filters.http.original_src":                  "//source/extensions/filters/http/original_src:config",
-    "envoy.filters.http.proto_message_extraction":       "//source/extensions/filters/http/proto_message_extraction:config",
+    "envoy.filters.http.proto_message_extraction":      "//source/extensions/filters/http/proto_message_extraction:config",
     "envoy.filters.http.ratelimit":                     "//source/extensions/filters/http/ratelimit:config",
     "envoy.filters.http.rbac":                          "//source/extensions/filters/http/rbac:config",
     "envoy.filters.http.router":                        "//source/extensions/filters/http/router:config",
@@ -215,6 +214,7 @@ EXTENSIONS = {
     "envoy.filters.network.dubbo_proxy":                          "//source/extensions/filters/network/dubbo_proxy:config",
     "envoy.filters.network.echo":                                 "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                            "//source/extensions/filters/network/ext_authz:config",
+    "envoy.filters.network.ext_proc":                             "//source/extensions/filters/network/ext_proc:config",
     "envoy.filters.network.http_connection_manager":              "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.local_ratelimit":                      "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                          "//source/extensions/filters/network/mongo_proxy:config",
@@ -252,6 +252,7 @@ EXTENSIONS = {
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
     "envoy.resource_monitors.global_downstream_max_connections":   "//source/extensions/resource_monitors/downstream_connections:config",
     "envoy.resource_monitors.cpu_utilization":          "//source/extensions/resource_monitors/cpu_utilization:config",
+    "envoy.resource_monitors.cgroup_memory":          "//source/extensions/resource_monitors/cgroup_memory:config",
 
     #
     # Stat sinks
@@ -283,6 +284,7 @@ EXTENSIONS = {
     "envoy.tracers.xray":                               "//source/extensions/tracers/xray:config",
     "envoy.tracers.skywalking":                         "//source/extensions/tracers/skywalking:config",
     "envoy.tracers.opentelemetry":                      "//source/extensions/tracers/opentelemetry:config",
+    "envoy.tracers.fluentd":                            "//source/extensions/tracers/fluentd:config",
 
     #
     # OpenTelemetry Resource Detectors
@@ -296,9 +298,11 @@ EXTENSIONS = {
     # OpenTelemetry tracer samplers
     #
 
-    "envoy.tracers.opentelemetry.samplers.always_on":         "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
-    "envoy.tracers.opentelemetry.samplers.dynatrace":         "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
-    "envoy.tracers.opentelemetry.samplers.cel":               "//source/extensions/tracers/opentelemetry/samplers/cel:config",
+    "envoy.tracers.opentelemetry.samplers.cel":                           "//source/extensions/tracers/opentelemetry/samplers/cel:config",
+    "envoy.tracers.opentelemetry.samplers.always_on":                     "//source/extensions/tracers/opentelemetry/samplers/always_on:config",
+    "envoy.tracers.opentelemetry.samplers.dynatrace":                     "//source/extensions/tracers/opentelemetry/samplers/dynatrace:config",
+    "envoy.tracers.opentelemetry.samplers.parent_based":                  "//source/extensions/tracers/opentelemetry/samplers/parent_based:config",
+    "envoy.tracers.opentelemetry.samplers.trace_id_ratio_based":          "//source/extensions/tracers/opentelemetry/samplers/trace_id_ratio_based:config",
 
     #
     # Transport sockets
@@ -402,6 +406,7 @@ EXTENSIONS = {
     #
 
     "envoy.http.stateful_session.cookie":                "//source/extensions/http/stateful_session/cookie:config",
+    "envoy.http.stateful_session.envelope":              "//source/extensions/http/stateful_session/envelope:config",
     "envoy.http.stateful_session.header":                "//source/extensions/http/stateful_session/header:config",
 
     #
@@ -463,6 +468,12 @@ EXTENSIONS = {
     "envoy.rbac.matchers.upstream_ip_port":     "//source/extensions/filters/common/rbac/matchers:upstream_ip_port_lib",
 
     #
+    # RBAC principals
+    #
+
+    "envoy.rbac.principals.mtls_authenticated":        "//source/extensions/filters/common/rbac/principals/mtls_authenticated:config",
+
+    #
     # DNS Resolver
     #
 
@@ -478,6 +489,7 @@ EXTENSIONS = {
     #
 
     "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
+    "envoy.matching.custom_matchers.domain_matcher":   "//source/extensions/common/matcher:domain_matcher_lib",
 
     #
     # Header Validators
@@ -507,6 +519,7 @@ EXTENSIONS = {
     "envoy.load_balancing_policies.subset":            "//source/extensions/load_balancing_policies/subset:config",
     "envoy.load_balancing_policies.cluster_provided":  "//source/extensions/load_balancing_policies/cluster_provided:config",
     "envoy.load_balancing_policies.client_side_weighted_round_robin": "//source/extensions/load_balancing_policies/client_side_weighted_round_robin:config",
+    "envoy.load_balancing_policies.override_host":     "//source/extensions/load_balancing_policies/override_host:config",
 
     #
     # HTTP Early Header Mutation
@@ -536,7 +549,8 @@ EXTENSIONS = {
     #
     # cluster specifier plugin
     #
-    "envoy.router.cluster_specifier_plugin.lua": "//source/extensions/router/cluster_specifiers/lua:config",
+    "envoy.router.cluster_specifier_plugin.lua":     "//source/extensions/router/cluster_specifiers/lua:config",
+    "envoy.router.cluster_specifier_plugin.matcher": "//source/extensions/router/cluster_specifiers/matcher:config",
 
     #
     # Extensions for generic proxy

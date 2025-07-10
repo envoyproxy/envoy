@@ -21,6 +21,7 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
@@ -252,17 +253,6 @@ TEST_P(ClientIntegrationTest, Basic) {
     ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
   }
 }
-
-#if not defined(__APPLE__)
-TEST_P(ClientIntegrationTest, BasicWithCares) {
-  builder_.setUseCares(true);
-  initialize();
-  basicTest();
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
-  }
-}
-#endif
 
 // TODO(fredyw): Disable this until we support treating no DNS record as a failure in the Apple
 // resolver.
@@ -1444,6 +1434,21 @@ TEST_P(ClientIntegrationTest, TestProxyResolutionApi) {
 // doesn't crash. It doesn't really test the actual network change event.
 TEST_P(ClientIntegrationTest, OnNetworkChanged) {
   builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", true);
+  initialize();
+  internalEngine()->onDefaultNetworkChanged(1);
+  basicTest();
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
+  }
+}
+
+// This test is simply to test the IPv6 connectivity check and DNS refresh and make sure the code
+// doesn't crash. It doesn't really test the actual network change event, but it does ensure that
+// requests/responses still work in the presence of IP version filtering.
+TEST_P(ClientIntegrationTest, OnNetworkChangedFilterUnsableIps) {
+  builder_.addRuntimeGuard("dns_cache_set_ip_version_to_remove", false);
+  builder_.addRuntimeGuard("dns_cache_filter_unusable_ip_version", true);
+  builder_.setDisableDnsRefreshOnNetworkChange(true);
   initialize();
   internalEngine()->onDefaultNetworkChanged(1);
   basicTest();

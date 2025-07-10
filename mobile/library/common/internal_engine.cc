@@ -9,8 +9,10 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "library/common/mobile_process_wide.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
@@ -321,7 +323,7 @@ InternalEngine::~InternalEngine() {
   }
 }
 
-envoy_status_t InternalEngine::setProxySettings(const char* hostname, const uint16_t port) {
+envoy_status_t InternalEngine::setProxySettings(absl::string_view hostname, const uint16_t port) {
   return dispatcher_->post([&, host = std::string(hostname), port]() -> void {
     connectivity_manager_->setProxySettings(Network::ProxySettings::parseHostAndPort(host, port));
   });
@@ -371,6 +373,25 @@ void InternalEngine::onDefaultNetworkChanged(int network) {
   });
 }
 
+void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType /*connection_type*/,
+                                                    int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling the default network changed callback on Android");
+}
+
+void InternalEngine::onNetworkDisconnectAndroid(int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling network disconnect callback on Android");
+}
+
+void InternalEngine::onNetworkConnectAndroid(ConnectionType /*connection_type*/,
+                                             int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling network connect callback on Android");
+}
+
+void InternalEngine::purgeActiveNetworkListAndroid(
+    const std::vector<int64_t>& /*active_network_ids*/) {
+  ENVOY_LOG_MISC(trace, "Calling network purge callback on Android");
+}
+
 void InternalEngine::onDefaultNetworkUnavailable() {
   ENVOY_LOG_MISC(trace, "Calling the default network unavailable callback");
   dispatcher_->post([&]() -> void { connectivity_manager_->dnsCache()->stop(); });
@@ -380,7 +401,9 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
   envoy_netconf_t configuration =
       Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dns_cache_filter_unusable_ip_version")) {
     // The IP version to remove flag must be set first before refreshing the DNS cache so that
     // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
     // removed.
@@ -390,15 +413,12 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
       connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
     }
   }
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.reset_brokenness_on_nework_change")) {
-    Http::HttpServerPropertiesCacheManager& cache_manager =
-        server_->httpServerPropertiesCacheManager();
+  Http::HttpServerPropertiesCacheManager& cache_manager =
+      server_->httpServerPropertiesCacheManager();
 
-    Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
-        [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
-    cache_manager.forEachThreadLocalCache(clear_brokenness);
-  }
+  Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+      [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+  cache_manager.forEachThreadLocalCache(clear_brokenness);
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
     Http::HttpServerPropertiesCacheManager& cache_manager =
         server_->httpServerPropertiesCacheManager();
@@ -408,7 +428,12 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
     cache_manager.forEachThreadLocalCache(reset_status);
   }
   if (!disable_dns_refresh_on_network_change_) {
-    connectivity_manager_->refreshDns(configuration, true);
+    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
+  } else if (Runtime::runtimeFeatureEnabled(
+                 "envoy.reloadable_features.drain_pools_on_network_change")) {
+    ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
+    connectivity_manager_->clusterManager().drainConnections(
+        [](const Upstream::Host&) { return true; });
   }
 }
 

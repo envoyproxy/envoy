@@ -81,13 +81,15 @@ public:
   NiceMock<MockFaultManager> fault_manager_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  absl::flat_hash_set<std::string> custom_commands_;
   CommandSplitter::InstanceImpl splitter_{
       RouterPtr{router_},
       *store_.rootScope(),
       "redis.foo.",
       time_system_,
       false,
-      std::make_unique<NiceMock<MockFaultManager>>(fault_manager_)};
+      std::make_unique<NiceMock<MockFaultManager>>(fault_manager_),
+      std::move(custom_commands_)};
   NoOpSplitCallbacks callbacks_;
   CommandSplitter::SplitRequestPtr handle_;
 };

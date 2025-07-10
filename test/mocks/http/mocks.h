@@ -60,9 +60,9 @@ public:
   MOCK_METHOD(void, encode1xxHeaders, (ResponseHeaderMap&));
   MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
-  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr &&));
+  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr&&));
   MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
-  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
+  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr&&));
   MOCK_METHOD(void, setInformationalHeaders_, (ResponseHeaderMap&));
   void setInformationalHeaders(ResponseHeaderMapPtr&& informational_headers) override {
     informational_headers_ = std::move(informational_headers);
@@ -237,6 +237,7 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(void, refreshRouteCluster, ());
 
   std::shared_ptr<Router::MockRoute> route_;
 };
@@ -394,7 +395,7 @@ public:
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(ResponseTrailerMap&, addEncodedTrailers, ());
-  MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr &&));
+  MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr&&));
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());
   MOCK_METHOD(void, modifyEncodingBuffer, (std::function<void(Buffer::Instance&)>));
@@ -699,7 +700,7 @@ public:
   const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
     return early_header_mutation_extensions_;
   }
-  MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(ServerHeaderValidatorPtr, makeHeaderValidator, (Protocol protocol));
   MOCK_METHOD(bool, appendLocalOverload, (), (const));
@@ -727,7 +728,7 @@ public:
 
   MOCK_METHOD(const absl::optional<uint32_t>&, maxConcurrentStreams, (), (const));
 
-  absl::optional<uint32_t> max_concurrent_streams_{};
+  absl::optional<uint32_t> max_concurrent_streams_;
 };
 
 } // namespace Http

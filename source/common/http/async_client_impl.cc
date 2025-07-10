@@ -28,13 +28,12 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
                                  Http::Context& http_context, Router::Context& router_context)
     : factory_context_(factory_context), cluster_(cluster),
       config_(std::make_shared<Router::FilterConfig>(
-          factory_context, http_context.asyncClientStatPrefix(), factory_context.localInfo(),
-          *stats_store.rootScope(), cm, factory_context.runtime(),
-          factory_context.api().randomGenerator(), std::move(shadow_writer), true, false, false,
-          false, false, false, Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(),
-          http_context, router_context)),
-      dispatcher_(dispatcher), runtime_(factory_context.runtime()),
-      local_reply_(LocalReply::Factory::createDefault()) {}
+          factory_context, http_context.asyncClientStatPrefix(), *stats_store.rootScope(), cm,
+          factory_context.runtime(), factory_context.api().randomGenerator(),
+          std::move(shadow_writer), true, false, false, false, false, false,
+          Protobuf::RepeatedPtrField<std::string>{}, dispatcher.timeSource(), http_context,
+          router_context)),
+      dispatcher_(dispatcher), local_reply_(LocalReply::Factory::createDefault()) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -168,6 +167,7 @@ void AsyncStreamImpl::sendLocalReply(Code code, absl::string_view body,
                                      std::function<void(ResponseHeaderMap& headers)> modify_headers,
                                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
                                      absl::string_view details) {
+  stream_info_.setResponseCodeDetails(details);
   if (encoded_response_headers_) {
     resetStream();
     return;
@@ -246,7 +246,7 @@ void AsyncStreamImpl::sendHeaders(RequestHeaderMap& headers, bool end_stream) {
   }
 
   if (send_xff_) {
-    Utility::appendXff(headers, *parent_.config_->local_info_.address());
+    Utility::appendXff(headers, *parent_.config_->factory_context_.localInfo().address());
   }
 
   router_.decodeHeaders(headers, end_stream);
@@ -374,7 +374,7 @@ AsyncRequestSharedImpl::AsyncRequestSharedImpl(AsyncClientImpl& parent,
                                                const AsyncClient::RequestOptions& options,
                                                absl::Status& creation_status)
     : AsyncStreamImpl(parent, *this, options, creation_status), callbacks_(callbacks),
-      response_buffer_limit_(parent.runtime_.snapshot().getInteger(
+      response_buffer_limit_(parent.config_->runtime_.snapshot().getInteger(
           AsyncClientImpl::ResponseBufferLimit, kBufferLimitForResponse)) {
   if (!creation_status.ok()) {
     return;

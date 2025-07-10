@@ -43,6 +43,7 @@ type HttpCAPI interface {
 	HttpCopyTrailers(s unsafe.Pointer, num uint64, bytes uint64) map[string][]string
 	HttpSetTrailer(s unsafe.Pointer, key string, value string, add bool)
 	HttpRemoveTrailer(s unsafe.Pointer, key string)
+	HttpSetUpstreamOverrideHost(s unsafe.Pointer, host string, strict bool) error
 
 	/* These APIs have nothing to do with the decode/encode phase, use the pointer of httpRequest. */
 	ClearRouteCache(r unsafe.Pointer, refresh bool)
@@ -59,6 +60,7 @@ type HttpCAPI interface {
 	HttpGetStringProperty(r unsafe.Pointer, key string) (string, error)
 
 	HttpFinalize(r unsafe.Pointer, reason int)
+	HttpGetStringSecret(c unsafe.Pointer, key string) (string, bool)
 
 	/* These APIs are related to config, use the pointer of config. */
 	HttpDefineMetric(c unsafe.Pointer, metricType MetricType, name string) uint32

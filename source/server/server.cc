@@ -389,6 +389,30 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   return absl::OkStatus();
 }
 
+void InstanceUtil::raiseFileLimits() {
+  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
+    return;
+  }
+  struct rlimit rlim;
+  if (const auto result = Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+      result.return_value_ != 0) {
+    ENVOY_LOG(warn, "Failed to read file descriptor limit, error {}.", errorDetails(result.errno_));
+    return;
+  }
+  const auto old = rlim.rlim_cur;
+  if (old == rlim.rlim_max) {
+    return;
+  }
+  rlim.rlim_cur = rlim.rlim_max;
+  if (const auto result = Api::OsSysCallsSingleton::get().setrlimit(RLIMIT_NOFILE, &rlim);
+      result.return_value_ != 0) {
+    ENVOY_LOG(warn, "Failed to raise file descriptor limit to maximum, error {}.",
+              errorDetails(result.errno_));
+    return;
+  }
+  ENVOY_LOG(info, "Raised file descriptor limits from {} to {}.", old, rlim.rlim_max);
+}
+
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   std::function set_up_logger = [&] {
@@ -417,9 +441,9 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
   MULTI_CATCH(
       const EnvoyException& e,
       {
-        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+        ENVOY_LOG(critical, "error `{}` initializing config '{} {} {}'", e.what(),
                   options_.configProto().DebugString(), options_.configYaml(),
-                  options_.configPath(), e.what());
+                  options_.configPath());
         terminate();
         throw;
       },
@@ -716,6 +740,13 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   runtime_ = component_factory.createRuntime(*this, initial_config);
   validation_context_.setRuntime(runtime());
 
+#ifndef WIN32
+  // Envoy automatically raises soft file limits, but we do it here in order to allow
+  // a runtime override to disable this feature. Once the feature defaults to always on,
+  // we can move this as the first thing to occur during the process initialization.
+  InstanceUtil::raiseFileLimits();
+#endif
+
   if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
     assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
         [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
@@ -759,12 +790,13 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   // Create the xDS-Manager that will be passed to the cluster manager when it
   // is initialized below.
-  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, validation_context_);
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, stats_store_,
+                                                          *local_info_, validation_context_, *this);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
+      *ssl_context_manager_, quic_stat_names_, *this);
 
   // Now that the worker thread are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
@@ -848,7 +880,7 @@ void InstanceBase::onRuntimeReady() {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0, false);
       THROW_IF_NOT_OK_REF(factory_or_error.status());
       hds_delegate_ = maybeCreateHdsDelegate(
           serverFactoryContext(), *stats_store_.rootScope(),
@@ -1014,6 +1046,9 @@ void InstanceBase::run() {
     watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                       "main_thread", *dispatcher_);
   }
+
+  main_dispatch_loop_started_.store(true);
+
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");

@@ -108,14 +108,22 @@ func (*PassThroughStreamFilter) OnDestroy(DestroyReason) {
 func (*PassThroughStreamFilter) OnStreamComplete() {
 }
 
+type Config interface {
+	// Called when the current config is deleted due to an update or removal of plugin.
+	// You can use this method is you store some resources in the config to be released later.
+	Destroy()
+}
+
 type StreamFilterConfigParser interface {
 	// Parse the proto message to any Go value, and return error to reject the config.
 	// This is called when Envoy receives the config from the control plane.
 	// Also, you can define Metrics through the callbacks, and the callbacks will be nil when parsing the route config.
+	// You can return a config implementing the Config interface if you need fine control over its lifecycle.
 	Parse(any *anypb.Any, callbacks ConfigCallbackHandler) (interface{}, error)
 	// Merge the two configs(filter level config or route level config) into one.
 	// May merge multi-level configurations, i.e. filter level, virtualhost level, router level and weighted cluster level,
 	// into a single one recursively, by invoking this method multiple times.
+	// You can return a config implementing the Config interface if you need fine control over its lifecycle.
 	Merge(parentConfig interface{}, childConfig interface{}) interface{}
 }
 
@@ -178,6 +186,11 @@ type StreamFilterCallbacks interface {
 	// * ErrValueNotFound
 	GetProperty(key string) (string, error)
 	// TODO add more for filter callbacks
+
+	// Get secret manager.
+	// Secrets should be defined in the plugin configuration.
+	// It is safe to use this secret manager from any goroutine.
+	SecretManager() SecretManager
 }
 
 // FilterProcessCallbacks is the interface for filter to process request/response in decode/encode phase.
@@ -197,6 +210,30 @@ type FilterProcessCallbacks interface {
 
 type DecoderFilterCallbacks interface {
 	FilterProcessCallbacks
+	// Sets an upstream address override for the request. When the overridden host exists in the host list of the routed cluster
+	// and can be selected directly, the load balancer bypasses its algorithm and routes traffic directly to the specified host.
+	//
+	// Here are some cases:
+	// 1. Set a valid host(no matter in or not in the cluster), will route to the specified host directly and return 200.
+	// 2. Set a non-IP host, C++ side will return error and not route to cluster.
+	// 3. Set a unavaiable host, and the host is not in the cluster, will req the valid host in the cluster and rerurn 200.
+	// 4. Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the host), will req the unavaiable hoat and rerurn 503.
+	// 5. Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the host), and with retry. when first request with unavaiable host failed 503, the second request will retry with the valid host, then the second request will succeed and finally return 200.
+	// 6. Set a unavaiable host with strict mode, and the host is in the cluster, will req the unavaiable host and rerurn 503.
+	// 7. Set a unavaiable host with strict mode, and the host is not in the cluster, will req the unavaiable host and rerurn 503.
+	// 8. Set a unavaiable host with strict mode and retry. when first request with unavaiable host failed 503, the second request will retry with the valid host, then the second request will succeed and finally return 200.
+	// 9. Set a unavaiable host with strict mode and retry, and the host is not in the cluster, will req the unavaiable host and rerurn 503.
+	//
+	// The function takes two arguments:
+	//
+	// host (string): The upstream host address to use for the request. This must be a valid IP address(with port); otherwise, the
+	// C++ side will throw an error.
+	//
+	// strict (boolean): Determines whether the HTTP request must be strictly routed to the requested
+	// host. When set to ``true``, if the requested host is invalid, Envoy will return a 503 status code.
+	// The default value is ``false``, which allows Envoy to fall back to its load balancing mechanism. In this case, if the
+	// requested host is invalid, the request will be routed according to the load balancing algorithm and choose other hosts.
+	SetUpstreamOverrideHost(host string, strict bool) error
 }
 
 type EncoderFilterCallbacks interface {
@@ -304,6 +341,12 @@ const (
 type FilterState interface {
 	SetString(key, value string, stateType StateType, lifeSpan LifeSpan, streamSharing StreamSharing)
 	GetString(key string) string
+}
+
+type SecretManager interface {
+	// Get generic secret from secret manager.
+	// bool is false on missing secret
+	GetGenericSecret(name string) (string, bool)
 }
 
 type MetricType uint32

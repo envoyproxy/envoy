@@ -36,7 +36,7 @@
 #endif
 #include "test/mocks/common.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
@@ -148,7 +148,8 @@ IntegrationUtil::createQuicUpstreamTransportSocketFactory(Api::Api& api, Stats::
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> context;
   ON_CALL(context.server_context_, api()).WillByDefault(testing::ReturnRef(api));
   ON_CALL(context, statsScope()).WillByDefault(testing::ReturnRef(*store.rootScope()));
-  ON_CALL(context, sslContextManager()).WillByDefault(testing::ReturnRef(context_manager));
+  ON_CALL(context.server_context_, sslContextManager())
+      .WillByDefault(testing::ReturnRef(context_manager));
   ON_CALL(context.server_context_, threadLocal()).WillByDefault(testing::ReturnRef(threadlocal));
   envoy::extensions::transport_sockets::quic::v3::QuicUpstreamTransport
       quic_transport_socket_config;
@@ -226,8 +227,7 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
           *Network::Utility::resolveUrl(
               fmt::format("{}://127.0.0.1:80", (type == Http::CodecType::HTTP3 ? "udp" : "tcp"))),
           nullptr, nullptr, envoy::config::core::v3::Locality().default_instance(),
-          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-          time_system));
+          envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0));
 
   if (type <= Http::CodecType::HTTP2) {
     Http::CodecClientProd client(type,

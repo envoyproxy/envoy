@@ -57,7 +57,7 @@ public:
     decoder_callbacks_ = &callbacks;
   }
 
-  void onDestroy() override{};
+  void onDestroy() override {};
   Http::StreamEncoderFilterCallbacks* decoder_callbacks_;
 };
 
@@ -316,6 +316,53 @@ typed_config:
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
 
     initialize();
+  }
+
+  void initializeSecretsConfig(std::string config_secret_key = "",
+                               std::string config_secret_value = "", std::string path = "") {
+    const auto yaml_fmt = R"EOF(
+      name: golang
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.golang.v3alpha.Config
+        library_id: %s
+        library_path: %s
+        plugin_name: %s
+        plugin_config:
+          "@type": type.googleapis.com/xds.type.v3.TypedStruct
+          value:
+            path: %s
+            secret_key: %s
+            secret_value: %s
+        generic_secrets:
+          - name: static_secret
+          - name: dynamic_secret
+            sds_config:
+              path_config_source:
+                path: "{{ test_tmpdir }}/dynamic_secret.yaml"
+      )EOF";
+    // dynamic secret using SDS
+    TestEnvironment::writeStringToFileForTest("dynamic_secret.yaml", R"EOF(
+      resources:
+        - "@type": "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret"
+          name: dynamic_secret
+          generic_secret:
+            secret:
+              inline_string: "dynamic_secret_value")EOF",
+                                              false);
+    // static secret in bootstrap file
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+      secret->set_name("static_secret");
+      auto* generic = secret->mutable_generic_secret();
+      generic->mutable_secret()->set_inline_string("static_secret_value");
+    });
+    auto yaml_string = absl::StrFormat(yaml_fmt, SECRETS, genSoPath(), SECRETS, path,
+                                       config_secret_key, config_secret_value);
+    config_helper_.prependFilter(TestEnvironment::substitute(yaml_string));
+    config_helper_.skipPortUsageValidation();
+
+    initialize();
+    registerTestServerPorts({"http"});
   }
 
   void testBasic(std::string path) {
@@ -800,6 +847,88 @@ typed_config:
     cleanup();
   }
 
+  void testSecrets(const std::string secret_key, const std::string expected_secret_value,
+                   const std::string status_code, std::string path) {
+    initializeSecretsConfig(secret_key, expected_secret_value, path);
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", "/"}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    auto response = std::move(encoder_decoder.second);
+
+    ASSERT_TRUE(response->waitForEndStream());
+
+    EXPECT_EQ(status_code, response->headers().getStatusValue());
+    EXPECT_EQ(expected_secret_value, response->body());
+    cleanup();
+  }
+
+  void testUpstreamOverrideHost(const std::string expected_status_code,
+                                const std::string expected_upstream_host, std::string path,
+                                bool bad_host = false, const std::string add_endpoint = "",
+                                bool retry = false) {
+    if (retry) {
+      config_helper_.addConfigModifier(
+          [](envoy::extensions::filters::network::http_connection_manager::v3::
+                 HttpConnectionManager& hcm) {
+            auto* retry_policy = hcm.mutable_route_config()
+                                     ->mutable_virtual_hosts(0)
+                                     ->mutable_routes(0)
+                                     ->mutable_route()
+                                     ->mutable_retry_policy();
+            retry_policy->set_retry_on("connect-failure");
+            retry_policy->mutable_num_retries()->set_value(2);
+            retry_policy->mutable_per_try_timeout()->set_seconds(1);
+          });
+    }
+
+    if (add_endpoint != "") {
+      config_helper_.addConfigModifier(
+          [add_endpoint](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+            auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters()->Mutable(0);
+            ASSERT(cluster_0->name() == "cluster_0");
+            auto* endpoint = cluster_0->mutable_load_assignment()->mutable_endpoints()->Mutable(0);
+
+            auto* address = endpoint->add_lb_endpoints()
+                                ->mutable_endpoint()
+                                ->mutable_address()
+                                ->mutable_socket_address();
+            address->set_address(add_endpoint);
+            address->set_port_value(8080);
+          });
+    }
+
+    initializeBasicFilter(BASIC);
+
+    codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+    Http::TestRequestHeaderMapImpl request_headers{
+        {":method", "POST"}, {":path", path}, {":scheme", "http"}, {":authority", "test.com"}};
+
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    Http::RequestEncoder& request_encoder = encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+
+    if (!bad_host) {
+      codec_client_->sendData(request_encoder, "helloworld", true);
+      if (expected_status_code == "200") {
+        waitForNextUpstreamRequest(0, std::chrono::milliseconds(100000));
+        Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+        upstream_request_->encodeHeaders(response_headers, true);
+      }
+    }
+
+    ASSERT_TRUE(response->waitForEndStream(std::chrono::milliseconds(100000)));
+
+    EXPECT_EQ(expected_status_code, response->headers().getStatusValue());
+    if (expected_upstream_host != "") {
+      EXPECT_TRUE(absl::StrContains(getHeader(response->headers(), "rsp-upstream-host"),
+                                    expected_upstream_host));
+    }
+
+    cleanup();
+  }
+
   const std::string ECHO{"echo"};
   const std::string BASIC{"basic"};
   const std::string PASSTHROUGH{"passthrough"};
@@ -811,6 +940,7 @@ typed_config:
   const std::string ACTION{"action"};
   const std::string ADDDATA{"add_data"};
   const std::string BUFFERINJECTDATA{"bufferinjectdata"};
+  const std::string SECRETS{"secrets"};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GolangIntegrationTest,
@@ -1681,6 +1811,133 @@ TEST_P(GolangIntegrationTest, RefreshRouteCache) {
   EXPECT_EQ("second_matched", getHeader(response->headers(), "add-header-from"));
 
   cleanup();
+}
+
+TEST_P(GolangIntegrationTest, DynamicSecret) {
+  testSecrets("dynamic_secret", "dynamic_secret_value", "200", "/");
+}
+
+TEST_P(GolangIntegrationTest, DynamicSecretGoRoutine) {
+  testSecrets("dynamic_secret", "dynamic_secret_value", "200", "/async");
+}
+
+TEST_P(GolangIntegrationTest, StaticSecret) {
+  testSecrets("static_secret", "static_secret_value", "200", "/");
+}
+
+TEST_P(GolangIntegrationTest, StaticSecretGoRoutine) {
+  testSecrets("static_secret", "static_secret_value", "200", "/async");
+}
+
+TEST_P(GolangIntegrationTest, MissingSecret) { testSecrets("missing_secret", "", "404", "/"); }
+
+TEST_P(GolangIntegrationTest, MissingSecretGoRoutine) {
+  testSecrets("missing_secret", "", "404", "/async");
+}
+
+// Set a valid host(no matter in or not in the cluster), will route to the specified host directly
+// and return 200.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost) {
+  const std::string host = GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  testUpstreamOverrideHost("200", host, "/test?upstreamOverrideHost=" + host);
+}
+
+// Set a non-IP host, C++ side will return error and not route to cluster.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_BadHost) {
+  testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost", true);
+}
+
+// Set a unavaiable host, and the host is not in the cluster, will req the valid host in the cluster
+// and rerurn 200.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_NotFound) {
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+  testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host, false);
+}
+
+// Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the
+// host), will req the unavaiable hoat and rerurn 503.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable) {
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string add_endpoint =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+  testUpstreamOverrideHost("503", "", "/test?upstreamOverrideHost=" + url_host, false,
+                           add_endpoint);
+}
+
+// Set a unavaiable host, and the host is in the cluster, but not available(can not connect to the
+// host), and with retry. when first request with unavaiable host failed 503, the second request
+// will retry with the valid host, then the second request will succeed and finally return 200.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable_Retry) {
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string add_endpoint =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+  testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host, false,
+                           add_endpoint, true);
+}
+
+// Set a unavaiable host with strict mode, and the host is in the cluster, will req the unavaiable
+// host and rerurn 503.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string add_endpoint =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+
+  testUpstreamOverrideHost(
+      "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
+      false, add_endpoint);
+}
+
+// Set a unavaiable host with strict mode, and the host is not in the cluster, will req the
+// unavaiable host and rerurn 503.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFound) {
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+
+  testUpstreamOverrideHost(
+      "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
+      false);
+}
+
+// Set a unavaiable host with strict mode and retry, and the host is in the cluster.
+// when first request with unavaiable host failed 503, the second request will retry with the valid
+// host, then the second request will succeed and finally return 200.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) {
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string add_endpoint =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1" : "::2";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+  testUpstreamOverrideHost("200", expected_host,
+                           "/test?upstreamOverrideHost=" + url_host +
+                               "&upstreamOverrideHostStrict=true",
+                           false, add_endpoint, true);
+}
+
+// Set a unavaiable host with strict mode and retry, and the host is not in the cluster, will req
+// the unavaiable host and rerurn 503.
+TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFound_Retry) {
+  const std::string expected_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
+  const std::string url_host =
+      GetParam() == Network::Address::IpVersion::v4 ? "200.0.0.1:8080" : "[::2]:8080";
+  testUpstreamOverrideHost(
+      "503", "", "/test?upstreamOverrideHost=" + url_host + "&upstreamOverrideHostStrict=true",
+      false, "", true);
 }
 
 } // namespace Envoy

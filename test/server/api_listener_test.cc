@@ -1,8 +1,10 @@
+#include <cstdint>
 #include <string>
+#include <vector>
 
 #include "envoy/config/listener/v3/listener.pb.h"
 
-#include "source/server/api_listener_impl.h"
+#include "source/extensions/api_listeners/default_api_listener/api_listener_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
@@ -17,6 +19,9 @@
 
 namespace Envoy {
 namespace Server {
+
+using Extensions::ApiListeners::DefaultApiListener::HttpApiListener;
+using Extensions::ApiListeners::DefaultApiListener::HttpApiListenerFactory;
 
 class ApiListenerTest : public testing::Test {
 protected:
@@ -53,7 +58,8 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
 
   ASSERT_EQ("test_api_listener", http_api_listener->name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
@@ -88,7 +94,8 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
 
   ASSERT_EQ("test_api_listener", http_api_listener->name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
@@ -124,8 +131,9 @@ api_listener:
       ->mutable_path_config_source()
       ->set_path("eds path");
   expected_any_proto.PackFrom(expected_cluster_proto);
+  HttpApiListenerFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      HttpApiListener::create(config, server_, config.name()).IgnoreError(), EnvoyException,
+      factory.create(config, server_, config.name()).IgnoreError(), EnvoyException,
       fmt::format("Unable to unpack as "
                   "envoy.extensions.filters.network.http_connection_manager.v3."
                   "HttpConnectionManager: {}",
@@ -159,7 +167,8 @@ api_listener:
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
   server_.server_factory_context_->cluster_manager_.initializeClusters(
       {"dynamic_forward_proxy_cluster"}, {});
-  auto http_api_listener = HttpApiListener::create(config, server_, config.name()).value();
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
 
   ASSERT_EQ("test_api_listener", http_api_listener->name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
@@ -179,6 +188,56 @@ api_listener:
   EXPECT_CALL(network_connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   // Shutting down the ApiListener should raise an event on all connection callback targets.
   api_listener.reset();
+}
+
+// Ensure unimplemented functions return an ENVOY_BUG for coverage.
+TEST_F(ApiListenerTest, UnimplementedFuctionsTriggerEnvoyBug) {
+  const std::string yaml = R"EOF(
+name: test_api_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+    stat_prefix: hcm
+    route_config:
+      name: api_router
+      virtual_hosts:
+        - name: api
+          domains:
+            - "*"
+          routes:
+            - match:
+                prefix: "/"
+              route:
+                cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
+
+  ASSERT_EQ("test_api_listener", http_api_listener->name());
+  ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener->type());
+  auto api_listener = http_api_listener->createHttpApiListener(server_.dispatcher());
+  ASSERT_NE(api_listener, nullptr);
+  auto& connection = dynamic_cast<HttpApiListener::ApiListenerWrapper*>(api_listener.get())
+                         ->readCallbacks()
+                         .connection();
+
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_ENVOY_BUG(connection.setSocketOption(sockopt_name, sockopt_val),
+                   "Unexpected function call");
+
+  EXPECT_ENVOY_BUG(connection.enableHalfClose(true), "Unexpected function call");
+  EXPECT_ENVOY_BUG(connection.isHalfCloseEnabled(), "Unexpected function call");
 }
 
 } // namespace Server
