@@ -52,7 +52,14 @@ jobs:
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
-      runs-on: macos-15-xlarge
+      # TODO: Remove these hardcoded branches when no longer supported
+      runs-on: >-
+        ${{ (contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.31')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.32')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.33')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.34'))
+            && 'macos-14-xlarge'
+            || 'macos-15-xlarge' }}
       source: ${{ matrix.source }}
       steps-post:
       steps-pre: ${{ matrix.steps-pre }}

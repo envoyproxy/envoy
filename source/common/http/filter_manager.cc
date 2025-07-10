@@ -84,6 +84,12 @@ void ActiveStreamFilterBase::commonContinue() {
     }
   }
 
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
+
   // Make sure that we handle the zero byte data frame case. We make no effort to optimize this
   // case in terms of merging it into a header only request/response. This could be done in the
   // future.
@@ -92,7 +98,19 @@ void ActiveStreamFilterBase::commonContinue() {
     doHeaders(observedEndStream() && !bufferedData() && !hasTrailers());
   }
 
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
+
   doMetadata();
+
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
 
   // It is possible for trailers to be added during doData(). doData() itself handles continuation
   // of trailers for the non-continuation case. Thus, we must keep track of whether we had
@@ -101,6 +119,12 @@ void ActiveStreamFilterBase::commonContinue() {
   const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
     doData(observedEndStream() && !had_trailers_before_data);
+  }
+
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
   }
 
   if (had_trailers_before_data) {

@@ -328,8 +328,6 @@ paths:
   # Files in these paths can use std::regex
   std_regex:
     include:
-    - contrib/squash/filters/http/source/squash_filter.h
-    - contrib/squash/filters/http/source/squash_filter.cc
     - source/common/common/regex.h
     - source/common/common/regex.cc
     - source/common/common/utility.cc

@@ -6,6 +6,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
@@ -19,6 +20,8 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
+
+using testing::Return;
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -72,8 +75,13 @@ public:
       : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
 
   void createLb() {
+    absl::Status creation_status;
+    TypedMaglevLbConfig typed_config(config_, context_.regex_engine_, creation_status);
+    ASSERT(creation_status.ok());
+
     lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, *stats_store_.rootScope(),
-                                               runtime_, random_, 50, config_);
+                                               context_.runtime_loader_, context_.api_.random_, 50,
+                                               typed_config.lb_config_, typed_config.hash_policy_);
   }
 
   void init(uint64_t table_size, bool locality_weighted_balancing = false) {
@@ -98,8 +106,8 @@ public:
   ClusterLbStatNames stat_names_;
   ClusterLbStats stats_;
   envoy::extensions::load_balancing_policies::maglev::v3::Maglev config_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+
   std::unique_ptr<MaglevLoadBalancer> lb_;
 };
 
@@ -271,6 +279,109 @@ TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
     TestLoadBalancerContext context(i);
     EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
               lb->chooseHost(&context).host);
+  }
+}
+
+TEST_F(MaglevLoadBalancerTest, MaglevLbWithHashPolicy) {
+  host_set_.hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
+  auto* hash_policy = config_.mutable_consistent_hashing_lb_config()->add_hash_policy();
+  *hash_policy->mutable_cookie()->mutable_name() = "test-cookie-name";
+  *hash_policy->mutable_cookie()->mutable_path() = "/test/path";
+  hash_policy->mutable_cookie()->mutable_ttl()->set_seconds(1000);
+
+  init(7);
+
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_entries_per_host_.value());
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+
+  {
+    // Cookie exists.
+    Http::TestRequestHeaderMapImpl request_headers{{"cookie", "test-cookie-name=1234567890"}};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(2).WillRepeatedly(Return(&stream_info));
+
+    EXPECT_CALL(context_.api_.random_, random()).Times(0);
+
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+    EXPECT_EQ(host_1.host, host_2.host);
+  }
+
+  {
+    // Cookie not exists and no stream info is provided.
+    Http::TestRequestHeaderMapImpl request_headers{};
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+
+    // No hash is generated and random will be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(2);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+  }
+
+  {
+    // Cookie not exists and no valid addresses.
+    Http::TestRequestHeaderMapImpl request_headers{};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+    stream_info.downstream_connection_info_provider_->setLocalAddress(nullptr);
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(4).WillRepeatedly(Return(&stream_info));
+
+    // No hash is generated and random will be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(2);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+  }
+
+  {
+    // Cookie not exists and has valid addresses.
+    Http::TestRequestHeaderMapImpl request_headers{};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(4).WillRepeatedly(Return(&stream_info));
+
+    const std::string address_values =
+        stream_info.downstream_connection_info_provider_->remoteAddress()->asString() +
+        stream_info.downstream_connection_info_provider_->localAddress()->asString();
+    std::string new_cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(address_values));
+
+    EXPECT_CALL(context, setHeadersModifier(_))
+        .WillRepeatedly(
+            testing::Invoke([&](std::function<void(Http::ResponseHeaderMap&)> modifier) {
+              Http::TestResponseHeaderMapImpl response;
+              modifier(response);
+              // Cookie is set.
+              EXPECT_TRUE(absl::StrContains(response.get_(Http::Headers::get().SetCookie),
+                                            new_cookie_value));
+            }));
+
+    // Hash is generated and random will not be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(0);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+    EXPECT_EQ(host_1.host, host_2.host);
   }
 }
 

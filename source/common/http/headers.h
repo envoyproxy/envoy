@@ -239,7 +239,6 @@ public:
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
-  const LowerCaseString XSquashDebug{"x-squash-debug"};
   const LowerCaseString EarlyData{"early-data"};
   const LowerCaseString EnvoyDstNodeUUID{"x-remote-node-id"};
   const LowerCaseString EnvoyDstClusterUUID{"x-dst-cluster-uuid"};
