@@ -1,4 +1,5 @@
 #include <memory>
+#include <stdlib.h>
 #include <string>
 #include <thread>
 
@@ -95,6 +96,30 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AltsChannelPoolTest,
 TEST_P(AltsChannelPoolTest, SuccessWithDefaultChannels) {
   startFakeHandshakerService();
 
+  // Create a channel pool and check that it has the correct dimensions.
+  auto channel_pool = AltsChannelPool::create(serverAddress());
+  EXPECT_THAT(channel_pool, NotNull());
+  EXPECT_THAT(channel_pool->getChannel(), NotNull());
+  EXPECT_EQ(channel_pool->getChannelPoolSize(), 10);
+
+  // Check that we can write to and read from the channel multiple times.
+  for (int i = 0; i < 10; ++i) {
+    auto channel = channel_pool->getChannel();
+    EXPECT_THAT(channel, NotNull());
+    grpc::ClientContext client_context;
+    auto stub = HandshakerService::NewStub(channel);
+    auto stream = stub->DoHandshake(&client_context);
+    HandshakerReq request;
+    EXPECT_TRUE(stream->Write(request));
+    HandshakerResp response;
+    EXPECT_TRUE(stream->Read(&response));
+  }
+}
+
+TEST_P(AltsChannelPoolTest, SuccessWithDefaultChannelsWithKeepAliveParams) {
+  startFakeHandshakerService();
+
+  setenv("GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS", "true", 1);
   // Create a channel pool and check that it has the correct dimensions.
   auto channel_pool = AltsChannelPool::create(serverAddress());
   EXPECT_THAT(channel_pool, NotNull());
