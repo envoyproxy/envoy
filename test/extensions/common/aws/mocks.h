@@ -154,6 +154,7 @@ public:
   void setMetadataFetcher(MetadataFetcherPtr fetcher) {
     provider_->metadata_fetcher_ = std::move(fetcher);
   }
+  void setCacheDurationTimer(Event::Timer* timer) { provider_->cache_duration_timer_.reset(timer); }
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
 
