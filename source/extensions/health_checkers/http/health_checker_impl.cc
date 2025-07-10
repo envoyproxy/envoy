@@ -255,9 +255,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     reuse_connection_ = parent_.reuse_connection_;
   }
 
-
-
-  
   Http::RequestEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);
   request_in_flight_ = true;
@@ -339,7 +336,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
       }
       return HealthCheckResult::Failed;
     }
-    ENVOY_CONN_LOG(debug, "hc response_code={} http response body healthcheck passed", *client_, response_code);
+    ENVOY_CONN_LOG(debug, "hc response_code={} http response body healthcheck passed", *client_,
+                   response_code);
   }
 
   if (!parent_.http_status_checker_.inExpectedRanges(response_code)) {
@@ -373,15 +371,18 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
             ? std::string(response_headers_->getEnvoyUpstreamHealthCheckedClusterValue())
             : EMPTY_STRING;
     if (parent_.service_name_matcher_->match(service_cluster_healthchecked)) {
-      ENVOY_CONN_LOG(debug, "hc response_code={} service_name_match_passed degraded={}", *client_, response_code, degraded);
+      ENVOY_CONN_LOG(debug, "hc response_code={} service_name_match_passed degraded={}", *client_,
+                     response_code, degraded);
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
     } else {
-      ENVOY_CONN_LOG(debug, "hc response_code={} service_name_match_failed", *client_, response_code);
+      ENVOY_CONN_LOG(debug, "hc response_code={} service_name_match_failed", *client_,
+                     response_code);
       return HealthCheckResult::Failed;
     }
   }
 
-  ENVOY_CONN_LOG(debug, "hc response_code={} success degraded={}", *client_, response_code, degraded);
+  ENVOY_CONN_LOG(debug, "hc response_code={} success degraded={}", *client_, response_code,
+                 degraded);
   return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
 }
 
