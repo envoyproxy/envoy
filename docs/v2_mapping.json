@@ -79,7 +79,6 @@
   "envoy/extensions/filters/http/ratelimit/v3/rate_limit.proto": "envoy/config/filter/http/rate_limit/v2/rate_limit.proto",
   "envoy/extensions/filters/http/rbac/v3/rbac.proto": "envoy/config/filter/http/rbac/v2/rbac.proto",
   "envoy/extensions/filters/http/router/v3/router.proto": "envoy/config/filter/http/router/v2/router.proto",
-  "envoy/extensions/filters/http/squash/v3/squash.proto": "envoy/config/filter/http/squash/v2/squash.proto",
   "envoy/extensions/filters/http/tap/v3/tap.proto": "envoy/config/filter/http/tap/v2alpha/tap.proto",
   "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.proto": "envoy/config/filter/http/transcoder/v2/transcoder.proto",
   "envoy/extensions/filters/listener/http_inspector/v3/http_inspector.proto": "envoy/config/filter/listener/http_inspector/v2/http_inspector.proto",

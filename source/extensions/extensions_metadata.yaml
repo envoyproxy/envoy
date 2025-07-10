@@ -602,8 +602,8 @@ envoy.filters.http.wasm:
 envoy.filters.http.stateful_session:
   categories:
   - envoy.filters.http
-  security_posture: unknown
-  status: alpha
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSession
   - envoy.extensions.filters.http.stateful_session.v3.StatefulSessionPerRoute
