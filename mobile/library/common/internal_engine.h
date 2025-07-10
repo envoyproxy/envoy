@@ -131,12 +131,35 @@ public:
    */
   void onDefaultNetworkChanged(int network);
 
+  /**
+   * The callback that gets executed when the device pick a different
+   * network as the default.
+   *
+   * @param connection_type the type of the given network, i.e. WIFI, 3G, 4G, etc.
+   * @param net_id an opaque handle to the network picked by the platform. Android Lollipop uses
+   * Network.netId as such handle, and Marshmallow+ uses the returned value of
+   * Network.getNetworkHandle().
+   *
+   */
   void onDefaultNetworkChangedAndroid(ConnectionType connection_type, int64_t net_id);
 
+  /**
+   * The callback that gets executed when the device gets disconnected from the
+   * given network.
+   *
+   */
   void onNetworkDisconnectAndroid(int64_t net_id);
 
+  /**
+   * The callback that gets executed when the device gets connected to a new
+   * network.
+   */
   void onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id);
 
+  /**
+   * The callback that gets executed when the device decides that the given list of networks should
+   * be forgotten.
+   */
   void purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids);
 
   /**

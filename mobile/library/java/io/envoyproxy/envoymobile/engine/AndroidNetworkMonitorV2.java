@@ -238,8 +238,7 @@ public class AndroidNetworkMonitorV2 {
     // Determine if the VPN applies to the current user by seeing if a socket can be bound
     // to the VPN.
     try (Socket s = new Socket()) {
-      // Avoid using network.getSocketFactory().createSocket() because it leaks
-      // (https://crbug.com/805424).
+      // Avoid using network.getSocketFactory().createSocket() because it leaks.
       network.bindSocket(s);
     } catch (IOException e) {
       // Failed to bind so this VPN isn't for the current user to use.
@@ -254,7 +253,7 @@ public class AndroidNetworkMonitorV2 {
    */
   private Network[] getAllNetworksFiltered(Network ignoreNetwork) {
     Network[] networks = mConnectivityManager.getAllNetworks();
-    // Very rarely this API inexplicably returns {@code null} (crbug.com/721116).
+    // Very rarely this API inexplicably returns null.
     networks = networks == null ? new Network[0] : networks;
     // Whittle down |networks| into just the list of networks useful to us.
     int filteredIndex = 0;
