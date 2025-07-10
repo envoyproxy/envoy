@@ -320,39 +320,5 @@ public:
 private:
   // Initialized with a single empty node as the root node.
   RadixTreeNode root_ = RadixTreeNode();
-
-  /**
-   * Recursive helper for find operation.
-   * @param node the current node to search from.
-   * @param search the remaining search key.
-   * @param result the value to return if found.
-   * @return true if the key was found, false otherwise.
-   */
-  bool findRecursive(const RadixTreeNode* node, absl::string_view search, Value& result) const {
-    if (search.empty()) {
-      if (hasValue(*node)) {
-        result = node->value_;
-        return true;
-      }
-      return false;
-    }
-
-    uint8_t firstChar = static_cast<uint8_t>(search[0]);
-    auto childIt = node->children_.find(firstChar);
-    if (childIt == node->children_.end()) {
-      return false;
-    }
-
-    const RadixTreeNode& child = childIt->second;
-
-    // Check if the child's prefix matches the search
-    if (search.size() >= child.prefix_.size() &&
-        search.substr(0, child.prefix_.size()) == child.prefix_) {
-      absl::string_view newSearch(search.begin() + child.prefix_.size(), search.end());
-      return findRecursive(&child, newSearch, result);
-    }
-
-    return false;
-  }
 };
 } // namespace Envoy
