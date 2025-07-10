@@ -13,17 +13,17 @@ TEST(RadixTree, AddItems) {
   const char* cstr_b = "b";
   const char* cstr_c = "c";
 
-  EXPECT_TRUE(radixtree.add("foo", cstr_a));
-  EXPECT_TRUE(radixtree.add("bar", cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("foo"), cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("bar"), cstr_b));
   EXPECT_EQ(cstr_a, radixtree.find("foo"));
   EXPECT_EQ(cstr_b, radixtree.find("bar"));
 
   // overwrite_existing = false
-  EXPECT_FALSE(radixtree.add("foo", cstr_c, false));
+  EXPECT_FALSE(radixtree.add(std::string("foo"), cstr_c, false));
   EXPECT_EQ(cstr_a, radixtree.find("foo"));
 
   // overwrite_existing = true
-  EXPECT_TRUE(radixtree.add("foo", cstr_c));
+  EXPECT_TRUE(radixtree.add(std::string("foo"), cstr_c));
   EXPECT_EQ(cstr_c, radixtree.find("foo"));
 }
 
@@ -36,13 +36,13 @@ TEST(RadixTree, LongestPrefix) {
   const char* cstr_e = "e";
   const char* cstr_f = "f";
 
-  EXPECT_TRUE(radixtree.add("foo/bar", cstr_d));
-  EXPECT_TRUE(radixtree.add("foo", cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("foo/bar"), cstr_d));
+  EXPECT_TRUE(radixtree.add(std::string("foo"), cstr_a));
   // Verify that prepending and appending branches to a node both work.
-  EXPECT_TRUE(radixtree.add("barn", cstr_e));
-  EXPECT_TRUE(radixtree.add("barp", cstr_f));
-  EXPECT_TRUE(radixtree.add("bar", cstr_b));
-  EXPECT_TRUE(radixtree.add("baro", cstr_c));
+  EXPECT_TRUE(radixtree.add(std::string("barn"), cstr_e));
+  EXPECT_TRUE(radixtree.add(std::string("barp"), cstr_f));
+  EXPECT_TRUE(radixtree.add(std::string("bar"), cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("baro"), cstr_c));
 
   EXPECT_EQ(cstr_a, radixtree.find("foo"));
   EXPECT_EQ(cstr_a, radixtree.findLongestPrefix("foo"));
@@ -97,10 +97,10 @@ TEST(RadixTree, RadixTreeSpecificTests) {
   const char* cstr_d = "d";
 
   // Test radix tree compression
-  EXPECT_TRUE(radixtree.add("test", cstr_a));
-  EXPECT_TRUE(radixtree.add("testing", cstr_b));
-  EXPECT_TRUE(radixtree.add("tester", cstr_c));
-  EXPECT_TRUE(radixtree.add("tested", cstr_d));
+  EXPECT_TRUE(radixtree.add(std::string("test"), cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("testing"), cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("tester"), cstr_c));
+  EXPECT_TRUE(radixtree.add(std::string("tested"), cstr_d));
 
   EXPECT_EQ(cstr_a, radixtree.find("test"));
   EXPECT_EQ(cstr_b, radixtree.find("testing"));
@@ -132,7 +132,7 @@ TEST(RadixTree, EmptyAndSingleNode) {
   EXPECT_THAT(radixtree.findMatchingPrefixes("anything"), ElementsAre());
 
   // Test single node
-  EXPECT_TRUE(radixtree.add("a", cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("a"), cstr_a));
   EXPECT_EQ(cstr_a, radixtree.find("a"));
   EXPECT_EQ(cstr_a, radixtree.findLongestPrefix("a"));
   EXPECT_THAT(radixtree.findMatchingPrefixes("a"), ElementsAre(cstr_a));
@@ -149,13 +149,13 @@ TEST(RadixTree, InsertAndFindEdgeCases) {
   const char* cstr_d = "d";
 
   // Test empty string
-  EXPECT_TRUE(radixtree.add("", cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string(""), cstr_a));
   EXPECT_EQ(cstr_a, radixtree.find(""));
   EXPECT_EQ(cstr_a, radixtree.findLongestPrefix(""));
   EXPECT_THAT(radixtree.findMatchingPrefixes(""), ElementsAre(cstr_a));
 
   // Test single character
-  EXPECT_TRUE(radixtree.add("x", cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("x"), cstr_b));
   EXPECT_EQ(cstr_b, radixtree.find("x"));
   EXPECT_EQ(cstr_b, radixtree.findLongestPrefix("x"));
   EXPECT_THAT(radixtree.findMatchingPrefixes("x"), ElementsAre(cstr_b));
@@ -168,7 +168,7 @@ TEST(RadixTree, InsertAndFindEdgeCases) {
   EXPECT_THAT(radixtree.findMatchingPrefixes(long_key), ElementsAre(cstr_c));
 
   // Test special characters
-  EXPECT_TRUE(radixtree.add("test/key", cstr_d));
+  EXPECT_TRUE(radixtree.add(std::string("test/key"), cstr_d));
   EXPECT_EQ(cstr_d, radixtree.find("test/key"));
   EXPECT_EQ(cstr_d, radixtree.findLongestPrefix("test/key"));
   EXPECT_THAT(radixtree.findMatchingPrefixes("test/key"), ElementsAre(cstr_d));
@@ -189,10 +189,10 @@ TEST(RadixTree, InsertAndFindComplexScenarios) {
   const char* cstr_f = "f";
 
   // Test overlapping prefixes
-  EXPECT_TRUE(radixtree.add("test", cstr_a));
-  EXPECT_TRUE(radixtree.add("testing", cstr_b));
-  EXPECT_TRUE(radixtree.add("tester", cstr_c));
-  EXPECT_TRUE(radixtree.add("tested", cstr_d));
+  EXPECT_TRUE(radixtree.add(std::string("test"), cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("testing"), cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("tester"), cstr_c));
+  EXPECT_TRUE(radixtree.add(std::string("tested"), cstr_d));
 
   // Verify all can be found
   EXPECT_EQ(cstr_a, radixtree.find("test"));
@@ -215,8 +215,8 @@ TEST(RadixTree, InsertAndFindComplexScenarios) {
   EXPECT_EQ(nullptr, radixtree.findLongestPrefix("tex"));
 
   // Test branching scenarios
-  EXPECT_TRUE(radixtree.add("hello", cstr_e));
-  EXPECT_TRUE(radixtree.add("world", cstr_f));
+  EXPECT_TRUE(radixtree.add(std::string("hello"), cstr_e));
+  EXPECT_TRUE(radixtree.add(std::string("world"), cstr_f));
 
   EXPECT_EQ(cstr_e, radixtree.find("hello"));
   EXPECT_EQ(cstr_f, radixtree.find("world"));
@@ -231,18 +231,18 @@ TEST(RadixTree, InsertAndFindOverwriteBehavior) {
   const char* cstr_c = "c";
 
   // Test overwrite_existing = true (default)
-  EXPECT_TRUE(radixtree.add("key", cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("key"), cstr_a));
   EXPECT_EQ(cstr_a, radixtree.find("key"));
 
-  EXPECT_TRUE(radixtree.add("key", cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("key"), cstr_b));
   EXPECT_EQ(cstr_b, radixtree.find("key"));
 
   // Test overwrite_existing = false
-  EXPECT_FALSE(radixtree.add("key", cstr_c, false));
+  EXPECT_FALSE(radixtree.add(std::string("key"), cstr_c, false));
   EXPECT_EQ(cstr_b, radixtree.find("key")); // Should still be cstr_b
 
   // Test overwrite_existing = true explicitly
-  EXPECT_TRUE(radixtree.add("key", cstr_c, true));
+  EXPECT_TRUE(radixtree.add(std::string("key"), cstr_c, true));
   EXPECT_EQ(cstr_c, radixtree.find("key"));
 }
 
@@ -253,9 +253,9 @@ TEST(RadixTree, InsertAndFindDeepNesting) {
   const char* cstr_c = "c";
 
   // Test deep nesting
-  EXPECT_TRUE(radixtree.add("a/b/c/d/e/f", cstr_a));
-  EXPECT_TRUE(radixtree.add("a/b/c/d/e/g", cstr_b));
-  EXPECT_TRUE(radixtree.add("a/b/c/d/e/h", cstr_c));
+  EXPECT_TRUE(radixtree.add(std::string("a/b/c/d/e/f"), cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("a/b/c/d/e/g"), cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("a/b/c/d/e/h"), cstr_c));
 
   EXPECT_EQ(cstr_a, radixtree.find("a/b/c/d/e/f"));
   EXPECT_EQ(cstr_b, radixtree.find("a/b/c/d/e/g"));
@@ -280,10 +280,10 @@ TEST(RadixTree, InsertAndFindMixedLengths) {
   const char* cstr_d = "d";
 
   // Test mixed length keys
-  EXPECT_TRUE(radixtree.add("a", cstr_a));
-  EXPECT_TRUE(radixtree.add("aa", cstr_b));
-  EXPECT_TRUE(radixtree.add("aaa", cstr_c));
-  EXPECT_TRUE(radixtree.add("aaaa", cstr_d));
+  EXPECT_TRUE(radixtree.add(std::string("a"), cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("aa"), cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("aaa"), cstr_c));
+  EXPECT_TRUE(radixtree.add(std::string("aaaa"), cstr_d));
 
   EXPECT_EQ(cstr_a, radixtree.find("a"));
   EXPECT_EQ(cstr_b, radixtree.find("aa"));
@@ -312,20 +312,20 @@ TEST(RadixTree, InsertAndFindSpecialCharacters) {
   const char* cstr_c = "c";
 
   // Test special characters
-  EXPECT_TRUE(radixtree.add("test-key", cstr_a));
-  EXPECT_TRUE(radixtree.add("test_key", cstr_b));
-  EXPECT_TRUE(radixtree.add("test.key", cstr_c));
+  EXPECT_TRUE(radixtree.add(std::string("test-key"), cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("test_key"), cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("test.key"), cstr_c));
 
   EXPECT_EQ(cstr_a, radixtree.find("test-key"));
   EXPECT_EQ(cstr_b, radixtree.find("test_key"));
   EXPECT_EQ(cstr_c, radixtree.find("test.key"));
 
   // Test with spaces
-  EXPECT_TRUE(radixtree.add("test key", cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("test key"), cstr_a));
   EXPECT_EQ(cstr_a, radixtree.find("test key"));
 
   // Test with numbers
-  EXPECT_TRUE(radixtree.add("test123", cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("test123"), cstr_b));
   EXPECT_EQ(cstr_b, radixtree.find("test123"));
 }
 
@@ -339,16 +339,16 @@ TEST(RadixTree, InsertAndFindBooleanInterface) {
 
   EXPECT_FALSE(radixtree.find("nonexistent", result));
 
-  EXPECT_TRUE(radixtree.add("key", cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string("key"), cstr_a));
   EXPECT_TRUE(radixtree.find("key", result));
   EXPECT_EQ(cstr_a, result);
 
-  EXPECT_TRUE(radixtree.add("key", cstr_b));
+  EXPECT_TRUE(radixtree.add(std::string("key"), cstr_b));
   EXPECT_TRUE(radixtree.find("key", result));
   EXPECT_EQ(cstr_b, result);
 
   // Test with empty string
-  EXPECT_TRUE(radixtree.add("", cstr_a));
+  EXPECT_TRUE(radixtree.add(std::string(""), cstr_a));
   EXPECT_TRUE(radixtree.find("", result));
   EXPECT_EQ(cstr_a, result);
 }
