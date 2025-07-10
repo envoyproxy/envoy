@@ -43,6 +43,10 @@ minor_behavior_changes:
     Previously, if this validation failed, the OAuth flow would fail. Now the CSRF token will simply be reset. This fixes
     the case where an HMAC secret change causes a redirect flow, but the CSRF token cookie hasn't yet expired
     causing a CSRF token validation failure.
+- area: oauth2
+  change: |
+    Cookies are now deleted with ``secure`` header. This behavior can
+    be reverted by setting the runtime guard ``envoy.reloadable_features.oauth2_secure_cookie_delete`` to ``false``.
 - area: cel
   change: |
     Precompile regexes in CEL expressions. This can be disabled by setting the runtime guard

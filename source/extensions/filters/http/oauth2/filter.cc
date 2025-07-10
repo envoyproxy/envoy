@@ -42,6 +42,8 @@ Http::RegisterCustomInlineHeader<Http::CustomInlineHeaderRegistry::Type::Request
 
 constexpr const char* CookieDeleteFormatString =
     "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; secure";
+constexpr const char* CookieDeleteFormatStringUnsecure =
+    "{}=deleted; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"; /* Deprecated */
 constexpr const char* CookieTailHttpOnlyFormatString = ";path=/;Max-Age={};secure;HttpOnly{}";
 constexpr const char* CookieDomainFormatString = ";domain={}";
 
@@ -860,6 +862,11 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
+  std::string cookie_delete_format_string = CookieDeleteFormatString;
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_secure_cookie_delete")) {
+    cookie_delete_format_string = CookieDeleteFormatStringUnsecure;
+  }
+
   std::string cookie_domain;
   if (!config_->cookieDomain().empty()) {
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
@@ -867,27 +874,27 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
 
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_hmac_),
+      absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().oauth_hmac_),
                    cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+      absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().bearer_token_),
                    cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+      absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().id_token_),
                    cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+      absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().refresh_token_),
                    cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_nonce_),
+      absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().oauth_nonce_),
                    cookie_domain));
   response_headers->addReferenceKey(
       Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().code_verifier_),
+      absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().code_verifier_),
                    cookie_domain));
 
   const std::string post_logout_redirect_url =
@@ -1147,6 +1154,12 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
 
   absl::flat_hash_map<std::string, std::string> request_cookies =
       Http::Utility::parseCookies(*request_headers_);
+
+  std::string cookie_delete_format_string = CookieDeleteFormatString;
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_secure_cookie_delete")) {
+    cookie_delete_format_string = CookieDeleteFormatStringUnsecure;
+  }
+
   std::string cookie_domain;
   if (!config_->cookieDomain().empty()) {
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
@@ -1159,7 +1172,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.bearer_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
+        absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().bearer_token_),
                      cookie_domain));
   }
 
@@ -1170,7 +1183,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.id_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
+        absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().id_token_),
                      cookie_domain));
   }
 
@@ -1181,7 +1194,7 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   } else if (request_cookies.contains(cookie_names.refresh_token_)) {
     headers.addReferenceKey(
         Http::Headers::get().SetCookie,
-        absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
+        absl::StrCat(fmt::format(cookie_delete_format_string, config_->cookieNames().refresh_token_),
                      cookie_domain));
   }
 }
