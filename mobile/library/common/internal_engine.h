@@ -17,6 +17,7 @@
 #include "library/common/http/client.h"
 #include "library/common/logger/logger_delegate.h"
 #include "library/common/network/connectivity_manager.h"
+#include "library/common/network/network_types.h"
 #include "library/common/types/c_types.h"
 
 namespace Envoy {
@@ -131,6 +132,37 @@ public:
   void onDefaultNetworkChanged(int network);
 
   /**
+   * The callback that gets executed when the device pick a different
+   * network as the default.
+   *
+   * @param connection_type the type of the given network, i.e. WIFI, 3G, 4G, etc.
+   * @param net_id an opaque handle to the network picked by the platform. Android Lollipop uses
+   * Network.netId as such handle, and Marshmallow+ uses the returned value of
+   * Network.getNetworkHandle().
+   *
+   */
+  void onDefaultNetworkChangedAndroid(ConnectionType connection_type, int64_t net_id);
+
+  /**
+   * The callback that gets executed when the device gets disconnected from the
+   * given network.
+   *
+   */
+  void onNetworkDisconnectAndroid(int64_t net_id);
+
+  /**
+   * The callback that gets executed when the device gets connected to a new
+   * network.
+   */
+  void onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id);
+
+  /**
+   * The callback that gets executed when the device decides that the given list of networks should
+   * be forgotten.
+   */
+  void purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids);
+
+  /**
    * The callback that gets executed when the mobile device network monitor receives a network
    * change event.
    *
@@ -188,7 +220,8 @@ private:
   //  - Sets the preferred network.
   //  - If no IPv6 connectivity, tells the DNS cache to remove IPv6 addresses from host entries.
   //  - Clear HTTP/3 broken status.
-  //  - Force refresh DNS cache.
+  //  - Drain all connections immediately or force refresh DNS cache and drain
+  //  all connections upon completion.
   void handleNetworkChange(int network_type, bool has_ipv6_connectivity);
 
   // Probe for connectivity for the provided `domain` and get a pointer to the local address. If

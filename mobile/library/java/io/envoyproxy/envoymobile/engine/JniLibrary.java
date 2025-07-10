@@ -233,6 +233,20 @@ public class JniLibrary {
    * A callback into the Envoy Engine when the default network was changed.
    */
   protected static native void onDefaultNetworkChanged(long engine, int networkType);
+  protected static native void onDefaultNetworkChangedV2(long engine, int connectionType,
+                                                         long net_id);
+
+  /**
+   * A callback into the Envoy Engine when the network with the given net_id gets disconnected.
+   */
+  protected static native void onNetworkDisconnect(long engine, long net_id);
+
+  /**
+   * A callback into the Envoy Engine when the network with the given net_id gets connected.
+   */
+  protected static native void onNetworkConnect(long engine, int connectionType, long net_id);
+
+  protected static native void purgeActiveNetworkList(long engine, long[] activeNetIds);
 
   /**
    * A more modern callback into the Envoy Engine when the default network was changed.
