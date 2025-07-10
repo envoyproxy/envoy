@@ -83,6 +83,39 @@ template <class Value> class RadixTree {
       // Replace the original child with the split node
       children_[firstChar] = std::move(splitNode);
     }
+
+    /**
+     * Recursive helper for find operation.
+     * @param search the remaining search key.
+     * @param result the value to return if found.
+     * @return true if the key was found, false otherwise.
+     */
+    bool find_recursive(absl::string_view search, Value& result) const {
+      if (search.empty()) {
+        if (hasValue(*this)) {
+          result = value_;
+          return true;
+        }
+        return false;
+      }
+
+      uint8_t firstChar = static_cast<uint8_t>(search[0]);
+      auto childIt = children_.find(firstChar);
+      if (childIt == children_.end()) {
+        return false;
+      }
+
+      const RadixTreeNode& child = childIt->second;
+
+      // Check if the child's prefix matches the search
+      if (search.size() >= child.prefix_.size() &&
+          search.substr(0, child.prefix_.size()) == child.prefix_) {
+        absl::string_view newSearch(search.begin() + child.prefix_.size(), search.end());
+        return child.find_recursive(newSearch, result);
+      }
+
+      return false;
+    }
   };
 
   /**
@@ -153,7 +186,7 @@ public:
    * @return true if the key was found, false otherwise.
    */
   bool find(absl::string_view key, Value& result) const {
-    return findRecursive(&root_, key, result);
+    return root_.find_recursive(key, result);
   }
 
   /**
