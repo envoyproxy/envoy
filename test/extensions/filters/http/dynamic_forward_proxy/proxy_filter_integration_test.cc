@@ -187,7 +187,6 @@ name: stream-info-to-headers-filter
       bootstrap.mutable_typed_dns_resolver_config()->MergeFrom(typed_dns_resolver_config);
     });
 
->>>>>>> bd3136178f84ba76f481c6ca588f589a074719e7
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_resource_api_version(
