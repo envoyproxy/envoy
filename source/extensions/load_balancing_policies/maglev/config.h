@@ -29,18 +29,22 @@ public:
                                               TimeSource& time_source) override;
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
-  loadConfig(Server::Configuration::ServerFactoryContext&,
+  loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
     ASSERT(dynamic_cast<const MaglevLbProto*>(&config) != nullptr);
-    const MaglevLbProto& typed_config = dynamic_cast<const MaglevLbProto&>(config);
-    return Upstream::LoadBalancerConfigPtr{new Upstream::TypedMaglevLbConfig(typed_config)};
+    const MaglevLbProto& typed_proto = dynamic_cast<const MaglevLbProto&>(config);
+    absl::Status creation_status = absl::OkStatus();
+    auto typed_config = std::make_unique<Upstream::TypedMaglevLbConfig>(
+        typed_proto, context.regexEngine(), creation_status);
+    RETURN_IF_NOT_OK_REF(creation_status);
+    return typed_config;
   }
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadLegacy(Server::Configuration::ServerFactoryContext&,
              const Upstream::ClusterProto& cluster) override {
-    return Upstream::LoadBalancerConfigPtr{
-        new Upstream::TypedMaglevLbConfig(cluster.common_lb_config(), cluster.maglev_lb_config())};
+    return std::make_unique<Upstream::TypedMaglevLbConfig>(cluster.common_lb_config(),
+                                                           cluster.maglev_lb_config());
   }
 };
 

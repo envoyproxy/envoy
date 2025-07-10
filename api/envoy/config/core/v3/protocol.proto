@@ -674,7 +674,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -709,6 +709,10 @@ message Http3ProtocolOptions {
   // No huffman encoding, zero dynamic table capacity and no cookie crumbing.
   // This can be useful for trading off CPU vs bandwidth when an upstream HTTP/3 connection multiplexes multiple downstream connections.
   bool disable_qpack = 7;
+
+  // Disables connection level flow control for HTTP/3 streams. This is useful in situations where the streams share the same connection
+  // but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
+  bool disable_connection_flow_control_for_streams = 8;
 }
 
 // A message to control transformations to the :scheme header

@@ -1571,19 +1571,19 @@ constexpr absl::string_view FailStreamResponseDetails = "wasm_fail_stream";
 void Context::failStream(WasmStreamType stream_type) {
   switch (stream_type) {
   case WasmStreamType::Request:
-    if (decoder_callbacks_ && !local_reply_sent_) {
+    if (decoder_callbacks_ && !failure_local_reply_sent_) {
       decoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
                                          Grpc::Status::WellKnownGrpcStatus::Unavailable,
                                          FailStreamResponseDetails);
-      local_reply_sent_ = true;
+      failure_local_reply_sent_ = true;
     }
     break;
   case WasmStreamType::Response:
-    if (encoder_callbacks_ && !local_reply_sent_) {
+    if (encoder_callbacks_ && !failure_local_reply_sent_) {
       encoder_callbacks_->sendLocalReply(Envoy::Http::Code::ServiceUnavailable, "", nullptr,
                                          Grpc::Status::WellKnownGrpcStatus::Unavailable,
                                          FailStreamResponseDetails);
-      local_reply_sent_ = true;
+      failure_local_reply_sent_ = true;
     }
     break;
   case WasmStreamType::Downstream:
@@ -1723,7 +1723,9 @@ Http::Filter1xxHeadersStatus Context::encode1xxHeaders(Http::ResponseHeaderMap&)
 
 Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                  bool end_stream) {
-  if (!in_vm_context_created_) {
+  // If the vm context is not created or the stream has failed and the local reply has been sent,
+  // we should not continue to call the VM.
+  if (!in_vm_context_created_ || failure_local_reply_sent_) {
     return Http::FilterHeadersStatus::Continue;
   }
   response_headers_ = &headers;
@@ -1736,7 +1738,9 @@ Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& header
 }
 
 Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool end_stream) {
-  if (!in_vm_context_created_) {
+  // If the vm context is not created or the stream has failed and the local reply has been sent,
+  // we should not continue to call the VM.
+  if (!in_vm_context_created_ || failure_local_reply_sent_) {
     return Http::FilterDataStatus::Continue;
   }
   if (buffering_response_body_) {
@@ -1771,7 +1775,9 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
 }
 
 Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& trailers) {
-  if (!in_vm_context_created_) {
+  // If the vm context is not created or the stream has failed and the local reply has been sent,
+  // we should not continue to call the VM.
+  if (!in_vm_context_created_ || failure_local_reply_sent_) {
     return Http::FilterTrailersStatus::Continue;
   }
   response_trailers_ = &trailers;
@@ -1783,7 +1789,9 @@ Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& tra
 }
 
 Http::FilterMetadataStatus Context::encodeMetadata(Http::MetadataMap& response_metadata) {
-  if (!in_vm_context_created_) {
+  // If the vm context is not created or the stream has failed and the local reply has been sent,
+  // we should not continue to call the VM.
+  if (!in_vm_context_created_ || failure_local_reply_sent_) {
     return Http::FilterMetadataStatus::Continue;
   }
   response_metadata_ = &response_metadata;
