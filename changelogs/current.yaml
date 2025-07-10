@@ -1,7 +1,6 @@
-date: Pending
+date: July 10, 2025
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: aws_iam
   change: |
     As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
@@ -31,7 +30,6 @@ behavior_changes:
     and appears abandoned.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: geoip
   change: |
     The lookup for asn information is fetched from ``asn_db`` if asn_db_path is defined and from ``isb_db`` if asn_db_path is not defined.
@@ -69,9 +67,9 @@ minor_behavior_changes:
     Add SSE style message framing for streamed responses in :ref:`gRPC JSON transcoder filter <config_http_filters_grpc_json_transcoder>`.
 - area: http
   change: |
-   :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
-   :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
-   will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
+    :ref:`response_headers_to_add <envoy_v3_api_field_config.route.v3.Route.response_headers_to_add>` and
+    :ref:`response_headers_to_remove <envoy_v3_api_field_config.route.v3.Route.response_headers_to_remove>`
+    will also be applied to the local responses from the ``envoy.filters.http.router`` filter.
 - area: tracing
   change: |
     Add :ref:`max_cache_size <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.max_cache_size>`
@@ -103,7 +101,6 @@ minor_behavior_changes:
     virtual host in case the route is not matched but the virtual host is found.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: conn_pool
   change: |
     Fixed an issue that could lead to too many connections when using
@@ -143,7 +140,6 @@ bug_fixes:
     Fixed a bug where the WASM filter will hangs when the VM is crashed in the request callbacks.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: websocket
   change: |
     Removed runtime guard ``envoy.reloadable_features.switch_protocol_websocket_handshake`` and legacy code paths.
@@ -345,5 +341,3 @@ new_features:
     Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_connection_flow_control_for_streams, an experimental
     option for disabling connection level flow control for streams. This is useful in situations where the streams share the same
     connection but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
-
-deprecated:
