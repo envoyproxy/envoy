@@ -25,10 +25,10 @@ public:
       const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor& config,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr& builder,
       const cel::expr::Expr& input_expr)
-      : builder_(builder), descriptor_key_(config.descriptor_key()),
+      : builder_(builder), input_expr_(input_expr), descriptor_key_(config.descriptor_key()),
         skip_if_error_(config.skip_if_error()) {
     compiled_expr_ =
-        Extensions::Filters::Common::Expr::createExpression(builder_->builder(), input_expr);
+        Extensions::Filters::Common::Expr::createExpression(builder_->builder(), input_expr_);
   }
 
   // Ratelimit::DescriptorProducer
@@ -50,6 +50,7 @@ public:
 
 private:
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
+  const cel::expr::Expr input_expr_;
   const std::string descriptor_key_;
   const bool skip_if_error_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;

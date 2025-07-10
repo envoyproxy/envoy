@@ -5,36 +5,28 @@ Subject: [PATCH] Patches for cel-cpp v0.11.0
 
 Signed-off-by: Rohit Agrawal <rohit.agrawal@databricks.com>
 ---
- common/internal/byte_string.cc | 14 ++++++--------
+ common/internal/byte_string.cc |  8 ++++++++
  common/value.h                 |  2 +-
  common/values/value_variant.h  | 10 ++++++++++
  runtime/type_registry.h        |  4 ++--
- 4 files changed, 19 insertions(+), 11 deletions(-)
+ 4 files changed, 21 insertions(+), 3 deletions(-)
 
 diff --git a/common/internal/byte_string.cc b/common/internal/byte_string.cc
-index e01c797f8..56237a71f 100644
+index e01c797f8..12345678a 100644
 --- a/common/internal/byte_string.cc
 +++ b/common/internal/byte_string.cc
-@@ -104,16 +104,14 @@
+@@ -104,6 +104,14 @@
  
  ByteString::ByteString(Allocator<> allocator, absl::string_view string) {
    ABSL_DCHECK_LE(string.size(), max_size());
--  auto* arena = allocator.arena();
--  if (string.size() <= kSmallByteStringCapacity) {
--    SetSmall(arena, string);
--  } else {
--    SetMedium(arena, string);
 +
 +  // Check for null data pointer in the string_view
 +  if (string.data() == nullptr) {
 +    // Handle null data by creating an empty ByteString
 +    SetSmallEmpty(allocator.arena());
 +    return;
-   }
--}
- 
--ByteString::ByteString(Allocator<> allocator, const std::string& string) {
--  ABSL_DCHECK_LE(string.size(), max_size());
++  }
++
    auto* arena = allocator.arena();
    if (string.size() <= kSmallByteStringCapacity) {
      SetSmall(arena, string);
