@@ -1,5 +1,7 @@
 #include "source/common/runtime/runtime_features.h"
 
+#include "envoy/http/codec.h"
+
 #include "absl/flags/commandlineflag.h"
 #include "absl/flags/flag.h"
 #include "absl/strings/match.h"
@@ -233,6 +235,13 @@ bool hasRuntimePrefix(absl::string_view feature) {
 
 bool isRuntimeFeature(absl::string_view feature) {
   return RuntimeFeaturesDefaults::get().getFlag(feature) != nullptr;
+}
+
+bool isLegacyRuntimeFeature(absl::string_view feature) {
+  return feature == Http::MaxRequestHeadersCountOverrideKey ||
+         feature == Http::MaxResponseHeadersCountOverrideKey ||
+         feature == Http::MaxRequestHeadersSizeOverrideKey ||
+         feature == Http::MaxResponseHeadersSizeOverrideKey;
 }
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
