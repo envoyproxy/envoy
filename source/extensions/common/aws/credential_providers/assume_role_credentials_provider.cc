@@ -79,12 +79,10 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
 
+  // No code path exists that can cause signing to fail, as signing only fails if path or method is
+  // unset.
   auto status = assume_role_signer_->sign(message, true, region_);
-  if (!status.ok()) {
-    ENVOY_LOG_MISC(debug, status.message());
-    credentialsRetrievalError();
-    return;
-  }
+
   // Stop any existing timer.
   if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
     cache_duration_timer_->disableTimer();
