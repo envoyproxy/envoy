@@ -276,7 +276,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
   auto status = request_encoder->encodeHeaders(*request_headers, true);
-  // Encoding will only fail if required request headers are missing.
+  // Encoding will only fail if required request headers are missing
   ASSERT(status.ok());
 }
 
