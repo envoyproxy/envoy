@@ -33,6 +33,19 @@ envoy_cc_extension(
 )
 
 envoy_cc_extension(
+    name = "trigger_mechanism_lib",
+    srcs = ["trigger_mechanism.cc"],
+    hdrs = ["trigger_mechanism.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:file_event_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_extension(
     name = "reverse_tunnel_initiator_lib",
     srcs = ["reverse_tunnel_initiator.cc"],
     hdrs = ["reverse_tunnel_initiator.h"],
@@ -40,6 +53,7 @@ envoy_cc_extension(
     deps = [
         ":reverse_connection_address_lib",
         ":reverse_connection_resolver_lib",
+        ":trigger_mechanism_lib",
         "//envoy/api:io_error_interface",
         "//envoy/network:address_interface",
         "//envoy/network:io_handle_interface",

@@ -27,6 +27,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/extensions/bootstrap/reverse_tunnel/trigger_mechanism.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -205,10 +206,10 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   /**
-   * Check if trigger pipe is ready for accepting connections.
-   * @return true if the trigger pipe is both the FDs are ready
+   * Check if trigger mechanism is ready for accepting connections.
+   * @return true if the trigger mechanism is initialized and ready
    */
-  bool isTriggerPipeReady() const;
+  bool isTriggerReady() const;
 
   // Callbacks from RCConnectionWrapper
   /**
@@ -316,9 +317,15 @@ private:
   Event::Dispatcher& getThreadLocalDispatcher() const;
 
   /**
-   * Create the trigger pipe used to wake up accept() when connections are established.
+   * Check if thread-local dispatcher is available (not destroyed during shutdown)
+   * @return true if dispatcher is available and safe to use
    */
-  void createTriggerPipe();
+  bool isThreadLocalDispatcherAvailable() const;
+
+  /**
+   * Create the trigger mechanism used to wake up accept() when connections are established.
+   */
+  void createTriggerMechanism();
 
   // Functions to maintain connections to remote clusters.
 
@@ -403,13 +410,12 @@ private:
   // Mapping from wrapper to host. This designates the number of successful connections to a host.
   std::unordered_map<RCConnectionWrapper*, std::string> conn_wrapper_to_host_map_;
 
-  // Pipe used to wake up accept() when a connection is established.
-  // We write a single byte to the write end of the pipe when the reverse
-  // connection request is accepted and read the byte in the accept() call.
-  // This, along with the established_connections_ queue, is used to
-  // determine the connection that got established last.
-  int trigger_pipe_read_fd_{-1};
-  int trigger_pipe_write_fd_{-1};
+  // Cross-platform trigger mechanism to wake up accept() when a connection is established.
+  // This replaces the legacy pipe-based approach with optimal implementations for each platform:
+  // - macOS: kqueue EVFILT_USER (no file descriptor overhead)
+  // - Linux: eventfd (single FD, 64-bit counter)
+  // - Other Unix: pipe (fallback for compatibility)
+  std::unique_ptr<TriggerMechanism> trigger_mechanism_;
 
   // Connection management : We store the established connections in a queue
   // and pop the last established connection when data is read on trigger_pipe_read_fd_
@@ -429,6 +435,9 @@ private:
   Event::TimerPtr rev_conn_retry_timer_;
 
   bool listening_initiated_{false}; // Whether reverse connections have been initiated
+
+  // Store original socket FD for cleanup
+  os_fd_t original_socket_fd_{-1};
 };
 
 /**

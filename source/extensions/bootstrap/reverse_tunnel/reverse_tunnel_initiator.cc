@@ -40,12 +40,10 @@ public:
    * Constructor that takes ownership of the socket.
    */
   explicit DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
-                                              const std::string& connection_key,
-                                              ReverseConnectionIOHandle* parent)
-      : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), 
-        owned_socket_(std::move(socket)),
-        connection_key_(connection_key),
-        parent_(parent) {
+                                               const std::string& connection_key,
+                                               ReverseConnectionIOHandle* parent)
+      : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), owned_socket_(std::move(socket)),
+        connection_key_(connection_key), parent_(parent) {
     ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {}",
               fd_, connection_key_);
   }
@@ -57,16 +55,27 @@ public:
   // Network::IoHandle overrides.
   Api::IoCallUint64Result close() override {
     ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: closing handle for FD: {}", fd_);
-    // Notify parent of connection closure for re-initiation
-    if (parent_) {
-      ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: Marking connection as closed");
-      parent_->onDownstreamConnectionClosed(connection_key_);
+
+    // Safely notify parent of connection closure
+    try {
+      if (parent_) {
+        ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: Marking connection as closed");
+        parent_->onDownstreamConnectionClosed(connection_key_);
+      }
+    } catch (const std::exception& e) {
+      ENVOY_LOG(debug, "Exception notifying parent of connection closure (continuing): {}",
+                e.what());
     }
-    
+
     // Reset the owned socket to properly close the connection.
-    if (owned_socket_) {
-      owned_socket_.reset();
+    try {
+      if (owned_socket_) {
+        owned_socket_.reset();
+      }
+    } catch (const std::exception& e) {
+      ENVOY_LOG(debug, "Exception resetting owned socket (continuing): {}", e.what());
     }
+
     return IoSocketHandleImpl::close();
   }
 
@@ -366,7 +375,7 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
                                                      const ReverseTunnelInitiator& socket_interface,
                                                      Stats::Scope& scope)
     : IoSocketHandleImpl(fd), config_(config), cluster_manager_(cluster_manager),
-      socket_interface_(socket_interface) {
+      socket_interface_(socket_interface), original_socket_fd_(fd) {
   ENVOY_LOG(debug, "Created ReverseConnectionIOHandle: fd={}, src_node={}, num_clusters={}", fd_,
             config_.src_node_id, config_.remote_clusters.size());
   ENVOY_LOG(debug,
@@ -375,9 +384,8 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
             config_.src_cluster_id, config_.src_node_id, config_.health_check_interval_ms,
             config_.connection_timeout_ms);
   initializeStats(scope);
-  // Create trigger pipe.
-  createTriggerPipe();
-  // Defer actual connection initiation until listen() is called on a worker thread.
+  // Defer trigger mechanism creation until listen() is called on a worker thread.
+  // This avoids accessing thread-local dispatcher during main thread initialization.
 }
 
 ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
@@ -387,52 +395,111 @@ ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
 
 void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG(debug, "Starting cleanup of reverse connection resources");
-  // Cancel the retry timer.
-  if (rev_conn_retry_timer_) {
-    rev_conn_retry_timer_->disableTimer();
-    ENVOY_LOG(debug, "Cancelled retry timer");
+
+  // CRITICAL: Clean up trigger mechanism FIRST to prevent use-after-free
+  if (trigger_mechanism_) {
+    ENVOY_LOG(debug, "Cleaning up trigger mechanism during cleanup");
+    trigger_mechanism_.reset();
+    ENVOY_LOG(debug, "Trigger mechanism cleaned up during cleanup");
   }
-  // Graceful shutdown of connection wrappers following best practices.
+
+  // Cancel the retry timer safely.
+  if (rev_conn_retry_timer_) {
+    try {
+      rev_conn_retry_timer_->disableTimer();
+      rev_conn_retry_timer_.reset();
+      ENVOY_LOG(debug, "Cancelled and reset retry timer");
+    } catch (const std::exception& e) {
+      ENVOY_LOG(debug, "Exception during timer cleanup (expected during shutdown): {}", e.what());
+      // Reset the timer pointer anyway to prevent further access
+      rev_conn_retry_timer_.reset();
+    }
+  }
+  // Graceful shutdown of connection wrappers with exception safety.
   ENVOY_LOG(debug, "Gracefully shutting down {} connection wrappers", connection_wrappers_.size());
 
-  // Step 1: Signal all connections to close gracefully.
+  // Step 1: Signal all connections to close gracefully with exception handling.
+  std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers_to_delete;
   for (auto& wrapper : connection_wrappers_) {
     if (wrapper) {
-      ENVOY_LOG(debug, "Initiating graceful shutdown for connection wrapper");
-      wrapper->shutdown();
+      try {
+        ENVOY_LOG(debug, "Initiating graceful shutdown for connection wrapper");
+        wrapper->shutdown();
+        // Move wrapper for deferred cleanup
+        wrappers_to_delete.push_back(std::move(wrapper));
+      } catch (const std::exception& e) {
+        ENVOY_LOG(debug, "Exception during wrapper shutdown (continuing cleanup): {}", e.what());
+        // Still move the wrapper to ensure it gets cleaned up
+        wrappers_to_delete.push_back(std::move(wrapper));
+      }
     }
   }
 
-  // Step 2: Clear the vector. Connections are now safely closed.
+  // Step 2: Clear containers safely.
   connection_wrappers_.clear();
   conn_wrapper_to_host_map_.clear();
+
+  // Step 3: Clean up wrappers with safe deletion.
+  for (auto& wrapper : wrappers_to_delete) {
+    if (wrapper && isThreadLocalDispatcherAvailable()) {
+      try {
+        getThreadLocalDispatcher().deferredDelete(std::move(wrapper));
+      } catch (...) {
+        // Direct cleanup as fallback
+        wrapper.reset();
+      }
+    } else {
+      // Direct cleanup when dispatcher not available
+      wrapper.reset();
+    }
+  }
 
   // Clear cluster to hosts mapping.
   cluster_to_resolved_hosts_map_.clear();
   host_to_conn_info_map_.clear();
 
-  // Clear established connections queue.
-  {
+  // Clear established connections queue safely.
+  try {
+    size_t queue_size = established_connections_.size();
+    ENVOY_LOG(debug, "Cleaning up {} established connections", queue_size);
+
     while (!established_connections_.empty()) {
-      auto connection = std::move(established_connections_.front());
-      established_connections_.pop();
-      if (connection && connection->state() == Envoy::Network::Connection::State::Open) {
-        connection->close(Envoy::Network::ConnectionCloseType::FlushWrite);
+      try {
+        auto connection = std::move(established_connections_.front());
+        established_connections_.pop();
+
+        if (connection) {
+          try {
+            auto state = connection->state();
+            if (state == Envoy::Network::Connection::State::Open) {
+              connection->close(Envoy::Network::ConnectionCloseType::FlushWrite);
+              ENVOY_LOG(debug, "Closed established connection");
+            } else {
+              ENVOY_LOG(debug, "Connection already in state: {}", static_cast<int>(state));
+            }
+          } catch (const std::exception& e) {
+            ENVOY_LOG(debug, "Exception closing connection (continuing): {}", e.what());
+          }
+        }
+      } catch (const std::exception& e) {
+        ENVOY_LOG(debug, "Exception processing connection queue item (continuing): {}", e.what());
+        // Skip this item and continue with the next
+        if (!established_connections_.empty()) {
+          established_connections_.pop();
+        }
       }
+    }
+    ENVOY_LOG(debug, "Completed established connections cleanup");
+  } catch (const std::exception& e) {
+    ENVOY_LOG(error, "Exception during established connections cleanup: {}", e.what());
+    // Force clear the queue
+    while (!established_connections_.empty()) {
+      established_connections_.pop();
     }
   }
 
-  // Cleanup trigger pipe.
-  if (trigger_pipe_read_fd_ != -1) {
-    ::close(trigger_pipe_read_fd_);
-    trigger_pipe_read_fd_ = -1;
-  }
+  // Trigger mechanism already cleaned up at the beginning of cleanup()
 
-  if (trigger_pipe_write_fd_ != -1) {
-    ::close(trigger_pipe_write_fd_);
-    trigger_pipe_write_fd_ = -1;
-  }
-  
   ENVOY_LOG(debug, "Completed cleanup of reverse connection resources");
 }
 
@@ -443,18 +510,51 @@ Api::SysCallIntResult ReverseConnectionIOHandle::listen(int backlog) {
             config_.remote_clusters.size());
 
   if (!listening_initiated_) {
+    // Create trigger mechanism on worker thread where TLS is available
+    if (!trigger_mechanism_) {
+      createTriggerMechanism();
+      if (!trigger_mechanism_) {
+        ENVOY_LOG(error,
+                  "Failed to create trigger mechanism - cannot proceed with reverse connections");
+        return Api::SysCallIntResult{-1, ENODEV};
+      }
+
+      // CRITICAL: Replace the monitored FD with trigger mechanism's FD
+      // This must happen before any event registration
+      int trigger_fd = trigger_mechanism_->getMonitorFd();
+      if (trigger_fd != -1) {
+        ENVOY_LOG(info, "Replacing monitored FD from {} to trigger FD {}", fd_, trigger_fd);
+        fd_ = trigger_fd;
+      } else {
+        ENVOY_LOG(warn,
+                  "Trigger mechanism does not provide a monitor FD - using original socket FD");
+      }
+    }
+
     // Create the retry timer on first use with thread-local dispatcher. The timer is reset
     // on each invocation of maintainReverseConnections().
     if (!rev_conn_retry_timer_) {
-      rev_conn_retry_timer_ = getThreadLocalDispatcher().createTimer([this]() -> void {
-        ENVOY_LOG(
-            debug,
-            "Reverse connection timer triggered - checking all clusters for missing connections");
-        maintainReverseConnections();
-      });
-      // Trigger the reverse connection workflow. The function will reset rev_conn_retry_timer_.
-      maintainReverseConnections();
-      ENVOY_LOG(debug, "Created retry timer for periodic connection checks");
+      try {
+        if (isThreadLocalDispatcherAvailable()) {
+          rev_conn_retry_timer_ = getThreadLocalDispatcher().createTimer([this]() -> void {
+            ENVOY_LOG(debug, "Reverse connection timer triggered - checking all clusters for "
+                             "missing connections");
+            // Safety check before maintenance
+            if (isThreadLocalDispatcherAvailable()) {
+              maintainReverseConnections();
+            } else {
+              ENVOY_LOG(debug, "Skipping maintenance - dispatcher not available");
+            }
+          });
+          // Trigger the reverse connection workflow. The function will reset rev_conn_retry_timer_.
+          maintainReverseConnections();
+          ENVOY_LOG(debug, "Created retry timer for periodic connection checks");
+        } else {
+          ENVOY_LOG(warn, "Cannot create retry timer - dispatcher not available");
+        }
+      } catch (const std::exception& e) {
+        ENVOY_LOG(error, "Exception creating retry timer: {}", e.what());
+      }
     }
     listening_initiated_ = true;
   }
@@ -464,10 +564,15 @@ Api::SysCallIntResult ReverseConnectionIOHandle::listen(int backlog) {
 
 Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* addr,
                                                               socklen_t* addrlen) {
-  if (isTriggerPipeReady()) {
-    char trigger_byte;
-    ssize_t bytes_read = ::read(trigger_pipe_read_fd_, &trigger_byte, 1);
-    if (bytes_read == 1) {
+  // Trigger mechanism is created lazily in listen() - if not ready, no connections available
+  if (!isTriggerReady()) {
+    ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - trigger mechanism not ready");
+    return nullptr;
+  }
+
+  ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - checking trigger mechanism");
+  try {
+    if (trigger_mechanism_->wait()) {
       ENVOY_LOG(debug,
                 "ReverseConnectionIOHandle::accept() - received trigger, processing connection");
       // When a connection is established, a byte is written to the trigger_pipe_write_fd_ and the
@@ -543,14 +648,11 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - returning io_handle");
         return io_handle;
       }
-    } else if (bytes_read == 0) {
-      ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - trigger pipe closed");
-      return nullptr;
-    } else if (bytes_read == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-      ENVOY_LOG(error, "ReverseConnectionIOHandle::accept() - error reading from trigger pipe: {}",
-                strerror(errno));
-      return nullptr;
+    } else {
+      ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - no trigger detected");
     }
+  } catch (const std::exception& e) {
+    ENVOY_LOG(error, "Exception in accept() trigger mechanism: {}", e.what());
   }
   return nullptr;
 }
@@ -580,6 +682,22 @@ ReverseConnectionIOHandle::connect(Envoy::Network::Address::InstanceConstSharedP
 // Individual connections are managed via DownstreamReverseConnectionIOHandle RAII ownership.
 Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
   ENVOY_LOG(debug, "ReverseConnectionIOHandle::close() - performing graceful shutdown");
+
+  // Clean up original socket FD if it's different from the current fd_
+  if (original_socket_fd_ != -1 && original_socket_fd_ != fd_) {
+    ENVOY_LOG(debug, "Closing original socket FD: {}", original_socket_fd_);
+    ::close(original_socket_fd_);
+    original_socket_fd_ = -1;
+  }
+
+  // CRITICAL: If we're using trigger mechanism FD, don't let IoSocketHandleImpl close it
+  // because the trigger mechanism destructor will handle it
+  if (trigger_mechanism_ && trigger_mechanism_->getMonitorFd() == fd_) {
+    ENVOY_LOG(debug, "Skipping close of trigger FD {} - will be handled by trigger mechanism", fd_);
+    // Reset fd_ to prevent double-close
+    fd_ = -1;
+  }
+
   return IoSocketHandleImpl::close();
 }
 
@@ -589,8 +707,10 @@ void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
   ENVOY_LOG(trace, "ReverseConnectionIOHandle::onEvent - event: {}", static_cast<int>(event));
 }
 
-bool ReverseConnectionIOHandle::isTriggerPipeReady() const {
-  return trigger_pipe_read_fd_ != -1 && trigger_pipe_write_fd_ != -1;
+bool ReverseConnectionIOHandle::isTriggerReady() const {
+  bool ready = trigger_mechanism_ != nullptr;
+  ENVOY_LOG(debug, "isTriggerReady() returning: {}", ready);
+  return ready;
 }
 
 // Use the thread-local registry to get the dispatcher
@@ -604,7 +724,21 @@ Event::Dispatcher& ReverseConnectionIOHandle::getThreadLocalDispatcher() const {
               local_registry->dispatcher().name());
     return local_registry->dispatcher();
   }
-  throw EnvoyException("Failed to get dispatcher from thread-local registry");
+
+  // CRITICAL SAFETY: During shutdown, TLS might be destroyed
+  ENVOY_LOG(warn, "Thread-local registry not available - likely during shutdown");
+  throw EnvoyException(
+      "Failed to get dispatcher from thread-local registry - TLS destroyed during shutdown");
+}
+
+// Safe wrapper for accessing thread-local dispatcher
+bool ReverseConnectionIOHandle::isThreadLocalDispatcherAvailable() const {
+  try {
+    auto* local_registry = socket_interface_.getLocalRegistry();
+    return local_registry != nullptr;
+  } catch (...) {
+    return false;
+  }
 }
 
 void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
@@ -733,8 +867,14 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
       ENVOY_LOG(debug, "Skipping connection attempt to host {} due to backoff", host_address);
       continue;
     }
-
     // Get current number of successful connections to this host
+    // uint32_t current_connections = 0;
+    // for (const auto& [wrapper, mapped_host] : conn_wrapper_to_host_map_) {
+    //   if (mapped_host == host_address) {
+    //     current_connections++;
+    //   }
+    // }
+
     uint32_t current_connections = host_to_conn_info_map_[host_address].connection_keys.size();
 
     ENVOY_LOG(info,
@@ -966,11 +1106,11 @@ void ReverseConnectionIOHandle::removeConnectionState(const std::string& host_ad
 
 void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& connection_key) {
   ENVOY_LOG(debug, "Downstream connection closed: {}", connection_key);
-  
+
   // Find the host for this connection key
   std::string host_address;
   std::string cluster_name;
-  
+
   // Search through host_to_conn_info_map_ to find which host this connection belongs to
   for (const auto& [host, host_info] : host_to_conn_info_map_) {
     if (host_info.connection_keys.find(connection_key) != host_info.connection_keys.end()) {
@@ -979,91 +1119,113 @@ void ReverseConnectionIOHandle::onDownstreamConnectionClosed(const std::string& 
       break;
     }
   }
-  
+
   if (host_address.empty()) {
     ENVOY_LOG(warn, "Could not find host for connection key: {}", connection_key);
     return;
   }
-  
-  ENVOY_LOG(debug, "Found connection {} belongs to host {} in cluster {}", 
-            connection_key, host_address, cluster_name);
-  
+
+  ENVOY_LOG(debug, "Found connection {} belongs to host {} in cluster {}", connection_key,
+            host_address, cluster_name);
+
   // Remove the connection key from the host's connection set
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it != host_to_conn_info_map_.end()) {
     host_it->second.connection_keys.erase(connection_key);
-    ENVOY_LOG(debug, "Removed connection key {} from host {} (remaining: {})", 
-              connection_key, host_address, host_it->second.connection_keys.size());
+    ENVOY_LOG(debug, "Removed connection key {} from host {} (remaining: {})", connection_key,
+              host_address, host_it->second.connection_keys.size());
   }
-  
+
   // Remove connection state tracking
   removeConnectionState(host_address, cluster_name, connection_key);
-  
+
   // The next call to maintainClusterConnections() will detect the missing connection
   // and re-initiate it automatically
-  ENVOY_LOG(debug, "Connection closure recorded for host {} in cluster {}. "
-            "Next maintenance cycle will re-initiate if needed.", host_address, cluster_name);
+  ENVOY_LOG(debug,
+            "Connection closure recorded for host {} in cluster {}. "
+            "Next maintenance cycle will re-initiate if needed.",
+            host_address, cluster_name);
 }
 
 void ReverseConnectionIOHandle::incrementStateGauge(ReverseConnectionDownstreamStats* cluster_stats,
                                                     ReverseConnectionDownstreamStats* host_stats,
                                                     ReverseConnectionState state) {
-  switch (state) {
-  case ReverseConnectionState::Connecting:
-    cluster_stats->reverse_conn_connecting_.inc();
-    host_stats->reverse_conn_connecting_.inc();
-    break;
-  case ReverseConnectionState::Connected:
-    cluster_stats->reverse_conn_connected_.inc();
-    host_stats->reverse_conn_connected_.inc();
-    break;
-  case ReverseConnectionState::Failed:
-    cluster_stats->reverse_conn_failed_.inc();
-    host_stats->reverse_conn_failed_.inc();
-    break;
-  case ReverseConnectionState::Recovered:
-    cluster_stats->reverse_conn_recovered_.inc();
-    host_stats->reverse_conn_recovered_.inc();
-    break;
-  case ReverseConnectionState::Backoff:
-    cluster_stats->reverse_conn_backoff_.inc();
-    host_stats->reverse_conn_backoff_.inc();
-    break;
-  case ReverseConnectionState::CannotConnect:
-    cluster_stats->reverse_conn_cannot_connect_.inc();
-    host_stats->reverse_conn_cannot_connect_.inc();
-    break;
+  // CRITICAL SAFETY: Handle stats access during/after shutdown
+  try {
+    if (!cluster_stats || !host_stats) {
+      ENVOY_LOG(debug, "Stats objects null during increment - likely during shutdown");
+      return;
+    }
+
+    switch (state) {
+    case ReverseConnectionState::Connecting:
+      cluster_stats->reverse_conn_connecting_.inc();
+      host_stats->reverse_conn_connecting_.inc();
+      break;
+    case ReverseConnectionState::Connected:
+      cluster_stats->reverse_conn_connected_.inc();
+      host_stats->reverse_conn_connected_.inc();
+      break;
+    case ReverseConnectionState::Failed:
+      cluster_stats->reverse_conn_failed_.inc();
+      host_stats->reverse_conn_failed_.inc();
+      break;
+    case ReverseConnectionState::Recovered:
+      cluster_stats->reverse_conn_recovered_.inc();
+      host_stats->reverse_conn_recovered_.inc();
+      break;
+    case ReverseConnectionState::Backoff:
+      cluster_stats->reverse_conn_backoff_.inc();
+      host_stats->reverse_conn_backoff_.inc();
+      break;
+    case ReverseConnectionState::CannotConnect:
+      cluster_stats->reverse_conn_cannot_connect_.inc();
+      host_stats->reverse_conn_cannot_connect_.inc();
+      break;
+    }
+  } catch (const std::exception& e) {
+    ENVOY_LOG(debug, "Exception during stats increment (expected during shutdown): {}", e.what());
   }
 }
 
 void ReverseConnectionIOHandle::decrementStateGauge(ReverseConnectionDownstreamStats* cluster_stats,
                                                     ReverseConnectionDownstreamStats* host_stats,
                                                     ReverseConnectionState state) {
-  switch (state) {
-  case ReverseConnectionState::Connecting:
-    cluster_stats->reverse_conn_connecting_.dec();
-    host_stats->reverse_conn_connecting_.dec();
-    break;
-  case ReverseConnectionState::Connected:
-    cluster_stats->reverse_conn_connected_.dec();
-    host_stats->reverse_conn_connected_.dec();
-    break;
-  case ReverseConnectionState::Failed:
-    cluster_stats->reverse_conn_failed_.dec();
-    host_stats->reverse_conn_failed_.dec();
-    break;
-  case ReverseConnectionState::Recovered:
-    cluster_stats->reverse_conn_recovered_.dec();
-    host_stats->reverse_conn_recovered_.dec();
-    break;
-  case ReverseConnectionState::Backoff:
-    cluster_stats->reverse_conn_backoff_.dec();
-    host_stats->reverse_conn_backoff_.dec();
-    break;
-  case ReverseConnectionState::CannotConnect:
-    cluster_stats->reverse_conn_cannot_connect_.dec();
-    host_stats->reverse_conn_cannot_connect_.dec();
-    break;
+  // CRITICAL SAFETY: Handle stats access during/after shutdown
+  try {
+    if (!cluster_stats || !host_stats) {
+      ENVOY_LOG(debug, "Stats objects null during decrement - likely during shutdown");
+      return;
+    }
+
+    switch (state) {
+    case ReverseConnectionState::Connecting:
+      cluster_stats->reverse_conn_connecting_.dec();
+      host_stats->reverse_conn_connecting_.dec();
+      break;
+    case ReverseConnectionState::Connected:
+      cluster_stats->reverse_conn_connected_.dec();
+      host_stats->reverse_conn_connected_.dec();
+      break;
+    case ReverseConnectionState::Failed:
+      cluster_stats->reverse_conn_failed_.dec();
+      host_stats->reverse_conn_failed_.dec();
+      break;
+    case ReverseConnectionState::Recovered:
+      cluster_stats->reverse_conn_recovered_.dec();
+      host_stats->reverse_conn_recovered_.dec();
+      break;
+    case ReverseConnectionState::Backoff:
+      cluster_stats->reverse_conn_backoff_.dec();
+      host_stats->reverse_conn_backoff_.dec();
+      break;
+    case ReverseConnectionState::CannotConnect:
+      cluster_stats->reverse_conn_cannot_connect_.dec();
+      host_stats->reverse_conn_cannot_connect_.dec();
+      break;
+    }
+  } catch (const std::exception& e) {
+    ENVOY_LOG(debug, "Exception during stats decrement (expected during shutdown): {}", e.what());
   }
 }
 
@@ -1163,29 +1325,38 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   }
 }
 
-// Trigger pipe used to wake up accept() when a connection is established.
-void ReverseConnectionIOHandle::createTriggerPipe() {
-  ENVOY_LOG(debug, "Creating trigger pipe for single-byte mechanism");
-  int pipe_fds[2];
-  if (pipe(pipe_fds) == -1) {
-    ENVOY_LOG(error, "Failed to create trigger pipe: {}", strerror(errno));
-    trigger_pipe_read_fd_ = -1;
-    trigger_pipe_write_fd_ = -1;
+// Cross-platform trigger mechanism used to wake up accept() when a connection is established.
+void ReverseConnectionIOHandle::createTriggerMechanism() {
+  ENVOY_LOG(debug, "Creating cross-platform trigger mechanism");
+
+  // Check if TLS is available before proceeding
+  if (!isThreadLocalDispatcherAvailable()) {
+    ENVOY_LOG(error, "Cannot create trigger mechanism - thread-local dispatcher not available");
     return;
   }
-  trigger_pipe_read_fd_ = pipe_fds[0];
-  trigger_pipe_write_fd_ = pipe_fds[1];
-  // Make both ends non-blocking.
-  int flags = fcntl(trigger_pipe_write_fd_, F_GETFL, 0);
-  if (flags != -1) {
-    fcntl(trigger_pipe_write_fd_, F_SETFL, flags | O_NONBLOCK);
+
+  // Create the optimal trigger mechanism for the current platform
+  trigger_mechanism_ = TriggerMechanism::create();
+
+  if (!trigger_mechanism_) {
+    ENVOY_LOG(error, "Failed to create trigger mechanism");
+    return;
   }
-  flags = fcntl(trigger_pipe_read_fd_, F_GETFL, 0);
-  if (flags != -1) {
-    fcntl(trigger_pipe_read_fd_, F_SETFL, flags | O_NONBLOCK);
+
+  try {
+    // Initialize with thread-local dispatcher
+    if (!trigger_mechanism_->initialize(getThreadLocalDispatcher())) {
+      ENVOY_LOG(error, "Failed to initialize trigger mechanism");
+      trigger_mechanism_.reset();
+      return;
+    }
+
+    ENVOY_LOG(info, "Created trigger mechanism: {} with monitor FD: {}",
+              trigger_mechanism_->getType(), trigger_mechanism_->getMonitorFd());
+  } catch (const std::exception& e) {
+    ENVOY_LOG(error, "Exception creating trigger mechanism: {}", e.what());
+    trigger_mechanism_.reset();
   }
-  ENVOY_LOG(debug, "Created trigger pipe: read_fd={}, write_fd={}", trigger_pipe_read_fd_,
-            trigger_pipe_write_fd_);
 }
 
 void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
@@ -1254,6 +1425,7 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
 
     // Track failure for backoff
     trackConnectionFailure(host_address, cluster_name);
+    // conn_wrapper_to_host_map_.erase(wrapper);
   } else {
     // Connection succeeded
     ENVOY_LOG(debug, "Reverse connection handshake succeeded for host {}", host_address);
@@ -1296,37 +1468,61 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
       established_connections_.push(std::move(released_conn));
 
       // Trigger the accept mechanism
-      if (isTriggerPipeReady()) {
-        char trigger_byte = 1;
-        ssize_t bytes_written = ::write(trigger_pipe_write_fd_, &trigger_byte, 1);
-        if (bytes_written == 1) {
-          ENVOY_LOG(debug,
-                    "Successfully triggered accept() for reverse connection from host {} "
-                    "of cluster {}",
+      if (isTriggerReady()) {
+        ENVOY_LOG(debug,
+                  "Triggering accept mechanism for reverse connection from host {} of cluster {}",
+                  host_address, cluster_name);
+        try {
+          if (trigger_mechanism_->trigger()) {
+            ENVOY_LOG(info,
+                      "Successfully triggered accept() for reverse connection from host {} "
+                      "of cluster {} - trigger FD: {}",
+                      host_address, cluster_name, trigger_mechanism_->getMonitorFd());
+          } else {
+            ENVOY_LOG(error, "Failed to trigger accept mechanism for host {} of cluster {}",
+                      host_address, cluster_name);
+          }
+        } catch (const std::exception& e) {
+          ENVOY_LOG(error, "Exception during trigger: {} for host {} of cluster {}", e.what(),
                     host_address, cluster_name);
-        } else {
-          ENVOY_LOG(error, "Failed to write trigger byte: {}", strerror(errno));
         }
+      } else {
+        ENVOY_LOG(error,
+                  "Cannot trigger accept mechanism - trigger not ready for host {} of cluster {}",
+                  host_address, cluster_name);
       }
     }
   }
 
   ENVOY_LOG(trace, "Removing wrapper from connection_wrappers_ vector");
+
   conn_wrapper_to_host_map_.erase(wrapper);
 
-  // CRITICAL FIX: Use deferred deletion to safely clean up the wrapper
-  // Find and remove the wrapper from connection_wrappers_ vector using deferred deletion pattern
+  // CRITICAL FIX: Safe cleanup with deferred deletion when available
   auto wrapper_vector_it = std::find_if(
       connection_wrappers_.begin(), connection_wrappers_.end(),
       [wrapper](const std::unique_ptr<RCConnectionWrapper>& w) { return w.get() == wrapper; });
 
   if (wrapper_vector_it != connection_wrappers_.end()) {
-    // Move the wrapper out and use deferred deletion to prevent crash during cleanup
+    // Move the wrapper out for safe cleanup
     auto wrapper_to_delete = std::move(*wrapper_vector_it);
     connection_wrappers_.erase(wrapper_vector_it);
-    // Use deferred deletion to ensure safe cleanup
-    getThreadLocalDispatcher().deferredDelete(std::move(wrapper_to_delete));
-    ENVOY_LOG(debug, "Deferred delete of connection wrapper");
+
+    // Try deferred deletion if dispatcher is available, otherwise direct cleanup
+    if (isThreadLocalDispatcherAvailable()) {
+      try {
+        getThreadLocalDispatcher().deferredDelete(std::move(wrapper_to_delete));
+        ENVOY_LOG(debug, "Deferred delete of connection wrapper");
+      } catch (const std::exception& e) {
+        ENVOY_LOG(warn, "Deferred deletion failed, using direct cleanup: {}", e.what());
+        // Direct cleanup as fallback
+        wrapper_to_delete.reset();
+      }
+    } else {
+      ENVOY_LOG(debug, "Dispatcher not available during shutdown - using direct wrapper cleanup");
+      // Direct cleanup when dispatcher is not available (during shutdown)
+      wrapper_to_delete.reset();
+    }
   }
 }
 

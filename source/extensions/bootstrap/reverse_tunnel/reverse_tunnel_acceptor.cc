@@ -513,8 +513,7 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
       },
       Event::FileTriggerType::Edge, Event::FileReadyType::Read);
 
-  fd_to_timer_map_[fd] =
-      dispatcher_.createTimer([this, fd]() { markSocketDead(fd); });
+  fd_to_timer_map_[fd] = dispatcher_.createTimer([this, fd]() { markSocketDead(fd); });
 
   // Initiate ping keepalives on the socket.
   tryEnablePingTimer(std::chrono::seconds(ping_interval.count()));
@@ -689,7 +688,8 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
   auto& sockets = accepted_reverse_connections_[node_id];
   if (sockets.empty()) {
     // This is a used connection (not in the idle pool)
-    ENVOY_LOG(debug, "UpstreamSocketManager: Marking used socket dead. node: {} cluster: {} FD: {}", node_id, cluster_id, fd);
+    ENVOY_LOG(debug, "UpstreamSocketManager: Marking used socket dead. node: {} cluster: {} FD: {}",
+              node_id, cluster_id, fd);
     // Update Envoy's stats system for production multi-tenant tracking
     // This ensures stats are decremented when connections are removed
     if (auto extension = getUpstreamExtension()) {
@@ -913,31 +913,31 @@ USMStats* UpstreamSocketManager::getStatsByCluster(const std::string& cluster_id
 
 UpstreamSocketManager::~UpstreamSocketManager() {
   ENVOY_LOG(debug, "UpstreamSocketManager destructor called");
-  
+
   // Clean up all active file events and timers first
   for (auto& [fd, event] : fd_to_event_map_) {
     ENVOY_LOG(debug, "UpstreamSocketManager: cleaning up file event for FD: {}", fd);
     event.reset(); // This will cancel the file event
   }
   fd_to_event_map_.clear();
-  
+
   for (auto& [fd, timer] : fd_to_timer_map_) {
     ENVOY_LOG(debug, "UpstreamSocketManager: cleaning up timer for FD: {}", fd);
     timer.reset(); // This will cancel the timer
   }
   fd_to_timer_map_.clear();
-  
+
   // Now mark all sockets as dead
   std::vector<int> fds_to_cleanup;
   for (const auto& [fd, node_id] : fd_to_node_map_) {
     fds_to_cleanup.push_back(fd);
   }
-  
+
   for (int fd : fds_to_cleanup) {
     ENVOY_LOG(debug, "UpstreamSocketManager: marking socket dead in destructor for FD: {}", fd);
     markSocketDead(fd); // false = not used, just cleanup
   }
-  
+
   // Clear the ping timer
   if (ping_timer_) {
     ping_timer_->disableTimer();
