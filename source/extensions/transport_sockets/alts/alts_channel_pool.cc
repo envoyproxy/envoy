@@ -35,7 +35,7 @@ AltsChannelPool::create(absl::string_view handshaker_service_address) {
   channel_pool.reserve(ChannelPoolSize);
   grpc::ChannelArguments channel_args;
   channel_args.SetInt(GRPC_ARG_USE_LOCAL_SUBCHANNEL_POOL, 1);
-  const char* keep_alive = std::getenv(kUseGrpcExperimentalAltsHandshakerKeepaliveParams)
+  const char* keep_alive = std::getenv(kUseGrpcExperimentalAltsHandshakerKeepaliveParams);
   if (keep_alive != nullptr && std::strcmp(keep_alive, "true") == 0) {
     channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, kExperimentalKeepAliveTimeoutMs);
     channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, kExperimentalKeepAliveTimeMs);
