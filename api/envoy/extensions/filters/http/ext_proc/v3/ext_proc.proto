@@ -16,6 +16,7 @@ import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
