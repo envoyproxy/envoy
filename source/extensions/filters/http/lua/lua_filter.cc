@@ -191,6 +191,14 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
   return thread_local_cluster->httpAsyncClient().send(std::move(message), callbacks, options);
 }
 
+VirtualHostOptConstRef getVirtualHost(Http::StreamFilterCallbacks* callbacks) {
+  if (const auto route = callbacks->route(); route != nullptr) {
+    const Router::VirtualHost& virtual_host = route->virtualHost();
+    return std::ref(virtual_host);
+  }
+  return absl::nullopt;
+}
+
 } // namespace
 
 PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotAllocator& tls)
@@ -211,6 +219,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<ConnectionStreamInfoWrapper>();
   lua_state_.registerType<ConnectionDynamicMetadataMapWrapper>();
   lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
+  lua_state_.registerType<VirtualHostWrapper>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -627,6 +636,20 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaVirtualHost(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (virtual_host_wrapper_.get() != nullptr) {
+    virtual_host_wrapper_.pushStack();
+  } else if (auto virtual_host = callbacks_.virtualHost(); virtual_host != absl::nullopt) {
+    virtual_host_wrapper_.reset(
+        VirtualHostWrapper::create(state, virtual_host->get(), callbacks_.filterConfigName()),
+        true);
+  } else {
+    lua_pushnil(state);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
   if (stream_info_wrapper_.get() != nullptr) {
@@ -966,6 +989,10 @@ const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
 }
 
+VirtualHostOptConstRef Filter::DecoderCallbacks::virtualHost() const {
+  return getVirtualHost(callbacks_);
+}
+
 void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Instance*,
                                        lua_State* state) {
   // TODO(mattklein123): Support response in response path if nothing has been continued
@@ -975,6 +1002,10 @@ void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Ins
 
 const ProtobufWkt::Struct& Filter::EncoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
+}
+
+VirtualHostOptConstRef Filter::EncoderCallbacks::virtualHost() const {
+  return getVirtualHost(callbacks_);
 }
 
 } // namespace Lua

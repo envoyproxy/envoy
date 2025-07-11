@@ -75,6 +75,24 @@ public:
           response_header->set_key("fake_header");
           response_header->set_value("fake_value");
 
+          const std::string vhost_key = "lua";
+          const std::string vhost_yaml =
+              R"EOF(
+            foo.bar:
+              foo: vhost_bar
+              baz: vhost_bat
+          )EOF";
+
+          ProtobufWkt::Struct vhost_value;
+          TestUtility::loadFromYaml(vhost_yaml, vhost_value);
+
+          // Sets the virtual host's metadata.
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_metadata()
+              ->mutable_filter_metadata()
+              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(vhost_key, vhost_value));
+
           const std::string key = "envoy.filters.http.lua";
           const std::string yaml =
               R"EOF(
@@ -294,6 +312,41 @@ INSTANTIATE_TEST_SUITE_P(Protocols, LuaIntegrationTest,
                          testing::ValuesIn(LuaIntegrationTest::getDefaultTestParams()),
                          UpstreamDownstreamIntegrationTest::testParamsToString);
 
+// Regression test for pulling virtual host metadata during early local replies using the Lua
+// filter virtualHost():metadata() API. Covers both the upgrade required and no authority cases.
+TEST_P(LuaIntegrationTest, CallVirtualHostMetadataDuringLocalReply) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This is a raw test that only supports http1";
+  }
+
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        local metadata = response_handle:virtualHost():metadata():get("foo.bar")
+        if metadata == nil then
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE, "foo");
+  std::string response;
+
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+
+  response = "";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
+}
+
 // Regression test for pulling route info during early local replies using the Lua filter
 // metadata() API. Covers both the upgrade required and no authority cases.
 TEST_P(LuaIntegrationTest, CallMetadataDuringLocalReply) {
@@ -346,6 +399,7 @@ typed_config:
         request_handle:logErr("log test")
         request_handle:logCritical("log test")
 
+        local vhost_metadata = request_handle:virtualHost():metadata():get("foo.bar")
         local metadata = request_handle:metadata():get("foo.bar")
         local body_length = request_handle:body():length()
 
@@ -367,6 +421,8 @@ typed_config:
         request_handle:headers():add("cookie_size", request_handle:headers():getNumValues("set-cookie"))
 
         request_handle:headers():add("request_body_size", body_length)
+        request_handle:headers():add("request_vhost_metadata_foo", vhost_metadata["foo"])
+        request_handle:headers():add("request_vhost_metadata_baz", vhost_metadata["baz"])
         request_handle:headers():add("request_metadata_foo", metadata["foo"])
         request_handle:headers():add("request_metadata_baz", metadata["baz"])
         if request_handle:connection():ssl() == nil then
@@ -389,8 +445,11 @@ typed_config:
       end
 
       function envoy_on_response(response_handle)
+        local vhost_metadata = response_handle:virtualHost():metadata():get("foo.bar")
         local metadata = response_handle:metadata():get("foo.bar")
         local body_length = response_handle:body():length()
+        response_handle:headers():add("response_vhost_metadata_foo", vhost_metadata["foo"])
+        response_handle:headers():add("response_vhost_metadata_baz", vhost_metadata["baz"])
         response_handle:headers():add("response_metadata_foo", metadata["foo"])
         response_handle:headers():add("response_metadata_baz", metadata["baz"])
         response_handle:headers():add("response_body_size", body_length)
@@ -469,6 +528,16 @@ typed_config:
                       ->value()
                       .getStringView());
 
+  EXPECT_EQ("vhost_bar", upstream_request_->headers()
+                             .get(Http::LowerCaseString("request_vhost_metadata_foo"))[0]
+                             ->value()
+                             .getStringView());
+
+  EXPECT_EQ("vhost_bat", upstream_request_->headers()
+                             .get(Http::LowerCaseString("request_vhost_metadata_baz"))[0]
+                             ->value()
+                             .getStringView());
+
   EXPECT_EQ("bar", upstream_request_->headers()
                        .get(Http::LowerCaseString("request_metadata_foo"))[0]
                        ->value()
@@ -543,6 +612,14 @@ typed_config:
                      .get(Http::LowerCaseString("response_body_size"))[0]
                      ->value()
                      .getStringView());
+  EXPECT_EQ("vhost_bar", response->headers()
+                             .get(Http::LowerCaseString("response_vhost_metadata_foo"))[0]
+                             ->value()
+                             .getStringView());
+  EXPECT_EQ("vhost_bat", response->headers()
+                             .get(Http::LowerCaseString("response_vhost_metadata_baz"))[0]
+                             ->value()
+                             .getStringView());
   EXPECT_EQ("bar", response->headers()
                        .get(Http::LowerCaseString("response_metadata_foo"))[0]
                        ->value()
