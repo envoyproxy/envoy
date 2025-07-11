@@ -4261,7 +4261,8 @@ TEST_F(PostCloseConnectionImplTest, AbortReset) {
 
 class ReadBufferLimitTest : public ConnectionImplTest {
 public:
-  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
+  void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size,
+                           size_t short_readv = 0) {
     const uint32_t buffer_size = 256 * 1024;
     dispatcher_ = api_->allocateDispatcher("test_thread");
     socket_ = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
@@ -4319,7 +4320,54 @@ public:
 
     Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
     client_connection_->write(data, false);
-    dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+    if (short_readv) {
+      // Emulate the scenario, that has been observed on some dev machines, where the readv call
+      // returns less than the requested amount of data, which can happen due to various reasons
+      // such as network conditions or system load. Without mocking this, it never seems to happen
+      // in CI, because for what ever reason, readv() always fills it's buffers, so these tests
+      // always pass in CI.
+      StrictMock<Api::MockOsSysCalls> mock_os_syscalls;
+      TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> injector(&mock_os_syscalls);
+      Api::OsSysCallsImpl& real_os_syscalls = injector.latched();
+
+      size_t total_bytes_read = 0;
+
+      EXPECT_CALL(mock_os_syscalls, readv(_, _, _))
+          .WillRepeatedly(
+              Invoke([&](os_fd_t, const iovec* iov, int num_iov) -> Api::SysCallSizeResult {
+                size_t bytes_remaining = buffer_size - total_bytes_read;
+                size_t provided_buffer = 0;
+                for (int i = 0; i < num_iov; ++i) {
+                  provided_buffer += iov[i].iov_len;
+                }
+                ssize_t bytes_to_read = std::min(bytes_remaining, provided_buffer) - short_readv;
+                short_readv = 0;                   // Only do one short read
+                total_bytes_read += bytes_to_read; // Update running total
+                return {bytes_to_read ? bytes_to_read : 0, bytes_to_read ? 0 : EAGAIN};
+              }));
+
+      EXPECT_CALL(mock_os_syscalls, recv(_, _, _, _))
+          .WillRepeatedly(Invoke([&](os_fd_t, void*, size_t length, int) -> Api::SysCallSizeResult {
+            size_t bytes_remaining = buffer_size - total_bytes_read;
+            ssize_t bytes_to_read = std::min(bytes_remaining, length);
+            total_bytes_read += bytes_to_read; // Update running total
+            return {bytes_to_read ? bytes_to_read : 0, bytes_to_read ? 0 : EAGAIN};
+          }));
+
+      EXPECT_CALL(mock_os_syscalls, send(_, _, _, _))
+          .WillRepeatedly(Invoke([&](os_fd_t socket, void* buffer, size_t length,
+                                     int flags) -> Api::SysCallSizeResult {
+            return real_os_syscalls.send(socket, buffer, length, flags);
+          }));
+      EXPECT_CALL(mock_os_syscalls, close(_))
+          .WillRepeatedly(Invoke(
+              [&](os_fd_t fd) -> Api::SysCallIntResult { return real_os_syscalls.close(fd); }));
+
+      dispatcher_->run(Event::Dispatcher::RunType::Block);
+    } else {
+      dispatcher_->run(Event::Dispatcher::RunType::Block);
+    }
   }
 };
 
@@ -4331,10 +4379,29 @@ TEST_P(ReadBufferLimitTest, NoLimit) { readBufferLimitTest(0, 256 * 1024); }
 
 TEST_P(ReadBufferLimitTest, SomeLimit) {
   const uint32_t read_buffer_limit = 32 * 1024;
-  // Envoy has soft limits, so as long as the first read is <= read_buffer_limit - 1 it will do a
-  // second read. The effective chunk size is then read_buffer_limit - 1 + MaxReadSize,
-  // which is currently 16384.
-  readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + 16384);
+  // Envoy has soft limits, so as long as the first read is < read_buffer_limit it will do a second
+  // read, before presenting the data to the ReadFilter. This additional read may include allocating
+  // an additional slice. The total chunk size is then read_buffer_limit +
+  // Buffer::Slice::default_slice_size_, which is currently 16384.
+  readBufferLimitTest(read_buffer_limit, read_buffer_limit + Buffer::Slice::default_slice_size_);
+}
+
+TEST_P(ReadBufferLimitTest, SomeLimit_ShortRead_1) {
+  const uint32_t read_buffer_limit = 32 * 1024;
+  readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + Buffer::Slice::default_slice_size_,
+                      1);
+}
+
+TEST_P(ReadBufferLimitTest, SomeLimit_ShortRead_2047) {
+  const uint32_t read_buffer_limit = 32 * 1024;
+  readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + Buffer::Slice::default_slice_size_,
+                      2047);
+}
+
+TEST_P(ReadBufferLimitTest, SomeLimit_ShortRead_2048) {
+  const uint32_t read_buffer_limit = 32 * 1024;
+  readBufferLimitTest(read_buffer_limit, read_buffer_limit + Buffer::Slice::default_slice_size_,
+                      2048);
 }
 
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
