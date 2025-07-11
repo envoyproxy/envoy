@@ -248,6 +248,34 @@ TEST(UtilityTest, TestGetCertificationExtensionValue) {
   EXPECT_EQ("", Utility::getCertificateExtensionValue(*cert, "foo"));
 }
 
+TEST(UtilityTest, TestGetCertificateOidMap) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/extensions_cert.pem"));
+  const auto& oid_map = Utility::getCertificateOidMap(*cert);
+  
+  EXPECT_EQ(7, oid_map.size());
+  
+  // Check that all expected OIDs are present
+  std::vector<std::string> expected_oids{
+      "2.5.29.14", "2.5.29.15", "2.5.29.19",
+      "2.5.29.35", "2.5.29.37",
+      "1.2.3.4.5.6.7.8", "1.2.3.4.5.6.7.9"};
+      
+  for (const auto& oid : expected_oids) {
+    EXPECT_NE(oid_map.find(oid), oid_map.end());
+  }
+  
+  // Check specific values for custom OIDs
+  EXPECT_EQ("\xc\x9Something", oid_map.at("1.2.3.4.5.6.7.8"));
+  EXPECT_EQ("\x30\x3\x1\x1\xFF", oid_map.at("1.2.3.4.5.6.7.9"));
+  
+  // Test with a certificate that has no extensions
+  bssl::UniquePtr<X509> no_ext_cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/tls/test_data/no_extension_cert.pem"));
+  const auto& empty_map = Utility::getCertificateOidMap(*no_ext_cert);
+  EXPECT_TRUE(empty_map.empty());
+}
+
 TEST(UtilityTest, SslErrorDescriptionTest) {
   const std::vector<std::pair<int, std::string>> test_set = {
       {SSL_ERROR_NONE, "NONE"},

@@ -837,6 +837,102 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(*value.value().MessageOrDie(),
                                                            upstream_locality));
   }
+  
+  // Test OID map properties
+  {
+    // Create maps of OIDs to values
+    std::map<std::string, std::string> local_oid_map = {
+        {"1.2.840.113549.1.9.1", "test@example.com"},
+        {"2.5.4.10", "Test Organization"}
+    };
+
+    std::map<std::string, std::string> peer_oid_map = {
+        {"1.2.840.113549.1.9.1", "peer@example.com"},
+        {"2.5.4.11", "Test OU"}
+    };
+
+    // Set up expectations for OID maps
+    EXPECT_CALL(*downstream_ssl_info, oidMapLocalCertificate())
+        .WillRepeatedly(ReturnRef(local_oid_map));
+    EXPECT_CALL(*downstream_ssl_info, oidMapPeerCertificate())
+        .WillRepeatedly(ReturnRef(peer_oid_map));
+    EXPECT_CALL(*upstream_ssl_info, oidMapLocalCertificate())
+        .WillRepeatedly(ReturnRef(local_oid_map));
+    EXPECT_CALL(*upstream_ssl_info, oidMapPeerCertificate())
+        .WillRepeatedly(ReturnRef(peer_oid_map));
+
+    // Test downstream local OID map
+    {
+        auto value = connection[CelValue::CreateStringView(OidMapLocalCertificate)];
+        EXPECT_TRUE(value.has_value());
+        ASSERT_TRUE(value.value().IsMap());
+        auto& map = *value.value().MapOrDie();
+        
+        auto email = map[CelValue::CreateStringView("1.2.840.113549.1.9.1")];
+        EXPECT_TRUE(email.has_value());
+        EXPECT_TRUE(email.value().IsString());
+        EXPECT_EQ("test@example.com", email.value().StringOrDie().value());
+        
+        auto org = map[CelValue::CreateStringView("2.5.4.10")];
+        EXPECT_TRUE(org.has_value());
+        EXPECT_TRUE(org.value().IsString());
+        EXPECT_EQ("Test Organization", org.value().StringOrDie().value());
+    }
+
+    // Test downstream peer OID map
+    {
+        auto value = connection[CelValue::CreateStringView(OidMapPeerCertificate)];
+        EXPECT_TRUE(value.has_value());
+        ASSERT_TRUE(value.value().IsMap());
+        auto& map = *value.value().MapOrDie();
+        
+        auto email = map[CelValue::CreateStringView("1.2.840.113549.1.9.1")];
+        EXPECT_TRUE(email.has_value());
+        EXPECT_TRUE(email.value().IsString());
+        EXPECT_EQ("peer@example.com", email.value().StringOrDie().value());
+        
+        auto ou = map[CelValue::CreateStringView("2.5.4.11")];
+        EXPECT_TRUE(ou.has_value());
+        EXPECT_TRUE(ou.value().IsString());
+        EXPECT_EQ("Test OU", ou.value().StringOrDie().value());
+    }
+    
+    // Test upstream local OID map
+    {
+        auto value = upstream[CelValue::CreateStringView(OidMapLocalCertificate)];
+        EXPECT_TRUE(value.has_value());
+        ASSERT_TRUE(value.value().IsMap());
+        auto& map = *value.value().MapOrDie();
+        
+        auto email = map[CelValue::CreateStringView("1.2.840.113549.1.9.1")];
+        EXPECT_TRUE(email.has_value());
+        EXPECT_TRUE(email.value().IsString());
+        EXPECT_EQ("test@example.com", email.value().StringOrDie().value());
+        
+        auto org = map[CelValue::CreateStringView("2.5.4.10")];
+        EXPECT_TRUE(org.has_value());
+        EXPECT_TRUE(org.value().IsString());
+        EXPECT_EQ("Test Organization", org.value().StringOrDie().value());
+    }
+
+    // Test upstream peer OID map
+    {
+        auto value = upstream[CelValue::CreateStringView(OidMapPeerCertificate)];
+        EXPECT_TRUE(value.has_value());
+        ASSERT_TRUE(value.value().IsMap());
+        auto& map = *value.value().MapOrDie();
+        
+        auto email = map[CelValue::CreateStringView("1.2.840.113549.1.9.1")];
+        EXPECT_TRUE(email.has_value());
+        EXPECT_TRUE(email.value().IsString());
+        EXPECT_EQ("peer@example.com", email.value().StringOrDie().value());
+        
+        auto ou = map[CelValue::CreateStringView("2.5.4.11")];
+        EXPECT_TRUE(ou.has_value());
+        EXPECT_TRUE(ou.value().IsString());
+        EXPECT_EQ("Test OU", ou.value().StringOrDie().value());
+    }
+  }
 }
 
 TEST(Context, FilterStateAttributes) {
