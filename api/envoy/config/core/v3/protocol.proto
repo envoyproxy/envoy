@@ -420,7 +420,7 @@ message Http1ProtocolOptions {
   // envoy.reloadable_features.http1_use_balsa_parser.
   // See issue #21245.
   google.protobuf.BoolValue use_balsa_parser = 9
-      [(xds.annotations.v3.field_status).work_in_progress = true];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // [#not-implemented-hide:] Hiding so that field can be removed.
   // If true, and BalsaParser is used (either `use_balsa_parser` above is true,

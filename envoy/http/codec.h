@@ -549,10 +549,6 @@ struct Http1Settings {
   // If true, Envoy will send a fully qualified URL in the firstline of the request.
   bool send_fully_qualified_url_{false};
 
-  // If true, BalsaParser is used for HTTP/1 parsing; if false, http-parser is
-  // used. See issue #21245.
-  bool use_balsa_parser_{false};
-
   // If true, any non-empty method composed of valid characters is accepted.
   // If false, only methods from a hard-coded list of known methods are accepted.
   // Only implemented in BalsaParser. http-parser only accepts known methods.
