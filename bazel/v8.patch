@@ -3,6 +3,8 @@
 # 3. Add support for --define=no_debug_info=1.
 # 4. Allow compiling v8 on macOS 10.15 to 13.0. TODO(dio): Will remove this patch when https://bugs.chromium.org/p/v8/issues/detail?id=13428 is fixed.
 # 5. Don't expose Wasm C API (only Wasm C++ API).
+# 6. Add BUILD file for fast_float dependency.
+# 7. Fix missing includes for newer clang/gcc versions.
 
 diff --git a/BUILD.bazel b/BUILD.bazel
 index 4e89f90..0df4f67 100644
@@ -11,7 +13,7 @@ index 4e89f90..0df4f67 100644
 @@ -4,7 +4,7 @@
  
  load("@bazel_skylib//lib:selects.bzl", "selects")
- load("@rules_python//python:defs.bzl", "py_binary")
+ load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 -load("@v8_python_deps//:requirements.bzl", "requirement")
 +load("@base_pip3//:requirements.bzl", "requirement")
  load(
@@ -26,66 +28,6 @@ index 4e89f90..0df4f67 100644
  )
  
  # Default setting for v8_enable_pointer_compression.
-diff --git a/bazel/defs.bzl b/bazel/defs.bzl
-index e957c0f..0327669 100644
---- a/bazel/defs.bzl
-+++ b/bazel/defs.bzl
-@@ -116,6 +116,7 @@ def _default_args():
-         }) + select({
-             "@v8//bazel/config:is_clang": [
-                 "-Wno-invalid-offsetof",
-+                "-Wno-unneeded-internal-declaration",
-                 "-std=c++17",
-             ],
-             "@v8//bazel/config:is_gcc": [
-@@ -131,6 +132,9 @@ def _default_args():
-                 "-Wno-redundant-move",
-                 "-Wno-return-type",
-                 "-Wno-stringop-overflow",
-+                "-Wno-nonnull",
-+                "-Wno-pessimizing-move",
-+                "-Wno-dangling-pointer",
-                 # Use GNU dialect, because GCC doesn't allow using
-                 # ##__VA_ARGS__ when in standards-conforming mode.
-                 "-std=gnu++17",
-@@ -151,6 +154,23 @@ def _default_args():
-                 "-fno-integrated-as",
-             ],
-             "//conditions:default": [],
-+        }) + select({
-+            "@envoy//bazel:no_debug_info": [
-+                "-g0",
-+            ],
-+            "//conditions:default": [],
-+        }) + select({
-+            "@v8//bazel/config:is_macos": [
-+                # The clang available on macOS catalina has a warning that isn't clean on v8 code.
-+                "-Wno-range-loop-analysis",
-+
-+                # To supress warning on deprecated declaration on v8 code. For example:
-+                # external/v8/src/base/platform/platform-darwin.cc:56:22: 'getsectdatafromheader_64'
-+                # is deprecated: first deprecated in macOS 13.0.
-+                # https://bugs.chromium.org/p/v8/issues/detail?id=13428.
-+                "-Wno-deprecated-declarations",
-+            ],
-+            "//conditions:default": [],
-         }),
-         includes = ["include"],
-         linkopts = select({
-diff --git a/src/compiler/control-equivalence.cc b/src/compiler/control-equivalence.cc
-index 4649cf0..6fc6e57 100644
---- a/src/compiler/control-equivalence.cc
-+++ b/src/compiler/control-equivalence.cc
-@@ -157,8 +157,8 @@ void ControlEquivalence::RunUndirectedDFS(Node* exit) {
-     // Pop node from stack when done with all inputs and uses.
-     DCHECK(entry.input == node->input_edges().end());
-     DCHECK(entry.use == node->use_edges().end());
--    DFSPop(stack, node);
-     VisitPost(node, entry.parent_node, entry.direction);
-+    DFSPop(stack, node);
-   }
- }
- 
 diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
 index 4473e20..65a6ec7 100644
 --- a/src/wasm/c-api.cc
@@ -118,3 +60,58 @@ index c3768b8..d4a1dda 100755
  import pdl
  
  try:
+diff --git a/third_party/fast_float/src/BUILD.bazel b/third_party/fast_float/src/BUILD.bazel
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/third_party/fast_float/src/BUILD.bazel
+@@ -0,0 +1,13 @@
++# Copyright 2025 the V8 project authors. All rights reserved.
++# Use of this source code is governed by a BSD-style license that can be
++# found in the LICENSE file.
++
++cc_library(
++    name = "fast_float",
++    hdrs = glob(["include/fast_float/*.h"]),
++    includes = ["include"],
++    visibility = ["//visibility:public"],
++    # fast_float is a header-only library
++    linkstatic = True,
++    alwayslink = False,
++)
+diff --git a/src/base/logging.h b/src/base/logging.h
+index 1111111..2222222 100644
+--- a/src/base/logging.h
++++ b/src/base/logging.h
+@@ -5,6 +5,7 @@
+ #ifndef V8_BASE_LOGGING_H_
+ #define V8_BASE_LOGGING_H_
+ 
++#include <cstdint>
+ #include <cstring>
+ #include <sstream>
+ #include <string>
+diff --git a/src/base/macros.h b/src/base/macros.h
+index 1111111..2222222 100644
+--- a/src/base/macros.h
++++ b/src/base/macros.h
+@@ -5,6 +5,7 @@
+ #ifndef V8_BASE_MACROS_H_
+ #define V8_BASE_MACROS_H_
+
++#include <cstdint>
+ #include <limits>
+ #include <type_traits>
+
+diff --git a/src/inspector/v8-string-conversions.h b/src/inspector/v8-string-conversions.h
+index 1111111..2222222 100644
+--- a/src/inspector/v8-string-conversions.h
++++ b/src/inspector/v8-string-conversions.h
+@@ -5,6 +5,7 @@
+ #ifndef V8_INSPECTOR_V8_STRING_CONVERSIONS_H_
+ #define V8_INSPECTOR_V8_STRING_CONVERSIONS_H_
+ 
++#include <cstdint>
+ #include <string>
+ 
+ // Conversion routines between UT8 and UTF16, used by string-16.{h,cc}. You may
