@@ -5527,7 +5527,7 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
   const std::string body_sent(2 * 1024 * 1024, 's');
   initializeConfigDuplexStreamed(false);
 
-  // Sends 30 consective request, each carrying 2MB data.
+  // Sends 30 consecutive request, each carrying 2MB data.
   for (int i = 0; i < 30; i++) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl default_headers;
@@ -5551,7 +5551,8 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
     uint32_t total_resp_body_msg = 50;
     const std::string body_response(64 * 1024, 'r');
     const std::string body_upstream(total_resp_body_msg * 64 * 1024, 'r');
-    serverSendBodyRespDuplexStreamed(total_resp_body_msg, true, false, body_response);
+    serverSendBodyRespDuplexStreamed(total_resp_body_msg, /*end_of_stream*/ true,
+                                     /*response*/ false, body_response);
 
     handleUpstreamRequest();
     EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
