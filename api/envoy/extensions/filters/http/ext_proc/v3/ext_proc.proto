@@ -440,8 +440,7 @@ message ExtProcOverrides {
   // [#not-implemented-hide:]
   // Set a different asynchronous processing option than the default.
   // Deprecated and not implemented.
-  bool async_mode = 2
-      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+  bool async_mode = 2 [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // [#not-implemented-hide:]
   // Set different optional attributes than the default setting of the
