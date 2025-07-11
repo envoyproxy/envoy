@@ -20,8 +20,8 @@ public:
    * @param config supplies the matcher configuration
    * @return a new MatcherExtension
    */
-  virtual MatcherConstSharedPtr create(const envoy::config::core::v3::TypedExtensionConfig& config,
-                                       Server::Configuration::CommonFactoryContext& context) PURE;
+  virtual MatcherConstPtr create(const envoy::config::core::v3::TypedExtensionConfig& config,
+                                 Server::Configuration::CommonFactoryContext& context) PURE;
 
   // @brief the category of the matcher extension type for factory registration.
   std::string category() const override { return "envoy.rbac.principals"; }
@@ -34,13 +34,13 @@ public:
 template <typename PrincipalType, typename ConfigProto>
 class BasePrincipalExtensionFactory : public PrincipalExtensionFactory {
 public:
-  Filters::Common::RBAC::MatcherConstSharedPtr
+  Filters::Common::RBAC::MatcherConstPtr
   create(const envoy::config::core::v3::TypedExtensionConfig& config,
          Server::Configuration::CommonFactoryContext& context) override {
     ConfigProto typed_config;
     MessageUtil::anyConvertAndValidate(config.typed_config(), typed_config,
                                        context.messageValidationVisitor());
-    return std::make_shared<PrincipalType>(typed_config, context);
+    return std::make_unique<PrincipalType>(typed_config, context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
