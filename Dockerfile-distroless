@@ -1,0 +1,17 @@
+FROM debian:bullseye-slim as bullseye
+RUN mkdir /etc/envoy \
+    && echo BOOM > /etc/envoy/envoy.txt
+
+
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:d1fc914c43cea489c26c896721344a49a1761b9bb678bcba1758772d22913302 AS envoy-distroless
+EXPOSE 10000
+ENTRYPOINT ["/usr/local/bin/envoy"]
+CMD ["-c", "/etc/envoy/envoy.yaml"]
+COPY --from=bullseye --chown=0:0 --chmod=755 \
+    /etc/envoy /etc/envoy
+
+
+FROM debian:bullseye-slim
+COPY --from=envoy-distroless  \
+    / /distroless-root
+CMD ls -alh /etc/envoy
