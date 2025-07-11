@@ -512,7 +512,7 @@ envoy.filters.http.oauth2:
   categories:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.oauth2.v3.OAuth2
 envoy.filters.http.on_demand:

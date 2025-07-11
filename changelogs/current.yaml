@@ -101,6 +101,9 @@ minor_behavior_changes:
   change: |
     Now the ``METADATA`` and ``CEL`` substitution formatters could access or log the metadata of
     virtual host in case the route is not matched but the virtual host is found.
+- area: oauth2
+  change: |
+    Extension status changed from ``alpha`` to ``stable``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -125,10 +128,22 @@ bug_fixes:
   change: |
     Fixed an bug where the config validation server will crash when the configuration contains
     ``%CEL%`` or ``%METADATA%`` substitution formatter.
+- area: tls
+  change: |
+    Fixed an issue with incorrectly cached connection properties on TLS connections.
+    If TLS connection data was queried before it was available, an empty value was being incorrectly cached, preventing later calls from
+    getting the correct value. This could be triggered with a ``tcp_proxy`` access log configured to emit a log upon connection
+    establishment if the log contains fields of the the TLS peer certificate. Then a later use of the data, such as the network RBAC
+    filter validating a peer certificate SAN, may incorrectly fail due to the empty cached value.
 - area: quic
   change: |
     Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a ``transfer-encoding`` header is incorrectly appended.
     Protected by runtime guard ``envoy.reloadable_features.quic_signal_headers_only_to_http1_backend``.
+- area: runtime
+  change: |
+    Fixed a bug which resulted in an ENVOY_BUG being incorrectly triggered when runtime settings
+    ``envoy.reloadable_features.max_request_headers_count``, ``envoy.reloadable_features.max_response_headers_count``,
+    ``envoy.reloadable_features.max_request_headers_size_kb``, or ``envoy.reloadable_features.max_response_headers_size_kb`` were set.
 - area: tls
   change: |
     Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
@@ -138,6 +153,9 @@ bug_fixes:
   change: |
     Fixes a bug where the TLS inspector filter would not correctly report ``client_hello_too_large`` stat for too big client hello messages
     i.e bigger than 16kb.
+- area: wasm
+  change: |
+    Fixed a bug where the WASM filter will hangs when the VM is crashed in the request callbacks.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -205,6 +223,9 @@ new_features:
   change: |
     Add counter in transport tap for streaming and buffer trace.
     streamed trace can sent tapped message based on configured size.
+- area: udp sink
+  change: |
+    Enhance udp sink to support the single message which the size is bigger than 64K.
 - area: load_balancing
   change: |
     Added Override Host Load Balancing policy. See

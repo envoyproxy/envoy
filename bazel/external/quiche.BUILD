@@ -3005,6 +3005,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     deps = [
+        ":quiche_common_mem_slice",
         ":quiche_common_platform_export",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
