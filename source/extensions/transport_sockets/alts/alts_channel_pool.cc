@@ -21,7 +21,7 @@ namespace Alts {
 
 // TODO(matthewstevenson88): Extend this to be configurable through API.
 constexpr std::size_t ChannelPoolSize = 10;
-const char kUseGrpcExperimentalAltsHandshakerKeepaliveParams[] =
+constexpr absl::string_view UseGrpcExperimentalAltsHandshakerKeepaliveParams =
     "GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS";
 
 // 10 seconds
@@ -35,7 +35,7 @@ AltsChannelPool::create(absl::string_view handshaker_service_address) {
   channel_pool.reserve(ChannelPoolSize);
   grpc::ChannelArguments channel_args;
   channel_args.SetInt(GRPC_ARG_USE_LOCAL_SUBCHANNEL_POOL, 1);
-  const char* keep_alive = std::getenv(kUseGrpcExperimentalAltsHandshakerKeepaliveParams);
+  const char* keep_alive = std::getenv(std::string(UseGrpcExperimentalAltsHandshakerKeepaliveParams).c_str());
   if (keep_alive != nullptr && std::strcmp(keep_alive, "true") == 0) {
     channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, kExperimentalKeepAliveTimeoutMs);
     channel_args.SetInt(GRPC_ARG_KEEPALIVE_TIME_MS, kExperimentalKeepAliveTimeMs);
