@@ -128,14 +128,14 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   bool allow_trusted_address_checks = false;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
 
-  if (config.useRemoteAddress()) {
+  if (config.useRemoteAddress() && config.originalIpDetectionExtensions().empty()) {
     allow_trusted_address_checks = request_headers.ForwardedFor() == nullptr;
     // If there are any trusted proxies in front of this Envoy instance (as indicated by
     // the xff_num_trusted_hops configuration option), get the trusted client address
     // from the XFF before we append to XFF.
     if (xff_num_trusted_hops > 0) {
       final_remote_address =
-          Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops - 1).address_;
+          Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops, true).address_;
     }
     // If there aren't any trusted proxies in front of this Envoy instance, or there
     // are but they didn't populate XFF properly, the trusted client address is the
@@ -146,30 +146,16 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     if (!config.skipXffAppend()) {
       appendXff(request_headers, connection, config);
     }
-    // If the prior hop is not a trusted proxy, overwrite any
-    // x-forwarded-proto/x-forwarded-port value it set as untrusted. Alternately if no
-    // x-forwarded-proto/x-forwarded-port header exists, add one if configured.
-    if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
-      request_headers.setReferenceForwardedProto(
-          connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
-    }
-    if (config.appendXForwardedPort() &&
-        (xff_num_trusted_hops == 0 || request_headers.ForwardedPort() == nullptr)) {
-      const Envoy::Network::Address::Ip* ip =
-          connection.streamInfo().downstreamAddressProvider().localAddress()->ip();
-      if (ip) {
-        request_headers.setForwardedPort(ip->port());
-      }
-    }
-  } else {
-    // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF
+  } else if (!config.originalIpDetectionExtensions().empty()) {
+    // If we have extensions configured, attempt to pull a valid IPv4 or IPv6 address out of XFF
     // or through an extension. An extension might be needed when XFF doesn't work (e.g. an
     // irregular network).
     //
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
     OriginalIPDetectionParams params = {request_headers,
-                                        connection.connectionInfoProvider().remoteAddress()};
+                                        connection.connectionInfoProvider().remoteAddress(),
+                                        config.useRemoteAddress()};
     for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
       const auto result = detection_extension->detect(params);
 
@@ -184,6 +170,26 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
         final_remote_address = result.detected_remote_address;
         allow_trusted_address_checks = result.allow_trusted_address_checks;
         break;
+      }
+    }
+  }
+
+  // Handle x-forwarded-port header creation for edge proxy case regardless of whether
+  // original IP detection extensions are configured.
+  if (config.useRemoteAddress()) {
+    // If the prior hop is not a trusted proxy, overwrite any
+    // x-forwarded-proto/x-forwarded-port value it set as untrusted. Alternately if no
+    // x-forwarded-proto/x-forwarded-port header exists, add one if configured.
+    if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
+      request_headers.setReferenceForwardedProto(
+          connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+    }
+    if (config.appendXForwardedPort() &&
+        (xff_num_trusted_hops == 0 || request_headers.ForwardedPort() == nullptr)) {
+      const Envoy::Network::Address::Ip* ip =
+          connection.streamInfo().downstreamAddressProvider().localAddress()->ip();
+      if (ip) {
+        request_headers.setForwardedPort(ip->port());
       }
     }
   }
