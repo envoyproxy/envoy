@@ -37,9 +37,9 @@ public:
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
   }
-  std::string rulesStatPrefix() const { return rules_stat_prefix_; }
+  absl::string_view rulesStatPrefix() const { return rules_stat_prefix_; }
 
-  std::string shadowRulesStatPrefix() const { return shadow_rules_stat_prefix_; }
+  absl::string_view shadowRulesStatPrefix() const { return shadow_rules_stat_prefix_; }
 
   bool perRuleStatsEnabled() const { return per_rule_stats_; }
 
