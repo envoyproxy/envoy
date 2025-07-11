@@ -58,7 +58,7 @@ public:
     ON_CALL(factory_context_, timeSource()).WillByDefault(testing::ReturnRef(time_source));
 
     // Initialize SPIFFEValidator with mocked context and stats
-    absl::Status creation_status;
+    absl::Status creation_status = absl::OkStatus();
     validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
                                                    *store_.rootScope(), creation_status);
     return creation_status;
@@ -112,14 +112,14 @@ public:
           }));
     }
 
-    absl::Status creation_status;
+    absl::Status creation_status = absl::OkStatus();
     validator_ = std::make_unique<SPIFFEValidator>(config_.get(), stats_, factory_context_,
                                                    *store_.rootScope(), creation_status);
     return creation_status;
   }
 
   absl::Status initialize() {
-    absl::Status creation_status;
+    absl::Status creation_status = absl::OkStatus();
     validator_ = std::make_unique<SPIFFEValidator>(stats_, factory_context_);
     return creation_status;
   }
@@ -793,74 +793,89 @@ typed_config:
 }
 
 TEST_F(TestSPIFFEValidator, InvalidTrustBundleMapConfig) {
-  EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
+  {
+    EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_empty_keys.json"
   )EOF")),
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        HasSubstr("No keys found in SPIFFE bundle for domain 'example.com'")));
-  EXPECT_THAT(
-      initialize(TestEnvironment::substitute(R"EOF(
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("No keys found in SPIFFE bundle for domain 'example.com'")));
+  }
+  {
+    EXPECT_THAT(
+        initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_key.json"
   )EOF")),
-      HasStatus(
-          absl::StatusCode::kInvalidArgument,
-          HasSubstr("Failed to create x509 object while loading certs in domain 'example.com'")));
-  EXPECT_THAT(
-      initialize(TestEnvironment::substitute(R"EOF(
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            HasSubstr("Failed to create x509 object while loading certs in domain 'example.com'")));
+  }
+  {
+    EXPECT_THAT(
+        initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_missing_use.json"
   )EOF")),
-      HasStatus(
-          absl::StatusCode::kInvalidArgument,
-          HasSubstr("missing or invalid 'use' field found in cert for domain 'example.com'")));
-  EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            HasSubstr("missing or invalid 'use' field found in cert for domain 'example.com'")));
+  }
+  {
+    EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_json.json"
   )EOF")),
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        HasSubstr("Invalid JSON found in SPIFFE bundle")));
-  EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("Invalid JSON found in SPIFFE bundle")));
+  }
+  {
+    EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_zero_domains.json"
   )EOF")),
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        HasSubstr("No trust domains found in SPIFFE bundle")));
-  EXPECT_THAT(
-      initialize(TestEnvironment::substitute(R"EOF(
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("No trust domains found in SPIFFE bundle")));
+  }
+  {
+    EXPECT_THAT(
+        initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_missing_x5c.json"
   )EOF")),
-      HasStatus(absl::StatusCode::kInvalidArgument,
-                HasSubstr("missing or empty 'x5c' field found in keys for domain: 'example.com'")));
-  EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
+        HasStatus(
+            absl::StatusCode::kInvalidArgument,
+            HasSubstr("missing or empty 'x5c' field found in keys for domain: 'example.com'")));
+  }
+  {
+    EXPECT_THAT(initialize(TestEnvironment::substitute(R"EOF(
 name: envoy.tls.cert_validator.spiffe
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
   trust_bundles:
     filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/cert_validator/spiffe/test_data/trust_bundles_invalid_x5c.json"
   )EOF")),
-              HasStatus(absl::StatusCode::kInvalidArgument,
-                        HasSubstr("Invalid x509 object in certs for domain 'example.com'")));
+                HasStatus(absl::StatusCode::kInvalidArgument,
+                          HasSubstr("Invalid x509 object in certs for domain 'example.com'")));
+  }
 }
 
 TEST_F(TestSPIFFEValidator, TestDoVerifyCertChainMultipleTrustDomainBundleMappingInline) {

@@ -504,7 +504,7 @@ public:
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context,
                       Stats::Scope& scope) override {
-    absl::Status creation_status;
+    absl::Status creation_status = absl::OkStatus();
     auto validator =
         std::make_unique<SPIFFEValidator>(config, stats, context, scope, creation_status);
     RETURN_IF_NOT_OK(creation_status);
