@@ -193,7 +193,8 @@ Http::AsyncClient::Request* makeHttpCall(lua_State* state, Filter& filter,
 
 VirtualHostOptConstRef getVirtualHost(Http::StreamFilterCallbacks* callbacks) {
   if (const auto route = callbacks->route(); route != nullptr) {
-    return std::ref(route->virtualHost());
+    const Router::VirtualHost& virtual_host = route->virtualHost();
+    return std::ref(virtual_host);
   }
   return absl::nullopt;
 }
