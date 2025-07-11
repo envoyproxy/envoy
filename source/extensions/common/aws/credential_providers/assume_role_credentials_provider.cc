@@ -83,10 +83,6 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
   // unset.
   auto status = assume_role_signer_->sign(message, true, region_);
 
-  // Stop any existing timer.
-  if (cache_duration_timer_ && cache_duration_timer_->enabled()) {
-    cache_duration_timer_->disableTimer();
-  }
   // Using Http async client to fetch the AWS credentials.
   if (!metadata_fetcher_) {
     metadata_fetcher_ = create_metadata_fetcher_cb_(context_.clusterManager(), clusterName());
