@@ -13,6 +13,12 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
+namespace {
+MatcherConstSharedPtr alwaysMatcherInstance() {
+  CONSTRUCT_ON_FIRST_USE(MatcherConstSharedPtr, new AlwaysMatcher());
+}
+} // namespace
+
 MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission& permission,
                                       ProtobufMessage::ValidationVisitor& validation_visitor,
                                       Server::Configuration::CommonFactoryContext& context) {
@@ -31,7 +37,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Permission&
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPortRange:
     return std::make_shared<const PortRangeMatcher>(permission.destination_port_range());
   case envoy::config::rbac::v3::Permission::RuleCase::kAny:
-    return std::make_shared<const AlwaysMatcher>();
+    return alwaysMatcherInstance();
   case envoy::config::rbac::v3::Permission::RuleCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(
         Matchers::MetadataMatcher(permission.metadata(), context),
@@ -86,7 +92,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v3::Principal& 
   case envoy::config::rbac::v3::Principal::IdentifierCase::kHeader:
     return std::make_shared<const HeaderMatcher>(principal.header(), context);
   case envoy::config::rbac::v3::Principal::IdentifierCase::kAny:
-    return std::make_shared<const AlwaysMatcher>();
+    return alwaysMatcherInstance();
   case envoy::config::rbac::v3::Principal::IdentifierCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(
         Matchers::MetadataMatcher(principal.metadata(), context),
