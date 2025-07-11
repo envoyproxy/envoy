@@ -18,6 +18,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/protobuf/message_validator_impl.h"
+#include "source/extensions/common/matcher/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -60,6 +61,8 @@ public:
   const bool use_http2_{};
   const bool use_http3_{};
   const bool use_alpn_{};
+
+  std::vector<Extensions::Common::Matcher::MatcherPtr> outlier_detection_http_error_matcher_;
 
 private:
   ProtocolOptionsConfigImpl(

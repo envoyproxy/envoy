@@ -1012,6 +1012,9 @@ public:
    */
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
+  virtual absl::optional<bool>
+  processHttpForOutlierDetection(Http::ResponseHeaderMap& reponse) const PURE;
+
   /**
    * @return the service discovery type to use for resolving the cluster.
    */
