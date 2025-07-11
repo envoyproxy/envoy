@@ -97,8 +97,14 @@ message GrpcService {
       ChannelCredentials fallback_credentials = 1;
     }
 
+    // Insecure credentials.
+    // [#not-implemented-hide:]
+    message InsecureCredentials {
+    }
+
     // See https://grpc.io/docs/guides/auth.html#credential-types to understand Channel and Call
     // credential types.
+    // [#next-free-field: 6]
     message ChannelCredentials {
       option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.core.GrpcService.GoogleGrpc.ChannelCredentials";
@@ -117,7 +123,7 @@ message GrpcService {
         XdsCredentials xds_credentials = 4;
 
         // [#not-implemented-hide:]
-        google.protobuf.Empty insecure_credentials = 5;
+        InsecureCredentials insecure_credentials = 5;
       }
     }
 
