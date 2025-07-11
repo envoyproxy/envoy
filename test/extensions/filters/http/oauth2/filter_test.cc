@@ -725,7 +725,7 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
  *
  * Expected behavior: the filter should redirect to the end session endpoint.
  */
-TEST_F(OAuth2Test, DEPRECATED_FEATURE_TEST(RequestSignoutUnsecureWhenEndSessionEndpointIsConfigured) {
+TEST_F(OAuth2Test, DEPRECATED_FEATURE_TEST(RequestSignoutUnsecureWhenEndSessionEndpointIsConfigured)) {
   // Create a filter config with end session endpoint and openid scope.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
