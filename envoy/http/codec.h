@@ -42,13 +42,13 @@ static constexpr uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
 // Default maximum number of headers.
 static constexpr uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
 
-const char MaxRequestHeadersCountOverrideKey[] =
+constexpr absl::string_view MaxRequestHeadersCountOverrideKey =
     "envoy.reloadable_features.max_request_headers_count";
-const char MaxResponseHeadersCountOverrideKey[] =
+constexpr absl::string_view MaxResponseHeadersCountOverrideKey =
     "envoy.reloadable_features.max_response_headers_count";
-const char MaxRequestHeadersSizeOverrideKey[] =
+constexpr absl::string_view MaxRequestHeadersSizeOverrideKey =
     "envoy.reloadable_features.max_request_headers_size_kb";
-const char MaxResponseHeadersSizeOverrideKey[] =
+constexpr absl::string_view MaxResponseHeadersSizeOverrideKey =
     "envoy.reloadable_features.max_response_headers_size_kb";
 
 class Stream;

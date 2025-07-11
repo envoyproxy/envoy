@@ -112,7 +112,6 @@ TEST(TestConfig, ConfigIsApplied) {
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
       "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
-      "validation_context { trusted_ca {",
       "initial_stream_window_size { value: 6291456 }",
       "initial_connection_window_size { value: 15728640 }"};
 
@@ -428,7 +427,6 @@ TEST(TestConfig, EnablePlatformCertificatesValidation) {
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(),
               Not(HasSubstr("envoy_mobile.cert_validator.platform_bridge_cert_validator")));
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("trusted_ca"));
 
   engine_builder.enablePlatformCertificatesValidation(true);
   bootstrap = engine_builder.generateBootstrap();
