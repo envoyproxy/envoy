@@ -123,6 +123,12 @@ public:
                CreateMetadataFetcherCb, MetadataFetcher::MetadataReceiver::RefreshState,
                std::chrono::seconds, absl::string_view));
 
+  MOCK_METHOD(
+      CredentialsProviderSharedPtr, createAssumeRoleCredentialsProvider,
+      (Server::Configuration::ServerFactoryContext & context,
+       AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+       const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config));
+
   MOCK_METHOD(CredentialsProviderSharedPtr, createIAMRolesAnywhereCredentialsProvider,
               (Server::Configuration::ServerFactoryContext & context,
                AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
@@ -148,6 +154,7 @@ public:
   void setMetadataFetcher(MetadataFetcherPtr fetcher) {
     provider_->metadata_fetcher_ = std::move(fetcher);
   }
+  void setCacheDurationTimer(Event::Timer* timer) { provider_->cache_duration_timer_.reset(timer); }
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
 

@@ -11,9 +11,6 @@ namespace Aws {
 
 constexpr char WEB_IDENTITY_RESPONSE_ELEMENT[] = "AssumeRoleWithWebIdentityResponse";
 constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult";
-constexpr char CREDENTIALS[] = "Credentials";
-constexpr char WEB_IDENTITY_EXPIRATION[] = "Expiration";
-constexpr char SESSION_TOKEN[] = "SessionToken";
 constexpr char AWS_WEB_IDENTITY_TOKEN_FILE[] = "AWS_WEB_IDENTITY_TOKEN_FILE";
 constexpr char AWS_ROLE_ARN[] = "AWS_ROLE_ARN";
 constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";

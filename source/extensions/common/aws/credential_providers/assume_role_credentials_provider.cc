@@ -1,69 +1,87 @@
-#include "source/extensions/common/aws/credential_providers/webidentity_credentials_provider.h"
+#include "source/extensions/common/aws/credential_providers/assume_role_credentials_provider.h"
 
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
+#include "source/common/common/logger.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/extensions/common/aws/aws_cluster_manager.h"
+#include "source/extensions/common/aws/credentials_provider.h"
+#include "source/extensions/common/aws/metadata_fetcher.h"
+#include "source/extensions/common/aws/signers/sigv4_signer_impl.h"
 #include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
+using std::chrono::seconds;
 
-WebIdentityCredentialsProvider::WebIdentityCredentialsProvider(
+AssumeRoleCredentialsProvider::AssumeRoleCredentialsProvider(
     Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
     absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
-    MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
+    absl::string_view region, MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer,
-    const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
-        web_identity_config)
+    std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> assume_role_signer,
+    envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider assume_role_config)
+
     : MetadataCredentialsProviderBase(context, aws_cluster_manager, cluster_name,
                                       create_metadata_fetcher_cb, refresh_state,
                                       initialization_timer),
-      role_arn_(web_identity_config.role_arn()),
-      role_session_name_(web_identity_config.role_session_name()) {
+      role_arn_(assume_role_config.role_arn()),
+      role_session_name_(assume_role_config.role_session_name()), region_(region),
+      assume_role_signer_(std::move(assume_role_signer)) {
 
-  auto provider_or_error_ = Config::DataSource::DataSourceProvider::create(
-      web_identity_config.web_identity_token_data_source(), context.mainThreadDispatcher(),
-      context.threadLocal(), context.api(), false, 4096);
-  if (provider_or_error_.ok()) {
-    web_identity_data_source_provider_ = std::move(provider_or_error_.value());
-  } else {
-    ENVOY_LOG(info, "Invalid web identity data source");
-    web_identity_data_source_provider_.reset();
+  if (assume_role_config.has_session_duration()) {
+    session_duration_ = DurationUtil::durationToSeconds(assume_role_config.session_duration());
   }
 }
 
-void WebIdentityCredentialsProvider::refresh() {
+void AssumeRoleCredentialsProvider::onMetadataSuccess(const std::string&& body) {
+  ENVOY_LOG(debug, "AWS STS AssumeRole fetch success, calling callback func");
+  on_async_fetch_cb_(std::move(body));
+}
 
-  absl::string_view web_identity_data;
+void AssumeRoleCredentialsProvider::onMetadataError(Failure reason) {
+  stats_->credential_refreshes_failed_.inc();
+  ENVOY_LOG(error, "AWS STS AssumeRole fetch failure: {}",
+            metadata_fetcher_->failureToString(reason));
+  credentialsRetrievalError();
+}
 
-  // If we're unable to read from the configured data source, exit early.
-  if (!web_identity_data_source_provider_.has_value()) {
+void AssumeRoleCredentialsProvider::refresh() {
+  // We can have assume role credentials pending at this point, as the signers credential provider
+  // chain is potentially async
+  if (assume_role_signer_->addCallbackIfCredentialsPending([this]() { continueRefresh(); }) ==
+      false) {
+    // We're not pending credentials, so sign immediately
+    return continueRefresh();
+  } else {
+    // Leave and let our callback handle the rest of the processing
     return;
   }
+}
 
-  ENVOY_LOG(debug, "Getting AWS web identity credentials from STS: {}",
-            aws_cluster_manager_->getUriFromClusterName(cluster_name_).value());
-  web_identity_data = web_identity_data_source_provider_.value()->data();
+void AssumeRoleCredentialsProvider::continueRefresh() {
+  const auto uri = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
+  ENVOY_LOG(debug, "Getting AWS credentials from STS at URI: {}", uri.value());
 
   Http::RequestMessageImpl message;
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
-  auto statusOr = aws_cluster_manager_->getUriFromClusterName(cluster_name_);
-  message.headers().setHost(Http::Utility::parseAuthority(statusOr.value()).host_);
+  message.headers().setHost(Http::Utility::parseAuthority(uri.value()).host_);
   message.headers().setPath(
-      fmt::format("/?Action=AssumeRoleWithWebIdentity"
-                  "&Version=2011-06-15"
-                  "&RoleSessionName={}"
-                  "&RoleArn={}"
-                  "&WebIdentityToken={}",
-                  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_),
+      fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",
                   Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
-                  Envoy::Http::Utility::PercentEncoding::encode(web_identity_data)));
-  // Use the Accept header to ensure that AssumeRoleWithWebIdentityResponse is returned as JSON.
+                  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_)));
+  // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
+
+  // No code path exists that can cause signing to fail, as signing only fails if path or method is
+  // unset.
+  auto status = assume_role_signer_->sign(message, true, region_);
 
   // Using Http async client to fetch the AWS credentials.
   if (!metadata_fetcher_) {
@@ -71,7 +89,6 @@ void WebIdentityCredentialsProvider::refresh() {
   } else {
     metadata_fetcher_->cancel(); // Cancel if there is any inflight request.
   }
-
   on_async_fetch_cb_ = [this](const std::string&& arg) {
     return this->extractCredentials(std::move(arg));
   };
@@ -82,7 +99,7 @@ void WebIdentityCredentialsProvider::refresh() {
   metadata_fetcher_->fetch(message, Tracing::NullSpan::instance(), *this);
 }
 
-void WebIdentityCredentialsProvider::extractCredentials(
+void AssumeRoleCredentialsProvider::extractCredentials(
     const std::string&& credential_document_value) {
 
   absl::StatusOr<Json::ObjectSharedPtr> document_json_or_error;
@@ -95,14 +112,14 @@ void WebIdentityCredentialsProvider::extractCredentials(
   }
 
   absl::StatusOr<Json::ObjectSharedPtr> root_node =
-      document_json_or_error.value()->getObject(WEB_IDENTITY_RESPONSE_ELEMENT);
+      document_json_or_error.value()->getObject(ASSUMEROLE_RESPONSE_ELEMENT);
   if (!root_node.ok()) {
     ENVOY_LOG(error, "AWS STS credentials document is empty");
     credentialsRetrievalError();
     return;
   }
   absl::StatusOr<Json::ObjectSharedPtr> result_node =
-      root_node.value()->getObject(WEB_IDENTITY_RESULT_ELEMENT);
+      root_node.value()->getObject(ASSUMEROLE_RESULT_ELEMENT);
   if (!result_node.ok()) {
     ENVOY_LOG(error, "AWS STS returned an unexpected result");
     credentialsRetrievalError();
@@ -155,16 +172,6 @@ void WebIdentityCredentialsProvider::extractCredentials(
 
   last_updated_ = context_.api().timeSource().systemTime();
   handleFetchDone();
-}
-
-void WebIdentityCredentialsProvider::onMetadataSuccess(const std::string&& body) {
-  ENVOY_LOG(debug, "AWS metadata fetch from STS success, calling callback func");
-  on_async_fetch_cb_(std::move(body));
-}
-
-void WebIdentityCredentialsProvider::onMetadataError(Failure reason) {
-  ENVOY_LOG(error, "AWS metadata fetch failure: {}", metadata_fetcher_->failureToString(reason));
-  credentialsRetrievalError();
 }
 
 } // namespace Aws

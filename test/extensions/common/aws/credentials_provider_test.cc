@@ -58,6 +58,16 @@ TEST(Credentials, AllNonEmpty) {
   EXPECT_EQ("session_token", c.sessionToken());
 }
 
+TEST(X509Credentials, CheckRetrieval) {
+  const auto c =
+      X509Credentials("certb64", X509Credentials::PublicKeySignatureAlgorithm::ECDSA, "serial",
+                      "chain", "privatekeypem", SystemTime(std::chrono::seconds(1)));
+  EXPECT_EQ("chain", c.certificateChainDerB64());
+  EXPECT_EQ("serial", c.certificateSerial());
+  EXPECT_EQ("certb64", c.certificateDerB64());
+  EXPECT_EQ(SystemTime(std::chrono::seconds(1)), c.certificateExpiration());
+  EXPECT_EQ("privatekeypem", c.certificatePrivateKey());
+}
 class AsyncCredentialHandlingTest : public testing::Test {
 public:
   AsyncCredentialHandlingTest()
