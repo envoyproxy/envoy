@@ -139,6 +139,8 @@ TEST_P(AltsChannelPoolTest, SuccessWithDefaultChannelsWithKeepAliveParams) {
     HandshakerResp response;
     EXPECT_TRUE(stream->Read(&response));
   }
+  
+  unsetenv("GRPC_EXPERIMENTAL_ALTS_HANDSHAKER_KEEPALIVE_PARAMS");
 }
 
 } // namespace
