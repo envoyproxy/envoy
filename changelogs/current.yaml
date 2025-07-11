@@ -101,6 +101,9 @@ minor_behavior_changes:
   change: |
     Now the ``METADATA`` and ``CEL`` substitution formatters could access or log the metadata of
     virtual host in case the route is not matched but the virtual host is found.
+- area: oauth2
+  change: |
+    Extension status changed from ``alpha`` to ``stable``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
