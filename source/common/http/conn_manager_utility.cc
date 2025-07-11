@@ -35,6 +35,23 @@ absl::string_view getScheme(absl::string_view forwarded_proto, bool is_ssl) {
   return is_ssl ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http;
 }
 
+bool hasForceTraceHeader(const RequestHeaderMap& request_headers, 
+                        const ConnectionManagerConfig& config) {
+  if (!config.tracingConfig()) {
+    return false;
+  }
+  
+  const std::string& force_trace_header = config.tracingConfig()->forceTraceHeader();
+  if (force_trace_header.empty()) {
+    // Default to the original x-envoy-force-trace header behavior
+    return request_headers.EnvoyForceTrace();
+  }
+  
+  // Check for the custom header
+  const auto header_entry = request_headers.get(LowerCaseString(force_trace_header));
+  return !header_entry.empty();
+}
+
 } // namespace
 std::string ConnectionManagerUtility::determineNextProtocol(Network::Connection& connection,
                                                             const Buffer::Instance& data) {
@@ -394,7 +411,7 @@ Tracing::Reason ConnectionManagerUtility::mutateTracingRequestHeader(
         runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
       final_reason = Tracing::Reason::ClientForced;
       rid_extension->setTraceReason(request_headers, final_reason);
-    } else if (request_headers.EnvoyForceTrace()) {
+    } else if (hasForceTraceHeader(request_headers, config)) {
       final_reason = Tracing::Reason::ServiceForced;
       rid_extension->setTraceReason(request_headers, final_reason);
     } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
@@ -545,7 +562,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(ResponseHeaderMap& response
   }
 
   if (request_headers != nullptr &&
-      (config.alwaysSetRequestIdInResponse() || request_headers->EnvoyForceTrace())) {
+      (config.alwaysSetRequestIdInResponse() || hasForceTraceHeader(*request_headers, config))) {
     config.requestIDExtension()->setInResponse(response_headers, *request_headers);
   }
   if (!via.empty()) {
