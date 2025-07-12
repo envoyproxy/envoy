@@ -14,8 +14,12 @@ envoy_cc_extension(
     hdrs = ["dns_cluster.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//source/common/common:dns_utils_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
         "//source/common/upstream:cluster_factory_includes",
         "//source/common/upstream:upstream_includes",
+        "//source/extensions/clusters/common:dns_cluster_backcompat_lib",
+        "//source/extensions/clusters/common:logical_host_lib",
         "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
