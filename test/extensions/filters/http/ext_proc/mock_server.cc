@@ -14,10 +14,10 @@ MockClient::MockClient() {
           [](envoy::service::ext_proc::v3::ProcessingRequest&& request, bool end_stream,
              const uint64_t,
              CommonExtProc::RequestCallbacks<envoy::service::ext_proc::v3::ProcessingResponse>*,
-             CommonExtProc::StreamBase* stream) {
+             CommonExtProc::StreamBase<envoy::service::ext_proc::v3::ProcessingRequest,
+                                       envoy::service::ext_proc::v3::ProcessingResponse>* stream) {
             if (stream != nullptr) {
-              ExternalProcessorStream* grpc_stream = dynamic_cast<ExternalProcessorStream*>(stream);
-              grpc_stream->send(std::move(request), end_stream);
+              stream->send(std::move(request), end_stream);
             }
           }));
 }
