@@ -119,20 +119,6 @@ template <class Value> class RadixTree {
   };
 
   /**
-   * Get the child node for the given character key.
-   * @param node the node to get the child from.
-   * @param char_key the one-byte key of the child to get.
-   * @return pointer to the child node, or nullptr if not found.
-   */
-  const RadixTreeNode* getChild(const RadixTreeNode& node, uint8_t char_key) const {
-    auto it = node.children_.find(char_key);
-    if (it != node.children_.end()) {
-      return &it->second;
-    }
-    return nullptr;
-  }
-
-  /**
    * Check if a node has a value (is a leaf node)
    */
   static bool hasValue(const RadixTreeNode& node) {
