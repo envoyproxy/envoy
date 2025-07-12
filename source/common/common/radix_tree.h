@@ -202,7 +202,6 @@ public:
     absl::InlinedVector<Value, 4> result;
     absl::string_view search = key;
     const RadixTreeNode* node = &root_;
-    bool consumed_prefix = false;
 
     // Special case: if searching for empty string, check root node
     if (search.empty()) {
@@ -214,7 +213,7 @@ public:
 
     while (true) {
       // Check if current node has a value (is a leaf) and we've consumed some prefix
-      if (has_value(*node) && consumed_prefix) {
+      if (has_value(*node)) {
         result.push_back(node->value_);
       }
 
@@ -237,7 +236,6 @@ public:
       if (search.size() >= child_node.prefix_.size() &&
           search.substr(0, child_node.prefix_.size()) == child_node.prefix_) {
         search = search.substr(child_node.prefix_.size());
-        consumed_prefix = true;
       } else {
         break;
       }
