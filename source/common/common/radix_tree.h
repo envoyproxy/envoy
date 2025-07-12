@@ -166,10 +166,11 @@ public:
    */
   bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
     // Check if the key already exists
-    Value existing = find(key);
+    Value existing;
+    bool found = root_.find_recursive(key, existing);
 
     // If a value exists and we shouldn't overwrite, return false
-    if (has_value(existing) && !overwrite_existing) {
+    if (found && !overwrite_existing) {
       return false;
     }
 
