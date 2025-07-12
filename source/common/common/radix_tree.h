@@ -169,7 +169,7 @@ public:
     Value existing = find(key);
 
     // If a value exists and we shouldn't overwrite, return false
-    if (static_cast<bool>(existing) && !overwrite_existing) {
+    if (hasValue(existing) && !overwrite_existing) {
       return false;
     }
 
@@ -180,22 +180,12 @@ public:
   /**
    * Finds the entry associated with the key.
    * @param key the key used to find.
-   * @param result the value associated with the key (only set if found).
-   * @return true if the key was found, false otherwise.
-   */
-  bool find(absl::string_view key, Value& result) const {
-    return root_.find_recursive(key, result);
-  }
-
-  /**
-   * Finds the entry associated with the key.
-   * @param key the key used to find.
    * @return the Value associated with the key, or an empty-initialized Value
    *         if there is no matching key.
    */
   Value find(absl::string_view key) const {
     Value result;
-    if (find(key, result)) {
+    if (root_.find_recursive(key, result)) {
       return result;
     }
     return Value{};

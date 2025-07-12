@@ -337,19 +337,20 @@ TEST(RadixTree, InsertAndFindBooleanInterface) {
   // Test boolean find interface
   const char* result;
 
-  EXPECT_FALSE(radixtree.find("nonexistent", result));
+  result = radixtree.find("nonexistent");
+  EXPECT_EQ(nullptr, result);
 
   EXPECT_TRUE(radixtree.add(std::string("key"), cstr_a));
-  EXPECT_TRUE(radixtree.find("key", result));
+  result = radixtree.find("key");
   EXPECT_EQ(cstr_a, result);
 
   EXPECT_TRUE(radixtree.add(std::string("key"), cstr_b));
-  EXPECT_TRUE(radixtree.find("key", result));
+  result = radixtree.find("key");
   EXPECT_EQ(cstr_b, result);
 
   // Test with empty string
   EXPECT_TRUE(radixtree.add(std::string(""), cstr_a));
-  EXPECT_TRUE(radixtree.find("", result));
+  result = radixtree.find("");
   EXPECT_EQ(cstr_a, result);
 }
 
