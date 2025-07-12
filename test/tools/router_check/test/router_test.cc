@@ -117,5 +117,20 @@ TEST(RouterCheckTest, RouterCheckTestRoutesFailuresTest) {
   EXPECT_TRUE(TestUtility::protoEqual(expected_result_proto, test_result, true));
 }
 
+TEST(RouterCheckTest, DynamicMetadataTest) {
+  const std::string config_filename_ =
+      TestEnvironment::runfilesPath(absl::StrCat(kDir, "DynamicMetadata.yaml"));
+  const std::string tests_filename_ =
+      TestEnvironment::runfilesPath(absl::StrCat(kDir, "DynamicMetadata.golden.proto.json"));
+  RouterCheckTool checktool = RouterCheckTool::create(config_filename_, false);
+  const std::vector<envoy::RouterCheckToolSchema::ValidationItemResult> test_results =
+      checktool.compareEntries(tests_filename_);
+  EXPECT_EQ(test_results.size(), 10);
+  for (const auto& test_result : test_results) {
+    EXPECT_TRUE(test_result.test_passed()) << "Test " << test_result.test_name() << " failed";
+    EXPECT_FALSE(test_result.has_failure()) << "Test " << test_result.test_name() << " has failure";
+  }
+}
+
 } // namespace
 } // namespace Envoy
