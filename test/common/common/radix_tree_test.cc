@@ -158,25 +158,25 @@ TEST(RadixTree, InsertAndFindEdgeCases) {
   EXPECT_TRUE(radixtree.add(std::string("x"), cstr_b));
   EXPECT_EQ(cstr_b, radixtree.find("x"));
   EXPECT_EQ(cstr_b, radixtree.findLongestPrefix("x"));
-  EXPECT_THAT(radixtree.findMatchingPrefixes("x"), ElementsAre(cstr_b));
+  EXPECT_THAT(radixtree.findMatchingPrefixes("x"), ElementsAre(cstr_a, cstr_b));
 
   // Test very long string
   std::string long_key(1000, 'a');
   EXPECT_TRUE(radixtree.add(long_key, cstr_c));
   EXPECT_EQ(cstr_c, radixtree.find(long_key));
   EXPECT_EQ(cstr_c, radixtree.findLongestPrefix(long_key));
-  EXPECT_THAT(radixtree.findMatchingPrefixes(long_key), ElementsAre(cstr_c));
+  EXPECT_THAT(radixtree.findMatchingPrefixes(long_key), ElementsAre(cstr_a, cstr_c));
 
   // Test special characters
   EXPECT_TRUE(radixtree.add(std::string("test/key"), cstr_d));
   EXPECT_EQ(cstr_d, radixtree.find("test/key"));
   EXPECT_EQ(cstr_d, radixtree.findLongestPrefix("test/key"));
-  EXPECT_THAT(radixtree.findMatchingPrefixes("test/key"), ElementsAre(cstr_d));
+  EXPECT_THAT(radixtree.findMatchingPrefixes("test/key"), ElementsAre(cstr_a, cstr_d));
 
   // Test non-existent keys
   EXPECT_EQ(nullptr, radixtree.find("nonexistent"));
   EXPECT_EQ(cstr_a, radixtree.findLongestPrefix("nonexistent"));
-  EXPECT_THAT(radixtree.findMatchingPrefixes("nonexistent"), ElementsAre());
+  EXPECT_THAT(radixtree.findMatchingPrefixes("nonexistent"), ElementsAre(cstr_a));
 }
 
 TEST(RadixTree, InsertAndFindComplexScenarios) {
