@@ -65,8 +65,7 @@ public:
     *plugin_config.mutable_root_id() = root_id_;
     *plugin_config.mutable_name() = "plugin_name";
     plugin_config.set_fail_open(fail_open_);
-    plugin_config.set_allow_on_headers_stop_iteration(
-      allow_on_headers_stop_iteration_);
+    plugin_config.set_allow_on_headers_stop_iteration(allow_on_headers_stop_iteration_);
     plugin_config.mutable_configuration()->set_value(plugin_configuration_);
     *plugin_config.mutable_vm_config()->mutable_environment_variables() = envs_;
 
@@ -124,9 +123,7 @@ public:
     plugin_configuration_ = plugin_configuration;
   }
   void setFailOpen(bool fail_open) { fail_open_ = fail_open; }
-  void setAllowOnHeadersStopIteration(bool allow) {
-    allow_on_headers_stop_iteration_ = allow;
-  }
+  void setAllowOnHeadersStopIteration(bool allow) { allow_on_headers_stop_iteration_ = allow; }
   void setAllowedCapabilities(proxy_wasm::AllowedCapabilitiesMap allowed_capabilities) {
     allowed_capabilities_ = allowed_capabilities;
   }

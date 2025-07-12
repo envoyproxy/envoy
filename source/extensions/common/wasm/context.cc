@@ -164,7 +164,7 @@ Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, 
   }
   root_local_info_ = &this->plugin()->localInfo();
   allow_on_headers_stop_iteration_ =
-    this->plugin()->wasmConfig().config().allow_on_headers_stop_iteration();
+      this->plugin()->wasmConfig().config().allow_on_headers_stop_iteration();
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
     : ContextBase(wasm, root_context_id, plugin_handle), plugin_handle_(plugin_handle) {
@@ -172,7 +172,7 @@ Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plu
     abi_version_ = wasm->abi_version_;
   }
   allow_on_headers_stop_iteration_ =
-    plugin()->wasmConfig().config().allow_on_headers_stop_iteration();
+      plugin()->wasmConfig().config().allow_on_headers_stop_iteration();
 }
 
 Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
