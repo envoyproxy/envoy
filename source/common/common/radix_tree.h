@@ -72,10 +72,10 @@ template <class Value> class RadixTree {
         split_node.value_ = std::move(value);
       } else {
         // Create a new leaf for the current key
-        RadixTreeNode newLeaf;
-        newLeaf.prefix_ = std::string(search.substr(cpl));
-        newLeaf.value_ = std::move(value);
-        split_node.children_[static_cast<uint8_t>(newLeaf.prefix_[0])] = std::move(newLeaf);
+        RadixTreeNode new_leaf;
+        new_leaf.prefix_ = std::string(search.substr(cpl));
+        new_leaf.value_ = std::move(value);
+        split_node.children_[static_cast<uint8_t>(new_leaf.prefix_[0])] = std::move(new_leaf);
       }
 
       // Add the child to the split node
