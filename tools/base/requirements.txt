@@ -447,10 +447,10 @@ coloredlogs==15.0.1 \
     # via
     #   -r requirements.in
     #   aio-run-runner
-cryptography==44.0.1 \
-    --hash=sha256:436df4f203482f41aad60ed1813811ac4ab102765ecae7a2bbb1dbb66dcff5a7 \
-    --hash=sha256:72198e2b5925155497a5a3e8c216c7fb3e64c16ccee11f0e7da272fa93b35c4c \
-    --hash=sha256:a2d8a7045e1ab9b9f803f0d9531ead85f90c5f2859e653b61497228b18452008
+cryptography==45.0.5 \
+    --hash=sha256:8c4a6ff8a30e9e3d38ac0539e9a9e02540ab3f827a3394f8852432f6b0ea152e \
+    --hash=sha256:982518cd64c54fcada9d7e5cf28eabd3ee76bd03ab18e08a48cad7e8b6f31b18 \
+    --hash=sha256:bd4c45986472694e5121084c6ebbd112aa919a25e783b87eb95953c9573906d6
     # via
     #   -r requirements.in
     #   aioquic
