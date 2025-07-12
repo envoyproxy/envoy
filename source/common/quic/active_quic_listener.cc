@@ -5,6 +5,7 @@
 
 #include "envoy/extensions/quic/connection_id_generator/v3/envoy_deterministic_connection_id_generator.pb.h"
 #include "envoy/extensions/quic/crypto_stream/v3/crypto_stream.pb.h"
+#include "envoy/extensions/quic/crypto_stream/v3/crypto_stream_fingerprinting.pb.h"
 #include "envoy/extensions/quic/proof_source/v3/proof_source.pb.h"
 #include "envoy/network/exception.h"
 
@@ -16,6 +17,7 @@
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_connection_helper.h"
+#include "source/common/quic/envoy_quic_crypto_server_stream_factory_with_fingerprinting.h"
 #include "source/common/quic/envoy_quic_dispatcher.h"
 #include "source/common/quic/envoy_quic_packet_writer.h"
 #include "source/common/quic/envoy_quic_proof_source.h"
@@ -292,17 +294,55 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
 
   // Initialize crypto stream factory.
   envoy::config::core::v3::TypedExtensionConfig crypto_stream_config;
-  if (!config.has_crypto_stream_config()) {
-    // If not specified, use the quic crypto stream created by QUICHE.
-    crypto_stream_config.set_name("envoy.quic.crypto_stream.server.quiche");
-    envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig empty_crypto_stream_config;
-    crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
+
+  // Check if``JA3``or``JA4``fingerprinting is enabled.
+  const bool ja3_enabled =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_ja3_fingerprinting, false);
+  const bool ja4_enabled =
+      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enable_ja4_fingerprinting, false);
+
+  if (ja3_enabled || ja4_enabled) {
+    // Use the fingerprinting crypto stream factory if fingerprinting is enabled.
+    if (config.has_crypto_stream_config()) {
+      ENVOY_LOG(warn,
+                "QUIC fingerprinting is enabled but a custom crypto stream factory is configured. "
+                "Fingerprinting will be disabled. To enable fingerprinting, remove the "
+                "crypto_stream_config field from the QuicProtocolOptions.");
+      crypto_stream_config = config.crypto_stream_config();
+    } else {
+      crypto_stream_config.set_name("envoy.quic.crypto_stream.server.fingerprinting");
+      envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamFingerprintingConfig
+          empty_crypto_stream_config;
+      crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
+    }
   } else {
-    crypto_stream_config = config.crypto_stream_config();
+    // Use the default crypto stream factory when fingerprinting is not enabled.
+    if (!config.has_crypto_stream_config()) {
+      // If not specified, use the quic crypto stream created by QUICHE.
+      crypto_stream_config.set_name("envoy.quic.crypto_stream.server.quiche");
+      envoy::extensions::quic::crypto_stream::v3::CryptoServerStreamConfig
+          empty_crypto_stream_config;
+      crypto_stream_config.mutable_typed_config()->PackFrom(empty_crypto_stream_config);
+    } else {
+      crypto_stream_config = config.crypto_stream_config();
+    }
   }
+
   crypto_server_stream_factory_ =
       Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactoryInterface>(
           crypto_stream_config);
+
+  // If using the fingerprinting factory, configure it with the QUIC config.
+  if (crypto_stream_config.name() == "envoy.quic.crypto_stream.server.fingerprinting") {
+    if (crypto_server_stream_factory_.has_value()) {
+      auto* fingerprinting_factory =
+          dynamic_cast<EnvoyQuicCryptoServerStreamFactoryWithFingerprinting*>(
+              &crypto_server_stream_factory_.value().get());
+      if (fingerprinting_factory != nullptr) {
+        fingerprinting_factory->setQuicConfig(config);
+      }
+    }
+  }
 
   // Initialize proof source factory.
   envoy::config::core::v3::TypedExtensionConfig proof_source_config;

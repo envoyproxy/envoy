@@ -877,6 +877,12 @@ public:
     return std::make_unique<QuicCustomTlsServerHandshaker>(session, crypto_config, fail_handshake_);
   }
 
+  // EnvoyQuicCryptoServerStreamFactoryInterface
+  void
+  setQuicConfig(const envoy::config::listener::v3::QuicProtocolOptions& /*quic_config*/) override {
+    // Test implementation: do nothing
+  }
+
   void setFailHandshake(bool fail_handshake) { fail_handshake_ = fail_handshake; }
 
 private:
