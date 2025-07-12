@@ -110,8 +110,8 @@ template <class Value> class RadixTree {
       // Check if the child's prefix matches the search
       if (search.size() >= child.prefix_.size() &&
           search.substr(0, child.prefix_.size()) == child.prefix_) {
-        absl::string_view newSearch(search.begin() + child.prefix_.size(), search.end());
-        return child.find_recursive(newSearch, result);
+        absl::string_view new_search = search.substr(child.prefix_.size());
+        return child.find_recursive(new_search, result);
       }
 
       return false;
