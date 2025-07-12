@@ -51,37 +51,37 @@ template <class Value> class RadixTree {
       RadixTreeNode& child = childIt->second;
 
       // Determine longest prefix of the search key on match
-      size_t commonPrefix = longestPrefix(search, child.prefix_);
-      if (commonPrefix == child.prefix_.size()) {
+      size_t cpl = common_prefix_length(search, child.prefix_);
+      if (cpl == child.prefix_.size()) {
         // The search key is longer than the child prefix, continue down
-        absl::string_view remainingSearch = search.substr(commonPrefix);
-        child.insert(key, remainingSearch, std::move(value));
+        absl::string_view remaining_search = search.substr(cpl);
+        child.insert(key, remaining_search, std::move(value));
         return;
       }
 
       // Split the node - create a new intermediate node
-      RadixTreeNode splitNode;
-      splitNode.prefix_ = std::string(search.substr(0, commonPrefix));
+      RadixTreeNode split_node;
+      split_node.prefix_ = std::string(search.substr(0, cpl));
 
       // Update the child's prefix
-      child.prefix_ = std::string(child.prefix_.substr(commonPrefix));
+      child.prefix_ = std::string(child.prefix_.substr(cpl));
 
       // If the search key is exactly the common prefix, set the value on the split node
-      if (commonPrefix == search.size()) {
-        splitNode.value_ = std::move(value);
+      if (cpl == search.size()) {
+        split_node.value_ = std::move(value);
       } else {
         // Create a new leaf for the current key
         RadixTreeNode newLeaf;
-        newLeaf.prefix_ = std::string(search.substr(commonPrefix));
+        newLeaf.prefix_ = std::string(search.substr(cpl));
         newLeaf.value_ = std::move(value);
-        splitNode.children_[static_cast<uint8_t>(newLeaf.prefix_[0])] = std::move(newLeaf);
+        split_node.children_[static_cast<uint8_t>(newLeaf.prefix_[0])] = std::move(newLeaf);
       }
 
       // Add the child to the split node
-      splitNode.children_[static_cast<uint8_t>(child.prefix_[0])] = std::move(child);
+      split_node.children_[static_cast<uint8_t>(child.prefix_[0])] = std::move(child);
 
       // Replace the original child with the split node
-      children_[firstChar] = std::move(splitNode);
+      children_[firstChar] = std::move(split_node);
     }
 
     /**
@@ -147,7 +147,7 @@ template <class Value> class RadixTree {
   /**
    * Find the longest common prefix between two strings
    */
-  static size_t longestPrefix(absl::string_view a, absl::string_view b) {
+  static size_t common_prefix_length(absl::string_view a, absl::string_view b) {
     size_t len = std::min(a.size(), b.size());
     for (size_t i = 0; i < len; i++) {
       if (a[i] != b[i]) {
