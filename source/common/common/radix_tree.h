@@ -24,7 +24,7 @@ template <class Value> class RadixTree {
      * @param search the remaining search key
      * @param value the value to insert
      */
-    void insert(absl::string_view key, absl::string_view search, Value value) {
+    void insert(absl::string_view search, Value value) {
       // Handle key exhaustion
       if (search.empty()) {
         value_ = std::move(value);
@@ -55,7 +55,7 @@ template <class Value> class RadixTree {
       if (cpl == child.prefix_.size()) {
         // The search key is longer than the child prefix, continue down
         absl::string_view remaining_search = search.substr(cpl);
-        child.insert(key, remaining_search, std::move(value));
+        child.insert(remaining_search, std::move(value));
         return;
       }
 
@@ -175,7 +175,7 @@ public:
       return false;
     }
 
-    root_.insert(key, key, std::move(value));
+    root_.insert(key, std::move(value));
     return true;
   }
 
