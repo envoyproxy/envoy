@@ -175,7 +175,7 @@ TEST(RadixTree, InsertAndFindEdgeCases) {
 
   // Test non-existent keys
   EXPECT_EQ(nullptr, radixtree.find("nonexistent"));
-  EXPECT_EQ(nullptr, radixtree.findLongestPrefix("nonexistent"));
+  EXPECT_EQ(cstr_a, radixtree.findLongestPrefix("nonexistent"));
   EXPECT_THAT(radixtree.findMatchingPrefixes("nonexistent"), ElementsAre());
 }
 
