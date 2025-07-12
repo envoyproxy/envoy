@@ -189,6 +189,25 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "fcds_api_test",
+    srcs = ["fcds_api_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/listener_manager:fcds_api_lib",
+        "//source/common/protobuf:utility_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:listener_manager_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],

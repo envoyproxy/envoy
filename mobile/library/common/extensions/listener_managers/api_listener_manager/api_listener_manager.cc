@@ -56,6 +56,13 @@ ApiListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::L
   return false;
 }
 
+absl::Status ApiListenerManagerImpl::updateDynamicFilterChains(
+    const std::string&, absl::optional<absl::string_view>&, const FilterChainRefVector&,
+    const absl::flat_hash_set<absl::string_view>&) {
+  return absl::UnimplementedError(
+      "Dynamic filter chains are not supported in ApiListenerManagerImpl");
+}
+
 REGISTER_FACTORY(ApiListenerManagerFactoryImpl, ListenerManagerFactory);
 
 } // namespace Server
