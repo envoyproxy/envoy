@@ -9,7 +9,7 @@
 #include "envoy/stats/timespan.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/common/trie_lookup_table.h"
+#include "source/common/common/radix_tree.h"
 #include "source/common/stats/timespan_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
@@ -481,7 +481,7 @@ private:
   CommandHandlerFactory<SelectRequest> select_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   CommandHandlerFactory<TransactionRequest> transaction_handler_;
-  TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
+  RadixTree<HandlerDataPtr> handler_lookup_table_;
   InstanceStats stats_;
   TimeSource& time_source_;
   Common::Redis::FaultManagerPtr fault_manager_;
