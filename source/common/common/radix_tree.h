@@ -93,7 +93,7 @@ template <class Value> class RadixTree {
      */
     bool find_recursive(absl::string_view search, Value& result) const {
       if (search.empty()) {
-        if (hasValue(*this)) {
+        if (has_value(*this)) {
           result = value_;
           return true;
         }
@@ -122,7 +122,7 @@ template <class Value> class RadixTree {
   /**
    * Check if a node has a value (is a leaf node)
    */
-  static bool hasValue(const RadixTreeNode& node) {
+  static bool has_value(const RadixTreeNode& node) {
     // For pointer types, check if the pointer is not null
     if constexpr (std::is_pointer_v<Value>) {
       return node.value_ != nullptr;
@@ -169,7 +169,7 @@ public:
     Value existing = find(key);
 
     // If a value exists and we shouldn't overwrite, return false
-    if (hasValue(existing) && !overwrite_existing) {
+    if (has_value(existing) && !overwrite_existing) {
       return false;
     }
 
@@ -205,7 +205,7 @@ public:
 
     // Special case: if searching for empty string, check root node
     if (search.empty()) {
-      if (hasValue(*node)) {
+      if (has_value(*node)) {
         result.push_back(node->value_);
       }
       return result;
@@ -213,7 +213,7 @@ public:
 
     while (true) {
       // Check if current node has a value (is a leaf) and we've consumed some prefix
-      if (hasValue(*node) && consumed_prefix) {
+      if (has_value(*node) && consumed_prefix) {
         result.push_back(node->value_);
       }
 
@@ -261,7 +261,7 @@ public:
 
     // Special case: if searching for empty string, check root node
     if (search.empty()) {
-      if (hasValue(*node)) {
+      if (has_value(*node)) {
         return node->value_;
       }
       return Value{};
@@ -269,7 +269,7 @@ public:
 
     while (true) {
       // Check if current node has a value (is a leaf) and we've consumed some prefix
-      if (hasValue(*node) && consumed_prefix) {
+      if (has_value(*node) && consumed_prefix) {
         last_node_with_value = node;
       }
 
