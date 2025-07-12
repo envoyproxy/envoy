@@ -61,9 +61,8 @@ public:
   ConfigTest(OptionsImplBase& options)
       : api_(Api::createApiForTest(time_system_)),
         ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()), options_(options) {
-    ON_CALL(server_.server_factory_context_->xds_manager_, adsMux())
-        .WillByDefault(Return(ads_mux_));
-    ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
+    ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+    ON_CALL(server_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
@@ -124,10 +123,9 @@ public:
     }
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-        *server_.server_factory_context_, server_.stats(), server_.threadLocal(),
-        server_.httpContext(),
+        server_factory_context_,
         [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-        ssl_context_manager_, server_.quic_stat_names_, server_);
+        server_.quic_stat_names_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -158,7 +156,6 @@ public:
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   filters, context);
             }));
-    ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
 
     try {
       THROW_IF_NOT_OK(main_config.initialize(bootstrap, server_, *cluster_manager_factory_));

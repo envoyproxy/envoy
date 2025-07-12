@@ -29,27 +29,22 @@ namespace Upstream {
 namespace {
 
 TEST(ValidationClusterManagerTest, MockedMethods) {
-  NiceMock<Server::MockInstance> server;
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
 
-  Stats::TestUtil::TestStore& stats_store = server.server_factory_context_->store_;
-  Event::GlobalTimeSystem& time_system = server.server_factory_context_->time_system_;
+  Stats::TestUtil::TestStore& stats_store = server_context.store_;
+  Event::GlobalTimeSystem& time_system = server_context.time_system_;
   Api::ApiPtr api(Api::createApiForTest(stats_store, time_system));
-  ON_CALL(*server.server_factory_context_, api()).WillByDefault(testing::ReturnRef(*api));
+  ON_CALL(server_context, api()).WillByDefault(testing::ReturnRef(*api));
+  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{server_context};
+  ON_CALL(server_context, sslContextManager())
+      .WillByDefault(testing::ReturnRef(ssl_context_manager));
 
-  NiceMock<ThreadLocal::MockInstance>& tls = server.server_factory_context_->thread_local_;
-
-  testing::NiceMock<Secret::MockSecretManager> secret_manager;
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager{
-      *server.server_factory_context_};
-
-  Http::ContextImpl http_context(stats_store.symbolTable());
   Quic::QuicStatNames quic_stat_names(stats_store.symbolTable());
 
   ValidationClusterManagerFactory factory(
-      *server.server_factory_context_, stats_store, tls, http_context,
-      [dns_resolver]() -> Network::DnsResolverSharedPtr { return dns_resolver; },
-      ssl_context_manager, quic_stat_names, server);
+      server_context, [dns_resolver]() -> Network::DnsResolverSharedPtr { return dns_resolver; },
+      quic_stat_names);
 
   const envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = *factory.clusterManagerFromProto(bootstrap);
