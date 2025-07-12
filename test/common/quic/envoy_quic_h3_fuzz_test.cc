@@ -94,6 +94,12 @@ public:
     }
     return nullptr;
   }
+
+  // EnvoyQuicCryptoServerStreamFactoryInterface
+  void
+  setQuicConfig(const envoy::config::listener::v3::QuicProtocolOptions& /*quic_config*/) override {
+    // Test implementation: do nothing
+  }
 };
 
 QuicDispatcherStats generateStats(Stats::Scope& store) {

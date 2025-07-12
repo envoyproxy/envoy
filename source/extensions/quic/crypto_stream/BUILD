@@ -27,7 +27,10 @@ envoy_cc_library(
     deps = envoy_select_enable_http3([
         "//envoy/registry",
         "//source/common/quic:envoy_quic_server_crypto_stream_factory_lib",
+        "//source/common/quic:envoy_quic_crypto_server_stream_with_fingerprinting_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/quic/crypto_stream/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ]),
     alwayslink = LEGACY_ALWAYSLINK,
 )

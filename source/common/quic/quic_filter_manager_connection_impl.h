@@ -182,6 +182,9 @@ public:
 
   bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override;
 
+  // Access to stats scope for crypto streams
+  Stats::Scope& statsScope() { return stats_scope_; }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,

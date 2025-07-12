@@ -399,5 +399,13 @@ new_features:
   change: |
     Added ``assume_role_credential_provider`` to add support for role chaining in AWS filters. This allows envoy to
     assume an additional role before SigV4 signing occurs.
+- area: quic
+  change: |
+    Added :ref:`enable_ja3_fingerprinting
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.enable_ja3_fingerprinting>` and
+    :ref:`enable_ja4_fingerprinting
+    <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.enable_ja4_fingerprinting>` to QUIC listeners.
+    When enabled, JA3 and JA4 fingerprints are extracted from the QUIC ``ClientHello`` message and made available
+    in connection info for access logs and other components. Both fingerprints are disabled by default.
 
 deprecated:

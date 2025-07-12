@@ -17,6 +17,10 @@ envoy_cc_library(
     srcs = ["ja4_fingerprint.cc"],
     hdrs = ["ja4_fingerprint.h"],
     external_deps = ["ssl"],
+    visibility = [
+        "//source/common/quic:__pkg__",
+        "//test/extensions/filters/listener/tls_inspector:__pkg__",
+    ],
     deps = [
         "//source/common/common:hex_lib",
     ],
