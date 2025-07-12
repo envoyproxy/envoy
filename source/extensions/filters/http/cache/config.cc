@@ -1,6 +1,8 @@
 #include "source/extensions/filters/http/cache/config.h"
 
 #include "source/extensions/filters/http/cache/cache_filter.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
+#include "source/extensions/filters/http/cache/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -10,7 +12,7 @@ namespace Cache {
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cache::v3::CacheConfig& config,
     const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<HttpCache> cache;
+  std::shared_ptr<CacheSessions> cache;
   if (!config.disabled().value()) {
     if (!config.has_typed_config()) {
       throw EnvoyException("at least one of typed_config or disabled must be set");
@@ -25,10 +27,10 @@ Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
 
     cache = http_cache_factory->getCache(config, context);
   }
-
-  return [config = std::make_shared<CacheFilterConfig>(config, context.serverFactoryContext()),
-          cache](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<CacheFilter>(config, cache));
+  return [config = std::make_shared<CacheFilterConfig>(config, std::move(cache),
+                                                       context.serverFactoryContext())](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<CacheFilter>(config));
   };
 }
 
