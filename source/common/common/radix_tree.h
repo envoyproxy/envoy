@@ -8,6 +8,7 @@
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "envoy/common/optref.h"
 
 namespace Envoy {
 template <class Value> class RadixTree {
@@ -143,6 +144,17 @@ template <class Value> class RadixTree {
     return len;
   }
 
+  /**
+   * Get a child node by character key
+   */
+  Envoy::OptRef<const RadixTreeNode> get_child(const RadixTreeNode& node, uint8_t char_key) const {
+    auto it = node.children_.find(char_key);
+    if (it != node.children_.end()) {
+      return {it->second};
+    }
+    return {};
+  }
+
 public:
   /**
    * Adds an entry to the RadixTree at the given Key.
@@ -222,18 +234,18 @@ public:
 
       // Look for an edge
       uint8_t firstChar = static_cast<uint8_t>(search[0]);
-      auto childIt = node->children_.find(firstChar);
-      if (childIt == node->children_.end()) {
+      auto child = get_child(*node, firstChar);
+      if (!child) {
         break;
       }
 
-      const RadixTreeNode& child = childIt->second;
-      node = &child;
+      const RadixTreeNode& child_node = *child;
+      node = &child_node;
 
       // Consume the search prefix
-      if (search.size() >= child.prefix_.size() &&
-          search.substr(0, child.prefix_.size()) == child.prefix_) {
-        search = search.substr(child.prefix_.size());
+      if (search.size() >= child_node.prefix_.size() &&
+          search.substr(0, child_node.prefix_.size()) == child_node.prefix_) {
+        search = search.substr(child_node.prefix_.size());
         consumed_prefix = true;
       } else {
         break;
@@ -278,18 +290,18 @@ public:
 
       // Look for an edge
       uint8_t firstChar = static_cast<uint8_t>(search[0]);
-      auto childIt = node->children_.find(firstChar);
-      if (childIt == node->children_.end()) {
+      auto child = get_child(*node, firstChar);
+      if (!child) {
         break;
       }
 
-      const RadixTreeNode& child = childIt->second;
-      node = &child;
+      const RadixTreeNode& child_node = *child;
+      node = &child_node;
 
       // Consume the search prefix
-      if (search.size() >= child.prefix_.size() &&
-          search.substr(0, child.prefix_.size()) == child.prefix_) {
-        search = search.substr(child.prefix_.size());
+      if (search.size() >= child_node.prefix_.size() &&
+          search.substr(0, child_node.prefix_.size()) == child_node.prefix_) {
+        search = search.substr(child_node.prefix_.size());
         consumed_prefix = true;
       } else {
         break;
