@@ -3,12 +3,13 @@
 #include <algorithm>
 #include <vector>
 
+#include "envoy/common/optref.h"
+
 #include "source/common/common/assert.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
-#include "envoy/common/optref.h"
 
 namespace Envoy {
 template <class Value> class RadixTree {
