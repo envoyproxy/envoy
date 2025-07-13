@@ -88,7 +88,7 @@ admin:
   address:
     socket_address:
       address: 0.0.0.0
-      port_value: 8878
+      port_value: 8888
 layered_runtime:
   layers:
   - name: layer

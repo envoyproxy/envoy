@@ -510,25 +510,30 @@ Api::SysCallIntResult ReverseConnectionIOHandle::listen(int backlog) {
             config_.remote_clusters.size());
 
   if (!listening_initiated_) {
-    // Create trigger mechanism on worker thread where TLS is available
+  
+    // Create trigger mechanism on worker thread where TLS is available. The
+    // listening_initiated_ ensures that this is done only once for a given
+    // ReverseConnectionIOHandle instance.
+    createTriggerMechanism();
     if (!trigger_mechanism_) {
-      createTriggerMechanism();
-      if (!trigger_mechanism_) {
-        ENVOY_LOG(error,
-                  "Failed to create trigger mechanism - cannot proceed with reverse connections");
-        return Api::SysCallIntResult{-1, ENODEV};
-      }
+      // If the trigger mechanism is not created, the reverse connections workflow
+      // cannot proceed.
+      ENVOY_LOG(error,
+                "Reverse connections failed. Failed to create trigger mechanism");
+      return Api::SysCallIntResult{-1, ENODEV};
+    }
 
-      // CRITICAL: Replace the monitored FD with trigger mechanism's FD
-      // This must happen before any event registration
-      int trigger_fd = trigger_mechanism_->getMonitorFd();
-      if (trigger_fd != -1) {
-        ENVOY_LOG(info, "Replacing monitored FD from {} to trigger FD {}", fd_, trigger_fd);
-        fd_ = trigger_fd;
-      } else {
-        ENVOY_LOG(warn,
-                  "Trigger mechanism does not provide a monitor FD - using original socket FD");
-      }
+    // Replace the monitored FD with trigger mechanism's FD. This ensures that
+    // the platform's event notification system (eg., EPOLL for linux) monitors the trigger
+    // mechanism's FD and wakes up accept() when data is available on the trigger mechanism
+    // FD.
+    int trigger_fd = trigger_mechanism_->getMonitorFd();
+    if (trigger_fd != -1) {
+      ENVOY_LOG(info, "Replacing monitored FD from {} to trigger FD {}", fd_, trigger_fd);
+      fd_ = trigger_fd;
+    } else {
+      ENVOY_LOG(error, " Reverse connections failed. Trigger mechanism does not provide a monitor FD");
+      return Api::SysCallIntResult{-1, ENODEV};
     }
 
     // Create the retry timer on first use with thread-local dispatcher. The timer is reset
@@ -539,18 +544,18 @@ Api::SysCallIntResult ReverseConnectionIOHandle::listen(int backlog) {
           rev_conn_retry_timer_ = getThreadLocalDispatcher().createTimer([this]() -> void {
             ENVOY_LOG(debug, "Reverse connection timer triggered - checking all clusters for "
                              "missing connections");
-            // Safety check before maintenance
+            // Prevent use-after-free by checking if the dispatcher is still available.
             if (isThreadLocalDispatcherAvailable()) {
               maintainReverseConnections();
             } else {
-              ENVOY_LOG(debug, "Skipping maintenance - dispatcher not available");
+              ENVOY_LOG(error, "Reverse connections failed. Skipping maintenance - dispatcher not available");
             }
           });
           // Trigger the reverse connection workflow. The function will reset rev_conn_retry_timer_.
           maintainReverseConnections();
           ENVOY_LOG(debug, "Created retry timer for periodic connection checks");
         } else {
-          ENVOY_LOG(warn, "Cannot create retry timer - dispatcher not available");
+          ENVOY_LOG(error, "Reverse connections failed. Cannot create retry timer - dispatcher not available");
         }
       } catch (const std::exception& e) {
         ENVOY_LOG(error, "Exception creating retry timer: {}", e.what());
@@ -683,8 +688,10 @@ ReverseConnectionIOHandle::connect(Envoy::Network::Address::InstanceConstSharedP
 Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
   ENVOY_LOG(debug, "ReverseConnectionIOHandle::close() - performing graceful shutdown");
 
-  // Clean up original socket FD if it's different from the current fd_
-  if (original_socket_fd_ != -1 && original_socket_fd_ != fd_) {
+  // Clean up original socket FD . fd_ is
+  // the FD of the trigger mechanism and should not be closed until the
+  // ReverseConnectionIOHandle is destroyed.
+  if (original_socket_fd_ != -1) {
     ENVOY_LOG(debug, "Closing original socket FD: {}", original_socket_fd_);
     ::close(original_socket_fd_);
     original_socket_fd_ = -1;
@@ -1602,9 +1609,6 @@ Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocke
     Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
     Envoy::Network::Address::IpVersion version, const ReverseConnectionSocketConfig& config) const {
 
-  ENVOY_LOG(debug, "Creating reverse connection socket for cluster: {}",
-            config.remote_clusters.empty() ? "unknown" : config.remote_clusters[0].cluster_name);
-
   // For stream sockets on IP addresses, create our reverse connection IOHandle.
   if (socket_type == Envoy::Network::Socket::Type::Stream &&
       addr_type == Envoy::Network::Address::Type::Ip) {
@@ -1626,7 +1630,8 @@ Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocke
     }
 
     // Create ReverseConnectionIOHandle with cluster manager from context and scope
-    return std::make_unique<ReverseConnectionIOHandle>(sock_fd, config, context_->clusterManager(),
+    return std::make_unique<ReverseConnectionIOHandle>(
+      , config, context_->clusterManager(),
                                                        *this, *scope_ptr);
   }
 

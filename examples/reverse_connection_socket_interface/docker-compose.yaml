@@ -19,7 +19,7 @@ services:
       # Admin interface
       - "8888:8888"
       # Reverse connection API listener
-      - "9001:9001"
+      - "9000:9000"
       # Ingress HTTP listener
       - "6060:6060"
     extra_hosts:
@@ -42,9 +42,9 @@ services:
     command: envoy -c /etc/cloud-envoy.yaml --concurrency 1 -l trace --drain-time-s 3
     ports:
       # Admin interface
-      - "8878:8878"
+      - "8889:8888"
       # Reverse connection API listener
-      - "9000:9000"
+      - "9001:9000"
       # Egress listener
       - "8085:8085"
     networks:

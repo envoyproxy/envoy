@@ -35,10 +35,10 @@ CONFIG = {
     'cloud_config_file': os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cloud-envoy.yaml'),
     
     # Ports
-    'cloud_admin_port': 8888,
+    'cloud_admin_port': 8889,
     'cloud_api_port': 9001,
-    'cloud_egress_port': 8081,
-    'on_prem_admin_port': 8889,
+    'cloud_egress_port': 8085,
+    'on_prem_admin_port': 8888,
     'xds_server_port': 18000,  # Port for our xDS server
     
     # Container names
@@ -327,6 +327,32 @@ class ReverseConnectionTester:
             
         except Exception as e:
             logger.error(f"Failed to add reverse_conn_listener via xDS: {e}")
+            return False
+    
+    def remove_reverse_conn_listener_via_xds(self) -> bool:
+        """Remove reverse_conn_listener via xDS."""
+        logger.info("Removing reverse_conn_listener via xDS")
+        
+        try:
+            # Send request to xDS server running in Docker
+            import requests
+            response = requests.post(
+                f"http://localhost:{CONFIG['xds_server_port']}/remove_listener",
+                json={
+                    'name': 'reverse_conn_listener'
+                },
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                logger.info("✓ reverse_conn_listener removed via xDS")
+                return True
+            else:
+                logger.error(f"Failed to remove listener via xDS: {response.status_code}")
+                return False
+            
+        except Exception as e:
+            logger.error(f"Failed to remove reverse_conn_listener via xDS: {e}")
             return False
     
     def get_container_name(self, service_name: str) -> str:
