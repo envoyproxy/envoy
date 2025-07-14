@@ -1195,7 +1195,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_url = "https://github.com/google/highway",
         # Same version as used by V8
         version = "1.2.0",
-        sha256 = "7ef3f39053f50f88d4603670bb9a915d252bd93314ced691ddf5913edbc4e75b",
+        sha256 = "7e0be78b8318e8bdbf6fa545d2ecb4c90f947df03f7aadc42c1967f019e63343",
         urls = ["https://github.com/google/highway/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
