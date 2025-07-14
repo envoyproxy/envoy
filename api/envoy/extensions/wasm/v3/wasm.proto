@@ -6,6 +6,7 @@ import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -195,7 +196,7 @@ message PluginConfig {
 
   // Whether or not to allow plugin onRequestHeaders and onResponseHeaders callbacks to return
   // FilterHeadersStatus::StopIteration.
-  bool allow_on_headers_stop_iteration = 9;
+  google.protobuf.BoolValue allow_on_headers_stop_iteration = 9;
 }
 
 // WasmService is configured as a built-in ``envoy.wasm_service`` :ref:`WasmService

@@ -23,6 +23,7 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
+#include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -65,7 +66,10 @@ public:
     *plugin_config.mutable_root_id() = root_id_;
     *plugin_config.mutable_name() = "plugin_name";
     plugin_config.set_fail_open(fail_open_);
-    plugin_config.set_allow_on_headers_stop_iteration(allow_on_headers_stop_iteration_);
+    if (allow_on_headers_stop_iteration_.has_value()) {
+      plugin_config.mutable_allow_on_headers_stop_iteration()->set_value(
+          *allow_on_headers_stop_iteration_);
+    }
     plugin_config.mutable_configuration()->set_value(plugin_configuration_);
     *plugin_config.mutable_vm_config()->mutable_environment_variables() = envs_;
 
@@ -133,7 +137,7 @@ private:
   std::string root_id_ = "";
   std::string vm_configuration_ = "";
   bool fail_open_ = false;
-  bool allow_on_headers_stop_iteration_ = false;
+  absl::optional<bool> allow_on_headers_stop_iteration_ = absl::nullopt;
   std::string plugin_configuration_ = "";
   proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_ = {};
   envoy::extensions::wasm::v3::EnvironmentVariables envs_ = {};
