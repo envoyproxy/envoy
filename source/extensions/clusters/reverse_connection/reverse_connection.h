@@ -18,12 +18,15 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_acceptor.h"
 
 #include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace ReverseConnection {
+
+namespace BootstrapReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
 /**
  * Custom address type that uses the UpstreamReverseSocketInterface.
@@ -137,7 +140,22 @@ public:
   public:
     LoadBalancer(const std::shared_ptr<RevConCluster>& parent) : parent_(parent) {}
 
+    // Chooses a host to send a downstream request over to a reverse connection endpoint.
+    // A request intended for a reverse connection has to have either of the below set and are
+    // checked in the given order:
+    // 1. If the host_id is set, it is used for creating the host.
+    // 2. The request should have either of the HTTP headers given in the RevConClusterConfig's
+    // http_header_names set. If any of the headers are set, the first found header is used to
+    // create the host.
+    // 3. The Host header should be set to "<uuid>.tcpproxy.envoy.remote:<remote_port>". This is
+    // mandatory if none of fields in 1. or 2. are set. The uuid is extracted from the host header
+    // and is used to create the host.
     Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
+
+
+    // Helper function to verify that the host header is of the format
+    // "<uuid>.tcpproxy.envoy.remote:<remote_port>" and extract the uuid from the header.
+    absl::optional<absl::string_view> getUUIDFromHost(const Http::RequestHeaderMap& headers);
 
     // Virtual functions that are not supported by our custom load-balancer.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
@@ -193,6 +211,9 @@ private:
   // If such header is present, it return that header value.
   absl::string_view getHostIdValue(const Http::RequestHeaderMap* request_headers);
 
+  // Get the upstream socket manager from the thread-local registry
+  BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;
+
   // No pre-initialize work needs to be completed by REVERSE CONNECTION cluster.
   void startPreInit() override { onPreInitComplete(); }
 
@@ -203,6 +224,8 @@ private:
   absl::Mutex host_map_lock_;
   absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
   std::vector<absl::optional<Http::LowerCaseString>> http_header_names_;
+  // Host header suffix expected by envoy when acting as a L4 proxy.
+  std::string proxy_host_suffix_;
   friend class RevConClusterFactory;
 };
 

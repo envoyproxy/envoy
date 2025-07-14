@@ -320,6 +320,12 @@ public:
   void updateConnectionStatsRegistry(const std::string& node_id, const std::string& cluster_id,
                                      bool increment);
 
+  /**
+   * Get the stats scope for accessing global stats.
+   * @return reference to the stats scope.
+   */
+  Stats::Scope& getStatsScope() const { return context_.scope(); }
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   // Thread-local slot for storing the socket manager per worker thread.
@@ -375,7 +381,7 @@ public:
    * @param key the remote cluster ID/ node ID.
    * @return pair containing the connection socket and whether proxy protocol is expected.
    */
-  std::pair<Network::ConnectionSocketPtr, bool> getConnectionSocket(const std::string& key);
+  std::pair<Network::ConnectionSocketPtr, bool> getConnectionSocket(const std::string& node_id);
 
   /**
    * @return the number of reverse connections for the given cluster id.
@@ -462,6 +468,10 @@ public:
    * @return pointer to the upstream extension or nullptr if not available.
    */
   ReverseTunnelAcceptorExtension* getUpstreamExtension() const { return extension_; }
+
+
+  // Get node ID from key (cluster ID or node ID)
+  std::string getNodeID(const std::string& key);
 
 private:
   // Pointer to the thread local Dispatcher instance.

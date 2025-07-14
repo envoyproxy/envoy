@@ -1631,8 +1631,8 @@ Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocke
 
     // Create ReverseConnectionIOHandle with cluster manager from context and scope
     return std::make_unique<ReverseConnectionIOHandle>(
-      , config, context_->clusterManager(),
-                                                       *this, *scope_ptr);
+        sock_fd, config, context_->clusterManager(),
+        *this, *scope_ptr);
   }
 
   // Fall back to regular socket for non-stream or non-IP sockets

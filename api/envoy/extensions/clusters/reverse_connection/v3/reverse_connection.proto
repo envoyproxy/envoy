@@ -26,4 +26,8 @@ message RevConClusterConfig {
 
   // Time interval after which envoy attempts to clean the stale host entries.
   google.protobuf.Duration cleanup_interval = 2 [(validate.rules).duration = {gt {}}];
+
+  // Suffix expected in the host header when envoy acts as a L4 proxy and deduces
+  // the cluster from the host header.
+  string proxy_host_suffix = 3;
 } 

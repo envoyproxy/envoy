@@ -96,7 +96,7 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
                               const Envoy::Network::SocketCreationOptions& options) const {
   ENVOY_LOG(debug,
             "ReverseTunnelAcceptor::socket() called with address: {}. Finding socket for "
-            "cluster/node: {}",
+            "node: {}",
             addr->asString(), addr->logicalName());
 
   // For upstream reverse connections, we need to get the thread-local socket manager
@@ -105,17 +105,17 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
   if (tls_registry && tls_registry->socketManager()) {
     auto* socket_manager = tls_registry->socketManager();
 
-    // Get the cluster ID from the address's logical name
-    std::string cluster_id = addr->logicalName();
-    ENVOY_LOG(debug, "ReverseTunnelAcceptor: Using cluster ID from logicalName: {}", cluster_id);
+    // The address's logical name should already be the node ID
+    std::string node_id = addr->logicalName();
+    ENVOY_LOG(debug, "ReverseTunnelAcceptor: Using node_id from logicalName: {}", node_id);
 
-    // Try to get a cached socket for the specific cluster
-    auto [socket, expects_proxy_protocol] = socket_manager->getConnectionSocket(cluster_id);
+    // Try to get a cached socket for the specific node
+    auto [socket, expects_proxy_protocol] = socket_manager->getConnectionSocket(node_id);
     if (socket) {
-      ENVOY_LOG(info, "Reusing cached reverse connection socket for cluster: {}", cluster_id);
+      ENVOY_LOG(info, "Reusing cached reverse connection socket for node: {}", node_id);
       // Create IOHandle that properly owns the socket using RAII
       auto io_handle =
-          std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), cluster_id);
+          std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), node_id);
       return io_handle;
     }
   }
@@ -525,30 +525,18 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
 }
 
 std::pair<Network::ConnectionSocketPtr, bool>
-UpstreamSocketManager::getConnectionSocket(const std::string& key) {
+UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
 
-  ENVOY_LOG(debug, "UpstreamSocketManager: getConnectionSocket() called with key: {}", key);
-  // The key can be cluster_id or node_id. If any worker has a socket for the key, treat it as a
-  // cluster ID. Otherwise treat it as a node ID.
-  std::string node_id = key;
-  std::string actual_cluster_id = "";
+  ENVOY_LOG(debug, "UpstreamSocketManager: getConnectionSocket() called with node_id: {}", node_id);
 
-  // If we have sockets for this key as a cluster ID, treat it as a cluster
-  if (getNumberOfSocketsByCluster(key) > 0) {
-    actual_cluster_id = key;
-    auto cluster_nodes_it = cluster_to_node_map_.find(actual_cluster_id);
-    if (cluster_nodes_it != cluster_to_node_map_.end() && !cluster_nodes_it->second.empty()) {
-      // Pick a random node for the cluster
-      auto node_idx = random_generator_->random() % cluster_nodes_it->second.size();
-      node_id = cluster_nodes_it->second[node_idx];
-    } else {
-      ENVOY_LOG(debug, "UpstreamSocketManager: No nodes found for cluster: {}", actual_cluster_id);
-      return {nullptr, false};
-    }
+  if (node_to_cluster_map_.find(node_id) == node_to_cluster_map_.end()) {
+    ENVOY_LOG(error, "UpstreamSocketManager: cluster -> node mapping changed for node: {}", node_id);
+    return {nullptr, false};
   }
 
-  ENVOY_LOG(debug, "UpstreamSocketManager: Looking for socket with node: {} cluster: {}", node_id,
-            actual_cluster_id);
+  const std::string& cluster_id = node_to_cluster_map_[node_id];
+  
+  ENVOY_LOG(debug, "UpstreamSocketManager: Looking for socket with node: {} cluster: {}", node_id, cluster_id);
 
   // Find first available socket for the node
   auto node_sockets_it = accepted_reverse_connections_.find(node_id);
@@ -567,9 +555,8 @@ UpstreamSocketManager::getConnectionSocket(const std::string& key) {
 
   ENVOY_LOG(debug,
             "UpstreamSocketManager: Reverse conn socket with FD:{} connection key:{} found for "
-            "node: {} and "
-            "cluster: {}",
-            fd, remoteConnectionKey, node_id, actual_cluster_id);
+            "node: {} cluster: {}",
+            fd, remoteConnectionKey, node_id, cluster_id);
 
   fd_to_event_map_.erase(fd);
   fd_to_timer_map_.erase(fd);
@@ -581,8 +568,8 @@ UpstreamSocketManager::getConnectionSocket(const std::string& key) {
   node_stats->reverse_conn_cx_idle_.dec();
   node_stats->reverse_conn_cx_used_.inc();
 
-  if (!actual_cluster_id.empty()) {
-    USMStats* cluster_stats = this->getStatsByCluster(actual_cluster_id);
+  if (!cluster_id.empty()) {
+    USMStats* cluster_stats = this->getStatsByCluster(cluster_id);
     cluster_stats->reverse_conn_cx_idle_.dec();
     cluster_stats->reverse_conn_cx_used_.inc();
   }
@@ -665,6 +652,38 @@ absl::flat_hash_map<std::string, size_t> UpstreamSocketManager::getSocketCountMa
   ENVOY_LOG(debug, "UpstreamSocketManager::getSocketCountMap returning {} clusters",
             cluster_stats.size());
   return cluster_stats;
+}
+
+std::string UpstreamSocketManager::getNodeID(const std::string& key) {
+  ENVOY_LOG(debug, "UpstreamSocketManager: getNodeID() called with key: {}", key);
+  
+  // First check if the key exists as a cluster ID by checking global stats
+  // This ensures we check across all threads, not just the current thread
+  if (auto extension = getUpstreamExtension()) {
+    // Check if any thread has sockets for this cluster by looking at global stats
+    std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}", key);
+    auto& stats_store = extension->getStatsScope();
+    auto& cluster_gauge = stats_store.gaugeFromString(cluster_stat_name, Stats::Gauge::ImportMode::Accumulate);
+    
+    if (cluster_gauge.value() > 0) {
+      // Key is a cluster ID with active connections, find a node from this cluster
+      auto cluster_nodes_it = cluster_to_node_map_.find(key);
+      if (cluster_nodes_it != cluster_to_node_map_.end() && !cluster_nodes_it->second.empty()) {
+        // Return a random existing node from this cluster
+        auto node_idx = random_generator_->random() % cluster_nodes_it->second.size();
+        std::string node_id = cluster_nodes_it->second[node_idx];
+        ENVOY_LOG(debug, "UpstreamSocketManager: key '{}' is cluster ID with {} connections, returning random node: {}", 
+                  key, cluster_gauge.value(), node_id);
+        return node_id;
+      }
+      // If cluster has connections but no local mapping, assume key is a node ID
+    }
+  }
+  
+  // Key is not a cluster ID, has no connections, or has no local mapping
+  // Treat it as a node ID and return it directly
+  ENVOY_LOG(debug, "UpstreamSocketManager: key '{}' is node ID, returning as-is", key);
+  return key;
 }
 
 void UpstreamSocketManager::markSocketDead(const int fd) {

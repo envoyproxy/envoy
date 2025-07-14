@@ -417,12 +417,6 @@ private:
   // - Other Unix: pipe (fallback for compatibility)
   std::unique_ptr<TriggerMechanism> trigger_mechanism_;
 
-  // Track if trigger mechanism creation failed - prevents further reverse connection attempts
-  bool trigger_mechanism_failed_{false};
-  
-  // Guard against multiple cleanup calls
-  bool cleanup_in_progress_{false};
-
   // Connection management : We store the established connections in a queue
   // and pop the last established connection when data is read on trigger_pipe_read_fd_
   // to determine the connection that got established last.
