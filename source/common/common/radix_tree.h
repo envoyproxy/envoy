@@ -53,7 +53,7 @@ template <class Value> class RadixTree {
       RadixTreeNode& child = childIt->second;
 
       // Determine longest prefix of the search key on match
-      size_t cpl = common_prefix_length(search, child.prefix_);
+      size_t cpl = commonPrefixLength(search, child.prefix_);
       if (cpl == child.prefix_.size()) {
         // The search key is longer than the child prefix, continue down
         absl::string_view remaining_search = search.substr(cpl);
@@ -135,7 +135,7 @@ template <class Value> class RadixTree {
   /**
    * Find the longest common prefix between two strings
    */
-  static size_t common_prefix_length(absl::string_view a, absl::string_view b) {
+  static size_t commonPrefixLength(absl::string_view a, absl::string_view b) {
     size_t len = std::min(a.size(), b.size());
     for (size_t i = 0; i < len; i++) {
       if (a[i] != b[i]) {
@@ -148,7 +148,7 @@ template <class Value> class RadixTree {
   /**
    * Get a child node by character key
    */
-  Envoy::OptRef<const RadixTreeNode> get_child(const RadixTreeNode& node, uint8_t char_key) const {
+  Envoy::OptRef<const RadixTreeNode> getChild(const RadixTreeNode& node, uint8_t char_key) const {
     auto it = node.children_.find(char_key);
     if (it != node.children_.end()) {
       return {it->second};
@@ -225,7 +225,7 @@ public:
 
       // Look for an edge
       uint8_t firstChar = static_cast<uint8_t>(search[0]);
-      auto child = get_child(*node, firstChar);
+      auto child = getChild(*node, firstChar);
       if (!child) {
         break;
       }
@@ -271,7 +271,7 @@ public:
 
       // Look for an edge
       uint8_t firstChar = static_cast<uint8_t>(search[0]);
-      auto child = get_child(*node, firstChar);
+      auto child = getChild(*node, firstChar);
       if (!child) {
         break;
       }
