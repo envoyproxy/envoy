@@ -52,7 +52,7 @@ template <class Value> class RadixTree {
       // Get the child node
       RadixTreeNode& child = childIt->second;
 
-      // Determine longest prefix of the search key on match
+      // Determine longest prefix length of the search key on match
       size_t cpl = commonPrefixLength(search, child.prefix_);
       if (cpl == child.prefix_.size()) {
         // The search key is longer than the child prefix, continue down
