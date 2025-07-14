@@ -349,4 +349,9 @@ new_features:
     option for disabling connection level flow control for streams. This is useful in situations where the streams share the same
     connection but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
 
+- changes:
+- area: dns filter, redis proxy and prefix matcher map
+change:
+  - Using Radix Tree instead of Trie for performance improvements
+
 deprecated:
