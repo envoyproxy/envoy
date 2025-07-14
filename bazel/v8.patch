@@ -107,3 +107,16 @@ index c3768b8..d4a1dda 100755
 
  try:
 
+diff --git a/BUILD.bazel b/BUILD.bazel
+index 54be2b945d4..1c6ab4464a3 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4370,7 +4370,7 @@ v8_library(
+         ":noicu/generated_torque_definitions",
+     ],
+     deps = [
+-        "//third_party/fast_float/src:fast_float",
++        "@fast_float",
+         ":lib_fp16",
+         ":simdutf",
+         ":v8_libbase",

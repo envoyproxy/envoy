@@ -1202,6 +1202,20 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2024-10-25",
         cpe = "N/A",
     ),
+    fast_float = dict(
+        project_name = "Fast_Float",
+        project_desc = "Efficient and performance-portable vector software",
+        project_url = "https://github.com/google/fast_float",
+        # Same version as used by V8
+        version = "7.0.0",
+        sha256 = "d2a08e722f461fe699ba61392cd29e6b23be013d0f56e50c7786d0954bffcb17",
+        urls = ["https://github.com/fastfloat/fast_float/archive/refs/tags/v{version}.tar.gz"],
+        strip_prefix = "fast_float-{version}",
+        use_category = ["dataplane_ext"],
+        extensions = ["envoy.wasm.runtime.v8"],
+        release_date = "2024-10-25",
+        cpe = "N/A",
+    ),
     com_googlesource_chromium_base_trace_event_common = dict(
         project_name = "Chromium's trace event headers",
         project_desc = "Chromium's trace event headers",

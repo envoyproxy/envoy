@@ -230,8 +230,6 @@ def envoy_dependencies(skip_targets = []):
 
     # v8 + deps
     _v8()
-    _highway()
-
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -369,9 +367,6 @@ def _com_github_google_benchmark():
         name = "libpfm",
         build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
     )
-
-def _highway():
-    external_http_archive(name = "highway")
 
 def _com_github_google_libprotobuf_mutator():
     external_http_archive(
@@ -722,8 +717,11 @@ def _v8():
         patch_args = ["-p1"],
         repo_mapping = {
             "@abseil-cpp": "@com_google_absl",
+            "@icu": "@com_github_unicode_org_icu",
         },
     )
+    external_http_archive(name = "highway")
+    external_http_archive(name = "fast_float")
 
     # Needed by proxy_wasm_cpp_host.
     native.bind(
