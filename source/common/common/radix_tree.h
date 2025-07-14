@@ -234,12 +234,12 @@ public:
       node = &child_node;
 
       // Consume the search prefix
-      if (search.size() < child.prefix_.size() ||
-          search.substr(0, child.prefix_.size()) != child.prefix) {
+      if (search.size() < child->prefix_.size() ||
+          search.substr(0, child->prefix_.size()) != child->prefix_) {
         break;
       }
       // Consume the search prefix
-      search = search.substr(child.prefix_.size());
+      search = search.substr(child->prefix_.size());
     }
 
     return result;
@@ -280,12 +280,12 @@ public:
       node = &child_node;
 
       // Consume the search prefix
-      if (search.size() < child.prefix_.size() ||
-          search.substr(0, child.prefix_.size()) != child.prefix) {
+      if (search.size() < child->prefix_.size() ||
+          search.substr(0, child->prefix_.size()) != child->prefix_) {
         break;
       }
       // Consume the search prefix
-      search = search.substr(child.prefix_.size());
+      search = search.substr(child->prefix_.size());
     }
 
     // Return the value from the last node that had a value, or empty value if none found
