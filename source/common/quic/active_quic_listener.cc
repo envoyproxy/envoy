@@ -300,9 +300,15 @@ ActiveQuicListenerFactory::ActiveQuicListenerFactory(
   } else {
     crypto_stream_config = config.crypto_stream_config();
   }
+
   crypto_server_stream_factory_ =
       Config::Utility::getAndCheckFactory<EnvoyQuicCryptoServerStreamFactoryInterface>(
           crypto_stream_config);
+
+  // Configure the factory with QUIC config for fingerprinting support.
+  if (crypto_server_stream_factory_.has_value()) {
+    crypto_server_stream_factory_.value().get().setQuicConfig(config);
+  }
 
   // Initialize proof source factory.
   envoy::config::core::v3::TypedExtensionConfig proof_source_config;
