@@ -161,6 +161,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
 // TODO(botengyao): flip to true after canarying the feature internally without problems.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_manager);
+// TODO(adisuissa): flip to true after all xDS types use the new subscription
+// method, and this is tested extensively.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
