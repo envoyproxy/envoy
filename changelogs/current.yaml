@@ -368,7 +368,7 @@ new_features:
 - area: dfp
   change: |
     Added :ref:`allow_dynamic_host_from_filter_state
-    <envoy_v3_api_field_config.core.v3.Http3ProtocolOptions.disable_connection_flow_control_for_streams>`, an experimental
+    <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
     flag to HTTP Dynamic Forward Proxy filter. When enabled, the filter will check for ``envoy.upstream.dynamic_host`` and
     ``envoy.upstream.dynamic_port`` filter state values before using the HTTP Host header, providing consistency with SNI
     and UDP DFP filters. When disabled (default), maintains backward compatibility by using the HTTP Host header directly.
