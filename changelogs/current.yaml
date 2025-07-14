@@ -350,6 +350,6 @@ new_features:
     connection but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
 - area: dns_filter, redis_proxy and prefix_matcher_map
   change: |
-    Using Radix Tree instead of Trie for performance improvements
+    Using Radix Tree instead of Trie for performance improvements.
 
 deprecated:
