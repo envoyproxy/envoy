@@ -159,7 +159,6 @@ def envoy_dependencies(skip_targets = []):
     _com_github_fmtlib_fmt()
     _com_github_gabime_spdlog()
     _com_github_google_benchmark()
-    _com_github_google_highway()
     _com_github_google_jwt_verify()
     _com_github_google_libprotobuf_mutator()
     _com_github_google_libsxg()
@@ -186,7 +185,6 @@ def envoy_dependencies(skip_targets = []):
     _com_google_googletest()
     _com_google_protobuf()
     _com_github_envoyproxy_sqlparser()
-    _v8()
     _com_googlesource_chromium_base_trace_event_common()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
@@ -229,6 +227,11 @@ def envoy_dependencies(skip_targets = []):
     )
 
     _com_github_fdio_vpp_vcl()
+
+    # v8 + deps
+    _v8()
+    _highway()
+
 
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
@@ -367,10 +370,8 @@ def _com_github_google_benchmark():
         build_file = "@com_github_google_benchmark//tools:libpfm.BUILD.bazel",
     )
 
-def _com_github_google_highway():
-    external_http_archive(
-        name = "com_github_google_highway",
-    )
+def _highway():
+    external_http_archive(name = "highway")
 
 def _com_github_google_libprotobuf_mutator():
     external_http_archive(
@@ -721,7 +722,6 @@ def _v8():
         patch_args = ["-p1"],
         repo_mapping = {
             "@abseil-cpp": "@com_google_absl",
-            "@highway": "@com_github_google_highway",
         },
     )
 

@@ -1189,13 +1189,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2025-04-22",
         cpe = "cpe:2.3:a:google:v8:*",
     ),
-    com_github_google_highway = dict(
+    highway = dict(
         project_name = "Highway",
         project_desc = "Efficient and performance-portable vector software",
         project_url = "https://github.com/google/highway",
         # Same version as used by V8
-        version = "00fe003dac355b979f36157f9407c7c46448958e",
-        sha256 = "7ef3f89053f50f88d4603670bb9a915d252bd93314ced691ddf5913edbc4e75b",
+        version = "1.2.0",
+        sha256 = "7ef3f39053f50f88d4603670bb9a915d252bd93314ced691ddf5913edbc4e75b",
         urls = ["https://github.com/google/highway/archive/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
