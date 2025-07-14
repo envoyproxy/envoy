@@ -436,7 +436,7 @@ int FilterStateWrapper::luaGet(lua_State* state) {
   if (string_value.has_value()) {
     const std::string& value = string_value.value();
 
-    // Return the filter state value as a string
+    // Return the filter state value as a string.
     lua_pushlstring(state, value.data(), value.size());
     return 1;
   }
