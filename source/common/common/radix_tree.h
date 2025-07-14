@@ -235,7 +235,7 @@ public:
 
       // Consume the search prefix
       if (search.size() < child.prefix_.size() ||
-          search.substr(0, child.prefix_.size()) == child.prefix) {
+          search.substr(0, child.prefix_.size()) != child.prefix) {
         break;
       }
       // Consume the search prefix
@@ -281,7 +281,7 @@ public:
 
       // Consume the search prefix
       if (search.size() < child.prefix_.size() ||
-          search.substr(0, child.prefix_.size()) == child.prefix) {
+          search.substr(0, child.prefix_.size()) != child.prefix) {
         break;
       }
       // Consume the search prefix
