@@ -92,7 +92,7 @@ template <class Value> class RadixTree {
      * @param result the value to return if found.
      * @return true if the key was found, false otherwise.
      */
-    bool find_recursive(absl::string_view search, Value& result) const {
+    bool findRecursive(absl::string_view search, Value& result) const {
       if (search.empty()) {
         if (has_value(*this)) {
           result = value_;
@@ -113,7 +113,7 @@ template <class Value> class RadixTree {
       if (search.size() >= child.prefix_.size() &&
           search.substr(0, child.prefix_.size()) == child.prefix_) {
         absl::string_view new_search = search.substr(child.prefix_.size());
-        return child.find_recursive(new_search, result);
+        return child.findRecursive(new_search, result);
       }
 
       return false;
@@ -168,7 +168,7 @@ public:
   bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
     // Check if the key already exists
     Value existing;
-    bool found = root_.find_recursive(key, existing);
+    bool found = root_.findRecursive(key, existing);
 
     // If a value exists and we shouldn't overwrite, return false
     if (found && !overwrite_existing) {
@@ -187,7 +187,7 @@ public:
    */
   Value find(absl::string_view key) const {
     Value result;
-    if (root_.find_recursive(key, result)) {
+    if (root_.findRecursive(key, result)) {
       return result;
     }
     return Value{};
