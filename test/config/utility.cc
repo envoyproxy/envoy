@@ -342,29 +342,6 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::defaultSquashFilter() {
-  return R"EOF(
-name: squash
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.squash.v3.Squash
-  cluster: squash
-  attachment_template:
-    spec:
-      attachment:
-        env: "{{ SQUASH_ENV_TEST }}"
-      match_request: true
-  attachment_timeout:
-    seconds: 1
-    nanos: 0
-  attachment_poll_period:
-    seconds: 2
-    nanos: 0
-  request_timeout:
-    seconds: 1
-    nanos: 0
-)EOF";
-}
-
 std::string ConfigHelper::clustersNoListenerBootstrap(const std::string& api_type) {
   return fmt::format(
       R"EOF(

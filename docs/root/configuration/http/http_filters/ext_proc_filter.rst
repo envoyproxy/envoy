@@ -55,3 +55,70 @@ The following statistics are supported:
   clear_route_cache_disabled, Counter, The number of clear cache requests that were rejected from being disabled
   clear_route_cache_upstream_ignored, Counter, The number of clear cache request that were ignored if the filter is in upstream
   send_immediate_resp_upstream_ignored, Counter, The number of send immediate response messages that were ignored if the filter is in upstream
+
+Access Log Fields
+------------------
+
+The external processing filter exposes processing statistics and metadata for use in access logs
+through the filter state object named ``envoy.filters.http.ext_proc``. This information includes
+gRPC call latencies, status codes, and byte counts that can be used for monitoring and debugging
+external processor performance.
+
+The filter state supports three serialization modes:
+
+* **PLAIN**: Comma-separated ``key:value`` pairs in abbreviated format.
+* **TYPED**: JSON object with descriptive field names.
+* **FIELD**: Individual field access by name.
+
+Available field names:
+
+.. csv-table::
+  :header: Field Name, Type, Description
+  :widths: 2, 1, 3
+
+  request_header_latency_us, Integer, Latency in microseconds for request header processing
+  request_header_call_status, Integer, gRPC status code for request header call
+  request_body_call_count, Integer, Number of request body chunks processed
+  request_body_total_latency_us, Integer, Total latency for all request body calls in microseconds
+  request_body_max_latency_us, Integer, Maximum latency among request body calls in microseconds
+  request_body_last_call_status, Integer, gRPC status of the last request body call
+  request_trailer_latency_us, Integer, Latency for request trailer processing in microseconds
+  request_trailer_call_status, Integer, gRPC status code for request trailer call
+  response_header_latency_us, Integer, Latency for response header processing in microseconds
+  response_header_call_status, Integer, gRPC status code for response header call
+  response_body_call_count, Integer, Number of response body chunks processed
+  response_body_total_latency_us, Integer, Total latency for all response body calls in microseconds
+  response_body_max_latency_us, Integer, Maximum latency among response body calls in microseconds
+  response_body_last_call_status, Integer, gRPC status of the last response body call
+  response_trailer_latency_us, Integer, Latency for response trailer processing in microseconds
+  response_trailer_call_status, Integer, gRPC status code for response trailer call
+  bytes_sent, Integer, Total bytes sent to external processor (Envoy gRPC only)
+  bytes_received, Integer, Total bytes received from external processor (Envoy gRPC only)
+
+Example usage in access log configuration:
+
+.. code-block:: yaml
+
+  access_log:
+    - name: envoy.access_loggers.stdout
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog
+        log_format:
+          json_format:
+            # Individual field access
+            ext_proc_header_latency: "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_latency_us)%"
+            ext_proc_body_calls: "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_body_call_count)%"
+            # Full structured data
+            ext_proc_all_stats: "%FILTER_STATE(envoy.filters.http.ext_proc:TYPED)%"
+            # Compact format
+            ext_proc_summary: "%FILTER_STATE(envoy.filters.http.ext_proc:PLAIN)%"
+
+.. note::
+
+  The ``bytes_sent`` and ``bytes_received`` fields are only populated when using Envoy gRPC client type.
+  For Google gRPC client type, these fields will be 0.
+
+.. note::
+
+  gRPC status codes follow the standard `gRPC status codes <https://grpc.github.io/grpc/core/md_doc_statuscodes.html>`_:
+  0 = OK, 1 = CANCELLED, 2 = UNKNOWN, 3 = INVALID_ARGUMENT, 4 = DEADLINE_EXCEEDED, etc.

@@ -184,6 +184,17 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
   return absl::OkStatus();
 }
 
+void XdsManagerImpl::startXdstpAdsMuxes() {
+  // Start the ADS mux objects that were defined in `config_sources`.
+  for (AuthorityData& authority : authorities_) {
+    authority.grpc_mux_->start();
+  }
+  // Start the ADS mux of the `default_config_source`, if defined.
+  if (default_authority_ != nullptr) {
+    default_authority_->grpc_mux_->start();
+  }
+}
+
 absl::StatusOr<SubscriptionPtr> XdsManagerImpl::subscribeToSingletonResource(
     absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
     absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
