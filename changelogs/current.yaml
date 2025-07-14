@@ -101,6 +101,9 @@ minor_behavior_changes:
   change: |
     Now the ``METADATA`` and ``CEL`` substitution formatters could access or log the metadata of
     virtual host in case the route is not matched but the virtual host is found.
+- area: oauth2
+  change: |
+    Extension status changed from ``alpha`` to ``stable``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -125,10 +128,22 @@ bug_fixes:
   change: |
     Fixed an bug where the config validation server will crash when the configuration contains
     ``%CEL%`` or ``%METADATA%`` substitution formatter.
+- area: tls
+  change: |
+    Fixed an issue with incorrectly cached connection properties on TLS connections.
+    If TLS connection data was queried before it was available, an empty value was being incorrectly cached, preventing later calls from
+    getting the correct value. This could be triggered with a ``tcp_proxy`` access log configured to emit a log upon connection
+    establishment if the log contains fields of the the TLS peer certificate. Then a later use of the data, such as the network RBAC
+    filter validating a peer certificate SAN, may incorrectly fail due to the empty cached value.
 - area: quic
   change: |
     Fixes a bug in Envoy's HTTP/3-to-HTTP/1 proxying when a ``transfer-encoding`` header is incorrectly appended.
     Protected by runtime guard ``envoy.reloadable_features.quic_signal_headers_only_to_http1_backend``.
+- area: runtime
+  change: |
+    Fixed a bug which resulted in an ENVOY_BUG being incorrectly triggered when runtime settings
+    ``envoy.reloadable_features.max_request_headers_count``, ``envoy.reloadable_features.max_response_headers_count``,
+    ``envoy.reloadable_features.max_request_headers_size_kb``, or ``envoy.reloadable_features.max_response_headers_size_kb`` were set.
 - area: tls
   change: |
     Fixes a bug where empty trusted CA file or inline string is accepted and causes Envoy to successfully validate any certificate
@@ -348,6 +363,13 @@ new_features:
     Added envoy_v3_api_field_extensions.upstreams.http.v3.Http3ProtocolOptions.disable_connection_flow_control_for_streams, an experimental
     option for disabling connection level flow control for streams. This is useful in situations where the streams share the same
     connection but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
+- area: dfp
+  change: |
+    Added :ref:`allow_dynamic_host_from_filter_state
+    <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
+    flag to HTTP Dynamic Forward Proxy filter. When enabled, the filter will check for ``envoy.upstream.dynamic_host`` and
+    ``envoy.upstream.dynamic_port`` filter state values before using the HTTP Host header, providing consistency with SNI
+    and UDP DFP filters. When disabled (default), maintains backward compatibility by using the HTTP Host header directly.
 - area: alts
   change: |
     Added environment variable-protected gRPC keepalive params to the ALTS handshaker client.
