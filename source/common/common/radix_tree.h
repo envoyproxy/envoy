@@ -118,6 +118,17 @@ template <class Value> class RadixTree {
 
       return false;
     }
+
+    /**
+     * Get a child node by character key
+     */
+    Envoy::OptRef<const RadixTreeNode> getChild(uint8_t char_key) const {
+      auto it = children_.find(char_key);
+      if (it != children_.end()) {
+        return {it->second};
+      }
+      return {};
+    }
   };
 
   /**
@@ -143,17 +154,6 @@ template <class Value> class RadixTree {
       }
     }
     return len;
-  }
-
-  /**
-   * Get a child node by character key
-   */
-  Envoy::OptRef<const RadixTreeNode> getChild(const RadixTreeNode& node, uint8_t char_key) const {
-    auto it = node.children_.find(char_key);
-    if (it != node.children_.end()) {
-      return {it->second};
-    }
-    return {};
   }
 
 public:
@@ -225,7 +225,7 @@ public:
 
       // Look for an edge
       uint8_t firstChar = static_cast<uint8_t>(search[0]);
-      auto child = getChild(*node, firstChar);
+      auto child = node->getChild(firstChar);
       if (!child) {
         break;
       }
@@ -271,7 +271,7 @@ public:
 
       // Look for an edge
       uint8_t firstChar = static_cast<uint8_t>(search[0]);
-      auto child = getChild(*node, firstChar);
+      auto child = node->getChild(firstChar);
       if (!child) {
         break;
       }
