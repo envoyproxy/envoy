@@ -21,6 +21,49 @@ The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You ca
 configuration options at
 :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
 
+.. _config_http_filters_ext_authz_security_considerations:
+
+Security Considerations
+-----------------------
+
+.. attention::
+
+   **Route Cache Clearing Risk**: When using per-route ExtAuthZ configuration, subsequent filters
+   in the filter chain may clear the route cache, potentially leading to privilege escalation
+   vulnerabilities where requests bypass authorization checks.
+
+   For more information about this security risk, including affected filters and general
+   mitigation strategies, see :ref:`Filter route mutation security considerations
+   <arch_overview_http_filters_route_mutation>`.
+
+   **ExtAuthZ-Specific Considerations**: The security risk is particularly important for ExtAuthZ
+   because it often handles authentication and authorization decisions that directly impact access
+   control. When route cache is cleared after ExtAuthZ has run, a request may be re-routed to
+   endpoints with different authorization requirements, bypassing those checks entirely.
+
+   **Example Vulnerable Configuration**:
+
+   .. code-block:: yaml
+
+      http_filters:
+      - name: envoy.filters.http.ext_authz
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+          # ... ext_authz config ...
+      - name: envoy.filters.http.lua
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+          inline_code: |
+            function envoy_on_request(request_handle)
+              -- This clears route cache after ext_authz has run
+              request_handle:clearRouteCache()
+              -- Request may now match a different route with different auth requirements
+            end
+
+   In this example, if the initial route had ExtAuthZ disabled but a subsequent route match
+   (after cache clearing) requires authorization, the request will bypass the authorization
+   check entirely.
+
 Configuration Examples
 ----------------------
 
@@ -93,62 +136,6 @@ Per-Route Configuration
 
 A sample virtual host and route filter configuration.
 In this example we add additional context on the virtual host, and disabled the filter for ``/static`` prefixed routes.
-
-.. _config_http_filters_ext_authz_security_considerations:
-
-Security Considerations
------------------------
-
-.. attention::
-
-   **Route Cache Clearing Risk**: When using per-route ExtAuthZ configuration, be aware that
-   subsequent filters in the filter chain may clear the route cache, potentially leading to
-   privilege escalation vulnerabilities.
-
-   **The Problem**: If a request initially matches Route A with certain ExtAuthZ settings,
-   gets authorized, but then a subsequent filter clears the route cache causing the request
-   to match Route B with different ExtAuthZ requirements, the request will bypass Route B's
-   authorization since ExtAuthZ has already executed.
-
-   **Filters That Can Clear Route Cache**:
-
-   * :ref:`Lua filter <config_http_filters_lua>` - via ``clearRouteCache()`` method.
-   * :ref:`ext_proc filter <config_http_filters_ext_proc>` - when configured with ``CLEAR`` route cache action or when response contains ``clear_route_cache`` directive.
-   * :ref:`Golang filter <config_http_filters_golang>` - via ``clearRouteCache()`` API.
-   * :ref:`Language filter <config_http_filters_language>` - when ``clear_route_cache`` is enabled.
-   * :ref:`JSON to metadata filter <config_http_filters_json_to_metadata>` - when ``clear_route_cache`` is enabled.
-   * :ref:`IP tagging filter <config_http_filters_ip_tagging>` - when sanitizing headers.
-   * Custom filters that call ``clearRouteCache()`` on the decoder callbacks.
-
-   **Mitigation Strategies**:
-
-   * Carefully review the order of filters in your HTTP filter chain when using per-route ExtAuthZ filter.
-   * Avoid placing filters that clear route cache after ExtAuthZ filter unless absolutely necessary.
-   * Consider using a single ExtAuthZ configuration at the HTTP connection manager level instead of per-route configs whenever possible.
-   * If route cache clearing is required, consider re-running authorization checks or using alternative authorization mechanisms.
-
-   **Example Vulnerable Configuration**:
-
-   .. code-block:: yaml
-
-      http_filters:
-      - name: envoy.filters.http.ext_authz
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-          # ... ext_authz config ...
-      - name: envoy.filters.http.lua
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-          inline_code: |
-            function envoy_on_request(request_handle)
-              -- This clears route cache after ext_authz has run
-              request_handle:clearRouteCache()
-              -- Request may now match a different route with different auth requirements
-            end
-
-   In this example, if the initial route had ExtAuthZ disabled but a subsequent route match
-   (after cache clearing) requires authorization, the request will bypass the authorization
-   check entirely.
 
 Statistics
 ----------
