@@ -361,6 +361,7 @@ void NetworkExtProcFilter::onGrpcClose() {
 void NetworkExtProcFilter::closeStream() {
   if (timeout_manager_) {
     timeout_manager_->stopAllTimers();
+    timeout_manager_.reset();
   }
 
   // Clear pending flags

@@ -949,7 +949,8 @@ TEST_F(NetworkExtProcFilterTest, WriteMessageTimeout) {
   EXPECT_CALL(write_callbacks_, disableClose(false)).Times(2);
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
   EXPECT_CALL(connection_,
-              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"))
+      .WillOnce([]() {});
 
   filter_->handleMessageTimeout(false);
 
@@ -997,7 +998,8 @@ TEST_F(NetworkExtProcFilterTest, TimeoutWithBothOperationsPending) {
   EXPECT_CALL(write_callbacks_, disableClose(false)).Times(2);
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
   EXPECT_CALL(connection_,
-              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
+              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"))
+      .WillOnce([]() {});
 
   filter_->handleMessageTimeout(true); // Timeout on read, but should clean up both
 
@@ -1083,7 +1085,8 @@ TEST_F(NetworkExtProcFilterTest, TimeoutCleanupOnGrpcError) {
   // Simulate gRPC error - should stop timer and clean up
   EXPECT_CALL(read_callbacks_, disableClose(false)); // Expect re-enable before close
   EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite, "ext_proc_grpc_error"));
+  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::FlushWrite, "ext_proc_grpc_error"))
+      .WillOnce([]() {});
 
   filter_->onGrpcError(Grpc::Status::Internal, "test error");
 
