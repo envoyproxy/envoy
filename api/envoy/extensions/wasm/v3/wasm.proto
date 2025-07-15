@@ -6,6 +6,7 @@ import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
@@ -148,7 +149,7 @@ message EnvironmentVariables {
 }
 
 // Base Configuration for Wasm Plugins e.g. filters and services.
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message PluginConfig {
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
   // multiple filters/services are handled by the same ``vm_id`` and ``root_id`` and for
@@ -192,6 +193,10 @@ message PluginConfig {
 
   // Configuration for restricting Proxy-Wasm capabilities available to modules.
   CapabilityRestrictionConfig capability_restriction_config = 6;
+
+  // Whether or not to allow plugin onRequestHeaders and onResponseHeaders callbacks to return
+  // FilterHeadersStatus::StopIteration.
+  google.protobuf.BoolValue allow_on_headers_stop_iteration = 9;
 }
 
 // WasmService is configured as a built-in ``envoy.wasm_service`` :ref:`WasmService
