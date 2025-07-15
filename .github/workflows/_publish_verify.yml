@@ -106,8 +106,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - name: examples
-          target: verify_distroless
+        - name: distroless
+          target: verify-distroless
           downloads: |
             docker: build_images
           rbe: false
