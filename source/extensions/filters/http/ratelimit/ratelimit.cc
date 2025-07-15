@@ -56,12 +56,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   std::vector<Envoy::RateLimit::Descriptor> descriptors;
-  if (config_.get()->hasRateLimitConfigs()) {
-    cluster_ = callbacks_->clusterInfo();
-    config_.get()->populateDescriptors(headers, callbacks_->streamInfo(), descriptors);
-  } else {
-    populateRateLimitDescriptors(descriptors, headers, false);
-  }
+  populateRateLimitDescriptors(descriptors, headers, false);
   if (!descriptors.empty()) {
     state_ = State::Calling;
     initiating_call_ = true;
@@ -98,6 +93,12 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   if (route_config_ != nullptr && route_config_->hasRateLimitConfigs()) {
     route_config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors,
                                        on_stream_done);
+    return;
+  }
+
+  // Rate Limit config in typed_per_filter_config takes precedence over route's rate limit.
+  if (config_.get()->hasRateLimitConfigs()) {
+    config_.get()->populateDescriptors(headers, callbacks_->streamInfo(), descriptors);
     return;
   }
 
