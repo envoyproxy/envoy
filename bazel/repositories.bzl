@@ -710,10 +710,37 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
-            "@envoy//bazel:v8_include.patch",
             "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+            "@icu": "@com_github_unicode_org_icu",
+        },
+    )
+    external_http_archive(
+        name = "highway",
+        build_file = "@envoy//bazel/external:highway.BUILD",
+    )
+    external_http_archive(
+        name = "fast_float",
+        build_file = "@envoy//bazel/external:fast_float.BUILD",
+    )
+    external_http_archive(
+        name = "fp16",
+        build_file = "@envoy//bazel/external:fp16.BUILD",
+    )
+    external_http_archive(
+        name = "simdutf",
+        build_file = "@envoy//bazel/external:simdutf.BUILD",
+    )
+    external_http_archive(
+        name = "intel_ittapi",
+        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
+    )
+    external_http_archive(
+        name = "simdutf",
+        build_file = "@envoy//bazel/external:simdutf.BUILD",
     )
 
     # Needed by proxy_wasm_cpp_host.
