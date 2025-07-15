@@ -205,7 +205,7 @@ public:
 
   // Store a callback if credentials are pending from a credential provider, to be called when
   // credentials are available
-  bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
+  virtual bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
 
   // Loop through all credential providers in a chain and return credentials from the first one that
   // has credentials available

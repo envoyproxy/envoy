@@ -15,6 +15,7 @@ using testing::_;
 using testing::Eq;
 using testing::NiceMock;
 using testing::Return;
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -157,7 +158,6 @@ public:
 };
 
 TEST_F(AssumeRoleCredentialsProviderTest, FailedFetchingDocument) {
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
   // Setup timer.
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
@@ -368,7 +368,6 @@ TEST_F(AssumeRoleCredentialsProviderTest, CredentialsWithWrongFormat) {
 
 TEST_F(AssumeRoleCredentialsProviderTest, ExpiredTokenException) {
   // Setup timer.
-  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   expectDocument(400, std::move(R"EOF(
 {
@@ -817,6 +816,48 @@ TEST_F(AssumeRoleCredentialsProviderTest, MetadataFetcherCreateAndCancel) {
 
   const auto credentials = provider_->getCredentials();
   EXPECT_TRUE(credentials.accessKeyId().has_value());
+}
+
+TEST_F(AssumeRoleCredentialsProviderTest, CredentialsPendingReturn) {
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+
+  ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider cred_provider = {};
+  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+  cred_provider.set_role_session_name("role-session-name");
+
+  mock_manager_ = std::make_shared<MockAwsClusterManager>();
+  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_))
+      .WillRepeatedly(Return("sts.region.amazonaws.com:443"));
+
+  auto cluster_name = "credentials_provider_cluster";
+  auto credentials_provider_chain = std::make_shared<MockCredentialsProviderChain>();
+
+  // Set up mock chain to return true (credentials pending)
+  EXPECT_CALL(*credentials_provider_chain, addCallbackIfChainCredentialsPending(_))
+      .WillRepeatedly(Return(true));
+
+  auto signer = std::make_unique<SigV4SignerImpl>(
+      STS_SERVICE_NAME, "region", credentials_provider_chain, context_,
+      Extensions::Common::Aws::AwsSigningHeaderExclusionVector{});
+
+  provider_ = std::make_shared<AssumeRoleCredentialsProvider>(
+      context_, mock_manager_, cluster_name,
+      [this](Upstream::ClusterManager&, absl::string_view) {
+        metadata_fetcher_.reset(raw_metadata_fetcher_);
+        return std::move(metadata_fetcher_);
+      },
+      "region", MetadataFetcher::MetadataReceiver::RefreshState::Ready, std::chrono::seconds(2),
+      std::move(signer), cred_provider);
+
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+
+  const auto credentials = provider_->getCredentials();
+  EXPECT_FALSE(credentials.accessKeyId().has_value());
 }
 
 } // namespace Aws
