@@ -47,13 +47,6 @@ void MessageTimeoutManager::stopAllTimers() {
 
 void MessageTimeoutManager::onTimeout(bool is_read) {
   ENVOY_LOG(warn, "{} message timeout occurred", is_read ? "Read" : "Write");
-
-  if (is_read) {
-    read_timer_active_ = false;
-  } else {
-    write_timer_active_ = false;
-  }
-
   filter_.handleMessageTimeout(is_read);
 }
 

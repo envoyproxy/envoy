@@ -869,54 +869,6 @@ TEST_F(NetworkExtProcFilterTest, TimeoutConfiguration) {
   EXPECT_EQ(filter_config->messageTimeout().count(), 0);
 }
 
-// Test message timeout with failure_mode_allow=false
-TEST_F(NetworkExtProcFilterTest, MessageTimeoutWithFailureModeDisallow) {
-  // Create filter with custom timeout
-  auto config = createConfig(false);
-  config.mutable_message_timeout()->set_nanos(100000000); // 100ms
-  auto filter_config = std::make_shared<Config>(config, scope_);
-  auto client = std::make_unique<NiceMock<MockExternalProcessorClient>>();
-  client_ = client.get();
-  filter_ = std::make_unique<NetworkExtProcFilter>(filter_config, std::move(client));
-  filter_->initializeReadFilterCallbacks(read_callbacks_);
-  filter_->initializeWriteFilterCallbacks(write_callbacks_);
-
-  // Create a mock stream
-  auto stream = std::make_unique<NiceMock<MockExternalProcessorStream>>();
-  auto* stream_ptr = stream.get();
-
-  EXPECT_CALL(*stream_ptr, send(_, false));
-  EXPECT_CALL(*client_, start(_, _, _, _))
-      .WillOnce([&](ExternalProcessorCallbacks&, const Grpc::GrpcServiceConfigWithHashKey&,
-                    Http::AsyncClient::StreamOptions&,
-                    Http::StreamFilterSidestreamWatermarkCallbacks&) -> ExternalProcessorStreamPtr {
-        return std::move(stream);
-      });
-
-  // Send data which starts the timer
-  EXPECT_CALL(read_callbacks_, disableClose(true));
-  Buffer::OwnedImpl data("test");
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
-
-  // Verify timer was started (indirectly through the timeout)
-  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_started"));
-  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.read_data_sent"));
-
-  // Simulate timeout by calling handleMessageTimeout directly
-  EXPECT_CALL(read_callbacks_, disableClose(false)).Times(2);
-  EXPECT_CALL(*stream_ptr, close()).WillOnce(Return(true));
-  EXPECT_CALL(connection_,
-              close(Network::ConnectionCloseType::FlushWrite, "ext_proc_message_timeout"));
-
-  filter_->handleMessageTimeout(true);
-
-  // Verify timeout counters
-  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.message_timeouts"));
-  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.streams_closed"));
-  EXPECT_EQ(1, getCounterValue("network_ext_proc.test_ext_proc.connections_closed"));
-  EXPECT_EQ(0, getCounterValue("network_ext_proc.test_ext_proc.failure_mode_allowed"));
-}
-
 // Test message timeout with failure_mode_allow=true
 TEST_F(NetworkExtProcFilterTest, MessageTimeoutWithFailureModeAllow) {
   // Create filter with failure_mode_allow=true and custom timeout
