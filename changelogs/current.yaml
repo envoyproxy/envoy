@@ -375,5 +375,11 @@ new_features:
 - area: alts
   change: |
     Added environment variable-protected gRPC keepalive params to the ALTS handshaker client.
+- area: lua
+  change: |
+    Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
+    This allows Lua scripts to retrieve string, boolean, and numeric values stored by various filters for use in routing decisions,
+    header modifications, and other processing logic. See :ref:`Filter State API <config_http_filters_lua_stream_info_filter_state_wrapper>`
+    for more details.
 
 deprecated:

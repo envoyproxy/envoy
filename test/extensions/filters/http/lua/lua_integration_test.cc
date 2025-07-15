@@ -2026,6 +2026,63 @@ typed_config:
   cleanup();
 }
 
+// Test ``filterState()`` functionality with simple string values.
+TEST_P(LuaIntegrationTest, FilterStateBasic) {
+  const std::string FILTER_AND_CODE = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local stream_info = request_handle:streamInfo()
+
+        -- Test filterState() function with non-existent key
+        local missing_state = stream_info:filterState():get("nonexistent_key")
+        if missing_state == nil then
+          request_handle:headers():add("missing_state", "nil")
+        else
+          request_handle:headers():add("missing_state", "unexpected")
+        end
+
+        -- Test with another non-existent key
+        local another_missing = stream_info:filterState():get("another_missing")
+        if another_missing == nil then
+          request_handle:headers():add("another_missing", "nil")
+        else
+          request_handle:headers():add("another_missing", "unexpected")
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify both calls return nil as expected for non-existent keys.
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("missing_state"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("another_missing"))[0]
+                       ->value()
+                       .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
 #ifdef NDEBUG
 // This test is only run in release mode because in debug mode,
 // the code reaches ENVOY_BUG() which triggers a forced abort
