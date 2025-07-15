@@ -513,4 +513,14 @@ message CheckSettings {
   // :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>`
   // may be specified.
   BufferSettings with_request_body = 3;
+
+  // Set a different gRPC service for this route than the default.
+  // This allows different routes to use different external authorization service backends.
+  //
+  // .. note::
+  //
+  //   This setting is only applied to a filter configured with a
+  //   :ref:`grpc_service<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
+  //   If the filter is configured with an ``http_service``, this field is ignored.
+  config.core.v3.GrpcService grpc_service = 4;
 }
