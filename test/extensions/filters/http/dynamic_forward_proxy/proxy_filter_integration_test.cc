@@ -104,11 +104,14 @@ public:
 
   void initialize() override { initializeWithArgs(); }
 
-  void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
-                          const std::string& override_auto_sni_header = "",
-                          absl::string_view typed_dns_resolver_config = typed_dns_resolver_config_,
-                          bool use_sub_cluster = false, double dns_query_timeout = 5,
-                          bool disable_dns_refresh_on_failure = false) {
+  void initializeWithArgs(
+      uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
+      const std::string& override_auto_sni_header = "",
+      absl::string_view typed_dns_resolver_config = typed_dns_resolver_config_,
+      bool use_sub_cluster = false, double dns_query_timeout = 5,
+      bool disable_dns_refresh_on_failure = false,
+      bool allow_dynamic_host_from_filter_state = false,
+      const absl::optional<std::string>& prepend_custom_filter_config_yaml = absl::nullopt) {
     const std::string filter_use_sub_cluster = R"EOF(
 name: dynamic_forward_proxy
 typed_config:
@@ -131,16 +134,43 @@ typed_config:
     disable_dns_refresh_on_failure: {}
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
+  {}
 )EOF",
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
         disable_dns_refresh_on_failure, max_pending_requests, key_value_config_,
-        typed_dns_resolver_config);
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
-      config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
-    } else if (use_sub_cluster) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
-                                        "false");
-      config_helper_.prependFilter(filter_use_sub_cluster);
+        typed_dns_resolver_config,
+        allow_dynamic_host_from_filter_state ? "allow_dynamic_host_from_filter_state: true" : "");
+    const std::string stream_info_filter_config_str = fmt::format(R"EOF(
+name: stream-info-to-headers-filter
+)EOF");
+
+    if (prepend_custom_filter_config_yaml.has_value()) {
+      // Prepend DFP filter.
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+        config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
+                                                     : filter_use_dns_cache);
+      } else if (use_sub_cluster) {
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
+                                          "false");
+        config_helper_.prependFilter(filter_use_sub_cluster);
+      }
+
+      // Prepend the custom_filter from the parameter.
+      config_helper_.prependFilter(prepend_custom_filter_config_yaml.value());
+
+      // Prepend stream_info_filter.
+      config_helper_.prependFilter(stream_info_filter_config_str);
+    } else {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+        config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
+                                                     : filter_use_dns_cache);
+      } else if (use_sub_cluster) {
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
+                                          "false");
+        config_helper_.prependFilter(filter_use_sub_cluster);
+      }
+
+      config_helper_.prependFilter(stream_info_filter_config_str);
     }
 
     config_helper_.prependFilter(fmt::format(R"EOF(

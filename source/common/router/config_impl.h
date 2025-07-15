@@ -846,26 +846,24 @@ private:
   };
 
   /**
-   * Returns a vector of request header parsers which applied or will apply header transformations
+   * Returns an array of request header parsers which applied or will apply header transformations
    * to the request in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of request header parsers.
+   * @return an array of request header parsers.
    */
-  absl::InlinedVector<const HeaderParser*, 3>
-  getRequestHeaderParsers(bool specificity_ascend) const;
+  std::array<const HeaderParser*, 3> getRequestHeaderParsers(bool specificity_ascend) const;
 
   /**
-   * Returns a vector of response header parsers which applied or will apply header transformations
+   * Returns an array of response header parsers which applied or will apply header transformations
    * to the response in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of request header parsers.
+   * @return an array of request header parsers.
    */
-  absl::InlinedVector<const HeaderParser*, 3>
-  getResponseHeaderParsers(bool specificity_ascend) const;
+  std::array<const HeaderParser*, 3> getResponseHeaderParsers(bool specificity_ascend) const;
 
   std::unique_ptr<const RuntimeData>
   loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
