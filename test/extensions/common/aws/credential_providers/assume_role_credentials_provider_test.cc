@@ -626,6 +626,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, Coverage) {
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   provider_friend.onClusterAddOrUpdate();
   timer_->invokeCallback();
+  ASSERT_EQ(provider_->providerName(), "AssumeRoleCredentialsProvider");
 }
 
 TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
@@ -858,6 +859,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, CredentialsPendingReturn) {
 
   const auto credentials = provider_->getCredentials();
   EXPECT_FALSE(credentials.accessKeyId().has_value());
+  delete (raw_metadata_fetcher_);
 }
 
 } // namespace Aws
