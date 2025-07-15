@@ -994,6 +994,11 @@ case $CI_TARGET in
               "$PACKAGE_BUILD"
         ;;
 
+    verify-distroless)
+        docker build -f ci/Dockerfile-distroless-testing -t distroless-testing .
+        docker run --rm distroless-testing
+        ;;
+
     verify_examples)
         DEV_CONTAINER_ID=$(docker inspect --format='{{.Id}}' envoyproxy/envoy:dev)
         bazel run --config=ci \
