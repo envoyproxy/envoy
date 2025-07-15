@@ -400,6 +400,32 @@ void InternalEngine::onDefaultNetworkUnavailable() {
 void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
   envoy_netconf_t configuration =
       Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
+  Http::HttpServerPropertiesCacheManager& cache_manager =
+      server_->httpServerPropertiesCacheManager();
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
+    // Reset HTTP/3 status for all origins.
+    Http::HttpServerPropertiesCacheManager::CacheFn reset_status =
+        [](Http::HttpServerPropertiesCache& cache) { cache.resetStatus(); };
+    cache_manager.forEachThreadLocalCache(reset_status);
+  } else {
+    // Reset HTTP/3 status only for origins marked as broken.
+    Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
+        [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
+    cache_manager.forEachThreadLocalCache(clear_brokenness);
+  }
+
+  if (disable_dns_refresh_on_network_change_) {
+    if (Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.drain_pools_on_network_change")) {
+      // Since DNS refreshing is disabled, explicitly drain all connections.
+      ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
+      getClusterManager().drainConnections(
+          [](const Upstream::Host&) { return true; });
+    }
+    return;
+  }
+  // Refresh DNS upon network changes.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
       Runtime::runtimeFeatureEnabled(
@@ -413,28 +439,8 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
       connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
     }
   }
-  Http::HttpServerPropertiesCacheManager& cache_manager =
-      server_->httpServerPropertiesCacheManager();
-
-  Http::HttpServerPropertiesCacheManager::CacheFn clear_brokenness =
-      [](Http::HttpServerPropertiesCache& cache) { cache.resetBrokenness(); };
-  cache_manager.forEachThreadLocalCache(clear_brokenness);
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
-    Http::HttpServerPropertiesCacheManager& cache_manager =
-        server_->httpServerPropertiesCacheManager();
-
-    Http::HttpServerPropertiesCacheManager::CacheFn reset_status =
-        [](Http::HttpServerPropertiesCache& cache) { cache.resetStatus(); };
-    cache_manager.forEachThreadLocalCache(reset_status);
-  }
-  if (!disable_dns_refresh_on_network_change_) {
-    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
-  } else if (Runtime::runtimeFeatureEnabled(
-                 "envoy.reloadable_features.drain_pools_on_network_change")) {
-    ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
-    connectivity_manager_->clusterManager().drainConnections(
-        [](const Upstream::Host&) { return true; });
-  }
+  // This call will possibly drain all connections asynchronously.
+  connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
 }
 
 envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
