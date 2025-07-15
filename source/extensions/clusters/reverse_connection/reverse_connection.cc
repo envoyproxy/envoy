@@ -59,74 +59,99 @@ RevConCluster::LoadBalancer::getUUIDFromHost(const Http::RequestHeaderMap& heade
   return host.substr(0, uuid_start);
 }
 
+absl::optional<absl::string_view>
+RevConCluster::LoadBalancer::getUUIDFromSNI(const Network::Connection* connection) {
+  if (connection == nullptr) {
+    ENVOY_LOG(debug, "Connection is null, cannot extract SNI");
+    return absl::nullopt;
+  }
+
+  absl::string_view sni = connection->requestedServerName();
+  ENVOY_LOG(debug, "SNI value: {}", sni);
+  
+  if (sni.empty()) {
+    ENVOY_LOG(debug, "Empty SNI value");
+    return absl::nullopt;
+  }
+  
+  // Extract the UUID from SNI. SNI format is expected to be "<uuid>.tcpproxy.envoy.remote"
+  const absl::string_view::size_type uuid_start = sni.find('.');
+  if (uuid_start == absl::string_view::npos ||
+      sni.substr(uuid_start + 1) != parent_->proxy_host_suffix_) {
+    ENVOY_LOG(error,
+              "Malformed SNI {}. Expected: <node_uuid>.tcpproxy.envoy.remote",
+              sni);
+    return absl::nullopt;
+  }
+  return sni.substr(0, uuid_start);
+}
+
 Upstream::HostSelectionResponse
 RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
-  if (!context) {
-    ENVOY_LOG(debug, "Invalid downstream connection or invalid downstream request");
+  if (context == nullptr) {
+    ENVOY_LOG(error, "RevConCluster::LoadBalancer::chooseHost called with null context");
     return {nullptr};
   }
 
-  // First, Check if host_id is already set for the upstream cluster. If it is, use
-  // that host_id.
-  if (!parent_->default_host_id_.empty()) {
-    return parent_->checkAndCreateHost(parent_->default_host_id_);
+  // If downstream headers are not present, host ID cannot be obtained.
+  if (context->downstreamHeaders() == nullptr) {
+    if (context->downstreamConnection() == nullptr) {
+      ENVOY_LOG(error, "Found empty downstream headers and null downstream connection");
+    } else {
+      ENVOY_LOG(error, "Found empty downstream headers for a request over connection with ID: {}",
+                *(context->downstreamConnection()->connectionInfoProvider().connectionID()));
+    }
+    return {nullptr};
   }
 
-  // Second, Check for the presence of headers in RevConClusterConfig's http_header_names in
+  // First, Check for the presence of headers in RevConClusterConfig's http_header_names in
   // the request context. In the absence of http_header_names in RevConClusterConfig, this
   // checks for the presence of EnvoyDstNodeUUID and EnvoyDstClusterUUID headers by default.
-  if (context->downstreamHeaders() == nullptr) {
-    ENVOY_LOG(error, "Found empty downstream headers for a request over connection with ID: {}",
-              *(context->downstreamConnection()->connectionInfoProvider().connectionID()));
-    return {nullptr};
-  }
-
-  // EnvoyDstClusterUUID is mandatory in each request. If this header is not
-  // present, we will issue a malformed request error message.
-  Http::HeaderMap::GetResult header_result =
-      context->downstreamHeaders()->get(Http::Headers::get().EnvoyDstClusterUUID);
-  if (header_result.empty()) {
-    ENVOY_LOG(error, "{} header not found in request context",
-              Http::Headers::get().EnvoyDstClusterUUID.get());
-    return {nullptr};
-  }
   const std::string host_id = std::string(parent_->getHostIdValue(context->downstreamHeaders()));
-  if (host_id.empty()) {
-    ENVOY_LOG(debug, "Found no header match for incoming request");
-    return {nullptr};
+  if (!host_id.empty()) {
+    ENVOY_LOG(debug, "Found header match. Creating host with host_id: {}", host_id);
+    return parent_->checkAndCreateHost(host_id);
   }
 
-  // Finally, check the Host header for the UUID. This is mandatory if neither the host_id
-  // nor any of the headers in RevConClusterConfig's http_header_names are set.
+  // Second, check the Host header for the UUID.
   absl::optional<absl::string_view> uuid = getUUIDFromHost(*context->downstreamHeaders());
-  if (!uuid.has_value()) {
-    ENVOY_LOG(error, "UUID not found in host header. Could not find host for request.");
-    return {nullptr};
+  if (uuid.has_value()) {
+    ENVOY_LOG(debug, "Found UUID in host header. Creating host with host_id: {}", uuid.value());
+    return parent_->checkAndCreateHost(std::string(uuid.value()));
   }
-  ENVOY_LOG(debug, "Found UUID in host header. Creating host with host_id: {}", uuid.value());
-  return parent_->checkAndCreateHost(std::string(uuid.value()));
-  
+
+  // Third, check SNI (Server Name Indication) for the UUID if available.
+  if (context->downstreamConnection() != nullptr) {
+    absl::optional<absl::string_view> sni_uuid = getUUIDFromSNI(context->downstreamConnection());
+    if (sni_uuid.has_value()) {
+      ENVOY_LOG(debug, "Found UUID in SNI. Creating host with host_id: {}", sni_uuid.value());
+      return parent_->checkAndCreateHost(std::string(sni_uuid.value()));
+    }
+  }
+
+  ENVOY_LOG(error, "UUID not found in host header or SNI. Could not find host for request.");
+  return {nullptr};
+}
+
+Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(const std::string host_id) {
+
   // Get the SocketManager to resolve cluster ID to node ID
-  auto* socket_manager = parent_->getUpstreamSocketManager();
-  if (!socket_manager) {
-    ENVOY_LOG(debug, "Socket manager not found");
+  auto* socket_manager = getUpstreamSocketManager();
+  if (socket_manager == nullptr) {
+    ENVOY_LOG(error, "Socket manager not found");
     return {nullptr};
   }
 
   // Use SocketManager to resolve the key to a node ID
   std::string node_id = socket_manager->getNodeID(host_id);
   ENVOY_LOG(debug, "RevConCluster: Resolved key '{}' to node_id '{}'", host_id, node_id);
-  
-  return parent_->checkAndCreateHost(node_id);
-}
 
-Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(const std::string host_id) {
   host_map_lock_.ReaderLock();
-  // Check if host_id is already present in host_map_ or not. This ensures,
+  // Check if node_id is already present in host_map_ or not. This ensures,
   // that envoy reuses a conn_pool_container for an endpoint.
-  auto host_itr = host_map_.find(host_id);
+  auto host_itr = host_map_.find(node_id);
   if (host_itr != host_map_.end()) {
-    ENVOY_LOG(debug, "Found an existing host for {}.", host_id);
+    ENVOY_LOG(debug, "Found an existing host for {}.", node_id);
     Upstream::HostSharedPtr host = host_itr->second;
     host_map_lock_.ReaderUnlock();
     return {host};
@@ -137,29 +162,28 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(const std::str
 
   // Create a custom address that uses the UpstreamReverseSocketInterface
   Network::Address::InstanceConstSharedPtr host_address(
-      std::make_shared<UpstreamReverseConnectionAddress>(host_id));
+      std::make_shared<UpstreamReverseConnectionAddress>(node_id));
 
   // Create a standard HostImpl using the custom address
   auto host_result = Upstream::HostImpl::create(
-      info(), absl::StrCat(info()->name(), static_cast<std::string>(host_id)),
+      info(), absl::StrCat(info()->name(), static_cast<std::string>(node_id)),
       std::move(host_address), nullptr /* endpoint_metadata */, nullptr /* locality_metadata */,
       1 /* initial_weight */, envoy::config::core::v3::Locality().default_instance(),
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
       0 /* priority */, envoy::config::core::v3::UNKNOWN);
 
   if (!host_result.ok()) {
-    ENVOY_LOG(error, "Failed to create HostImpl for {}: {}", host_id,
+    ENVOY_LOG(error, "Failed to create HostImpl for {}: {}", node_id,
               host_result.status().ToString());
     return {nullptr};
   }
 
   // Convert unique_ptr to shared_ptr
   Upstream::HostSharedPtr host(std::move(host_result.value()));
-  // host->setHostId(host_id);
   ENVOY_LOG(trace, "Created a HostImpl {} for {} that will use UpstreamReverseSocketInterface.",
-            *host, host_id);
+            *host, node_id);
 
-  host_map_[host_id] = host;
+  host_map_[node_id] = host;
   return {host};
 }
 
@@ -207,8 +231,8 @@ absl::string_view RevConCluster::getHostIdValue(const Http::RequestHeaderMap* re
 BootstrapReverseConnection::UpstreamSocketManager* RevConCluster::getUpstreamSocketManager() const {
   auto* upstream_interface = Network::socketInterface(
       "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
-  if (!upstream_interface) {
-    ENVOY_LOG(debug, "Upstream reverse socket interface not found");
+  if (upstream_interface == nullptr) {
+    ENVOY_LOG(error, "Upstream reverse socket interface not found");
     return nullptr;
   }
 
@@ -237,9 +261,6 @@ RevConCluster::RevConCluster(
       cleanup_interval_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(rev_con_config, cleanup_interval, 10000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
-  default_host_id_ =
-      Config::Metadata::metadataValue(&config.metadata(), "envoy.reverse_conn", "host_id")
-          .string_value();
   if (rev_con_config.proxy_host_suffix().empty()) {
     proxy_host_suffix_ = default_proxy_host_suffix;
   } else {

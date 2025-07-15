@@ -157,6 +157,10 @@ public:
     // "<uuid>.tcpproxy.envoy.remote:<remote_port>" and extract the uuid from the header.
     absl::optional<absl::string_view> getUUIDFromHost(const Http::RequestHeaderMap& headers);
 
+    // Helper function to extract UUID from SNI (Server Name Indication) if it follows the format
+    // "<uuid>.tcpproxy.envoy.remote".
+    absl::optional<absl::string_view> getUUIDFromSNI(const Network::Connection* connection);
+
     // Virtual functions that are not supported by our custom load-balancer.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
@@ -219,7 +223,6 @@ private:
 
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds cleanup_interval_;
-  std::string default_host_id_;
   Event::TimerPtr cleanup_timer_;
   absl::Mutex host_map_lock_;
   absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
@@ -238,6 +241,7 @@ public:
   RevConClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.reverse_connection") {}
 
 private:
+  friend class ReverseConnectionClusterTest;
   absl::StatusOr<
       std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(
