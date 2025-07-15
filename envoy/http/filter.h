@@ -873,8 +873,9 @@ public:
   /**
    * Called when a match result occurs that isn't handled by the filter manager.
    * @param action the resulting match action
+   * @return false if the action should be skipped, true otherwise.
    */
-  virtual void onMatchCallback(const Matcher::Action&) {}
+  virtual bool onMatchCallback(const Matcher::Action&) { return false; }
 
   struct LocalReplyData {
     // The error code which (barring reset) will be sent to the client.

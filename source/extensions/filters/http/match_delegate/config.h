@@ -61,8 +61,8 @@ public:
   // Envoy::Http::StreamFilterBase
   void onStreamComplete() override { base_filter_->onStreamComplete(); }
   void onDestroy() override { base_filter_->onDestroy(); }
-  void onMatchCallback(const Matcher::Action& action) override {
-    base_filter_->onMatchCallback(action);
+  bool onMatchCallback(const Matcher::Action& action) override {
+    return base_filter_->onMatchCallback(action);
   }
   Envoy::Http::LocalErrorStatus onLocalReply(const LocalReplyData& data) override {
     return base_filter_->onLocalReply(data);

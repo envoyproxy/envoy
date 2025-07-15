@@ -141,7 +141,7 @@ public:
 class MockCodecEventCallbacks : public CodecEventCallbacks {
 public:
   MockCodecEventCallbacks();
-  ~MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks() override;
 
   MOCK_METHOD(void, onCodecEncodeComplete, ());
   MOCK_METHOD(void, onCodecLowLevelReset, ());
@@ -343,7 +343,7 @@ public:
   MOCK_METHOD(bool, shouldLoadShed, (), (const));
 
   Buffer::InstancePtr buffer_;
-  std::list<DownstreamWatermarkCallbacks*> callbacks_{};
+  std::list<DownstreamWatermarkCallbacks*> callbacks_;
   testing::NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
@@ -420,7 +420,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
-  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(bool, onMatchCallback, (const Matcher::Action&));
   MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::StreamDecoderFilter
@@ -447,7 +447,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
-  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(bool, onMatchCallback, (const Matcher::Action&));
   MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::MockStreamEncoderFilter
@@ -470,7 +470,7 @@ public:
   // Http::StreamFilterBase
   MOCK_METHOD(void, onStreamComplete, ());
   MOCK_METHOD(void, onDestroy, ());
-  MOCK_METHOD(void, onMatchCallback, (const Matcher::Action&));
+  MOCK_METHOD(bool, onMatchCallback, (const Matcher::Action&));
   MOCK_METHOD(LocalErrorStatus, onLocalReply, (const LocalReplyData&));
 
   // Http::StreamDecoderFilter

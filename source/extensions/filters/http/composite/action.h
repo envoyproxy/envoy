@@ -18,16 +18,37 @@ class ExecuteFilterAction
     : public Matcher::ActionBase<
           envoy::extensions::filters::http::composite::v3::ExecuteFilterAction> {
 public:
-  explicit ExecuteFilterAction(Http::FilterFactoryCb cb, const std::string& name)
-      : cb_(std::move(cb)), name_(name) {}
+  using FilterConfigProvider = std::function<OptRef<Http::FilterFactoryCb>()>;
 
-  void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
+  explicit ExecuteFilterAction(
+      FilterConfigProvider config_provider, const std::string& name,
+      const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent>& sample,
+      Runtime::Loader& runtime)
+      : config_provider_(std::move(config_provider)), name_(name), sample_(sample),
+        runtime_(runtime) {}
+
+  void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
+    if (auto config_value = config_provider_(); config_value.has_value()) {
+      (*config_value)(callbacks);
+      return;
+    }
+    // There is no dynamic config available. Apply missing config filter.
+    Envoy::Http::MissingConfigFilterFactory(callbacks);
+  }
+
+  bool actionSkip() const {
+    return sample_.has_value() ? !runtime_.snapshot().featureEnabled(sample_->runtime_key(),
+                                                                     sample_->default_value())
+                               : false;
+  }
 
   const std::string& actionName() const { return name_; }
 
 private:
-  Http::FilterFactoryCb cb_;
+  FilterConfigProvider config_provider_;
   const std::string name_;
+  const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> sample_;
+  Runtime::Loader& runtime_;
 };
 
 class ExecuteFilterActionFactory
@@ -36,29 +57,22 @@ class ExecuteFilterActionFactory
 public:
   std::string name() const override { return "composite-action"; }
 
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config,
-                        Http::Matching::HttpFilterActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, Http::Matching::HttpFilterActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::http::composite::v3::ExecuteFilterAction>();
   }
 
-  // Rolling the dice to decide whether the action will be sampled.
-  // By default, if sample_percent is not specified, then it is sampled.
-  bool isSampled(
-      const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
-      Envoy::Runtime::Loader& runtime);
-
 private:
-  Matcher::ActionFactoryCb createActionFactoryCbCommon(
+  Matcher::ActionConstSharedPtr createActionCommon(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
       bool is_downstream);
 
   template <class FactoryCtx, class FilterCfgProviderMgr>
-  Matcher::ActionFactoryCb createDynamicActionFactoryCbTyped(
+  Matcher::ActionConstSharedPtr createDynamicActionTyped(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context, const std::string& filter_chain_type,
       FactoryCtx& factory_context, std::shared_ptr<FilterCfgProviderMgr>& provider_manager) {
@@ -73,35 +87,30 @@ private:
             server_factory_context.clusterManager(), false, filter_chain_type, nullptr);
 
     Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
-    return
-        [provider = std::move(provider), n = std::move(name),
-         composite_action = std::move(composite_action), &runtime, this]() -> Matcher::ActionPtr {
-          if (!isSampled(composite_action, runtime)) {
-            return nullptr;
-          }
 
-          if (auto config_value = provider->config(); config_value.has_value()) {
-            return std::make_unique<ExecuteFilterAction>(config_value.ref(), n);
-          }
-          // There is no dynamic config available. Apply missing config filter.
-          return std::make_unique<ExecuteFilterAction>(Envoy::Http::MissingConfigFilterFactory, n);
-        };
+    return std::make_shared<ExecuteFilterAction>(
+        [provider]() -> OptRef<Http::FilterFactoryCb> { return provider->config(); }, name,
+        composite_action.has_sample_percent()
+            ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
+                  composite_action.sample_percent())
+            : absl::nullopt,
+        runtime);
   }
 
-  Matcher::ActionFactoryCb createDynamicActionFactoryCbDownstream(
+  Matcher::ActionConstSharedPtr createDynamicActionDownstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context);
 
-  Matcher::ActionFactoryCb createDynamicActionFactoryCbUpstream(
+  Matcher::ActionConstSharedPtr createDynamicActionUpstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context);
 
-  Matcher::ActionFactoryCb createStaticActionFactoryCbDownstream(
+  Matcher::ActionConstSharedPtr createStaticActionDownstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
-  Matcher::ActionFactoryCb createStaticActionFactoryCbUpstream(
+  Matcher::ActionConstSharedPtr createStaticActionUpstream(
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
       Http::Matching::HttpFilterActionContext& context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
