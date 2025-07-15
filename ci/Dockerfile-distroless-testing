@@ -1,0 +1,3 @@
+FROM debian:bullseye-slim
+COPY --from=envoyproxy/envoy:distroless-dev / /distroless-dev
+CMD ["/bin/sh", "-c", "stat -c '%A' /distroless-dev/etc/envoy | grep -q '...x' && echo OK || (echo FAIL: Envoy config is not readable in distroless container; exit 1)"]
