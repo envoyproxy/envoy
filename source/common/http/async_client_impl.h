@@ -156,7 +156,8 @@ public:
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   void setForceImmediateLocalReply(bool value) override {
-    ENVOY_LOG(error, "Cannot set value {}. AsyncStreamImpl does not support force immediate local reply.",
+    ENVOY_LOG(error,
+              "Cannot set value {}. AsyncStreamImpl does not support force immediate local reply.",
               value);
   }
 

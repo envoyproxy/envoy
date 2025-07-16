@@ -1009,10 +1009,10 @@ void DownstreamFilterManager::sendLocalReply(
     // We only prepare a local reply to execute later if we're actively invoking filters to avoid
     // re-entrant in filters.
     //
-    // For reverse connections (where upstream initiates the connection to downstream), we need to
-    // send local replies immediately rather than queuing them. This ensures proper handling of the
-    // reversed connection flow and prevents potential issues with connection state and filter chain
-    // processing.
+    // For reverse connections workflow, where Upstream Envoy receives connections from the
+    // Downstream Envoy, we need to send local replies immediately rather than queuing them.
+    // This ensures proper handling of the reverse connection lifecycle and prevents any
+    // potential issues with the connection state and filter chain processing.
     if (!force_immediate_local_reply_ &&
         (state_.filter_call_state_ & FilterCallState::IsDecodingMask)) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,

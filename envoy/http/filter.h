@@ -835,7 +835,8 @@ public:
   virtual bool shouldLoadShed() const PURE;
 
   /**
-   * @return set a flag to send a local reply immediately. Currently only used for reverse connections.
+   * @return set a flag to send a local reply immediately. Some Envoy features like reverse
+   * connections need this.
    */
   virtual void setForceImmediateLocalReply(bool value) PURE;
 };
