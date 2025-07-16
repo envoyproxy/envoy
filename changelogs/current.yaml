@@ -105,6 +105,11 @@ minor_behavior_changes:
 - area: oauth2
   change: |
     Extension status changed from ``alpha`` to ``stable``.
+- area: oauth2
+  change: |
+      Starting from this release, these cookies: oauth_hmac,oauth_expires,refresh_token,oauth_nonce,code_verifier will
+      not be forwarded to the upstream. This behavior can be reverted by setting the runtime guard
+      ``envoy.reloadable_features.oauth2_cleanup_cookies`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
