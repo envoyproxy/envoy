@@ -85,6 +85,9 @@ public:
   RouterTest()
       : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
+    // Add default mock for requestBodyBufferLimit which is called during router initialization.
+    EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
+        .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
     ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
       return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
     }));
@@ -2965,6 +2968,8 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
   EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillOnce(Return(10));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -2985,6 +2990,47 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
 
   // Complete request while there is no upstream request.
   const std::string body2(50, 'a');
+  Buffer::OwnedImpl buf2(body2);
+  router_->decodeData(buf2, false);
+
+  EXPECT_EQ(callbacks_.details(), "request_payload_exceeded_retry_buffer_limit");
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("retry_or_shadow_abandoned")
+                    .value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Test that router uses request_body_buffer_limit when configured instead of
+// retry_shadow_buffer_limit.
+TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+  // Configure a large request body buffer limit (50 bytes) but small retry/shadow limit (10 bytes).
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
+  EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillOnce(Return(10));
+
+  NiceMock<Http::MockRequestEncoder> encoder1;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers{
+      {"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}, {"myheader", "present"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  // Send 40 bytes - should be within request body buffer limit (50) but exceeds retry limit (10).
+  const std::string body1(40, 'x');
+  Buffer::OwnedImpl buf1(body1);
+  EXPECT_CALL(*router_->retry_state_, enabled()).Times(2).WillRepeatedly(Return(true));
+  router_->decodeData(buf1, false);
+
+  router_->retry_state_->expectResetRetry();
+  encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
+
+  // Send additional 15 bytes - total 55 bytes, which should exceed request body buffer limit (50).
+  const std::string body2(15, 'y');
   Buffer::OwnedImpl buf2(body2);
   router_->decodeData(buf2, false);
 
@@ -3476,6 +3522,8 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   // Set a per route body limit which disallows any buffering.
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
   EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillOnce(Return(0));
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3508,6 +3556,8 @@ TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   // Set a per route body limit which disallows any buffering.
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
+      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
   EXPECT_CALL(callbacks_.route_->route_entry_, retryShadowBufferLimit()).WillOnce(Return(0));
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
@@ -4716,6 +4766,9 @@ public:
   RouterShadowingTest() : streaming_shadow_(GetParam()) {
     scoped_runtime_.mergeValues(
         {{"envoy.reloadable_features.streaming_shadow", streaming_shadow_ ? "true" : "false"}});
+    // Add default mock for requestBodyBufferLimit which is called during router initialization.
+    EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
+        .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
     // Recreate router filter so it latches the correct value of streaming shadow.
     router_ = std::make_unique<RouterTestFilter>(config_, config_->default_stats_);
     router_->setDecoderFilterCallbacks(callbacks_);
@@ -6675,7 +6728,7 @@ TEST(RouterFilterUtilityTest, SetTimeoutHeaders) {
     Http::TestRequestHeaderMapImpl headers;
     TimeoutData timeout;
     timeout.global_timeout_ = std::chrono::milliseconds(200);
-    timeout.per_try_timeout_ = std::chrono::milliseconds(0);
+    timeout.per_try_timeout_ = std::chrono::milliseconds(150);
 
     FilterUtility::setTimeoutHeaders(300, timeout, route, headers, true, false, false);
     EXPECT_EQ("1", headers.get_("x-envoy-expected-rq-timeout-ms")); // Over time

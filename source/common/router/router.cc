@@ -517,6 +517,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // limits, apply the new cap.
   retry_shadow_buffer_limit_ =
       std::min(retry_shadow_buffer_limit_, route_entry_->retryShadowBufferLimit());
+  // Set the request body buffer limit from the route entry, allowing larger buffering
+  // for inference payloads beyond connection buffer limits.
+  request_body_buffer_limit_ = route_entry_->requestBodyBufferLimit();
   Upstream::ThreadLocalCluster* cluster =
       config_->cm_.getThreadLocalCluster(route_entry_->clusterName());
   if (!cluster) {
@@ -933,12 +936,21 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   bool buffering = (retry_state_ && retry_state_->enabled()) ||
                    (!active_shadow_policies_.empty() && !streaming_shadows_) ||
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
+
+  // Determine the effective buffer limit for request body buffering.
+  // Use request_body_buffer_limit_ if it's configured (not max), otherwise fall back to
+  // retry_shadow_buffer_limit_.
+  uint64_t effective_buffer_limit =
+      (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max())
+          ? request_body_buffer_limit_
+          : static_cast<uint64_t>(retry_shadow_buffer_limit_);
+
   if (buffering &&
-      getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
+      getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit) {
     ENVOY_LOG(debug,
               "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
               "up on the retry/shadow.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), retry_shadow_buffer_limit_);
+              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
