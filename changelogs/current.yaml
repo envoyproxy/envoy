@@ -385,5 +385,9 @@ new_features:
     Added support for returning ``StopIteration`` from plugin ``onRequestHeader`` and ``onResponseHeader`` callbacks. See
     :ref:`allow_on_headers_stop_iteration <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.allow_on_headers_stop_iteration>`
     for more details. By default, current behavior is maintained.
+- area: aws
+  change: |
+    Added ``assume_role_credential_provider`` to add support for role chaining in AWS filters. This allows envoy to
+    assume an additional role before SigV4 signing occurs.
 
 deprecated:
