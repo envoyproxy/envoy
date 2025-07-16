@@ -319,7 +319,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void stopDecodingIfNonTerminalFilterEncodedEndStream(bool encoded_end_stream);
   StreamDecoderFilters::Iterator entry() const { return entry_; }
 
-  void setReverseConnForceLocalReply(bool value) override;
+  void setForceImmediateLocalReply(bool value) override;
 
   StreamDecoderFilterSharedPtr handle_;
   StreamDecoderFilters::Iterator entry_;
@@ -907,7 +907,7 @@ public:
   bool sawDownstreamReset() { return state_.saw_downstream_reset_; }
 
   virtual bool shouldLoadShed() { return false; };
-  void setReverseConnForceLocalReply(bool value) { reverse_conn_force_local_reply_ = value; }
+  void setForceImmediateLocalReply(bool value) { force_immediate_local_reply_ = value; }
 
   void sendGoAwayAndClose() {
     // Stop filter chain iteration by checking encoder or decoder chain.
@@ -1105,7 +1105,7 @@ private:
   const uint64_t stream_id_;
   Buffer::BufferMemoryAccountSharedPtr account_;
   const bool proxy_100_continue_;
-  bool reverse_conn_force_local_reply_{false};
+  bool force_immediate_local_reply_{false};
 
   StreamDecoderFilters decoder_filters_;
   StreamEncoderFilters encoder_filters_;

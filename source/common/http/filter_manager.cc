@@ -472,8 +472,8 @@ void ActiveStreamDecoderFilter::modifyDecodingBuffer(
   callback(*parent_.buffered_request_data_.get());
 }
 
-void ActiveStreamDecoderFilter::setReverseConnForceLocalReply(bool value) {
-  parent_.setReverseConnForceLocalReply(value);
+void ActiveStreamDecoderFilter::setForceImmediateLocalReply(bool value) {
+  parent_.setForceImmediateLocalReply(value);
 }
 
 void ActiveStreamDecoderFilter::sendLocalReply(
@@ -1037,7 +1037,7 @@ void DownstreamFilterManager::sendLocalReply(
     // send local replies immediately rather than queuing them. This ensures proper handling of the
     // reversed connection flow and prevents potential issues with connection state and filter chain
     // processing.
-    if (!reverse_conn_force_local_reply_ &&
+    if (!force_immediate_local_reply_ &&
         (state_.filter_call_state_ & FilterCallState::IsDecodingMask)) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                       grpc_status, details);

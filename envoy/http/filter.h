@@ -837,7 +837,7 @@ public:
   /**
    * @return set a flag to send a local reply immediately for reverse connections.
    */
-  virtual void setReverseConnForceLocalReply(bool value) PURE;
+  virtual void setForceImmediateLocalReply(bool value) PURE;
 };
 
 /**

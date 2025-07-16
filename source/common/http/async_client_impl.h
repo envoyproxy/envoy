@@ -155,7 +155,7 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
   StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
-  void setReverseConnForceLocalReply(bool value) override {
+  void setForceImmediateLocalReply(bool value) override {
     ENVOY_LOG(error, "Cannot set value {}. AsyncStreamImpl does not support reverse connection.",
               value);
   }
