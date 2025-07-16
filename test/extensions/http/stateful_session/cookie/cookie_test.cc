@@ -49,7 +49,7 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
     // Check the format of the cookie sent back to client.
-    session_state->onUpdate("1.2.3.4:80", response_headers);
+    session_state->onUpdateHeader("1.2.3.4:80", response_headers);
     EXPECT_EQ(response_headers.get_("set-cookie"),
               Envoy::Http::Utility::makeSetCookieValue(
                   "override_host",
@@ -83,12 +83,12 @@ TEST(CookieBasedSessionStateFactoryTest, SessionStateTest) {
     EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate("1.2.3.4:80", response_headers);
+    session_state->onUpdateHeader("1.2.3.4:80", response_headers);
 
     // Session state is not updated and then do nothing.
     EXPECT_EQ(response_headers.get_("set-cookie"), "");
 
-    session_state->onUpdate("2.3.4.5:80", response_headers);
+    session_state->onUpdateHeader("2.3.4.5:80", response_headers);
 
     // Update session state because the current request is routed to a new upstream host.
     cookie.set_address("2.3.4.5:80");
@@ -239,7 +239,7 @@ TEST(CookieBasedSessionStateFactoryTest, CookieAttributesTest) {
     Envoy::Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
     auto session_state = factory.create(request_headers);
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate("10.0.0.1:8080", response_headers);
+    session_state->onUpdateHeader("10.0.0.1:8080", response_headers);
 
     std::string actual_cookie = response_headers.get_("set-cookie");
     // Should only have HttpOnly (added by makeSetCookieValue by default)
@@ -268,7 +268,7 @@ TEST(CookieBasedSessionStateFactoryTest, CookieAttributesTest) {
     Envoy::Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
     auto session_state = factory.create(request_headers);
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate("10.1.1.1:443", response_headers);
+    session_state->onUpdateHeader("10.1.1.1:443", response_headers);
 
     std::string actual_cookie = response_headers.get_("set-cookie");
     // Should have HttpOnly (added by makeSetCookieValue by default)

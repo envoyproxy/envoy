@@ -30,7 +30,7 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
     EXPECT_EQ(absl::nullopt, session_state->upstreamAddress());
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate("1.2.3.4:80", response_headers);
+    session_state->onUpdateHeader("1.2.3.4:80", response_headers);
 
     // No valid address then update it in the headers
     EXPECT_EQ(response_headers.get_("session-header"), Envoy::Base64::encode("1.2.3.4:80"));
@@ -49,12 +49,12 @@ TEST(HeaderBasedSessionStateFactoryTest, SessionStateTest) {
     EXPECT_EQ("1.2.3.4:80", session_state->upstreamAddress().value());
 
     Envoy::Http::TestResponseHeaderMapImpl response_headers;
-    session_state->onUpdate("1.2.3.4:80", response_headers);
+    session_state->onUpdateHeader("1.2.3.4:80", response_headers);
 
     // Session state is not updated so expect no header in response
     EXPECT_EQ(response_headers.get_("session-header"), "");
 
-    session_state->onUpdate("2.3.4.5:80", response_headers);
+    session_state->onUpdateHeader("2.3.4.5:80", response_headers);
 
     // Update session state because the current request is routed to a new upstream host.
     EXPECT_EQ(response_headers.get_("session-header"), Envoy::Base64::encode("2.3.4.5:80", 10));

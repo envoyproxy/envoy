@@ -11,7 +11,10 @@ namespace Http {
 class MockSessionState : public SessionState {
 public:
   MOCK_METHOD(absl::optional<absl::string_view>, upstreamAddress, (), (const));
-  MOCK_METHOD(void, onUpdate, (absl::string_view host_address, Http::ResponseHeaderMap& headers));
+  MOCK_METHOD(void, onUpdateHeader,
+              (absl::string_view host_address, Http::ResponseHeaderMap& headers));
+  MOCK_METHOD(Http::FilterDataStatus, onUpdateData,
+              (absl::string_view host_address, Buffer::Instance& data, bool end_stream));
 };
 
 class MockSessionStateFactory : public Http::SessionStateFactory {

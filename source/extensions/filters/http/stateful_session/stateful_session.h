@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -9,6 +10,7 @@
 #include "envoy/http/stateful_session.h"
 #include "envoy/upstream/load_balancer.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
@@ -65,6 +67,8 @@ public:
 
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
+
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
 
   Http::SessionStatePtr& sessionStateForTest() { return session_state_; }
 

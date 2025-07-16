@@ -34,7 +34,17 @@ public:
    * @param host_address the upstream host that was finally selected.
    * @param headers the response headers.
    */
-  virtual void onUpdate(absl::string_view host_address, ResponseHeaderMap& headers) PURE;
+  virtual void onUpdateHeader(absl::string_view host_address, ResponseHeaderMap& headers) PURE;
+
+  /**
+   * Called when a request is completed to update the session state through data.
+   *
+   * @param host_address the upstream host that was finally selected.
+   * @param data the response data.
+   * @return the status of the data processing.
+   */
+  virtual Http::FilterDataStatus onUpdateData(absl::string_view host_address,
+                                              Buffer::Instance& data, bool end_stream) PURE;
 };
 
 using SessionStatePtr = std::unique_ptr<SessionState>;

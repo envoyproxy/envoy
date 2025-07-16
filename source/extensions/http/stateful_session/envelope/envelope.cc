@@ -9,28 +9,137 @@ namespace StatefulSession {
 namespace Envelope {
 
 constexpr absl::string_view OriginUpstreamValuePartFlag = "UV:";
+constexpr absl::string_view CRLFCRLF = "\r\n\r\n";
+constexpr absl::string_view CRCR = "\r\r";
+constexpr absl::string_view LFLF = "\n\n";
+constexpr char SEPARATOR = '.'; // separate session ID and host address in sse mode
 
-void EnvelopeSessionStateFactory::SessionStateImpl::onUpdate(
+void EnvelopeSessionStateFactory::SessionStateImpl::onUpdateHeader(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
 
-  const auto upstream_value_header = headers.get(factory_.name_);
+  if (factory_.mode_ == envoy::extensions::http::stateful_session::envelope::v3::
+                            EnvelopeSessionState::kSseEndpointMessage) {
+    response_headers_ = &headers;
+    return;
+  }
+
+  const auto upstream_value_header = headers.get(factory_.header_name_);
   if (upstream_value_header.size() != 1) {
-    ENVOY_LOG(trace, "Header {} not exist or occurs multiple times", factory_.name_);
+    ENVOY_LOG(trace, "Header {} not exist or occurs multiple times", factory_.header_name_);
     return;
   }
 
   const std::string new_header =
       absl::StrCat(Envoy::Base64::encode(host_address), ";", OriginUpstreamValuePartFlag,
                    Envoy::Base64::encode(upstream_value_header[0]->value().getStringView()));
-  headers.setReferenceKey(factory_.name_, new_header);
+  headers.setReferenceKey(factory_.header_name_, new_header);
+}
+
+Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onUpdateData(
+    absl::string_view host_address, Buffer::Instance& data, bool end_stream) {
+  if (factory_.mode_ ==
+      envoy::extensions::http::stateful_session::envelope::v3::EnvelopeSessionState::kHeader) {
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+
+  // Skip if not SSE response
+  if (!isSSEResponse()) {
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+
+  // Append new data to pending buffer
+  pending_chunk_.add(data);
+  data.drain(data.length());
+
+  while (pending_chunk_.length() > 0) {
+    // Get pending chunk as string
+    const std::string pending_chunk_str(
+        static_cast<const char*>(pending_chunk_.linearize(pending_chunk_.length())),
+        pending_chunk_.length());
+
+    // Find next complete chunk
+    size_t chunk_end_pos;
+    size_t chunk_end_and_end_str;
+    std::string chunk_end_string;
+
+    // Check different line ending patterns
+    // according to the HTML standard, the end of a server-sent-events' chunk can be
+    // - CRLFCRLF (two CRLFs)
+    // - CRCR (two CRs)
+    // - LFLF (two LFs)
+    // https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream
+    if ((chunk_end_pos = pending_chunk_str.find(CRLFCRLF)) != std::string::npos) {
+      chunk_end_string = CRLFCRLF;
+      chunk_end_and_end_str = chunk_end_pos + CRLFCRLF.length();
+    } else if ((chunk_end_pos = pending_chunk_str.find(CRCR)) != std::string::npos) {
+      chunk_end_string = CRCR;
+      chunk_end_and_end_str = chunk_end_pos + CRCR.length();
+    } else if ((chunk_end_pos = pending_chunk_str.find(LFLF)) != std::string::npos) {
+      chunk_end_string = LFLF;
+      chunk_end_and_end_str = chunk_end_pos + LFLF.length();
+    } else {
+      ENVOY_LOG(trace, "No complete chunk found, waiting for more data");
+      break;
+    }
+
+    // Process current complete chunk
+    Buffer::OwnedImpl chunk_buffer;
+    chunk_buffer.add(pending_chunk_str.substr(0, chunk_end_pos));
+    pending_chunk_.drain(chunk_end_and_end_str);
+
+    const std::string chunk_buffer_str(
+        static_cast<const char*>(chunk_buffer.linearize(chunk_buffer.length())),
+        chunk_buffer.length());
+
+    // Search for the parameter name in the URL
+    const std::string param_name = factory_.param_name_;
+    size_t param_pos = chunk_buffer_str.find(param_name + "=");
+    if (param_pos != std::string::npos) {
+      size_t value_start = param_pos + param_name.length() + 1;
+      size_t value_end = chunk_buffer_str.find("&", value_start);
+      if (value_end == std::string::npos) {
+        value_end = chunk_buffer_str.length();
+      }
+
+      // Get original session ID
+      const std::string original_session_id =
+          chunk_buffer_str.substr(value_start, value_end - value_start);
+      const char* host_address_c = host_address.data();
+      uint64_t host_address_length = static_cast<uint64_t>(host_address.size());
+
+      // Build new URL with encrypted host address
+      const std::string modified_url = absl::StrCat(
+          chunk_buffer_str.substr(0, param_pos), param_name, "=", original_session_id,
+          std::string(1, SEPARATOR), Envoy::Base64Url::encode(host_address_c, host_address_length),
+          chunk_buffer_str.substr(value_end));
+
+      data.add(modified_url);
+    } else {
+      // If parameter not found, keep chunk unchanged
+      data.add(chunk_buffer);
+    }
+
+    // Add chunk ending
+    data.add(chunk_end_string);
+  }
+  if (end_stream) {
+    data.add(pending_chunk_);
+    pending_chunk_.drain(pending_chunk_.length());
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+  return data.length() > 0 ? Envoy::Http::FilterDataStatus::Continue
+                           : Envoy::Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
 EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)
-    : name_(config.header().name()) {}
+    : mode_(config.session_mode_case()),
+      header_name_(config.has_header() ? config.header().name() : ""),
+      param_name_(config.has_sse_endpoint_message() ? config.sse_endpoint_message().param_name()
+                                                    : "") {}
 
 absl::optional<std::string>
-EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers) const {
-  const auto hdr = headers.get(name_);
+EnvelopeSessionStateFactory::parseAddressHeader(Envoy::Http::RequestHeaderMap& headers) const {
+  const auto hdr = headers.get(header_name_);
   if (hdr.empty()) {
     return absl::nullopt;
   }
@@ -55,12 +164,65 @@ EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers
   const std::string decoded = Envoy::Base64::decode(upstream_value);
   if (decoded.empty()) {
     // Do nothing if the 'UV' part is not valid or if there is no UV part.
-    ENVOY_LOG(info, "Header {} contains invalid 'UV' part or there is no 'UV' part", name_);
+    ENVOY_LOG(info, "Header {} contains invalid 'UV' part or there is no 'UV' part", header_name_);
     return absl::nullopt;
   }
-  headers.setReferenceKey(name_, decoded);
+  headers.setReferenceKey(header_name_, decoded);
 
   return !upstream_host.empty() ? absl::make_optional(std::move(upstream_host)) : absl::nullopt;
+}
+
+absl::optional<std::string>
+EnvelopeSessionStateFactory::parseAddressSse(Envoy::Http::RequestHeaderMap& headers) const {
+  const auto* path = headers.Path();
+  if (!path) {
+    return absl::nullopt;
+  }
+
+  // Parse query parameters
+  const auto params =
+      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(path->value().getStringView())
+          .data();
+  auto it = params.find(param_name_);
+  if (it == params.end() || it->second.empty()) {
+    return absl::nullopt;
+  }
+  const std::string& session_value = it->second[0];
+  ENVOY_LOG(debug, "Processing session value: {}", session_value);
+
+  auto separator_pos = session_value.rfind(SEPARATOR);
+  if (separator_pos == std::string::npos) {
+    ENVOY_LOG(debug, "No separator found in session value: {}", session_value);
+    return absl::nullopt;
+  }
+
+  std::string original_session_id = session_value.substr(0, separator_pos);
+  std::string host_address = Envoy::Base64Url::decode(session_value.substr(separator_pos + 1));
+
+  // Build new query
+  std::string new_query;
+
+  // First add the session ID parameter
+  new_query += absl::StrCat(param_name_, "=", original_session_id);
+
+  // Then append all other parameters
+  for (const auto& param : params) {
+    if (param.first == param_name_) {
+      continue; // Skip the session ID as we already added it
+    }
+    for (const auto& value : param.second) {
+      new_query += "&" + absl::StrCat(param.first, "=", value);
+    }
+  }
+
+  const auto path_str = path->value().getStringView();
+  auto query_start = path_str.find('?');
+  std::string new_path = absl::StrCat(path_str.substr(0, query_start + 1), new_query);
+
+  headers.setPath(new_path);
+  ENVOY_LOG(debug, "Restored session ID: {}, host: {}", original_session_id, host_address);
+
+  return host_address;
 }
 
 } // namespace Envelope

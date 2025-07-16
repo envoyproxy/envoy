@@ -97,6 +97,9 @@ TEST_F(StatefulSessionTest, NormalSessionStateTest) {
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
+  Buffer::OwnedImpl data_buffer;
+  data_buffer.add("data: http://example.com?sessionId=abcdefg\n\n");
+
   auto session_state = std::make_unique<NiceMock<Http::MockSessionState>>();
   auto raw_session_state = session_state.get();
 
@@ -110,8 +113,11 @@ TEST_F(StatefulSessionTest, NormalSessionStateTest) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  EXPECT_CALL(*raw_session_state, onUpdate(_, _));
+  EXPECT_CALL(*raw_session_state, onUpdateHeader(_, _));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  EXPECT_CALL(*raw_session_state, onUpdateData(_, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_buffer, true));
 }
 
 // Test the case that the stateful session is disabled by the route config.
@@ -139,6 +145,9 @@ TEST_F(StatefulSessionTest, SessionStateOverrideByRoute) {
   auto session_state = std::make_unique<NiceMock<Http::MockSessionState>>();
   auto raw_session_state = session_state.get();
 
+  Buffer::OwnedImpl data_buffer;
+  data_buffer.add("data: http://example.com?sessionId=abcdefg\n\n");
+
   EXPECT_CALL(*route_factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::move(session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
@@ -150,8 +159,11 @@ TEST_F(StatefulSessionTest, SessionStateOverrideByRoute) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  EXPECT_CALL(*raw_session_state, onUpdate(_, _));
+  EXPECT_CALL(*raw_session_state, onUpdateHeader(_, _));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  EXPECT_CALL(*raw_session_state, onUpdateData(_, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_buffer, true));
 }
 
 // Test the case that the session state has not valid upstream address.
@@ -164,14 +176,20 @@ TEST_F(StatefulSessionTest, SessionStateHasNoUpstreamAddress) {
   auto session_state = std::make_unique<NiceMock<Http::MockSessionState>>();
   auto raw_session_state = session_state.get();
 
+  Buffer::OwnedImpl data_buffer;  
+  data_buffer.add("data: http://example.com?sessionId=abcdefg\n\n");
+
   EXPECT_CALL(*route_factory_, create(_))
       .WillOnce(Return(testing::ByMove(std::move(session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress()).WillOnce(Return(absl::nullopt));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  EXPECT_CALL(*raw_session_state, onUpdate(_, _));
+  EXPECT_CALL(*raw_session_state, onUpdateHeader(_, _));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  EXPECT_CALL(*raw_session_state, onUpdateData(_, _, _));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_buffer, true));
 }
 
 // Test the case that no valid upstream host.
@@ -182,7 +200,10 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
   auto session_state = std::make_unique<NiceMock<Http::MockSessionState>>();
-  auto raw_session_state = session_state.get();
+  auto raw_session_state = session_state.get(); 
+
+  Buffer::OwnedImpl data_buffer;
+  data_buffer.add("data: http://example.com?sessionId=abcdefg\n\n");
 
   EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(std::move(session_state))));
   EXPECT_CALL(*raw_session_state, upstreamAddress())
@@ -195,9 +216,12 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
   encoder_callbacks_.stream_info_.setUpstreamInfo(nullptr);
-  EXPECT_CALL(*raw_session_state, onUpdate(_, _)).Times(0);
+  EXPECT_CALL(*raw_session_state, onUpdateHeader(_, _)).Times(0);
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+
+  EXPECT_CALL(*raw_session_state, onUpdateData(_, _, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_buffer, true));
 }
 
 // Test the case that no valid session state.
