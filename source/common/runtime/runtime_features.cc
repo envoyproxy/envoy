@@ -79,6 +79,7 @@ RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_
 RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_ssl_port);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
+RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
@@ -112,7 +113,6 @@ RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
-RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
