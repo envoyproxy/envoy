@@ -112,7 +112,6 @@ message QuicProtocolOptions {
   // For internal corporate network, a long timeout is often fine.
   // But for client facing network, 30s is usually a good choice.
   google.protobuf.Duration idle_network_timeout = 8 [(validate.rules).duration = {
-    lte {seconds: 600}
     gte {seconds: 1}
   }];
 
