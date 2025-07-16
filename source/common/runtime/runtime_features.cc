@@ -112,6 +112,7 @@ RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
+RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -136,8 +137,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
-// TODO(pksohn): enable after canarying the feature internally without problems.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
