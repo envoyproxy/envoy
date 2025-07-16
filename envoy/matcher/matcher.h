@@ -194,19 +194,19 @@ protected:
       // Parent result's keep_matching skips the nested result.
       if (on_match->keep_matching_ && nested_result.isMatch()) {
         if (skipped_match_cb) {
-          skipped_match_cb(nested_result.actionPtr());
+          skipped_match_cb(nested_result.action());
         }
         return MatchResult::noMatch();
       }
       return nested_result;
     }
-    if (on_match->action_cb_ && on_match->keep_matching_) {
+    if (on_match->action_ && on_match->keep_matching_) {
       if (skipped_match_cb) {
-        skipped_match_cb(on_match->action_cb_);
+        skipped_match_cb(on_match->action_);
       }
       return MatchResult::noMatch();
     }
-    return MatchResult{on_match->action_cb_};
+    return MatchResult{on_match->action_};
   }
 };
 

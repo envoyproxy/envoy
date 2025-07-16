@@ -595,7 +595,9 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureNotEnabled) {
           abort:
             http_status: 503
       sample_percent:
-        runtime_key:
+        default_value:
+          numerator: 30
+          denominator: HUNDRED
    )EOF";
 
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
