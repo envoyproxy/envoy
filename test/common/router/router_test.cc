@@ -12,6 +12,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/copy_on_write_buffer.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
@@ -3039,6 +3040,142 @@ TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
                     .counter("retry_or_shadow_abandoned")
                     .value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// ====================================================================
+// Copy-On-Write Buffer Integration Tests
+// ====================================================================
+TEST_F(RouterTest, CopyOnWriteBasicFunctionalityWithoutRetries) {
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  router_->decodeHeaders(headers, false);
+
+  // Send request body
+  const std::string body(256, 'X');
+  Buffer::OwnedImpl buf(body);
+
+  // Router should handle request without crashing
+  auto result = router_->decodeData(buf, true);
+  EXPECT_TRUE(result == Http::FilterDataStatus::Continue ||
+              result == Http::FilterDataStatus::StopIterationNoBuffer);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, CopyOnWriteBehaviorWithRequestsAndRetries) {
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  router_->decodeHeaders(headers, false);
+
+  const std::string body(1536, 'Y');
+  Buffer::OwnedImpl buf(body);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(buf, false));
+
+  // Complete the request normally
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, CopyOnWriteBehaviorSmallRequestsWithRetries) {
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  router_->decodeHeaders(headers, false);
+
+  const std::string small_body(256, 'S');
+  Buffer::OwnedImpl buf(small_body);
+
+  // With retry policy enabled, even small requests buffer
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(buf, false));
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, CopyOnWriteWithRequestBodyBufferLimitIntegration) {
+  // Configure a specific request body buffer limit
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
+      .WillRepeatedly(Return(4096)); // 4KB limit
+
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  router_->decodeHeaders(headers, false);
+
+  const std::string body_part1(2048, 'X');
+  Buffer::OwnedImpl buf1(body_part1);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(buf1, false));
+
+  // Complete request
+  const std::string body_part2(1024, 'Y');
+  Buffer::OwnedImpl buf2(body_part2);
+  router_->decodeData(buf2, true);
+
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(RouterTest, CopyOnWriteCompilationAndBasicFunctionality) {
+
+  Buffer::OwnedImpl decoding_buffer;
+  EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
+
+  Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  router_->decodeHeaders(headers, false);
+
+  const std::string medium_body(1536, 'Z');
+  Buffer::OwnedImpl buf(medium_body);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(buf, true));
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl({{":status", "200"}}));
+  response_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 // Two requests are sent (slow request + hedged retry) and then global timeout

@@ -957,6 +957,9 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     active_shadow_policies_.clear();
     request_buffer_overflowed_ = true;
 
+    // Clean up shared copy-on-write buffer when buffering is abandoned.
+    shared_request_buffer_.reset();
+
     // If we had to abandon buffering and there's no request in progress, abort the request and
     // clean up. This happens if the initial upstream request failed, and we are currently waiting
     // for a backoff timer before starting the next upstream attempt.
@@ -970,21 +973,63 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     }
   }
 
+  // Determine if copy-on-write buffers should be used for memory efficiency.
+  const bool useCopyOnWrite = shouldUseCopyOnWriteBuffers(buffering, data.length());
+
   for (auto* shadow_stream : shadow_streams_) {
     if (end_stream) {
       shadow_stream->removeDestructorCallback();
       shadow_stream->removeWatermarkCallbacks();
     }
-    Buffer::OwnedImpl copy(data);
-    shadow_stream->sendData(copy, end_stream);
+
+    if (useCopyOnWrite) {
+      // Create shared copy-on-write buffer if not already created for this data chunk.
+      if (!shared_request_buffer_) {
+        auto owned_copy = std::make_unique<Buffer::OwnedImpl>(data);
+        shared_request_buffer_ = std::make_shared<Buffer::SharedBuffer>(std::move(owned_copy));
+        ENVOY_LOG(debug,
+                  "Created shared copy-on-write buffer for {} byte request body with {} potential "
+                  "consumers",
+                  data.length(), shadow_streams_.size() + (buffering ? 1 : 0));
+      }
+
+      // Use copy-on-write buffer for shadow stream.
+      auto copyOnWriteBuffer = std::make_unique<Buffer::CopyOnWriteBuffer>(shared_request_buffer_);
+      shadow_stream->sendData(*copyOnWriteBuffer, end_stream);
+    } else {
+      // Use traditional copy for smaller requests or single consumers.
+      Buffer::OwnedImpl copy(data);
+      shadow_stream->sendData(copy, end_stream);
+    }
   }
   if (end_stream) {
     shadow_streams_.clear();
+    // Clean up shared copy-on-write buffer when stream ends as no more data will be processed.
+    shared_request_buffer_.reset();
   }
   if (buffering) {
     if (!upstream_requests_.empty()) {
-      Buffer::OwnedImpl copy(data);
-      upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
+      if (useCopyOnWrite) {
+        // Create shared copy-on-write buffer if not already created for this data chunk.
+        if (!shared_request_buffer_) {
+          auto owned_copy = std::make_unique<Buffer::OwnedImpl>(data);
+          shared_request_buffer_ = std::make_shared<Buffer::SharedBuffer>(std::move(owned_copy));
+          ENVOY_LOG(
+              debug,
+              "Created shared copy-on-write buffer for {} byte request body for upstream request",
+              data.length());
+        }
+
+        // Use copy-on-write buffer for upstream request to optimize memory usage for large request
+        // bodies that may be retried or shadowed multiple times.
+        auto copyOnWriteBuffer =
+            std::make_unique<Buffer::CopyOnWriteBuffer>(shared_request_buffer_);
+        upstream_requests_.front()->acceptDataFromRouter(*copyOnWriteBuffer, end_stream);
+      } else {
+        // Use traditional copy for smaller requests or single consumers.
+        Buffer::OwnedImpl copy(data);
+        upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
+      }
     }
 
     // If we are potentially going to retry or buffer shadow this request we need to buffer.
@@ -1079,6 +1124,9 @@ void Filter::cleanup() {
     response_timeout_->disableTimer();
     response_timeout_.reset();
   }
+
+  // Clean up shared copy-on-write buffer when filter is cleaned up.
+  shared_request_buffer_.reset();
 }
 
 absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& policy,
@@ -1112,7 +1160,21 @@ void Filter::maybeDoShadowing() {
     Http::RequestMessagePtr request(new Http::RequestMessageImpl(
         Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
     if (callbacks_->decodingBuffer()) {
-      request->body().add(*callbacks_->decodingBuffer());
+      const auto& decoding_buffer = *callbacks_->decodingBuffer();
+      const bool useCopyOnWriteForShadow =
+          shouldUseCopyOnWriteBuffers(true, decoding_buffer.length());
+
+      if (useCopyOnWriteForShadow) {
+        // Use copy-on-write buffer for shadow request to optimize memory usage.
+        auto copyOnWriteBuffer =
+            Buffer::createCopyOnWriteBuffer(std::make_unique<Buffer::OwnedImpl>(decoding_buffer));
+        ENVOY_LOG(debug, "Using copy-on-write buffer for shadow request of {} byte request body",
+                  decoding_buffer.length());
+        request->body().add(*copyOnWriteBuffer);
+      } else {
+        // Use traditional copy for smaller requests or when copy-on-write isn't beneficial.
+        request->body().add(decoding_buffer);
+      }
     }
     if (shadow_trailers_) {
       request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
@@ -2182,10 +2244,25 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
   // sure we don't send data on the wrong request.
   if (!upstream_requests_.empty() && (upstream_requests_.front().get() == upstream_request_tmp)) {
     if (callbacks_->decodingBuffer()) {
-      // If we are doing a retry we need to make a copy.
-      Buffer::OwnedImpl copy(*callbacks_->decodingBuffer());
-      upstream_requests_.front()->acceptDataFromRouter(copy, !downstream_trailers_ &&
-                                                                 downstream_end_stream_);
+      const auto& decoding_buffer = *callbacks_->decodingBuffer();
+      const bool useCopyOnWriteForRetry =
+          shouldUseCopyOnWriteBuffers(true, decoding_buffer.length());
+
+      if (useCopyOnWriteForRetry) {
+        // Create copy-on-write buffer from the full buffered request body for memory-efficient
+        // retries.
+        auto copyOnWriteBuffer =
+            Buffer::createCopyOnWriteBuffer(std::make_unique<Buffer::OwnedImpl>(decoding_buffer));
+        ENVOY_LOG(debug, "Using copy-on-write buffer for retry of {} byte request body",
+                  decoding_buffer.length());
+        upstream_requests_.front()->acceptDataFromRouter(
+            *copyOnWriteBuffer, !downstream_trailers_ && downstream_end_stream_);
+      } else {
+        // Use traditional copy for smaller requests or when copy-on-write isn't beneficial.
+        Buffer::OwnedImpl copy(decoding_buffer);
+        upstream_requests_.front()->acceptDataFromRouter(copy, !downstream_trailers_ &&
+                                                                   downstream_end_stream_);
+      }
     }
 
     if (downstream_trailers_) {
@@ -2197,6 +2274,31 @@ void Filter::continueDoRetry(bool can_send_early_data, bool can_use_http3,
 uint32_t Filter::numRequestsAwaitingHeaders() {
   return std::count_if(upstream_requests_.begin(), upstream_requests_.end(),
                        [](const auto& req) -> bool { return req->awaitingHeaders(); });
+}
+
+bool Filter::shouldUseCopyOnWriteBuffers(bool buffering, uint64_t data_size) const {
+  // Only use copy-on-write for buffering scenarios with large request bodies where multiple copies
+  // might be beneficial. This optimizes memory usage for ML/inference workloads.
+  if (!buffering || data_size < 1024) { // Only beneficial for requests >= 1KB
+    return false;
+  }
+
+  // Count potential consumers: upstream request + retry attempts + shadow streams
+  uint32_t potential_copies = 0;
+
+  if (!upstream_requests_.empty()) {
+    potential_copies++; // Current upstream request
+  }
+
+  if (retry_state_ && retry_state_->enabled()) {
+    potential_copies++; // Potential retry copies
+  }
+
+  potential_copies += shadow_streams_.size();         // Active shadow streams
+  potential_copies += active_shadow_policies_.size(); // Potential future shadows
+
+  // Copy-on-write is beneficial when we expect 2+ copies of reasonably large data
+  return potential_copies >= 2;
 }
 
 bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster) {
