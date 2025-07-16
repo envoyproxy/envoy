@@ -107,7 +107,7 @@ void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
 
   if (match_tree_evaluated_ && match_result.isMatch()) {
     const auto& result = match_result.action();
-    if (SkipAction().typeUrl() == result.typeUrl()) {
+    if (SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
       // TODO(botengyao) this would be similar to `base_filter_->onMatchCallback(*result);`
@@ -115,7 +115,7 @@ void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
       ENVOY_LOG(warn,
                 "Network filter match result {}, and it is not supported. The configured"
                 " filter will be used.",
-                result.typeUrl());
+                result->typeUrl());
     }
   }
 }
