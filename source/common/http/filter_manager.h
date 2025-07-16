@@ -143,8 +143,6 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // TODO(soya3129): make this pure when adding impl to encoder filter.
   virtual void handleMetadataAfterHeadersCallback() PURE;
 
-  virtual void onMatchCallback(const Matcher::Action& action) PURE;
-
   // Http::StreamFilterCallbacks
   OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
@@ -265,9 +263,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
-  void onMatchCallback(const Matcher::Action& action) override {
-    handle_->onMatchCallback(std::move(action));
-  }
 
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
@@ -351,7 +346,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
   void handleMetadataAfterHeadersCallback() override;
-  void onMatchCallback(const Matcher::Action& action) override { handle_->onMatchCallback(action); }
 
   void doMetadata() override {
     if (saved_response_metadata_ != nullptr) {
