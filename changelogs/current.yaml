@@ -375,5 +375,10 @@ new_features:
 - area: alts
   change: |
     Added environment variable-protected gRPC keepalive params to the ALTS handshaker client.
+- area: wasm
+  change: |
+    Added support for returning ``StopIteration`` from plugin ``onRequestHeader`` and ``onResponseHeader`` callbacks. See
+    :ref:`allow_on_headers_stop_iteration <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.allow_on_headers_stop_iteration>`
+    for more details. By default, current behavior is maintained.
 
 deprecated:
