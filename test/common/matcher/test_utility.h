@@ -273,14 +273,9 @@ void PrintTo(const FieldMatchResult& result, std::ostream* os) {
   }
 }
 
-// Creates a StringAction from a provided string.
-std::unique_ptr<StringAction> stringValue(absl::string_view value) {
-  return std::make_unique<StringAction>(std::string(value));
-}
-
 // Creates an OnMatch that evaluates to a StringValue with the provided value.
 template <class T> OnMatch<T> stringOnMatch(absl::string_view value, bool keep_matching = false) {
-  return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr, keep_matching};
+  return OnMatch<T>{std::make_shared<StringAction>(std::string(value)), nullptr, keep_matching};
 }
 
 inline void PrintTo(const Action& action, std::ostream* os) {
@@ -358,8 +353,7 @@ MATCHER_P(HasStringAction, matcher, "") {
   if (!arg.isMatch()) {
     return false;
   }
-  return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.actionFactory(),
-                                       result_listener);
+  return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.action(), result_listener);
 }
 
 MATCHER_P(HasActionWithType, matcher, "") {
@@ -368,8 +362,7 @@ MATCHER_P(HasActionWithType, matcher, "") {
   if (!arg.isMatch()) {
     return false;
   }
-  return ::testing::ExplainMatchResult(IsActionWithType(matcher), arg.actionFactory(),
-                                       result_listener);
+  return ::testing::ExplainMatchResult(IsActionWithType(matcher), arg.action(), result_listener);
 }
 
 MATCHER(HasNoMatch, "") {
