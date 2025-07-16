@@ -41,7 +41,7 @@ public:
     if (!match_result.isMatch()) {
       return;
     }
-    cluster_name_.emplace(match_result.action().getTyped<ClusterAction>().cluster());
+    cluster_name_.emplace(match_result.action()->getTyped<ClusterAction>().cluster());
   }
 
 private:
