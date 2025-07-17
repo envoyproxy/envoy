@@ -63,7 +63,7 @@ def _default_envoy_build_config_impl(ctx):
     ctx.file("BUILD.bazel", "")
     ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
 
-_default_envoy_build_config = repository_rule(
+default_envoy_build_config = repository_rule(
     implementation = _default_envoy_build_config_impl,
     attrs = {
         "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
@@ -118,7 +118,7 @@ def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
-        _default_envoy_build_config(name = "envoy_build_config")
+        default_envoy_build_config(name = "envoy_build_config")
 
     # Setup Bazel shell rules
     external_http_archive(name = "rules_shell")
@@ -761,7 +761,11 @@ def _com_github_grpc_grpc():
         patches = ["@envoy//bazel:grpc.patch"],
         repo_mapping = {"@openssl": "@boringssl"},
     )
-    external_http_archive("build_bazel_rules_apple")
+    external_http_archive(
+        "build_bazel_rules_apple",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel:rules_apple.patch"],
+    )
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(

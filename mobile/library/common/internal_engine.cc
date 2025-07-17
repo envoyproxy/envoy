@@ -12,6 +12,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "library/common/mobile_process_wide.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_api.h"
 #include "library/common/stats/utility.h"
 
@@ -370,6 +371,25 @@ void InternalEngine::onDefaultNetworkChanged(int network) {
   dispatcher_->post([&, network]() -> void {
     handleNetworkChange(network, probeAndGetLocalAddr(AF_INET6) != nullptr);
   });
+}
+
+void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType /*connection_type*/,
+                                                    int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling the default network changed callback on Android");
+}
+
+void InternalEngine::onNetworkDisconnectAndroid(int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling network disconnect callback on Android");
+}
+
+void InternalEngine::onNetworkConnectAndroid(ConnectionType /*connection_type*/,
+                                             int64_t /*net_id*/) {
+  ENVOY_LOG_MISC(trace, "Calling network connect callback on Android");
+}
+
+void InternalEngine::purgeActiveNetworkListAndroid(
+    const std::vector<int64_t>& /*active_network_ids*/) {
+  ENVOY_LOG_MISC(trace, "Calling network purge callback on Android");
 }
 
 void InternalEngine::onDefaultNetworkUnavailable() {

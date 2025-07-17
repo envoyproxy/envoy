@@ -85,12 +85,12 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       const Http::StreamFilterCallbacks* callbacks) const {                                        \
     const auto* route_local = Http::Utility::resolveMostSpecificPerFilterConfig<                   \
         RoleBasedAccessControlRouteSpecificFilterConfig>(callbacks);                               \
-    std::string prefix = PREFIX;                                                                   \
+    absl::string_view prefix = PREFIX;                                                             \
     if (route_local && !route_local->ROUTE_LOCAL_PREFIX_OVERRIDE().empty()) {                      \
       prefix = route_local->ROUTE_LOCAL_PREFIX_OVERRIDE();                                         \
     }                                                                                              \
-    return prefix +                                                                                \
-           Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().DYNAMIC_METADATA_KEY;        \
+    return absl::StrCat(                                                                           \
+        prefix, Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().DYNAMIC_METADATA_KEY);  \
   }
 
 DEFINE_DYNAMIC_METADATA_STAT_KEY_GETTER(shadowEffectivePolicyIdField, shadow_rules_stat_prefix_,

@@ -642,13 +642,40 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
-    // We use event_id to determine if the cache key was found.
-    if event_id == 0 {
-      // This means the cache key was not found, so we continue decoding.
-      envoy_filter.continue_decoding();
-    } else {
-      let result = self.rx.take().unwrap().recv().unwrap();
-      envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()));
+    match event_id {
+      // Event from the on_request_headers when the cache key was not found.
+      0 => {
+        // Ensure that it is possible to set response headers on the generic scheduled event.
+        envoy_filter.set_request_header("on-scheduled", b"req");
+        envoy_filter.continue_decoding();
+      },
+      // Event from the on_scheduled when the cache key was found.
+      1 => {
+        let result = self.rx.take().unwrap().recv().unwrap();
+        envoy_filter.send_response(200, vec![("cached", b"yes")], Some(result.as_bytes()));
+      },
+      // Event from the on_response_headers.
+      2 => {
+        // Ensure that it is possible to set response headers on the generic scheduled event.
+        envoy_filter.set_response_header("on-scheduled", b"res");
+        envoy_filter.continue_encoding();
+      },
+      _ => unreachable!(),
     }
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    let scheduler = envoy_filter.new_scheduler();
+    _ = std::thread::spawn(move || {
+      scheduler.commit(2);
+    });
+
+    // Return StopIteration to indicate that we will continue the processing
+    // once the scheduled event is completed.
+    envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
   }
 }

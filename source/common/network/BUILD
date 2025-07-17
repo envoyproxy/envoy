@@ -205,6 +205,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ip_address_lib",
+    srcs = ["ip_address.cc"],
+    hdrs = ["ip_address.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/network:address_interface",
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "io_socket_error_lib",
     srcs = ["io_socket_error_impl.cc"],
     hdrs = ["io_socket_error_impl.h"],

@@ -37,6 +37,7 @@ Millicores
 NID
 NIST
 NORMALISATION
+SQLSTATE
 bm
 BSON
 BPF
@@ -90,6 +91,7 @@ ETB
 ETX
 FS
 FIXME
+decrypted
 gperf
 HEXDIG
 HEXDIGIT
