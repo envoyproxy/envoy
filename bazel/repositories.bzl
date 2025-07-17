@@ -739,6 +739,8 @@ def _com_github_google_quiche():
         name = "com_github_google_quiche",
         patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
+        patches = ["@envoy//bazel/external:quiche.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_googlesource_googleurl():
