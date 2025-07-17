@@ -11759,8 +11759,10 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
   EXPECT_FALSE(creation_status_.ok());
-  EXPECT_THAT(creation_status_.message(),
-              testing::HasSubstr("Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set"));
+  EXPECT_THAT(
+      creation_status_.message(),
+      testing::HasSubstr(
+          "Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set"));
 }
 
 // Test validation that both per_request_buffer_limit_bytes and request_body_buffer_limit cannot be
@@ -11782,8 +11784,10 @@ virtual_hosts:
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
   EXPECT_FALSE(creation_status_.ok());
-  EXPECT_THAT(creation_status_.message(),
-              testing::HasSubstr("Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set"));
+  EXPECT_THAT(
+      creation_status_.message(),
+      testing::HasSubstr(
+          "Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set"));
 }
 
 } // namespace

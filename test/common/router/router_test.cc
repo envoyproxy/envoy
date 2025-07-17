@@ -3007,7 +3007,7 @@ TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  // Configure a large request body buffer limit (50 bytes) but small retry/shadow limit (10 bytes).
+  // Configure a large request body buffer limit (50 bytes) but small request buffer limit (10 bytes).
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
   EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillOnce(Return(10));
 

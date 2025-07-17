@@ -207,6 +207,9 @@ removed_config_or_runtime:
 - area: lua
   change: |
     Removed runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` and legacy code paths.
+- area: http1
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.envoy_reloadable_features_http1_use_balsa_parser`` and legacy code paths.
 
 new_features:
 - area: build
