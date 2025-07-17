@@ -25,6 +25,49 @@ public:
   std::unique_ptr<struct iovec[]> iov_;
 };
 
+class SendRequest : public Request {
+public:
+  SendRequest(IoUringSocket& socket, const void* buf, size_t len, int flags);
+
+  const void* buf_;
+  size_t len_;
+  int flags_;
+};
+
+class RecvRequest : public Request {
+public:
+  RecvRequest(IoUringSocket& socket, size_t len, int flags);
+
+  std::unique_ptr<uint8_t[]> buf_;
+  size_t len_;
+  int flags_;
+};
+
+class SendMsgRequest : public Request {
+public:
+  SendMsgRequest(IoUringSocket& socket, const struct msghdr* msg, int flags);
+
+  std::unique_ptr<struct msghdr> msg_;
+  std::unique_ptr<struct iovec[]> iov_;
+  std::unique_ptr<uint8_t[]> name_buf_;
+  std::unique_ptr<uint8_t[]> control_buf_;
+  int flags_;
+};
+
+class RecvMsgRequest : public Request {
+public:
+  RecvMsgRequest(IoUringSocket& socket, size_t buf_size, size_t control_size, int flags);
+
+  std::unique_ptr<struct msghdr> msg_;
+  std::unique_ptr<struct iovec> iov_;
+  std::unique_ptr<uint8_t[]> buf_;
+  std::unique_ptr<uint8_t[]> name_buf_;
+  std::unique_ptr<uint8_t[]> control_buf_;
+  size_t buf_size_;
+  size_t control_size_;
+  int flags_;
+};
+
 class IoUringSocketEntry;
 using IoUringSocketEntryPtr = std::unique_ptr<IoUringSocketEntry>;
 
@@ -32,9 +75,9 @@ class IoUringWorkerImpl : public IoUringWorker, private Logger::Loggable<Logger:
 public:
   IoUringWorkerImpl(uint32_t io_uring_size, bool use_submission_queue_polling,
                     uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    Event::Dispatcher& dispatcher);
+                    Event::Dispatcher& dispatcher, IoUringMode mode = IoUringMode::ReadWritev);
   IoUringWorkerImpl(IoUringPtr&& io_uring, uint32_t read_buffer_size, uint32_t write_timeout_ms,
-                    Event::Dispatcher& dispatcher);
+                    Event::Dispatcher& dispatcher, IoUringMode mode = IoUringMode::ReadWritev);
   ~IoUringWorkerImpl() override;
 
   // IoUringWorker
@@ -52,6 +95,12 @@ public:
   Request* submitCloseRequest(IoUringSocket& socket) override;
   Request* submitCancelRequest(IoUringSocket& socket, Request* request_to_cancel) override;
   Request* submitShutdownRequest(IoUringSocket& socket, int how) override;
+  Request* submitSendRequest(IoUringSocket& socket, const void* buf, size_t len,
+                             int flags) override;
+  Request* submitRecvRequest(IoUringSocket& socket, void* buf, size_t len, int flags) override;
+  Request* submitSendmsgRequest(IoUringSocket& socket, const struct msghdr* msg,
+                                int flags) override;
+  Request* submitRecvmsgRequest(IoUringSocket& socket, struct msghdr* msg, int flags) override;
 
   Event::Dispatcher& dispatcher() override;
 
@@ -63,6 +112,12 @@ public:
 
   // Return the number of sockets in this worker.
   uint32_t getNumOfSockets() const override { return sockets_.size(); }
+
+  // Return the configured io_uring operation mode.
+  IoUringMode getMode() const override { return mode_; }
+
+  // Return the read buffer size configuration.
+  uint32_t getReadBufferSize() const { return read_buffer_size_; }
 
 protected:
   // Add a socket to the worker.
@@ -84,6 +139,8 @@ protected:
   // The IoUringWorker will delay the submit the requests which are submitted in request completion
   // callback.
   bool delay_submit_{false};
+  // The configured io_uring operation mode.
+  IoUringMode mode_;
 };
 
 class IoUringSocketEntry : public IoUringSocket,
@@ -108,39 +165,72 @@ public:
   void connect(const Network::Address::InstanceConstSharedPtr&) override { PANIC("not implement"); }
 
   void onAccept(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Accept))) {
-      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Accept);
+    if (injected && (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Accept))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Accept);
     }
   }
   void onConnect(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Connect))) {
-      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Connect);
+    if (injected &&
+        (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Connect))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Connect);
     }
   }
   void onRead(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Read))) {
-      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Read);
+    if (injected && (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Read))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Read);
     }
   }
   void onWrite(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Write))) {
-      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Write);
+    if (injected && (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Write))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Write);
     }
   }
   void onClose(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Close))) {
-      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Close);
+    if (injected && (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Close))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Close);
     }
   }
   void onCancel(Request*, int32_t, bool injected) override {
-    if (injected && (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Cancel))) {
-      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Cancel);
+    if (injected && (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Cancel))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Cancel);
     }
   }
-  void onShutdown(Request*, int32_t, bool injected) override {
+  void onShutdown(Request* req, int32_t result, bool injected) override {
+    (void)req;
+    (void)result;
     if (injected &&
-        (injected_completions_ & static_cast<uint8_t>(Request::RequestType::Shutdown))) {
-      injected_completions_ &= ~static_cast<uint8_t>(Request::RequestType::Shutdown);
+        (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Shutdown))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Shutdown);
+    }
+  }
+  void onSend(Request* req, int32_t result, bool injected) override {
+    (void)req;
+    (void)result;
+    if (injected && (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Send))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Send);
+    }
+  }
+  void onRecv(Request* req, int32_t result, bool injected) override {
+    (void)req;
+    (void)result;
+    if (injected && (injected_completions_ & static_cast<uint16_t>(Request::RequestType::Recv))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::Recv);
+    }
+  }
+  void onSendmsg(Request* req, int32_t result, bool injected) override {
+    (void)req;
+    (void)result;
+    if (injected &&
+        (injected_completions_ & static_cast<uint16_t>(Request::RequestType::SendMsg))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::SendMsg);
+    }
+  }
+  void onRecvmsg(Request* req, int32_t result, bool injected) override {
+    (void)req;
+    (void)result;
+    if (injected &&
+        (injected_completions_ & static_cast<uint16_t>(Request::RequestType::RecvMsg))) {
+      injected_completions_ &= ~static_cast<uint16_t>(Request::RequestType::RecvMsg);
     }
   }
   void injectCompletion(Request::RequestType type) override;
@@ -165,7 +255,7 @@ protected:
   IoUringWorkerImpl& parent_;
   // This records already injected completion request type to
   // avoid duplicated injections.
-  uint8_t injected_completions_{0};
+  uint16_t injected_completions_{0};
   // The current status of socket.
   IoUringSocketStatus status_{Initialized};
   // Deliver the remote close as file read event or file close event.
@@ -200,6 +290,10 @@ public:
   void onWrite(Request* req, int32_t result, bool injected) override;
   void onShutdown(Request* req, int32_t result, bool injected) override;
   void onCancel(Request* req, int32_t result, bool injected) override;
+  void onSend(Request* req, int32_t result, bool injected) override;
+  void onRecv(Request* req, int32_t result, bool injected) override;
+  void onSendmsg(Request* req, int32_t result, bool injected) override;
+  void onRecvmsg(Request* req, int32_t result, bool injected) override;
 
   Buffer::OwnedImpl& getReadBuffer() { return read_buf_; }
 
