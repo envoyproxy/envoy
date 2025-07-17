@@ -28,6 +28,10 @@ public:
         runtime_(runtime) {}
 
   void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
+    if (actionSkip()) {
+      return;
+    }
+
     if (auto config_value = config_provider_(); config_value.has_value()) {
       (*config_value)(callbacks);
       return;
@@ -36,15 +40,15 @@ public:
     Envoy::Http::MissingConfigFilterFactory(callbacks);
   }
 
+  const std::string& actionName() const { return name_; }
+
+private:
   bool actionSkip() const {
     return sample_.has_value() ? !runtime_.snapshot().featureEnabled(sample_->runtime_key(),
                                                                      sample_->default_value())
                                : false;
   }
 
-  const std::string& actionName() const { return name_; }
-
-private:
   FilterConfigProvider config_provider_;
   const std::string name_;
   const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> sample_;

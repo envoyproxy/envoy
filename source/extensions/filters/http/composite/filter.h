@@ -99,7 +99,7 @@ public:
     }
   }
 
-  bool onMatchCallback(const Matcher::Action& action) override;
+  void onMatchCallback(const Matcher::Action& action) override;
 
   // AccessLog::Instance
   void log(const Formatter::HttpFormatterContext& log_context,

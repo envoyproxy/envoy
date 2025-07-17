@@ -121,13 +121,11 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
 
   if (match_tree_evaluated_ && match_result.isMatch()) {
     const auto& result = match_result.action();
-    if (SkipAction().typeUrl() == result->typeUrl()) {
+    if (result == nullptr || SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
       ASSERT(base_filter_ != nullptr);
-      if (!base_filter_->onMatchCallback(*result)) {
-        skip_filter_ = true;
-      }
+      base_filter_->onMatchCallback(*result);
     }
   }
 }
