@@ -49,6 +49,14 @@ public:
   socklen_t sockAddrLen() const override;
   absl::string_view addressType() const override { return "reverse_connection"; }
   const Network::SocketInterface& socketInterface() const override {
+    auto* socket_interface = Network::socketInterface(
+        "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface");
+    if (socket_interface) {
+      return *socket_interface;
+    }
+    // Fallback to default if reverse connection interface is not available
+    ENVOY_LOG_MISC(error, "Reverse connection address detected but socket interface not registered: {}",
+              logicalName());
     return Network::SocketInterfaceSingleton::get();
   }
 
