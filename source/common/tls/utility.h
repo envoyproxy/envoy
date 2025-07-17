@@ -117,6 +117,13 @@ std::vector<std::string> getCertificateExtensionOids(X509& cert);
 absl::string_view getCertificateExtensionValue(X509& cert, absl::string_view extension_name);
 
 /**
+ * Retrieves all OIDs and their values from a certificate's extensions as a map.
+ * @param cert the certificate.
+ * @return std::map<std::string, std::string> a map of OID strings to their extension values.
+ */
+std::map<std::string, std::string> getCertificateOidMap(X509& cert);
+
+/**
  * Returns the seconds since unix epoch of the expiration time of this certificate.
  * @param cert the certificate
  * @return the seconds since unix epoch as a duration, or max duration if cert is null.

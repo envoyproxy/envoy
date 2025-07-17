@@ -45,6 +45,8 @@ public:
   absl::Span<const std::string> othernameSansLocalCertificate() const override;
   absl::Span<const std::string> oidsPeerCertificate() const override;
   absl::Span<const std::string> oidsLocalCertificate() const override;
+  const std::map<std::string, std::string>& oidMapPeerCertificate() const override;
+  const std::map<std::string, std::string>& oidMapLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
   const std::string& sessionId() const override;
@@ -88,6 +90,8 @@ private:
     IpSansPeerCertificate,
     OidsPeerCertificate,
     OidsLocalCertificate,
+    OidMapPeerCertificate,
+    OidMapLocalCertificate,
   };
 
   // Retrieve the given tag from the set of cached values, or create the value via the supplied
@@ -101,7 +105,7 @@ private:
   // table of cached values that are created on demand. Use a node_hash_map so that returned
   // references are not invalidated when additional items are added.
   using CachedValue = absl::variant<std::string, std::vector<std::string>, Ssl::ParsedX509NamePtr,
-                                    bssl::UniquePtr<GENERAL_NAMES>>;
+                                    bssl::UniquePtr<GENERAL_NAMES>, std::map<std::string, std::string>>;
   mutable absl::node_hash_map<CachedValueTag, CachedValue> cached_values_;
 };
 
