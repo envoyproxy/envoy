@@ -571,8 +571,11 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)), route_name_(route.name()),
       time_source_(factory_context.mainThreadDispatcher().timeSource()),
-      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          route, per_request_buffer_limit_bytes, vhost->retryShadowBufferLimit())),
+      per_request_buffer_limit_(
+          route.has_request_body_buffer_limit()
+              ? std::numeric_limits<uint32_t>::max()
+              : PROTOBUF_GET_WRAPPED_OR_DEFAULT(route, per_request_buffer_limit_bytes,
+                                                vhost->perRequestBufferLimit())),
       request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route, request_body_buffer_limit,
                                                                  vhost->requestBodyBufferLimit())),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
@@ -584,6 +587,14 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       using_new_timeouts_(route.route().has_max_stream_duration()),
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
+
+  // Validate that only one of per_request_buffer_limit_bytes and request_body_buffer_limit is set.
+  if (route.has_per_request_buffer_limit_bytes() && route.has_request_body_buffer_limit()) {
+    creation_status = absl::InvalidArgumentError(
+        "Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set.");
+    return;
+  }
+
   auto config_or_error =
       PerFilterConfigs::create(route.typed_per_filter_config(), factory_context, validator);
   SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
@@ -1565,13 +1576,25 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
                                                          factory_context, validator),
                                 std::unique_ptr<PerFilterConfigs>)),
-      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
+      per_request_buffer_limit_(
+          virtual_host.has_request_body_buffer_limit()
+              ? std::numeric_limits<uint32_t>::max()
+              : PROTOBUF_GET_WRAPPED_OR_DEFAULT(virtual_host, per_request_buffer_limit_bytes,
+                                                std::numeric_limits<uint32_t>::max())),
       request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, request_body_buffer_limit, std::numeric_limits<uint64_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
       include_is_timeout_retry_header_(virtual_host.include_is_timeout_retry_header()) {
+
+  // Validate that only one of per_request_buffer_limit_bytes and request_body_buffer_limit is set.
+  if (virtual_host.has_per_request_buffer_limit_bytes() &&
+      virtual_host.has_request_body_buffer_limit()) {
+    creation_status = absl::InvalidArgumentError(
+        "Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set.");
+    return;
+  }
+
   if (!virtual_host.request_headers_to_add().empty() ||
       !virtual_host.request_headers_to_remove().empty()) {
     request_headers_parser_ =

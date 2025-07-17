@@ -4831,7 +4831,7 @@ virtual_hosts:
                 .retryOn());
   EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
-                    ->retryShadowBufferLimit());
+                    ->perRequestBufferLimit());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -4871,7 +4871,7 @@ virtual_hosts:
                 .retryOn());
   EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
-                    ->retryShadowBufferLimit());
+                    ->perRequestBufferLimit());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -11715,201 +11715,75 @@ virtual_hosts:
   }
 }
 
-TEST_F(RouteMatcherTest, RequestBodyBufferLimitRouteAndVirtualHost) {
+// Test that request_body_buffer_limit takes precedence over virtual_host
+// per_request_buffer_limit_bytes
+TEST_F(RouteConfigurationV2, RequestBodyBufferLimitPrecedenceRouteOverridesVirtualHost) {
   const std::string yaml = R"EOF(
 virtual_hosts:
-- domains: [www.inference.com]
-  name: inference
-  request_body_buffer_limit: 2097152  # 2MB virtual host level
+- domains: [test.example.com]
+  name: test_host
+  per_request_buffer_limit_bytes: 32768
   routes:
-  - match: {prefix: /large-inference}
-    request_body_buffer_limit: 5242880  # 5MB route level
-    route:
-      cluster: ml_backend
-  - match: {prefix: /small-inference}
-    route:
-      cluster: ml_backend
-  - match: {prefix: /}
-    route:
-      cluster: default
-- domains: [www.regular.com]
-  name: regular
-  routes:
-  - match: {prefix: /}
-    route:
-      cluster: default
-  )EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"ml_backend", "default"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                        creation_status_);
-
-  // Route level request_body_buffer_limit takes precedence over virtual host level.
-  EXPECT_EQ(5242880U, config.route(genHeaders("www.inference.com", "/large-inference", "POST"), 0)
-                          ->routeEntry()
-                          ->requestBodyBufferLimit());
-
-  // Virtual host level request_body_buffer_limit is used when route doesn't override.
-  EXPECT_EQ(2097152U, config.route(genHeaders("www.inference.com", "/small-inference", "POST"), 0)
-                          ->routeEntry()
-                          ->requestBodyBufferLimit());
-
-  EXPECT_EQ(2097152U, config.route(genHeaders("www.inference.com", "/", "POST"), 0)
-                          ->routeEntry()
-                          ->requestBodyBufferLimit());
-
-  // Default value when not configured (should be max uint64_t).
-  EXPECT_EQ(std::numeric_limits<uint64_t>::max(),
-            config.route(genHeaders("www.regular.com", "/", "POST"), 0)
-                ->routeEntry()
-                ->requestBodyBufferLimit());
-}
-
-TEST_F(RouteMatcherTest, RequestBodyBufferLimitInheritanceAndEdgeCases) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- domains: [inheritance.example.com]
-  name: inheritance_test
-  request_body_buffer_limit: 1048576  # 1MB
-  routes:
-  - match: {prefix: /override}
-    request_body_buffer_limit: 4194304  # 4MB - route overrides vhost
+  - match: {prefix: /test}
     route:
       cluster: backend
-  - match: {prefix: /inherit}
-    route:
-      cluster: backend  # Should inherit vhost setting
-  - match: {prefix: /zero}
-    request_body_buffer_limit: 0  # Explicit zero
-    route:
-      cluster: backend
-  - match: {prefix: /max}
-    request_body_buffer_limit: 18446744073709551615  # Max uint64_t
-    route:
-      cluster: backend
-  )EOF";
+    request_body_buffer_limit: 4194304
+)EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
 
-  // Route overrides virtual host.
-  EXPECT_EQ(4194304U, config.route(genHeaders("inheritance.example.com", "/override", "PUT"), 0)
-                          ->routeEntry()
-                          ->requestBodyBufferLimit());
-
-  // Route inherits from virtual host.
-  EXPECT_EQ(1048576U, config.route(genHeaders("inheritance.example.com", "/inherit", "PUT"), 0)
-                          ->routeEntry()
-                          ->requestBodyBufferLimit());
-
-  // Explicit zero should be preserved.
-  EXPECT_EQ(0U, config.route(genHeaders("inheritance.example.com", "/zero", "PUT"), 0)
-                    ->routeEntry()
-                    ->requestBodyBufferLimit());
-
-  // Max value should be handled correctly.
-  EXPECT_EQ(std::numeric_limits<uint64_t>::max(),
-            config.route(genHeaders("inheritance.example.com", "/max", "PUT"), 0)
-                ->routeEntry()
-                ->requestBodyBufferLimit());
+  Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(), route->perRequestBufferLimit());
 }
 
-TEST_F(RouteMatcherTest, RequestBodyBufferLimitInferenceUseCases) {
+// Test validation that both per_request_buffer_limit_bytes and request_body_buffer_limit cannot be
+// set on route
+TEST_F(RouteConfigurationV2, RequestBodyBufferLimitValidationConflict) {
   const std::string yaml = R"EOF(
 virtual_hosts:
-- domains: [ml.example.com]
-  name: ml_inference
-  request_body_buffer_limit: 1048576  # 1MB default for small models
+- domains: [test.example.com]
+  name: test_host
   routes:
-  - match: {prefix: /text-inference}
-    request_body_buffer_limit: 655360  # 640KB for text models (128K tokens * 5 bytes)
-    route:
-      cluster: text_model_backend
-  - match: {prefix: /vision-inference}
-    request_body_buffer_limit: 67108864  # 64MB for vision models with large images
-    route:
-      cluster: vision_model_backend
-  - match: {prefix: /embedding}
-    request_body_buffer_limit: 10485760  # 10MB for large document embedding
-    route:
-      cluster: embedding_backend
-  - match: {prefix: /health}
-    route:
-      cluster: health_backend  # Uses vhost default 1MB
-  )EOF";
-
-  factory_context_.cluster_manager_.initializeClusters(
-      {"text_model_backend", "vision_model_backend", "embedding_backend", "health_backend"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                        creation_status_);
-
-  // Text inference with specific buffer size for token limits.
-  EXPECT_EQ(655360U, config.route(genHeaders("ml.example.com", "/text-inference", "POST"), 0)
-                         ->routeEntry()
-                         ->requestBodyBufferLimit());
-
-  // Vision inference with large buffer for image data.
-  EXPECT_EQ(67108864U, config.route(genHeaders("ml.example.com", "/vision-inference", "POST"), 0)
-                           ->routeEntry()
-                           ->requestBodyBufferLimit());
-
-  // Embedding with medium buffer size.
-  EXPECT_EQ(10485760U, config.route(genHeaders("ml.example.com", "/embedding", "POST"), 0)
-                           ->routeEntry()
-                           ->requestBodyBufferLimit());
-
-  // Health check inherits default.
-  EXPECT_EQ(1048576U, config.route(genHeaders("ml.example.com", "/health", "GET"), 0)
-                          ->routeEntry()
-                          ->requestBodyBufferLimit());
-}
-
-TEST_F(RouteMatcherTest, RequestBodyBufferLimitWithRetryShadowBufferLimit) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- domains: [compatibility.example.com]
-  name: compatibility_test
-  per_request_buffer_limit_bytes: 32768  # 32KB retry/shadow limit
-  request_body_buffer_limit: 4194304     # 4MB request body limit
-  routes:
-  - match: {prefix: /mixed-config}
-    per_request_buffer_limit_bytes: 16384    # 16KB retry/shadow limit
-    request_body_buffer_limit: 8388608       # 8MB request body limit
+  - match: {prefix: /test}
     route:
       cluster: backend
-  - match: {prefix: /retry-only}
-    per_request_buffer_limit_bytes: 8192     # 8KB retry/shadow limit
-    route:
-      cluster: backend  # Inherits 4MB request body limit from vhost
-  - match: {prefix: /body-only}
-    request_body_buffer_limit: 2097152       # 2MB request body limit
-    route:
-      cluster: backend  # Inherits 32KB retry/shadow limit from vhost
-  )EOF";
+    per_request_buffer_limit_bytes: 32768
+    request_body_buffer_limit: 4194304
+)EOF";
 
   factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
   TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                         creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr("Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set"));
+}
 
-  // Route with both settings overridden.
-  auto mixed_route =
-      config.route(genHeaders("compatibility.example.com", "/mixed-config", "POST"), 0)
-          ->routeEntry();
-  EXPECT_EQ(16384U, mixed_route->retryShadowBufferLimit());
-  EXPECT_EQ(8388608U, mixed_route->requestBodyBufferLimit());
+// Test validation that both per_request_buffer_limit_bytes and request_body_buffer_limit cannot be
+// set on virtual host
+TEST_F(RouteConfigurationV2, RequestBodyBufferLimitValidationConflictVirtualHost) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [test.example.com]
+  name: test_host
+  per_request_buffer_limit_bytes: 32768
+  request_body_buffer_limit: 4194304
+  routes:
+  - match: {prefix: /test}
+    route:
+      cluster: backend
+)EOF";
 
-  // Route with only retry/shadow buffer override.
-  auto retry_route =
-      config.route(genHeaders("compatibility.example.com", "/retry-only", "POST"), 0)->routeEntry();
-  EXPECT_EQ(8192U, retry_route->retryShadowBufferLimit());
-  EXPECT_EQ(4194304U, retry_route->requestBodyBufferLimit());
-
-  // Route with only request body buffer override.
-  auto body_route =
-      config.route(genHeaders("compatibility.example.com", "/body-only", "POST"), 0)->routeEntry();
-  EXPECT_EQ(32768U, body_route->retryShadowBufferLimit());
-  EXPECT_EQ(2097152U, body_route->requestBodyBufferLimit());
+  factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
+  EXPECT_THAT(creation_status_.message(),
+              testing::HasSubstr("Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set"));
 }
 
 } // namespace

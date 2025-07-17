@@ -275,7 +275,7 @@ public:
     }
     return absl::nullopt;
   }
-  uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
+  uint32_t perRequestBufferLimit() const override { return per_request_buffer_limit_; }
   uint64_t requestBodyBufferLimit() const override { return request_body_buffer_limit_; }
 
   RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
@@ -349,7 +349,7 @@ private:
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint32_t per_request_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
   const bool include_attempt_count_in_request_ : 1;
   const bool include_attempt_count_in_response_ : 1;
@@ -714,7 +714,7 @@ public:
   const PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
   const PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
 
-  uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
+  uint32_t perRequestBufferLimit() const override { return per_request_buffer_limit_; }
   uint64_t requestBodyBufferLimit() const override { return request_body_buffer_limit_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   std::chrono::milliseconds timeout() const override { return timeout_; }
@@ -966,7 +966,7 @@ private:
   EarlyDataPolicyPtr early_data_policy_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint32_t per_request_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
   const absl::optional<Http::Code> direct_response_code_;
   const Http::Code cluster_not_found_response_code_;

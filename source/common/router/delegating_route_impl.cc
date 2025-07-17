@@ -77,8 +77,8 @@ const InternalRedirectPolicy& DelegatingRouteEntry::internalRedirectPolicy() con
   return base_route_entry_->internalRedirectPolicy();
 }
 
-uint32_t DelegatingRouteEntry::retryShadowBufferLimit() const {
-  return base_route_entry_->retryShadowBufferLimit();
+uint32_t DelegatingRouteEntry::perRequestBufferLimit() const {
+  return base_route_entry_->perRequestBufferLimit();
 }
 
 uint64_t DelegatingRouteEntry::requestBodyBufferLimit() const {

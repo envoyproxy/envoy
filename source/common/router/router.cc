@@ -513,10 +513,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
 
   // A route entry matches for the request.
   route_entry_ = route_->routeEntry();
-  // If there's a route specific limit and it's smaller than general downstream
-  // limits, apply the new cap.
-  retry_shadow_buffer_limit_ =
-      std::min(retry_shadow_buffer_limit_, route_entry_->retryShadowBufferLimit());
+  // Store the original buffer limits from the route entry for the new logic.
+  // Note: We no longer modify per_request_buffer_limit_ here since the new logic
+  // will compute the effective buffer limit dynamically in decodeData().
+  per_request_buffer_limit_ = route_entry_->perRequestBufferLimit();
   // Set the request body buffer limit from the route entry, allowing larger buffering
   // for inference payloads beyond connection buffer limits.
   request_body_buffer_limit_ = route_entry_->requestBodyBufferLimit();
@@ -837,9 +837,9 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
               .setIsShadow(true)
               .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
               .setBufferAccount(callbacks_->account())
-              // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
+              // A buffer limit of 1 is set in the case that per_request_buffer_limit_ == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
+              .setBufferLimit(1 > per_request_buffer_limit_ ? 1 : per_request_buffer_limit_)
               .setDiscardResponseBody(true)
               .setFilterConfig(config_)
               .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
@@ -937,13 +937,28 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
                    (!active_shadow_policies_.empty() && !streaming_shadows_) ||
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
 
-  // Determine the effective buffer limit for request body buffering.
-  // Use request_body_buffer_limit_ if it's configured (not max), otherwise fall back to
-  // retry_shadow_buffer_limit_.
-  uint64_t effective_buffer_limit =
-      (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max())
-          ? request_body_buffer_limit_
-          : static_cast<uint64_t>(retry_shadow_buffer_limit_);
+  // Determine the effective buffer limit for request body buffering:
+  // 1. If request_body_buffer_limit is set then we use request_body_buffer_limit.
+  // 2. If per_request_buffer_limit_bytes is set but request_body_buffer_limit is not then,
+  //    we use min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes)
+  // 3. If neither of these are set then we use per_connection_buffer_limit_bytes.
+  uint64_t effective_buffer_limit;
+
+  if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
+    // Case 1: request_body_buffer_limit is explicitly set.
+    effective_buffer_limit = request_body_buffer_limit_;
+  } else if (per_request_buffer_limit_ != std::numeric_limits<uint32_t>::max() &&
+             connection_buffer_limit_ != 0) {
+    // Case 2: per_request_buffer_limit_bytes is set but request_body_buffer_limit is not.
+    effective_buffer_limit = std::min(static_cast<uint64_t>(per_request_buffer_limit_),
+                                      static_cast<uint64_t>(connection_buffer_limit_));
+  } else if (connection_buffer_limit_ != 0) {
+    // Case 3: neither is set, use connection buffer limit.
+    effective_buffer_limit = static_cast<uint64_t>(connection_buffer_limit_);
+  } else {
+    // Case 4: no limits set, use a large default
+    effective_buffer_limit = std::numeric_limits<uint64_t>::max();
+  }
 
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit) {
@@ -1060,11 +1075,8 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   // it, it can latch the current buffer limit and does not need to update the
   // limit if another filter increases it.
   //
-  // The default is "do not limit". If there are configured (non-zero) buffer
-  // limits, apply them here.
-  if (callbacks_->decoderBufferLimit() != 0) {
-    retry_shadow_buffer_limit_ = callbacks_->decoderBufferLimit();
-  }
+  // Store the connection buffer limit for use in the new buffer limit logic.
+  connection_buffer_limit_ = callbacks_->decoderBufferLimit();
 
   watermark_callbacks_.setDecoderFilterCallbacks(callbacks_);
 }
@@ -2315,7 +2327,7 @@ ProdFilter::createRetryState(const RetryPolicy& policy, Http::RequestHeaderMap& 
     // Since doing retry will make Envoy to buffer the request body, if upstream using HTTP/3 is the
     // only reason for doing retry, set the retry shadow buffer limit to 0 so that we don't retry or
     // buffer safe requests with body which is not common.
-    setRetryShadowBufferLimit(0);
+    setPerRequestBufferLimit(0);
   }
   return retry_state;
 }

@@ -684,14 +684,14 @@ public:
    *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
    *         rather than no limit applies.
    */
-  virtual uint32_t retryShadowBufferLimit() const PURE;
+  virtual uint32_t perRequestBufferLimit() const PURE;
 
   /**
    * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
-   *         buffering larger request bodies beyond the connection buffer limit for use cases like
-   *         ML inference with large payloads. If not set, falls back to retryShadowBufferLimit()
-   *         behavior. When set, this limit supersedes per_connection_buffer_limit_bytes for
-   *         request body buffering but retryShadowBufferLimit() still controls flow control.
+   *         buffering larger request bodies beyond the connection buffer limit for use cases
+   *         with large payloads. If not set, falls back to perRequestBufferLimit() behavior.
+   *         When set, this limit supersedes per_connection_buffer_limit_bytes for request body
+   *         buffering but perRequestBufferLimit() still controls flow control.
    */
   virtual uint64_t requestBodyBufferLimit() const PURE;
 
@@ -1011,14 +1011,14 @@ public:
    *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
    *         rather than no limit applies.
    */
-  virtual uint32_t retryShadowBufferLimit() const PURE;
+  virtual uint32_t perRequestBufferLimit() const PURE;
 
   /**
    * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
-   *         buffering larger request bodies beyond the connection buffer limit for use cases like
-   *         ML inference with large payloads. If not set, falls back to retryShadowBufferLimit()
-   *         behavior. When set, this limit supersedes per_connection_buffer_limit_bytes for
-   *         request body buffering but retryShadowBufferLimit() still controls flow control.
+   *         buffering larger request bodies beyond the connection buffer limit for use cases
+   *         with large payloads. If not set, falls back to perRequestBufferLimit() behavior.
+   *         When set, this limit supersedes per_connection_buffer_limit_bytes for request body
+   *         buffering but perRequestBufferLimit() still controls flow control.
    */
   virtual uint64_t requestBodyBufferLimit() const PURE;
 
