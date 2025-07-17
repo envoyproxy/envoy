@@ -36,7 +36,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jc
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
     JNIEnv* env, jclass, jobject on_engine_running, jobject envoy_logger,
-    jobject envoy_event_tracker) {
+    jobject envoy_event_tracker, jboolean disable_dns_refresh_on_network_change) {
   //================================================================================================
   // EngineCallbacks
   //================================================================================================
@@ -108,7 +108,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   }
 
   return reinterpret_cast<jlong>(
-      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker)));
+      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
+                                /*network_thread_priority*/ absl::nullopt,
+                                (disable_dns_refresh_on_network_change == JNI_TRUE)));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(

@@ -152,10 +152,13 @@ public class JniLibrary {
    * @param runningCallback, called when the engine finishes its async startup and begins running.
    * @param logger,          the logging interface.
    * @param eventTracker     the event tracking interface.
+   * @param disableDnsRefreshOnNetworkChange whether disable dns refreshment or not after the
+   *     network has changed.
    * @return envoy_engine_t, handle to the underlying engine.
    */
   protected static native long initEngine(EnvoyOnEngineRunning runningCallback, EnvoyLogger logger,
-                                          EnvoyEventTracker eventTracker);
+                                          EnvoyEventTracker eventTracker,
+                                          boolean disableDnsRefreshOnNetworkChange);
 
   /**
    * External entry point for library.
