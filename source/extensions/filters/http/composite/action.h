@@ -42,13 +42,13 @@ public:
 
   const std::string& actionName() const { return name_; }
 
-private:
   bool actionSkip() const {
     return sample_.has_value() ? !runtime_.snapshot().featureEnabled(sample_->runtime_key(),
                                                                      sample_->default_value())
                                : false;
   }
 
+private:
   FilterConfigProvider config_provider_;
   const std::string name_;
   const absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> sample_;
