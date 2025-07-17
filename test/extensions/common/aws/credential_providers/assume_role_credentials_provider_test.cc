@@ -632,7 +632,28 @@ TEST_F(AssumeRoleCredentialsProviderTest, Coverage) {
 TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  expectDocument(200, std::move(R"EOF(
+  // Custom matcher for request with session duration parameter
+  Http::TestRequestHeaderMapImpl headers_with_duration{
+      {":path", "/?Version=2011-06-15&Action=AssumeRole&RoleArn=aws:iam::123456789012:role/"
+                "arn&RoleSessionName=role-session-name&DurationSeconds=3600"},
+      {":authority", "sts.region.amazonaws.com"},
+      {":scheme", "https"},
+      {":method", "GET"},
+      {"Accept", "application/json"},
+      {"x-amz-content-sha256",
+       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      {"x-amz-security-token", "token"},
+      {"x-amz-date", "20180102T030405Z"},
+      {"authorization",
+       "AWS4-HMAC-SHA256 Credential=akid/20180102/region/sts/aws4_request, "
+       "SignedHeaders=accept;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, "
+       "Signature=88533b93b82077848fa88b5d1fe69540a0916960fdd48a1df66b764dc73a6d9a"}};
+
+  // Use a custom expectation for this test to verify the DurationSeconds parameter
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers_with_duration), _, _))
+      .WillRepeatedly(Invoke([](Http::RequestMessage&, Tracing::Span&,
+                                   MetadataFetcher::MetadataReceiver& receiver) {
+          receiver.onMetadataSuccess(std::move(R"EOF(
 {
   "AssumeRoleResponse": {
     "AssumeRoleResult": {
@@ -645,6 +666,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   }
 }
 )EOF"));
+      }));
 
   // Setup provider with session duration
   ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
