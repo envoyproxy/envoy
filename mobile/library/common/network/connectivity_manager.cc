@@ -284,6 +284,7 @@ void ConnectivityManagerImpl::resetConnectivityState() {
   envoy_netconf_t configuration_key;
   {
     Thread::LockGuard lock{network_state_.mutex_};
+    network_state_.network_ = 0;
     network_state_.remaining_faults_ = 1;
     network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
     configuration_key = ++network_state_.configuration_key_;
