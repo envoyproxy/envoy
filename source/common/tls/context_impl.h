@@ -104,6 +104,7 @@ public:
   // Ssl::Context
   absl::optional<uint32_t> daysUntilFirstCertExpires() const override;
   Envoy::Ssl::CertificateDetailsPtr getCaCertInformation() const override;
+  bssl::UniquePtr<STACK_OF(X509_NAME)> clientCA() const;
   std::vector<Envoy::Ssl::CertificateDetailsPtr> getCertChainInformation() const override;
   absl::optional<uint64_t> secondsUntilFirstOcspResponseExpires() const override;
 
@@ -153,6 +154,7 @@ protected:
   // potentially switch to a different CertificateContext based on certificate
   // selection.
   std::vector<Ssl::TlsContext> tls_contexts_;
+  bssl::UniquePtr<STACK_OF(X509_NAME)> client_ca_list_;
   CertValidatorPtr cert_validator_;
   Stats::Scope& scope_;
   SslStats stats_;

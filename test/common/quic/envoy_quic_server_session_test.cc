@@ -57,6 +57,7 @@ public:
   }
 
   using EnvoyQuicServerSession::GetCryptoStream;
+  using EnvoyQuicServerSession::GetSSLConfig;
 };
 
 class ProofSourceDetailsSetter {
@@ -580,6 +581,7 @@ TEST_F(EnvoyQuicServerSessionTest, NoFlushWithDataToWrite) {
 
 TEST_F(EnvoyQuicServerSessionTest, FlushCloseWithDataToWrite) {
   installReadFilter();
+  envoy_quic_session_.setDelayedCloseTimeout(std::chrono::milliseconds(100));
   Http::MockRequestDecoder request_decoder;
   Http::MockStreamCallbacks stream_callbacks;
   setupRequestDecoderMock(request_decoder);
@@ -591,11 +593,20 @@ TEST_F(EnvoyQuicServerSessionTest, FlushCloseWithDataToWrite) {
   // Connection shouldn't be closed right away as there is a stream write blocked.
   envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
+
+  // Advance the time a bit and try to close again. The delay close timer
+  // shouldn't be rescheduled by this call.
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(10), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
+  envoy_quic_session_.close(Network::ConnectionCloseType::FlushWriteAndDelay);
+  EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
+
   EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_NO_ERROR, _, _));
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
-  // Unblock that stream to trigger actual connection close.
-  quic_connection_->OnCanWrite();
+  // Advance the time to fire connection close timer.
+  time_system_.advanceTimeAndRun(std::chrono::milliseconds(90), *dispatcher_,
+                                 Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
 }
