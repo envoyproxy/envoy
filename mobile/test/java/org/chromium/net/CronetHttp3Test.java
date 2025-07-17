@@ -282,7 +282,6 @@ public class CronetHttp3Test {
   @SmallTest
   @Feature({"Cronet"})
   public void testRetryPostHandshake() throws Exception {
-
     setUp(printEnvoyLogs);
 
     retryPostHandshake();
