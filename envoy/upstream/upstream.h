@@ -746,6 +746,7 @@ public:
   GAUGE(upstream_cx_tx_bytes_buffered, Accumulate)                                                 \
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
+  GAUGE(upstream_rq_per_cx_http1, NeverImport)                                                     \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
   HISTOGRAM(upstream_cx_length_ms, Milliseconds)
 

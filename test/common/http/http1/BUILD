@@ -51,6 +51,18 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "request_tracker_test",
+    srcs = ["request_tracker_test.cc"],
+    deps = [
+        "//source/common/http/http1:request_tracker_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:simulated_time_system_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
     rbe_pool = "6gig",

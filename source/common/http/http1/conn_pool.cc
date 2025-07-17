@@ -16,6 +16,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/http1/request_tracker.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/match.h"
@@ -78,9 +79,24 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
                                 /* effective_concurrent_stream_limit */ 1,
                                 /* configured_concurrent_stream_limit */ 1, data) {
   parent.host()->cluster().trafficStats()->upstream_cx_http1_total_.inc();
+  
+  // Notify request tracker of new connection
+  auto* http1_pool = dynamic_cast<Http1ConnPoolImpl*>(&parent);
+  if (http1_pool && http1_pool->request_tracker_) {
+    http1_pool->request_tracker_->onConnectionEstablished(getConnectionId());
+  }
 }
 
-ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }
+ActiveClient::~ActiveClient() { 
+  // Notify request tracker of connection closure
+  auto& parent = static_cast<HttpConnPoolImplBase&>(parent_);
+  auto* http1_pool = dynamic_cast<Http1ConnPoolImpl*>(&parent);
+  if (http1_pool && http1_pool->request_tracker_) {
+    http1_pool->request_tracker_->onConnectionClosed(getConnectionId());
+  }
+  
+  ASSERT(!stream_wrapper_.get()); 
+}
 
 bool ActiveClient::closingWithIncompleteStream() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
@@ -89,7 +105,29 @@ bool ActiveClient::closingWithIncompleteStream() const {
 RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
   ASSERT(!stream_wrapper_);
   stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, *this);
+  
+  // Notify request tracker of new request
+  auto& parent = static_cast<HttpConnPoolImplBase&>(parent_);
+  auto* http1_pool = dynamic_cast<Http1ConnPoolImpl*>(&parent);
+  if (http1_pool && http1_pool->request_tracker_) {
+    http1_pool->request_tracker_->onRequestStarted(getConnectionId());
+  }
+  
   return *stream_wrapper_;
+}
+
+Http1ConnPoolImpl::Http1ConnPoolImpl(
+    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+    Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+    CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
+    Server::OverloadManager& overload_manager)
+    : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
+                            random_generator, state, client_fn, codec_fn, protocols,
+                            overload_manager) {
+  // Initialize the request tracker for HTTP/1.1 connections
+  request_tracker_ = std::make_unique<Http1RequestTracker>(*host->cluster().trafficStats());
 }
 
 ConnectionPool::InstancePtr
@@ -99,7 +137,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state,
                  Server::OverloadManager& overload_manager) {
-  return std::make_unique<FixedHttpConnPoolImpl>(
+  return std::make_unique<Http1ConnPoolImpl>(
       std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
       random_generator, state,
       [](HttpConnPoolImplBase* pool) {
@@ -111,7 +149,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http11}, overload_manager, absl::nullopt, nullptr);
+      std::vector<Protocol>{Protocol::Http11}, overload_manager);
 }
 
 } // namespace Http1
