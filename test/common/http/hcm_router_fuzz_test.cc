@@ -217,6 +217,7 @@ public:
     ON_CALL(mock_route_->route_entry_.early_data_policy_, allowsEarlyDataForRequest(_))
         .WillByDefault(Return(allows_early_data_for_request_));
     route_ = Router::RouteConstSharedPtr(mock_route_);
+    vhost_ = mock_route_->virtual_host_;
 
     ON_CALL(*tlc_.cluster_.info_, maintenanceMode()).WillByDefault(Return(maintenance_));
   }
@@ -313,15 +314,16 @@ public:
   bool allows_early_data_for_request_{true};
 
   Router::MockRoute* mock_route_;
+  Router::VirtualHostConstSharedPtr vhost_;
   Router::RouteConstSharedPtr route_;
 
   bool maintenance_{false};
   StreamInfo::MockStreamInfo mock_stream_info_;
 
   std::vector<std::unique_ptr<FuzzUpstream>> upstreams_;
-  std::unique_ptr<Router::MockDirectResponseEntry> direct_response_entry_{};
+  std::unique_ptr<Router::MockDirectResponseEntry> direct_response_entry_;
 
-  std::string direct_response_body_{};
+  std::string direct_response_body_;
 };
 
 // This class holds the upstream `FuzzCluster` instances. This has nothing
@@ -375,13 +377,13 @@ public:
     }
   }
 
-  Router::RouteConstSharedPtr route(const Http::RequestHeaderMap& request_map) {
+  Router::VirtualHostRoute route(const Http::RequestHeaderMap& request_map) {
     absl::string_view path = request_map.Path()->value().getStringView();
     FuzzCluster* cluster = selectClusterByName(path);
     if (!cluster) {
-      return nullptr;
+      return {};
     }
-    return cluster->route_;
+    return {cluster->vhost_, cluster->route_};
   }
 
   Upstream::ThreadLocalCluster* getThreadLocalCluster(absl::string_view name) {

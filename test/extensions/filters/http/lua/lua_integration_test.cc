@@ -2026,5 +2026,66 @@ typed_config:
   cleanup();
 }
 
+#ifdef NDEBUG
+// This test is only run in release mode because in debug mode,
+// the code reaches ENVOY_BUG() which triggers a forced abort
+// that stops execution.
+TEST_P(LuaIntegrationTest, ModifyResponseBodyAndRemoveStatusHeader) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This is a test that only supports http1";
+  }
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        local response_headers = response_handle:headers()
+        response_headers:remove(":status")
+        response_handle:body(true):setBytes("hello world")
+      end
+)EOF";
+
+  const std::string route_config =
+      R"EOF(
+name: basic_lua_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["lua.per.route"]
+  routes:
+  - match:
+      prefix: "/lua"
+    direct_response:
+      status: 200
+      body:
+        inline_string: "hello"
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
+                                                 {":path", "/lua"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "lua.per.route"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("missing required header: :status"));
+
+  cleanup();
+}
+#endif
+
 } // namespace
 } // namespace Envoy
