@@ -101,6 +101,19 @@ public:
   virtual bool isUnicastAddress() const PURE;
 
   /**
+   * @return true if the address is a link-local address, false otherwise.
+   */
+  virtual bool isLinkLocalAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Teredo address, see
+   * https://datatracker.ietf.org/doc/html/rfc4380 for details.
+   *
+   * @return true if the address is a Teredo address, false otherwise.
+   */
+  virtual bool isTeredoAddress() const PURE;
+
+  /**
    * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise nullptr.
    */
   virtual const Ipv4* ipv4() const PURE;
