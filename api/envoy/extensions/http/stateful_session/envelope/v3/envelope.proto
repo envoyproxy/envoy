@@ -26,7 +26,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // When processing the request from the downstream, Envoy will check if the request contains the
 // session context. If the request contains the session context, Envoy will strip the
 // upstream host from the session context.
-
+//
+//
 // SSE endpoint message mode:
 // When processing the response from the upstream, Envoy will check if the Sse data stream contains
 // the session context. If the Sse data stream contains the session context, Envoy will join it and
@@ -35,7 +36,6 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // When processing the request from the downstream, Envoy will check if the url query params contain
 // the session context. If the Sse data stream contains the session context, Envoy will strip the
 // upstream host from the session context.
-
 // [#extension: envoy.http.stateful_session.envelope]
 message EnvelopeSessionState {
   message Header {
@@ -88,8 +88,10 @@ message EnvelopeSessionState {
   // Header header = 1 [(validate.rules).message = {required: true}];
   oneof session_mode {
     option (validate.required) = true;
+
     // Use header-based session tracking (MCP 2025-03-26)
     Header header = 1;
+
     // Use URL query parameter-based session tracking (MCP 2024-11-05)
     SseEndpointMessage sse_endpoint_message = 2;
   }

@@ -176,7 +176,7 @@ TEST_F(StatefulSessionTest, SessionStateHasNoUpstreamAddress) {
   auto session_state = std::make_unique<NiceMock<Http::MockSessionState>>();
   auto raw_session_state = session_state.get();
 
-  Buffer::OwnedImpl data_buffer;  
+  Buffer::OwnedImpl data_buffer;
   data_buffer.add("data: http://example.com?sessionId=abcdefg\n\n");
 
   EXPECT_CALL(*route_factory_, create(_))
@@ -200,7 +200,7 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
   auto session_state = std::make_unique<NiceMock<Http::MockSessionState>>();
-  auto raw_session_state = session_state.get(); 
+  auto raw_session_state = session_state.get();
 
   Buffer::OwnedImpl data_buffer;
   data_buffer.add("data: http://example.com?sessionId=abcdefg\n\n");
