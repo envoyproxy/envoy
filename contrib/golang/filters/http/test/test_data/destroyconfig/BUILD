@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test_library",
