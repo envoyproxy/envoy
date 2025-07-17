@@ -4,6 +4,15 @@
 
 set -e
 
+# TMP TEST DEBUG
+df -h
+
+debug () {
+    df -h
+}
+
+trap debug EXIT
+
 # TODO(phlax): Clarify and/or integrate SRCDIR and ENVOY_SRCDIR
 export SRCDIR="${SRCDIR:-$PWD}"
 export ENVOY_SRCDIR="${ENVOY_SRCDIR:-$PWD}"
