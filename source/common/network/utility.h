@@ -41,7 +41,7 @@ public:
   virtual void processPacket(Address::InstanceConstSharedPtr local_address,
                              Address::InstanceConstSharedPtr peer_address,
                              Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                             Buffer::OwnedImpl saved_cmsg) PURE;
+                             uint32_t ipv6_flow_label, Buffer::OwnedImpl saved_cmsg) PURE;
 
   /**
    * Called whenever datagrams are dropped due to overflow or truncation.

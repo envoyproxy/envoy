@@ -67,7 +67,8 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-    MonotonicTime receive_time, uint8_t tos, Buffer::OwnedImpl /*saved_cmsg*/) {
+    MonotonicTime receive_time, uint8_t tos, uint32_t ipv6_flow_label,
+    Buffer::OwnedImpl /*saved_cmsg*/) {
   quic::QuicTime timestamp =
       quic::QuicTime::Zero() +
       quic::QuicTime::Delta::FromMicroseconds(
@@ -98,8 +99,8 @@ void EnvoyQuicClientConnection::processPacket(
   quic::QuicReceivedPacket packet(reinterpret_cast<char*>(slice.mem_), slice.len_, timestamp,
                                   /*owns_buffer=*/false, /*ttl=*/0, /*ttl_valid=*/false,
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
-                                  /*owns_header_buffer*/ false,
-                                  getQuicEcnCodepointFromTosByte(tos));
+                                  /*owns_header_buffer*/ false, getQuicEcnCodepointFromTosByte(tos),
+                                  std::nullopt, ipv6_flow_label);
   ProcessUdpPacket(envoyIpAddressToQuicSocketAddress(local_address->ip()),
                    envoyIpAddressToQuicSocketAddress(peer_address->ip()), packet);
 }

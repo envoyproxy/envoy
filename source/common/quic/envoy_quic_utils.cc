@@ -212,6 +212,9 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
+  if (peer_addr->ip()->version() == Network::Address::IpVersion::v6) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpV6FlowLabelOptions());
+  }
   if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
