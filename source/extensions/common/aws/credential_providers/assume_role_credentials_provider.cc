@@ -71,10 +71,14 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(Http::Utility::parseAuthority(uri.value()).host_);
-  message.headers().setPath(
+  std::string path =
       fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",
                   Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
-                  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_)));
+                  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_));
+  if (session_duration_) {
+    path += fmt::format("&DurationSeconds={}", session_duration_.value());
+  }
+  message.headers().setPath(path);
   // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
