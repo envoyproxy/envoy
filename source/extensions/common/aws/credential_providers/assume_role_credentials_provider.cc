@@ -31,6 +31,7 @@ AssumeRoleCredentialsProvider::AssumeRoleCredentialsProvider(
                                       initialization_timer),
       role_arn_(assume_role_config.role_arn()),
       role_session_name_(assume_role_config.role_session_name()), region_(region),
+      external_id_(assume_role_config.external_id()),
       assume_role_signer_(std::move(assume_role_signer)) {
 
   if (assume_role_config.has_session_duration()) {
@@ -78,6 +79,11 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
   if (session_duration_) {
     path += fmt::format("&DurationSeconds={}", session_duration_.value());
   }
+
+  if (!external_id_.empty()) {
+    path += fmt::format("&ExternalId={}", external_id_);
+  }
+
   message.headers().setPath(path);
   // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
