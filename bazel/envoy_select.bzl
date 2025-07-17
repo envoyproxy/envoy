@@ -175,8 +175,11 @@ def envoy_select_wasm_v8_bool():
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
 def envoy_select_wasm_wamr(xs):
     return select({
+        "@envoy//bazel:wasm_v8": [],
         "@envoy//bazel:wasm_wamr": xs,
-        "//conditions:default": [],
+        "@envoy//bazel:wasm_wasmtime": [],
+        "@envoy//bazel:wasm_disabled": [],
+        "//conditions:default": xs, # implicit default (wamr)
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
