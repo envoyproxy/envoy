@@ -519,6 +519,8 @@ protected:
     per_request_buffer_limit_ = per_request_buffer_limit;
   }
 
+  uint64_t calculateEffectiveBufferLimit() const;
+
 private:
   friend class UpstreamRequest;
 

@@ -837,9 +837,16 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
               .setIsShadow(true)
               .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
               .setBufferAccount(callbacks_->account())
-              // A buffer limit of 1 is set in the case that per_request_buffer_limit_ == 0,
+              // Calculate effective buffer limit for shadow streams using the same logic as main
+              // request. A buffer limit of 1 is set in the case that the effective limit == 0,
               // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-              .setBufferLimit(1 > per_request_buffer_limit_ ? 1 : per_request_buffer_limit_)
+              .setBufferLimit([this]() -> uint32_t {
+                uint64_t effective_limit = calculateEffectiveBufferLimit();
+                // Convert to uint32_t for AsyncClient, clamping to max uint32_t if needed
+                uint32_t shadow_limit = static_cast<uint32_t>(std::min(
+                    effective_limit, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max())));
+                return shadow_limit == 0 ? 1 : shadow_limit;
+              }())
               .setDiscardResponseBody(true)
               .setFilterConfig(config_)
               .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
@@ -925,47 +932,66 @@ void Filter::sendNoHealthyUpstreamResponse(absl::optional<std::string> optional_
                              absl::nullopt, details);
 }
 
+uint64_t Filter::calculateEffectiveBufferLimit() const {
+  // Determine the effective buffer limit for request body buffering:
+  // 1. If request_body_buffer_limit is set then, we use request_body_buffer_limit.
+  // 2. If per_request_buffer_limit is set then, we use min(per_request_buffer_limit
+  // connection_buffer_limit).
+  // 3. Otherwise we use connection_buffer_limit.
+
+  uint64_t result;
+  if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
+    // Case 1: request_body_buffer_limit is explicitly set.
+    result = request_body_buffer_limit_;
+    result = request_body_buffer_limit_;
+  } else if (per_request_buffer_limit_ != std::numeric_limits<uint32_t>::max()) {
+    // Case 2: per_request_buffer_limit_bytes is set but request_body_buffer_limit is not.
+    if (connection_buffer_limit_ != 0) {
+      result = std::min(static_cast<uint64_t>(per_request_buffer_limit_),
+                        static_cast<uint64_t>(connection_buffer_limit_));
+    } else {
+      // If connection limit is 0 (unlimited), use per_request_buffer_limit directly.
+      result = static_cast<uint64_t>(per_request_buffer_limit_);
+    }
+  } else if (connection_buffer_limit_ != 0) {
+    // Case 3: use connection buffer limit.
+    result = static_cast<uint64_t>(connection_buffer_limit_);
+  } else {
+    // Case 4: no limits set, we use a large default.
+    result = std::numeric_limits<uint64_t>::max();
+  }
+  return result;
+}
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
   // try timeout timer is not started until onRequestComplete(). It could be zero
   // if the first request attempt has already failed and a retry is waiting for
-  // a backoff timer.
+  // a backoff timer..
   ASSERT(upstream_requests_.size() <= 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) ||
-                   (!active_shadow_policies_.empty() && !streaming_shadows_) ||
-                   (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
+  bool retry_enabled = retry_state_ && retry_state_->enabled();
+  bool shadow_buffering = !active_shadow_policies_.empty() && !streaming_shadows_;
+  bool redirect_enabled = route_entry_ && route_entry_->internalRedirectPolicy().enabled();
+  bool buffering = retry_enabled || shadow_buffering || redirect_enabled;
+  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
 
-  // Determine the effective buffer limit for request body buffering:
-  // 1. If request_body_buffer_limit is set then we use request_body_buffer_limit.
-  // 2. If per_request_buffer_limit_bytes is set but request_body_buffer_limit is not then,
-  //    we use min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes)
-  // 3. If neither of these are set then we use per_connection_buffer_limit_bytes.
-  uint64_t effective_buffer_limit;
+  // Check if we would exceed buffer limits, regardless of current buffering state
+  // This ensures error details are set even if retry state was cleared due to upstream reset.
+  bool would_exceed_buffer =
+      (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
+  bool had_retry_or_shadow = retry_enabled || shadow_buffering;
 
-  if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
-    // Case 1: request_body_buffer_limit is explicitly set.
-    effective_buffer_limit = request_body_buffer_limit_;
-  } else if (per_request_buffer_limit_ != std::numeric_limits<uint32_t>::max() &&
-             connection_buffer_limit_ != 0) {
-    // Case 2: per_request_buffer_limit_bytes is set but request_body_buffer_limit is not.
-    effective_buffer_limit = std::min(static_cast<uint64_t>(per_request_buffer_limit_),
-                                      static_cast<uint64_t>(connection_buffer_limit_));
-  } else if (connection_buffer_limit_ != 0) {
-    // Case 3: neither is set, use connection buffer limit.
-    effective_buffer_limit = static_cast<uint64_t>(connection_buffer_limit_);
-  } else {
-    // Case 4: no limits set, use a large default
-    effective_buffer_limit = std::numeric_limits<uint64_t>::max();
-  }
+  if (would_exceed_buffer && had_retry_or_shadow && !request_buffer_overflowed_) {
+    ENVOY_LOG(
+        debug,
+        "The request payload has at least {} bytes data which exceeds buffer limit {}. "
+        "per_request_buffer_limit_={}, request_body_buffer_limit_={}, connection_buffer_limit_={}. "
+        "Giving up on the retry/shadow.",
+        getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit,
+        per_request_buffer_limit_, request_body_buffer_limit_, connection_buffer_limit_);
 
-  if (buffering &&
-      getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit) {
-    ENVOY_LOG(debug,
-              "The request payload has at least {} bytes data which exceeds buffer limit {}. Give "
-              "up on the retry/shadow.",
-              getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit);
     cluster_->trafficStats()->retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
@@ -1390,6 +1416,14 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::CoreResponseFlag respo
   // If we have not yet sent anything downstream, send a response with an appropriate status code.
   // Otherwise just reset the ongoing response.
   callbacks_->streamInfo().setResponseFlag(response_flags);
+
+  // Check if buffer overflow occurred and override error details accordingly
+  if (request_buffer_overflowed_) {
+    code = Http::Code::InsufficientStorage;
+    body = "exceeded request buffer limit while retrying upstream";
+    details = StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit;
+  }
+
   // This will destroy any created retry timers.
   cleanup();
   // sendLocalReply may instead reset the stream if downstream_response_started_ is true.

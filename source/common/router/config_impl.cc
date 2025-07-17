@@ -1576,11 +1576,8 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
                                                          factory_context, validator),
                                 std::unique_ptr<PerFilterConfigs>)),
-      per_request_buffer_limit_(
-          virtual_host.has_request_body_buffer_limit()
-              ? std::numeric_limits<uint32_t>::max()
-              : PROTOBUF_GET_WRAPPED_OR_DEFAULT(virtual_host, per_request_buffer_limit_bytes,
-                                                std::numeric_limits<uint32_t>::max())),
+      per_request_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
       request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, request_body_buffer_limit, std::numeric_limits<uint64_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
