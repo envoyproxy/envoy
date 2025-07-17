@@ -319,25 +319,19 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
-  // Check logicalName() for reverse connection addresses
+  // Addresses with the "rc://" prefix are reverse connection addresses.
   std::string logical_name = address->logicalName();
   if (absl::StartsWith(logical_name, "rc://")) {
-    // Try to get a registered reverse connection socket interface
+    // Use the address's socket interface for reverse connections. If the
+    // reverse connection socket interface is not registered, the default
+    // socket interface is returned by socketInterface().
     ENVOY_LOG(debug, "Creating reverse connection socket for logical name: {}", logical_name);
-    auto* socket_interface = Network::socketInterface(
-        "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface");
-    if (socket_interface) {
-      ENVOY_LOG(debug, "Creating reverse connection socket for logical name: {}", logical_name);
-      auto io_handle = socket_interface->socket(socket_type, address, creation_options);
-      if (!io_handle) {
-        return absl::InvalidArgumentError("Failed to create reverse connection socket");
-      }
-      return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
-    } else {
-      ENVOY_LOG(warn, "Reverse connection address detected but socket interface not registered: {}",
-                logical_name);
-      return absl::InvalidArgumentError("Reverse connection socket interface not available");
+    const auto& socket_interface = address->socketInterface();
+    auto io_handle = socket_interface.socket(socket_type, address, creation_options);
+    if (!io_handle) {
+      return absl::InternalError("Failed to create reverse connection socket");
     }
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
   }
 
   // First we try to get the socket from our parent if applicable in each case below.
