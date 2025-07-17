@@ -71,9 +71,10 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(Http::Utility::parseAuthority(uri.value()).host_);
-  std::string path = fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",
-  Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
-  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_));
+  std::string path =
+      fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",
+                  Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
+                  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_));
   if (session_duration_) {
     path += fmt::format("&DurationSeconds={}", session_duration_.value());
   }

@@ -640,8 +640,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
       {":scheme", "https"},
       {":method", "GET"},
       {"Accept", "application/json"},
-      {"x-amz-content-sha256",
-       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      {"x-amz-content-sha256", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
       {"x-amz-security-token", "token"},
       {"x-amz-date", "20180102T030405Z"},
       {"authorization",
@@ -651,9 +650,9 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
 
   // Use a custom expectation for this test to verify the DurationSeconds parameter
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers_with_duration), _, _))
-      .WillRepeatedly(Invoke([](Http::RequestMessage&, Tracing::Span&,
-                                   MetadataFetcher::MetadataReceiver& receiver) {
-          receiver.onMetadataSuccess(std::move(R"EOF(
+      .WillRepeatedly(Invoke(
+          [](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
+            receiver.onMetadataSuccess(std::move(R"EOF(
 {
   "AssumeRoleResponse": {
     "AssumeRoleResult": {
@@ -666,7 +665,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   }
 }
 )EOF"));
-      }));
+          }));
 
   // Setup provider with session duration
   ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
