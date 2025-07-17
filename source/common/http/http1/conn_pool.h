@@ -7,6 +7,7 @@
 
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/http/conn_pool_base.h"
+#include "source/common/http/http1/request_tracker.h"
 
 namespace Envoy {
 namespace Http {
@@ -35,6 +36,9 @@ public:
     parent_.dispatcher().deferredDelete(std::move(stream_wrapper_));
     Envoy::Http::ActiveClient::releaseResources();
   }
+
+  // Get the unique connection ID for request tracking
+  uint64_t getConnectionId() const { return reinterpret_cast<uint64_t>(this); }
 
   struct StreamWrapper : public RequestEncoderWrapper,
                          public ResponseDecoderWrapper,
@@ -67,6 +71,26 @@ public:
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
   StreamWrapperPtr stream_wrapper_;
+};
+
+/**
+ * HTTP/1.1 connection pool implementation with request tracking support.
+ */
+class Http1ConnPoolImpl : public FixedHttpConnPoolImpl {
+public:
+  Http1ConnPoolImpl(
+      Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+      Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+      const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
+      Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
+      CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
+      Server::OverloadManager& overload_manager);
+
+  // Allow ActiveClient to access the request tracker
+  friend class ActiveClient;
+
+private:
+  Http1RequestTrackerPtr request_tracker_;
 };
 
 ConnectionPool::InstancePtr
