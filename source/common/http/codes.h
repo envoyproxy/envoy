@@ -53,6 +53,8 @@ public:
                           bool exclude_http_code_stats) const override;
   void chargeResponseTiming(const ResponseTimingInfo& info) const override;
 
+  static constexpr uint32_t HttpCodeOffset = 100; // code 100 is at index 0.
+  static constexpr uint32_t NumHttpCodes = 500;
 private:
   friend class CodeStatsTest;
 
@@ -110,8 +112,6 @@ private:
   //
   // The Codes object is global to the server.
 
-  static constexpr uint32_t NumHttpCodes = 500;
-  static constexpr uint32_t HttpCodeOffset = 100; // code 100 is at index 0.
   mutable Thread::AtomicPtrArray<const uint8_t, NumHttpCodes,
                                  Thread::AtomicPtrAllocMode::DoNotDelete>
       rc_stat_names_;
@@ -134,6 +134,7 @@ public:
   static bool is3xx(uint64_t code) { return code >= 300 && code < 400; }
   static bool is4xx(uint64_t code) { return code >= 400 && code < 500; }
   static bool is5xx(uint64_t code) { return code >= 500 && code < 600; }
+  static bool isValid(uint64_t code) { return code >= 100 && code < 600; }
 
   static bool isGatewayError(uint64_t code) { return code >= 502 && code < 505; }
 
