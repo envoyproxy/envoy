@@ -678,9 +678,7 @@ message HttpConnectionManager {
   // If all extensions fail without rejection, Envoy defaults to using the directly connected remote address.
   //
   // .. warning::
-  //    These extensions cannot be configured simultaneously with :ref:`use_remote_address
-  //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.use_remote_address>`
-  //    or :ref:`xff_num_trusted_hops
+  //    These extensions cannot be configured simultaneously with :ref:`xff_num_trusted_hops
   //    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.xff_num_trusted_hops>`.
   //
   // [#extension-category: envoy.http.original_ip_detection]

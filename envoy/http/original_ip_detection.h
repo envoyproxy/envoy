@@ -22,6 +22,8 @@ struct OriginalIPDetectionParams {
   Http::RequestHeaderMap& request_headers;
   // The downstream directly connected address.
   const Network::Address::InstanceConstSharedPtr& downstream_remote_address;
+  // Whether use_remote_address is enabled in the configuration.
+  bool use_remote_address = false;
 };
 
 // Parameters to be used for sending a local reply when detection fails.
