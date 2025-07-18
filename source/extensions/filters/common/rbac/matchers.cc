@@ -113,15 +113,17 @@ MatcherConstPtr Matcher::create(const envoy::config::rbac::v3::Principal& princi
 AndMatcher::AndMatcher(const envoy::config::rbac::v3::Permission::Set& set,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
                        Server::Configuration::CommonFactoryContext& context) {
+  matchers_.reserve(set.rules_size());
   for (const auto& rule : set.rules()) {
-    matchers_.push_back(Matcher::create(rule, validation_visitor, context));
+    matchers_.emplace_back(Matcher::create(rule, validation_visitor, context));
   }
 }
 
 AndMatcher::AndMatcher(const envoy::config::rbac::v3::Principal::Set& set,
                        Server::Configuration::CommonFactoryContext& context) {
+  matchers_.reserve(set.ids_size());
   for (const auto& id : set.ids()) {
-    matchers_.push_back(Matcher::create(id, context));
+    matchers_.emplace_back(Matcher::create(id, context));
   }
 }
 
@@ -140,15 +142,17 @@ bool AndMatcher::matches(const Network::Connection& connection,
 OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Permission>& rules,
                      ProtobufMessage::ValidationVisitor& validation_visitor,
                      Server::Configuration::CommonFactoryContext& context) {
+  matchers_.reserve(rules.size());
   for (const auto& rule : rules) {
-    matchers_.push_back(Matcher::create(rule, validation_visitor, context));
+    matchers_.emplace_back(Matcher::create(rule, validation_visitor, context));
   }
 }
 
 OrMatcher::OrMatcher(const Protobuf::RepeatedPtrField<envoy::config::rbac::v3::Principal>& ids,
                      Server::Configuration::CommonFactoryContext& context) {
+  matchers_.reserve(ids.size());
   for (const auto& id : ids) {
-    matchers_.push_back(Matcher::create(id, context));
+    matchers_.emplace_back(Matcher::create(id, context));
   }
 }
 
