@@ -8,9 +8,6 @@ bug_fixes:
     getting the correct value. This could be triggered with a ``tcp_proxy`` access log configured to emit a log upon connection
     establishment if the log contains fields of the the TLS peer certificate. Then a later use of the data, such as the network RBAC
     filter validating a peer certificate SAN, may incorrectly fail due to the empty cached value.
-- area: http2
-  change: |
-    Fixed an issue where http/2 connections using the default codec of ``oghttp2`` could get stuck due to a window buffer leak.
 - area: release
   change: |
     Container (Ubuntu/distroless) updates, and fixed permissions for distroless config directory.
