@@ -1039,6 +1039,21 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     connection_manager_.stats_.named_.downstream_rq_5xx_.inc();
     connection_manager_.listener_stats_.downstream_rq_5xx_.inc();
   }
+
+  if (response_code_details.has_value() &&
+    response_code_details == Envoy::StreamInfo::ResponseCodeDetails::get().ViaUpstream) {
+    if (CodeUtility::is1xx(response_code)) {
+      connection_manager_.stats_.named_.via_upstream_downstream_rq_1xx_.inc();
+    } else if (CodeUtility::is2xx(response_code)) {
+      connection_manager_.stats_.named_.via_upstream_downstream_rq_2xx_.inc();
+    } else if (CodeUtility::is3xx(response_code)) {
+      connection_manager_.stats_.named_.via_upstream_downstream_rq_3xx_.inc();
+    } else if (CodeUtility::is4xx(response_code)) {
+      connection_manager_.stats_.named_.via_upstream_downstream_rq_4xx_.inc();
+    } else if (CodeUtility::is5xx(response_code)) {
+      connection_manager_.stats_.named_.via_upstream_downstream_rq_5xx_.inc();
+    }
+ }
 }
 
 const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
