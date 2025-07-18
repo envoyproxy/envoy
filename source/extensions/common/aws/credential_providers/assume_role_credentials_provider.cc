@@ -76,13 +76,6 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
       fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",
                   Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
                   Envoy::Http::Utility::PercentEncoding::encode(role_session_name_));
-  if (session_duration_) {
-    path += fmt::format("&DurationSeconds={}", session_duration_.value());
-  }
-
-  if (!external_id_.empty()) {
-    path += fmt::format("&ExternalId={}", external_id_);
-  }
 
   message.headers().setPath(path);
   // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
