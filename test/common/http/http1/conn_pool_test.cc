@@ -165,6 +165,8 @@ public:
   Event::MockSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<MockResponseDecoder> outer_decoder_;
+  ConnPoolCallbacks callbacks_;
 };
 
 /**
@@ -285,6 +287,8 @@ TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
@@ -521,6 +525,9 @@ TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
     EXPECT_CALL(
         cluster_->stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+    EXPECT_CALL(
+        cluster_->stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
     EXPECT_CALL(*conn_pool_, onClientDestroy());
     conn_pool_->test_clients_.front().connection_->raiseEvent(
         Network::ConnectionEvent::RemoteClose);
@@ -1184,6 +1191,122 @@ TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
         dispatcher_.to_delete_.clear();
         deferring_delete = false;
       }));
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Test that request tracking works correctly for HTTP/1.1 connections.
+ * Verifies that the upstream_rq_per_cx histogram is emitted correctly.
+ */
+TEST_F(Http1ConnPoolImplTest, RequestTrackingMetric) {
+  // Set up expectations for all histograms that will be emitted on connection close
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 3));
+
+  // Create connection and make 3 requests to test request counting
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r1.completeResponse(false); // Keep connection alive
+
+  // Second request on same connection (HTTP/1.1 keep-alive)
+  ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Immediate);
+  r2.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r2.completeResponse(false); // Keep connection alive
+
+  // Third request on same connection
+  ActiveTestRequest r3(*this, 0, ActiveTestRequest::Type::Immediate);
+  r3.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r3.completeResponse(false);
+
+  // Explicitly close connection to trigger metrics
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Test request tracking with connection that handles multiple individual requests.
+ * Verifies that each separate request is tracked correctly.
+ */
+TEST_F(Http1ConnPoolImplTest, RequestTrackingMultipleConnections) {
+  // Set up expectations for histograms from first connection
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 2));
+
+  // Create first connection and handle 2 requests
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r1.completeResponse(false); // Keep connection alive
+
+  ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Immediate);
+  r2.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r2.completeResponse(false); // Keep connection alive
+
+  // Close first connection
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  // Set up expectations for histograms from second connection
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 1));
+
+  // Create second connection and handle 1 request  
+  ActiveTestRequest r3(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r3.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r3.completeResponse(false);
+
+  // Close second connection
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+/**
+ * Test request tracking with single request per connection.
+ */
+TEST_F(Http1ConnPoolImplTest, RequestTrackingSingleRequest) {
+  // Set up expectations for all histograms that will be emitted on connection close
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 1));
+
+  // Create connection and send request
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+
+  // Complete response but keep connection open
+  conn_pool_->expectEnableUpstreamReady();
+  r1.completeResponse(false);
+
+  // Explicitly close connection to trigger metrics
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 }
 
