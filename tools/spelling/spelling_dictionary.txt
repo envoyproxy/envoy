@@ -1414,6 +1414,7 @@ templating
 templatize
 templatized
 templatizing
+teredo
 testability
 testcase
 testcases
