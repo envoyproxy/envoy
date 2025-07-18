@@ -1024,6 +1024,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
     request_buffer_overflowed_ = true;
     buffering = false;
+    retry_state_.reset(); // Ensure any initialized retry state is cleared.
   }
 
   for (auto* shadow_stream : shadow_streams_) {
