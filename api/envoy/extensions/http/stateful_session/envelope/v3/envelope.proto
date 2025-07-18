@@ -18,6 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // (like session id header or cookie) in the initial response of the session and the client will use
 // the same session context in the subsequent requests without any modification.
 //
+// Header mode:
 // When processing the response from the upstream, Envoy will check if the response contains the
 // session context. If the response contains the session context, no matter if it's a new session
 // context or an existing one, Envoy will join it and the upstream host as new session context.
@@ -26,10 +27,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // session context. If the request contains the session context, Envoy will strip the
 // upstream host from the session context.
 //
+//
+// SSE endpoint message mode:
+// When processing the response from the upstream, Envoy will check if the Sse data stream contains
+// the session context. If the Sse data stream contains the session context, Envoy will join it and
+// the upstream host as new session context.
+//
+// When processing the request from the downstream, Envoy will check if the url query params contain
+// the session context. If the Sse data stream contains the session context, Envoy will strip the
+// upstream host from the session context.
 // [#extension: envoy.http.stateful_session.envelope]
 message EnvelopeSessionState {
   message Header {
-    // Iff the header specified by the ``name`` field is present in the response (assume the ``name``
+    // If the header specified by the ``name`` field is present in the response (assume the ``name``
     // is set to ``session-header`` and original header value is ``xxxxxx``), then the upstream host
     // address and value of ``name`` field specified header will be encoded in following format and
     // the output will be used to update the ``name`` field specified header in the response:
@@ -47,6 +57,42 @@ message EnvelopeSessionState {
     string name = 1 [(validate.rules).string = {min_len: 1}];
   }
 
+  message SseEndpointMessage {
+    // If the query parameter specified by the ``param_name`` field is present in the SSE data stream,
+    // the upstream host address will be encoded in following format:
+    //
+    // .. code-block:: none
+    //
+    //   sessionId={original_value}.{encoded_host}
+    //
+    // Where {encoded_host} is the Base64Url encoded host address.
+    //
+    // When processing the request from downstream, this extension will:
+    // 1. Split the value at the last dot
+    // 2. Decode the host address for upstream routing
+    // 3. Keep only the original session ID in the request
+    //
+    // For example:
+    //
+    // .. code-block:: none
+    //
+    //   GET /path?sessionId=original_session_id.{encoded_host}
+    //   # after processing:
+    //   GET /path?sessionId=original_session_id
+    //
+    // Note: Uses Base64Url encoding for the host address.
+    string param_name = 1 [(validate.rules).string = {min_len: 1}];
+  }
+
   // Set the header config to track the session state.
-  Header header = 1 [(validate.rules).message = {required: true}];
+  // Header header = 1 [(validate.rules).message = {required: true}];
+  oneof session_mode {
+    option (validate.required) = true;
+
+    // Use header-based session tracking (MCP 2025-03-26)
+    Header header = 1;
+
+    // Use URL query parameter-based session tracking (MCP 2024-11-05)
+    SseEndpointMessage sse_endpoint_message = 2;
+  }
 }

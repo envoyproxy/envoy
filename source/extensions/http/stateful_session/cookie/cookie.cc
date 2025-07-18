@@ -9,7 +9,7 @@ namespace Http {
 namespace StatefulSession {
 namespace Cookie {
 
-void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
+void CookieBasedSessionStateFactory::SessionStateImpl::onUpdateHeader(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
     // Build proto message
@@ -28,6 +28,12 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
     headers.addReferenceKey(Envoy::Http::Headers::get().SetCookie,
                             factory_.makeSetCookie(encoded_address));
   }
+}
+
+Envoy::Http::FilterDataStatus
+CookieBasedSessionStateFactory::SessionStateImpl::onUpdateData(absl::string_view, Buffer::Instance&,
+                                                               bool) {
+  return Envoy::Http::FilterDataStatus::Continue;
 }
 
 CookieBasedSessionStateFactory::CookieBasedSessionStateFactory(

@@ -12,7 +12,7 @@ namespace StatefulSession {
 namespace Envelope {
 namespace {
 
-TEST(EnvelopeSessionStateFactoryConfigTest, Basic) {
+TEST(EnvelopeSessionStateFactoryConfigTest, BasicHeader) {
   auto* factory = Registry::FactoryRegistry<Envoy::Http::SessionStateFactoryConfig>::getFactory(
       "envoy.http.stateful_session.envelope");
   ASSERT_NE(factory, nullptr);
@@ -25,6 +25,22 @@ TEST(EnvelopeSessionStateFactoryConfigTest, Basic) {
   TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  EXPECT_NE(factory->createSessionStateFactory(proto_config, context), nullptr);
+}
+
+TEST(EnvelopeSessionStateFactoryConfigTest, BasicSse) {
+  auto* factory = Registry::FactoryRegistry<Envoy::Http::SessionStateFactoryConfig>::getFactory(
+      "envoy.http.stateful_session.envelope");
+  ASSERT_NE(factory, nullptr);
+
+  EnvelopeSessionStateProto proto_config;
+  const std::string yaml = R"EOF(
+    sse_endpoint_message:
+      param_name: custom-endpoint-param-name
+    )EOF";
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_NE(factory->createSessionStateFactory(proto_config, context), nullptr);
 }
 

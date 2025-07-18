@@ -82,11 +82,26 @@ Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap
       upstream_info != nullptr) {
     auto host = upstream_info->upstreamHost();
     if (host != nullptr) {
-      session_state_->onUpdate(host->address()->asStringView(), headers);
+      session_state_->onUpdateHeader(host->address()->asStringView(), headers);
     }
   }
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterDataStatus StatefulSession::encodeData(Buffer::Instance& data, bool end_stream) {
+  if (session_state_ == nullptr) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  if (auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
+      upstream_info != nullptr) {
+    auto host = upstream_info->upstreamHost();
+    if (host != nullptr) {
+      return session_state_->onUpdateData(host->address()->asStringView(), data, end_stream);
+    }
+  }
+  return Http::FilterDataStatus::Continue;
 }
 
 } // namespace StatefulSession

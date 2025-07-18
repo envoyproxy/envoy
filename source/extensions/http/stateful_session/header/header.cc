@@ -6,13 +6,19 @@ namespace Http {
 namespace StatefulSession {
 namespace Header {
 
-void HeaderBasedSessionStateFactory::SessionStateImpl::onUpdate(
+void HeaderBasedSessionStateFactory::SessionStateImpl::onUpdateHeader(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
   if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
     const std::string encoded_address =
         Envoy::Base64::encode(host_address.data(), host_address.length());
     headers.setCopy(factory_.getHeaderName(), encoded_address);
   }
+}
+
+Envoy::Http::FilterDataStatus
+HeaderBasedSessionStateFactory::SessionStateImpl::onUpdateData(absl::string_view, Buffer::Instance&,
+                                                               bool) {
+  return Envoy::Http::FilterDataStatus::Continue;
 }
 
 HeaderBasedSessionStateFactory::HeaderBasedSessionStateFactory(
