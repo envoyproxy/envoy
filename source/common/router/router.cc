@@ -989,9 +989,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   bool would_exceed_buffer =
       (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
 
-  // Handle retry/shadow buffer overflow.
+  // Handle retry/shadow buffer overflow, excluding redirect-only scenarios.
+  // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
+  // request.
   bool had_retry_or_shadow = retry_enabled || shadow_buffering;
-  if (would_exceed_buffer && had_retry_or_shadow && !request_buffer_overflowed_) {
+  bool is_redirect_only = redirect_enabled && !retry_enabled && !shadow_buffering;
+
+  if (would_exceed_buffer && had_retry_or_shadow && !is_redirect_only &&
+      !request_buffer_overflowed_) {
     ENVOY_LOG(
         debug,
         "The request payload has at least {} bytes data which exceeds buffer limit {}. "
@@ -1029,36 +1034,20 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   }
 
   // Handle redirect-only buffer overflow when retry/shadow is not active.
-  bool redirect_only = redirect_enabled && !retry_enabled && !shadow_buffering;
-  if (would_exceed_buffer && redirect_only && !request_buffer_overflowed_) {
+  // For redirect scenarios, buffer overflow should only affect redirect processing, not initial
+  // request.
+  if (would_exceed_buffer && is_redirect_only && !request_buffer_overflowed_) {
     ENVOY_LOG(
         debug,
         "The request payload has at least {} bytes data which exceeds buffer limit {}. "
         "per_request_buffer_limit_={}, request_body_buffer_limit_={}, connection_buffer_limit_={}. "
-        "Giving up on buffering for internal redirect.",
+        "Marking request as buffer overflowed to cancel internal redirects.",
         getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit,
         per_request_buffer_limit_, request_body_buffer_limit_, connection_buffer_limit_);
 
-    buffering = false;
-    ENVOY_LOG(debug, "overflow: buffering set to false");
-
-    // Always cleanup and send local reply for redirect-only buffer overflow.
-    if (upstream_requests_.empty()) {
-      request_buffer_overflowed_ = true;
-      ENVOY_LOG(debug, "overflow: No upstream requests, resetting and calling cleanup()");
-      resetAll();
-      cleanup();
-      callbacks_->streamInfo().setResponseCodeDetails(
-          "request_payload_exceeded_buffer_limit_internal_redirect");
-      callbacks_->sendLocalReply(Http::Code::InsufficientStorage,
-                                 "exceeded request buffer limit while processing internal redirect",
-                                 modify_headers_, absl::nullopt,
-                                 "request_payload_exceeded_buffer_limit_internal_redirect");
-      return Http::FilterDataStatus::StopIterationNoBuffer;
-    } else {
-      ENVOY_LOG(debug,
-                "overflow: Upstream requests exist, deferring to normal upstream failure handling");
-    }
+    // Set the flag to cancel internal redirect processing, but allow the request to proceed
+    // normally.
+    request_buffer_overflowed_ = true;
   }
 
   for (auto* shadow_stream : shadow_streams_) {
