@@ -5,6 +5,27 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Composite {
 
+void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
+  if (actionSkip()) {
+    return;
+  }
+
+  if (auto config_value = config_provider_(); config_value.has_value()) {
+    (*config_value)(callbacks);
+    return;
+  }
+  // There is no dynamic config available. Apply missing config filter.
+  Envoy::Http::MissingConfigFilterFactory(callbacks);
+}
+
+const std::string& ExecuteFilterAction::actionName() const { return name_; }
+
+bool ExecuteFilterAction::actionSkip() const {
+  return sample_.has_value()
+             ? !runtime_.snapshot().featureEnabled(sample_->runtime_key(), sample_->default_value())
+             : false;
+}
+
 Matcher::ActionConstSharedPtr
 ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
                                          Http::Matching::HttpFilterActionContext& context,

@@ -27,26 +27,11 @@ public:
       : config_provider_(std::move(config_provider)), name_(name), sample_(sample),
         runtime_(runtime) {}
 
-  void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
-    if (actionSkip()) {
-      return;
-    }
+  void createFilters(Http::FilterChainFactoryCallbacks& callbacks) const;
 
-    if (auto config_value = config_provider_(); config_value.has_value()) {
-      (*config_value)(callbacks);
-      return;
-    }
-    // There is no dynamic config available. Apply missing config filter.
-    Envoy::Http::MissingConfigFilterFactory(callbacks);
-  }
+  const std::string& actionName() const;
 
-  const std::string& actionName() const { return name_; }
-
-  bool actionSkip() const {
-    return sample_.has_value() ? !runtime_.snapshot().featureEnabled(sample_->runtime_key(),
-                                                                     sample_->default_value())
-                               : false;
-  }
+  bool actionSkip() const;
 
 private:
   FilterConfigProvider config_provider_;
