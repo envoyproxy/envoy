@@ -118,15 +118,10 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
   }
 
   if (chain_to_create.has_assume_role_credential_provider()) {
-    auto assume_role_config = chain_to_create.assume_role_credential_provider();
+    const auto& assume_role_config = chain_to_create.assume_role_credential_provider();
 
     const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
     const auto cluster_name = stsClusterName(region);
-
-    // Default session name if not provided
-    if (assume_role_config.role_session_name().empty()) {
-      assume_role_config.set_role_session_name(sessionName(context.api()));
-    }
 
     ENVOY_LOG(debug,
               "Using assumerole credentials provider with STS endpoint: {} and session name: {}",
@@ -239,10 +234,12 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
 
     envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config;
     credential_provider_config.CopyFrom(assume_role_config.credential_provider());
+
     if (credential_provider_config.has_assume_role_credential_provider()) {
       ENVOY_LOG(warn, "Multiple assume_role_credential_provider configurations are not supported. "
                       "Ignoring second assume_role_credential_provider.");
     }
+
     credential_provider_config.clear_assume_role_credential_provider();
     credentials_provider_chain =
         std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
