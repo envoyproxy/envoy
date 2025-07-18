@@ -81,6 +81,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "wasm_filter_integration_test",
+    size = "large",
     srcs = ["wasm_filter_integration_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/http/wasm/test_data:test_cpp.wasm",
