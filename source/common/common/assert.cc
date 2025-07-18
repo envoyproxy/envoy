@@ -116,8 +116,48 @@ private:
   static EnvoyBugRegistrationImpl* envoy_bug_failure_record_action_;
 };
 
+// This class implements the logic for triggering ENVOY_NOTIFICATION logs and actions.
+class EnvoyNotificationRegistrationImpl : public ActionRegistration {
+public:
+  EnvoyNotificationRegistrationImpl(std::function<void(absl::string_view)> action)
+      : action_(action) {
+    next_action_ = envoy_notification_record_action_;
+    envoy_notification_record_action_ = this;
+
+    // Reset counters when a registration is added.
+    EnvoyBugState::get().clear();
+  }
+
+  ~EnvoyNotificationRegistrationImpl() override {
+    ASSERT(envoy_notification_record_action_ == this);
+    envoy_notification_record_action_ = next_action_;
+  }
+
+  void invoke(absl::string_view name) {
+    action_(name);
+    if (next_action_) {
+      next_action_->invoke(name);
+    }
+  }
+
+  static void invokeAction(absl::string_view name) {
+    if (envoy_notification_record_action_ != nullptr) {
+      envoy_notification_record_action_->invoke(name);
+    }
+  }
+
+private:
+  std::function<void(absl::string_view)> action_;
+  EnvoyNotificationRegistrationImpl* next_action_ = nullptr;
+
+  // Pointer to the first action in the chain or nullptr if no action is currently registered.
+  static EnvoyNotificationRegistrationImpl* envoy_notification_record_action_;
+};
+
 ActionRegistrationImpl* ActionRegistrationImpl::debug_assertion_failure_record_action_ = nullptr;
 EnvoyBugRegistrationImpl* EnvoyBugRegistrationImpl::envoy_bug_failure_record_action_ = nullptr;
+EnvoyNotificationRegistrationImpl*
+    EnvoyNotificationRegistrationImpl::envoy_notification_record_action_ = nullptr;
 
 ActionRegistrationPtr
 addDebugAssertionFailureRecordAction(const std::function<void(const char* location)>& action) {
@@ -142,6 +182,15 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
 }
 
 void resetEnvoyBugCountersForTest() { EnvoyBugRegistrationImpl::resetEnvoyBugCounters(); }
+
+ActionRegistrationPtr
+addEnvoyNotificationRecordAction(const std::function<void(absl::string_view)>& action) {
+  return std::make_unique<EnvoyNotificationRegistrationImpl>(action);
+}
+
+void invokeEnvoyNotificationRecordActionForEnvoyNotificationMacroUseOnly(absl::string_view name) {
+  EnvoyNotificationRegistrationImpl::invokeAction(name);
+}
 
 } // namespace Assert
 } // namespace Envoy
