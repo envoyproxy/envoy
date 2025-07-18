@@ -943,7 +943,6 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
   if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
     // Case 1: request_body_buffer_limit is explicitly set.
     result = request_body_buffer_limit_;
-    result = request_body_buffer_limit_;
   } else if (per_request_buffer_limit_ != std::numeric_limits<uint32_t>::max()) {
     // Case 2: per_request_buffer_limit_bytes is set but request_body_buffer_limit is not.
     if (connection_buffer_limit_ != 0) {
@@ -981,14 +980,15 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // This ensures error details are set even if retry state was cleared due to upstream reset.
   bool would_exceed_buffer =
       (getLength(callbacks_->decodingBuffer()) + data.length() > effective_buffer_limit);
-  bool had_retry_or_shadow = retry_enabled || shadow_buffering;
 
+  // Handle retry/shadow buffer overflow.
+  bool had_retry_or_shadow = retry_enabled || shadow_buffering;
   if (would_exceed_buffer && had_retry_or_shadow && !request_buffer_overflowed_) {
     ENVOY_LOG(
         debug,
         "The request payload has at least {} bytes data which exceeds buffer limit {}. "
         "per_request_buffer_limit_={}, request_body_buffer_limit_={}, connection_buffer_limit_={}. "
-        "Giving up on the retry/shadow.",
+        "Giving up on buffering.",
         getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit,
         per_request_buffer_limit_, request_body_buffer_limit_, connection_buffer_limit_);
 
@@ -1009,6 +1009,21 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
           StreamInfo::ResponseCodeDetails::get().RequestPayloadExceededRetryBufferLimit);
       return Http::FilterDataStatus::StopIterationNoBuffer;
     }
+  }
+
+  // Handle redirect-only buffer overflow when retry/shadow is not active.
+  bool redirect_only = redirect_enabled && !retry_enabled && !shadow_buffering;
+  if (would_exceed_buffer && redirect_only && !request_buffer_overflowed_) {
+    ENVOY_LOG(
+        debug,
+        "The request payload has at least {} bytes data which exceeds buffer limit {}. "
+        "per_request_buffer_limit_={}, request_body_buffer_limit_={}, connection_buffer_limit_={}. "
+        "Giving up on buffering for internal redirect.",
+        getLength(callbacks_->decodingBuffer()) + data.length(), effective_buffer_limit,
+        per_request_buffer_limit_, request_body_buffer_limit_, connection_buffer_limit_);
+
+    request_buffer_overflowed_ = true;
+    buffering = false;
   }
 
   for (auto* shadow_stream : shadow_streams_) {
