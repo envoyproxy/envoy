@@ -235,7 +235,7 @@ message VirtualHost {
   // Only one of :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
   // and ``request_body_buffer_limit`` could be set.
   google.protobuf.UInt64Value request_body_buffer_limit = 25
-      [(validate.rules).message.required = false];
+      [(validate.rules).message = {required: false}];
 
   // Specify a set of default request mirroring policies for every route under this virtual host.
   // It takes precedence over the route config mirror policy entirely.
