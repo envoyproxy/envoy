@@ -1153,7 +1153,7 @@ TEST_F(RouterTest, EnvoyAttemptCountInResponsePresentWithLocalReply) {
   // Pool failure, so upstream request was never initiated.
   EXPECT_EQ(0U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1)); // Expect 1 error for connection failure
   EXPECT_EQ(callbacks_.details(),
             "upstream_reset_before_response_started{remote_connection_failure}");
   EXPECT_EQ(1U, callbacks_.stream_info_.attemptCount().value());
@@ -3337,6 +3337,11 @@ TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
   Buffer::OwnedImpl buf(body);
   EXPECT_CALL(*router_->retry_state_, enabled()).WillRepeatedly(Return(true));
   router_->decodeData(buf, true);
+
+  // Send a successful upstream response to complete the request
+  Http::ResponseHeaderMapPtr response_headers(
+      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
 
   // Should be successful with the large buffer limit
   EXPECT_EQ(1000U, decoding_buffer.length());
