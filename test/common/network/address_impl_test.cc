@@ -364,7 +364,7 @@ TEST(Ipv6InstanceTest, Broadcast) {
 }
 
 TEST(Ipv6InstanceTest, LinkLocal) {
-  // Link-local addresses are in the range fe80::0 to febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff.
+  // Link-local addresses are in the range "fe80::0" to "febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff".
   EXPECT_TRUE(Ipv6Instance("fe80:0:0:0:0:0:0:0").ip()->isLinkLocalAddress());
   EXPECT_TRUE(Ipv6Instance("fe80::0").ip()->isLinkLocalAddress());
   EXPECT_TRUE(Ipv6Instance("fe80::1").ip()->isLinkLocalAddress());
