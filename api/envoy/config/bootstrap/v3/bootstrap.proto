@@ -455,7 +455,7 @@ message Admin {
   //
   // Example:
   // allow_listed_routes:
-  // - prefix: xfoo
+  // - prefix: foo
   // - exact: foo
   // - exact: bar
   repeated type.matcher.v3.StringMatcher allow_listed_routes = 7;

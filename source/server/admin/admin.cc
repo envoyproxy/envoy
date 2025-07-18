@@ -113,8 +113,8 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
       factory_context_(server, listener_info_),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
-      profile_path_(profile_path),
-      stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", *server_.stats().rootScope())),
+      profile_path_(profile_path), stats_(Http::ConnectionManagerImpl::generateStats(
+                                       "http.admin.", *server_.stats().rootScope())),
       null_overload_manager_(server.threadLocal(), false),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.",
                                                                        *no_op_store_.rootScope())),

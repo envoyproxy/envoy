@@ -158,7 +158,6 @@ public:
    * limit.
    */
   virtual bool ignoreGlobalConnLimit() const PURE;
-
 };
 
 /**
