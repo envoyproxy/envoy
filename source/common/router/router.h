@@ -49,6 +49,10 @@
 namespace Envoy {
 namespace Router {
 
+// Control if check the websocket handshake 101 response.
+// https://github.com/envoyproxy/envoy/issues/9961
+constexpr absl::string_view WebsocketHandshakeCheck = "http1.websocket_handshake_check";
+
 /**
  * Struct definition for all router filter stats. @see stats_macros.h
  */
@@ -219,6 +223,7 @@ public:
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
         flush_upstream_log_on_upstream_stream_(flush_upstream_log_on_upstream_stream),
+        check_websocket_handshake_(runtime_.snapshot().getBoolean(WebsocketHandshakeCheck, true)),
         http_context_(http_context), zone_name_(factory_context.localInfo().zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
@@ -282,6 +287,7 @@ public:
   // TODO(xyu-stripe): Make this a bitset to keep cluster memory footprint down.
   HeaderVectorPtr strict_check_headers_;
   const bool flush_upstream_log_on_upstream_stream_;
+  const bool check_websocket_handshake_;
   absl::optional<std::chrono::milliseconds> upstream_log_flush_interval_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
   Http::Context& http_context_;
