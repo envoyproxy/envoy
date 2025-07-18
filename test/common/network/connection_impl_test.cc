@@ -4584,6 +4584,80 @@ TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) 
   disconnect(false);
 }
 
+TEST_P(ConnectionImplTest, TestMoveSocket) {
+  setUpBasicConnection();
+  connect();
+
+  // Test socket reuse flag functionality.
+  EXPECT_FALSE(client_connection_->isSocketReused());
+  client_connection_->setSocketReused(true);
+  EXPECT_TRUE(client_connection_->isSocketReused());
+
+  // Test getSocket functionality.
+  const auto& socket_ref = client_connection_->getSocket();
+  EXPECT_NE(socket_ref, nullptr);
+
+  // Test moveSocket functionality.
+  auto moved_socket = client_connection_->moveSocket();
+  EXPECT_NE(moved_socket, nullptr);                                  // Ensure the socket is moved.
+  EXPECT_EQ(client_connection_->state(), Connection::State::Closed); // Connection should be closed.
+
+  // Clean up - close the moved socket.
+  moved_socket->close();
+
+  // Clean up server connection.
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
+TEST_P(ConnectionImplTest, TestSocketReuseFlagDefaultState) {
+  setUpBasicConnection();
+  connect();
+
+  // Test that socket reuse flag defaults to false.
+  EXPECT_FALSE(client_connection_->isSocketReused());
+
+  // Test that setting to false works when already false.
+  client_connection_->setSocketReused(false);
+  EXPECT_FALSE(client_connection_->isSocketReused());
+
+  disconnect(true);
+}
+
+TEST_P(ConnectionImplTest, TestConstSocketAccess) {
+  setUpBasicConnection();
+  connect();
+
+  // Test const access to socket.
+  const Network::Connection& const_connection = *client_connection_;
+  const auto& socket_ref = const_connection.getSocket();
+  EXPECT_NE(socket_ref, nullptr);
+
+  // Verify that const and non-const getSocket return the same socket.
+  EXPECT_EQ(&socket_ref, &client_connection_->getSocket());
+
+  disconnect(true);
+}
+
+TEST_P(ConnectionImplTest, TestGetSocketAfterMoveSocket) {
+  setUpBasicConnection();
+  connect();
+
+  // Move the socket.
+  auto moved_socket = client_connection_->moveSocket();
+  EXPECT_NE(moved_socket, nullptr);
+
+  // Attempting to access socket after move should trigger RELEASE_ASSERT.
+  EXPECT_DEATH(client_connection_->getSocket(), "socket is null");
+
+  // Clean up.
+  moved_socket->close();
+  EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy
