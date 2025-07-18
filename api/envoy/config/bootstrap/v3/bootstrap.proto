@@ -16,6 +16,7 @@ import "envoy/config/metrics/v3/stats.proto";
 import "envoy/config/overload/v3/overload.proto";
 import "envoy/config/trace/v3/http_tracer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+import "envoy/type/matcher/v3/string.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -448,9 +449,16 @@ message Admin {
   // should apply to the admin interface or not.
   bool ignore_global_conn_limit = 6;
 
-  // Optional list of routes accessible to the admin.
+  // Optional list of routes accessible to the admin. The allowed routes can be matched by
+  // any patterns defined in the StringMatcher proto (e.g. exact string, prefix, regex, etc).
   // If not specified, the allowlist check will be skipped.
-  repeated string allow_listed_routes = 7;
+  //
+  // Example:
+  // allow_listed_routes:
+  // - prefix: xfoo
+  // - exact: foo
+  // - exact: bar
+  repeated type.matcher.v3.StringMatcher allow_listed_routes = 7;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
