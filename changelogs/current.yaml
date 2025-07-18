@@ -162,6 +162,10 @@ bug_fixes:
 - area: wasm
   change: |
     Fixed a bug where the Wasm filter hangs when the VM is crashed in the request callbacks.
+- area: dynatrace
+  change: |
+    Fixed a division by zero bug in the Dynatrace sampling controller that occurred when ``total_wanted`` was less than
+    ``top_k_size``. The calculation was refactored to avoid the intermediate division that could result in zero.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
