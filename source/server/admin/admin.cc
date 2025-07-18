@@ -22,6 +22,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/matchers.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -107,15 +108,13 @@ Http::HeaderValidatorFactoryPtr createHeaderValidatorFactory(
 } // namespace
 
 AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
-                     bool ignore_global_conn_limit,
-                     absl::flat_hash_set<std::string> allow_listed_routes)
+                     bool ignore_global_conn_limit)
     : server_(server), listener_info_(std::make_shared<ListenerInfoImpl>()),
       factory_context_(server, listener_info_),
       request_id_extension_(Extensions::RequestId::UUIDRequestIDExtension::defaultInstance(
           server_.api().randomGenerator())),
-      allow_listed_route_(allow_listed_routes), profile_path_(profile_path),
-      stats_(
-          Http::ConnectionManagerImpl::generateStats("http.admin.", *server_.stats().rootScope())),
+      profile_path_(profile_path),
+      stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", *server_.stats().rootScope())),
       null_overload_manager_(server.threadLocal(), false),
       tracing_stats_(Http::ConnectionManagerImpl::generateTracingStats("http.admin.",
                                                                        *no_op_store_.rootScope())),
@@ -317,6 +316,10 @@ bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
   return true;
 }
 
+void AdminImpl::addAllowListedRoute(Matchers::StringMatcherPtr matcher) {
+  allow_listed_routes_.emplace_back(std::move(matcher));
+}
+
 namespace {
 // Implements a chunked request for static text.
 class StaticTextRequest : public Admin::Request {
@@ -395,8 +398,9 @@ Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
   }
-  if (!allow_listed_route_.empty() && !acceptTargetRoute(path_and_query)) {
-    ENVOY_LOG(info, fmt::format("Admin Allow list filter check for {}", path_and_query));
+  if (!allow_listed_routes_.empty() && !acceptTargetRoute(path_and_query)) {
+    ENVOY_LOG(info, fmt::format("Admin Allow list filter check for {} failed not allowed",
+                                path_and_query));
     Buffer::OwnedImpl error_response;
     error_response.add(fmt::format("request to route {} not allowed", path_and_query));
     return Admin::makeStaticTextRequest(error_response, Http::Code::Forbidden);
