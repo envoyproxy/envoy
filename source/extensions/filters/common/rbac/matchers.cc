@@ -284,7 +284,7 @@ bool PolicyMatcher::matches(const Network::Connection& connection,
                             const StreamInfo::StreamInfo& info) const {
   return permissions_.matches(connection, headers, info) &&
          principals_.matches(connection, headers, info) &&
-         (expr_ == nullptr ? true : Expr::matches(*expr_, info, headers));
+         (expr_wrapper_ == nullptr ? true : expr_wrapper_->matches(headers, info));
 }
 
 bool RequestedServerNameMatcher::matches(const Network::Connection& connection,
