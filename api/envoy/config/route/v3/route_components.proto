@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -210,6 +210,18 @@ message VirtualHost {
   // value of this and the listener per_connection_buffer_limit_bytes.
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 
+  // The maximum bytes which will be buffered for request bodies to support large request body
+  // buffering beyond the ``per_connection_buffer_limit_bytes``.
+  //
+  // This limit is specifically for request body buffering and allows buffering larger inference
+  // payloads while maintaining the flow control.
+  //
+  // If not set, defaults to ``per_request_buffer_limit_bytes`` behavior.
+  //
+  // When set, this limit supersedes ``per_connection_buffer_limit_bytes`` for request body buffering
+  // but ``per_request_buffer_limit_bytes`` still controls flow control chunk sizes.
+  google.protobuf.UInt64Value request_body_buffer_limit = 25;
+
   // Specify a set of default request mirroring policies for every route under this virtual host.
   // It takes precedence over the route config mirror policy entirely.
   // That is, policies are not merged, the most specific non-empty one becomes the mirror policies.
@@ -244,7 +256,7 @@ message RouteList {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -357,6 +369,18 @@ message Route {
   //    every application endpoint. This is both not easily maintainable and
   //    statistics use a non-trivial amount of memory(approximately 1KiB per route).
   string stat_prefix = 19;
+
+  // The maximum bytes which will be buffered for request bodies to support large request body
+  // buffering beyond the ``per_connection_buffer_limit_bytes``.
+  //
+  // This limit is specifically for request body buffering and allows buffering larger inference
+  // payloads while maintaining the flow control.
+  //
+  // If not set, defaults to ``per_request_buffer_limit_bytes`` behavior.
+  //
+  // When set, this limit supersedes ``per_connection_buffer_limit_bytes`` for request body buffering
+  // but ``per_request_buffer_limit_bytes`` still controls flow control chunk sizes.
+  google.protobuf.UInt64Value request_body_buffer_limit = 20;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a

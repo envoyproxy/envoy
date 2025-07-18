@@ -687,6 +687,15 @@ public:
   virtual uint32_t retryShadowBufferLimit() const PURE;
 
   /**
+   * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
+   *         buffering larger request bodies beyond the connection buffer limit for use cases like
+   *         ML inference with large payloads. If not set, falls back to retryShadowBufferLimit()
+   *         behavior. When set, this limit supersedes per_connection_buffer_limit_bytes for
+   *         request body buffering but retryShadowBufferLimit() still controls flow control.
+   */
+  virtual uint64_t requestBodyBufferLimit() const PURE;
+
+  /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
    * hierarchy (Route --> VirtualHost --> RouteConfiguration). Or nullptr if none of them exist.
    */
@@ -998,10 +1007,20 @@ public:
    * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
    *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
    *         as other limits may apply.
+   *         If a per route limit exists, it takes precedence over this configuration.
    *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
    *         rather than no limit applies.
    */
   virtual uint32_t retryShadowBufferLimit() const PURE;
+
+  /**
+   * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
+   *         buffering larger request bodies beyond the connection buffer limit for use cases like
+   *         ML inference with large payloads. If not set, falls back to retryShadowBufferLimit()
+   *         behavior. When set, this limit supersedes per_connection_buffer_limit_bytes for
+   *         request body buffering but retryShadowBufferLimit() still controls flow control.
+   */
+  virtual uint64_t requestBodyBufferLimit() const PURE;
 
   /**
    * @return const std::vector<ShadowPolicy>& the shadow policies for the route. The vector is empty

@@ -64,6 +64,7 @@ struct NullVirtualHost : public Router::VirtualHost {
   bool includeAttemptCountInResponse() const override { return false; }
   bool includeIsTimeoutRetryHeader() const override { return false; }
   uint32_t retryShadowBufferLimit() const override { return std::numeric_limits<uint32_t>::max(); }
+  uint64_t requestBodyBufferLimit() const override { return std::numeric_limits<uint64_t>::max(); }
   const Router::RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
@@ -162,6 +163,7 @@ protected:
   const Router::PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
   const Router::PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
   uint32_t retryShadowBufferLimit() const override { return std::numeric_limits<uint32_t>::max(); }
+  uint64_t requestBodyBufferLimit() const override { return std::numeric_limits<uint64_t>::max(); }
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override {
     return shadow_policies_;
   }

@@ -27,6 +27,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/access_log/access_log_impl.h"
+#include "source/common/buffer/copy_on_write_buffer.h"
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/cleanup.h"
 #include "source/common/common/hash.h"
@@ -552,6 +553,9 @@ private:
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();
+
+  // Helper method to determine if copy-on-write buffers should be used for memory efficiency.
+  bool shouldUseCopyOnWriteBuffers(bool buffering, uint64_t data_size) const;
   void onGlobalTimeout();
   void onRequestComplete();
   void onResponseTimeout();
@@ -634,8 +638,13 @@ private:
   // Set of ongoing shadow streams which have not yet received end stream.
   absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
 
+  // Shared buffer for copy-on-write optimization when request body buffering is enabled
+  // and multiple copies are needed for retries/shadows.
+  Buffer::SharedBufferPtr shared_request_buffer_;
+
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
   uint32_t attempt_count_{0};
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;
