@@ -7,7 +7,6 @@
 
 #include "source/common/http/codec_wrappers.h"
 #include "source/common/http/conn_pool_base.h"
-#include "source/common/http/http1/request_tracker.h"
 
 namespace Envoy {
 namespace Http {
@@ -86,11 +85,7 @@ public:
       CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
       Server::OverloadManager& overload_manager);
 
-  // Allow ActiveClient to access the request tracker
-  friend class ActiveClient;
-
 private:
-  Http1RequestTrackerPtr request_tracker_;
 };
 
 ConnectionPool::InstancePtr

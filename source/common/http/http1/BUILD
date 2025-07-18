@@ -66,25 +66,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "request_tracker_lib",
-    srcs = ["request_tracker.cc"],
-    hdrs = ["request_tracker.h"],
-    deps = [
-        "//envoy/event:dispatcher_interface",
-        "//envoy/event:timer_interface",
-        "//envoy/stats:stats_interface",
-        "//envoy/upstream:upstream_interface",
-        "//source/common/common:logger_lib",
-        "@com_google_absl//absl/container:flat_hash_map",
-    ],
-)
-
-envoy_cc_library(
     name = "conn_pool_lib",
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
     deps = [
-        ":request_tracker_lib",
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
