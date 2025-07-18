@@ -79,11 +79,6 @@ FcdsApiPtr ListenerImpl::createFcdsSubscription(
       std::make_unique<FcdsApiImpl>(fcds_config.config_source(), fcds_config.resources_locator(),
                                     name_, parent_.server_.clusterManager(), listenerScope(),
                                     *dynamic_init_manager_, parent_, validation_visitor_);
-
-  if (!fcds_config.start_listener_without_warming()) {
-    dynamic_init_manager_->add(subscription->initTarget());
-  }
-
   return subscription;
 }
 
@@ -320,10 +315,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
-      bypass_overload_manager_(config.bypass_overload_manager()),
-      start_listener_without_warming_(config.has_fcds_config() &&
-                                      config.fcds_config().start_listener_without_warming()),
-      created_by_fcds_(false),
+      bypass_overload_manager_(config.bypass_overload_manager()), created_by_fcds_(false),
       listener_init_target_(std::make_shared<Init::TargetImpl>(
           fmt::format("Listener-init-target {}", name),
           [this]() { dynamic_init_manager_->initialize(*local_init_watcher_); })),
@@ -455,9 +447,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
-      bypass_overload_manager_(config.bypass_overload_manager()),
-      start_listener_without_warming_(origin.start_listener_without_warming_),
-      created_by_fcds_(false),
+      bypass_overload_manager_(config.bypass_overload_manager()), created_by_fcds_(false),
       // listener_init_target_ is not used during in place update because we expect server started.
       listener_init_target_(std::make_shared<Init::TargetImpl>("", nullptr)),
       dynamic_init_manager_(std::make_shared<Init::ManagerImpl>(
@@ -518,9 +508,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& add
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(origin.ignore_global_conn_limit_),
-      bypass_overload_manager_(origin.bypass_overload_manager_),
-      start_listener_without_warming_(origin.start_listener_without_warming_),
-      created_by_fcds_(true),
+      bypass_overload_manager_(origin.bypass_overload_manager_), created_by_fcds_(true),
       // Used in case where FCDS is received while server is initializing and the listener has a
       // dependency on FCDS update to arrive to complete initialization.
       listener_init_target_(std::make_shared<Init::TargetImpl>(
@@ -547,8 +535,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& add
       reuse_port_(origin.reuse_port_),
       local_init_watcher_(std::make_shared<Init::WatcherImpl>(
           fmt::format("FCDS-Listener-local-init-watcher {}", origin.name_),
-          [this, target = listener_init_target_, workers_started = workers_started_,
-           start_listener_without_warming = start_listener_without_warming_] {
+          [this, target = listener_init_target_, workers_started = workers_started_] {
             if (workers_started) {
               auto active_listener_tag = parent_.activeListenerTagByName(name_);
               if (active_listener_tag.has_value() && active_listener_tag.value() == listener_tag_) {
@@ -556,7 +543,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& add
               } else {
                 parent_.onListenerWarmed(*this);
               }
-            } else if (!start_listener_without_warming) {
+            } else {
               // Notify Server that this listener is ready.
               target->ready();
             }
@@ -585,7 +572,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& add
   }
 
   trackOriginInitDependencies(origin);
-  if (!workers_started_ && !start_listener_without_warming_) {
+  if (!workers_started_) {
     ASSERT(parent_.server_.initManager().state() == Init::Manager::State::Initializing);
     // If workers have not started yet and the listener was updated using FCDS, we need to
     // add the listener_init_target_ to the server's init manager, so all the new filter chain
@@ -1156,10 +1143,7 @@ void ListenerImpl::initialize() {
   // If workers have already started, we shift from using the global init manager to using a local
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // by resetting the watcher.
-  // If the listener was created due to FCDS update, initialize the dynamic init manager in case
-  // where start_listener_without_warming_ is true, because listener_init_target_ will not be in
-  // use.
-  if (workers_started_ || (created_by_fcds_ && start_listener_without_warming_)) {
+  if (workers_started_) {
     ENVOY_LOG_MISC(debug, "Initialize listener {} local-init-manager.", name_);
     // If workers_started_ is true, dynamic_init_manager_ should be initialized by listener
     // manager directly.

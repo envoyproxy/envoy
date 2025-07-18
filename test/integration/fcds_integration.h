@@ -73,7 +73,7 @@ public:
 
   envoy::config::listener::v3::Listener
   listenerConfig(const std::string& name, const std::string& fcds_collection_name,
-                 bool start_without_warming, absl::optional<std::string> default_response,
+                 absl::optional<std::string> default_response,
                  absl::optional<FilterChainConfig> filter_chain_config,
                  absl::optional<std::vector<std::tuple<std::string, std::string>>> matcher_rules) {
     std::string filter_chain;
@@ -142,16 +142,14 @@ public:
                                  config.name_, match, config.filter_name_, filter_config);
     }
 
-    std::string fcds_config =
-        fmt::format(R"EOF(
+    std::string fcds_config = fmt::format(R"EOF(
       fcds_config:
         resources_locator: xdstp://test/envoy.config.listener.v3.FilterChain/{0}/*
-        start_listener_without_warming: {1}
         config_source:
           resource_api_version: V3
           ads: {{}}
     )EOF",
-                    fcds_collection_name, start_without_warming ? "true" : "false");
+                                          fcds_collection_name);
 
     std::string default_filter_chain;
     if (default_response.has_value()) {

@@ -15,14 +15,7 @@ FcdsApiImpl::FcdsApiImpl(const envoy::config::core::v3::ConfigSource& fcds_confi
                                                                                 "name"),
       resources_locator_(resources_locator), listener_name_(listener_name),
       scope_(scope.createScope("fcds.")), listener_manager_(listener_manager),
-      local_init_target_("FCDS-local",
-                         [this]() {
-                           // This init target that is used to start the subscription regardless of
-                           // whether the listener is started with warming or not.
-                           subscription_->start({});
-                           local_init_target_.ready();
-                         }),
-      init_target_("FCDS", []() {}) {
+      init_target_("FCDS", [this]() { subscription_->start({}); }) {
   const xds::core::v3::ResourceLocator fcds_resource_locator = THROW_OR_RETURN_VALUE(
       Config::XdsResourceIdentifier::decodeUrl(resources_locator_), xds::core::v3::ResourceLocator);
   const auto resource_name = getResourceName();
@@ -31,7 +24,7 @@ FcdsApiImpl::FcdsApiImpl(const envoy::config::core::v3::ConfigSource& fcds_confi
           fcds_resource_locator, fcds_config, resource_name, *scope_, *this, resource_decoder_),
       Config::SubscriptionPtr);
 
-  init_manager.add(local_init_target_);
+  init_manager.add(init_target_);
 }
 
 absl::Status
@@ -88,6 +81,7 @@ FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added
 
 absl::Status FcdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>&,
                                          const std::string&) {
+  init_target_.ready();
   return absl::UnavailableError("SoTW FCDS is not implemented");
 }
 

@@ -27,8 +27,6 @@ public:
   // Server::FcdsApi
   std::string versionInfo() const override { return system_version_info_; }
 
-  Init::Target& initTarget() { return init_target_; }
-
 private:
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -45,7 +43,6 @@ private:
   std::string system_version_info_;
   Stats::ScopeSharedPtr scope_;
   ListenerManager& listener_manager_;
-  Init::TargetImpl local_init_target_;
   Init::TargetImpl init_target_;
 };
 

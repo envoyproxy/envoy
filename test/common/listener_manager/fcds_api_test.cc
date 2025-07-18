@@ -41,17 +41,8 @@ public:
                                           cluster_manager_, *store_.rootScope(), init_manager_,
                                           listener_manager_, validation_visitor_);
     EXPECT_CALL(*cluster_manager_.subscription_factory_.subscription_, start(_));
-    // Expect the init_watcher_.ready() call that happens during initialization
-    EXPECT_CALL(init_watcher_, ready());
     init_target_handle_->initialize(init_watcher_);
     fcds_callbacks_ = cluster_manager_.subscription_factory_.callbacks_;
-    subscription_init_target_handle_ =
-        fcds_->initTarget().createHandle(subscription_init_handle_name_);
-  }
-
-  void expectSubscriptionInitTargetReady() {
-    EXPECT_CALL(subscription_init_watcher_, ready());
-    subscription_init_target_handle_->initialize(subscription_init_watcher_);
   }
 
   void expectFilterChainUpdateSuccess(
@@ -79,7 +70,7 @@ public:
     EXPECT_CALL(listener_manager_,
                 updateDynamicFilterChains(listener_name, _, _, removed_filter_chains))
         .WillOnce(Invoke([result, expected_added_count](
-                             const std::string&, absl::optional<absl::string_view>&,
+                             const std::string&, absl::optional<absl::string_view>,
                              const Server::FilterChainRefVector& added,
                              const absl::flat_hash_set<absl::string_view>&) -> absl::Status {
           EXPECT_EQ(expected_added_count, added.size());
@@ -129,8 +120,6 @@ public:
   Init::MockManager init_manager_;
   Init::ExpectableWatcherImpl init_watcher_;
   Init::TargetHandlePtr init_target_handle_;
-  Init::ExpectableWatcherImpl subscription_init_watcher_;
-  Init::TargetHandlePtr subscription_init_target_handle_;
   Stats::IsolatedStoreImpl store_;
   MockListenerManager listener_manager_;
   Config::SubscriptionCallbacks* fcds_callbacks_{};
@@ -149,6 +138,7 @@ TEST_F(FcdsApiTest, BasicFilterChainOperations) {
 
   // Test adding multiple filter chains
   expectFilterChainUpdateSuccess(2);
+  EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(startConfigUpdate({filter_chain_1, filter_chain_2}, {}, version_0_).ok());
   EXPECT_EQ(version_0_, fcds_->versionInfo());
 
@@ -169,20 +159,6 @@ TEST_F(FcdsApiTest, BasicFilterChainOperations) {
   EXPECT_EQ(version_2_, fcds_->versionInfo());
 }
 
-TEST_F(FcdsApiTest, InitialStateAndsubscriptionInitTarget) {
-  setup();
-
-  // Test initial version is empty
-  EXPECT_EQ(empty_version_, fcds_->versionInfo());
-
-  // Test that we can get the subscription init target
-  Init::Target& subscription_target = fcds_->initTarget();
-
-  // Verify we can create a handle from it
-  auto handle = subscription_target.createHandle("test_subscription");
-  EXPECT_NE(handle, nullptr);
-}
-
 // Test error handling: absl::Status errors, EnvoyExceptions, and version persistence on failure
 TEST_F(FcdsApiTest, ErrorHandlingAndVersionPersistence) {
   InSequence s;
@@ -194,28 +170,20 @@ TEST_F(FcdsApiTest, ErrorHandlingAndVersionPersistence) {
 
   // Test first successful update
   expectFilterChainUpdateSuccess(1);
-  expectSubscriptionInitTargetReady();
+  EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(startConfigUpdate({valid_filter_chain}, {}, version_0_).ok());
   EXPECT_EQ(version_0_, fcds_->versionInfo());
 
-  // Reset subscription init target for next test
-  subscription_init_target_handle_ = fcds_->initTarget().createHandle("subscription_test2");
-
   // Test absl::Status error - version should not change
   expectFilterChainUpdateFailure(1, something_wrong_error_);
-  expectSubscriptionInitTargetReady();
   const auto result1 = startConfigUpdate({invalid_filter_chain}, {}, version_1_);
   EXPECT_FALSE(result1.ok());
   EXPECT_EQ(result1.message(), buildFcdsErrorMessage(something_wrong_error_));
   EXPECT_EQ(version_0_, fcds_->versionInfo()); // Version should remain unchanged
 
-  // Reset subscription init target for EnvoyException test
-  subscription_init_target_handle_ = fcds_->initTarget().createHandle("subscription_test3");
-
   // Test EnvoyException handling
   EXPECT_CALL(listener_manager_, updateDynamicFilterChains(_, _, _, _))
       .WillOnce(Throw(EnvoyException(envoy_exception_error_)));
-  expectSubscriptionInitTargetReady();
 
   const auto result2 = startConfigUpdate({invalid_filter_chain}, {}, version_1_);
   EXPECT_EQ(result2.message(), buildFcdsErrorMessage(envoy_exception_error_));
@@ -226,17 +194,14 @@ TEST_F(FcdsApiTest, ErrorHandlingAndVersionPersistence) {
 TEST_F(FcdsApiTest, SubscriptionFailuresAndReasons) {
   setup();
 
+  EXPECT_CALL(init_watcher_, ready());
+
   // Test FetchTimedout
-  expectSubscriptionInitTargetReady();
   fcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
                                         nullptr);
   EXPECT_EQ(empty_version_, fcds_->versionInfo());
 
-  // Reset for next test
-  subscription_init_target_handle_ = fcds_->initTarget().createHandle("subscription_test2");
-
   // Test UpdateRejected
-  expectSubscriptionInitTargetReady();
   fcds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::UpdateRejected,
                                         nullptr);
   EXPECT_EQ(empty_version_, fcds_->versionInfo());
@@ -247,6 +212,8 @@ TEST_F(FcdsApiTest, SotwNotImplemented) {
 
   const auto filter_chain = buildFilterChain(filter_chain_1_name_);
   const auto decoded_resources = TestUtility::decodeResources({filter_chain});
+
+  EXPECT_CALL(init_watcher_, ready());
 
   EXPECT_EQ(fcds_callbacks_->onConfigUpdate(decoded_resources.refvec_, version_1_).message(),
             sotw_not_implemented_error_);
@@ -262,19 +229,15 @@ TEST_F(FcdsApiTest, FailureStatePropagation) {
   // Test failure state propagation
   EXPECT_CALL(listener_manager_, updateDynamicFilterChains(_, _, _, _))
       .WillOnce(::testing::Return(absl::InvalidArgumentError(something_wrong_error_)));
-  expectSubscriptionInitTargetReady();
+  EXPECT_CALL(init_watcher_, ready());
 
   const auto result = startConfigUpdate({filter_chain}, {}, version_1_);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ(result.message(), buildFcdsErrorMessage(something_wrong_error_));
 
-  // Reset for success state test
-  subscription_init_target_handle_ = fcds_->initTarget().createHandle("subscription_test2");
-
   // Test success state propagation (null failure state)
   EXPECT_CALL(listener_manager_, updateDynamicFilterChains(_, _, _, _))
       .WillOnce(::testing::Return(absl::OkStatus()));
-  expectSubscriptionInitTargetReady();
 
   const auto result2 = startConfigUpdate({filter_chain}, {}, version_1_);
   EXPECT_TRUE(result2.ok());
@@ -292,6 +255,7 @@ TEST_F(FcdsApiTest, ConsecutiveVersionUpdates) {
 
   // First update
   expectFilterChainUpdateSuccess(1);
+  EXPECT_CALL(init_watcher_, ready());
   EXPECT_TRUE(startConfigUpdate({filter_chain_1}, {}, version_0_).ok());
   EXPECT_EQ(version_0_, fcds_->versionInfo());
 

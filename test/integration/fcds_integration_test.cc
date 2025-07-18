@@ -25,7 +25,7 @@ TEST_P(FcdsIntegrationTest, BasicSuccess) {
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listeners = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
+  auto listeners = listenerConfig(l0_name_, l0_name_, {}, {}, {});
   sendLdsResponse(listeners, listeners_v1_);
   expectWarmingListeners(1);
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
@@ -46,8 +46,8 @@ TEST_P(FcdsIntegrationTest, TwoListenersSeparateFcdsSubscription) {
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener_0 = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
-  auto listener_1 = listenerConfig(l1_name_, l1_name_, false, {}, {}, {});
+  auto listener_0 = listenerConfig(l0_name_, l0_name_, {}, {}, {});
+  auto listener_1 = listenerConfig(l1_name_, l1_name_, {}, {}, {});
   sendLdsResponse({listener_0, listener_1}, listeners_v1_);
   expectWarmingListeners(2);
 
@@ -76,8 +76,8 @@ TEST_P(FcdsIntegrationTest, TwoListenersSameFcdsSubscription) {
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener_0 = listenerConfig(l0_name_, all_listeners_, false, {}, {}, {});
-  auto listener_1 = listenerConfig(l1_name_, all_listeners_, false, {}, {}, {});
+  auto listener_0 = listenerConfig(l0_name_, all_listeners_, {}, {}, {});
+  auto listener_1 = listenerConfig(l1_name_, all_listeners_, {}, {}, {});
   sendLdsResponse({listener_0, listener_1}, listeners_v1_);
   expectWarmingListeners(2);
 
@@ -103,7 +103,7 @@ TEST_P(FcdsIntegrationTest, ListenersWithFcdsWithFilterChainMatching) {
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, {}, {}, {});
   sendLdsResponse(listener, listeners_v1_);
   expectWarmingListeners(1);
 
@@ -132,7 +132,7 @@ TEST_P(FcdsIntegrationTest, ListenersWithDefaultFilterChainWithFcdsWithFilterCha
 
   auto default_response = "pong_from_listener_0_default_filter_chain";
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, default_response, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, default_response, {}, {});
   sendLdsResponse(listener, listeners_v1_);
   expectWarmingListeners(1);
 
@@ -161,7 +161,7 @@ TEST_P(FcdsIntegrationTest, ListenersWithStaticFilterChainWithFcdsWithFilterChai
 
   auto static_filter_response = "pong_from_listener_0_static_filter_chain";
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {},
+  auto listener = listenerConfig(l0_name_, l0_name_, {},
                                  FilterChainConfig{"listener_0_static_filter_chain", ip_4_,
                                                    filter_name_, static_filter_response},
                                  {});
@@ -195,7 +195,7 @@ TEST_P(FcdsIntegrationTest,
   auto default_response = "pong_from_listener_0_default_filter_chain";
   auto static_filter_response = "pong_from_listener_0_static_filter_chain";
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, default_response,
+  auto listener = listenerConfig(l0_name_, l0_name_, default_response,
                                  FilterChainConfig{"listener_0_static_filter_chain", ip_4_,
                                                    filter_name_, static_filter_response},
                                  {});
@@ -228,7 +228,7 @@ TEST_P(FcdsIntegrationTest, ListenerWithFcdsWithEcds) {
 
   auto ecds_filter_name = "listener_0_filter_chain_0_direct_response";
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, {}, {}, {});
   sendLdsResponse(listener, listeners_v1_);
   expectWarmingListeners(1);
 
@@ -258,7 +258,7 @@ TEST_P(FcdsIntegrationTest, TwoFcdsUpdates) {
 
   auto default_response = "pong_from_listener_0_default_filter_chain";
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, default_response, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, default_response, {}, {});
   sendLdsResponse(listener, listeners_v1_);
   expectWarmingListeners(1);
 
@@ -291,38 +291,13 @@ TEST_P(FcdsIntegrationTest, TwoFcdsUpdates) {
   sendDataVerifyResponse(l0_port_, default_response, ip_4_);
 }
 
-TEST_P(FcdsIntegrationTest, FcdsUpdateNoWarming) {
-  initialize();
-
-  auto default_response = "pong_from_listener_0_default_filter_chain";
-  ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, true, default_response, {}, {});
-  sendLdsResponse(listener, listeners_v1_);
-  expectWarmingListeners(1);
-
-  EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
-  expectListenersUpdateStats(1, 1, 1);
-
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
-
-  auto direct_response = "pong_from_listener_0_filter_chain_0";
-  auto filter_chain = filterChainConfig(l0_name_, fc0_name_, filter_name_, direct_response, ip_2_);
-
-  sendFcdsResponse(filter_chains_v1_, filter_chain);
-  expectListenersModified(1);
-  expectFilterChainUpdateStats(l0_name_, 1, 1);
-  expectConfigDump(listeners_v1_, filter_chains_v1_, listener);
-
-  sendDataVerifyResponse(l0_port_, direct_response, ip_2_);
-}
-
-TEST_P(FcdsIntegrationTest, NoWarmingFcdsUpdateDuringServerInitialization) {
+TEST_P(FcdsIntegrationTest, FcdsUpdateDuringServerInitializationDueToEcdsWithStaticFilterChain) {
   initialize();
 
   auto ecds_filter_name = "listener_0_static_filter_chain_0_direct_response";
   ASSERT_TRUE(expectLdsSubscription());
   auto listener = listenerConfig(
-      l0_name_, l0_name_, true, {},
+      l0_name_, l0_name_, {},
       FilterChainConfig{"listener_0_static_filter_chain", ip_4_, ecds_filter_name, {}}, {});
   sendLdsResponse(listener, listeners_v1_);
   expectWarmingListeners(1);
@@ -361,7 +336,7 @@ TEST_P(FcdsIntegrationTest, TwoFcdsUpdatesWhileInitializingDependencies) {
   auto ecds_filter_name = "listener_0_static_filter_chain_0_direct_response";
   ASSERT_TRUE(expectLdsSubscription());
   auto listener = listenerConfig(
-      l0_name_, l0_name_, true, {},
+      l0_name_, l0_name_, {},
       FilterChainConfig{"listener_0_static_filter_chain", ip_4_, ecds_filter_name, {}}, {});
   sendLdsResponse(listener, listeners_v1_);
   expectWarmingListeners(1);
@@ -400,13 +375,14 @@ TEST_P(FcdsIntegrationTest, TwoFcdsUpdatesWhileInitializingDependencies) {
   auto ecds_direct_response = "pong_from_listener_0_static_filter_chain_0_ecds_response";
   auto extension_config = extensionConfig(ecds_filter_name, ecds_direct_response);
   sendExtensionResponse(extension_config, ecds_stream_, "ecds_v1");
-  expectExtensionReloadStats(ecds_filter_name, 1);
+  expectExtensionReloadStats(ecds_filter_name, 0);
 
   auto ecds_direct_response2 = "pong_from_listener_0_filter_chain_0_ecds_response";
   auto extension_config_2 = extensionConfig(ecds_filter_name_2, ecds_direct_response2);
   sendExtensionResponse(extension_config_2, ecds_stream_2_, "ecds_v1");
-  expectExtensionReloadStats(ecds_filter_name_2, 1);
   expectListenersUpdateStats(1, 1, 1);
+  expectExtensionReloadStats(ecds_filter_name, 1);
+  expectExtensionReloadStats(ecds_filter_name_2, 1);
   expectConfigDump(listeners_v1_, filter_chains_v2_, listener);
 
   sendDataVerifyResponse(l0_port_, ecds_direct_response2, ip_2_);
@@ -414,92 +390,11 @@ TEST_P(FcdsIntegrationTest, TwoFcdsUpdatesWhileInitializingDependencies) {
   sendDataVerifyResponse(l0_port_, ecds_direct_response, ip_4_);
 }
 
-TEST_P(FcdsIntegrationTest, FcdsUpdateWhilePreviousFcdsUpdatesAreInitializing) {
-  initialize();
-
-  auto default_response = "pong_from_listener_0_default_filter_chain";
-  ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, true, default_response, {}, {});
-  sendLdsResponse(listener, listeners_v1_);
-  expectListenersUpdateStats(1, 1, 1);
-  expectConfigDump(listeners_v1_, "", listener);
-
-  EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
-
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
-
-  auto ecds_filter_name = "listener_0_filter_chain_0_direct_response";
-  auto filter_chain = filterChainConfig(l0_name_, fc0_name_, ecds_filter_name, {}, ip_2_);
-  sendFcdsResponse(filter_chains_v1_, filter_chain);
-  expectListenersModified(1);
-  expectFilterChainUpdateStats(l0_name_, 1, 1);
-  expectListenersUpdateStats(1, 1, 1);
-  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener},
-                    ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener, true}});
-
-  ecds_stream_ = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream_));
-
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
-
-  auto ecds_filter_name_2 = "listener_0_filter_chain_1_direct_response";
-  auto filter_chain_2 = filterChainConfig(l0_name_, fc1_name_, ecds_filter_name_2, {}, ip_3_);
-  sendFcdsResponse(filter_chains_v2_, filter_chain_2);
-  expectListenersModified(2);
-  expectFilterChainUpdateStats(l0_name_, 2, 2);
-  expectListenersUpdateStats(1, 1, 1);
-  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v2_, listener},
-                    ExpectedListenerDump{listeners_v1_, filter_chains_v2_, listener, true}});
-
-  ecds_stream_2_ = waitForNewEcdsStream();
-  EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name_2, ecds_stream_2_));
-
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
-  sendDataVerifyResponse(l0_port_, default_response, ip_3_);
-
-  auto direct_response = "listener_0_filter_chain_1_direct_response";
-  auto filter_chain_3 =
-      filterChainConfig(l0_name_, fc2_name_, filter_name_, direct_response, ip_4_);
-  sendFcdsResponse(filter_chains_v1_, filter_chain_3);
-  expectListenersModified(3);
-  expectFilterChainUpdateStats(l0_name_, 3, 3);
-  expectListenersUpdateStats(1, 1, 1);
-  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener},
-                    ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener, true}});
-
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
-  sendDataVerifyResponse(l0_port_, default_response, ip_3_);
-  sendDataVerifyResponse(l0_port_, default_response, ip_4_);
-
-  auto ecds_direct_response_1 = "pong_from_listener_0_filter_chain_0_ecds_response";
-  auto extension_config = extensionConfig(ecds_filter_name, ecds_direct_response_1);
-  sendExtensionResponse(extension_config, ecds_stream_, "ecds_v1");
-  expectExtensionReloadStats(ecds_filter_name, 1);
-  expectListenersUpdateStats(1, 1, 1);
-  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener},
-                    ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener, true}});
-
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
-  sendDataVerifyResponse(l0_port_, default_response, ip_3_);
-  sendDataVerifyResponse(l0_port_, default_response, ip_4_);
-
-  auto ecds_direct_response_2 = "pong_from_listener_0_filter_chain_0_ecds_response";
-  auto extension_config_2 = extensionConfig(ecds_filter_name_2, ecds_direct_response_2);
-  sendExtensionResponse(extension_config_2, ecds_stream_2_, "ecds_v1");
-  expectExtensionReloadStats(ecds_filter_name_2, 1);
-  expectListenersUpdateStats(1, 1, 2);
-  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener}});
-
-  sendDataVerifyResponse(l0_port_, ecds_direct_response_1, ip_2_);
-  sendDataVerifyResponse(l0_port_, ecds_direct_response_2, ip_3_);
-  sendDataVerifyResponse(l0_port_, direct_response, ip_4_);
-}
-
 TEST_P(FcdsIntegrationTest, FcdsUpdateToExistingFilterChainAddedByFcds) {
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, {}, {}, {});
   sendLdsResponse(listener, listeners_v1_);
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
@@ -532,7 +427,7 @@ TEST_P(FcdsIntegrationTest, FcdsWithListenerLevelMatcher) {
 
   ASSERT_TRUE(expectLdsSubscription());
   auto listener = listenerConfig(
-      l0_name_, l0_name_, false, {}, {},
+      l0_name_, l0_name_, {}, {},
       {{{ip_2_, xdstpResource(l0_name_, fc0_name_)}, {ip_3_, xdstpResource(l0_name_, fc1_name_)}}});
   sendLdsResponse(listener, listeners_v1_);
 
@@ -557,7 +452,7 @@ TEST_P(FcdsIntegrationTest, LdsUpdateCreatesNewFcdsSubscription) {
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, {}, {}, {});
   sendLdsResponse(listener, listeners_v1_);
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
@@ -598,7 +493,7 @@ TEST_P(FcdsIntegrationTest, AdditionalListenerDoesNotImpactExistingListenerWithF
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, {}, {}, {});
   sendLdsResponse(listener, listeners_v1_);
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
@@ -614,7 +509,7 @@ TEST_P(FcdsIntegrationTest, AdditionalListenerDoesNotImpactExistingListenerWithF
 
   sendDataVerifyResponse(l0_port_, direct_response, ip_2_);
 
-  auto listener_2 = listenerConfig(l1_name_, l1_name_, false, {}, {}, {});
+  auto listener_2 = listenerConfig(l1_name_, l1_name_, {}, {}, {});
   sendLdsResponse(listener_2, listeners_v2_);
   expectLdsAck();
   expectFcdsAck();
@@ -639,7 +534,7 @@ TEST_P(FcdsIntegrationTest, ResendSameFcdsConfig) {
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, {}, {}, {});
   sendLdsResponse(listener, listeners_v1_);
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
@@ -668,7 +563,7 @@ TEST_P(FcdsIntegrationTest, TestDrainingScenariosForMultipleFcdsUpdates) {
   initialize();
 
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {}, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, {}, {}, {});
   sendLdsResponse(listener, listeners_v1_);
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
@@ -718,20 +613,36 @@ TEST_P(FcdsIntegrationTest, TestDrainingScenariosForMultipleFcdsUpdates) {
 
   sendDataVerifyResponse(l0_port_, direct_response_2, ip_3_);
 
-  // Add another listener and expect the connection to be kept alive.
+  // Add another warming listener and expect the connection to be kept alive.
   auto default_response = "pong_from_listener_0_default_filter_chain";
-  auto listener_2 = listenerConfig(l1_name_, l1_name_, true, default_response, {}, {});
+  auto listener_2 = listenerConfig(l1_name_, l1_name_, default_response, {}, {});
   sendLdsResponse(listener_2, listeners_v2_);
   expectListenersModified(4);
   expectFilterChainUpdateStats(l0_name_, 4, 4);
   expectFilterChainUpdateStats(l1_name_, 0, 4);
-  expectListenersUpdateStats(2, 2, 5);
+  expectListenersUpdateStats(2, 1, 4);
   expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v2_, listener},
-                    ExpectedListenerDump{listeners_v2_, "", listener_2}});
+                    ExpectedListenerDump{listeners_v2_, "", listener_2, true}});
   ASSERT_TRUE(tcp_client->write("ping", false, true));
 
   sendDataVerifyResponse(l0_port_, direct_response_2, ip_3_);
-  sendDataVerifyResponse(l1_port_, default_response, ip_3_);
+
+  // Send FCDS response for the new listener and expect the connection to be kept alive.
+  auto direct_response_3 = "listener_1_filter_chain_0_direct_response";
+  auto filter_chain_4 =
+      filterChainConfig(l1_name_, fc0_name_, filter_name_, direct_response_3, ip_4_);
+  sendFcdsResponse(filter_chains_v1_, filter_chain_4);
+  expectListenersModified(5);
+  expectFilterChainUpdateStats(l0_name_, 4, 5);
+  expectFilterChainUpdateStats(l1_name_, 1, 5);
+  expectListenersUpdateStats(2, 2, 5);
+  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v2_, listener},
+                    ExpectedListenerDump{listeners_v2_, filter_chains_v1_, listener_2}});
+
+  ASSERT_TRUE(tcp_client->write("ping", false, true));
+
+  sendDataVerifyResponse(l0_port_, direct_response_2, ip_3_);
+  sendDataVerifyResponse(l1_port_, direct_response_3, ip_4_);
   tcp_client->close();
 }
 
@@ -740,7 +651,7 @@ TEST_P(FcdsIntegrationTest, RemoveFilterChainsByFcds) {
 
   ASSERT_TRUE(expectLdsSubscription());
   auto default_response = "listener_0_default_filter_chain";
-  auto listener = listenerConfig(l0_name_, l0_name_, false, default_response, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, default_response, {}, {});
   sendLdsResponse(listener, listeners_v1_);
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
@@ -795,7 +706,7 @@ TEST_P(FcdsIntegrationTest, RejectUpdateOrRemoveStaticFilterChainsByFcds) {
 
   ASSERT_TRUE(expectLdsSubscription());
   auto static_filter_response = "pong_from_listener_0_static_filter_chain";
-  auto listener = listenerConfig(l0_name_, l0_name_, false, {},
+  auto listener = listenerConfig(l0_name_, l0_name_, {},
                                  FilterChainConfig{xdstpResource(l0_name_, "static"), ip_2_,
                                                    filter_name_, static_filter_response},
                                  {});
@@ -846,7 +757,7 @@ TEST_P(FcdsIntegrationTest, RemoveInitializingFilterChainDuringServerInitializat
 
   auto default_response = "pong_from_listener_0_default_filter_chain";
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, false, default_response, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, default_response, {}, {});
   sendLdsResponse(listener, listeners_v1_);
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
 
@@ -874,34 +785,43 @@ TEST_P(FcdsIntegrationTest, RemoveInitializingFilterChainAfterServerInitializati
 
   auto default_response = "pong_from_listener_0_default_filter_chain";
   ASSERT_TRUE(expectLdsSubscription());
-  auto listener = listenerConfig(l0_name_, l0_name_, true, default_response, {}, {});
+  auto listener = listenerConfig(l0_name_, l0_name_, default_response, {}, {});
   sendLdsResponse(listener, listeners_v1_);
-  expectListenersUpdateStats(1, 1, 1);
-  expectConfigDump(listeners_v1_, "", listener);
+  expectWarmingListeners(1);
 
   EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
 
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
+  auto direct_response = "pong_from_listener_0_filter_chain_0";
+  auto filter_chain = filterChainConfig(l0_name_, fc0_name_, filter_name_, direct_response, ip_2_);
 
-  auto ecds_filter_name = "listener_0_filter_chain_0_direct_response";
-  auto filter_chain = filterChainConfig(l0_name_, fc0_name_, ecds_filter_name, {}, ip_2_);
   sendFcdsResponse(filter_chains_v1_, filter_chain);
   expectListenersModified(1);
   expectFilterChainUpdateStats(l0_name_, 1, 1);
-  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener},
-                    ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener, true}});
+  expectListenersUpdateStats(1, 1, 1);
+  expectConfigDump(listeners_v1_, filter_chains_v1_, listener);
+
+  sendDataVerifyResponse(l0_port_, direct_response, ip_2_);
+  sendDataVerifyResponse(l0_port_, default_response, ip_3_);
+
+  auto ecds_filter_name = "listener_0_filter_chain_1_direct_response";
+  auto filter_chain_1 = filterChainConfig(l0_name_, fc1_name_, ecds_filter_name, {}, ip_3_);
+  sendFcdsResponse(filter_chains_v2_, filter_chain_1);
+  expectListenersModified(2);
+  expectFilterChainUpdateStats(l0_name_, 2, 2);
 
   ecds_stream_ = waitForNewEcdsStream();
   EXPECT_TRUE(expectExtensionSubscription(ecds_filter_name, ecds_stream_));
 
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
+  sendDataVerifyResponse(l0_port_, direct_response, ip_2_);
+  sendDataVerifyResponse(l0_port_, default_response, ip_3_);
 
-  sendFcdsResponse(filter_chains_v2_, noFilterChains(), {xdstpResource(l0_name_, fc0_name_)});
-  expectListenersModified(2);
-  expectFilterChainUpdateStats(l0_name_, 2, 2);
-  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v2_, listener}});
+  sendFcdsResponse(filter_chains_v1_, noFilterChains(), {xdstpResource(l0_name_, fc1_name_)});
+  expectListenersModified(3);
+  expectFilterChainUpdateStats(l0_name_, 3, 3);
+  expectConfigDump({ExpectedListenerDump{listeners_v1_, filter_chains_v1_, listener}});
 
-  sendDataVerifyResponse(l0_port_, default_response, ip_2_);
+  sendDataVerifyResponse(l0_port_, direct_response, ip_2_);
+  sendDataVerifyResponse(l0_port_, default_response, ip_3_);
 }
 
 } // namespace

@@ -480,7 +480,6 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool ignore_global_conn_limit_;
   const bool bypass_overload_manager_;
-  const bool start_listener_without_warming_;
   const bool created_by_fcds_;
 
   std::shared_ptr<Init::TargetImpl> tracking_init_target_;
