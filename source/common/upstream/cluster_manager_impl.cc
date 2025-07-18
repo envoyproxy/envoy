@@ -223,14 +223,11 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds_leds_sds;
-      if (cm_.adsMux()) {
-        const std::vector<std::string> paused_xds_types{
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-            Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-        maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
-      }
+      const std::vector<std::string> paused_xds_types{
+          Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+          Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
+          Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
+      Config::ScopedResume resume_eds_leds_sds = xds_manager_.pause(paused_xds_types);
       initializeSecondaryClusters();
     }
     return;
@@ -316,7 +313,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                        ? absl::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : absl::nullopt),
       local_info_(local_info), cm_stats_(generateStats(*stats.rootScope())),
-      init_helper_(*this,
+      init_helper_(xds_manager_,
                    [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
       http_context_(http_context), router_context_(router_context),
@@ -954,7 +951,7 @@ void ClusterManagerImpl::updateClusterCounts() {
   if (all_clusters_initialized && xds_manager_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     if (resume_cds_ == nullptr && !warming_clusters_.empty()) {
-      resume_cds_ = xds_manager_.adsMux()->pause(type_url);
+      resume_cds_ = xds_manager_.pause(type_url);
     } else if (warming_clusters_.empty()) {
       resume_cds_.reset();
     }
@@ -1537,8 +1534,8 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, *this, *this,
-                                          *stats_.rootScope(), validation_visitor);
+  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, xds_manager_,
+                                          *this, *this, *stats_.rootScope(), validation_visitor);
   RETURN_IF_NOT_OK_REF(odcds_or_error.status());
   return OdCdsApiHandleImpl::create(*this, std::move(*odcds_or_error));
 }

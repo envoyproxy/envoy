@@ -11,31 +11,33 @@ namespace Upstream {
 absl::StatusOr<OdCdsApiSharedPtr>
 OdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& odcds_config,
                      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                     ClusterManager& cm, MissingClusterNotifier& notifier, Stats::Scope& scope,
+                     Config::XdsManager& xds_manager, ClusterManager& cm,
+                     MissingClusterNotifier& notifier, Stats::Scope& scope,
                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, cm, notifier,
-                                                scope, validation_visitor, creation_status));
+  auto ret =
+      OdCdsApiSharedPtr(new OdCdsApiImpl(odcds_config, odcds_resources_locator, xds_manager, cm,
+                                         notifier, scope, validation_visitor, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
 OdCdsApiImpl::OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                            OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                           ClusterManager& cm, MissingClusterNotifier& notifier,
-                           Stats::Scope& scope,
+                           Config::XdsManager& xds_manager, ClusterManager& cm,
+                           MissingClusterNotifier& notifier, Stats::Scope& scope,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            absl::Status& creation_status)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
                                                                            "name"),
-      helper_(cm, "odcds"), cm_(cm), notifier_(notifier),
+      helper_(cm, xds_manager, "odcds"), notifier_(notifier),
       scope_(scope.createScope("cluster_manager.odcds.")) {
   // TODO(krnowak): Move the subscription setup to CdsApiHelper. Maybe make CdsApiHelper a base
   // class for CDS and ODCDS.
   const auto resource_name = getResourceName();
   absl::StatusOr<Config::SubscriptionPtr> subscription_or_error;
   if (!odcds_resources_locator.has_value()) {
-    subscription_or_error = cm_.subscriptionFactory().subscriptionFromConfigSource(
+    subscription_or_error = cm.subscriptionFactory().subscriptionFromConfigSource(
         odcds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
   } else {
     subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
