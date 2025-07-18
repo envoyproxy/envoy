@@ -118,9 +118,7 @@ protected:
       void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.remove(&cb);
       }
-      const Network::ConnectionSocketPtr& getSocket() const override {
-        PANIC("not implemented");
-      }
+      const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
       Network::ConnectionSocketPtr moveSocket() override { return nullptr; }
       void setSocketReused(bool) override {}
       bool isSocketReused() override { return false; }

@@ -344,8 +344,8 @@ public:
 
   /**
    * Transfers ownership of the connection socket to the caller. This should only be called when
-   * the connection is marked as reused. The connection will be cleaned up but the socket will
-   * not be closed.
+   * the connection is marked as reused. The connection will be cleaned when it goes out of scope
+   * but the socket will not be closed.
    *
    * @return ConnectionSocketPtr the connection socket.
    */
