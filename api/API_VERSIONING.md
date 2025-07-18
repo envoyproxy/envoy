@@ -80,10 +80,10 @@ implementations within a major version should set explicit values for these fiel
 
 At one point, the Envoy project planned for regular major version updates to the xDS API in order to
 remove technical debt. At this point we recognize that Envoy and the larger xDS ecosystem (gRPC,
-etc.) is too widely used to make version bumps realistic. As such, for practical purposes, the v3
-API is the final major version of the API and will be supported forever. Deprecations will still
-occur as an end-user indication that there is a preferred way to configure a particular feature, but
-no field will ever be removed nor will Envoy ever remove the implementation for any deprecated
+etc.) is so widely used that version bumps are no longer realistic. As such, for practical purposes,
+the v3 API is the final major version of the API and will be supported forever. Deprecations will
+still occur as an end-user indication that there is a preferred way to configure a particular feature,
+but no field will ever be removed nor will Envoy ever remove the implementation for any deprecated
 field.
 
 **NOTE**: Client implementations are free to output additional warnings about field usage beyond

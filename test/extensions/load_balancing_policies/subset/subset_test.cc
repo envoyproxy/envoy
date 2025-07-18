@@ -333,6 +333,14 @@ public:
   using HostURLMetadataMap = std::map<std::string, HostMetadata>;
 
   void initLbConfigAndLB(LoadBalancerSubsetInfoPtr subset_info = nullptr, bool zone_aware = false) {
+    if (child_lb_config_ == nullptr) {
+      // NOTE: the child lb config should never be null.
+      auto factory =
+          Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(child_lb_name_);
+      auto proto_message = factory->createEmptyConfigProto();
+      child_lb_config_ = factory->loadConfig(server_context_, *proto_message).value();
+    }
+
     lb_config_ = std::make_unique<SubsetLoadBalancerConfig>(
         [&]() -> LoadBalancerSubsetInfoPtr {
           if (subset_info == nullptr) {
@@ -479,7 +487,7 @@ public:
           .set_string_value(m_it.second);
     }
 
-    return makeTestHost(info_, url, m, simTime());
+    return makeTestHost(info_, url, m);
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata,
@@ -490,7 +498,7 @@ public:
           .set_string_value(m_it.second);
     }
 
-    return makeTestHost(info_, url, m, locality, simTime());
+    return makeTestHost(info_, url, m, locality);
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostListMetadata& metadata) {
@@ -503,7 +511,7 @@ public:
       }
     }
 
-    return makeTestHost(info_, url, m, simTime());
+    return makeTestHost(info_, url, m);
   }
 
   ProtobufWkt::Struct makeDefaultSubset(HostMetadata metadata) {
@@ -1674,7 +1682,7 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   EXPECT_CALL(subset_info_, subsetSelectors()).WillRepeatedly(ReturnRef(subset_selectors));
 
   HostVector hosts;
-  hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80", simTime()));
+  hosts.emplace_back(makeTestHost(info_, "tcp://127.0.0.1:80"));
   hosts.emplace_back(makeHost("tcp://127.0.0.1:81", {{"version", "1.0"}}));
 
   host_set_.hosts_ = hosts;
@@ -3329,6 +3337,9 @@ TEST(LoadBalancerContextWrapperTest, LoadBalancingContextWrapperTest) {
 
   EXPECT_CALL(mock_context, overrideHostToSelect());
   wrapper.overrideHostToSelect();
+
+  EXPECT_CALL(mock_context, setHeadersModifier(_));
+  wrapper.setHeadersModifier(nullptr);
 }
 
 } // namespace

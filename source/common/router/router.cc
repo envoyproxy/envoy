@@ -83,9 +83,8 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            const envoy::extensions::filters::http::router::v3::Router& config,
                            absl::Status& creation_status)
     : FilterConfig(
-          context.serverFactoryContext(), stat_prefix, context.serverFactoryContext().localInfo(),
-          context.scope(), context.serverFactoryContext().clusterManager(),
-          context.serverFactoryContext().runtime(),
+          context.serverFactoryContext(), stat_prefix, context.scope(),
+          context.serverFactoryContext().clusterManager(), context.serverFactoryContext().runtime(),
           context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
           config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
@@ -399,7 +398,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         config_->empty_stat_name_,
         response_status_code,
         internal_request,
-        route_->virtualHost().statName(),
+        route_->virtualHost()->statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -450,6 +449,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   modify_headers_ = [this](Http::ResponseHeaderMap& headers) {
     if (route_entry_ == nullptr) {
       return;
+    }
+
+    if (modify_headers_from_upstream_lb_) {
+      modify_headers_from_upstream_lb_(headers);
     }
 
     route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
@@ -529,7 +532,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
-  request_vcluster_ = route_->virtualHost().virtualCluster(headers);
+  request_vcluster_ = route_->virtualHost()->virtualCluster(headers);
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
@@ -587,49 +590,53 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // Increment the attempt count from 0 to 1 at the first upstream request.
+  attempt_count_++;
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
+
+  // Finalize the request headers before the host selection.
+  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+                                       !config_->suppress_envoy_headers_);
+
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
-
-  if (upstream_http_protocol_options.has_value() &&
-      (upstream_http_protocol_options.value().auto_sni() ||
-       upstream_http_protocol_options.value().auto_san_validation())) {
+  if (upstream_http_protocol_options && (upstream_http_protocol_options->auto_sni() ||
+                                         upstream_http_protocol_options->auto_san_validation())) {
     // Default the header to Host/Authority header.
-    std::string header_value = route_entry_->getRequestHostValue(headers);
+    absl::string_view header_value = headers.getHostValue();
 
     // Check whether `override_auto_sni_header` is specified.
-    const auto override_auto_sni_header =
-        upstream_http_protocol_options.value().override_auto_sni_header();
-    if (!override_auto_sni_header.empty()) {
+    if (const auto& override_header = upstream_http_protocol_options->override_auto_sni_header();
+        !override_header.empty()) {
       // Use the header value from `override_auto_sni_header` to set the SNI value.
-      const auto overridden_header_value = Http::HeaderUtility::getAllOfHeaderAsString(
-          headers, Http::LowerCaseString(override_auto_sni_header));
-      if (overridden_header_value.result().has_value() &&
-          !overridden_header_value.result().value().empty()) {
-        header_value = overridden_header_value.result().value();
+      const auto override_header_value = headers.get(Http::LowerCaseString(override_header));
+      if (override_header_value.size() > 1) {
+        ENVOY_STREAM_LOG(info, "Multiple values for auto sni header '{}' and use the first one",
+                         *callbacks_, override_header);
+      }
+      if (!override_header_value.empty() && !override_header_value[0]->value().empty()) {
+        header_value = override_header_value[0]->value().getStringView();
       }
     }
-    const auto parsed_authority = Http::Utility::parseAuthority(header_value);
-    bool should_set_sni = !parsed_authority.is_ip_address_;
-    // `host_` returns a string_view so doing this should be safe.
-    absl::string_view sni_value = parsed_authority.host_;
 
-    if (should_set_sni && upstream_http_protocol_options.value().auto_sni() &&
-        !callbacks_->streamInfo().filterState()->hasDataWithName(
-            Network::UpstreamServerName::key())) {
-      callbacks_->streamInfo().filterState()->setData(
-          Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(sni_value),
-          StreamInfo::FilterState::StateType::Mutable);
+    auto& filter_state = callbacks_->streamInfo().filterState();
+
+    // Parse the authority header value to extract the host and check if it's an IP address.
+    const auto parsed_authority = Http::Utility::parseAuthority(header_value);
+
+    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options->auto_sni() &&
+        !filter_state->hasDataWithName(Network::UpstreamServerName::key())) {
+      filter_state->setData(Network::UpstreamServerName::key(),
+                            std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+                            StreamInfo::FilterState::StateType::Mutable);
     }
 
-    if (upstream_http_protocol_options.value().auto_san_validation() &&
-        !callbacks_->streamInfo().filterState()->hasDataWithName(
-            Network::UpstreamSubjectAltNames::key())) {
-      callbacks_->streamInfo().filterState()->setData(
-          Network::UpstreamSubjectAltNames::key(),
-          std::make_unique<Network::UpstreamSubjectAltNames>(
-              std::vector<std::string>{std::string(sni_value)}),
-          StreamInfo::FilterState::StateType::Mutable);
+    if (upstream_http_protocol_options->auto_san_validation() &&
+        !filter_state->hasDataWithName(Network::UpstreamSubjectAltNames::key())) {
+      filter_state->setData(Network::UpstreamSubjectAltNames::key(),
+                            std::make_unique<Network::UpstreamSubjectAltNames>(
+                                std::vector<std::string>{std::string(parsed_authority.host_)}),
+                            StreamInfo::FilterState::StateType::Mutable);
     }
   }
 
@@ -657,15 +664,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_start_ms",
       callbacks_->dispatcher().timeSource().monotonicTime());
-
-  // Increment the attempt count from 0 to 1 at the first upstream request.
-  attempt_count_++;
-  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
-  if (include_attempt_count_in_request_) {
-    headers.setEnvoyAttemptCount(attempt_count_);
-  }
-
-  callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   auto host_selection_response = cluster->chooseHost(this);
   if (!host_selection_response.cancelable ||
@@ -770,8 +768,11 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
     headers.removeEnvoyUpstreamRequestTimeoutAltResponse();
   }
 
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
-                                       !config_->suppress_envoy_headers_);
+  include_attempt_count_in_request_ = route_entry_->includeAttemptCountInRequest();
+  if (include_attempt_count_in_request_) {
+    headers.setEnvoyAttemptCount(attempt_count_);
+  }
+
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
       host->transportSocketFactory().sslCtx() != nullptr,
@@ -802,7 +803,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   const bool can_send_early_data =
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
-  include_timeout_retry_header_in_request_ = route_->virtualHost().includeIsTimeoutRetryHeader();
+  include_timeout_retry_header_in_request_ = route_->virtualHost()->includeIsTimeoutRetryHeader();
 
   // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
   // For retries etc, HTTP/3 usability may transition from true to false, but
@@ -1633,11 +1634,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   maybeProcessOrcaLoadReport(*headers, upstream_request);
 
-  if (grpc_status.has_value()) {
-    upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(grpc_to_http_status);
-  } else {
-    upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(response_code);
-  }
+  const uint64_t put_result_code = grpc_status.has_value() ? grpc_to_http_status : response_code;
+  upstream_request.upstreamHost()->outlierDetector().putResult(
+      put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
+                             : Upstream::Outlier::Result::ExtOriginRequestSuccess,
+      put_result_code);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(
@@ -1843,7 +1844,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         response_time,
         upstream_request.upstreamCanary(),
         internal_request,
-        route_->virtualHost().statName(),
+        route_->virtualHost()->statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,

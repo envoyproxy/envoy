@@ -11,15 +11,12 @@ class MaglevTester : public BaseTester {
 public:
   MaglevTester(uint64_t num_hosts, uint32_t weighted_subset_percent = 0, uint32_t weight = 0)
       : BaseTester(num_hosts, weighted_subset_percent, weight) {
-    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(
-        priority_set_, stats_, stats_scope_, runtime_, random_,
-        config_.has_value()
-            ? makeOptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig>(config_.value())
-            : absl::nullopt,
-        common_config_);
+    envoy::extensions::load_balancing_policies::maglev::v3::Maglev config;
+    maglev_lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_scope_, runtime_,
+                                                      random_, 50, config, hash_policy_);
   }
 
-  absl::optional<envoy::config::cluster::v3::Cluster::MaglevLbConfig> config_;
+  std::shared_ptr<TestHashPolicy> hash_policy_ = std::make_shared<TestHashPolicy>();
   std::unique_ptr<MaglevLoadBalancer> maglev_lb_;
 };
 
@@ -40,7 +37,7 @@ void benchmarkMaglevLoadBalancerChooseHost(::benchmark::State& state) {
     // absl::node_hash_map. However, it should be roughly equivalent to the work done when
     // comparing different hashing algorithms.
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = hashInt(i);
+      tester.hash_policy_->hash_key_ = hashInt(i);
       hit_counter[lb->chooseHost(&context).host->address()->asString()] += 1;
     }
 
@@ -92,7 +89,7 @@ void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = hashInt(i);
+      tester.hash_policy_->hash_key_ = hashInt(i);
       hosts.push_back(lb->chooseHost(&context).host);
     }
 
@@ -101,7 +98,7 @@ void benchmarkMaglevLoadBalancerHostLoss(::benchmark::State& state) {
     lb = tester2.maglev_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = hashInt(i);
+      tester.hash_policy_->hash_key_ = hashInt(i);
       hosts2.push_back(lb->chooseHost(&context).host);
     }
 
@@ -139,7 +136,7 @@ void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
     std::vector<HostConstSharedPtr> hosts;
     TestLoadBalancerContext context;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = hashInt(i);
+      tester.hash_policy_->hash_key_ = hashInt(i);
       hosts.push_back(lb->chooseHost(&context).host);
     }
 
@@ -148,7 +145,7 @@ void benchmarkMaglevLoadBalancerWeighted(::benchmark::State& state) {
     lb = tester2.maglev_lb_->factory()->create(tester2.lb_params_);
     std::vector<HostConstSharedPtr> hosts2;
     for (uint64_t i = 0; i < keys_to_simulate; i++) {
-      context.hash_key_ = hashInt(i);
+      tester.hash_policy_->hash_key_ = hashInt(i);
       hosts2.push_back(lb->chooseHost(&context).host);
     }
 

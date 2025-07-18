@@ -146,6 +146,7 @@ Security releases are published on a 3-monthly cycle, around the mid point betwe
 | 2024 Q3 | 2024/09/03 | 2024/09/19 |  16 days   |
 | 2024 Q4 | 2024/12/03 | 2024/12/18 |  15 days   |
 | 2025 Q1 | 2025/03/04 | 2025/03/20 |  16 days   |
-| 2025 Q2 | 2025/06/03 |            |            |
+| 2025 Q2 | 2025/06/03 |     --     |     --     |
+| 2025 Q3 | 2025/09/02 |            |            |
 
 NOTE: Zero-day vulnerabilities, and upstream vulnerabilities disclosed to us under embargo, may necessitate an emergency release with little or no warning.

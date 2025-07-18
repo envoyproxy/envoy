@@ -6,6 +6,8 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_service.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 
@@ -19,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
@@ -57,4 +59,9 @@ message OpenTelemetryConfig {
   // See: `OpenTelemetry sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#sampler>`_
   // [#extension-category: envoy.tracers.opentelemetry.samplers]
   core.v3.TypedExtensionConfig sampler = 5;
+
+  // Envoy caches the span in memory when the OpenTelemetry backend service is temporarily unavailable.
+  // This field specifies the maximum number of spans that can be cached. If not specified, the
+  // default is 1024.
+  google.protobuf.UInt32Value max_cache_size = 6;
 }

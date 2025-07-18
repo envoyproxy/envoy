@@ -10,6 +10,7 @@ android_library(
     srcs = [
         "AndroidEngineImpl.java",
         "AndroidNetworkMonitor.java",
+        "AndroidNetworkMonitorV2.java",
         "AndroidProxyMonitor.java",
         "UpstreamHttpProtocol.java",
     ],

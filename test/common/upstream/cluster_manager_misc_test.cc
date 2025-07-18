@@ -129,9 +129,13 @@ public:
     cluster1->info_->name_ = "cluster_0";
     cluster1->info_->lb_factory_ =
         Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
+    auto proto_message = cluster1->info_->lb_factory_->createEmptyConfigProto();
+    cluster1->info_->typed_lb_config_ =
+        cluster1->info_->lb_factory_->loadConfig(*server_.server_factory_context_, *proto_message)
+            .value();
 
     InSequence s;
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
         .WillOnce(Return(std::make_pair(cluster1, nullptr)));
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
     create(parseBootstrapFromV3Json(json));
@@ -139,7 +143,7 @@ public:
     EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
 
     cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
-        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_)};
+        makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
     cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
         cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
     cluster1->initialize_callback_();
@@ -247,7 +251,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
           "envoy.load_balancers.metadata_writer");
 
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   create(parseBootstrapFromV3Json(json));
@@ -255,7 +259,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
   EXPECT_EQ(nullptr, cluster_manager_->getThreadLocalCluster("cluster_0"));
 
   cluster1->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster1->info_, "tcp://127.0.0.1:80", time_system_)};
+      makeTestHost(cluster1->info_, "tcp://127.0.0.1:80")};
   cluster1->prioritySet().getMockHostSet(0)->runCallbacks(
       cluster1->prioritySet().getMockHostSet(0)->hosts_, {});
   cluster1->initialize_callback_();
@@ -273,7 +277,7 @@ using NameVals = std::vector<std::pair<Network::SocketOptionName, int>>;
 // due to the complexity of creating an integration test involving the network stack. We only test
 // the IPv4 case here, as the logic around IPv4/IPv6 handling is tested generically in
 // socket_option_impl_test.cc.
-class SockoptsTest : public ClusterManagerImplTest {
+class SockOptsTest : public ClusterManagerImplTest {
 public:
   void initialize(const std::string& yaml) { create(parseBootstrapFromV3Yaml(yaml)); }
 
@@ -319,7 +323,7 @@ public:
           }
           return connection_;
         }));
-    cluster_manager_->getThreadLocalCluster("SockoptsCluster")->tcpConn(nullptr);
+    cluster_manager_->getThreadLocalCluster("SockOptsCluster")->tcpConn(nullptr);
   }
 
   void expectSetsockoptFreebind() {
@@ -345,23 +349,23 @@ public:
               EXPECT_TRUE(options != nullptr && options->empty());
               return connection_;
             }));
-    auto conn_data = cluster_manager_->getThreadLocalCluster("SockoptsCluster")->tcpConn(nullptr);
+    auto conn_data = cluster_manager_->getThreadLocalCluster("SockOptsCluster")->tcpConn(nullptr);
     EXPECT_EQ(connection_, conn_data.connection_.get());
   }
 
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
 };
 
-TEST_F(SockoptsTest, SockoptsUnset) {
+TEST_F(SockOptsTest, SockOptsUnset) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -378,16 +382,16 @@ TEST_F(SockoptsTest, SockoptsUnset) {
   }
 }
 
-TEST_F(SockoptsTest, FreebindClusterOnly) {
+TEST_F(SockOptsTest, FreebindClusterOnly) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -402,16 +406,16 @@ TEST_F(SockoptsTest, FreebindClusterOnly) {
   expectSetsockoptFreebind();
 }
 
-TEST_F(SockoptsTest, FreebindClusterManagerOnly) {
+TEST_F(SockOptsTest, FreebindClusterManagerOnly) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -427,16 +431,16 @@ TEST_F(SockoptsTest, FreebindClusterManagerOnly) {
   expectSetsockoptFreebind();
 }
 
-TEST_F(SockoptsTest, FreebindClusterOverride) {
+TEST_F(SockOptsTest, FreebindClusterOverride) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -454,16 +458,16 @@ TEST_F(SockoptsTest, FreebindClusterOverride) {
   expectSetsockoptFreebind();
 }
 
-TEST_F(SockoptsTest, SockoptsClusterOnly) {
+TEST_F(SockOptsTest, SockOptsClusterOnly) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -486,16 +490,16 @@ TEST_F(SockoptsTest, SockoptsClusterOnly) {
   expectSetsockopts(names_vals);
 }
 
-TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
+TEST_F(SockOptsTest, SockOptsClusterManagerOnly) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -519,16 +523,16 @@ TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
 }
 
 // The cluster options should override/replace the cluster manager options when both are specified.
-TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerNoAddress) {
+TEST_F(SockOptsTest, SockOptsClusterAndClusterManagerNoAddress) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -554,16 +558,16 @@ TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerNoAddress) {
 
 // The cluster options should override/replace the cluster manager options when both are specified
 // when a source_address is only specified on the cluster manager bind config.
-TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerAddress) {
+TEST_F(SockOptsTest, SockOptsClusterAndClusterManagerAddress) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -590,16 +594,16 @@ TEST_F(SockoptsTest, SockoptsClusterAndClusterManagerAddress) {
   expectSetsockopts(names_vals);
 }
 
-TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndOpts) {
+TEST_F(SockOptsTest, SockOptsWithExtraSourceAddressAndOpts) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -635,16 +639,16 @@ TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndOpts) {
   expectSetsockopts(names_vals);
 }
 
-TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndEmptyOpts) {
+TEST_F(SockOptsTest, SockOptsWithExtraSourceAddressAndEmptyOpts) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -677,16 +681,16 @@ TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndEmptyOpts) {
   }
 }
 
-TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterOpts) {
+TEST_F(SockOptsTest, SockOptsWithExtraSourceAddressAndClusterOpts) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -718,16 +722,16 @@ TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterOpts) {
   expectSetsockopts(names_vals);
 }
 
-TEST_F(SockoptsTest, SockoptsWithExtraSourceAddressAndClusterManangerOpts) {
+TEST_F(SockOptsTest, SockOptsWithExtraSourceAddressAndClusterManagerOpts) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: SockoptsCluster
+    - name: SockOptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
       load_assignment:
-        cluster_name: SockoptsCluster
+        cluster_name: SockOptsCluster
         endpoints:
           - lb_endpoints:
             - endpoint:
@@ -1025,10 +1029,10 @@ public:
     cluster_ = &cluster_manager_->activeClusters().begin()->second.get();
 
     // Set up the HostSet.
-    host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
-    host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
-    host3_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
-    host4_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80", time_system_);
+    host1_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host2_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host3_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
+    host4_ = makeTestHost(cluster_->info(), "tcp://127.0.0.1:80");
 
     HostVector hosts{host1_, host2_, host3_, host4_};
     auto hosts_ptr = std::make_shared<HostVector>(hosts);
@@ -1053,7 +1057,7 @@ TEST_F(PreconnectTest, PreconnectOff) {
   // With preconnect set to 0, each request for a connection pool will only
   // allocate that conn pool.
   initialize(0);
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(1)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
   auto http_handle =
@@ -1077,7 +1081,7 @@ TEST_F(PreconnectTest, PreconnectOn) {
   // preconnecting, so create the pool for both the current connection and the
   // anticipated one.
   initialize(1.1);
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(2)
       .WillRepeatedly(ReturnNew<NiceMock<Http::ConnectionPool::MockInstance>>());
   auto http_handle =
@@ -1120,7 +1124,7 @@ TEST_F(PreconnectTest, PreconnectHighHttp) {
   // With preconnect set to 3, the first request will kick off 3 preconnect attempts.
   initialize(3);
   int http_preconnect = 0;
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(4)
       .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
         auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
@@ -1165,7 +1169,7 @@ TEST_F(PreconnectTest, PreconnectCappedAt3) {
   // With preconnect set to 20, no more than 3 connections will be preconnected.
   initialize(20);
   int http_preconnect = 0;
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(4)
       .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
         auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();
@@ -1204,7 +1208,7 @@ TEST_F(PreconnectTest, PreconnectCappedByMaybePreconnect) {
   // Set preconnect high, and verify preconnecting stops when maybePreconnect returns false.
   initialize(20);
   int http_preconnect_calls = 0;
-  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _))
+  EXPECT_CALL(factory_, allocateConnPool_(_, _, _, _, _, _, _))
       .Times(2)
       .WillRepeatedly(InvokeWithoutArgs([&]() -> Http::ConnectionPool::Instance* {
         auto* ret = new NiceMock<Http::ConnectionPool::MockInstance>();

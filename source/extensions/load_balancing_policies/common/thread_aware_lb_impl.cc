@@ -3,6 +3,10 @@
 #include <memory>
 #include <random>
 
+#include "source/common/common/hex.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -93,6 +97,35 @@ absl::Status normalizeWeights(const HostSet& host_set, bool in_panic,
   return absl::OkStatus();
 }
 
+std::string generateCookie(LoadBalancerContext* context, absl::string_view name,
+                           absl::string_view path, std::chrono::seconds ttl,
+                           absl::Span<const Http::CookieAttribute> attributes) {
+  ASSERT(context != nullptr);
+  const StreamInfo::StreamInfo* stream_info = context->requestStreamInfo();
+  if (stream_info == nullptr) {
+    return {};
+  }
+
+  const auto& conn = stream_info->downstreamAddressProvider();
+  const auto& remote_address = conn.remoteAddress();
+  const auto& local_address = conn.localAddress();
+  if (remote_address == nullptr || local_address == nullptr) {
+    return {};
+  }
+
+  const std::string value = remote_address->asString() + local_address->asString();
+  std::string cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(value));
+
+  std::string cookie_header_value =
+      Http::Utility::makeSetCookieValue(name, cookie_value, path, ttl, true, attributes);
+  context->setHeadersModifier(
+      [h = std::move(cookie_header_value)](Http::ResponseHeaderMap& headers) {
+        headers.addReferenceKey(Http::Headers::get().SetCookie, h);
+      });
+
+  return cookie_value;
+}
+
 } // namespace
 
 absl::Status ThreadAwareLoadBalancerBase::initialize() {
@@ -159,8 +192,20 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   // computeHashKey() may be computed on demand, so get it only once.
   absl::optional<uint64_t> hash;
   if (context) {
-    hash = context->computeHashKey();
+    // If there is a hash policy, use the hash policy in the load balancer first.
+    if (hash_policy_ != nullptr) {
+      hash = hash_policy_->generateHash(
+          makeOptRefFromPtr(context->downstreamHeaders()),
+          makeOptRefFromPtr(context->requestStreamInfo()),
+          [context](absl::string_view name, absl::string_view path, std::chrono::seconds ttl,
+                    absl::Span<const Http::CookieAttribute> attributes) -> std::string {
+            return generateCookie(context, name, path, ttl, attributes);
+          });
+    } else {
+      hash = context->computeHashKey();
+    }
   }
+
   const uint64_t h = hash ? hash.value() : random_.random();
 
   const uint32_t priority =
@@ -186,7 +231,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
 }
 
 LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create(LoadBalancerParams) {
-  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_);
+  auto lb = std::make_unique<LoadBalancerImpl>(stats_, random_, hash_policy_);
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.
@@ -312,6 +357,17 @@ ThreadAwareLoadBalancerBase::BoundedLoadHashingLoadBalancer::chooseHost(uint64_t
   }
 
   return least_overloaded_host;
+}
+
+TypedHashLbConfigBase::TypedHashLbConfigBase(absl::Span<const HashPolicyProto* const> hash_policy,
+                                             Regex::Engine& regex_engine,
+                                             absl::Status& creation_status) {
+  if (hash_policy.empty()) {
+    return;
+  }
+  auto hash_policy_or = Http::HashPolicyImpl::create(hash_policy, regex_engine);
+  SET_AND_RETURN_IF_NOT_OK(hash_policy_or.status(), creation_status);
+  hash_policy_ = std::move(hash_policy_or).value();
 }
 
 } // namespace Upstream

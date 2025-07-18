@@ -299,6 +299,8 @@ TEST_F(MetadataFetcherTest, TestFailureToStringConversion) {
             "InvalidMetadata");
   EXPECT_EQ(fetcher_->failureToString(MetadataFetcher::MetadataReceiver::Failure::MissingConfig),
             "MissingConfig");
+  EXPECT_EQ(fetcher_->failureToString(static_cast<MetadataFetcher::MetadataReceiver::Failure>(999)),
+            "");
 }
 
 } // namespace Aws

@@ -202,25 +202,24 @@ public:
 class FilterConfig : public Http::FilterChainFactory {
 public:
   FilterConfig(Server::Configuration::CommonFactoryContext& factory_context,
-               Stats::StatName stat_prefix, const LocalInfo::LocalInfo& local_info,
-               Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
-               Random::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
-               bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
-               bool respect_expected_rq_timeout, bool suppress_grpc_request_failure_code_stats,
+               Stats::StatName stat_prefix, Stats::Scope& scope, Upstream::ClusterManager& cm,
+               Runtime::Loader& runtime, Random::RandomGenerator& random,
+               ShadowWriterPtr&& shadow_writer, bool emit_dynamic_stats, bool start_child_span,
+               bool suppress_envoy_headers, bool respect_expected_rq_timeout,
+               bool suppress_grpc_request_failure_code_stats,
                bool flush_upstream_log_on_upstream_stream,
                const Protobuf::RepeatedPtrField<std::string>& strict_check_headers,
                TimeSource& time_source, Http::Context& http_context,
                Router::Context& router_context)
-      : factory_context_(factory_context), router_context_(router_context), scope_(scope),
-        local_info_(local_info), cm_(cm), runtime_(runtime),
-        default_stats_(router_context_.statNames(), scope_, stat_prefix),
+      : factory_context_(factory_context), router_context_(router_context), scope_(scope), cm_(cm),
+        runtime_(runtime), default_stats_(router_context_.statNames(), scope_, stat_prefix),
         async_stats_(router_context_.statNames(), scope, http_context.asyncClientStatPrefix()),
         random_(random), emit_dynamic_stats_(emit_dynamic_stats),
         start_child_span_(start_child_span), suppress_envoy_headers_(suppress_envoy_headers),
         respect_expected_rq_timeout_(respect_expected_rq_timeout),
         suppress_grpc_request_failure_code_stats_(suppress_grpc_request_failure_code_stats),
         flush_upstream_log_on_upstream_stream_(flush_upstream_log_on_upstream_stream),
-        http_context_(http_context), zone_name_(local_info_.zoneStatName()),
+        http_context_(http_context), zone_name_(factory_context.localInfo().zoneStatName()),
         shadow_writer_(std::move(shadow_writer)), time_source_(time_source) {
     if (!strict_check_headers.empty()) {
       strict_check_headers_ = std::make_unique<HeaderVector>();
@@ -270,7 +269,6 @@ public:
   Server::Configuration::CommonFactoryContext& factory_context_;
   Router::Context& router_context_;
   Stats::Scope& scope_;
-  const LocalInfo::LocalInfo& local_info_;
   Upstream::ClusterManager& cm_;
   Runtime::Loader& runtime_;
   FilterStats default_stats_;
@@ -362,13 +360,11 @@ public:
       auto hash_policy = route_entry_->hashPolicy();
       if (hash_policy) {
         return hash_policy->generateHash(
-            callbacks_->streamInfo().downstreamAddressProvider().remoteAddress().get(),
-            *downstream_headers_,
-            [this](const std::string& key, const std::string& path, std::chrono::seconds max_age,
-                   Http::CookieAttributeRefVector attributes) {
+            *downstream_headers_, callbacks_->streamInfo(),
+            [this](absl::string_view key, absl::string_view path, std::chrono::seconds max_age,
+                   absl::Span<const Http::CookieAttribute> attributes) -> std::string {
               return addDownstreamSetCookie(key, path, max_age, attributes);
-            },
-            callbacks_->streamInfo().filterState());
+            });
       }
     }
     return {};
@@ -449,6 +445,9 @@ public:
     }
     return callbacks_->upstreamOverrideHost();
   }
+  void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) override {
+    modify_headers_from_upstream_lb_ = std::move(modifier);
+  }
 
   void onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string&& details) override;
 
@@ -459,9 +458,9 @@ public:
    * @param  path the path of the cookie, or ""
    * @return std::string the value of the new cookie
    */
-  std::string addDownstreamSetCookie(const std::string& key, const std::string& path,
+  std::string addDownstreamSetCookie(absl::string_view key, absl::string_view path,
                                      std::chrono::seconds max_age,
-                                     Http::CookieAttributeRefVector attributes) {
+                                     absl::Span<const Http::CookieAttribute> attributes) {
     // The cookie value should be the same per connection so that if multiple
     // streams race on the same path, they all receive the same cookie.
     // Since the downstream port is part of the hashed value, multiple HTTP1
@@ -621,7 +620,8 @@ private:
   MonotonicTime downstream_request_complete_time_;
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::ResponseHeaderMap&)> modify_headers_;
-  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
+  std::function<void(Http::ResponseHeaderMap&)> modify_headers_from_upstream_lb_;
+  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_;
   std::unique_ptr<Http::RequestHeaderMap> shadow_headers_;
   std::unique_ptr<Http::RequestTrailerMap> shadow_trailers_;
   // The stream lifetime configured by request header.

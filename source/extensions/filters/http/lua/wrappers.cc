@@ -1,8 +1,11 @@
 #include "source/extensions/filters/http/lua/wrappers.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/lua/protobuf_converter.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
@@ -170,6 +173,13 @@ int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaDynamicTypedMetadata(lua_State* state) {
+  // Get the typed metadata from the stream's metadata
+  const auto& typed_metadata = stream_info_.dynamicMetadata().typed_filter_metadata();
+  return Filters::Common::Lua::ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
+      state, typed_metadata);
+}
+
 int ConnectionStreamInfoWrapper::luaConnectionDynamicMetadata(lua_State* state) {
   if (connection_dynamic_metadata_wrapper_.get() != nullptr) {
     connection_dynamic_metadata_wrapper_.pushStack();
@@ -193,6 +203,13 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
     lua_pushnil(state);
   }
   return 1;
+}
+
+int ConnectionStreamInfoWrapper::luaConnectionDynamicTypedMetadata(lua_State* state) {
+  // Get the typed metadata from the connection's metadata
+  const auto& typed_metadata = connection_stream_info_.dynamicMetadata().typed_filter_metadata();
+  return Filters::Common::Lua::ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
+      state, typed_metadata);
 }
 
 int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
