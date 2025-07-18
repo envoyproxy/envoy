@@ -83,9 +83,8 @@ FilterConfig::FilterConfig(Stats::StatName stat_prefix,
                            const envoy::extensions::filters::http::router::v3::Router& config,
                            absl::Status& creation_status)
     : FilterConfig(
-          context.serverFactoryContext(), stat_prefix, context.serverFactoryContext().localInfo(),
-          context.scope(), context.serverFactoryContext().clusterManager(),
-          context.serverFactoryContext().runtime(),
+          context.serverFactoryContext(), stat_prefix, context.scope(),
+          context.serverFactoryContext().clusterManager(), context.serverFactoryContext().runtime(),
           context.serverFactoryContext().api().randomGenerator(), std::move(shadow_writer),
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true), config.start_child_span(),
           config.suppress_envoy_headers(), config.respect_expected_rq_timeout(),
@@ -399,7 +398,7 @@ void Filter::chargeUpstreamCode(uint64_t response_status_code,
         config_->empty_stat_name_,
         response_status_code,
         internal_request,
-        route_->virtualHost().statName(),
+        route_->virtualHost()->statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -445,11 +444,26 @@ void Filter::chargeUpstreamCode(Http::Code code, Upstream::HostDescriptionOptCon
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
   downstream_headers_ = &headers;
 
-  // Extract debug configuration from filter state. This is used further along to determine whether
-  // we should append cluster and host headers to the response, and whether to forward the request
-  // upstream.
-  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
-  const DebugConfig* debug_config = filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key());
+  // Initialize the `modify_headers_` function that will be used to modify the response headers for
+  // all upstream responses or local responses.
+  modify_headers_ = [this](Http::ResponseHeaderMap& headers) {
+    if (route_entry_ == nullptr) {
+      return;
+    }
+
+    if (modify_headers_from_upstream_lb_) {
+      modify_headers_from_upstream_lb_(headers);
+    }
+
+    route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
+
+    if (attempt_count_ == 0 || !route_entry_->includeAttemptCountInResponse()) {
+      return;
+    }
+    // This header is added without checking for config_->suppress_envoy_headers_ to mirror what
+    // is done for upstream requests.
+    headers.setEnvoyAttemptCount(attempt_count_);
+  };
 
   // TODO: Maybe add a filter API for this.
   grpc_request_ = Grpc::Common::isGrpcRequestHeaders(headers);
@@ -459,11 +473,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // that get handled by earlier filters.
   stats_.rq_total_.inc();
 
-  // Initialize the `modify_headers` function as a no-op (so we don't have to remember to check it
-  // against nullptr before calling it), and feed it behavior later if/when we have cluster info
-  // headers to append.
-  std::function<void(Http::ResponseHeaderMap&)> modify_headers = [](Http::ResponseHeaderMap&) {};
-
   // Determine if there is a route entry or a direct response for the request.
   route_ = callbacks_->route();
   if (!route_) {
@@ -471,7 +480,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     ENVOY_STREAM_LOG(debug, "no route match for URL '{}'", *callbacks_, headers.getPathValue());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoRouteFound);
-    callbacks_->sendLocalReply(Http::Code::NotFound, "", modify_headers, absl::nullopt,
+    callbacks_->sendLocalReply(Http::Code::NotFound, "", nullptr, absl::nullopt,
                                StreamInfo::ResponseCodeDetails::get().RouteNotFound);
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -508,13 +517,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // limits, apply the new cap.
   retry_shadow_buffer_limit_ =
       std::min(retry_shadow_buffer_limit_, route_entry_->retryShadowBufferLimit());
-  if (debug_config && debug_config->append_cluster_) {
-    // The cluster name will be appended to any local or upstream responses from this point.
-    modify_headers = [this, debug_config](Http::ResponseHeaderMap& headers) {
-      headers.addCopy(debug_config->cluster_header_.value_or(Http::Headers::get().EnvoyCluster),
-                      route_entry_->clusterName());
-    };
-  }
   Upstream::ThreadLocalCluster* cluster =
       config_->cm_.getThreadLocalCluster(route_entry_->clusterName());
   if (!cluster) {
@@ -522,7 +524,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
 
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::NoClusterFound);
-    callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", modify_headers,
+    callbacks_->sendLocalReply(route_entry_->clusterNotFoundResponseCode(), "", modify_headers_,
                                absl::nullopt,
                                StreamInfo::ResponseCodeDetails::get().ClusterNotFound);
     return Http::FilterHeadersStatus::StopIteration;
@@ -530,7 +532,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   cluster_ = cluster->info();
 
   // Set up stat prefixes, etc.
-  request_vcluster_ = route_->virtualHost().virtualCluster(headers);
+  request_vcluster_ = route_->virtualHost()->virtualCluster(headers);
   if (request_vcluster_ != nullptr) {
     callbacks_->streamInfo().setVirtualClusterName(request_vcluster_->name());
   }
@@ -550,7 +552,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
         const std::string details =
             absl::StrCat(StreamInfo::ResponseCodeDetails::get().InvalidEnvoyRequestHeaders, "{",
                          StringUtil::replaceAllEmptySpace(res.entry_->key().getStringView()), "}");
-        callbacks_->sendLocalReply(Http::Code::BadRequest, body, nullptr, absl::nullopt, details);
+        callbacks_->sendLocalReply(Http::Code::BadRequest, body, modify_headers_, absl::nullopt,
+                                   details);
         return Http::FilterHeadersStatus::StopIteration;
       }
     }
@@ -569,13 +572,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, true);
     callbacks_->sendLocalReply(
         Http::Code::ServiceUnavailable, "maintenance mode",
-        [modify_headers, this](Http::ResponseHeaderMap& headers) {
+        [this](Http::ResponseHeaderMap& headers) {
           if (!config_->suppress_envoy_headers_) {
             headers.addReference(Http::Headers::get().EnvoyOverloaded,
                                  Http::Headers::get().EnvoyOverloadedValues.True);
           }
           // Note: append_cluster_info does not respect suppress_envoy_headers.
-          modify_headers(headers);
+          modify_headers_(headers);
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().MaintenanceMode);
     cluster_->trafficStats()->upstream_rq_maintenance_mode_.inc();
@@ -583,53 +586,57 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   }
 
   // Support DROP_OVERLOAD config from control plane to drop certain percentage of traffic.
-  if (checkDropOverload(*cluster, modify_headers)) {
+  if (checkDropOverload(*cluster)) {
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // Increment the attempt count from 0 to 1 at the first upstream request.
+  attempt_count_++;
+  callbacks_->streamInfo().setAttemptCount(attempt_count_);
+
+  // Finalize the request headers before the host selection.
+  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+                                       !config_->suppress_envoy_headers_);
+
   // Fetch a connection pool for the upstream cluster.
   const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
-
-  if (upstream_http_protocol_options.has_value() &&
-      (upstream_http_protocol_options.value().auto_sni() ||
-       upstream_http_protocol_options.value().auto_san_validation())) {
+  if (upstream_http_protocol_options && (upstream_http_protocol_options->auto_sni() ||
+                                         upstream_http_protocol_options->auto_san_validation())) {
     // Default the header to Host/Authority header.
-    std::string header_value = route_entry_->getRequestHostValue(headers);
+    absl::string_view header_value = headers.getHostValue();
 
     // Check whether `override_auto_sni_header` is specified.
-    const auto override_auto_sni_header =
-        upstream_http_protocol_options.value().override_auto_sni_header();
-    if (!override_auto_sni_header.empty()) {
+    if (const auto& override_header = upstream_http_protocol_options->override_auto_sni_header();
+        !override_header.empty()) {
       // Use the header value from `override_auto_sni_header` to set the SNI value.
-      const auto overridden_header_value = Http::HeaderUtility::getAllOfHeaderAsString(
-          headers, Http::LowerCaseString(override_auto_sni_header));
-      if (overridden_header_value.result().has_value() &&
-          !overridden_header_value.result().value().empty()) {
-        header_value = overridden_header_value.result().value();
+      const auto override_header_value = headers.get(Http::LowerCaseString(override_header));
+      if (override_header_value.size() > 1) {
+        ENVOY_STREAM_LOG(info, "Multiple values for auto sni header '{}' and use the first one",
+                         *callbacks_, override_header);
+      }
+      if (!override_header_value.empty() && !override_header_value[0]->value().empty()) {
+        header_value = override_header_value[0]->value().getStringView();
       }
     }
-    const auto parsed_authority = Http::Utility::parseAuthority(header_value);
-    bool should_set_sni = !parsed_authority.is_ip_address_;
-    // `host_` returns a string_view so doing this should be safe.
-    absl::string_view sni_value = parsed_authority.host_;
 
-    if (should_set_sni && upstream_http_protocol_options.value().auto_sni() &&
-        !callbacks_->streamInfo().filterState()->hasDataWithName(
-            Network::UpstreamServerName::key())) {
-      callbacks_->streamInfo().filterState()->setData(
-          Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(sni_value),
-          StreamInfo::FilterState::StateType::Mutable);
+    auto& filter_state = callbacks_->streamInfo().filterState();
+
+    // Parse the authority header value to extract the host and check if it's an IP address.
+    const auto parsed_authority = Http::Utility::parseAuthority(header_value);
+
+    if (!parsed_authority.is_ip_address_ && upstream_http_protocol_options->auto_sni() &&
+        !filter_state->hasDataWithName(Network::UpstreamServerName::key())) {
+      filter_state->setData(Network::UpstreamServerName::key(),
+                            std::make_unique<Network::UpstreamServerName>(parsed_authority.host_),
+                            StreamInfo::FilterState::StateType::Mutable);
     }
 
-    if (upstream_http_protocol_options.value().auto_san_validation() &&
-        !callbacks_->streamInfo().filterState()->hasDataWithName(
-            Network::UpstreamSubjectAltNames::key())) {
-      callbacks_->streamInfo().filterState()->setData(
-          Network::UpstreamSubjectAltNames::key(),
-          std::make_unique<Network::UpstreamSubjectAltNames>(
-              std::vector<std::string>{std::string(sni_value)}),
-          StreamInfo::FilterState::StateType::Mutable);
+    if (upstream_http_protocol_options->auto_san_validation() &&
+        !filter_state->hasDataWithName(Network::UpstreamSubjectAltNames::key())) {
+      filter_state->setData(Network::UpstreamSubjectAltNames::key(),
+                            std::make_unique<Network::UpstreamSubjectAltNames>(
+                                std::vector<std::string>{std::string(parsed_authority.host_)}),
+                            StreamInfo::FilterState::StateType::Mutable);
     }
   }
 
@@ -657,6 +664,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_start_ms",
       callbacks_->dispatcher().timeSource().monotonicTime());
+
   auto host_selection_response = cluster->chooseHost(this);
   if (!host_selection_response.cancelable ||
       !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.async_host_selection")) {
@@ -666,9 +674,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     // This branch handles the common case of synchronous host selection, as
     // well as handling unsupported asynchronous host selection by treating it
     // as host selection failure and calling sendNoHealthyUpstreamResponse.
-    return continueDecodeHeaders(cluster, headers, end_stream, modify_headers, nullptr,
-                                 std::move(host_selection_response.host),
-                                 std::string(host_selection_response.details));
+    continueDecodeHeaders(cluster, headers, end_stream, std::move(host_selection_response.host),
+                          std::string(host_selection_response.details));
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   ENVOY_STREAM_LOG(debug, "Doing asynchronous host selection\n", *callbacks_);
@@ -676,15 +684,13 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // like stream timeout.
   host_selection_cancelable_ = std::move(host_selection_response.cancelable);
   // Configure a callback to be called on asynchronous host selection.
-  on_host_selected_ = ([this, cluster, end_stream,
-                        modify_headers](Upstream::HostConstSharedPtr&& host,
-                                        std::string host_selection_details) -> void {
+  on_host_selected_ = ([this, cluster, end_stream](Upstream::HostConstSharedPtr&& host,
+                                                   std::string host_selection_details) -> void {
     // It should always be safe to call continueDecodeHeaders. In the case the
     // stream had a local reply before host selection completed,
     // the lookup should be canceled.
-    bool should_continue_decoding = false;
-    continueDecodeHeaders(cluster, *downstream_headers_, end_stream, modify_headers,
-                          &should_continue_decoding, std::move(host), host_selection_details);
+    const bool should_continue_decoding = continueDecodeHeaders(
+        cluster, *downstream_headers_, end_stream, std::move(host), host_selection_details);
     // continueDecodeHeaders can itself send a local reply, in which case should_continue_decoding
     // should be false. If this is not the case, we can continue the filter chain due to successful
     // asynchronous host selection.
@@ -707,54 +713,39 @@ void Filter::onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::stri
   on_host_selected_(std::move(host), details);
 }
 
-Http::FilterHeadersStatus Filter::continueDecodeHeaders(
-    Upstream::ThreadLocalCluster* cluster, Http::RequestHeaderMap& headers, bool end_stream,
-    std::function<void(Http::ResponseHeaderMap&)> modify_headers, bool* should_continue_decoding,
-    Upstream::HostConstSharedPtr&& selected_host,
-    absl::optional<std::string> host_selection_details) {
-  const StreamInfo::FilterStateSharedPtr& filter_state = callbacks_->streamInfo().filterState();
-  const DebugConfig* debug_config = filter_state->getDataReadOnly<DebugConfig>(DebugConfig::key());
+bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
+                                   Http::RequestHeaderMap& headers, bool end_stream,
+                                   Upstream::HostConstSharedPtr&& selected_host,
+                                   absl::optional<std::string> host_selection_details) {
   callbacks_->streamInfo().downstreamTiming().setValue(
       "envoy.router.host_selection_end_ms", callbacks_->dispatcher().timeSource().monotonicTime());
 
   std::unique_ptr<GenericConnPool> generic_conn_pool = createConnPool(*cluster, selected_host);
   if (!generic_conn_pool) {
     sendNoHealthyUpstreamResponse(host_selection_details);
-    return Http::FilterHeadersStatus::StopIteration;
+    return false;
   }
   Upstream::HostDescriptionConstSharedPtr host = generic_conn_pool->host();
 
-  if (debug_config && debug_config->append_upstream_host_) {
-    // The hostname and address will be appended to any local or upstream responses from this point,
-    // possibly in addition to the cluster name.
-    modify_headers = [modify_headers, debug_config, host](Http::ResponseHeaderMap& headers) {
-      modify_headers(headers);
-      headers.addCopy(
-          debug_config->hostname_header_.value_or(Http::Headers::get().EnvoyUpstreamHostname),
-          host->hostname());
-      headers.addCopy(debug_config->host_address_header_.value_or(
-                          Http::Headers::get().EnvoyUpstreamHostAddress),
-                      host->address()->asString());
-    };
-  }
-
   // If we've been instructed not to forward the request upstream, send an empty local response.
-  if (debug_config && debug_config->do_not_forward_) {
-    modify_headers = [modify_headers, debug_config](Http::ResponseHeaderMap& headers) {
-      modify_headers(headers);
-      headers.addCopy(
-          debug_config->not_forwarded_header_.value_or(Http::Headers::get().EnvoyNotForwarded),
-          "true");
-    };
-    callbacks_->sendLocalReply(Http::Code::NoContent, "", modify_headers, absl::nullopt, "");
-    return Http::FilterHeadersStatus::StopIteration;
+  if (auto* debug_config =
+          callbacks_->streamInfo().filterState()->getDataReadOnly<DebugConfig>(DebugConfig::key());
+      debug_config != nullptr && debug_config->do_not_forward_) {
+    callbacks_->sendLocalReply(
+        Http::Code::NoContent, "",
+        [this](Http::ResponseHeaderMap& headers) {
+          headers.addReference(Http::Headers::get().EnvoyNotForwarded, "true");
+          modify_headers_(headers);
+        },
+        absl::nullopt, "");
+    return false;
   }
 
   if (callbacks_->shouldLoadShed()) {
-    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded", nullptr,
+    callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "envoy overloaded", modify_headers_,
                                absl::nullopt, StreamInfo::ResponseCodeDetails::get().Overload);
     stats_.rq_overload_local_reply_.inc();
-    return Http::FilterHeadersStatus::StopIteration;
+    return false;
   }
 
   hedging_params_ = FilterUtility::finalHedgingParams(*route_entry_, headers);
@@ -782,22 +773,6 @@ Http::FilterHeadersStatus Filter::continueDecodeHeaders(
     headers.setEnvoyAttemptCount(attempt_count_);
   }
 
-  // The router has reached a point where it is going to try to send a request upstream,
-  // so now modify_headers should attach x-envoy-attempt-count to the downstream response if the
-  // config flag is true.
-  if (route_entry_->includeAttemptCountInResponse()) {
-    modify_headers = [modify_headers, this](Http::ResponseHeaderMap& headers) {
-      modify_headers(headers);
-
-      // This header is added without checking for config_->suppress_envoy_headers_ to mirror what
-      // is done for upstream requests.
-      headers.setEnvoyAttemptCount(attempt_count_);
-    };
-  }
-  callbacks_->streamInfo().setAttemptCount(attempt_count_);
-
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
-                                       !config_->suppress_envoy_headers_);
   FilterUtility::setUpstreamScheme(
       headers, callbacks_->streamInfo().downstreamAddressProvider().sslConnection() != nullptr,
       host->transportSocketFactory().sslCtx() != nullptr,
@@ -825,13 +800,10 @@ Http::FilterHeadersStatus Filter::continueDecodeHeaders(
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
-  // Hang onto the modify_headers function for later use in handling upstream responses.
-  modify_headers_ = modify_headers;
-
   const bool can_send_early_data =
       route_entry_->earlyDataPolicy().allowsEarlyDataForRequest(*downstream_headers_);
 
-  include_timeout_retry_header_in_request_ = route_->virtualHost().includeIsTimeoutRetryHeader();
+  include_timeout_retry_header_in_request_ = route_->virtualHost()->includeIsTimeoutRetryHeader();
 
   // Set initial HTTP/3 use based on the presence of HTTP/1.1 proxy config.
   // For retries etc, HTTP/3 usability may transition from true to false, but
@@ -891,11 +863,8 @@ Http::FilterHeadersStatus Filter::continueDecodeHeaders(
     onRequestComplete();
   }
 
-  // If this was called due to asynchronous host selection, the caller should continueDecoding
-  if (should_continue_decoding) {
-    *should_continue_decoding = true;
-  }
-  return Http::FilterHeadersStatus::StopIteration;
+  // If this was called due to asynchronous host selection, the caller should continueDecoding.
+  return true;
 }
 
 std::unique_ptr<GenericConnPool> Filter::createConnPool(Upstream::ThreadLocalCluster& cluster,
@@ -1651,7 +1620,6 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   ASSERT(!host_selection_cancelable_);
 
-  modify_headers_(*headers);
   // When grpc-status appears in response headers, convert grpc-status to HTTP status code
   // for outlier detection. This does not currently change any stats or logging and does not
   // handle the case when an error grpc-status is sent as a trailer.
@@ -1666,11 +1634,11 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   maybeProcessOrcaLoadReport(*headers, upstream_request);
 
-  if (grpc_status.has_value()) {
-    upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(grpc_to_http_status);
-  } else {
-    upstream_request.upstreamHost()->outlierDetector().putHttpResponseCode(response_code);
-  }
+  const uint64_t put_result_code = grpc_status.has_value() ? grpc_to_http_status : response_code;
+  upstream_request.upstreamHost()->outlierDetector().putResult(
+      put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
+                             : Upstream::Outlier::Result::ExtOriginRequestSuccess,
+      put_result_code);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(
@@ -1782,17 +1750,16 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
       StreamInfo::ResponseCodeDetails::get().ViaUpstream);
 
   callbacks_->streamInfo().setResponseCode(response_code);
-
-  // TODO(zuercher): If access to response_headers_to_add (at any level) is ever needed outside
-  // Router::Filter we'll need to find a better location for this work. One possibility is to
-  // provide finalizeResponseHeaders functions on the Router::Config and VirtualHost interfaces.
-  route_entry_->finalizeResponseHeaders(*headers, callbacks_->streamInfo());
-
   downstream_response_started_ = true;
   final_upstream_request_ = &upstream_request;
   // Make sure that for request hedging, we end up with the correct final upstream info.
   callbacks_->streamInfo().setUpstreamInfo(final_upstream_request_->streamInfo().upstreamInfo());
   resetOtherUpstreams(upstream_request);
+
+  // Modify response headers after we have set the final upstream info because we may need to
+  // modify the headers based on the upstream host.
+  modify_headers_(*headers);
+
   if (end_stream) {
     onUpstreamComplete(upstream_request);
   }
@@ -1877,7 +1844,7 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
         response_time,
         upstream_request.upstreamCanary(),
         internal_request,
-        route_->virtualHost().statName(),
+        route_->virtualHost()->statName(),
         request_vcluster_ ? request_vcluster_->statName() : config_->empty_stat_name_,
         route_stats_context_.has_value() ? route_stats_context_->statName()
                                          : config_->empty_stat_name_,
@@ -2220,8 +2187,7 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
                        [](const auto& req) -> bool { return req->awaitingHeaders(); });
 }
 
-bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
-                               std::function<void(Http::ResponseHeaderMap&)>& modify_headers) {
+bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster) {
   if (cluster.dropOverload().value()) {
     ENVOY_STREAM_LOG(debug, "Router filter: cluster DROP_OVERLOAD configuration: {}", *callbacks_,
                      cluster.dropOverload().value());
@@ -2235,12 +2201,12 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
       chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, true);
       callbacks_->sendLocalReply(
           Http::Code::ServiceUnavailable, "unconditional drop overload",
-          [modify_headers, this](Http::ResponseHeaderMap& headers) {
+          [this](Http::ResponseHeaderMap& headers) {
             if (!config_->suppress_envoy_headers_) {
               headers.addReference(Http::Headers::get().EnvoyUnconditionalDropOverload,
                                    Http::Headers::get().EnvoyUnconditionalDropOverloadValues.True);
             }
-            modify_headers(headers);
+            modify_headers_(headers);
           },
           absl::nullopt, StreamInfo::ResponseCodeDetails::get().UnconditionalDropOverload);
 
@@ -2254,12 +2220,12 @@ bool Filter::checkDropOverload(Upstream::ThreadLocalCluster& cluster,
       chargeUpstreamCode(Http::Code::ServiceUnavailable, {}, true);
       callbacks_->sendLocalReply(
           Http::Code::ServiceUnavailable, "drop overload",
-          [modify_headers, this](Http::ResponseHeaderMap& headers) {
+          [this](Http::ResponseHeaderMap& headers) {
             if (!config_->suppress_envoy_headers_) {
               headers.addReference(Http::Headers::get().EnvoyDropOverload,
                                    Http::Headers::get().EnvoyDropOverloadValues.True);
             }
-            modify_headers(headers);
+            modify_headers_(headers);
           },
           absl::nullopt, StreamInfo::ResponseCodeDetails::get().DropOverload);
 

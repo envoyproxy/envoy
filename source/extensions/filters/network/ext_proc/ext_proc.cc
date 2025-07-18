@@ -5,6 +5,51 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ExtProc {
 
+MessageTimeoutManager::MessageTimeoutManager(NetworkExtProcFilter& filter,
+                                             Event::Dispatcher& dispatcher)
+    : filter_(filter), read_timer_(dispatcher.createTimer([this]() -> void { onTimeout(true); })),
+      write_timer_(dispatcher.createTimer([this]() -> void { onTimeout(false); })) {}
+
+void MessageTimeoutManager::startTimer(bool is_read) {
+  const auto timeout = filter_.getMessageTimeout();
+  if (timeout.count() == 0) {
+    // Zero timeout means no timeout
+    return;
+  }
+
+  if (is_read) {
+    ENVOY_LOG(debug, "Starting read message timer with timeout {} ms", timeout.count());
+    read_timer_->enableTimer(timeout);
+    read_timer_active_ = true;
+  } else {
+    ENVOY_LOG(debug, "Starting write message timer with timeout {} ms", timeout.count());
+    write_timer_->enableTimer(timeout);
+    write_timer_active_ = true;
+  }
+}
+
+void MessageTimeoutManager::stopTimer(bool is_read) {
+  if (is_read && read_timer_active_) {
+    ENVOY_LOG(debug, "Stopping read message timer");
+    read_timer_->disableTimer();
+    read_timer_active_ = false;
+  } else if (!is_read && write_timer_active_) {
+    ENVOY_LOG(debug, "Stopping write message timer");
+    write_timer_->disableTimer();
+    write_timer_active_ = false;
+  }
+}
+
+void MessageTimeoutManager::stopAllTimers() {
+  stopTimer(true);  // Stop read timer
+  stopTimer(false); // Stop write timer
+}
+
+void MessageTimeoutManager::onTimeout(bool is_read) {
+  ENVOY_LOG(warn, "{} message timeout occurred", is_read ? "Read" : "Write");
+  filter_.handleMessageTimeout(is_read);
+}
+
 NetworkExtProcFilter::NetworkExtProcFilter(ConfigConstSharedPtr config,
                                            ExternalProcessorClientPtr&& client)
     : config_(config), stats_(config->stats()), client_(std::move(client)),
@@ -15,6 +60,11 @@ NetworkExtProcFilter::~NetworkExtProcFilter() { closeStream(); }
 void NetworkExtProcFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
   read_callbacks_->connection().addConnectionCallbacks(downstream_callbacks_);
+
+  if (!timeout_manager_) {
+    timeout_manager_ =
+        std::make_unique<MessageTimeoutManager>(*this, read_callbacks_->connection().dispatcher());
+  }
 }
 
 void NetworkExtProcFilter::initializeWriteFilterCallbacks(
@@ -85,7 +135,7 @@ Network::FilterStatus NetworkExtProcFilter::handleStreamError() {
     return Network::FilterStatus::Continue;
   } else {
     // In strict mode, close the connection and stop processing
-    closeConnection("ext_proc_stream_error");
+    closeConnection("ext_proc_stream_error", Network::ConnectionCloseType::FlushWrite);
     return Network::FilterStatus::StopIteration;
   }
 }
@@ -150,6 +200,42 @@ NetworkExtProcFilter::StreamOpenState NetworkExtProcFilter::openStream() {
   return StreamOpenState::Ok;
 }
 
+void NetworkExtProcFilter::handleMessageTimeout(bool is_read) {
+  ENVOY_CONN_LOG(warn, "{} message timeout occurred", read_callbacks_->connection(),
+                 is_read ? "Read" : "Write");
+
+  stats_.message_timeouts_.inc();
+  processing_complete_ = true;
+
+  read_pending_ = false;
+  write_pending_ = false;
+
+  // Re-enable close callbacks for both directions
+  if (disable_count_read_ > 0) {
+    updateCloseCallbackStatus(false, true);
+  }
+  if (disable_count_write_ > 0) {
+    updateCloseCallbackStatus(false, false);
+  }
+
+  closeStream();
+
+  // Handle timeout based on failure mode
+  if (config_->failureModeAllow()) {
+    ENVOY_CONN_LOG(debug, "Message timeout with failure_mode_allow=true, continuing",
+                   read_callbacks_->connection());
+    stats_.failure_mode_allowed_.inc();
+  } else {
+    ENVOY_CONN_LOG(info, "Message timeout with failure_mode_allow=false, closing connection",
+                   read_callbacks_->connection());
+    closeConnection("ext_proc_message_timeout", Network::ConnectionCloseType::FlushWrite);
+  }
+}
+
+const std::chrono::milliseconds& NetworkExtProcFilter::getMessageTimeout() {
+  return config_->messageTimeout();
+}
+
 void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, bool is_read) {
   if (stream_ == nullptr) {
     ENVOY_CONN_LOG(error, "Cannot send request: stream is null", read_callbacks_->connection());
@@ -171,11 +257,18 @@ void NetworkExtProcFilter::sendRequest(Buffer::Instance& data, bool end_stream, 
     read_data->set_data(data.toString());
     read_data->set_end_of_stream(end_stream);
     stats_.read_data_sent_.inc();
+    read_pending_ = true;
   } else {
     auto* write_data = request.mutable_write_data();
     write_data->set_data(data.toString());
     write_data->set_end_of_stream(end_stream);
     stats_.write_data_sent_.inc();
+    write_pending_ = true;
+  }
+
+  // Start timeout for this specific direction
+  if (timeout_manager_) {
+    timeout_manager_->startTimer(is_read);
   }
 
   // Send to external processor
@@ -198,8 +291,19 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
   ENVOY_CONN_LOG(debug, "Received response from external processor", read_callbacks_->connection());
   stats_.stream_msgs_received_.inc();
 
+  // Handle connection status before processing data
+  handleConnectionStatus(*response);
+  if (processing_complete_) {
+    return;
+  }
+
   if (response->has_read_data()) {
     const auto& data = response->read_data();
+    if (timeout_manager_ && read_pending_) {
+      timeout_manager_->stopTimer(true);
+    }
+    read_pending_ = false;
+
     ENVOY_CONN_LOG(trace, "Processing READ data response: {} bytes, end_stream={}",
                    read_callbacks_->connection(), data.data().size(), data.end_of_stream());
 
@@ -208,6 +312,11 @@ void NetworkExtProcFilter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&
     updateCloseCallbackStatus(false, true);
     stats_.read_data_injected_.inc();
   } else if (response->has_write_data()) {
+    if (timeout_manager_ && write_pending_) {
+      timeout_manager_->stopTimer(true);
+    }
+    write_pending_ = false;
+
     const auto& data = response->write_data();
     ENVOY_CONN_LOG(trace, "Processing WRITE data response: {} bytes, end_stream={}",
                    read_callbacks_->connection(), data.data().size(), data.end_of_stream());
@@ -234,7 +343,7 @@ void NetworkExtProcFilter::onGrpcError(Grpc::Status::GrpcStatus status,
   if (!config_->failureModeAllow()) {
     ENVOY_CONN_LOG(debug, "Closing connection since failure model allow is not enabled",
                    read_callbacks_->connection());
-    closeConnection("ext_proc_grpc_error");
+    closeConnection("ext_proc_grpc_error", Network::ConnectionCloseType::FlushWrite);
     return;
   }
 
@@ -248,7 +357,17 @@ void NetworkExtProcFilter::onGrpcClose() {
   closeStream();
 }
 
+// Update closeStream to stop all timers
 void NetworkExtProcFilter::closeStream() {
+  if (timeout_manager_) {
+    timeout_manager_->stopAllTimers();
+    timeout_manager_.reset();
+  }
+
+  // Clear pending flags
+  read_pending_ = false;
+  write_pending_ = false;
+
   if (stream_ == nullptr) {
     return;
   }
@@ -261,14 +380,53 @@ void NetworkExtProcFilter::closeStream() {
   stream_ = nullptr;
 }
 
-void NetworkExtProcFilter::closeConnection(const std::string& reason) {
-  ENVOY_CONN_LOG(info, "Closing connection: {}", read_callbacks_->connection(), reason);
+void NetworkExtProcFilter::closeConnection(const std::string& reason,
+                                           Network::ConnectionCloseType close_type) {
+  ENVOY_CONN_LOG(
+      info, "Closing connection: {}, close_type: {}", read_callbacks_->connection(), reason,
+      close_type == Network::ConnectionCloseType::FlushWrite ? "FlushWrite" : "AbortReset");
 
   // Ensure all callbacks are enabled before closing
   read_callbacks_->disableClose(false);
   write_callbacks_->disableClose(false);
-  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite, reason);
+  read_callbacks_->connection().close(close_type, reason);
+
+  // Track different types of closures in stats
+  if (close_type == Network::ConnectionCloseType::AbortReset) {
+    stats_.connections_reset_.inc();
+  }
   stats_.connections_closed_.inc();
+}
+
+void NetworkExtProcFilter::handleConnectionStatus(const ProcessingResponse& response) {
+  switch (response.connection_status()) {
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CONTINUE:
+    ENVOY_CONN_LOG(debug, "External processor requested to continue connection",
+                   read_callbacks_->connection());
+    break;
+
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE:
+    // Close the connection with normal FIN
+    ENVOY_CONN_LOG(info, "External processor requested to close connection with FIN",
+                   read_callbacks_->connection());
+    closeConnection("ext_proc_close_requested", Network::ConnectionCloseType::FlushWrite);
+    processing_complete_ = true;
+    break;
+
+  case envoy::service::network_ext_proc::v3::ProcessingResponse::CLOSE_RST:
+    // Immediately reset the connection
+    ENVOY_CONN_LOG(info, "External processor requested to reset connection",
+                   read_callbacks_->connection());
+    closeConnection("ext_proc_reset_requested", Network::ConnectionCloseType::AbortReset);
+    processing_complete_ = true;
+    break;
+
+  default:
+    // Unknown status, log a warning and continue
+    ENVOY_CONN_LOG(warn, "Unknown connection status from external processor.",
+                   read_callbacks_->connection());
+    break;
+  }
 }
 
 void NetworkExtProcFilter::addDynamicMetadata(ProcessingRequest& req) {

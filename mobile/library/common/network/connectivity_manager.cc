@@ -14,6 +14,7 @@
 
 #include "fmt/ostream.h"
 #include "library/common/network/network_type_socket_option_impl.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/src_addr_socket_option_impl.h"
 
 // Used on Linux (requires root/CAP_NET_RAW)
@@ -283,6 +284,7 @@ void ConnectivityManagerImpl::resetConnectivityState() {
   envoy_netconf_t configuration_key;
   {
     Thread::LockGuard lock{network_state_.mutex_};
+    network_state_.network_ = 0;
     network_state_.remaining_faults_ = 1;
     network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
     configuration_key = ++network_state_.configuration_key_;
@@ -310,13 +312,7 @@ Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(int n
   // Setting a dummy socket option is a hack that allows us to select a different
   // connection pool without materially changing the socket configuration.
   auto options = std::make_shared<Socket::Options>();
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_network_type_socket_option")) {
-    options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
-        envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL,
-        ENVOY_SOCKET_IPV6_UNICAST_HOPS, DEFAULT_IP_TTL + static_cast<int>(network)));
-  } else {
-    options->push_back(std::make_shared<NetworkTypeSocketOptionImpl>(network));
-  }
+  options->push_back(std::make_shared<NetworkTypeSocketOptionImpl>(network));
 
   return options;
 }

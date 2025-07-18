@@ -256,6 +256,8 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   }
 
   local_addr = connection_socket->connectionInfoProvider().localAddress();
+  ENVOY_LOG_MISC(trace, "connected to local address: {}",
+                 local_addr != nullptr ? local_addr->asString() : "<none>");
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
                                      envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");

@@ -80,9 +80,13 @@ public:
           const std::string policy_yaml = R"EOF(
           policies:
           - typed_extension_config:
-              name: envoy.load_balancing_policies.maglev
+              name: envoy.load_balancing_policies.ring_hash
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.maglev.v3.Maglev
+                "@type": type.googleapis.com/envoy.extensions.load_balancing_policies.ring_hash.v3.RingHash
+                consistent_hashing_lb_config:
+                  hash_policy:
+                  - header:
+                      header_name: x-hash
           )EOF";
 
           TestUtility::loadFromYaml(policy_yaml, *policy);

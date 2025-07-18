@@ -213,16 +213,13 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("buffer_filter_1")
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
 
-    // Cert Validation
-    assertThat(resolvedTemplate).contains("trusted_ca")
-
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createProtoString doesn't change filter order.
     val resolvedTemplate2 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createBootstrap also doesn't change filter order.
-    // This may leak memory as the boostrap isn't used.
+    // This may leak memory as the bootstrap isn't used.
     envoyConfiguration.createBootstrap()
     val resolvedTemplate3 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))

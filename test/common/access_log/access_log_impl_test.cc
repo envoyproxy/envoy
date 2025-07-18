@@ -114,7 +114,7 @@ typed_config:
 
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstreamInfo()->setUpstreamHost(
-      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234"));
   stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamConnectionTermination);
 
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
@@ -255,7 +255,7 @@ typed_config:
 TEST_F(AccessLogImplTest, UpstreamHost) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstreamInfo()->setUpstreamHost(
-      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234"));
 
   const std::string yaml = R"EOF(
 name: accesslog
