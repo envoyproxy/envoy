@@ -80,9 +80,7 @@ ActiveClient::ActiveClient(HttpConnPoolImplBase& parent,
   parent.host()->cluster().trafficStats()->upstream_cx_http1_total_.inc();
 }
 
-ActiveClient::~ActiveClient() { 
-  ASSERT(!stream_wrapper_.get()); 
-}
+ActiveClient::~ActiveClient() { ASSERT(!stream_wrapper_.get()); }
 
 bool ActiveClient::closingWithIncompleteStream() const {
   return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
@@ -91,20 +89,7 @@ bool ActiveClient::closingWithIncompleteStream() const {
 RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
   ASSERT(!stream_wrapper_);
   stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, *this);
-  
   return *stream_wrapper_;
-}
-
-Http1ConnPoolImpl::Http1ConnPoolImpl(
-    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-    Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
-    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-    Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
-    CreateClientFn client_fn, CreateCodecFn codec_fn, std::vector<Http::Protocol> protocols,
-    Server::OverloadManager& overload_manager)
-    : FixedHttpConnPoolImpl(host, priority, dispatcher, options, transport_socket_options,
-                            random_generator, state, client_fn, codec_fn, protocols,
-                            overload_manager) {
 }
 
 ConnectionPool::InstancePtr
@@ -114,7 +99,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
                  Upstream::ClusterConnectivityState& state,
                  Server::OverloadManager& overload_manager) {
-  return std::make_unique<Http1ConnPoolImpl>(
+  return std::make_unique<FixedHttpConnPoolImpl>(
       std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
       random_generator, state,
       [](HttpConnPoolImplBase* pool) {
@@ -126,7 +111,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
             pool->dispatcher(), pool->randomGenerator(), pool->transportSocketOptions())};
         return codec;
       },
-      std::vector<Protocol>{Protocol::Http11}, overload_manager);
+      std::vector<Protocol>{Protocol::Http11}, overload_manager, absl::nullopt, nullptr);
 }
 
 } // namespace Http1
