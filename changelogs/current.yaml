@@ -18,6 +18,9 @@ bug_fixes:
 - area: http2
   change: |
     Fixed an issue where http/2 connections using the default codec of ``oghttp2`` could get stuck due to a window buffer leak.
+- area: release
+  change: |
+    Container (Ubuntu/distroless) updates, and fixed permissions for distroless config directory.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
