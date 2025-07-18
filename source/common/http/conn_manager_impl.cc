@@ -1018,6 +1018,9 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& h
     return;
   }
 
+  if (CodeUtility::isValid(response_code)) {
+    connection_manager_.stats_.downstreamRqCounter(static_cast<Http::Code>(response_code)).inc();
+  }
   connection_manager_.stats_.named_.downstream_rq_completed_.inc();
   connection_manager_.listener_stats_.downstream_rq_completed_.inc();
   if (CodeUtility::is1xx(response_code)) {

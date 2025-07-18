@@ -14,6 +14,8 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/http/date_provider.h"
+#include "source/common/http/codes.h"
+#include "source/common/common/enum_to_int.h"
 #include "source/common/local_reply/local_reply.h"
 #include "source/common/network/utility.h"
 #include "source/common/stats/symbol_table.h"
@@ -71,6 +73,7 @@ namespace Http {
   COUNTER(downstream_rq_header_timeout)                                                            \
   COUNTER(downstream_rq_too_large)                                                                 \
   COUNTER(downstream_rq_total)                                                                     \
+  COUNTER(downstream_rq_unknown)                                                                   \
   COUNTER(downstream_rq_tx_reset)                                                                  \
   COUNTER(downstream_rq_max_duration_reached)                                                      \
   COUNTER(downstream_rq_ws_on_non_ws_route)                                                        \
@@ -96,17 +99,49 @@ struct ConnectionManagerNamedStats {
 };
 
 struct ConnectionManagerStats {
+  // Use a single constexpr for array size.
+  static constexpr uint32_t kHttpCodeOffset = Envoy::Http::CodeStatsImpl::HttpCodeOffset;
+  static constexpr uint32_t kArraySize = Envoy::Http::CodeStatsImpl::NumHttpCodes - kHttpCodeOffset;
+
   ConnectionManagerStats(ConnectionManagerNamedStats&& named_stats, const std::string& prefix,
                          Stats::Scope& scope)
       : named_(std::move(named_stats)), prefix_(prefix),
-        prefix_stat_name_storage_(prefix, scope.symbolTable()), scope_(scope) {}
+        prefix_stat_name_storage_(prefix, scope.symbolTable()), scope_(scope),
+        stat_name_pool_(scope.symbolTable()) {
+    // Optionally pre-initialize common codes.
+    downstreamRqCounter(Http::Code::OK);
+    downstreamRqCounter(Http::Code::NotFound);
+    downstreamRqCounter(Http::Code::ServiceUnavailable);
+  }
 
   Stats::StatName prefixStatName() const { return prefix_stat_name_storage_.statName(); }
+
+  // Returns a reference to the counter for a given HTTP code, using atomic pointer array
+  Stats::Counter& downstreamRqCounter(Http::Code code) const {
+    const uint32_t rc_index = static_cast<uint32_t>(code) - kHttpCodeOffset;
+    if (rc_index >= kArraySize) {
+      return named_.downstream_rq_unknown_;
+    }
+
+    auto* counter_ptr = downstream_rc_counters_.get(rc_index, [this, code]() -> Stats::Counter* {
+      return &scope_.counterFromStatName(
+         stat_name_pool_.add(absl::StrCat(prefix_, "downstream_rq_", enumToInt(code)))
+      );
+    });
+    if (counter_ptr == nullptr) {
+      ENVOY_LOG_MISC(critical, "Null counter for HTTP code {}, using downstream_rq_unknown", enumToInt(code));
+      return named_.downstream_rq_unknown_;
+    }
+    return *counter_ptr;
+  }
 
   ConnectionManagerNamedStats named_;
   std::string prefix_;
   Stats::StatNameManagedStorage prefix_stat_name_storage_;
   Stats::Scope& scope_;
+
+  mutable Stats::StatNamePool stat_name_pool_;
+  mutable Thread::AtomicPtrArray<Stats::Counter, kArraySize, Thread::AtomicPtrAllocMode::DoNotDelete> downstream_rc_counters_;
 };
 
 /**
