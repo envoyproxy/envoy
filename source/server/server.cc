@@ -752,6 +752,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
         [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
     envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
         [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
+    envoy_notification_registration_ = Assert::addEnvoyNotificationRecordAction(
+        [this](absl::string_view) { server_stats_->envoy_notifications_.inc(); });
   }
 
   if (initial_config.admin().address()) {
