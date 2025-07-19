@@ -598,7 +598,7 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverRouteBufferLimit) {
   config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
     hcm.mutable_route_config()
         ->mutable_virtual_hosts(0)
-        ->mutable_per_request_buffer_limit_bytes()
+        ->mutable_request_body_buffer_limit()
         ->set_value(0);
   });
   config_helper_.disableDelayClose();
