@@ -301,52 +301,50 @@ void ClusterManagerInitHelper::setPrimaryClustersInitializedCb(
   }
 }
 
-ClusterManagerImpl::ClusterManagerImpl(
-    const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
-    Server::Configuration::CommonFactoryContext& context, Stats::Store& stats,
-    ThreadLocal::Instance& tls, Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-    AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
-    OptRef<Server::Admin> admin, Api::Api& api, Http::Context& http_context,
-    Grpc::Context& grpc_context, Router::Context& router_context, Server::Instance& server,
-    Config::XdsManager& xds_manager, absl::Status& creation_status)
-    : server_(server), factory_(factory), runtime_(runtime), stats_(stats), tls_(tls),
-      xds_manager_(xds_manager), random_(api.randomGenerator()),
+ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                       ClusterManagerFactory& factory,
+                                       Server::Configuration::ServerFactoryContext& context,
+                                       absl::Status& creation_status)
+    : context_(context), factory_(factory), runtime_(context.runtime()),
+      stats_(context.serverScope().store()), tls_(context.threadLocal()),
+      xds_manager_(context.xdsManager()), random_(context.api().randomGenerator()),
       deferred_cluster_creation_(bootstrap.cluster_manager().enable_deferred_cluster_creation()),
       bind_config_(bootstrap.cluster_manager().has_upstream_bind_config()
                        ? absl::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : absl::nullopt),
-      local_info_(local_info), cm_stats_(generateStats(*stats.rootScope())),
+      local_info_(context.localInfo()), cm_stats_(generateStats(*stats_.rootScope())),
       init_helper_(*this,
                    [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
-      time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher),
-      http_context_(http_context), router_context_(router_context),
-      cluster_stat_names_(stats.symbolTable()),
-      cluster_config_update_stat_names_(stats.symbolTable()),
-      cluster_lb_stat_names_(stats.symbolTable()),
-      cluster_endpoint_stat_names_(stats.symbolTable()),
-      cluster_load_report_stat_names_(stats.symbolTable()),
-      cluster_circuit_breakers_stat_names_(stats.symbolTable()),
-      cluster_request_response_size_stat_names_(stats.symbolTable()),
-      cluster_timeout_budget_stat_names_(stats.symbolTable()),
+      time_source_(context.timeSource()), dispatcher_(context.mainThreadDispatcher()),
+      http_context_(context.httpContext()), router_context_(context.routerContext()),
+      cluster_stat_names_(stats_.symbolTable()),
+      cluster_config_update_stat_names_(stats_.symbolTable()),
+      cluster_lb_stat_names_(stats_.symbolTable()),
+      cluster_endpoint_stat_names_(stats_.symbolTable()),
+      cluster_load_report_stat_names_(stats_.symbolTable()),
+      cluster_circuit_breakers_stat_names_(stats_.symbolTable()),
+      cluster_request_response_size_stat_names_(stats_.symbolTable()),
+      cluster_timeout_budget_stat_names_(stats_.symbolTable()),
       common_lb_config_pool_(
           std::make_shared<SharedPool::ObjectSharedPool<
               const envoy::config::cluster::v3::Cluster::CommonLbConfig, MessageUtil, MessageUtil>>(
-              main_thread_dispatcher)),
+              dispatcher_)),
       shutdown_(false) {
-  if (admin.has_value()) {
+  if (auto admin = context.admin(); admin.has_value()) {
     config_tracker_entry_ = admin->getConfigTracker().add(
         "clusters", [this](const Matchers::StringMatcher& name_matcher) {
           return dumpClusterConfigs(name_matcher);
         });
   }
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-      *this, tls, context, grpc_context.statNames(), bootstrap.grpc_async_client_manager_config());
+      *this, context.threadLocal(), context, context.grpcContext().statNames(),
+      bootstrap.grpc_async_client_manager_config());
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      auto outlier_or_error =
-          Outlier::EventLoggerImpl::create(log_manager, event_log_file_path, time_source_);
+      auto outlier_or_error = Outlier::EventLoggerImpl::create(context.accessLogManager(),
+                                                               event_log_file_path, time_source_);
       SET_AND_RETURN_IF_NOT_OK(outlier_or_error.status(), creation_status);
       outlier_event_logger_ = std::move(*outlier_or_error);
     }
@@ -1464,7 +1462,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::httpAsyncClient
   if (lazy_http_async_client_ == nullptr) {
     lazy_http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
         cluster_info_, parent_.parent_.stats_, parent_.thread_local_dispatcher_, parent_.parent_,
-        parent_.parent_.server_.serverFactoryContext(),
+        parent_.parent_.context_,
         Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent_.parent_)},
         parent_.parent_.http_context_, parent_.parent_.router_context_);
   }
@@ -2146,11 +2144,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::tcpConnPoolIsIdle(
 absl::StatusOr<ClusterManagerPtr> ProdClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   absl::Status creation_status = absl::OkStatus();
-  auto cluster_manager_impl = std::unique_ptr<ClusterManagerImpl>{new ClusterManagerImpl(
-      bootstrap, *this, context_, stats_, tls_, context_.runtime(), context_.localInfo(),
-      context_.accessLogManager(), context_.mainThreadDispatcher(), context_.admin(),
-      context_.api(), http_context_, context_.grpcContext(), context_.routerContext(), server_,
-      context_.xdsManager(), creation_status)};
+  auto cluster_manager_impl = std::unique_ptr<ClusterManagerImpl>{
+      new ClusterManagerImpl(bootstrap, *this, context_, creation_status)};
   RETURN_IF_NOT_OK(creation_status);
   return cluster_manager_impl;
 }
@@ -2201,7 +2196,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, source, alternate_protocols_cache, coptions,
         quic_stat_names_, *stats_.rootScope(), *quic_info, network_observer_registry,
-        server_.overloadManager());
+        context_.overloadManager());
 #else
     (void)quic_info;
     (void)network_observer_registry;
@@ -2221,13 +2216,13 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return std::make_unique<Http::HttpConnPoolImplMixed>(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, origin, alternate_protocols_cache,
-        server_.overloadManager());
+        context_.overloadManager());
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http2 &&
       context_.runtime().snapshot().featureEnabled("upstream.use_http2", 100)) {
     return Http::Http2::allocateConnPool(dispatcher, context_.api().randomGenerator(), host,
                                          priority, options, transport_socket_options, state,
-                                         server_.overloadManager(), origin,
+                                         context_.overloadManager(), origin,
                                          alternate_protocols_cache);
   }
   if (protocols.size() == 1 && protocols[0] == Http::Protocol::Http3 &&
@@ -2239,7 +2234,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
     return Http::Http3::allocateConnPool(
         dispatcher, context_.api().randomGenerator(), host, priority, options,
         transport_socket_options, state, quic_stat_names_, {}, *stats_.rootScope(), {}, *quic_info,
-        network_observer_registry, server_.overloadManager(), false);
+        network_observer_registry, context_.overloadManager(), false);
 #else
     UNREFERENCED_PARAMETER(source);
     // Should be blocked by configuration checking at an earlier point.
@@ -2249,7 +2244,7 @@ Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(
   ASSERT(protocols.size() == 1 && protocols[0] == Http::Protocol::Http11);
   return Http::Http1::allocateConnPool(dispatcher, context_.api().randomGenerator(), host, priority,
                                        options, transport_socket_options, state,
-                                       server_.overloadManager());
+                                       context_.overloadManager());
 }
 
 Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
@@ -2261,7 +2256,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
   ENVOY_LOG_MISC(debug, "Allocating TCP conn pool");
   return std::make_unique<Tcp::ConnPoolImpl>(dispatcher, host, priority, options,
                                              transport_socket_options, state, tcp_pool_idle_timeout,
-                                             server_.overloadManager());
+                                             context_.overloadManager());
 }
 
 absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
