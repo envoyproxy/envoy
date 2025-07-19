@@ -11730,14 +11730,14 @@ virtual_hosts:
   }
 }
 
-// Test that request_body_buffer_limit takes precedence over virtual_host
-// per_request_buffer_limit_bytes
+// Test that route-level request_body_buffer_limit takes precedence over virtual_host
+// request_body_buffer_limit
 TEST_F(RouteConfigurationV2, RequestBodyBufferLimitPrecedenceRouteOverridesVirtualHost) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - domains: [test.example.com]
   name: test_host
-  per_request_buffer_limit_bytes: 32768
+  request_body_buffer_limit: 32768
   routes:
   - match: {prefix: /test}
     route:
@@ -11753,56 +11753,6 @@ virtual_hosts:
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(), route->perRequestBufferLimit());
-}
-
-// Test validation that both per_request_buffer_limit_bytes and request_body_buffer_limit cannot be
-// set on route
-TEST_F(RouteConfigurationV2, RequestBodyBufferLimitValidationConflict) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- domains: [test.example.com]
-  name: test_host
-  routes:
-  - match: {prefix: /test}
-    route:
-      cluster: backend
-    per_request_buffer_limit_bytes: 32768
-    request_body_buffer_limit: 4194304
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                        creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
-  EXPECT_THAT(
-      creation_status_.message(),
-      testing::HasSubstr(
-          "Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set"));
-}
-
-// Test validation that both per_request_buffer_limit_bytes and request_body_buffer_limit cannot be
-// set on virtual host
-TEST_F(RouteConfigurationV2, RequestBodyBufferLimitValidationConflictVirtualHost) {
-  const std::string yaml = R"EOF(
-virtual_hosts:
-- domains: [test.example.com]
-  name: test_host
-  per_request_buffer_limit_bytes: 32768
-  request_body_buffer_limit: 4194304
-  routes:
-  - match: {prefix: /test}
-    route:
-      cluster: backend
-)EOF";
-
-  factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
-  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                        creation_status_);
-  EXPECT_FALSE(creation_status_.ok());
-  EXPECT_THAT(
-      creation_status_.message(),
-      testing::HasSubstr(
-          "Only one of per_request_buffer_limit_bytes and request_body_buffer_limit may be set"));
 }
 
 } // namespace
