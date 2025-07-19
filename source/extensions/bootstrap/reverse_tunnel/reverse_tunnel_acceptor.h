@@ -33,24 +33,6 @@ class ReverseTunnelAcceptorExtension;
 class UpstreamSocketManager;
 
 /**
- * All UpstreamSocketManager stats. @see stats_macros.h
- * This encompasses the stats for all accepted reverse connections by the responder envoy.
- */
-#define ALL_USM_STATS(GAUGE)                                                                       \
-  GAUGE(reverse_conn_cx_idle, NeverImport)                                                         \
-  GAUGE(reverse_conn_cx_used, NeverImport)                                                         \
-  GAUGE(reverse_conn_cx_total, NeverImport)
-
-/**
- * Struct definition for all UpstreamSocketManager stats. @see stats_macros.h
- */
-struct USMStats {
-  ALL_USM_STATS(GENERATE_GAUGE_STRUCT)
-};
-
-using USMStatsPtr = std::unique_ptr<USMStats>;
-
-/**
  * Custom IoHandle for upstream reverse connections that properly owns a ConnectionSocket.
  * This class uses RAII principles to manage socket lifetime without requiring external storage.
  */
@@ -106,15 +88,14 @@ class UpstreamSocketThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
   /**
    * Constructor for UpstreamSocketThreadLocal.
-   * Creates a new socket manager instance for the given dispatcher and scope.
+   * Creates a new socket manager instance for the given dispatcher.
    * @param dispatcher the thread-local dispatcher.
-   * @param scope the stats scope for this thread's socket manager.
    * @param extension the upstream extension for stats integration.
    */
-  UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher, Stats::Scope& scope,
+  UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher,
                             ReverseTunnelAcceptorExtension* extension = nullptr)
       : dispatcher_(dispatcher),
-        socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, scope, extension)) {}
+        socket_manager_(std::make_unique<UpstreamSocketManager>(dispatcher, extension)) {}
 
   /**
    * @return reference to the thread-local dispatcher.
@@ -273,29 +254,7 @@ public:
   const std::string& statPrefix() const { return stat_prefix_; }
 
   /**
-   * Aggregate connection statistics from all worker threads.
-   * @return map of node_id to total connection count across all threads.
-   */
-  absl::flat_hash_map<std::string, size_t> getAggregatedConnectionStats();
-
-  /**
-   * Aggregate socket count statistics from all worker threads.
-   * @return map of cluster_id to total socket count across all threads.
-   */
-  absl::flat_hash_map<std::string, size_t> getAggregatedSocketCountMap();
-
-  /**
-   * Production-ready cross-thread connection aggregation for multi-tenant reporting.
-   * Uses Envoy's runOnAllThreads pattern to safely collect data from all worker threads.
-   * @param callback function called with aggregated results when collection completes
-   */
-  void
-  getMultiTenantConnectionStats(std::function<void(const absl::flat_hash_map<std::string, size_t>&,
-                                                   const std::vector<std::string>&)>
-                                    callback);
-
-  /**
-   * Synchronous version for admin API endpoints that require immediate response.
+   * Synchronous version for admin API endpoints that require immediate response on reverse connection stats.
    * Uses blocking aggregation with timeout for production reliability.
    * @param timeout_ms maximum time to wait for aggregation completion
    * @return pair of <connected_nodes, accepted_connections> or empty if timeout
@@ -304,21 +263,36 @@ public:
   getConnectionStatsSync(std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(5000));
 
   /**
-   * Production-ready multi-tenant connection tracking using Envoy's stats system.
-   * This integrates with Envoy's proven cross-thread stats aggregation infrastructure.
-   * @return map of connection statistics across all worker threads
+   * Get cross-worker aggregated reverse connection stats. 
+   * @return map of node/cluster -> connection count across all worker threads
    */
-  absl::flat_hash_map<std::string, uint64_t> getMultiTenantConnectionStatsViaStats();
+  absl::flat_hash_map<std::string, uint64_t> getCrossWorkerStatMap();
 
   /**
-   * Register connection stats with Envoy's stats system for automatic cross-thread aggregation.
-   * This ensures consistent reporting across all threads without manual thread coordination.
+   * Update the cross-thread aggregated stats for the connection.
    * @param node_id the node identifier for the connection
    * @param cluster_id the cluster identifier for the connection
    * @param increment whether to increment (true) or decrement (false) the connection count
    */
-  void updateConnectionStatsRegistry(const std::string& node_id, const std::string& cluster_id,
-                                     bool increment);
+  void updateConnectionStats(const std::string& node_id, const std::string& cluster_id,
+                             bool increment);
+
+  /**
+   * Update per-worker connection stats for debugging purposes.
+   * Creates worker-specific stats "reverse_connections.{worker_name}.node.{node_id}".
+   * @param node_id the node identifier for the connection
+   * @param cluster_id the cluster identifier for the connection
+   * @param increment whether to increment (true) or decrement (false) the connection count
+   */
+  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
+                                      bool increment);
+
+  /**
+   * Get per-worker connection stats for debugging purposes.
+   * Returns stats like "reverse_connections.{worker_name}.node.{node_id}" for the current thread only.
+   * @return map of node/cluster -> connection count for the current worker thread
+   */
+  absl::flat_hash_map<std::string, uint64_t> getPerWorkerStatMap();
 
   /**
    * Get the stats scope for accessing global stats.
@@ -333,21 +307,6 @@ private:
   ReverseTunnelAcceptor* socket_interface_;
   std::string stat_prefix_;
 
-  /**
-   * Internal helper for cross-thread data aggregation.
-   * Follows Envoy's thread-safe aggregation patterns.
-   */
-  struct ConnectionAggregationState {
-    absl::flat_hash_map<std::string, size_t> connection_stats;
-    std::vector<std::string> connected_nodes;
-    std::vector<std::string> accepted_connections;
-    std::atomic<uint32_t> pending_threads{0};
-    std::function<void(const absl::flat_hash_map<std::string, size_t>&,
-                       const std::vector<std::string>&)>
-        completion_callback;
-    absl::Mutex mutex;
-    bool completed{false};
-  };
 };
 
 /**
@@ -357,7 +316,7 @@ private:
 class UpstreamSocketManager : public ThreadLocal::ThreadLocalObject,
                               public Logger::Loggable<Logger::Id::filter> {
 public:
-  UpstreamSocketManager(Event::Dispatcher& dispatcher, Stats::Scope& scope,
+  UpstreamSocketManager(Event::Dispatcher& dispatcher,
                         ReverseTunnelAcceptorExtension* extension = nullptr);
 
   ~UpstreamSocketManager();
@@ -382,28 +341,6 @@ public:
    * @return pair containing the connection socket and whether proxy protocol is expected.
    */
   std::pair<Network::ConnectionSocketPtr, bool> getConnectionSocket(const std::string& node_id);
-
-  /**
-   * @return the number of reverse connections for the given cluster id.
-   */
-  size_t getNumberOfSocketsByCluster(const std::string& cluster_id);
-
-  /**
-   * @return the number of reverse connections for the given node id.
-   */
-  size_t getNumberOfSocketsByNode(const std::string& node_id);
-
-  /**
-   * @return the cluster -> reverse conn count mapping.
-   */
-  absl::flat_hash_map<std::string, size_t> getSocketCountMap();
-  absl::flat_hash_map<std::string, size_t> getSocketCountMap() const;
-
-  /**
-   * @return the node -> reverse conn count mapping.
-   */
-  absl::flat_hash_map<std::string, size_t> getConnectionStats();
-  absl::flat_hash_map<std::string, size_t> getConnectionStats() const;
 
   /** Mark the connection socket dead and remove it from internal maps.
    * @param fd the FD for the socket to be marked dead.
@@ -436,39 +373,10 @@ public:
   void onPingResponse(Network::IoHandle& io_handle);
 
   /**
-   * Get or create stats for a specific node.
-   * @param node_id the node ID to get stats for.
-   * @return pointer to the node stats.
-   */
-  USMStats* getStatsByNode(const std::string& node_id);
-
-  /**
-   * Get or create stats for a specific cluster.
-   * @param cluster_id the cluster ID to get stats for.
-   * @return pointer to the cluster stats.
-   */
-  USMStats* getStatsByCluster(const std::string& cluster_id);
-
-  /**
-   * Delete stats for a specific node.
-   * @param node_id the node ID to delete stats for.
-   * @return true if stats were deleted, false if not found.
-   */
-  bool deleteStatsByNode(const std::string& node_id);
-
-  /**
-   * Delete stats for a specific cluster.
-   * @param cluster_id the cluster ID to delete stats for.
-   * @return true if stats were deleted, false if not found.
-   */
-  bool deleteStatsByCluster(const std::string& cluster_id);
-
-  /**
    * Get the upstream extension for stats integration.
    * @return pointer to the upstream extension or nullptr if not available.
    */
   ReverseTunnelAcceptorExtension* getUpstreamExtension() const { return extension_; }
-
 
   // Get node ID from key (cluster ID or node ID)
   std::string getNodeID(const std::string& key);
@@ -495,16 +403,6 @@ private:
   absl::flat_hash_map<int, Event::FileEventPtr> fd_to_event_map_;
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_timer_map_;
 
-  // A map of the remote node ID -> USMStatsPtr, used to log accepted
-  // reverse conn stats for every initiator node, by the local envoy as responder.
-  absl::flat_hash_map<std::string, USMStatsPtr> usm_node_stats_map_;
-
-  // A map of the remote cluster ID -> USMStatsPtr, used to log accepted
-  // reverse conn stats for every initiator cluster, by the local envoy as responder.
-  absl::flat_hash_map<std::string, USMStatsPtr> usm_cluster_stats_map_;
-
-  // The scope for UpstreamSocketManager stats.
-  Stats::ScopeSharedPtr usm_scope_;
   Event::TimerPtr ping_timer_;
   std::chrono::seconds ping_interval_{0};
 

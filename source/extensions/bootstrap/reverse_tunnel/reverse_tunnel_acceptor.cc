@@ -4,6 +4,7 @@
 #include <atomic>
 #include <future>
 #include <thread>
+#include <string>
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
@@ -176,7 +177,7 @@ void ReverseTunnelAcceptorExtension::onServerInitialized() {
 
   // Set up the thread local dispatcher and socket manager for each worker thread
   tls_slot_->set([this](Event::Dispatcher& dispatcher) {
-    return std::make_shared<UpstreamSocketThreadLocal>(dispatcher, context_.scope(), this);
+    return std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
   });
 }
 
@@ -195,146 +196,14 @@ UpstreamSocketThreadLocal* ReverseTunnelAcceptorExtension::getLocalRegistry() co
   return nullptr;
 }
 
-absl::flat_hash_map<std::string, size_t>
-ReverseTunnelAcceptorExtension::getAggregatedConnectionStats() {
-  absl::flat_hash_map<std::string, size_t> aggregated_stats;
-
-  if (!tls_slot_) {
-    ENVOY_LOG(debug, "No TLS slot available for connection stats aggregation");
-    return aggregated_stats;
-  }
-
-  // Get stats from current thread only - cross-thread aggregation in HTTP handler causes deadlock
-  if (auto opt = tls_slot_->get(); opt.has_value() && opt->socketManager()) {
-    auto thread_stats = opt->socketManager()->getConnectionStats();
-    for (const auto& stat : thread_stats) {
-      aggregated_stats[stat.first] = stat.second;
-    }
-    ENVOY_LOG(debug, "Got connection stats from current thread: {} nodes", aggregated_stats.size());
-  } else {
-    ENVOY_LOG(debug, "No socket manager available on current thread");
-  }
-
-  return aggregated_stats;
-}
-
-absl::flat_hash_map<std::string, size_t>
-ReverseTunnelAcceptorExtension::getAggregatedSocketCountMap() {
-  absl::flat_hash_map<std::string, size_t> aggregated_stats;
-
-  if (!tls_slot_) {
-    ENVOY_LOG(debug, "No TLS slot available for socket count aggregation");
-    return aggregated_stats;
-  }
-
-  // Get stats from current thread only - cross-thread aggregation in HTTP handler causes deadlock
-  if (auto opt = tls_slot_->get(); opt.has_value() && opt->socketManager()) {
-    auto thread_stats = opt->socketManager()->getSocketCountMap();
-    for (const auto& stat : thread_stats) {
-      aggregated_stats[stat.first] = stat.second;
-    }
-    ENVOY_LOG(debug, "Got socket count from current thread: {} clusters", aggregated_stats.size());
-  } else {
-    ENVOY_LOG(debug, "No socket manager available on current thread");
-  }
-
-  return aggregated_stats;
-}
-
-void ReverseTunnelAcceptorExtension::getMultiTenantConnectionStats(
-    std::function<void(const absl::flat_hash_map<std::string, size_t>&,
-                       const std::vector<std::string>&)>
-        callback) {
-
-  if (!tls_slot_) {
-    ENVOY_LOG(warn, "No TLS slot available for multi-tenant connection aggregation");
-    callback({}, {});
-    return;
-  }
-
-  // Create aggregation state - shared across all threads
-  auto aggregation_state = std::make_shared<ConnectionAggregationState>();
-  aggregation_state->completion_callback = std::move(callback);
-
-  // Use Envoy's runOnAllThreads pattern for safe cross-thread data collection
-  tls_slot_->runOnAllThreads(
-      [aggregation_state](OptRef<UpstreamSocketThreadLocal> tls_instance) {
-        absl::flat_hash_map<std::string, size_t> thread_stats;
-        std::vector<std::string> thread_connected;
-        std::vector<std::string> thread_accepted;
-
-        if (tls_instance.has_value() && tls_instance->socketManager()) {
-          // Collect connection stats from this thread
-          auto connection_stats = tls_instance->socketManager()->getConnectionStats();
-          for (const auto& [node_id, count] : connection_stats) {
-            if (count > 0) {
-              thread_connected.push_back(node_id);
-              thread_stats[node_id] = count;
-            }
-          }
-
-          // Collect accepted connections from this thread
-          auto socket_count_map = tls_instance->socketManager()->getSocketCountMap();
-          for (const auto& [cluster_id, count] : socket_count_map) {
-            if (count > 0) {
-              thread_accepted.push_back(cluster_id);
-            }
-          }
-        }
-
-        // Thread-safe aggregation
-        {
-          absl::MutexLock lock(&aggregation_state->mutex);
-
-          // Merge connection stats
-          for (const auto& [node_id, count] : thread_stats) {
-            aggregation_state->connection_stats[node_id] += count;
-          }
-
-          // Merge connected nodes (de-duplicate)
-          for (const auto& node : thread_connected) {
-            if (std::find(aggregation_state->connected_nodes.begin(),
-                          aggregation_state->connected_nodes.end(),
-                          node) == aggregation_state->connected_nodes.end()) {
-              aggregation_state->connected_nodes.push_back(node);
-            }
-          }
-
-          // Merge accepted connections (de-duplicate)
-          for (const auto& connection : thread_accepted) {
-            if (std::find(aggregation_state->accepted_connections.begin(),
-                          aggregation_state->accepted_connections.end(),
-                          connection) == aggregation_state->accepted_connections.end()) {
-              aggregation_state->accepted_connections.push_back(connection);
-            }
-          }
-        }
-      },
-      [aggregation_state]() {
-        // Completion callback - called when all threads have finished
-        absl::MutexLock lock(&aggregation_state->mutex);
-        if (!aggregation_state->completed) {
-          aggregation_state->completed = true;
-          ENVOY_LOG(debug,
-                    "Multi-tenant connection aggregation completed: {} connection stats, {} "
-                    "connected nodes, {} accepted connections",
-                    aggregation_state->connection_stats.size(),
-                    aggregation_state->connected_nodes.size(),
-                    aggregation_state->accepted_connections.size());
-
-          aggregation_state->completion_callback(aggregation_state->connection_stats,
-                                                 aggregation_state->connected_nodes);
-        }
-      });
-}
 
 std::pair<std::vector<std::string>, std::vector<std::string>>
 ReverseTunnelAcceptorExtension::getConnectionStatsSync(std::chrono::milliseconds /* timeout_ms */) {
 
   ENVOY_LOG(debug, "getConnectionStatsSync: using stats-based approach for production reliability");
 
-  // Use Envoy's stats system for reliable cross-thread aggregation
-  auto connection_stats = getMultiTenantConnectionStatsViaStats();
+  // Get all gauges with the reverse_connections prefix.
+  auto connection_stats = getCrossWorkerStatMap();
 
   std::vector<std::string> connected_nodes;
   std::vector<std::string> accepted_connections;
@@ -362,33 +231,30 @@ ReverseTunnelAcceptorExtension::getConnectionStatsSync(std::chrono::milliseconds
 }
 
 absl::flat_hash_map<std::string, uint64_t>
-ReverseTunnelAcceptorExtension::getMultiTenantConnectionStatsViaStats() {
+ReverseTunnelAcceptorExtension::getCrossWorkerStatMap() {
   absl::flat_hash_map<std::string, uint64_t> stats_map;
-
-  // Use Envoy's proven stats aggregation - this automatically aggregates across all threads
   auto& stats_store = context_.scope();
 
-  // Iterate through all gauges with the reverse_connections prefix using correct IterateFn
-  // signature
+  // Iterate through all gauges with the reverse_connections prefix.
   Stats::IterateFn<Stats::Gauge> gauge_callback =
       [&stats_map](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     if (gauge->name().find("reverse_connections.") == 0 && gauge->used()) {
       stats_map[gauge->name()] = gauge->value();
     }
-    return true; // Continue iteration
+    return true;
   };
   stats_store.iterate(gauge_callback);
 
   ENVOY_LOG(debug,
-            "getMultiTenantConnectionStatsViaStats: collected {} stats from Envoy's stats system",
+            "getCrossWorkerStatMap: collected {} stats for reverse connections across all worker threads",
             stats_map.size());
 
   return stats_map;
 }
 
-void ReverseTunnelAcceptorExtension::updateConnectionStatsRegistry(const std::string& node_id,
-                                                                   const std::string& cluster_id,
-                                                                   bool increment) {
+void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& node_id,
+                                                           const std::string& cluster_id,
+                                                           bool increment) {
 
   // Register stats with Envoy's system for automatic cross-thread aggregation
   auto& stats_store = context_.scope();
@@ -400,12 +266,12 @@ void ReverseTunnelAcceptorExtension::updateConnectionStatsRegistry(const std::st
         stats_store.gaugeFromString(node_stat_name, Stats::Gauge::ImportMode::Accumulate);
     if (increment) {
       node_gauge.inc();
-      ENVOY_LOG(trace, "updateConnectionStatsRegistry: incremented node stat {} to {}",
-                node_stat_name, node_gauge.value());
+          ENVOY_LOG(trace, "updateConnectionStats: incremented node stat {} to {}",
+              node_stat_name, node_gauge.value());
     } else {
       node_gauge.dec();
-      ENVOY_LOG(trace, "updateConnectionStatsRegistry: decremented node stat {} to {}",
-                node_stat_name, node_gauge.value());
+          ENVOY_LOG(trace, "updateConnectionStats: decremented node stat {} to {}",
+              node_stat_name, node_gauge.value());
     }
   }
 
@@ -416,21 +282,107 @@ void ReverseTunnelAcceptorExtension::updateConnectionStatsRegistry(const std::st
         stats_store.gaugeFromString(cluster_stat_name, Stats::Gauge::ImportMode::Accumulate);
     if (increment) {
       cluster_gauge.inc();
-      ENVOY_LOG(trace, "updateConnectionStatsRegistry: incremented cluster stat {} to {}",
-                cluster_stat_name, cluster_gauge.value());
+          ENVOY_LOG(trace, "updateConnectionStats: incremented cluster stat {} to {}",
+              cluster_stat_name, cluster_gauge.value());
     } else {
       cluster_gauge.dec();
-      ENVOY_LOG(trace, "updateConnectionStatsRegistry: decremented cluster stat {} to {}",
-                cluster_stat_name, cluster_gauge.value());
+          ENVOY_LOG(trace, "updateConnectionStats: decremented cluster stat {} to {}",
+              cluster_stat_name, cluster_gauge.value());
+    }
+  }
+
+  // Also update per-worker stats for debugging
+  updatePerWorkerConnectionStats(node_id, cluster_id, increment);
+}
+
+void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::string& node_id,
+                                                                    const std::string& cluster_id,
+                                                                    bool increment) {
+  auto& stats_store = context_.scope();
+  
+  // Get dispatcher name from the thread local dispatcher
+  std::string dispatcher_name = "main_thread"; // Default for main thread
+  auto* local_registry = getLocalRegistry();
+  if (local_registry) {
+    // Dispatcher name is of the form "worker_x" where x is the worker index
+    dispatcher_name = local_registry->dispatcher().name();
+  }
+  
+  // Create/update per-worker node connection stat
+  if (!node_id.empty()) {
+    std::string worker_node_stat_name = fmt::format("reverse_connections.{}.node.{}", 
+                                                    dispatcher_name, node_id);
+    auto& worker_node_gauge =
+        stats_store.gaugeFromString(worker_node_stat_name, Stats::Gauge::ImportMode::NeverImport);
+    if (increment) {
+      worker_node_gauge.inc();
+      ENVOY_LOG(trace, "updatePerWorkerConnectionStats: incremented worker node stat {} to {}",
+                worker_node_stat_name, worker_node_gauge.value());
+    } else {
+      worker_node_gauge.dec();
+      ENVOY_LOG(trace, "updatePerWorkerConnectionStats: decremented worker node stat {} to {}",
+                worker_node_stat_name, worker_node_gauge.value());
+    }
+  }
+
+  // Create/update per-worker cluster connection stat
+  if (!cluster_id.empty()) {
+    std::string worker_cluster_stat_name = fmt::format("reverse_connections.{}.cluster.{}", 
+                                                       dispatcher_name, cluster_id);
+    auto& worker_cluster_gauge =
+        stats_store.gaugeFromString(worker_cluster_stat_name, Stats::Gauge::ImportMode::NeverImport);
+    if (increment) {
+      worker_cluster_gauge.inc();
+      ENVOY_LOG(trace, "updatePerWorkerConnectionStats: incremented worker cluster stat {} to {}",
+                worker_cluster_stat_name, worker_cluster_gauge.value());
+    } else {
+      worker_cluster_gauge.dec();
+      ENVOY_LOG(trace, "updatePerWorkerConnectionStats: decremented worker cluster stat {} to {}",
+                worker_cluster_stat_name, worker_cluster_gauge.value());
     }
   }
 }
 
+absl::flat_hash_map<std::string, uint64_t>
+ReverseTunnelAcceptorExtension::getPerWorkerStatMap() {
+  absl::flat_hash_map<std::string, uint64_t> stats_map;
+  auto& stats_store = context_.scope();
+
+  // Get the current dispatcher name
+  std::string dispatcher_name = "main_thread"; // Default for main thread
+  auto* local_registry = getLocalRegistry();
+  if (local_registry) {
+    // Dispatcher name is of the form "worker_x" where x is the worker index
+    dispatcher_name = local_registry->dispatcher().name();
+  }
+
+  // Iterate through all gauges and filter for the current dispatcher
+  Stats::IterateFn<Stats::Gauge> gauge_callback =
+      [&stats_map, &dispatcher_name](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+    const std::string& gauge_name = gauge->name();
+    if (gauge_name.find("reverse_connections.") == 0 && 
+        gauge_name.find(dispatcher_name + ".") != std::string::npos &&
+        (gauge_name.find(".node.") != std::string::npos || 
+         gauge_name.find(".cluster.") != std::string::npos) && 
+        gauge->used()) {
+      stats_map[gauge_name] = gauge->value();
+    }
+    return true;
+  };
+  stats_store.iterate(gauge_callback);
+
+  ENVOY_LOG(debug,
+            "getPerWorkerStatMap: collected {} stats for dispatcher '{}'",
+            stats_map.size(), dispatcher_name);
+
+  return stats_map;
+}
+
 // UpstreamSocketManager implementation
-UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher, Stats::Scope& scope,
+UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
                                              ReverseTunnelAcceptorExtension* extension)
     : dispatcher_(dispatcher), random_generator_(std::make_unique<Random::RandomGeneratorImpl>()),
-      usm_scope_(scope.createScope("upstream_socket_manager.")), extension_(extension) {
+      extension_(extension) {
   ENVOY_LOG(debug, "UpstreamSocketManager: creating UpstreamSocketManager with stats integration");
   ping_timer_ = dispatcher_.createTimer([this]() { pingConnections(); });
 }
@@ -451,14 +403,6 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   ENVOY_LOG(debug, "UpstreamSocketManager: Adding connection socket for node: {} and cluster: {}",
             node_id, cluster_id);
 
-  // Update stats for the node
-  USMStats* node_stats = this->getStatsByNode(node_id);
-  node_stats->reverse_conn_cx_total_.inc();
-  node_stats->reverse_conn_cx_idle_.inc();
-  ENVOY_LOG(debug, "UpstreamSocketManager: reverse conn count for node:{} idle: {} total:{}",
-            node_id, node_stats->reverse_conn_cx_idle_.value(),
-            node_stats->reverse_conn_cx_total_.value());
-
   ENVOY_LOG(debug,
             "UpstreamSocketManager: added socket to accepted_reverse_connections_ for node: {} "
             "cluster: {}",
@@ -474,14 +418,8 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
       node_to_cluster_map_[node_id] = cluster_id;
       cluster_to_node_map_[cluster_id].push_back(node_id);
     }
-    ENVOY_LOG(debug, "UpstreamSocketManager: node_to_cluster_map_ size: {}",
-              node_to_cluster_map_.size());
-    ENVOY_LOG(debug, "UpstreamSocketManager: cluster_to_node_map_ size: {}",
-              cluster_to_node_map_.size());
-    // Update stats for the cluster
-    USMStats* cluster_stats = this->getStatsByCluster(cluster_id);
-    cluster_stats->reverse_conn_cx_total_.inc();
-    cluster_stats->reverse_conn_cx_idle_.inc();
+    ENVOY_LOG(trace, "UpstreamSocketManager: node_to_cluster_map_ has {} entries, cluster_to_node_map_ has {} entries",
+              node_to_cluster_map_.size(), cluster_to_node_map_.size());
   } else {
     ENVOY_LOG(error, "Found a reverse connection with an empty cluster uuid, and node uuid: {}",
               node_id);
@@ -495,10 +433,9 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   ENVOY_LOG(debug, "UpstreamSocketManager: mapping fd {} to node '{}'", fd, node_id);
   fd_to_node_map_[fd] = node_id;
 
-  // Update Envoy's stats system for production multi-tenant tracking
-  // This integrates with Envoy's proven cross-thread stats aggregation
+  // Update stats registry
   if (auto extension = getUpstreamExtension()) {
-    extension->updateConnectionStatsRegistry(node_id, cluster_id, true /* increment */);
+    extension->updateConnectionStats(node_id, cluster_id, true /* increment */);
     ENVOY_LOG(debug, "UpstreamSocketManager: updated stats registry for node '{}' cluster '{}'",
               node_id, cluster_id);
   }
@@ -545,6 +482,9 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
     return {nullptr, false};
   }
 
+  // Debugging: Print the number of free sockets on this worker thread
+  ENVOY_LOG(debug, "UpstreamSocketManager: Found {} sockets for node: {}", node_sockets_it->second.size(), node_id);
+
   // Fetch the socket from the accepted_reverse_connections_ and remove it from the list
   Network::ConnectionSocketPtr socket(std::move(node_sockets_it->second.front()));
   node_sockets_it->second.pop_front();
@@ -563,95 +503,7 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
 
   cleanStaleNodeEntry(node_id);
 
-  // Update stats
-  USMStats* node_stats = this->getStatsByNode(node_id);
-  node_stats->reverse_conn_cx_idle_.dec();
-  node_stats->reverse_conn_cx_used_.inc();
-
-  if (!cluster_id.empty()) {
-    USMStats* cluster_stats = this->getStatsByCluster(cluster_id);
-    cluster_stats->reverse_conn_cx_idle_.dec();
-    cluster_stats->reverse_conn_cx_used_.inc();
-  }
-
   return {std::move(socket), false};
-}
-
-size_t UpstreamSocketManager::getNumberOfSocketsByCluster(const std::string& cluster_id) {
-  USMStats* stats = this->getStatsByCluster(cluster_id);
-  if (!stats) {
-    ENVOY_LOG(error, "UpstreamSocketManager: No stats available for cluster: {}", cluster_id);
-    return 0;
-  }
-  ENVOY_LOG(debug, "UpstreamSocketManager: Number of sockets for cluster: {} is {}", cluster_id,
-            stats->reverse_conn_cx_idle_.value());
-  return stats->reverse_conn_cx_idle_.value();
-}
-
-size_t UpstreamSocketManager::getNumberOfSocketsByNode(const std::string& node_id) {
-  USMStats* stats = this->getStatsByNode(node_id);
-  if (!stats) {
-    ENVOY_LOG(error, "UpstreamSocketManager: No stats available for node: {}", node_id);
-    return 0;
-  }
-  ENVOY_LOG(debug, "UpstreamSocketManager: Number of sockets for node: {} is {}", node_id,
-            stats->reverse_conn_cx_idle_.value());
-  return stats->reverse_conn_cx_idle_.value();
-}
-
-bool UpstreamSocketManager::deleteStatsByNode(const std::string& node_id) {
-  const auto& iter = usm_node_stats_map_.find(node_id);
-  if (iter == usm_node_stats_map_.end()) {
-    return false;
-  }
-  usm_node_stats_map_.erase(iter);
-  return true;
-}
-
-bool UpstreamSocketManager::deleteStatsByCluster(const std::string& cluster_id) {
-  const auto& iter = usm_cluster_stats_map_.find(cluster_id);
-  if (iter == usm_cluster_stats_map_.end()) {
-    return false;
-  }
-  usm_cluster_stats_map_.erase(iter);
-  return true;
-}
-
-absl::flat_hash_map<std::string, size_t> UpstreamSocketManager::getConnectionStats() {
-  absl::flat_hash_map<std::string, size_t> node_stats;
-  for (const auto& node_entry : accepted_reverse_connections_) {
-    const std::string& node_id = node_entry.first;
-    size_t connection_count = node_entry.second.size();
-    if (connection_count > 0) {
-      node_stats[node_id] = connection_count;
-    }
-  }
-  ENVOY_LOG(debug, "UpstreamSocketManager::getConnectionStats returning {} nodes",
-            node_stats.size());
-  return node_stats;
-}
-
-absl::flat_hash_map<std::string, size_t> UpstreamSocketManager::getSocketCountMap() {
-  absl::flat_hash_map<std::string, size_t> cluster_stats;
-  for (const auto& cluster_entry : cluster_to_node_map_) {
-    const std::string& cluster_id = cluster_entry.first;
-    size_t total_connections = 0;
-
-    // Sum up connections for all nodes in this cluster
-    for (const std::string& node_id : cluster_entry.second) {
-      const auto& node_conn_iter = accepted_reverse_connections_.find(node_id);
-      if (node_conn_iter != accepted_reverse_connections_.end()) {
-        total_connections += node_conn_iter->second.size();
-      }
-    }
-
-    if (total_connections > 0) {
-      cluster_stats[cluster_id] = total_connections;
-    }
-  }
-  ENVOY_LOG(debug, "UpstreamSocketManager::getSocketCountMap returning {} clusters",
-            cluster_stats.size());
-  return cluster_stats;
 }
 
 std::string UpstreamSocketManager::getNodeID(const std::string& key) {
@@ -712,17 +564,12 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
     // Update Envoy's stats system for production multi-tenant tracking
     // This ensures stats are decremented when connections are removed
     if (auto extension = getUpstreamExtension()) {
-      extension->updateConnectionStatsRegistry(node_id, cluster_id, false /* decrement */);
+      extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
       ENVOY_LOG(debug,
                 "UpstreamSocketManager: decremented stats registry for node '{}' cluster '{}'",
                 node_id, cluster_id);
     }
 
-    USMStats* stats = this->getStatsByNode(node_id);
-    if (stats) {
-      stats->reverse_conn_cx_used_.dec();
-      stats->reverse_conn_cx_total_.dec();
-    }
     return;
   }
 
@@ -739,25 +586,10 @@ void UpstreamSocketManager::markSocketDead(const int fd) {
       fd_to_event_map_.erase(fd);
       fd_to_timer_map_.erase(fd);
 
-      // Update stats
-      USMStats* node_stats = this->getStatsByNode(node_id);
-      if (node_stats) {
-        node_stats->reverse_conn_cx_idle_.dec();
-        node_stats->reverse_conn_cx_total_.dec();
-      }
-
-      if (!cluster_id.empty()) {
-        USMStats* cluster_stats = this->getStatsByCluster(cluster_id);
-        if (cluster_stats) {
-          cluster_stats->reverse_conn_cx_idle_.dec();
-          cluster_stats->reverse_conn_cx_total_.dec();
-        }
-      }
-
       // Update Envoy's stats system for production multi-tenant tracking
       // This ensures stats are decremented when connections are removed
       if (auto extension = getUpstreamExtension()) {
-        extension->updateConnectionStatsRegistry(node_id, cluster_id, false /* decrement */);
+        extension->updateConnectionStats(node_id, cluster_id, false /* decrement */);
         ENVOY_LOG(debug,
                   "UpstreamSocketManager: decremented stats registry for node '{}' cluster '{}'",
                   node_id, cluster_id);
@@ -900,34 +732,6 @@ void UpstreamSocketManager::pingConnections() {
     pingConnections(itr.first);
   }
   ping_timer_->enableTimer(ping_interval_);
-}
-
-USMStats* UpstreamSocketManager::getStatsByNode(const std::string& node_id) {
-  auto iter = usm_node_stats_map_.find(node_id);
-  if (iter != usm_node_stats_map_.end()) {
-    USMStats* stats = iter->second.get();
-    return stats;
-  }
-
-  ENVOY_LOG(debug, "UpstreamSocketManager: Creating new stats for node: {}", node_id);
-  const std::string& final_prefix = "node." + node_id;
-  usm_node_stats_map_[node_id] = std::make_unique<USMStats>(
-      USMStats{ALL_USM_STATS(POOL_GAUGE_PREFIX(*usm_scope_, final_prefix))});
-  return usm_node_stats_map_[node_id].get();
-}
-
-USMStats* UpstreamSocketManager::getStatsByCluster(const std::string& cluster_id) {
-  auto iter = usm_cluster_stats_map_.find(cluster_id);
-  if (iter != usm_cluster_stats_map_.end()) {
-    USMStats* stats = iter->second.get();
-    return stats;
-  }
-
-  ENVOY_LOG(debug, "UpstreamSocketManager: Creating new stats for cluster: {}", cluster_id);
-  const std::string& final_prefix = "cluster." + cluster_id;
-  usm_cluster_stats_map_[cluster_id] = std::make_unique<USMStats>(
-      USMStats{ALL_USM_STATS(POOL_GAUGE_PREFIX(*usm_scope_, final_prefix))});
-  return usm_cluster_stats_map_[cluster_id].get();
 }
 
 UpstreamSocketManager::~UpstreamSocketManager() {
