@@ -129,6 +129,16 @@ public:
    * found.
    */
   virtual const ProtobufWkt::Struct& filterContext() const PURE;
+
+  /**
+   * @return const Router::VirtualHostConstSharedPtr& the virtual host that owns the route.
+   */
+  virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
+
+  /**
+   * @return absl::string_view the value of filter config name.
+   */
+  virtual const absl::string_view filterConfigName() const PURE;
 };
 
 class Filter;
@@ -202,7 +212,8 @@ public:
             {"connectionStreamInfo", static_luaConnectionStreamInfo},
             {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost},
             {"clearRouteCache", static_luaClearRouteCache},
-            {"filterContext", static_luaFilterContext}};
+            {"filterContext", static_luaFilterContext},
+            {"virtualHost", static_luaVirtualHost}};
   }
 
 private:
@@ -339,6 +350,11 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaFilterContext);
 
+  /**
+   * @return a handle to the virtual host.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVirtualHost);
+
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
@@ -363,6 +379,7 @@ private:
     connection_wrapper_.reset();
     public_key_wrapper_.reset();
     connection_stream_info_wrapper_.reset();
+    virtual_host_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -392,6 +409,7 @@ private:
   Filters::Common::Lua::LuaDeathRef<ConnectionStreamInfoWrapper> connection_stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> virtual_host_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
@@ -565,6 +583,12 @@ private:
       }
     }
     const ProtobufWkt::Struct& filterContext() const override { return parent_.filterContext(); }
+    const Router::VirtualHostConstSharedPtr& virtualHost() const override {
+      return callbacks_->streamInfo().virtualHost();
+    }
+    const absl::string_view filterConfigName() const override {
+      return callbacks_->filterConfigName();
+    }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -594,6 +618,12 @@ private:
     }
     void clearRouteCache() override {}
     const ProtobufWkt::Struct& filterContext() const override { return parent_.filterContext(); }
+    const Router::VirtualHostConstSharedPtr& virtualHost() const override {
+      return callbacks_->streamInfo().virtualHost();
+    }
+    const absl::string_view filterConfigName() const override {
+      return callbacks_->filterConfigName();
+    }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
