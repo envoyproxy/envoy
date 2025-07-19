@@ -221,7 +221,7 @@ new_features:
     Upgraded Envoy to build with C++20; Envoy developers can use C++20 features now.
 - area: redis
   change: |
-    Added support for ``SCAN`` and ``INFO``.
+    Added support for ``SCAN``, ``INFO`` and ``ROLE``.
 - area: http
   change: |
     Added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
