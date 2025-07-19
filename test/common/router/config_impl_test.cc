@@ -4780,7 +4780,7 @@ TEST_F(RouteMatcherTest, RetryVirtualHostLevel) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - domains: [www.lyft.com]
-  per_request_buffer_limit_bytes: 8
+  request_body_buffer_limit: 8
   name: www
   retry_policy:
     num_retries: 3
@@ -4792,7 +4792,7 @@ virtual_hosts:
         "@type": type.googleapis.com/google.protobuf.Struct
   routes:
   - match: {prefix: /foo}
-    per_request_buffer_limit_bytes: 7
+    request_body_buffer_limit: 7
     route:
       cluster: www
       retry_policy:
@@ -4829,9 +4829,13 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
+            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                ->routeEntry()
+                ->perRequestBufferLimit());
   EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
-                    ->perRequestBufferLimit());
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -4854,6 +4858,13 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
+            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                ->routeEntry()
+                ->perRequestBufferLimit());
+  EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(std::chrono::milliseconds(1000),
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
@@ -4869,9 +4880,13 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                ->routeEntry()
+                ->perRequestBufferLimit());
   EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
-                    ->perRequestBufferLimit());
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
