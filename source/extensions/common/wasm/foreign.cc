@@ -138,7 +138,7 @@ RegisterForeignFunction registerClearRouteCacheForeignFunction(
 class ExpressionFactory : public Logger::Loggable<Logger::Id::wasm> {
 protected:
   struct ExpressionData {
-    google::api::expr::v1alpha1::ParsedExpr parsed_expr_;
+    cel::expr::ParsedExpr parsed_expr_;
     Filters::Common::Expr::ExpressionPtr compiled_expr_;
   };
 
@@ -203,9 +203,14 @@ public:
       auto token = expr_context.createToken();
       auto& handler = expr_context.getExpression(token);
 
-      handler.parsed_expr_ = parse_status.value();
-      auto cel_expression_status = expr_context.builder()->CreateExpression(
-          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info());
+      const auto& parsed_expr = parse_status.value();
+      const cel::expr::Expr& cel_expr = parsed_expr.expr();
+      const cel::expr::SourceInfo& cel_source_info = parsed_expr.source_info();
+
+      std::vector<absl::Status> warnings;
+      auto cel_expression_status =
+          expr_context.builder()->CreateExpression(&cel_expr, &cel_source_info, &warnings);
+
       if (!cel_expression_status.ok()) {
         ENVOY_LOG(info, "expr_create compile error: {}", cel_expression_status.status().message());
         expr_context.deleteExpression(token);
@@ -213,6 +218,8 @@ public:
       }
 
       handler.compiled_expr_ = std::move(cel_expression_status.value());
+      handler.parsed_expr_ = parsed_expr;
+
       auto result = reinterpret_cast<uint32_t*>(alloc_result(sizeof(uint32_t)));
       *result = token;
       return WasmResult::Ok;
