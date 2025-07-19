@@ -11,9 +11,9 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-Envoy::Matcher::ActionFactoryCb
-ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionContext& context,
-                                     ProtobufMessage::ValidationVisitor& validation_visitor) {
+Envoy::Matcher::ActionConstSharedPtr
+ActionFactory::createAction(const Protobuf::Message& config, ActionContext& context,
+                            ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& action_config =
       MessageUtil::downcastAndValidate<const envoy::config::rbac::v3::Action&>(config,
                                                                                validation_visitor);
@@ -25,7 +25,7 @@ ActionFactory::createActionFactoryCb(const Protobuf::Message& config, ActionCont
     context.has_log_ = true;
   }
 
-  return [name, action]() { return std::make_unique<Action>(name, action); };
+  return std::make_shared<Action>(name, action);
 }
 
 REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
@@ -138,18 +138,17 @@ bool RoleBasedAccessControlMatcherEngineImpl::handleAction(
       Envoy::Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
   ASSERT(result.isComplete());
   if (result.isMatch()) {
-    auto action = result.action()->getTyped<Action>();
+    const auto& action = result.action()->getTyped<Action>();
     if (effective_policy_id != nullptr) {
       *effective_policy_id = action.name();
     }
 
     // If there is at least an LOG action in matchers, we have to turn on and off for shared log
     // metadata every time when there is a connection or request.
-    auto rbac_action = action.action();
+    const auto rbac_action = action.action();
     if (has_log_) {
       generateLog(info, mode_, rbac_action == envoy::config::rbac::v3::RBAC::LOG);
     }
-
     switch (rbac_action) {
       PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
     case envoy::config::rbac::v3::RBAC::ALLOW:

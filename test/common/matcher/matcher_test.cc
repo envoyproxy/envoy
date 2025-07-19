@@ -907,8 +907,8 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingSupportInEvaluation) {
   validation_visitor_.setSupportKeepMatching(true);
   std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
 
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+  std::vector<ActionConstSharedPtr> skipped_results;
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
   const auto result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
@@ -1020,8 +1020,8 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithRecursiveMatcher) {
 
   // Expect the nested matchers with keep_matching to be skipped and also the top-level
   // keep_matching setting to skip the result of the first sub-matcher.
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+  std::vector<ActionConstSharedPtr> skipped_results;
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
   MatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
@@ -1056,8 +1056,8 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithUnsupportedReentry) {
   validation_visitor_.setSupportKeepMatching(true);
   std::shared_ptr<MatchTree<TestData>> matcher = createMatcherFromYaml(yaml)();
 
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+  std::vector<ActionConstSharedPtr> skipped_results;
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
   MatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);
@@ -1130,12 +1130,12 @@ TEST_P(MatcherAmbiguousTest, KeepMatchingWithFailingNestedMatcher) {
       stringOnMatch<TestData>("fail"));
 
   matcher->addMatcher(createSingleMatcher("string", [](auto) { return true; }),
-                      OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/nested_matcher,
+                      OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/nested_matcher,
                                         /*.keep_matching=*/true});
 
   // Expect re-entry to fail due to the nested matcher.
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+  std::vector<ActionConstSharedPtr> skipped_results;
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
   MatchResult result = evaluateMatch(*matcher, TestData(), skipped_match_cb);

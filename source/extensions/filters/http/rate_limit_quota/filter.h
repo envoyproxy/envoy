@@ -65,7 +65,8 @@ public:
 
   // Perform request matching. It returns the generated bucket ids if the
   // matching succeeded, error status otherwise.
-  absl::StatusOr<Matcher::ActionPtr> requestMatching(const Http::RequestHeaderMap& headers);
+  absl::StatusOr<Matcher::ActionConstSharedPtr>
+  requestMatching(const Http::RequestHeaderMap& headers);
 
   Http::Matching::HttpMatchingDataImpl matchingData() {
     ASSERT(data_ptr_ != nullptr);

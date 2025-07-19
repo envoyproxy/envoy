@@ -61,13 +61,12 @@ RouteEntryImpl::RouteEntryImpl(const ProtoRouteAction& route_action,
   }
 }
 
-Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
-    const Protobuf::Message& config, RouteActionContext& context,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+Matcher::ActionConstSharedPtr
+RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActionContext& context,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_action =
       MessageUtil::downcastAndValidate<const ProtoRouteAction&>(config, validation_visitor);
-  auto route = std::make_shared<RouteEntryImpl>(route_action, context.factory_context);
-  return [route]() { return std::make_unique<RouteMatchAction>(route); };
+  return std::make_shared<RouteEntryImpl>(route_action, context.factory_context);
 }
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
@@ -92,15 +91,12 @@ RouteEntryConstSharedPtr VirtualHostImpl::routeEntry(const MatchInput& request) 
   Matcher::MatchResult match_result = Matcher::evaluateMatch<MatchInput>(*matcher_, request);
 
   if (match_result.isMatch()) {
-    Matcher::ActionPtr action = match_result.action();
-
+    Matcher::ActionConstSharedPtr action = match_result.actionByMove();
     // The only possible action that can be used within the route matching context
     // is the RouteMatchAction, so this must be true.
-    ASSERT(action->typeUrl() == RouteMatchAction::staticTypeUrl());
-    ASSERT(dynamic_cast<RouteMatchAction*>(action.get()));
-    const RouteMatchAction& route_action = static_cast<const RouteMatchAction&>(*action);
-
-    return route_action.route();
+    ASSERT(action->typeUrl() == RouteEntryImpl::staticTypeUrl());
+    ASSERT(dynamic_cast<const RouteEntryImpl*>(action.get()));
+    return std::dynamic_pointer_cast<const RouteEntryImpl>(std::move(action));
   }
 
   ENVOY_LOG(debug, "failed to match incoming request: {}",

@@ -49,11 +49,11 @@ class FilterChainNameActionFactory : public Matcher::ActionFactory<FilterChainAc
                                      Logger::Loggable<Logger::Id::config> {
 public:
   std::string name() const override { return "filter-chain-name"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
-                                                 FilterChainActionFactoryContext&,
-                                                 ProtobufMessage::ValidationVisitor&) override {
-    const auto& name = dynamic_cast<const ProtobufWkt::StringValue&>(config);
-    return [value = name.value()]() { return std::make_unique<FilterChainNameAction>(value); };
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
+                                             FilterChainActionFactoryContext&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return std::make_shared<FilterChainNameAction>(
+        dynamic_cast<const ProtobufWkt::StringValue&>(config).value());
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
@@ -573,9 +573,8 @@ FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSoc
       Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
   ASSERT(match_result.isComplete(), "Matching must complete for network streams.");
   if (match_result.isMatch()) {
-    const Matcher::ActionPtr action = match_result.action();
-    return action->getTyped<Configuration::FilterChainBaseAction>().get(filter_chains_by_name_,
-                                                                        info);
+    return match_result.action()->getTyped<Configuration::FilterChainBaseAction>().get(
+        filter_chains_by_name_, info);
   }
   return default_filter_chain_.get();
 }
