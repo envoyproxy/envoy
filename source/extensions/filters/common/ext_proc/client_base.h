@@ -12,9 +12,15 @@ namespace ExternalProcessing {
 /**
  * Stream base class used during external processing.
  */
-class StreamBase {
+template <typename RequestType, typename ResponseType> class StreamBase {
 public:
   virtual ~StreamBase() = default;
+  virtual void send(RequestType&& request, bool end_stream) PURE;
+  virtual bool close() PURE;
+  virtual bool halfCloseAndDeleteOnRemoteClose() PURE;
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+  virtual void notifyFilterDestroy() PURE;
 };
 
 /**
@@ -34,7 +40,8 @@ template <typename RequestType, typename ResponseType> class ClientBase {
 public:
   virtual ~ClientBase() = default;
   virtual void sendRequest(RequestType&& request, bool end_stream, const uint64_t stream_id,
-                           RequestCallbacks<ResponseType>* callbacks, StreamBase* stream) PURE;
+                           RequestCallbacks<ResponseType>* callbacks,
+                           StreamBase<RequestType, ResponseType>* stream) PURE;
   virtual void cancel() PURE;
   virtual const Envoy::StreamInfo::StreamInfo* getStreamInfo() const PURE;
 };
