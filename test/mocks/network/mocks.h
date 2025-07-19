@@ -273,6 +273,7 @@ public:
   MOCK_METHOD(void, destroy_, ());
   MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
   MOCK_METHOD(Network::FilterStatus, onData, (Network::ListenerFilterBuffer&));
+  MOCK_METHOD(void, onClose, ());
 
   size_t listener_filter_max_read_bytes_{0};
 };
