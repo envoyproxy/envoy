@@ -646,6 +646,15 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   admin_ = std::make_shared<AdminImpl>(initial_config.admin().profilePath(), *this,
                                        initial_config.admin().ignoreGlobalConnLimit());
 
+  auto typed_admin_impl_ = dynamic_cast<AdminImpl*>(admin_.get());
+
+  if (!bootstrap_.admin().allow_listed_routes().empty()) {
+    for (const auto& allow_listed_route : bootstrap_.admin().allow_listed_routes()) {
+      typed_admin_impl_->addAllowListedRoute(
+          std::make_unique<Matchers::StringMatcherImpl>(allow_listed_route, server_contexts_));
+    }
+  }
+
   config_tracker = admin_->getConfigTracker();
 #endif
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(config_tracker);

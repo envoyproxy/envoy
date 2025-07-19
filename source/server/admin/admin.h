@@ -22,6 +22,7 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/macros.h"
+#include "source/common/common/matchers.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_impl.h"
 #include "source/common/http/date_provider_impl.h"
@@ -128,6 +129,14 @@ public:
     return request_id_extension_;
   }
   const AccessLog::InstanceSharedPtrVector& accessLogs() override { return access_logs_; }
+  bool acceptTargetRoute(absl::string_view route_name) const {
+    bool is_route_allowed = std::any_of(allow_listed_routes_.begin(), allow_listed_routes_.end(),
+                                        [&route_name](const Matchers::StringMatcherPtr& matcher) {
+                                          return matcher->match(route_name);
+                                        });
+    return is_route_allowed;
+  }
+  void addAllowListedRoute(Matchers::StringMatcherPtr matcher);
   bool flushAccessLogOnNewRequest() override { return flush_access_log_on_new_request_; }
   bool flushAccessLogOnTunnelSuccessfullyEstablished() const override { return false; }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
@@ -453,6 +462,7 @@ private:
   AdminFactoryContext factory_context_;
   Http::RequestIDExtensionSharedPtr request_id_extension_;
   AccessLog::InstanceSharedPtrVector access_logs_;
+  std::vector<Matchers::StringMatcherPtr> allow_listed_routes_;
   const bool flush_access_log_on_new_request_ = false;
   const absl::optional<std::chrono::milliseconds> null_access_log_flush_interval_;
   const std::string profile_path_;
