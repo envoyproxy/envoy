@@ -1,96 +1,145 @@
-# 1. Use already imported python dependencies
-# 2. Disable pointer compression (limits the maximum number of WasmVMs).
-# 3. Add support for --define=no_debug_info=1.
-# 4. Allow compiling v8 on macOS 10.15 to 13.0. TODO(dio): Will remove this patch when https://bugs.chromium.org/p/v8/issues/detail?id=13428 is fixed.
-# 5. Don't expose Wasm C API (only Wasm C++ API).
-
 diff --git a/BUILD.bazel b/BUILD.bazel
-index 4e89f90..0df4f67 100644
+index 54be2b94..5fbb68b8 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
 @@ -4,7 +4,7 @@
  
  load("@bazel_skylib//lib:selects.bzl", "selects")
- load("@rules_python//python:defs.bzl", "py_binary")
+ load("@rules_python//python:defs.bzl", "py_binary", "py_test")
 -load("@v8_python_deps//:requirements.bzl", "requirement")
 +load("@base_pip3//:requirements.bzl", "requirement")
  load(
      "@v8//:bazel/defs.bzl",
      "v8_binary",
-@@ -157,7 +157,7 @@ v8_int(
+@@ -293,7 +293,7 @@ v8_int(
  # If no explicit value for v8_enable_pointer_compression, we set it to 'none'.
  v8_string(
      name = "v8_enable_pointer_compression",
 -    default = "none",
-+    default = "False",
++    default = "false",
  )
  
  # Default setting for v8_enable_pointer_compression.
+@@ -4336,11 +4336,7 @@ cc_library(
+     ],
+ )
+ 
+-cc_library(
+-  name = "simdutf",
+-  srcs = ["third_party/simdutf/simdutf.cpp"],
+-  hdrs = ["third_party/simdutf/simdutf.h"],
+-)
++
+ 
+ v8_library(
+     name = "v8_libshared",
+@@ -4370,9 +4366,9 @@ v8_library(
+         ":noicu/generated_torque_definitions",
+     ],
+     deps = [
+-        "//third_party/fast_float/src:fast_float",
+-        ":lib_fp16",
++        "@fast_float",
++        "@fp16",
+-        ":simdutf",
++        "@simdutf",
+         ":v8_libbase",
+         "@abseil-cpp//absl/container:btree",
+         "@abseil-cpp//absl/container:flat_hash_map",
 diff --git a/bazel/defs.bzl b/bazel/defs.bzl
-index e957c0f..0327669 100644
+index fbd942ba..97721d3b 100644
 --- a/bazel/defs.bzl
 +++ b/bazel/defs.bzl
-@@ -116,6 +116,7 @@ def _default_args():
-         }) + select({
-             "@v8//bazel/config:is_clang": [
+@@ -125,6 +125,7 @@ def _default_args():
                  "-Wno-invalid-offsetof",
+                 "-Wno-deprecated-this-capture",
+                 "-Wno-deprecated-declarations",
 +                "-Wno-unneeded-internal-declaration",
-                 "-std=c++17",
+                 "-std=c++20",
              ],
              "@v8//bazel/config:is_gcc": [
-@@ -131,6 +132,9 @@ def _default_args():
-                 "-Wno-redundant-move",
+@@ -141,6 +142,9 @@ def _default_args():
                  "-Wno-return-type",
                  "-Wno-stringop-overflow",
+                 "-Wno-deprecated-this-capture",
 +                "-Wno-nonnull",
 +                "-Wno-pessimizing-move",
 +                "-Wno-dangling-pointer",
                  # Use GNU dialect, because GCC doesn't allow using
                  # ##__VA_ARGS__ when in standards-conforming mode.
-                 "-std=gnu++17",
-@@ -151,6 +154,23 @@ def _default_args():
-                 "-fno-integrated-as",
+                 "-std=gnu++2a",
+@@ -168,6 +172,14 @@ def _default_args():
              ],
-             "//conditions:default": [],
+             "//conditions:default": [
+             ],
 +        }) + select({
 +            "@envoy//bazel:no_debug_info": [
 +                "-g0",
++                "-DNDEBUG",
 +            ],
-+            "//conditions:default": [],
-+        }) + select({
-+            "@v8//bazel/config:is_macos": [
-+                # The clang available on macOS catalina has a warning that isn't clean on v8 code.
-+                "-Wno-range-loop-analysis",
-+
-+                # To supress warning on deprecated declaration on v8 code. For example:
-+                # external/v8/src/base/platform/platform-darwin.cc:56:22: 'getsectdatafromheader_64'
-+                # is deprecated: first deprecated in macOS 13.0.
-+                # https://bugs.chromium.org/p/v8/issues/detail?id=13428.
-+                "-Wno-deprecated-declarations",
++            "//conditions:default": [
++                "-DDEBUG",
 +            ],
-+            "//conditions:default": [],
          }),
          includes = ["include"],
          linkopts = select({
-diff --git a/src/compiler/control-equivalence.cc b/src/compiler/control-equivalence.cc
-index 4649cf0..6fc6e57 100644
---- a/src/compiler/control-equivalence.cc
-+++ b/src/compiler/control-equivalence.cc
-@@ -157,8 +157,8 @@ void ControlEquivalence::RunUndirectedDFS(Node* exit) {
-     // Pop node from stack when done with all inputs and uses.
-     DCHECK(entry.input == node->input_edges().end());
-     DCHECK(entry.use == node->use_edges().end());
--    DFSPop(stack, node);
-     VisitPost(node, entry.parent_node, entry.direction);
-+    DFSPop(stack, node);
-   }
- }
+diff --git a/src/builtins/builtins-typed-array.cc b/src/builtins/builtins-typed-array.cc
+index f1a46d5b..5de29e9d 100644
+--- a/src/builtins/builtins-typed-array.cc
++++ b/src/builtins/builtins-typed-array.cc
+@@ -12,7 +12,7 @@
+ #include "src/objects/js-array-buffer-inl.h"
+ #include "src/objects/objects-inl.h"
+ #include "src/objects/simd.h"
+-#include "third_party/simdutf/simdutf.h"
++#include "simdutf.h"
  
+ namespace v8 {
+ namespace internal {
+diff --git a/src/objects/string.h b/src/objects/string.h
+index 3a4d4510..0447631a 100644
+--- a/src/objects/string.h
++++ b/src/objects/string.h
+@@ -21,7 +21,7 @@
+ #include "src/objects/tagged.h"
+ #include "src/sandbox/external-pointer.h"
+ #include "src/strings/unicode-decoder.h"
+-#include "third_party/simdutf/simdutf.h"
++#include "simdutf.h"
+ 
+ // Has to be the last include (doesn't have include guards):
+ #include "src/objects/object-macros.h"
+diff --git a/src/wasm/wasm-objects-inl.h b/src/wasm/wasm-objects-inl.h
+index 8267b150..2950da2d 100644
+--- a/src/wasm/wasm-objects-inl.h
++++ b/src/wasm/wasm-objects-inl.h
+@@ -29,7 +29,7 @@
+ #include "src/roots/roots.h"
+ #include "src/wasm/wasm-code-manager.h"
+ #include "src/wasm/wasm-module.h"
+-#include "third_party/fp16/src/include/fp16.h"
++#include "fp16.h"
+ 
+ #if V8_ENABLE_DRUMBRAKE
+ #include "src/wasm/interpreter/wasm-interpreter-objects.h"
+diff --git a/src/wasm/wasm-value.h b/src/wasm/wasm-value.h
+index d8076fb4..64c4468a 100644
+--- a/src/wasm/wasm-value.h
++++ b/src/wasm/wasm-value.h
+@@ -14,7 +14,7 @@
+ #include "src/handles/handles.h"
+ #include "src/utils/boxed-float.h"
+ #include "src/wasm/value-type.h"
+-#include "third_party/fp16/src/include/fp16.h"
++#include "fp16.h"
+ 
+ namespace v8 {
+ namespace internal {
 diff --git a/src/wasm/c-api.cc b/src/wasm/c-api.cc
-index 4473e20..65a6ec7 100644
+index 6594e5aa..468a71cc 100644
 --- a/src/wasm/c-api.cc
 +++ b/src/wasm/c-api.cc
-@@ -2247,6 +2247,8 @@ auto Instance::exports() const -> ownvec<Extern> {
+@@ -2474,6 +2474,8 @@ WASM_EXPORT auto Instance::exports() const -> ownvec<Extern> {
  
  }  // namespace wasm
  
@@ -99,22 +148,9 @@ index 4473e20..65a6ec7 100644
  // BEGIN FILE wasm-c.cc
  
  extern "C" {
-@@ -3274,3 +3276,5 @@ wasm_instance_t* wasm_frame_instance(const wasm_frame_t* frame) {
+@@ -3520,3 +3522,5 @@ wasm_instance_t* wasm_frame_instance(const wasm_frame_t* frame) {
  #undef WASM_DEFINE_SHARABLE_REF
  
  }  // extern "C"
 +
 +#endif
-diff --git a/third_party/inspector_protocol/code_generator.py b/third_party/inspector_protocol/code_generator.py
-index c3768b8..d4a1dda 100755
---- a/third_party/inspector_protocol/code_generator.py
-+++ b/third_party/inspector_protocol/code_generator.py
-@@ -16,6 +16,8 @@ try:
- except ImportError:
-   import simplejson as json
- 
-+sys.path += [os.path.dirname(__file__)]
-+
- import pdl
- 
- try:
