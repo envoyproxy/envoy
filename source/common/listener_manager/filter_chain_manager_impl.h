@@ -165,6 +165,10 @@ public:
 
   static bool isWildcardServerName(const std::string& name);
 
+  const std::vector<Network::DrainableFilterChainSharedPtr>& drainingFilterChains() const {
+    return draining_filter_chains_;
+  }
+
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
   // listener to calculate the intersection of filter chains with another listener.
   const FcContextMap& filterChainsByMessage() const { return fc_contexts_; }
@@ -350,6 +354,9 @@ private:
 
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
+
+  // Used to hint listener which filter chains it should drain.
+  mutable std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chains_;
 };
 
 namespace FilterChain {

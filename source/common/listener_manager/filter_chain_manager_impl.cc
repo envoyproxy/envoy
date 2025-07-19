@@ -150,6 +150,15 @@ absl::Status FilterChainManagerImpl::addFilterChains(
                                                    filter_chain_factory_builder, context_creator));
   maybeConstructMatcher(filter_chain_matcher, filter_chains_by_name, parent_context_);
 
+  const auto* origin = getOriginFilterChainManager();
+  if (origin != nullptr) {
+    for (const auto& message_and_filter_chain : origin->fc_contexts_) {
+      if (fc_contexts_.find(message_and_filter_chain.first) == fc_contexts_.end()) {
+        origin->draining_filter_chains_.push_back(message_and_filter_chain.second);
+      }
+    }
+  }
+
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
             fc_contexts_.size(), new_filter_chain_size);
   return absl::OkStatus();
