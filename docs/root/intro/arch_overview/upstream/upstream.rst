@@ -13,6 +13,7 @@ Upstream clusters
   connection_pooling
   load_balancing/load_balancing
   aggregate_cluster
+  aggregate_retry_cluster
   outlier
   circuit_breaking
   upstream_filters

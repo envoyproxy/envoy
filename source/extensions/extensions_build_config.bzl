@@ -19,6 +19,7 @@ EXTENSIONS = {
     #
 
     "envoy.clusters.aggregate":                         "//source/extensions/clusters/aggregate:cluster",
+    "envoy.clusters.aggregate_retry":                   "//source/extensions/clusters/aggregate_retry:cluster",
     "envoy.clusters.dns":                               "//source/extensions/clusters/dns:dns_cluster_lib",
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.eds":                               "//source/extensions/clusters/eds:eds_lib",

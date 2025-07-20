@@ -396,5 +396,11 @@ new_features:
   change: |
     Added ``assume_role_credential_provider`` to add support for role chaining in AWS filters. This allows envoy to
     assume an additional role before SigV4 signing occurs.
+- area: cluster
+  change: |
+    Added ``AggregateRetryCluster`` extension that enables retry-aware cluster selection. This cluster type allows
+    retries to automatically fall back to different subclusters based on retry attempt count, providing failover
+    between different providers. See :ref:`aggregate retry cluster docs <arch_overview_aggregate_retry_cluster>`
+    for more details.
 
 deprecated:

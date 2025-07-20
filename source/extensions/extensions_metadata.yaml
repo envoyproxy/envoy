@@ -96,6 +96,13 @@ envoy.clusters.aggregate:
   status: stable
   type_urls:
   - envoy.extensions.clusters.aggregate.v3.ClusterConfig
+envoy.clusters.aggregate_retry:
+  categories:
+  - envoy.clusters
+  security_posture: requires_trusted_downstream_and_upstream
+  status: stable
+  type_urls:
+  - envoy.extensions.clusters.aggregate_retry.v3.ClusterConfig
 envoy.clusters.dynamic_forward_proxy:
   categories:
   - envoy.clusters
