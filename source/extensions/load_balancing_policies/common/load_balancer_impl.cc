@@ -693,7 +693,8 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     const auto& locality = upstream_hosts[0]->locality();
 
     const auto& local_weight_it = local_weights.find(locality);
-    const uint64_t local_weight = local_weight_it == local_weights.end() ? 0 : local_weight_it->second;
+    const uint64_t local_weight =
+        local_weight_it == local_weights.end() ? 0 : local_weight_it->second;
     const auto& upstream_weight_it = upstream_weights.find(locality);
     const uint64_t upstream_weight =
         upstream_weight_it == upstream_weights.end() ? 0 : upstream_weight_it->second;

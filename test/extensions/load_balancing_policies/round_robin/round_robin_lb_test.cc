@@ -979,7 +979,6 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareDifferentZoneSize) {
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
-
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareUseHostWeight) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;
@@ -997,24 +996,23 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareUseHostWeight) {
   // Zone B: 1L with 200 weight, 1U with 100 weight
 
   HostVectorSharedPtr upstream_hosts(
-    new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                    makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}));
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}));
   HostVectorSharedPtr local_hosts(
-    new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a),
-                    makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_a),
-                    makeTestHost(info_, "tcp://127.0.0.1:2", simTime(), zone_b)}));
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:2", simTime(), zone_b)}));
   HostsPerLocalitySharedPtr upstream_hosts_per_locality =
-    makeHostsPerLocality({{//zone A
-                           makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
-                          {//zone B
-                           makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}});
+      makeHostsPerLocality({{// zone A
+                             makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
+                            {// zone B
+                             makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}});
   HostsPerLocalitySharedPtr local_hosts_per_locality =
-    makeHostsPerLocality({{//zone A
-                           makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a),
-                           makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_a)},
-                          {//zone B
-                           makeTestHost(info_, "tcp://127.0.0.1:2", simTime(), zone_b)}});
-  
+      makeHostsPerLocality({{// zone A
+                             makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a),
+                             makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_a)},
+                            {// zone B
+                             makeTestHost(info_, "tcp://127.0.0.1:2", simTime(), zone_b)}});
 
   local_hosts_per_locality->get()[0][0]->weight(100);
   local_hosts_per_locality->get()[0][1]->weight(100);
@@ -1049,8 +1047,8 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareUseHostWeight) {
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 2))
       .WillRepeatedly(Return(2));
 
-  //Although there are two local hosts in zone A, the zone A and zone B has the same total weight in total.
-  //So all traffic should go directly to the same zone.
+  // Although there are two local hosts in zone A, the zone A and zone B has the same total weight
+  // in total. So all traffic should go directly to the same zone.
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
   EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
