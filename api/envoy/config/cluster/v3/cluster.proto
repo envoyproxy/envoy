@@ -589,6 +589,8 @@ message Cluster {
       // failing service.
       bool fail_traffic_on_panic = 3;
 
+      // If set to true, Envoy will use the weight of each host, rather than the number of hosts to
+      // calculate the locality percentages in zone aware routing.
       bool use_host_weight = 4;
     }
 
