@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package envoy.extensions.http.stateful_session.mcp_sse.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.stateful_session.mcp_sse.v3";
+option java_outer_classname = "McpSseProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/stateful_session/mcp_sse/v3;mcp_ssev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: MCP SSE stateful session extension]
+
+// The extension implements MCP 241105 spec for SSE-based session tracking.
+// It enables Envoy to handle session context in SSE event streams, allowing session ID 
+// and upstream host to be encoded/decoded as required by the protocol.
+//
+// When processing the response from the upstream, Envoy will check if the SSE data stream contains
+// the session context. If the SSE data stream contains the session context, Envoy will join it and
+// the upstream host as new session context using a separator.
+//
+// When processing the request from the downstream, Envoy will check if the url query params contain
+// the session context. If the request contains the session context, Envoy will strip the
+// upstream host from the session context.
+// [#extension: envoy.http.stateful_session.mcp_sse]
+message McpSseSessionState {
+  // The query parameter name used to track the session state in SSE data streams.
+  // If the query parameter specified by this field is present in the SSE data stream,
+  // the upstream host address will be encoded in following format:
+  //
+  // .. code-block:: none
+  //
+  //   sessionId={original_value}.{encoded_host}
+  //
+  // Where {encoded_host} is the Base64Url encoded host address.
+  //
+  // When processing the request from downstream, this extension will:
+  // 1. Split the value at the last dot
+  // 2. Decode the host address for upstream routing
+  // 3. Keep only the original session ID in the request
+  //
+  // For example:
+  //
+  // .. code-block:: none
+  //
+  //   GET /path?sessionId=original_session_id.{encoded_host}
+  //   # after processing:
+  //   GET /path?sessionId=original_session_id
+  //
+  // Note: Uses Base64Url encoding for the host address and '.' as separator.
+  string param_name = 1 [(validate.rules).string = {min_len: 1}];
+} 
