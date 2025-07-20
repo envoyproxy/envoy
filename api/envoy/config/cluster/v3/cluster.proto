@@ -588,6 +588,8 @@ message Cluster {
       // requests as if all hosts are unhealthy. This can help avoid potentially overwhelming a
       // failing service.
       bool fail_traffic_on_panic = 3;
+
+      bool use_host_weight = 4;
     }
 
     // Configuration for :ref:`locality weighted load balancing

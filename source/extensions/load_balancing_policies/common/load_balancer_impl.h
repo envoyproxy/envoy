@@ -96,6 +96,7 @@ public:
       const auto& legacy = source.zone_aware_lb_config();
 
       zone_aware_lb_config.set_fail_traffic_on_panic(legacy.fail_traffic_on_panic());
+      zone_aware_lb_config.set_use_host_weight(legacy.use_host_weight());
 
       if (legacy.has_routing_enabled()) {
         *zone_aware_lb_config.mutable_routing_enabled() = legacy.routing_enabled();

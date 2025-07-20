@@ -644,17 +644,16 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
   std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> upstream_weights;
   uint64_t total_local_weight = 0;
   for (const auto& locality_hosts : local_hosts_per_locality.get()) {
+    // If use_host_weight_ is true, we use the host's weight to calculate the locality percentage.
+    // Otherwise, we count the number of hosts in the locality.
     uint64_t locality_weight = 0;
-    for (const auto& host : locality_hosts) {
-      // If use_host_weight_ is true, we use the host's weight to calculate the locality percentage.
-      // Otherwise, we count the number of hosts in the locality.
-      if (use_host_weight_) {
+    if (use_host_weight_) {
+      for (const auto& host : locality_hosts) {
         locality_weight += host->weight();
-      } else {
-        locality_weight += 1;
       }
+    } else {
+      locality_weight = locality_hosts.size();
     }
-
     total_local_weight += locality_weight;
     // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
     if (!locality_hosts.empty()) {
@@ -664,14 +663,14 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
   uint64_t total_upstream_weight = 0;
   for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
     uint64_t locality_weight = 0;
-    for (const auto& host : locality_hosts) {
-      // If use_host_weight_ is true, we use the host's weight to calculate the locality percentage.
-      // Otherwise, we count the number of hosts in the locality.
-      if (use_host_weight_) {
+    // If use_host_weight_ is true, we use the host's weight to calculate the locality percentage.
+    // Otherwise, we count the number of hosts in the locality.
+    if (use_host_weight_) {
+      for (const auto& host : locality_hosts) {
         locality_weight += host->weight();
-      } else {
-        locality_weight += 1;
       }
+    } else {
+      locality_weight = locality_hosts.size();
     }
     total_upstream_weight += locality_weight;
     // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
