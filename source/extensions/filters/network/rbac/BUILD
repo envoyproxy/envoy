@@ -33,6 +33,8 @@ envoy_cc_library(
         "//envoy/network:connection_interface",
         "//envoy/network:filter_interface",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/stream_info:bool_accessor_lib",
+        "//source/common/tcp_proxy:tcp_proxy",
         "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/network:well_known_names",
