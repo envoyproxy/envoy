@@ -85,7 +85,6 @@ public:
   static bool extractPingFromHttpData(absl::string_view http_data);
 
 private:
-  // Make this utility class non-instantiable like other Envoy utilities
   ReverseConnectionUtility() = delete;
 };
 
