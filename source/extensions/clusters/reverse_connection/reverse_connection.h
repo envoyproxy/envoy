@@ -125,6 +125,7 @@ private:
  * Also, the RevConCluster cleans these hosts if no connection pool is using them.
  */
 class RevConCluster : public Upstream::ClusterImplBase {
+friend class ReverseConnectionClusterTest;
 public:
   RevConCluster(const envoy::config::cluster::v3::Cluster& config,
                 Upstream::ClusterFactoryContext& context, absl::Status& creation_status,

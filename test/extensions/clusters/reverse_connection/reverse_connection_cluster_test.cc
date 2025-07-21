@@ -44,91 +44,6 @@ namespace Envoy {
 namespace Extensions {
 namespace ReverseConnection {
 
-// Test socket manager that provides predictable getNodeID behavior
-class TestUpstreamSocketManager : public BootstrapReverseConnection::UpstreamSocketManager {
-public:
-  TestUpstreamSocketManager(Event::Dispatcher& dispatcher, Stats::Scope& scope)
-      : BootstrapReverseConnection::UpstreamSocketManager(dispatcher, scope, nullptr) {
-    std::cout << "TestUpstreamSocketManager: Constructor called" << std::endl;
-  }
-  
-  // This hides the base class's getNodeID method 
-  std::string getNodeID(const std::string& key) {
-    std::cout << "TestUpstreamSocketManager::getNodeID() called with key: " << key << std::endl;
-    std::string result = "test-node-" + key;
-    std::cout << "TestUpstreamSocketManager::getNodeID() returning: " << result << std::endl;
-    return result;
-  }
-};
-
-// Test thread local registry that provides our test socket manager
-class TestUpstreamSocketThreadLocal : public BootstrapReverseConnection::UpstreamSocketThreadLocal {
-public:
-  TestUpstreamSocketThreadLocal(Event::Dispatcher& dispatcher, Stats::Scope& scope)
-      : BootstrapReverseConnection::UpstreamSocketThreadLocal(dispatcher, scope, nullptr),
-        test_socket_manager_(dispatcher, scope) {
-    std::cout << "TestUpstreamSocketThreadLocal: Constructor called" << std::endl;
-  }
-  
-  // Override both const and non-const versions of socketManager
-  BootstrapReverseConnection::UpstreamSocketManager* socketManager() {
-    std::cout << "TestUpstreamSocketThreadLocal::socketManager() (non-const) called" << std::endl;
-    std::cout << "TestUpstreamSocketThreadLocal::socketManager() returning: " << &test_socket_manager_ << std::endl;
-    return &test_socket_manager_;
-  }
-  
-  const BootstrapReverseConnection::UpstreamSocketManager* socketManager() const {
-    std::cout << "TestUpstreamSocketThreadLocal::socketManager() (const) called" << std::endl;
-    std::cout << "TestUpstreamSocketThreadLocal::socketManager() returning: " << &test_socket_manager_ << std::endl;
-    return &test_socket_manager_;
-  }
-  
-private:
-  TestUpstreamSocketManager test_socket_manager_;
-};
-
-// Forward declaration
-class TestReverseTunnelAcceptor;
-
-// Simple test extension that just returns our registry
-class SimpleTestExtension {
-public:
-  SimpleTestExtension(TestUpstreamSocketThreadLocal& registry) : test_registry_(registry) {}
-  
-  BootstrapReverseConnection::UpstreamSocketThreadLocal* getLocalRegistry() const {
-    std::cout << "SimpleTestExtension::getLocalRegistry() called" << std::endl;
-    return &test_registry_;
-  }
-  
-private:
-  TestUpstreamSocketThreadLocal& test_registry_;
-};
-
-// Test reverse tunnel acceptor that returns our test registry
-class TestReverseTunnelAcceptor : public BootstrapReverseConnection::ReverseTunnelAcceptor {
-public:
-  TestReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context)
-      : BootstrapReverseConnection::ReverseTunnelAcceptor(context),
-        test_registry_(context.mainThreadDispatcher(), context.scope()),
-        simple_extension_(test_registry_) {
-    std::cout << "TestReverseTunnelAcceptor: Constructor called" << std::endl;
-    
-    // This is a hack: we'll reinterpret_cast our simple extension to fool the type system
-    // This is unsafe but should work for testing since we only call getLocalRegistry()
-    extension_ = reinterpret_cast<BootstrapReverseConnection::ReverseTunnelAcceptorExtension*>(&simple_extension_);
-    std::cout << "TestReverseTunnelAcceptor: extension_ set to: " << extension_ << std::endl;
-  }
-  
-  // Override the name to ensure it matches what the test expects
-  std::string name() const override {
-    return "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface";
-  }
-  
-private:
-  mutable TestUpstreamSocketThreadLocal test_registry_;
-  SimpleTestExtension simple_extension_;
-};
-
 class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(const Network::Connection* connection)
@@ -160,62 +75,28 @@ public:
 class ReverseConnectionClusterTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   ReverseConnectionClusterTest() {
-    // // Create our test acceptor FIRST
-    // test_acceptor_ = std::make_unique<TestReverseTunnelAcceptor>(server_context_);
+    // Set up the stats scope
+    stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
     
-    // // Inject our test acceptor as a BootstrapExtensionFactory (which is what socketInterface() looks for)
-    // factory_injection_ = std::make_unique<Registry::InjectFactory<Server::Configuration::BootstrapExtensionFactory>>(*test_acceptor_);
+    // Set up the mock context
+    EXPECT_CALL(server_context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
+    EXPECT_CALL(server_context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     
-    // // Print all registered factories for debugging AFTER injection
-    // printRegisteredFactories();
+    // Create the config
+    config_.set_stat_prefix("test_prefix");
+    
+    // Create the socket interface
+    socket_interface_ = std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptor>(server_context_);
+    
+    // Create the extension
+    extension_ = std::make_unique<BootstrapReverseConnection::ReverseTunnelAcceptorExtension>(
+        *socket_interface_, server_context_, config_);
+    
+    // Set up thread local slot
+    setupThreadLocalSlot();
   }
   
   ~ReverseConnectionClusterTest() override = default;
-
-  void printRegisteredFactories() {
-    std::cout << "=== Registered Bootstrap Extension Factories ===" << std::endl;
-    for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
-      if (ext.first == "envoy.bootstrap") {
-        std::cout << "Category: " << ext.first << std::endl;
-        for (const auto& name : ext.second->registeredNames()) {
-          std::cout << "  - " << name << std::endl;
-        }
-      }
-    }
-    
-    std::cout << "=== Registered Socket Interface Factories ===" << std::endl;
-    auto& socket_factories = Registry::FactoryRegistry<Network::SocketInterface>::factories();
-    for (const auto& [name, factory] : socket_factories) {
-      std::cout << "  - " << name << " (ptr: " << factory << ")" << std::endl;
-    }
-    
-    std::cout << "=== Testing socketInterface lookup ===" << std::endl;
-    
-    // Check what's in the BootstrapExtensionFactory registry
-    std::cout << "Checking BootstrapExtensionFactory registry:" << std::endl;
-    auto* factory = Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::getFactory(
-        "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
-    std::cout << "Factory from registry: " << factory << std::endl;
-    std::cout << "Our test acceptor: " << test_acceptor_.get() << std::endl;
-    
-    auto* found = Network::socketInterface("envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
-    std::cout << "Found socket interface: " << (found ? "YES" : "NO") << std::endl;
-    if (found) {
-      std::cout << "Socket interface ptr: " << found << std::endl;
-      std::cout << "Our test acceptor ptr: " << test_acceptor_.get() << std::endl;
-      
-      // Test the dynamic_cast
-      auto* cast_result = dynamic_cast<const BootstrapReverseConnection::ReverseTunnelAcceptor*>(found);
-      std::cout << "Dynamic cast result: " << cast_result << std::endl;
-      if (cast_result) {
-        std::cout << "Cast succeeded, calling getLocalRegistry()" << std::endl;
-        auto* registry = cast_result->getLocalRegistry();
-        std::cout << "getLocalRegistry() returned: " << registry << std::endl;
-      } else {
-        std::cout << "Cast failed!" << std::endl;
-      }
-    }
-  }
 
   void setupFromYaml(const std::string& yaml, bool expect_success = true) {
     if (expect_success) {
@@ -262,11 +143,83 @@ public:
       // EXPECT_CALL(server_context_.dispatcher_, post(_));
       EXPECT_CALL(*cleanup_timer_, disableTimer());
     }
+    
+    // Clean up thread local resources
+    tls_slot_.reset();
+    thread_local_registry_.reset();
+    extension_.reset();
+    socket_interface_.reset();
+  }
+
+  // Helper function to set up thread local slot for tests
+  void setupThreadLocalSlot() {
+    // First, call onServerInitialized to set up the extension reference properly
+    extension_->onServerInitialized();
+    
+    // Create a thread local registry with the properly initialized extension
+    thread_local_registry_ = std::make_shared<BootstrapReverseConnection::UpstreamSocketThreadLocal>(
+        server_context_.dispatcher_, extension_.get());
+    
+    // Create the actual TypedSlot
+    tls_slot_ = ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>::makeUnique(thread_local_);
+    thread_local_.setDispatcher(&server_context_.dispatcher_);
+    
+    // Set up the slot to return our registry
+    tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
+    
+    // Override the TLS slot with our test version
+    extension_->setTestOnlyTLSRegistry(std::move(tls_slot_));
+    
+    // Get the registered socket interface from the global registry and set up its extension
+    auto* registered_socket_interface = Network::socketInterface(
+        "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+    if (registered_socket_interface) {
+      auto* registered_acceptor = dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
+          const_cast<Network::SocketInterface*>(registered_socket_interface));
+      if (registered_acceptor) {
+        // Set up the extension for the registered socket interface
+        registered_acceptor->extension_ = extension_.get();
+      }
+    }
+  }
+
+  // Helper to add a socket to the manager for testing
+  void addTestSocket(const std::string& node_id, const std::string& cluster_id) {
+    if (!thread_local_registry_ || !thread_local_registry_->socketManager()) {
+      return;
+    }
+    
+    // Set up mock expectations for timer and file event creation
+    auto mock_timer = new NiceMock<Event::MockTimer>();
+    auto mock_file_event = new NiceMock<Event::MockFileEvent>();
+    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_))
+        .WillOnce(Return(mock_timer));
+    EXPECT_CALL(server_context_.dispatcher_, createFileEvent_(_, _, _, _))
+        .WillOnce(Return(mock_file_event));
+    
+    // Create a mock socket
+    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+    socket->io_handle_ = std::move(mock_io_handle);
+
+    // Get the socket manager from the thread local registry
+    auto* tls_socket_manager = socket_interface_->getLocalRegistry()->socketManager();
+    EXPECT_NE(tls_socket_manager, nullptr);
+    
+    // Add the socket to the manager
+    tls_socket_manager->addConnectionSocket(
+        node_id, cluster_id, std::move(socket), std::chrono::seconds(30), false);
+  }
+
+  // Helper method to call cleanup since this class is a friend of RevConCluster
+  void callCleanup() {
+    cluster_->cleanup();
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
 
   std::shared_ptr<RevConCluster> cluster_;
   ReadyWatcher membership_updated_;
@@ -275,12 +228,26 @@ public:
   Common::CallbackHandlePtr priority_update_cb_;
   bool init_complete_{false};
   
-  // Test factory injection
-  std::unique_ptr<TestReverseTunnelAcceptor> test_acceptor_;
-  std::unique_ptr<Registry::InjectFactory<Server::Configuration::BootstrapExtensionFactory>> factory_injection_;
+  // Real thread local slot and registry for reverse connection testing
+  std::unique_ptr<ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>> tls_slot_;
+  std::shared_ptr<BootstrapReverseConnection::UpstreamSocketThreadLocal> thread_local_registry_;
+  
+  // Real socket interface and extension
+  std::unique_ptr<BootstrapReverseConnection::ReverseTunnelAcceptor> socket_interface_;
+  std::unique_ptr<BootstrapReverseConnection::ReverseTunnelAcceptorExtension> extension_;
+  
+  // Mock thread local instance
+  NiceMock<ThreadLocal::MockInstance> thread_local_;
+  
+  // Mock dispatcher
+  NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
+  
+  // Stats and config
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr stats_scope_;
+  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_;
 };
-
-namespace {
 
 TEST(ReverseConnectionClusterConfigTest, GoodConfig) {
   const std::string yaml = R"EOF(
@@ -615,140 +582,223 @@ TEST_F(ReverseConnectionClusterTest, GetUUIDFromSNIFunction) {
   }
 }
 
-// TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
-//   const std::string yaml = R"EOF(
-//     name: name
-//     connect_timeout: 0.25s
-//     lb_policy: CLUSTER_PROVIDED
-//     cleanup_interval: 1s
-//     cluster_type:
-//       name: envoy.clusters.reverse_connection
-//       typed_config:
-//         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
-//         cleanup_interval: 10s
-//   )EOF";
+TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        cleanup_interval: 10s
+  )EOF";
 
-//   EXPECT_CALL(initialized_, ready());
-//   setupFromYaml(yaml);
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
 
-//   RevConCluster::LoadBalancer lb(cluster_);
+  // Add test sockets to the socket manager
+  addTestSocket("test-uuid-123", "cluster-123");
+  addTestSocket("test-uuid-456", "cluster-456");
 
-//   // Test host creation with Host header
-//   {
-//     NiceMock<Network::MockConnection> connection;
-//     TestLoadBalancerContext lb_context(&connection);
-//     lb_context.downstream_headers_ = 
-//         Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
-//             {"Host", "test-uuid-123.tcpproxy.envoy.remote:8080"}}};
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Test host creation with Host header
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = 
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
+            {"Host", "test-uuid-123.tcpproxy.envoy.remote:8080"}}};
     
-//     auto result = lb.chooseHost(&lb_context);
-//     EXPECT_NE(result.host, nullptr);
-//     EXPECT_EQ(result.host->address()->logicalName(), "test-node-test-uuid-123");
-//   }
+    auto result = lb.chooseHost(&lb_context);
+    EXPECT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "test-uuid-123");
+  }
 
-//   // Test host creation with SNI
-//   {
-//     NiceMock<Network::MockConnection> connection;
-//     EXPECT_CALL(connection, requestedServerName())
-//         .WillRepeatedly(Return("test-uuid-456.tcpproxy.envoy.remote"));
+  // Test host creation with SNI
+  {
+    NiceMock<Network::MockConnection> connection;
+    EXPECT_CALL(connection, requestedServerName())
+        .WillRepeatedly(Return("test-uuid-456.tcpproxy.envoy.remote"));
     
-//     TestLoadBalancerContext lb_context(&connection);
-//     // No Host header, so it should fall back to SNI
-//     lb_context.downstream_headers_ = 
-//         Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{}};
+    TestLoadBalancerContext lb_context(&connection);
+    // No Host header, so it should fall back to SNI
+    lb_context.downstream_headers_ = 
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{}};
     
-//     auto result = lb.chooseHost(&lb_context);
-//     EXPECT_NE(result.host, nullptr);
-//     EXPECT_EQ(result.host->address()->logicalName(), "test-node-test-uuid-456");
-//   }
+    auto result = lb.chooseHost(&lb_context);
+    EXPECT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "test-uuid-456");
+  }
 
-//   // Test host creation with HTTP headers
-//   {
-//     NiceMock<Network::MockConnection> connection;
-//     TestLoadBalancerContext lb_context(&connection, "x-dst-cluster-uuid", "cluster-123");
+  // Test host creation with HTTP headers
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection, "x-dst-cluster-uuid", "cluster-123");
     
-//     auto result = lb.chooseHost(&lb_context);
-//     EXPECT_NE(result.host, nullptr);
-//     EXPECT_EQ(result.host->address()->logicalName(), "test-node-cluster-123");
-//   }
-// }
+    auto result = lb.chooseHost(&lb_context);
+    EXPECT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "test-uuid-123");
+  }
+}
 
-// TEST_F(ReverseConnectionClusterTest, HostReuse) {
-//   const std::string yaml = R"EOF(
-//     name: name
-//     connect_timeout: 0.25s
-//     lb_policy: CLUSTER_PROVIDED
-//     cleanup_interval: 1s
-//     cluster_type:
-//       name: envoy.clusters.reverse_connection
-//       typed_config:
-//         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
-//         cleanup_interval: 10s
-//   )EOF";
+TEST_F(ReverseConnectionClusterTest, HostReuse) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        cleanup_interval: 10s
+  )EOF";
 
-//   EXPECT_CALL(initialized_, ready());
-//   setupFromYaml(yaml);
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
 
-//   RevConCluster::LoadBalancer lb(cluster_);
+  // Add test socket to the socket manager
+  addTestSocket("test-uuid-123", "cluster-123");
 
-//   // Create first host
-//   {
-//     NiceMock<Network::MockConnection> connection;
-//     TestLoadBalancerContext lb_context(&connection);
-//     lb_context.downstream_headers_ = 
-//         Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
-//             {"Host", "test-uuid-123.tcpproxy.envoy.remote:8080"}}};
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Create first host
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = 
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
+            {"Host", "test-uuid-123.tcpproxy.envoy.remote:8080"}}};
     
-//     auto result1 = lb.chooseHost(&lb_context);
-//     EXPECT_NE(result1.host, nullptr);
+    auto result1 = lb.chooseHost(&lb_context);
+    EXPECT_NE(result1.host, nullptr);
     
-//     // Create second host with same UUID - should reuse the same host
-//     auto result2 = lb.chooseHost(&lb_context);
-//     EXPECT_NE(result2.host, nullptr);
-//     EXPECT_EQ(result1.host, result2.host);
-//   }
-// }
+    // Create second host with same UUID - should reuse the same host
+    auto result2 = lb.chooseHost(&lb_context);
+    EXPECT_NE(result2.host, nullptr);
+    EXPECT_EQ(result1.host, result2.host);
+  }
+}
 
-// TEST_F(ReverseConnectionClusterTest, DifferentHostsForDifferentUUIDs) {
-//   const std::string yaml = R"EOF(
-//     name: name
-//     connect_timeout: 0.25s
-//     lb_policy: CLUSTER_PROVIDED
-//     cleanup_interval: 1s
-//     cluster_type:
-//       name: envoy.clusters.reverse_connection
-//       typed_config:
-//         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
-//         cleanup_interval: 10s
-//   )EOF";
+TEST_F(ReverseConnectionClusterTest, DifferentHostsForDifferentUUIDs) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        cleanup_interval: 10s
+  )EOF";
 
-//   EXPECT_CALL(initialized_, ready());
-//   setupFromYaml(yaml);
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
 
-//   RevConCluster::LoadBalancer lb(cluster_);
+  // Add test sockets to the socket manager
+  addTestSocket("test-uuid-123", "cluster-123");
+  addTestSocket("test-uuid-456", "cluster-456");
 
-//   // Create first host
-//   {
-//     NiceMock<Network::MockConnection> connection;
-//     TestLoadBalancerContext lb_context(&connection);
-//     lb_context.downstream_headers_ = 
-//         Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
-//             {"Host", "test-uuid-123.tcpproxy.envoy.remote:8080"}}};
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Create first host
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = 
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
+            {"Host", "test-uuid-123.tcpproxy.envoy.remote:8080"}}};
     
-//     auto result1 = lb.chooseHost(&lb_context);
-//     EXPECT_NE(result1.host, nullptr);
+    auto result1 = lb.chooseHost(&lb_context);
+    EXPECT_NE(result1.host, nullptr);
     
-//     // Create second host with different UUID - should be different host
-//     lb_context.downstream_headers_ = 
-//         Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
-//             {"Host", "test-uuid-456.tcpproxy.envoy.remote:8080"}}};
-//     auto result2 = lb.chooseHost(&lb_context);
-//     EXPECT_NE(result2.host, nullptr);
-//     EXPECT_NE(result1.host, result2.host);
-//   }
-// }
+    // Create second host with different UUID - should be different host
+    lb_context.downstream_headers_ = 
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
+            {"Host", "test-uuid-456.tcpproxy.envoy.remote:8080"}}};
+    auto result2 = lb.chooseHost(&lb_context);
+    EXPECT_NE(result2.host, nullptr);
+    EXPECT_NE(result1.host, result2.host);
+  }
+}
 
-} // namespace
+TEST_F(ReverseConnectionClusterTest, TestCleanup) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        cleanup_interval: 10s
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
+
+  // Add test sockets to the socket manager
+  addTestSocket("test-uuid-123", "cluster-123");
+  addTestSocket("test-uuid-456", "cluster-456");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Create two hosts
+  Upstream::HostSharedPtr host1, host2;
+  
+  // Create first host
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = 
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
+            {"Host", "test-uuid-123.tcpproxy.envoy.remote:8080"}}};
+    
+    auto result1 = lb.chooseHost(&lb_context);
+    EXPECT_NE(result1.host, nullptr);
+    host1 = std::const_pointer_cast<Upstream::Host>(result1.host);
+  }
+
+  // Create second host
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = 
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
+            {"Host", "test-uuid-456.tcpproxy.envoy.remote:8080"}}};
+    
+    auto result2 = lb.chooseHost(&lb_context);
+    EXPECT_NE(result2.host, nullptr);
+    host2 = std::const_pointer_cast<Upstream::Host>(result2.host);
+  }
+
+  // Verify hosts are different
+  EXPECT_NE(host1, host2);
+
+  // Expect the cleanup timer to be enabled after cleanup
+  EXPECT_CALL(*cleanup_timer_, enableTimer(std::chrono::milliseconds(10000), nullptr));
+
+  // Call cleanup via the helper method
+  callCleanup();
+
+  // Verify that hosts can still be accessed after cleanup
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = 
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{
+            {"Host", "test-uuid-123.tcpproxy.envoy.remote:8080"}}};
+    
+    auto result = lb.chooseHost(&lb_context);
+    EXPECT_NE(result.host, nullptr);
+  }
+}
+
 } // namespace ReverseConnection
 } // namespace Extensions
 } // namespace Envoy 
