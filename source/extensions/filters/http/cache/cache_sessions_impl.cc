@@ -96,9 +96,7 @@ void ActiveLookupContext::getHeaders(GetHeadersCallback&& cb) {
         dispatcher(), lookup().timestamp(),
         [ranges = std::move(ranges.value()), cl = content_length_,
          cb = std::move(cb)](Http::ResponseHeaderMapPtr headers, EndStream end_stream) mutable {
-          if (!headers) {
-            return cb(nullptr, end_stream);
-          }
+          ASSERT(headers != nullptr, "it should be impossible for headers to be null");
           if (cl == 0 && headers->ContentLength()) {
             absl::SimpleAtoi(headers->getContentLengthValue(), &cl) || (cl = 0);
           }
@@ -499,6 +497,7 @@ void CacheSession::onBodyChunkFromCache(AdjustedByteRange range, Buffer::Instanc
   }
   if (buffer == nullptr) {
     IS_ENVOY_BUG("cache returned null buffer non-reset");
+    onCacheError();
     return;
   }
   ASSERT(buffer->length() <= range.length());
