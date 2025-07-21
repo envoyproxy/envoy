@@ -79,10 +79,13 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
   // Process send payload.
   if (config.http_health_check().has_send()) {
     // Validate that the method supports a request body when payload is specified.
-    if (method_ == envoy::config::core::v3::GET || method_ == envoy::config::core::v3::HEAD) {
+    // Use the same logic as HeaderUtility::requestShouldHaveNoBody(), except CONNECT is already
+    // disallowed by proto validation.
+    if (method_ == envoy::config::core::v3::GET || method_ == envoy::config::core::v3::HEAD ||
+        method_ == envoy::config::core::v3::DELETE || method_ == envoy::config::core::v3::TRACE) {
       throw EnvoyException(
           fmt::format("HTTP health check cannot specify a request payload with method '{}'. "
-                      "Only methods that support a request body (POST, PUT, PATCH, etc.) can be "
+                      "Only methods that support a request body (POST, PUT, PATCH, OPTIONS) can be "
                       "used with payload.",
                       envoy::config::core::v3::RequestMethod_Name(method_)));
     }
