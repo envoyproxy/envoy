@@ -400,7 +400,6 @@ void InternalEngine::onDefaultNetworkUnavailable() {
 void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
   envoy_netconf_t configuration =
       Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
-  // Refresh DNS upon network changes.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
       Runtime::runtimeFeatureEnabled(
@@ -436,7 +435,7 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
     }
     return;
   }
-
+  // Refresh DNS upon network changes.
   // This call will possibly drain all connections asynchronously.
   connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
 }
