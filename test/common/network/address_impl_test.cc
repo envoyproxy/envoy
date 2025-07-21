@@ -250,6 +250,18 @@ TEST(Ipv4InstanceTest, Teredo) {
   EXPECT_FALSE(Ipv4Instance("200.1.1.1").ip()->isTeredoAddress());
 }
 
+TEST(Ipv4InstanceTest, SiteLocal) {
+  // Site-local addresses are not applicable to IPv4.
+  EXPECT_FALSE(Ipv4Instance("1.2.3.4").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv4Instance("200.1.1.1").ip()->isSiteLocalAddress());
+}
+
+TEST(Ipv4InstanceTest, UniqueLocal) {
+  // Unique Local Addresses (ULA) are not applicable to IPv4.
+  EXPECT_FALSE(Ipv4Instance("1.2.3.4").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv4Instance("200.1.1.1").ip()->isUniqueLocalAddress());
+}
+
 TEST(Ipv4InstanceTest, BadAddress) {
   EXPECT_THROW(Ipv4Instance("foo"), EnvoyException);
   EXPECT_THROW(Ipv4Instance("bar", 1), EnvoyException);
@@ -409,6 +421,36 @@ TEST(Ipv6InstanceTest, Teredo) {
   EXPECT_FALSE(Ipv6Instance("2002::0").ip()->isTeredoAddress());
   EXPECT_FALSE(Ipv6Instance("2002::1").ip()->isTeredoAddress());
   EXPECT_FALSE(Ipv6Instance("3001::1").ip()->isTeredoAddress());
+}
+
+TEST(Ipv6InstanceTest, UniqueLocal) {
+  // Unique Local Addresses (ULA) are in the range fc00::/7.
+  EXPECT_TRUE(Ipv6Instance("fc00:0:0:0:0:0:0:0").ip()->isUniqueLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fc00::1").ip()->isUniqueLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fc00::42:43").ip()->isUniqueLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fdff::ffff:ffff:ffff:ffff:ffff:ffff").ip()->isUniqueLocalAddress());
+
+  // Not ULA addresses.
+  EXPECT_FALSE(Ipv6Instance("fec0:0:0:0:0:0:0:0").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("feff::ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fe00::0").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fe80::0").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("ff00::0").ip()->isUniqueLocalAddress());
+}
+
+TEST(Ipv6InstanceTest, SiteLocal) {
+  // Site-local addresses are in the range fec0::/10.
+  EXPECT_TRUE(Ipv6Instance("fec0:0:0:0:0:0:0:0").ip()->isSiteLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fec0::1").ip()->isSiteLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("fec0::42:43").ip()->isSiteLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("feff::ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isSiteLocalAddress());
+
+  // Not site-local addresses.
+  EXPECT_FALSE(Ipv6Instance("fc00:0:0:0:0:0:0:0").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fdff::ffff:ffff:ffff:ffff:ffff:ffff").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("ff00::0").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("2002::1").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("3001::1").ip()->isSiteLocalAddress());
 }
 
 TEST(Ipv6InstanceTest, BadAddress) {

@@ -101,6 +101,9 @@ public:
   virtual bool isUnicastAddress() const PURE;
 
   /**
+   * Determines whether the address is a link-local address, see
+   * https://datatracker.ietf.org/doc/html/rfc3513#section-2.4 for details.
+   *
    * @return true if the address is a link-local address, false otherwise.
    */
   virtual bool isLinkLocalAddress() const PURE;
@@ -112,6 +115,22 @@ public:
    * @return true if the address is a Teredo address, false otherwise.
    */
   virtual bool isTeredoAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Unique Local Address, see
+   * https://datatracker.ietf.org/doc/html/rfc4193 for details.
+   *
+   * @return true if the address is a Unique Local Address, false otherwise.
+   */
+  virtual bool isUniqueLocalAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Site-Local Address, see
+   * https://datatracker.ietf.org/doc/html/rfc3513#section-2.4 for details.
+   *
+   * @return true if the address is a Site-Local Address, false otherwise.
+   */
+  virtual bool isSiteLocalAddress() const PURE;
 
   /**
    * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise nullptr.
