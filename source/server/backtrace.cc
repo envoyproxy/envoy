@@ -8,8 +8,8 @@ namespace Envoy {
 
 bool BackwardsTrace::log_to_stderr_ = false;
 
-const std::string& BackwardsTrace::addrMapping(bool setup) {
-  CONSTRUCT_ON_FIRST_USE(std::string, [setup]() -> std::string {
+absl::string_view BackwardsTrace::addrMapping(bool setup) {
+  CONSTRUCT_ON_FIRST_USE(absl::string_view, [setup]() -> absl::string_view {
     if (!setup) {
       return "";
     }
@@ -23,7 +23,8 @@ const std::string& BackwardsTrace::addrMapping(bool setup) {
     while (std::getline(maps, line)) {
       std::vector<absl::string_view> parts = absl::StrSplit(line, ' ');
       if (parts[1] == "r-xp") {
-        return absl::StrCat(parts[0], " ", parts.back());
+        static std::string result = absl::StrCat(parts[0], " ", parts.back());
+        return result;
       }
     }
 #endif
