@@ -316,7 +316,7 @@ private:
                ipv6_.address_.sin6_addr.s6_addr[13] == 0xfe));
     }
     bool isTeredoAddress() const override {
-      // Teredo addresses have the prefix 2001::/32.
+      // Teredo addresses have the prefix 2001:0000::/32.
       return ipv6_.address_.sin6_addr.s6_addr[0] == 0x20 &&
              ipv6_.address_.sin6_addr.s6_addr[1] == 0x01 &&
              ipv6_.address_.sin6_addr.s6_addr[2] == 0x00 &&
