@@ -402,7 +402,20 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
       Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
   Http::HttpServerPropertiesCacheManager& cache_manager =
       server_->httpServerPropertiesCacheManager();
-
+  // Refresh DNS upon network changes.
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dns_cache_filter_unusable_ip_version")) {
+    // The IP version to remove flag must be set first before refreshing the DNS cache so that
+    // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
+    // removed.
+    if (!has_ipv6_connectivity) {
+      connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
+    } else {
+      connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
+    }
+  }
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
     // Reset HTTP/3 status for all origins.
     Http::HttpServerPropertiesCacheManager::CacheFn reset_status =
@@ -423,20 +436,7 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
     }
     return;
   }
-  // Refresh DNS upon network changes.
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
-      Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dns_cache_filter_unusable_ip_version")) {
-    // The IP version to remove flag must be set first before refreshing the DNS cache so that
-    // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
-    // removed.
-    if (!has_ipv6_connectivity) {
-      connectivity_manager_->dnsCache()->setIpVersionToRemove({Network::Address::IpVersion::v6});
-    } else {
-      connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
-    }
-  }
+
   // This call will possibly drain all connections asynchronously.
   connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
 }

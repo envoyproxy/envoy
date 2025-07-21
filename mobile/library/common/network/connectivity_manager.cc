@@ -1,4 +1,3 @@
-#include "connectivity_manager.h"
 #include "library/common/network/connectivity_manager.h"
 
 #include <net/if.h>
@@ -209,6 +208,8 @@ void RefreshDnsWithPostDrainHandler::refreshDnsAndDrainHosts() {
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache =
       dns_cache_manager_->lookUpCacheByName(BaseDnsCache);
   if (!dns_cache) {
+    // There may not be a DNS cache during initialization, but if one is available, it should always
+    // exist by the time this handler is instantiated from the NetworkConfigurationFilter.
     ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", "{}", std::string(BaseDnsCache));
     return;
   }
@@ -252,9 +253,6 @@ void ConnectivityManagerImpl::setDrainPostDnsRefreshEnabled(bool enabled) {
   } else if (!dns_refresh_handler_) {
     dns_refresh_handler_ =
         std::make_unique<RefreshDnsWithPostDrainHandler>(dns_cache_manager_, cluster_manager_);
-    // Register callbacks once, on demand, using the handler as a sentinel. There may not be
-    // a DNS cache during initialization, but if one is available, it should always exist by the
-    // time this function is called from the NetworkConfigurationFilter.
   }
 }
 
