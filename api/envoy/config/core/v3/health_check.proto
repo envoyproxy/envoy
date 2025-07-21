@@ -102,7 +102,8 @@ message HealthCheck {
     // ``/healthcheck``.
     string path = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
 
-    // [#not-implemented-hide:] HTTP specific payload.
+    // HTTP specific payload to be sent as the request body during health checking.
+    // If specified, the method should support a request body (POST, PUT, PATCH, etc.).
     Payload send = 3;
 
     // Specifies a list of HTTP expected responses to match in the first ``response_buffer_size`` bytes of the response body.

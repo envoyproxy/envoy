@@ -396,5 +396,12 @@ new_features:
   change: |
     Added ``assume_role_credential_provider`` to add support for role chaining in AWS filters. This allows envoy to
     assume an additional role before SigV4 signing occurs.
+- area: health_check
+  change: |
+    Added support for request payloads in HTTP health checks. The ``send`` field in ``HttpHealthCheck`` can now be
+    used to specify a request body to be sent during health checking. This feature supports both hex-encoded text
+    and binary payloads, similar to TCP health checks. The payload can only be used with HTTP methods that support
+    request bodies (POST, PUT, PATCH, etc.). See :ref:`HttpHealthCheck
+    <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
 
 deprecated:

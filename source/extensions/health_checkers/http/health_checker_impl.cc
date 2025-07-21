@@ -75,6 +75,25 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
       random_generator_(context.api().randomGenerator()) {
   // TODO(boteng): introduce additional validation for the authority and path headers
   // based on the default UHV when it is available.
+
+  // Process send payload.
+  if (config.http_health_check().has_send()) {
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> send_repeated;
+    send_repeated.Add()->CopyFrom(config.http_health_check().send());
+    auto send_bytes_or_error = PayloadMatcher::loadProtoBytes(send_repeated);
+    THROW_IF_NOT_OK_REF(send_bytes_or_error.status());
+    send_bytes_ = send_bytes_or_error.value();
+
+    // Validate that the method supports a request body when payload is specified.
+    if (method_ == envoy::config::core::v3::GET || method_ == envoy::config::core::v3::HEAD) {
+      throw EnvoyException(
+          fmt::format("HTTP health check cannot specify a request payload with method '{}'. "
+                      "Only methods that support a request body (POST, PUT, PATCH, etc.) can be "
+                      "used with payload.",
+                      envoy::config::core::v3::RequestMethod_Name(method_)));
+    }
+  }
+
   auto bytes_or_error = PayloadMatcher::loadProtoBytes(config.http_health_check().receive());
   THROW_IF_NOT_OK_REF(bytes_or_error.status());
   receive_bytes_ = bytes_or_error.value();
@@ -275,9 +294,31 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   stream_info.setUpstreamInfo(std::make_shared<StreamInfo::UpstreamInfoImpl>());
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
-  auto status = request_encoder->encodeHeaders(*request_headers, true);
+
+  // Check if we have a payload to send.
+  const bool has_payload = !parent_.send_bytes_.empty();
+
+  if (has_payload) {
+    // Set Content-Length header for the payload.
+    uint64_t payload_size = 0;
+    for (const auto& segment : parent_.send_bytes_) {
+      payload_size += segment.size();
+    }
+    request_headers->setContentLength(payload_size);
+  }
+
+  auto status = request_encoder->encodeHeaders(*request_headers, !has_payload);
   // Encoding will only fail if required request headers are missing.
   ASSERT(status.ok());
+
+  // Send the payload as request body if specified.
+  if (has_payload) {
+    Buffer::OwnedImpl payload_buffer;
+    for (const auto& segment : parent_.send_bytes_) {
+      payload_buffer.add(segment.data(), segment.size());
+    }
+    request_encoder->encodeData(payload_buffer, true);
+  }
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResetStream(Http::StreamResetReason,

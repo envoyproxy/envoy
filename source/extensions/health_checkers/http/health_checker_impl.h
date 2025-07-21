@@ -166,6 +166,7 @@ private:
 
   const std::string path_;
   const std::string host_value_;
+  PayloadMatcher::MatchSegments send_bytes_;
   PayloadMatcher::MatchSegments receive_bytes_;
   const envoy::config::core::v3::RequestMethod method_;
   uint64_t response_buffer_size_;
