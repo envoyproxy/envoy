@@ -12,9 +12,9 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_extension_cc_test(
-    name = "reverse_tunnel_acceptor_extension_test",
+    name = "reverse_tunnel_acceptor_test",
     size = "large",
-    srcs = ["reverse_tunnel_acceptor_extension_test.cc"],
+    srcs = ["reverse_tunnel_acceptor_test.cc"],
     extension_names = ["envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface"],
     deps = [
         "//source/common/network:socket_interface_lib",

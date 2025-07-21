@@ -1002,13 +1002,13 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteSuccess) {
       .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         // Drain the buffer to simulate successful write
         buffer.drain(buffer.length());
-        return Api::IoCallUint64Result{0, Network::IoSocketError::create(EAGAIN)};
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
       }));
   EXPECT_CALL(*mock_io_handle2, write(_))
       .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
         // Drain the buffer to simulate successful write
         buffer.drain(buffer.length());
-        return Api::IoCallUint64Result{0, Network::IoSocketError::create(EAGAIN)};
+        return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
       }));
 
   // Manually call pingConnections to test the functionality
@@ -1056,7 +1056,7 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
         // Drain the buffer to simulate successful write
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{
-            0, Network::IoSocketError::create(EAGAIN)}; // Second socket succeeds
+            0, Network::IoSocketError::getIoSocketEagainError()}; // Second socket succeeds
       }));
 
   // Manually call pingConnections to test the functionality
@@ -1137,7 +1137,8 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseReadError) {
 
   // Mock read error
   EXPECT_CALL(*mock_io_handle, read(_, _))
-      .WillOnce(Return(Api::IoCallUint64Result{0, Network::IoSocketError::create(EAGAIN)}));
+      .WillOnce(
+          Return(Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()}));
 
   // Call onPingResponse - should mark socket dead due to read error
   socket_manager_->onPingResponse(*mock_io_handle);
