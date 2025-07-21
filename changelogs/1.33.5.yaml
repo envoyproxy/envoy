@@ -1,0 +1,17 @@
+date: July 18, 2025
+
+bug_fixes:
+- area: tls
+  change: |
+    Fixed an issue with incorrectly cached connection properties on TLS connections.
+    If TLS connection data was queried before it was available, an empty value was being incorrectly cached, preventing later calls from
+    getting the correct value. This could be triggered with a ``tcp_proxy`` access log configured to emit a log upon connection
+    establishment if the log contains fields of the the TLS peer certificate. Then a later use of the data, such as the network RBAC
+    filter validating a peer certificate SAN, may incorrectly fail due to the empty cached value.
+- area: release
+  change: |
+    Container (Ubuntu/distroless) updates, and fixed permissions for distroless config directory.
+- area: dynatrace
+  change: |
+    Fixed a division by zero bug in the Dynatrace sampling controller that occurred when ``total_wanted`` was less than
+    ``top_k_size``. The calculation was refactored to avoid the intermediate division that could result in zero.
