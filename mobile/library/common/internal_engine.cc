@@ -400,8 +400,6 @@ void InternalEngine::onDefaultNetworkUnavailable() {
 void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
   envoy_netconf_t configuration =
       Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
-  Http::HttpServerPropertiesCacheManager& cache_manager =
-      server_->httpServerPropertiesCacheManager();
   // Refresh DNS upon network changes.
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
@@ -416,6 +414,8 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
       connectivity_manager_->dnsCache()->setIpVersionToRemove(absl::nullopt);
     }
   }
+  Http::HttpServerPropertiesCacheManager& cache_manager =
+      server_->httpServerPropertiesCacheManager();
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_no_tcp_delay")) {
     // Reset HTTP/3 status for all origins.
     Http::HttpServerPropertiesCacheManager::CacheFn reset_status =
