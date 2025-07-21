@@ -94,6 +94,7 @@ envoy_cc_library(
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:utility_lib",
+        "//source/extensions/common/aws/credential_providers:assume_role_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:container_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:environment_credentials_provider_lib",

@@ -23,9 +23,10 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    * @param eventTracker    The event tracking interface.
    */
   public EnvoyEngineImpl(EnvoyOnEngineRunning runningCallback, EnvoyLogger logger,
-                         EnvoyEventTracker eventTracker) {
+                         EnvoyEventTracker eventTracker, Boolean disableDnsRefreshOnNetworkChange) {
     JniLibrary.load();
-    this.engineHandle = JniLibrary.initEngine(runningCallback, logger, eventTracker);
+    this.engineHandle = JniLibrary.initEngine(runningCallback, logger, eventTracker,
+                                              disableDnsRefreshOnNetworkChange.booleanValue());
   }
 
   /**
