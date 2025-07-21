@@ -410,17 +410,17 @@ private:
   Random::RandomGeneratorPtr random_generator_;
 
   // Map of node IDs to connection sockets, stored on the accepting(remote) envoy.
-  std::unordered_map<std::string, std::list<Network::ConnectionSocketPtr>>
+  absl::flat_hash_map<std::string, std::list<Network::ConnectionSocketPtr>>
       accepted_reverse_connections_;
 
   // Map from file descriptor to node ID
-  std::unordered_map<int, std::string> fd_to_node_map_;
+  absl::flat_hash_map<int, std::string> fd_to_node_map_;
 
   // Map of node ID to the corresponding cluster it belongs to.
-  std::unordered_map<std::string, std::string> node_to_cluster_map_;
+  absl::flat_hash_map<std::string, std::string> node_to_cluster_map_;
 
   // Map of cluster IDs to list of node IDs
-  std::unordered_map<std::string, std::vector<std::string>> cluster_to_node_map_;
+  absl::flat_hash_map<std::string, std::vector<std::string>> cluster_to_node_map_;
 
   // File events and timers for ping functionality
   absl::flat_hash_map<int, Event::FileEventPtr> fd_to_event_map_;
