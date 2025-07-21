@@ -210,6 +210,8 @@ private:
 class ReverseTunnelAcceptorExtension
     : public Envoy::Network::SocketInterfaceExtension,
       public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
+  // Friend class for testing
+  friend class ReverseTunnelAcceptorExtensionTest;
 public:
   /**
    * @param sock_interface the socket interface to extend.
@@ -300,6 +302,16 @@ public:
    */
   Stats::Scope& getStatsScope() const { return context_.scope(); }
 
+  /**
+   * Test-only method to set the thread local slot for testing purposes.
+   * This allows tests to inject a custom thread local registry without
+   * requiring friend class access.
+   * @param slot the thread local slot to set
+   */
+  void setTestOnlyTLSRegistry(std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> slot) {
+    tls_slot_ = std::move(slot);
+  }
+
 private:
   Server::Configuration::ServerFactoryContext& context_;
   // Thread-local slot for storing the socket manager per worker thread.
@@ -315,6 +327,9 @@ private:
  */
 class UpstreamSocketManager : public ThreadLocal::ThreadLocalObject,
                               public Logger::Loggable<Logger::Id::filter> {
+  // Friend class for testing
+  friend class TestUpstreamSocketManager;
+
 public:
   UpstreamSocketManager(Event::Dispatcher& dispatcher,
                         ReverseTunnelAcceptorExtension* extension = nullptr);
@@ -337,10 +352,10 @@ public:
 
   /** Called by the responder envoy when a request is received, that could be sent through a reverse
    * connection. This returns an accepted connection socket, if present.
-   * @param key the remote cluster ID/ node ID.
-   * @return pair containing the connection socket and whether proxy protocol is expected.
+   * @param node_id the node ID to get a socket for.
+   * @return the connection socket, or nullptr if none available.
    */
-  std::pair<Network::ConnectionSocketPtr, bool> getConnectionSocket(const std::string& node_id);
+  Network::ConnectionSocketPtr getConnectionSocket(const std::string& node_id);
 
   /** Mark the connection socket dead and remove it from internal maps.
    * @param fd the FD for the socket to be marked dead.
@@ -377,8 +392,14 @@ public:
    * @return pointer to the upstream extension or nullptr if not available.
    */
   ReverseTunnelAcceptorExtension* getUpstreamExtension() const { return extension_; }
-
-  // Get node ID from key (cluster ID or node ID)
+  /**
+   * Automatically discern whether the key is a node ID or a cluster ID. The key is a
+   * cluster ID if any worker has a reverse connection for that cluster, in which case
+   * return a node belonging to that cluster. Otherwise, it is a node ID, in which case
+   * return the node ID as-is.
+   * @param key the key to get the node ID for.
+   * @return the node ID or cluster ID.
+   */
   std::string getNodeID(const std::string& key);
 
 private:
