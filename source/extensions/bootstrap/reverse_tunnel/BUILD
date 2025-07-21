@@ -70,12 +70,25 @@ envoy_cc_extension(
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf",
-        "//source/common/reverse_connection:reverse_connection_utility_lib",
+        ":reverse_connection_utility_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/reverse_conn/v3:pkg_cc_proto",
     ],
     alwayslink = 1,
+)
+
+envoy_cc_extension(
+    name = "reverse_connection_utility_lib",
+    srcs = ["reverse_connection_utility.cc"],
+    hdrs = ["reverse_connection_utility.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/network:connection_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+    ],
 )
 
 envoy_cc_extension(
@@ -99,7 +112,7 @@ envoy_cc_extension(
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/protobuf",
-        "//source/common/reverse_connection:reverse_connection_utility_lib",
+        ":reverse_connection_utility_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
     ],
     alwayslink = 1,

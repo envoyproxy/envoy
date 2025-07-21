@@ -1,9 +1,11 @@
-#include "source/common/reverse_connection/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_utility.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Bootstrap {
 namespace ReverseConnection {
 
 bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
@@ -91,4 +93,6 @@ bool PingMessageHandler::processPingMessage(absl::string_view data,
 }
 
 } // namespace ReverseConnection
-} // namespace Envoy
+} // namespace Bootstrap
+} // namespace Extensions
+} // namespace Envoy 

@@ -21,7 +21,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/reverse_connection/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_address.h"
 
 #include "google/protobuf/empty.pb.h"
@@ -191,9 +191,9 @@ private:
       const std::string data = buffer.toString();
 
       // Handle ping messages.
-      if (::Envoy::ReverseConnection::ReverseConnectionUtility::isPingMessage(data)) {
+      if (::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::isPingMessage(data)) {
         ENVOY_LOG(debug, "Received RPING message, using utility to echo back");
-        ::Envoy::ReverseConnection::ReverseConnectionUtility::sendPingResponse(
+        ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::sendPingResponse(
             *parent_->connection_);
         buffer.drain(buffer.length()); // Consume the ping message.
         return Network::FilterStatus::Continue;

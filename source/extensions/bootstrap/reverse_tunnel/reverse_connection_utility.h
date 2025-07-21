@@ -11,6 +11,8 @@
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
+namespace Extensions {
+namespace Bootstrap {
 namespace ReverseConnection {
 
 /**
@@ -133,4 +135,6 @@ private:
 };
 
 } // namespace ReverseConnection
-} // namespace Envoy
+} // namespace Bootstrap
+} // namespace Extensions
+} // namespace Envoy 

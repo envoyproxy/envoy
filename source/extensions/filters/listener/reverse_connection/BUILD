@@ -30,7 +30,7 @@ envoy_cc_extension(
         "//envoy/network:filter_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:logger_lib",
-        "//source/common/reverse_connection:reverse_connection_utility_lib",
+        "//source/extensions/bootstrap/reverse_tunnel:reverse_connection_utility_lib",
     ],
 )
 

@@ -13,7 +13,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
-#include "source/common/reverse_connection/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_utility.h"
 
 // #include "source/common/network/io_socket_handle_impl.h"
 
@@ -23,7 +23,7 @@ namespace ListenerFilters {
 namespace ReverseConnection {
 
 // Use centralized constants from utility
-using ::Envoy::ReverseConnection::ReverseConnectionUtility;
+using ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility;
 
 Filter::Filter(const Config& config) : config_(config) {
   ENVOY_LOG(debug, "reverse_connection: ping_wait_timeout is {}",
