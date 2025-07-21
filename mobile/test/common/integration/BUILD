@@ -51,6 +51,7 @@ envoy_cc_test_library(
         "//library/cc:engine_builder_lib",
         "//library/common/http:client_lib",
         "//library/common/http:header_utility_lib",
+        "//library/common/network:network_types_lib",
         "//library/common/types:c_types_lib",
         "@envoy//test/common/http:common_lib",
         "@envoy//test/integration:http_integration_lib_light",

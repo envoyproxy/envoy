@@ -354,9 +354,9 @@ public:
 
   // Http::HashPolicy
   MOCK_METHOD(absl::optional<uint64_t>, generateHash,
-              (const Network::Address::Instance* downstream_address,
-               const Http::RequestHeaderMap& headers, const AddCookieCallback add_cookie,
-               const StreamInfo::FilterStateSharedPtr filter_state),
+              (OptRef<const Http::RequestHeaderMap> headers,
+               OptRef<const StreamInfo::StreamInfo> info,
+               Http::HashPolicy::AddCookieCallback add_cookie),
               (const));
 };
 
@@ -456,6 +456,8 @@ public:
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
+  MOCK_METHOD(void, refreshRouteCluster,
+              (const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
@@ -519,7 +521,7 @@ public:
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
-  MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
+  MOCK_METHOD(const VirtualHostConstSharedPtr&, virtualHost, (), (const));
 
   // Router::RouteEntry
   MOCK_METHOD(const std::string&, clusterName, (), (const));
@@ -569,6 +571,8 @@ public:
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
+  MOCK_METHOD(void, refreshRouteCluster,
+              (const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
@@ -576,7 +580,10 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
   std::string route_name_{"fake_route_name"};
-  testing::NiceMock<MockVirtualHost> virtual_host_;
+  std::shared_ptr<testing::NiceMock<MockVirtualHost>> virtual_host_ =
+      std::make_shared<testing::NiceMock<MockVirtualHost>>();
+  // Same with virtual_host_ but this could be returned as VirtualHostConstSharedPtr reference.
+  VirtualHostConstSharedPtr virtual_host_copy_ = virtual_host_;
 };
 
 class MockConfig : public Config {
@@ -585,11 +592,11 @@ public:
   ~MockConfig() override;
 
   // Router::Config
-  MOCK_METHOD(RouteConstSharedPtr, route,
+  MOCK_METHOD(VirtualHostRoute, route,
               (const Http::RequestHeaderMap&, const Envoy::StreamInfo::StreamInfo&,
                uint64_t random_value),
               (const));
-  MOCK_METHOD(RouteConstSharedPtr, route,
+  MOCK_METHOD(VirtualHostRoute, route,
               (const RouteCallback& cb, const Http::RequestHeaderMap&,
                const Envoy::StreamInfo::StreamInfo&, uint64_t random_value),
               (const));
@@ -735,7 +742,7 @@ public:
 
   MOCK_METHOD(RouteConstSharedPtr, route,
               (RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap& headers,
-               const StreamInfo::StreamInfo& stream_info),
+               const StreamInfo::StreamInfo& stream_info, uint64_t random),
               (const));
 };
 
@@ -744,7 +751,7 @@ public:
   MockClusterSpecifierPluginFactoryConfig();
   MOCK_METHOD(ClusterSpecifierPluginSharedPtr, createClusterSpecifierPlugin,
               (const Protobuf::Message& config,
-               Server::Configuration::CommonFactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();

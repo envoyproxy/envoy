@@ -17,11 +17,11 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
       config_(std::make_shared<FilterConfig>(
-          factory_context_, pool_.add("test"), factory_context_.local_info_,
-          *stats_store_.rootScope(), cm_, runtime_, random_, ShadowWriterPtr{shadow_writer_}, true,
-          start_child_span, suppress_envoy_headers, false, suppress_grpc_request_failure_code_stats,
-          flush_upstream_log_on_upstream_stream, std::move(strict_headers_to_check),
-          test_time_.timeSystem(), http_context_, router_context_)),
+          factory_context_, pool_.add("test"), *stats_store_.rootScope(), cm_, runtime_, random_,
+          ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers, false,
+          suppress_grpc_request_failure_code_stats, flush_upstream_log_on_upstream_stream,
+          std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_,
+          router_context_)),
       router_(std::make_unique<RouterTestFilter>(config_, config_->default_stats_)) {
   router_->setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");
@@ -177,9 +177,9 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
   router_->onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(0U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_count_in_response,
@@ -212,7 +212,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
   EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 void RouterTestBase::sendRequest(bool end_stream) {

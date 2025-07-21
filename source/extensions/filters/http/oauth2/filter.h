@@ -163,6 +163,10 @@ public:
   std::chrono::seconds defaultRefreshTokenExpiresIn() const {
     return default_refresh_token_expires_in_;
   }
+  std::chrono::seconds getCsrfTokenExpiresIn() const { return csrf_token_expires_in_; }
+  std::chrono::seconds getCodeVerifierTokenExpiresIn() const {
+    return code_verifier_token_expires_in_;
+  }
   bool disableIdTokenSetCookie() const { return disable_id_token_set_cookie_; }
   bool disableAccessTokenSetCookie() const { return disable_access_token_set_cookie_; }
   bool disableRefreshTokenSetCookie() const { return disable_refresh_token_set_cookie_; }
@@ -223,6 +227,8 @@ private:
   const AuthType auth_type_;
   const std::chrono::seconds default_expires_in_;
   const std::chrono::seconds default_refresh_token_expires_in_;
+  const std::chrono::seconds csrf_token_expires_in_;
+  const std::chrono::seconds code_verifier_token_expires_in_;
   const bool forward_bearer_token_ : 1;
   const bool preserve_authorization_header_ : 1;
   const bool use_refresh_token_ : 1;
@@ -262,13 +268,13 @@ public:
   virtual bool canUpdateTokenByRefreshToken() const PURE;
 };
 
-class OAuth2CookieValidator : public CookieValidator {
+class OAuth2CookieValidator : public CookieValidator, Logger::Loggable<Logger::Id::oauth2> {
 public:
   explicit OAuth2CookieValidator(TimeSource& time_source, const CookieNames& cookie_names,
                                  const std::string& cookie_domain)
       : time_source_(time_source), cookie_names_(cookie_names), cookie_domain_(cookie_domain) {}
 
-  const std::string& token() const override { return token_; }
+  const std::string& token() const override { return access_token_; }
   const std::string& refreshToken() const override { return refresh_token_; }
 
   void setParams(const Http::RequestHeaderMap& headers, const std::string& secret) override;
@@ -278,7 +284,7 @@ public:
   bool canUpdateTokenByRefreshToken() const override;
 
 private:
-  std::string token_;
+  std::string access_token_;
   std::string id_token_;
   std::string refresh_token_;
   std::string expires_;
@@ -362,7 +368,7 @@ private:
   bool canRedirectToOAuthServer(Http::RequestHeaderMap& headers) const;
   void redirectToOAuthServer(Http::RequestHeaderMap& headers);
 
-  Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers);
+  Http::FilterHeadersStatus signOutUser(const Http::RequestHeaderMap& headers) const;
 
   std::string getEncodedToken() const;
   std::string getExpiresTimeForRefreshToken(const std::string& refresh_token,
@@ -373,9 +379,13 @@ private:
   void addResponseCookies(Http::ResponseHeaderMap& headers, const std::string& encoded_token) const;
   const std::string& bearerPrefix() const;
   CallbackValidationResult validateOAuthCallback(const Http::RequestHeaderMap& headers,
-                                                 const absl::string_view path_str);
+                                                 const absl::string_view path_str) const;
   bool validateCsrfToken(const Http::RequestHeaderMap& headers,
                          const std::string& csrf_token) const;
+  void decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const;
+  std::string encryptToken(const std::string& token) const;
+  std::string decryptToken(const std::string& encrypted_token) const;
+  void removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const;
 };
 
 } // namespace Oauth2

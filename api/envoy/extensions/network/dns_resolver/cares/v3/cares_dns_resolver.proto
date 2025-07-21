@@ -22,16 +22,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Configuration for c-ares DNS resolver.
 // [#next-free-field: 9]
 message CaresDnsResolverConfig {
-  // A list of dns resolver addresses.
-  // :ref:`use_resolvers_as_fallback<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
+  // A list of DNS resolver addresses.
+  // :ref:`use_resolvers_as_fallback <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
   // below dictates if the DNS client should override system defaults or only use the provided
   // resolvers if the system defaults are not available, i.e., as a fallback.
   repeated config.core.v3.Address resolvers = 1;
 
   // If true use the resolvers listed in the
-  // :ref:`resolvers<envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.resolvers>`
+  // :ref:`resolvers <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.resolvers>`
   // field only if c-ares is unable to obtain a
-  // nameserver from the system (e.g., /etc/resolv.conf).
+  // nameserver from the system (e.g., ``/etc/resolv.conf``).
   // Otherwise, the resolvers listed in the resolvers list will override the default system
   // resolvers. Defaults to false.
   bool use_resolvers_as_fallback = 3;
@@ -45,27 +45,36 @@ message CaresDnsResolverConfig {
   // Configuration of DNS resolver option flags which control the behavior of the DNS resolver.
   config.core.v3.DnsResolverOptions dns_resolver_options = 2;
 
-  // This option allows for number of UDP based DNS queries to be capped. Note, this
-  // is only applicable to c-ares DNS resolver currently.
+  // This option allows the number of UDP based DNS queries to be capped.
+  //
+  // .. note::
+  //   This is only applicable to c-ares DNS resolver currently.
+  //
   google.protobuf.UInt32Value udp_max_queries = 5;
 
   // The number of seconds each name server is given to respond to a query on the first try of any given server.
   //
-  // Note: While the c-ares library defaults to 2 seconds, Envoy's default (if this field is unset) is 5 seconds.
-  // This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
+  // .. note::
+  //   While the c-ares library defaults to 2 seconds, Envoy's default (if this field is unset) is 5 seconds.
+  //   This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
+  //
   google.protobuf.UInt64Value query_timeout_seconds = 6 [(validate.rules).uint64 = {gte: 1}];
 
   // The maximum number of query attempts the resolver will make before giving up.
   // Each attempt may use a different name server.
   //
-  // Note: While the c-ares library defaults to 3 attempts, Envoy's default (if this field is unset) is 4 attempts.
-  // This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
+  // .. note::
+  //   While the c-ares library defaults to 3 attempts, Envoy's default (if this field is unset) is 4 attempts.
+  //   This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
+  //
   google.protobuf.UInt32Value query_tries = 7 [(validate.rules).uint32 = {gte: 1}];
 
   // Enable round-robin selection of name servers for DNS resolution. When enabled, the resolver will cycle through the
   // list of name servers for each resolution request. This can help distribute the query load across multiple name
   // servers. If disabled (default), the resolver will try name servers in the order they are configured.
   //
-  // Note: This setting overrides any system configuration for name server rotation.
+  // .. note::
+  //   This setting overrides any system configuration for name server rotation.
+  //
   bool rotate_nameservers = 8;
 }

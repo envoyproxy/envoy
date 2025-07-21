@@ -14,6 +14,7 @@
 
 #include "fmt/ostream.h"
 #include "library/common/network/network_type_socket_option_impl.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/src_addr_socket_option_impl.h"
 
 // Used on Linux (requires root/CAP_NET_RAW)
@@ -283,6 +284,7 @@ void ConnectivityManagerImpl::resetConnectivityState() {
   envoy_netconf_t configuration_key;
   {
     Thread::LockGuard lock{network_state_.mutex_};
+    network_state_.network_ = 0;
     network_state_.remaining_faults_ = 1;
     network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
     configuration_key = ++network_state_.configuration_key_;
