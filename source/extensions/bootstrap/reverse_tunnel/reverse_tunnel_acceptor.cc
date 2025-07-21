@@ -185,7 +185,7 @@ void ReverseTunnelAcceptorExtension::onServerInitialized() {
 UpstreamSocketThreadLocal* ReverseTunnelAcceptorExtension::getLocalRegistry() const {
   ENVOY_LOG(debug, "ReverseTunnelAcceptorExtension::getLocalRegistry()");
   if (!tls_slot_) {
-    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension::getLocalRegistry() - no thread local slot");
+    ENVOY_LOG(warn, "ReverseTunnelAcceptorExtension::getLocalRegistry() - no thread local slot");
     return nullptr;
   }
 
