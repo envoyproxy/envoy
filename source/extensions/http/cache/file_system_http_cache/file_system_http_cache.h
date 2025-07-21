@@ -86,14 +86,6 @@ public:
   absl::string_view cachePath() const;
 
   /**
-   * Returns the AsyncFileManager associated with this instance.
-   * @return a shared_ptr to the AsyncFileManager associated with this instance.
-   */
-  std::shared_ptr<Common::AsyncFiles::AsyncFileManager> asyncFileManager() const {
-    return async_file_manager_;
-  }
-
-  /**
    * Updates stats to reflect that a file has been added to the cache.
    * @param file_size The size in bytes of the file that was added.
    */

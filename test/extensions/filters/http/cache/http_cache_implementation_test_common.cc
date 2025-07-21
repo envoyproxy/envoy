@@ -322,6 +322,27 @@ TEST_P(HttpCacheImplementationTest, InsertReadingNullBufferBodyWithEndStream) {
   pumpDispatcher();
 }
 
+TEST_P(HttpCacheImplementationTest, HeadersOnlyInsert) {
+  const std::string request_path1("/name");
+  LookupResult lookup_result = lookup(request_path1);
+  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"cache-control", "public,max-age=3600"}};
+
+  const ResponseMetadata metadata{time_system_.systemTime()};
+  auto mock_progress_receiver = std::make_shared<MockCacheProgressReceiver>();
+  EXPECT_CALL(*mock_progress_receiver,
+              onHeadersInserted(_, HeaderMapEqualIgnoreOrder(&response_headers), true));
+  // source=nullptr indicates that the response was headers-only.
+  cache().insert(dispatcher(), simpleKey(request_path1),
+                 Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers), metadata,
+                 nullptr, mock_progress_receiver);
+  pumpDispatcher();
+}
+
 TEST_P(HttpCacheImplementationTest, ReadingFromBodyDuringInsert) {
   const std::string request_path1("/name");
   LookupResult lookup_result = lookup(request_path1);
@@ -372,6 +393,101 @@ TEST_P(HttpCacheImplementationTest, ReadingFromBodyDuringInsert) {
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(&mock_body_callback);
   Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
+}
+
+TEST_P(HttpCacheImplementationTest, UpstreamResetWhileExpectingBodyShouldBeInsertFailed) {
+  const std::string request_path1("/name");
+  LookupResult lookup_result = lookup(request_path1);
+  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"cache-control", "public,max-age=3600"}};
+
+  const std::string body("Hello World");
+  auto source = std::make_unique<MockHttpSource>();
+  GetBodyCallback get_body_1;
+  EXPECT_CALL(*source, getBody(RangeIs(0, Ge(11)), _))
+      .WillOnce([&](AdjustedByteRange, GetBodyCallback cb) { get_body_1 = std::move(cb); });
+  const ResponseMetadata metadata{time_system_.systemTime()};
+  auto mock_progress_receiver = std::make_shared<MockCacheProgressReceiver>();
+  CacheReaderPtr cache_reader;
+  EXPECT_CALL(*mock_progress_receiver,
+              onHeadersInserted(_, HeaderMapEqualIgnoreOrder(&response_headers), false))
+      .WillOnce([&cache_reader](CacheReaderPtr cr, Http::ResponseHeaderMapPtr, bool) {
+        cache_reader = std::move(cr);
+      });
+  cache().insert(dispatcher(), simpleKey(request_path1),
+                 Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers), metadata,
+                 std::move(source), mock_progress_receiver);
+  pumpDispatcher();
+  Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
+  ASSERT_THAT(cache_reader, NotNull());
+  ASSERT_THAT(get_body_1, NotNull());
+  EXPECT_CALL(*mock_progress_receiver, onInsertFailed());
+  get_body_1(nullptr, EndStream::Reset);
+  pumpDispatcher();
+  Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
+}
+
+TEST_P(HttpCacheImplementationTest, TouchOnExistingEntryHasNoExternallyVisibleEffect) {
+  auto key = simpleKey("/name");
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"cache-control", "public,max-age=3600"}};
+  insert(key, response_headers, "");
+  cache().touch(key, SystemTime());
+}
+
+TEST_P(HttpCacheImplementationTest, TouchOnAbsentEntryHasNoExternallyVisibleEffect) {
+  auto key = simpleKey("/name");
+  cache().touch(key, SystemTime());
+}
+
+TEST_P(HttpCacheImplementationTest, UpstreamResetWhileExpectingTrailersShouldBeInsertFailed) {
+  const std::string request_path1("/name");
+  LookupResult lookup_result = lookup(request_path1);
+  EXPECT_THAT(lookup_result.body_length_, Eq(absl::nullopt));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"date", formatter_.fromTime(time_system_.systemTime())},
+      {"cache-control", "public,max-age=3600"}};
+
+  const std::string body("Hello World");
+  auto source = std::make_unique<MockHttpSource>();
+  GetBodyCallback get_body_1;
+  GetTrailersCallback get_trailers;
+  EXPECT_CALL(*source, getBody(RangeIs(0, Ge(6)), _))
+      .WillOnce([&](AdjustedByteRange, GetBodyCallback cb) { get_body_1 = std::move(cb); });
+  EXPECT_CALL(*source, getTrailers(_)).WillOnce([&](GetTrailersCallback cb) {
+    get_trailers = std::move(cb);
+  });
+  const ResponseMetadata metadata{time_system_.systemTime()};
+  auto mock_progress_receiver = std::make_shared<MockCacheProgressReceiver>();
+  CacheReaderPtr cache_reader;
+  EXPECT_CALL(*mock_progress_receiver,
+              onHeadersInserted(_, HeaderMapEqualIgnoreOrder(&response_headers), false))
+      .WillOnce([&cache_reader](CacheReaderPtr cr, Http::ResponseHeaderMapPtr, bool) {
+        cache_reader = std::move(cr);
+      });
+  cache().insert(dispatcher(), simpleKey(request_path1),
+                 Http::createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers), metadata,
+                 std::move(source), mock_progress_receiver);
+  pumpDispatcher();
+  Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
+  ASSERT_THAT(cache_reader, NotNull());
+  ASSERT_THAT(get_body_1, NotNull());
+  // Null body + EndStream::More signifies trailers.
+  get_body_1(nullptr, EndStream::More);
+  pumpDispatcher();
+  Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
+  ASSERT_THAT(get_trailers, NotNull());
+  EXPECT_CALL(*mock_progress_receiver, onInsertFailed());
+  get_trailers(nullptr, EndStream::Reset);
+  pumpDispatcher();
 }
 
 } // namespace Cache

@@ -125,12 +125,6 @@ public:
   uint64_t offsetToHeaders() const { return offsetToTrailers() + trailerSize(); }
 
   /**
-   * the offset from the start of the file to the end of the file.
-   * @return the offset in bytes.
-   */
-  uint64_t offsetToEnd() const { return offsetToHeaders() + headerSize(); }
-
-  /**
    * is this a valid cache file header block for the current code version?
    * @return True if the block's cache version id and file id match the current version.
    */
