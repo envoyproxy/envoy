@@ -78,12 +78,6 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
 
   // Process send payload.
   if (config.http_health_check().has_send()) {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> send_repeated;
-    send_repeated.Add()->CopyFrom(config.http_health_check().send());
-    auto send_bytes_or_error = PayloadMatcher::loadProtoBytes(send_repeated);
-    THROW_IF_NOT_OK_REF(send_bytes_or_error.status());
-    send_bytes_ = send_bytes_or_error.value();
-
     // Validate that the method supports a request body when payload is specified.
     if (method_ == envoy::config::core::v3::GET || method_ == envoy::config::core::v3::HEAD) {
       throw EnvoyException(
@@ -91,6 +85,17 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
                       "Only methods that support a request body (POST, PUT, PATCH, etc.) can be "
                       "used with payload.",
                       envoy::config::core::v3::RequestMethod_Name(method_)));
+    }
+
+    // Process the payload and store it in the buffer once during construction.
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> send_repeated;
+    send_repeated.Add()->CopyFrom(config.http_health_check().send());
+    auto send_bytes_or_error = PayloadMatcher::loadProtoBytes(send_repeated);
+    THROW_IF_NOT_OK_REF(send_bytes_or_error.status());
+
+    // Copy the processed payload into the buffer once.
+    for (const auto& segment : send_bytes_or_error.value()) {
+      request_payload_.add(segment.data(), segment.size());
     }
   }
 
@@ -296,15 +301,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
 
   // Check if we have a payload to send.
-  const bool has_payload = !parent_.send_bytes_.empty();
-
+  const bool has_payload = parent_.request_payload_.length() > 0;
   if (has_payload) {
     // Set Content-Length header for the payload.
-    uint64_t payload_size = 0;
-    for (const auto& segment : parent_.send_bytes_) {
-      payload_size += segment.size();
-    }
-    request_headers->setContentLength(payload_size);
+    request_headers->setContentLength(parent_.request_payload_.length());
   }
 
   auto status = request_encoder->encodeHeaders(*request_headers, !has_payload);
@@ -313,11 +313,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
   // Send the payload as request body if specified.
   if (has_payload) {
-    Buffer::OwnedImpl payload_buffer;
-    for (const auto& segment : parent_.send_bytes_) {
-      payload_buffer.add(segment.data(), segment.size());
-    }
-    request_encoder->encodeData(payload_buffer, true);
+    // Copy the payload buffer to send (we need to preserve the original for reuse).
+    Buffer::OwnedImpl payload_copy;
+    payload_copy.add(parent_.request_payload_);
+    request_encoder->encodeData(payload_copy, true);
   }
 }
 
