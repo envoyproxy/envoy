@@ -87,10 +87,10 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
   auto& http_context = typedContext<HttpAttachContext>(context);
   Http::ResponseDecoder& response_decoder = *http_context.decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
-  
+
   // Track this request on the connection
   http_client->trackRequest();
-  
+
   Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
   callbacks.onPoolReady(new_encoder, client.real_host_description_,
                         http_client->codec_client_->streamInfo(),
@@ -210,9 +210,7 @@ RequestEncoder& MultiplexedActiveClientBase::newStreamEncoder(ResponseDecoder& r
   return codec_client_->newStream(response_decoder);
 }
 
-void ActiveClient::trackRequest() {
-  request_count_++;
-}
+void ActiveClient::trackRequest() { request_count_++; }
 
 } // namespace Http
 } // namespace Envoy
