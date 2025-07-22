@@ -202,7 +202,7 @@ void GeoipProvider::lookupInCityDb(
         city_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
         &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
-    if (!mmdb_error) {
+    if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
       if (status == MMDB_SUCCESS) {
@@ -255,7 +255,7 @@ void GeoipProvider::lookupInAsnDb(
         asn_db_ptr->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
         &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
-    if (!mmdb_error) {
+    if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
       if (status == MMDB_SUCCESS) {
@@ -293,7 +293,7 @@ void GeoipProvider::lookupInAnonDb(
         anon_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()),
         &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
-    if (!mmdb_error) {
+    if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
       if (status == MMDB_SUCCESS) {
@@ -347,7 +347,7 @@ void GeoipProvider::lookupInIspDb(
     MMDB_lookup_result_s mmdb_lookup_result = MMDB_lookup_sockaddr(
         isp_db->mmdb(), reinterpret_cast<const sockaddr*>(remote_address->sockAddr()), &mmdb_error);
     const uint32_t n_prev_hits = lookup_result.size();
-    if (!mmdb_error) {
+    if (!mmdb_error && mmdb_lookup_result.found_entry) {
       MMDB_entry_data_list_s* entry_data_list;
       int status = MMDB_get_entry_data_list(&mmdb_lookup_result.entry, &entry_data_list);
       if (status == MMDB_SUCCESS) {
