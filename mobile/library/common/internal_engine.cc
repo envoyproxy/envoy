@@ -570,23 +570,23 @@ Network::Address::InstanceConstSharedPtr InternalEngine::probeAndGetLocalAddr(in
     ENVOY_LOG(trace, "Local address error: {}", address.status().message());
     return nullptr;
   }
-  if (address->ip() == nullptr) {
+  if ((*address)->ip() == nullptr) {
     ENVOY_LOG(trace, "Local address is not an IP address: {}.", address->asString());
     return nullptr;
   }
-  if (address->ip()->isLinkLocalAddress()) {
+  if ((*address)->ip()->isLinkLocalAddress()) {
     ENVOY_LOG(trace, "Ignoring link-local address: {}.", address->asString());
     return nullptr;
   }
-  if (address->ip()->isUniqueLocalAddress()) {
+  if ((*address)->ip()->isUniqueLocalAddress()) {
     ENVOY_LOG(trace, "Ignoring unique-local address: {}.", address->asString());
     return nullptr;
   }
-  if (address->ip()->isSiteLocalAddress()) {
+  if ((*address)->ip()->isSiteLocalAddress()) {
     ENVOY_LOG(trace, "Ignoring site-local address: {}.", address->asString());
     return nullptr;
   }
-  if (address->ip()->isTeredoAddress()) {
+  if ((*address)->ip()->isTeredoAddress()) {
     ENVOY_LOG(trace, "Ignoring teredo address: {}.", address->asString());
     return nullptr;
   }
