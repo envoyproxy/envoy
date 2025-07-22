@@ -10,14 +10,12 @@ namespace Extensions {
 namespace Router {
 namespace Matcher {
 
-Envoy::Matcher::ActionFactoryCb ClusterActionFactory::createActionFactoryCb(
-    const Protobuf::Message& config, ClusterActionContext&,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+Envoy::Matcher::ActionConstSharedPtr
+ClusterActionFactory::createAction(const Protobuf::Message& config, ClusterActionContext&,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const ClusterActionProto&>(config, validation_visitor);
-  auto cluster = std::make_shared<std::string>(proto_config.cluster());
-
-  return [cluster]() { return std::make_unique<ClusterAction>(cluster); };
+  return std::make_shared<ClusterAction>(proto_config.cluster());
 }
 
 REGISTER_FACTORY(ClusterActionFactory, Envoy::Matcher::ActionFactory<ClusterActionContext>);
@@ -43,9 +41,7 @@ public:
     if (!match_result.isMatch()) {
       return;
     }
-
-    const Envoy::Matcher::ActionPtr result = match_result.action();
-    cluster_name_.emplace(result->getTyped<ClusterAction>().cluster());
+    cluster_name_.emplace(match_result.action()->getTyped<ClusterAction>().cluster());
   }
 
 private:
