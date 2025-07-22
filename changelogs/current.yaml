@@ -113,6 +113,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: geoip
+  change: |
+    Fixed a bug where the ``apple_private_relay`` header was not populated correctly when isp header wasn't set.
 - area: conn_pool
   change: |
     Fixed an issue that could lead to too many connections when using
