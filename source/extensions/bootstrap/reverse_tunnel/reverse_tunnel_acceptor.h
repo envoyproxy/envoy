@@ -34,7 +34,7 @@ class UpstreamSocketManager;
 
 /**
  * Custom IoHandle for upstream reverse connections that properly owns a ConnectionSocket.
- * This class uses RAII principles to manage socket lifetime without requiring external storage.
+ * This class uses RAII principles to manage socket lifetime.
  */
 class UpstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
 public:
@@ -76,7 +76,6 @@ private:
   // The name of the cluster this reverse connection belongs to.
   std::string cluster_name_;
   // The socket that this IOHandle owns and manages lifetime for.
-  // This eliminates the need for external storage hacks.
   Network::ConnectionSocketPtr owned_socket_;
 };
 
@@ -212,6 +211,7 @@ class ReverseTunnelAcceptorExtension
       public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
   // Friend class for testing
   friend class ReverseTunnelAcceptorExtensionTest;
+
 public:
   /**
    * @param sock_interface the socket interface to extend.
@@ -256,8 +256,8 @@ public:
   const std::string& statPrefix() const { return stat_prefix_; }
 
   /**
-   * Synchronous version for admin API endpoints that require immediate response on reverse connection stats.
-   * Uses blocking aggregation with timeout for production reliability.
+   * Synchronous version for admin API endpoints that require immediate response on reverse
+   * connection stats. Uses blocking aggregation with timeout for production reliability.
    * @param timeout_ms maximum time to wait for aggregation completion
    * @return pair of <connected_nodes, accepted_connections> or empty if timeout
    */
@@ -265,7 +265,7 @@ public:
   getConnectionStatsSync(std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(5000));
 
   /**
-   * Get cross-worker aggregated reverse connection stats. 
+   * Get cross-worker aggregated reverse connection stats.
    * @return map of node/cluster -> connection count across all worker threads
    */
   absl::flat_hash_map<std::string, uint64_t> getCrossWorkerStatMap();
@@ -291,7 +291,8 @@ public:
 
   /**
    * Get per-worker connection stats for debugging purposes.
-   * Returns stats like "reverse_connections.{worker_name}.node.{node_id}" for the current thread only.
+   * Returns stats like "reverse_connections.{worker_name}.node.{node_id}" for the current thread
+   * only.
    * @return map of node/cluster -> connection count for the current worker thread
    */
   absl::flat_hash_map<std::string, uint64_t> getPerWorkerStatMap();
@@ -308,7 +309,8 @@ public:
    * requiring friend class access.
    * @param slot the thread local slot to set
    */
-  void setTestOnlyTLSRegistry(std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> slot) {
+  void
+  setTestOnlyTLSRegistry(std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> slot) {
     tls_slot_ = std::move(slot);
   }
 
@@ -318,7 +320,6 @@ private:
   std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> tls_slot_;
   ReverseTunnelAcceptor* socket_interface_;
   std::string stat_prefix_;
-
 };
 
 /**
