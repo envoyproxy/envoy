@@ -82,9 +82,6 @@ public:
   // Returns the number of active streams on this connection.
   virtual uint32_t numActiveStreams() const PURE;
 
-  // Request tracking methods
-  virtual void trackRequest();
-
   // Return true if it is ready to dispatch the next stream.
   virtual bool readyForStream() const {
     ASSERT(!supportsEarlyData());
@@ -150,9 +147,6 @@ public:
   bool timed_out_{false};
   // TODO(danzh) remove this once http codec exposes the handshake state for h3.
   bool has_handshake_completed_{false};
-
-  // Request tracking for all HTTP protocols
-  uint32_t request_count_{0};
 
 protected:
   // HTTP/3 subclass should override this.
