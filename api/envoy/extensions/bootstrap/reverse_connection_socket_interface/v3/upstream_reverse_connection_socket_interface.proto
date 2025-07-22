@@ -10,7 +10,6 @@ option java_outer_classname = "UpstreamReverseConnectionSocketInterfaceProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_connection_socket_interface/v3;reverse_connection_socket_interfacev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: Bootstrap settings for Upstream Reverse Connection Socket Interface]
 // [#extension: envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface]
@@ -19,4 +18,4 @@ option (udpa.annotations.file_status).work_in_progress = true;
 message UpstreamReverseConnectionSocketInterface {
   // Stat prefix to be used for upstream reverse connection socket interface stats.
   string stat_prefix = 1;
-} 
+}
