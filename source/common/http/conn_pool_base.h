@@ -135,6 +135,12 @@ public:
          &traffic_stats.bind_errors_, nullptr});
   }
 
+  ~ActiveClient() override {
+    // Record final request count for this HTTP connection
+    // Base class destructor runs after this to handle generic connection cleanup
+    parent_.host()->cluster().trafficStats()->upstream_rq_per_cx_.recordValue(request_count_);
+  }
+
   void initializeReadFilters() override { codec_client_->initializeReadFilters(); }
   absl::optional<Http::Protocol> protocol() const override { return codec_client_->protocol(); }
   void close() override { codec_client_->close(); }
@@ -144,10 +150,18 @@ public:
   }
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
   uint64_t id() const override { return codec_client_->id(); }
+  
+  // Request tracking methods
+  virtual void trackRequest();
+  
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
-};
+
+  protected:
+    // Request tracking for HTTP protocols
+    uint32_t request_count_{0};
+  };
 
 /* An implementation of Envoy::ConnectionPool::ConnPoolImplBase for HTTP/1 and HTTP/2
  */

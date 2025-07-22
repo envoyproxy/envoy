@@ -858,9 +858,6 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
   parent_.host()->cluster().trafficStats()->upstream_cx_total_.inc();
   parent_.host()->cluster().trafficStats()->upstream_cx_active_.inc();
   parent_.host()->cluster().resourceManager(parent_.priority()).connections().inc();
-  
-  // Initialize request tracking
-  request_count_ = 0;
 }
 
 ActiveClient::~ActiveClient() { 
@@ -872,12 +869,6 @@ void ActiveClient::releaseResourcesBase() {
     resources_released_ = true;
 
     conn_length_->complete();
-
-    // Emit request tracking metric alongside other connection metrics
-    // Include zero-request connections as they represent important anomalies
-    if (protocol().has_value()) {
-      parent_.host()->cluster().trafficStats()->upstream_rq_per_cx_.recordValue(request_count_);
-    }
 
     parent_.host()->cluster().trafficStats()->upstream_cx_active_.dec();
     parent_.host()->stats().cx_active_.dec();
@@ -938,10 +929,6 @@ void ActiveClient::drain() {
   if (unused > 0) {
     parent_.decrConnectingAndConnectedStreamCapacity(unused, *this);
   }
-}
-
-void ActiveClient::trackRequest() {
-  request_count_++;
 }
 
 } // namespace ConnectionPool
