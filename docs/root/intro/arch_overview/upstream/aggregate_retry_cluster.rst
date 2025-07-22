@@ -5,8 +5,8 @@ Aggregate Retry Cluster
 
 An aggregate retry cluster enables retry-aware cluster selection, allowing different retry attempts to automatically
 target different upstream clusters. This is particularly useful for scenarios where we want to implement intelligent
-failover between different providers based on retry attempts. For example, we might start with a high-performance
-provider and automatically fall back to a more reliable but slower provider on retries.
+failover between different services based on retry attempts. For example, we might start with a high-performance
+service and automatically fall back to a more reliable but slower service on retries.
 
 Unlike the standard :ref:`aggregate cluster <arch_overview_aggregate_cluster>` which uses health-based selection,
 the aggregate retry cluster uses the retry attempt count to deterministically select which subcluster to route to.
@@ -23,9 +23,9 @@ Retry-Aware Cluster Selection
 
 The aggregate retry cluster maps retry attempts to specific subclusters using a simple but effective algorithm:
 
-* **First attempt (retry count = 0):** Routes to the first cluster in the list
-* **Second attempt (retry count = 1):** Routes to the second cluster in the list
-* **Subsequent attempts:** Continue through the list, with overflow behavior configurable
+* **First attempt (retry count = 0):** Routes to the first cluster in the list.
+* **Second attempt (retry count = 1):** Routes to the second cluster in the list.
+* **Subsequent attempts:** Continue through the list, with overflow behavior configurable.
 
 The cluster extracts the retry attempt count from the load balancer context's stream info, specifically from the
 ``host_selection_retry_count`` field. This ensures that retry routing decisions are made consistently across
@@ -37,8 +37,8 @@ Retry Overflow Behavior
 When the retry attempt count exceeds the number of configured clusters, the aggregate retry cluster supports
 two overflow behaviors:
 
-* **FIRST_CLUSTER (default):** Route all overflow attempts to the first cluster
-* **LAST_CLUSTER:** Route all overflow attempts to the last cluster
+* **FAIL (default):** Fail the request when no more clusters are available.
+* **USE_LAST_CLUSTER:** Route all overflow attempts to the last cluster.
 
 This provides flexibility in handling scenarios where more retries are attempted than there are configured clusters.
 
@@ -61,12 +61,12 @@ A sample aggregate retry cluster configuration for AI Gateway failover:
       - primary        # High-performance, attempt 0
       - secondary      # Reliable fallback, attempt 1
       - local          # Local backup, attempt 2+
-      retry_overflow_behavior: LAST_CLUSTER
+      retry_overflow_behavior: USE_LAST_CLUSTER
 
 In this configuration:
 - First requests (retry count 0) go to ``primary``.
 - First retries (retry count 1) go to ``secondary``.
-- Subsequent retries (retry count 2+) go to ``local`` due to ``LAST_CLUSTER`` overflow behavior.
+- Subsequent retries (retry count 2+) go to ``local`` due to ``USE_LAST_CLUSTER`` overflow behavior.
 
 Connection Lifetime Callbacks
 -----------------------------
@@ -145,15 +145,15 @@ Use Cases
 AI Gateway Scenarios
 ^^^^^^^^^^^^^^^^^^^^
 
-The aggregate retry cluster is designed for AI Gateway deployments where different AI providers have different
+The aggregate retry cluster is designed for AI Gateway deployments where different AI services have different
 characteristics:
 
-* **Primary Provider:** High-performance, potentially less reliable.
-* **Secondary Provider:** More reliable, potentially higher latency.
-* **Tertiary Provider:** Local or backup model with guaranteed availability.
+* **Primary Service:** High-performance, potentially less reliable.
+* **Secondary Service:** More reliable, potentially higher latency.
+* **Tertiary Service:** Local or backup model with guaranteed availability.
 
 Cost Optimization
 ^^^^^^^^^^^^^^^^^^
 
-By routing initial attempts to preferred (often more expensive) providers and retries to alternative providers,
+By routing initial attempts to preferred (often more expensive) services and retries to alternative services,
 the aggregate retry cluster enables cost optimization while maintaining service reliability.

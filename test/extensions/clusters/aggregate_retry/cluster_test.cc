@@ -168,13 +168,14 @@ cluster_type:
   AggregateRetryClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
                                        cluster_->clusters_, cluster_->retry_overflow_behavior_);
 
-  // Test normal mapping.
-  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(0));
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(1));
+  // Test normal mapping (1-based retry attempts).
+  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(0).has_value()); // Invalid attempt 0
+  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value());     // First attempt -> first cluster
+  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2).value());     // Second attempt -> second cluster
 
   // Test overflow with FAIL behavior.
-  EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(2));  // Out of bounds index
-  EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(10)); // Far out of bounds
+  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(3).has_value());  // Out of bounds, should fail
+  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(10).has_value()); // Far out of bounds, should fail
 }
 
 // Test cluster index mapping with USE_LAST_CLUSTER overflow behavior.
@@ -198,13 +199,14 @@ cluster_type:
   AggregateRetryClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
                                        cluster_->clusters_, cluster_->retry_overflow_behavior_);
 
-  // Test normal mapping.
-  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(0));
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(1));
+  // Test normal mapping (1-based retry attempts).
+  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(0).has_value()); // Invalid attempt 0
+  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value());     // First attempt -> first cluster
+  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2).value());     // Second attempt -> second cluster
 
   // Test overflow with USE_LAST_CLUSTER behavior.
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2));  // Should use last cluster (index 1)
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(10)); // Should still use last cluster
+  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(3).value());  // Should use last cluster (index 1)
+  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(10).value()); // Should still use last cluster
 }
 
 // Test getClusterByIndex with bounds checking.
@@ -607,8 +609,8 @@ TEST_F(AggregateRetryClusterTest, RetryOverflowDefaultCase) {
           999));
 
   // Test overflow condition to trigger default case.
-  size_t index = lb.mapRetryAttemptToClusterIndex(10);
-  EXPECT_EQ(2, index); // Should default to FAIL behavior
+  auto index_opt = lb.mapRetryAttemptToClusterIndex(10);
+  EXPECT_FALSE(index_opt.has_value()); // Should default to FAIL behavior
 }
 
 // Test AggregateRetryThreadAwareLoadBalancer initialization.
@@ -653,12 +655,13 @@ TEST_F(AggregateRetryClusterTest, MapRetryAttemptBoundaryConditions) {
   AggregateRetryClusterLoadBalancer lb(cluster_->info(), server_context_.cluster_manager_,
                                        cluster_->clusters_, cluster_->retry_overflow_behavior_);
 
-  // Test exact boundary conditions.
-  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(0));   // First cluster
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(1));   // Second cluster
-  EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(2));   // Third cluster
-  EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(3));   // Overflow, use last
-  EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(100)); // Large overflow, use last
+  // Test exact boundary conditions (1-based retry attempts).
+  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(0).has_value()); // Invalid attempt 0
+  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value());     // First cluster
+  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2).value());     // Second cluster
+  EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(3).value());     // Third cluster
+  EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(4).value());     // Overflow, use last
+  EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(100).value());   // Large overflow, use last
 }
 
 TEST_F(AggregateRetryClusterTest, AddMemberUpdateCallbackForExistingCluster) {
@@ -711,7 +714,7 @@ TEST_F(AggregateRetryClusterTest, ChooseHostSuccessfulDelegation) {
   auto cluster_info = std::make_shared<testing::NiceMock<Upstream::MockClusterInfo>>();
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(0)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("target_cluster"))
       .WillRepeatedly(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
@@ -745,7 +748,7 @@ TEST_F(AggregateRetryClusterTest, PeekAnotherHostSuccessfulDelegation) {
   auto mock_host = std::make_shared<testing::NiceMock<Upstream::MockHost>>();
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(0)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("peek_target"))
       .WillOnce(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillOnce(ReturnRef(mock_lb));
@@ -776,7 +779,7 @@ TEST_F(AggregateRetryClusterTest, SelectExistingConnectionSuccessfulDelegation) 
   testing::NiceMock<Upstream::MockHost> mock_host;
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(0)));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
   EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("select_target"))
       .WillOnce(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillOnce(ReturnRef(mock_lb));
@@ -884,6 +887,123 @@ TEST_F(AggregateRetryClusterTest, FactoryCreateMethodCoverage) {
   EXPECT_TRUE(result.ok());
   EXPECT_NE(nullptr, result.value().first);
   EXPECT_NE(nullptr, result.value().second);
+}
+
+TEST_F(AggregateRetryClusterTest, RetryAttemptMapping) {
+  const std::string yaml = R"EOF(
+name: aggregate_retry_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.aggregate_retry
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.aggregate_retry.v3.ClusterConfig
+    clusters:
+    - cluster_0
+    - cluster_1
+    - cluster_2
+    retry_overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  AggregateRetryClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                       cluster_->clusters_, cluster_->retry_overflow_behavior_);
+
+  // Invalid attempt 0 should return nullopt.
+  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(0).has_value());
+
+  // First attempt (1) should map to first cluster (index 0).
+  auto result1 = lb.mapRetryAttemptToClusterIndex(1);
+  ASSERT_TRUE(result1.has_value());
+  EXPECT_EQ(0, result1.value());
+
+  // Second attempt (2) should map to second cluster (index 1).
+  auto result2 = lb.mapRetryAttemptToClusterIndex(2);
+  ASSERT_TRUE(result2.has_value());
+  EXPECT_EQ(1, result2.value());
+
+  // Third attempt (3) should map to third cluster (index 2).
+  auto result3 = lb.mapRetryAttemptToClusterIndex(3);
+  ASSERT_TRUE(result3.has_value());
+  EXPECT_EQ(2, result3.value());
+
+  // Fourth attempt (4) should fail with FAIL overflow behavior.
+  auto result4 = lb.mapRetryAttemptToClusterIndex(4);
+  EXPECT_FALSE(result4.has_value());
+}
+
+// Test USE_LAST_CLUSTER overflow behavior with proper 1-based indexing.
+TEST_F(AggregateRetryClusterTest, UseLastClusterOverflowWithProperIndexing) {
+  const std::string yaml = R"EOF(
+name: aggregate_retry_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.aggregate_retry
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.aggregate_retry.v3.ClusterConfig
+    clusters:
+    - cluster_0
+    - cluster_1
+    retry_overflow_behavior: USE_LAST_CLUSTER
+)EOF";
+
+  initialize(yaml);
+
+  AggregateRetryClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                       cluster_->clusters_, cluster_->retry_overflow_behavior_);
+
+  // Verify normal mapping with 1-based indexing.
+  auto result1 = lb.mapRetryAttemptToClusterIndex(1);
+  ASSERT_TRUE(result1.has_value());
+  EXPECT_EQ(0, result1.value());
+
+  auto result2 = lb.mapRetryAttemptToClusterIndex(2);
+  ASSERT_TRUE(result2.has_value());
+  EXPECT_EQ(1, result2.value());
+
+  // Test overflow, should use last cluster.
+  auto result3 = lb.mapRetryAttemptToClusterIndex(3);
+  ASSERT_TRUE(result3.has_value());
+  EXPECT_EQ(1, result3.value()); // Last cluster index
+
+  auto result10 = lb.mapRetryAttemptToClusterIndex(10);
+  ASSERT_TRUE(result10.has_value());
+  EXPECT_EQ(1, result10.value()); // Still last cluster index
+}
+
+// Test that the optional return type properly replaces sentinel values.
+TEST_F(AggregateRetryClusterTest, OptionalReturnValueInsteadOfSentinel) {
+  const std::string yaml = R"EOF(
+name: aggregate_retry_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.aggregate_retry
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.aggregate_retry.v3.ClusterConfig
+    clusters:
+    - single_cluster
+    retry_overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  AggregateRetryClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                       cluster_->clusters_, cluster_->retry_overflow_behavior_);
+
+  // Valid attempts should return values.
+  auto valid_result = lb.mapRetryAttemptToClusterIndex(1);
+  ASSERT_TRUE(valid_result.has_value());
+  EXPECT_EQ(0, valid_result.value());
+
+  // Invalid/overflow attempts should return nullopt instead of sentinel values.
+  auto invalid_result = lb.mapRetryAttemptToClusterIndex(0);
+  EXPECT_FALSE(invalid_result.has_value());
+
+  auto overflow_result = lb.mapRetryAttemptToClusterIndex(2);
+  EXPECT_FALSE(overflow_result.has_value());
 }
 
 } // namespace AggregateRetry

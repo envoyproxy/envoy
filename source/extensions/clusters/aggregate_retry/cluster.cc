@@ -71,24 +71,33 @@ uint32_t AggregateRetryClusterLoadBalancer::getRetryAttemptCount(
   return 0;
 }
 
-size_t
+absl::optional<size_t>
 AggregateRetryClusterLoadBalancer::mapRetryAttemptToClusterIndex(uint32_t retry_attempt) const {
-  // Map retry attempt to cluster index. Initial request (attempt 0) uses first cluster.
-  if (retry_attempt < clusters_->size()) {
-    return retry_attempt;
+  // Map retry attempt to cluster index. Retry attempts are 1-based in Envoy router.
+  // First attempt (attempt 1) uses first cluster (index 0).
+  if (retry_attempt == 0) {
+    ENVOY_LOG(warn, "Invalid retry attempt 0 in aggregate retry cluster '{}'",
+              parent_info_->name());
+    return absl::nullopt;
+  }
+
+  const size_t cluster_index = retry_attempt - 1;
+
+  if (cluster_index < clusters_->size()) {
+    return cluster_index;
   }
 
   // Handle overflow based on configuration.
   switch (retry_overflow_behavior_) {
   case envoy::extensions::clusters::aggregate_retry::v3::ClusterConfig::FAIL:
-    // Return out-of-bounds index to signal failure.
-    return clusters_->size();
+    // Return nullopt to signal failure.
+    return absl::nullopt;
   case envoy::extensions::clusters::aggregate_retry::v3::ClusterConfig::USE_LAST_CLUSTER:
     // Use the last cluster in the list.
     return clusters_->size() - 1;
   default:
     // Default to FAIL behavior.
-    return clusters_->size();
+    return absl::nullopt;
   }
 }
 
@@ -145,13 +154,21 @@ AggregateRetryClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* con
   const uint32_t retry_attempt = getRetryAttemptCount(context);
 
   // Map retry attempt to cluster index.
-  const size_t cluster_index = mapRetryAttemptToClusterIndex(retry_attempt);
+  const auto cluster_index_opt = mapRetryAttemptToClusterIndex(retry_attempt);
+  if (!cluster_index_opt.has_value()) {
+    ENVOY_LOG(debug, "no cluster available for retry attempt {} in aggregate retry cluster '{}'",
+              retry_attempt, parent_info_->name());
+    return {nullptr};
+  }
+
+  const size_t cluster_index = cluster_index_opt.value();
 
   // Get the target cluster.
   auto* cluster = getClusterByIndex(cluster_index);
   if (cluster == nullptr) {
-    ENVOY_LOG(debug, "no cluster available for retry attempt {} in aggregate retry cluster '{}'",
-              retry_attempt, parent_info_->name());
+    ENVOY_LOG(debug,
+              "cluster index {} not available for retry attempt {} in aggregate retry cluster '{}'",
+              cluster_index, retry_attempt, parent_info_->name());
     return {nullptr};
   }
 
@@ -172,7 +189,12 @@ AggregateRetryClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext
   // For simplicity, delegate to chooseHost for now. Future optimization could cache the
   // selected cluster from the last chooseHost call.
   const uint32_t retry_attempt = getRetryAttemptCount(context);
-  const size_t cluster_index = mapRetryAttemptToClusterIndex(retry_attempt);
+  const auto cluster_index_opt = mapRetryAttemptToClusterIndex(retry_attempt);
+  if (!cluster_index_opt.has_value()) {
+    return nullptr;
+  }
+
+  const size_t cluster_index = cluster_index_opt.value();
   auto* cluster = getClusterByIndex(cluster_index);
 
   if (cluster == nullptr) {
@@ -189,7 +211,12 @@ AggregateRetryClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalanc
                                                             std::vector<uint8_t>& hash_key) {
   // Delegate to the appropriate cluster's load balancer.
   const uint32_t retry_attempt = getRetryAttemptCount(context);
-  const size_t cluster_index = mapRetryAttemptToClusterIndex(retry_attempt);
+  const auto cluster_index_opt = mapRetryAttemptToClusterIndex(retry_attempt);
+  if (!cluster_index_opt.has_value()) {
+    return absl::nullopt;
+  }
+
+  const size_t cluster_index = cluster_index_opt.value();
   auto* cluster = getClusterByIndex(cluster_index);
 
   if (cluster == nullptr) {

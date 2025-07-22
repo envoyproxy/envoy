@@ -38,3 +38,26 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/clusters/aggregate_retry/v3:pkg_cc_proto",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "cluster_integration_test",
+    size = "large",
+    srcs = ["cluster_integration_test.cc"],
+    extension_names = ["envoy.clusters.aggregate_retry"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/clusters/aggregate_retry:cluster",
+        "//source/extensions/load_balancing_policies/cluster_provided:config",
+        "//test/config:v2_link_hacks",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:resources_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/aggregate_retry/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)

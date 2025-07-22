@@ -400,7 +400,7 @@ new_features:
   change: |
     Added ``AggregateRetryCluster`` extension that enables retry-aware cluster selection. This cluster type allows
     retries to automatically fall back to different subclusters based on retry attempt count, providing failover
-    between different providers. See :ref:`aggregate retry cluster docs <arch_overview_aggregate_retry_cluster>`
+    between different services. See :ref:`aggregate retry cluster docs <arch_overview_aggregate_retry_cluster>`
     for more details.
 
 deprecated:

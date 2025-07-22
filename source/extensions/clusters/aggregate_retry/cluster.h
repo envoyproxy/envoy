@@ -83,7 +83,7 @@ public:
   uint32_t getRetryAttemptCount(Upstream::LoadBalancerContext* context) const;
 
   // Map retry attempt to cluster index based on configuration.
-  size_t mapRetryAttemptToClusterIndex(uint32_t retry_attempt) const;
+  absl::optional<size_t> mapRetryAttemptToClusterIndex(uint32_t retry_attempt) const;
 
   // Get cluster by index, handling overflow behavior.
   Upstream::ThreadLocalCluster* getClusterByIndex(size_t cluster_index) const;
