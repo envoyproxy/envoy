@@ -525,9 +525,8 @@ TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
     EXPECT_CALL(
         cluster_->stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
-    EXPECT_CALL(
-        cluster_->stats_store_,
-        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
+    EXPECT_CALL(cluster_->stats_store_,
+                deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
     EXPECT_CALL(*conn_pool_, onClientDestroy());
     conn_pool_->test_clients_.front().connection_->raiseEvent(
         Network::ConnectionEvent::RemoteClose);
@@ -1270,7 +1269,7 @@ TEST_F(Http1ConnPoolImplTest, RequestTrackingMultipleConnections) {
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 1));
 
-  // Create second connection and handle 1 request  
+  // Create second connection and handle 1 request
   ActiveTestRequest r3(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r3.startRequest();
   conn_pool_->expectEnableUpstreamReady();

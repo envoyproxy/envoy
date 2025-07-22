@@ -1996,7 +1996,7 @@ TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectMaxRequests) {
 TEST_F(Http2ConnPoolImplTest, RequestTrackingMultipleStreams) {
   // Allow multiple concurrent streams on a single connection
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(5);
-  
+
   // Set up expectations for all histograms that will be emitted on connection close
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
@@ -2014,8 +2014,8 @@ TEST_F(Http2ConnPoolImplTest, RequestTrackingMultipleStreams) {
   expectClientConnect(0, r1);
 
   // Create second and third requests - these should reuse the same connection due to multiplexing
-  ActiveTestRequest r2(*this, 0, true);  // expect_connected=true means reuse connection
-  ActiveTestRequest r3(*this, 0, true);  // expect_connected=true means reuse connection
+  ActiveTestRequest r2(*this, 0, true); // expect_connected=true means reuse connection
+  ActiveTestRequest r3(*this, 0, true); // expect_connected=true means reuse connection
 
   // Complete all requests
   completeRequest(r1);
@@ -2035,7 +2035,7 @@ TEST_F(Http2ConnPoolImplTest, RequestTrackingMultipleStreams) {
 TEST_F(Http2ConnPoolImplTest, RequestTrackingFiveStreams) {
   // Allow multiple concurrent streams on a single connection
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(10);
-  
+
   // Set up expectations for all histograms that will be emitted on connection close
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
