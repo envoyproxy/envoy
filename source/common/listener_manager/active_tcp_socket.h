@@ -53,6 +53,8 @@ public:
     }
 
     size_t maxReadBytes() const override { return listener_filter_->maxReadBytes(); }
+
+    void onClose() override { return listener_filter_->onClose(); }
   };
   using ListenerFilterWrapperPtr = std::unique_ptr<GenericListenerFilter>;
 

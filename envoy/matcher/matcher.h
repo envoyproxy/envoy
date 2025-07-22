@@ -91,22 +91,20 @@ public:
   }
 };
 
-using ActionPtr = std::unique_ptr<Action>;
-using ActionFactoryCb = std::function<ActionPtr()>;
+using ActionConstSharedPtr = std::shared_ptr<const Action>;
 
 template <class ActionFactoryContext> class ActionFactory : public Config::TypedFactory {
 public:
-  virtual ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config,
-                        ActionFactoryContext& action_factory_context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, ActionFactoryContext& action_factory_context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
 
 // On match, we either return the action to perform or another match tree to match against.
 template <class DataType> struct OnMatch {
-  const ActionFactoryCb action_cb_;
+  const ActionConstSharedPtr action_;
   const MatchTreeSharedPtr<DataType> matcher_;
   bool keep_matching_{};
 };
@@ -130,30 +128,39 @@ public:
 // - The match could not be completed due to lack of data (isInsufficientData() will return true.)
 // - The match was completed, no match found (isNoMatch() will return true.)
 // - The match was completed, match found (isMatch() will return true, action() will return the
-//   ActionFactoryCb.)
+//   ActionConstSharedPtr.)
 struct MatchResult {
 public:
-  MatchResult(ActionFactoryCb cb) : result_(std::move(cb)) {}
+  MatchResult(ActionConstSharedPtr cb) : result_(std::move(cb)) {}
   static MatchResult noMatch() { return MatchResult(NoMatch{}); }
   static MatchResult insufficientData() { return MatchResult(InsufficientData{}); }
   bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
   bool isComplete() const { return !isInsufficientData(); }
   bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
-  bool isMatch() const { return absl::holds_alternative<ActionFactoryCb>(result_); }
-  ActionFactoryCb actionFactory() const { return absl::get<ActionFactoryCb>(result_); }
-  ActionPtr action() const { return actionFactory()(); }
+  bool isMatch() const { return absl::holds_alternative<ActionConstSharedPtr>(result_); }
+  const ActionConstSharedPtr& action() const {
+    ASSERT(isMatch());
+    return absl::get<ActionConstSharedPtr>(result_);
+  }
+  // Returns the action by move. The caller must ensure that the MatchResult is not used after
+  // this call.
+  ActionConstSharedPtr actionByMove() {
+    ASSERT(isMatch());
+    return absl::get<ActionConstSharedPtr>(std::move(result_));
+  }
 
 private:
   struct InsufficientData {};
   struct NoMatch {};
-  using Result = absl::variant<ActionFactoryCb, NoMatch, InsufficientData>;
+  using Result = absl::variant<ActionConstSharedPtr, NoMatch, InsufficientData>;
   Result result_;
   MatchResult(NoMatch) : result_(NoMatch{}) {}
   MatchResult(InsufficientData) : result_(InsufficientData{}) {}
 };
 
 // Callback to execute against skipped matches' actions.
-using SkippedMatchCb = std::function<void(ActionFactoryCb)>;
+using SkippedMatchCb = std::function<void(const ActionConstSharedPtr&)>;
+
 /**
  * MatchTree provides the interface for performing matches against the data provided by DataType.
  */
@@ -187,19 +194,19 @@ protected:
       // Parent result's keep_matching skips the nested result.
       if (on_match->keep_matching_ && nested_result.isMatch()) {
         if (skipped_match_cb) {
-          skipped_match_cb(nested_result.actionFactory());
+          skipped_match_cb(nested_result.action());
         }
         return MatchResult::noMatch();
       }
       return nested_result;
     }
-    if (on_match->action_cb_ && on_match->keep_matching_) {
+    if (on_match->action_ && on_match->keep_matching_) {
       if (skipped_match_cb) {
-        skipped_match_cb(on_match->action_cb_);
+        skipped_match_cb(on_match->action_);
       }
       return MatchResult::noMatch();
     }
-    return MatchResult{on_match->action_cb_};
+    return MatchResult{on_match->action_};
   }
 };
 
