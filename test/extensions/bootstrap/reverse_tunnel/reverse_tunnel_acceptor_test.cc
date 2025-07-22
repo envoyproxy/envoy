@@ -155,12 +155,22 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetLocalRegistryAfterInitialization) 
   auto* registry = extension_->getLocalRegistry();
   EXPECT_NE(registry, nullptr);
 
-  // Verify we can access the socket manager from the registry
+  // Verify we can access the socket manager from the registry (non-const version)
   auto* socket_manager = registry->socketManager();
   EXPECT_NE(socket_manager, nullptr);
 
   // Verify the socket manager has the correct extension reference
   EXPECT_EQ(socket_manager->getUpstreamExtension(), extension_.get());
+
+  // Test const socketManager()
+  const auto* const_registry = extension_->getLocalRegistry();
+  EXPECT_NE(const_registry, nullptr);
+
+  const auto* const_socket_manager = const_registry->socketManager();
+  EXPECT_NE(const_socket_manager, nullptr);
+
+  // Verify the const socket manager has the correct extension reference
+  EXPECT_EQ(const_socket_manager->getUpstreamExtension(), extension_.get());
 }
 
 // Test stats aggregation for one thread only (test thread)
@@ -288,11 +298,15 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"],
             3); // 4 - 1
 
-  // Test decrementing gauges that are already at 0 (should be safe given the guardrails)
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2",
-                                             false); // Decrement node2/cluster2 from 0
+  // Decrement cluster2 which is already at 0 from cross-worker stats
+  extension_->updateConnectionStats("node2", "cluster2", false);
 
-  // Get stats again to verify the guardrails prevented underflow
+  // Get cross-worker stats to verify the guardrail worked
+  auto cross_worker_stat_map = extension_->getCrossWorkerStatMap();
+
+  // Verify that cluster2 remains at 0 (guardrail prevented underflow)
+  EXPECT_EQ(cross_worker_stat_map["test_scope.reverse_connections.clusters.cluster2"], 0);
+
   per_worker_stat_map = extension_->getPerWorkerStatMap();
 
   // Verify that node2/cluster2 remain at 0 (not wrapped around to UINT64_MAX)

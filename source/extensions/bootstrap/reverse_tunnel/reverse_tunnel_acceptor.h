@@ -134,7 +134,7 @@ public:
 
   // SocketInterface overrides
   /**
-   * Create a socket without a specific address.
+   * Create a socket without a specific address (no-op for reverse connections).
    * @param socket_type the type of socket to create.
    * @param addr_type the address type.
    * @param version the IP version.
@@ -186,7 +186,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   /**
-   * @return string containing the interface name.
+   * @return the interface name.
    */
   std::string name() const override {
     return "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface";
@@ -254,9 +254,10 @@ public:
   const std::string& statPrefix() const { return stat_prefix_; }
 
   /**
-   * Get reverse connection stats synchronously for admin API endpoints.
-   * @param timeout_ms maximum time to wait for aggregation completion.
-   * @return pair of <connected_nodes, accepted_connections> or empty if timeout.
+   * Synchronous version for admin API endpoints that require immediate response on reverse
+   * connection stats.
+   * @param timeout_ms maximum time to wait for aggregation completion
+   * @return pair of <connected_nodes, accepted_connections> or empty if timeout
    */
   std::pair<std::vector<std::string>, std::vector<std::string>>
   getConnectionStatsSync(std::chrono::milliseconds timeout_ms = std::chrono::milliseconds(5000));
