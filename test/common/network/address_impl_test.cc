@@ -431,8 +431,9 @@ TEST(Ipv6InstanceTest, UniqueLocal) {
   EXPECT_TRUE(Ipv6Instance("fdff::ffff:ffff:ffff:ffff:ffff:ffff").ip()->isUniqueLocalAddress());
 
   // Not ULA addresses.
-  EXPECT_FALSE(Ipv6Instance("fec0:0:0:0:0:0:0:0").ip()->isSiteLocalAddress());
-  EXPECT_FALSE(Ipv6Instance("feff::ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fec0:0:0:0:0:0:0:0").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(
+      Ipv6Instance("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isUniqueLocalAddress());
   EXPECT_FALSE(Ipv6Instance("fe00::0").ip()->isUniqueLocalAddress());
   EXPECT_FALSE(Ipv6Instance("fe80::0").ip()->isUniqueLocalAddress());
   EXPECT_FALSE(Ipv6Instance("ff00::0").ip()->isUniqueLocalAddress());
@@ -443,11 +444,11 @@ TEST(Ipv6InstanceTest, SiteLocal) {
   EXPECT_TRUE(Ipv6Instance("fec0:0:0:0:0:0:0:0").ip()->isSiteLocalAddress());
   EXPECT_TRUE(Ipv6Instance("fec0::1").ip()->isSiteLocalAddress());
   EXPECT_TRUE(Ipv6Instance("fec0::42:43").ip()->isSiteLocalAddress());
-  EXPECT_TRUE(Ipv6Instance("feff::ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isSiteLocalAddress());
+  EXPECT_TRUE(Ipv6Instance("feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff").ip()->isSiteLocalAddress());
 
   // Not site-local addresses.
-  EXPECT_FALSE(Ipv6Instance("fc00:0:0:0:0:0:0:0").ip()->isUniqueLocalAddress());
-  EXPECT_FALSE(Ipv6Instance("fdff::ffff:ffff:ffff:ffff:ffff:ffff").ip()->isUniqueLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fc00:0:0:0:0:0:0:0").ip()->isSiteLocalAddress());
+  EXPECT_FALSE(Ipv6Instance("fdff::ffff:ffff:ffff:ffff:ffff:ffff").ip()->isSiteLocalAddress());
   EXPECT_FALSE(Ipv6Instance("ff00::0").ip()->isSiteLocalAddress());
   EXPECT_FALSE(Ipv6Instance("2002::1").ip()->isSiteLocalAddress());
   EXPECT_FALSE(Ipv6Instance("3001::1").ip()->isSiteLocalAddress());
