@@ -38,7 +38,7 @@ message HeaderValidatorConfig {
   // characters.
   //
   // Underscore character is allowed in header names by RFC-7230, and this behavior is implemented
-  // as a security measure due to systems that treat ``_`` and ``-`` as interchangeable. Envoy by 
+  // as a security measure due to systems that treat ``_`` and ``-`` as interchangeable. Envoy by
   // default allows client request headers with underscore characters.
   //
   // This setting provides control over how to handle such headers for security and compatibility reasons.
