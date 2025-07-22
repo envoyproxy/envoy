@@ -17,70 +17,52 @@ namespace ReverseConnection {
 
 /**
  * Utility class for reverse connection ping/heartbeat functionality.
- * Follows Envoy patterns like HeaderUtility, StringUtil, etc.
- *
- * This centralizes RPING message handling that was previously duplicated across:
- * - reverse_tunnel_acceptor.cc
- * - reverse_tunnel_initiator.cc
- * - reverse_connection.cc
  */
 class ReverseConnectionUtility : public Logger::Loggable<Logger::Id::connection> {
 public:
-  // Constants following Envoy naming conventions
+  // Constants following Envoy naming conventions.
   static constexpr absl::string_view PING_MESSAGE = "RPING";
   static constexpr absl::string_view PROXY_MESSAGE = "PROXY";
 
   /**
-   * Check if received data contains a ping message (raw or HTTP-embedded).
-   * Follows the pattern of existing Envoy utilities for message detection.
-   *
-   * @param data the received data to check
-   * @return true if data contains RPING message
+   * Check if received data contains a ping message.
+   * @param data the received data to check.
+   * @return true if data contains RPING message.
    */
   static bool isPingMessage(absl::string_view data);
 
   /**
    * Create a ping response buffer.
-   * Follows DirectResponseUtil pattern from Dubbo heartbeat implementation.
-   *
-   * @return Buffer containing RPING response
+   * @return Buffer containing RPING response.
    */
   static Buffer::InstancePtr createPingResponse();
 
   /**
    * Send ping response using connection's IO handle.
-   * Centralizes the write logic with proper error handling.
-   *
-   * @param connection the connection to send ping response on
-   * @return true if ping was sent successfully
+   * @param connection the connection to send ping response on.
+   * @return true if ping was sent successfully.
    */
   static bool sendPingResponse(Network::Connection& connection);
 
   /**
    * Send ping response using raw IO handle.
-   * Alternative for cases where only IoHandle is available.
-   *
-   * @param io_handle the IO handle to write to
-   * @return Api::IoCallUint64Result the write result
+   * @param io_handle the IO handle to write to.
+   * @return Api::IoCallUint64Result the write result.
    */
   static Api::IoCallUint64Result sendPingResponse(Network::IoHandle& io_handle);
 
   /**
-   * Handle ping message detection and response in a read filter context.
-   * Consolidates the ping handling logic used across multiple filters.
-   *
-   * @param data the incoming data buffer
-   * @param connection the connection to respond on
-   * @return true if data was a ping message and was handled
+   * Handle ping message detection and response.
+   * @param data the incoming data buffer.
+   * @param connection the connection to respond on.
+   * @return true if data was a ping message and was handled.
    */
   static bool handlePingMessage(absl::string_view data, Network::Connection& connection);
 
   /**
    * Extract ping message from HTTP-embedded content.
-   * Used when RPING is sent within HTTP response bodies.
-   *
-   * @param http_data the HTTP response data
-   * @return true if RPING was found and extracted
+   * @param http_data the HTTP response data.
+   * @return true if RPING was found and extracted.
    */
   static bool extractPingFromHttpData(absl::string_view http_data);
 
@@ -90,22 +72,18 @@ private:
 
 /**
  * Factory for creating reverse connection message handlers.
- * Follows factory patterns used throughout Envoy for extensible components.
  */
 class ReverseConnectionMessageHandlerFactory {
 public:
   /**
    * Create a shared ping handler instance.
-   * Follows shared_ptr pattern from cache filter PR #21114.
-   *
-   * @return shared_ptr to ping handler
+   * @return shared_ptr to ping handler.
    */
   static std::shared_ptr<class PingMessageHandler> createPingHandler();
 };
 
 /**
  * Ping message handler that can be shared across filters.
- * Implements the shared component pattern to avoid static allocation issues.
  */
 class PingMessageHandler : public std::enable_shared_from_this<PingMessageHandler>,
                            public Logger::Loggable<Logger::Id::connection> {
@@ -115,17 +93,15 @@ public:
 
   /**
    * Process incoming data for ping messages.
-   *
-   * @param data incoming data
-   * @param connection connection to respond on
-   * @return true if ping was handled
+   * @param data incoming data.
+   * @param connection connection to respond on.
+   * @return true if ping was handled.
    */
   bool processPingMessage(absl::string_view data, Network::Connection& connection);
 
   /**
    * Get ping message statistics.
-   *
-   * @return number of pings processed
+   * @return number of pings processed.
    */
   uint64_t getPingCount() const { return ping_count_; }
 

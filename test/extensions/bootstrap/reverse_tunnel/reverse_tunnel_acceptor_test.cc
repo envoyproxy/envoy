@@ -32,27 +32,27 @@ namespace ReverseConnection {
 class ReverseTunnelAcceptorExtensionTest : public testing::Test {
 protected:
   ReverseTunnelAcceptorExtensionTest() {
-    // Set up the stats scope
+    // Set up the stats scope.
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
 
-    // Set up the mock context
+    // Set up the mock context.
     EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
 
-    // Create the config
+    // Create the config.
     config_.set_stat_prefix("test_prefix");
 
-    // Create the socket interface
+    // Create the socket interface.
     socket_interface_ = std::make_unique<ReverseTunnelAcceptor>(context_);
 
-    // Create the extension
+    // Create the extension.
     extension_ =
         std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
   }
 
-  // Helper function to set up thread local slot for tests
+  // Helper function to set up thread local slot for tests.
   void setupThreadLocalSlot() {
-    // Create a thread local registry
+    // Create a thread local registry.
     thread_local_registry_ =
         std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
 
@@ -1624,6 +1624,110 @@ TEST_F(TestUpstreamReverseConnectionIOHandle, GetSocketReturnsConstReference) {
 
   // Should return a valid reference
   EXPECT_NE(&socket, nullptr);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportIPv4) {
+  // Test: IPv4 is supported
+  EXPECT_TRUE(socket_interface_->ipFamilySupported(AF_INET));
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportIPv6) {
+  // Test: IPv6 is supported
+  EXPECT_TRUE(socket_interface_->ipFamilySupported(AF_INET6));
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportUnknown) {
+  // Test: Unknown families are not supported
+  EXPECT_FALSE(socket_interface_->ipFamilySupported(AF_UNIX));
+  EXPECT_FALSE(socket_interface_->ipFamilySupported(-1));
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionNotInitialized) {
+  // Test: Handle calls before onServerInitialized
+  ReverseTunnelAcceptor acceptor(context_);
+
+  auto registry = acceptor.getLocalRegistry();
+  EXPECT_EQ(registry, nullptr);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, CreateEmptyConfigProto) {
+  // Test: createEmptyConfigProto returns valid proto
+  auto proto = socket_interface_->createEmptyConfigProto();
+  EXPECT_NE(proto, nullptr);
+
+  // Should be able to cast to the correct type
+  auto* typed_proto =
+      dynamic_cast<envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+                       UpstreamReverseConnectionSocketInterface*>(proto.get());
+  EXPECT_NE(typed_proto, nullptr);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, FactoryName) {
+  // Test: Factory returns correct name
+  EXPECT_EQ(socket_interface_->name(),
+            "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+}
+
+class UpstreamReverseConnectionIOHandleTest : public testing::Test {
+protected:
+  void SetUp() override {
+    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+
+    socket->io_handle_ = std::move(mock_io_handle);
+
+    handle_ =
+        std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), "test-cluster");
+  }
+
+  std::unique_ptr<UpstreamReverseConnectionIOHandle> handle_;
+};
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
+  // Test: connect() returns success immediately for reverse connections
+  auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
+
+  auto result = handle_->connect(address);
+
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(result.errno_, 0);
+}
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, GetSocketReturnsValidReference) {
+  // Test: getSocket() returns a valid reference
+  const auto& socket = handle_->getSocket();
+  EXPECT_NE(&socket, nullptr);
+}
+
+// Configuration validation tests
+class ConfigValidationTest : public testing::Test {
+protected:
+  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+};
+
+TEST_F(ConfigValidationTest, ValidConfiguration) {
+  // Test: Valid configuration is accepted
+  config_.set_stat_prefix("reverse_tunnel");
+
+  ReverseTunnelAcceptor acceptor(context_);
+
+  // Should not throw when creating bootstrap extension
+  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
+}
+
+TEST_F(ConfigValidationTest, EmptyStatPrefix) {
+  // Test: Empty stat_prefix should still work with default
+  // (Note: Current implementation uses default if empty)
+
+  ReverseTunnelAcceptor acceptor(context_);
+
+  // Should not throw and should use default prefix
+  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
 }
 
 } // namespace ReverseConnection

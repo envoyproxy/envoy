@@ -2,6 +2,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,7 +14,7 @@ bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
     return false;
   }
 
-  // Check for exact RPING match
+  // Check for exact RPING match.
   return (data.length() == PING_MESSAGE.length() &&
           !memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.length()));
 }
@@ -59,7 +60,7 @@ bool ReverseConnectionUtility::handlePingMessage(absl::string_view data,
 }
 
 bool ReverseConnectionUtility::extractPingFromHttpData(absl::string_view http_data) {
-  // Look for RPING in HTTP response body
+  // Look for RPING in HTTP response body.
   if (http_data.find(PING_MESSAGE) != absl::string_view::npos) {
     ENVOY_LOG(debug, "Reverse connection utility: found RPING in HTTP data");
     return true;
@@ -68,7 +69,7 @@ bool ReverseConnectionUtility::extractPingFromHttpData(absl::string_view http_da
 }
 
 std::shared_ptr<PingMessageHandler> ReverseConnectionMessageHandlerFactory::createPingHandler() {
-  // Use make_shared following Envoy patterns for shared components
+  // Use make_shared following Envoy patterns for shared components.
   return std::make_shared<PingMessageHandler>();
 }
 
