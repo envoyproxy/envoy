@@ -13,9 +13,22 @@ Cache filter
   upstream than the cache filter, while non-cacheable requests still go through the
   listener filter chain. It is therefore recommended for consistency that only the
   router filter should be further upstream in the listener filter chain than the
-  cache filter.
+  cache filter, and even then only if the router filter does not perform any mutations
+  such as if ``request_headers_to_add`` is set.
 
 .. image:: /_static/cache-filter-chain.svg
+   :width: 80%
+   :align: center
+
+* For more complex filter chains where some filters must be upstream of the cache
+  filter for correct behavior, or if the router filter is configured to perform
+  mutations via
+  :ref:`RouteConfiguration <envoy_v3_api_field_config.route.v3.RouteConfiguration.request_headers_to_add>`
+  the recommended way to configure this so that it works correctly is to configure
+  an internal listener which duplicates the part of the filter chain that is
+  upstream of the cache filter, and the ``RouteConfiguration``.
+
+.. image:: /_static/cache-filter-internal-listener.svg
    :width: 80%
    :align: center
 
@@ -49,6 +62,16 @@ Example filter configuration with a ``SimpleHttpCache`` cache implementation:
    :linenos:
    :lineno-start: 29
    :caption: :download:`http-cache-configuration.yaml <_include/http-cache-configuration.yaml>`
+
+The more complicated filter chain configuration required if mutations occur upstream of the cache filter
+involves duplicating the full route config into an internal listener (unfortunately this is currently unavoidable):
+
+.. literalinclude:: _include/http-cache-configuration-internal-listener.yaml
+   :language: yaml
+   :lines: 38-113
+   :linenos:
+   :lineno-start: 38
+   :caption: :download:`http-cache-configuration-internal-listener.yaml <_include/http-cache-configuration-internal-listener.yaml>`
 
 .. seealso::
 
