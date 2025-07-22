@@ -26,10 +26,12 @@ using ::Envoy::StatusHelpers::IsOk;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::testing::_;
 using ::testing::Eq;
+using ::testing::Gt;
 using ::testing::IsNull;
 using ::testing::Not;
 using ::testing::NotNull;
 using ::testing::Optional;
+using ::testing::Property;
 using ::testing::Return;
 
 class CacheFilterTest : public ::testing::Test {
@@ -272,6 +274,90 @@ TEST_F(CacheFilterTest, GetHeadersWithHeadersOnlyResponseCompletes) {
   captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
                                  EndStream::End);
   EXPECT_THAT(decoder_callbacks_.details(), Eq("cache.insert_via_upstream"));
+}
+
+TEST_F(CacheFilterTest, PartialContentCodeWithNoContentRangeGivesFullContent) {
+  response_headers_.setStatus(std::to_string(enumToInt(Http::Code::PartialContent)));
+  CacheFilterSharedPtr filter = makeFilter(mock_cache_);
+  EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::Miss));
+  EXPECT_CALL(*mock_cache_, lookup);
+  EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
+              Eq(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*mock_http_source_, getHeaders);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+  EXPECT_CALL(*mock_http_source_, getBody(IsRange(0, Gt(500)), _));
+  captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
+      ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Miss}));
+  captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
+                                 EndStream::More);
+}
+
+TEST_F(CacheFilterTest, PartialContentCodeWithInvalidContentRangeGivesFullContent) {
+  response_headers_.setStatus(std::to_string(enumToInt(Http::Code::PartialContent)));
+  response_headers_.addCopy("content-range", "invalid-value");
+  CacheFilterSharedPtr filter = makeFilter(mock_cache_);
+  EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::Miss));
+  EXPECT_CALL(*mock_cache_, lookup);
+  EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
+              Eq(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*mock_http_source_, getHeaders);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+  EXPECT_CALL(*mock_http_source_, getBody(IsRange(0, Gt(500)), _));
+  captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
+      ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Miss}));
+  captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
+                                 EndStream::More);
+}
+
+TEST_F(CacheFilterTest, PartialContentCodeWithInvalidContentRangeNumberGivesFullContent) {
+  response_headers_.setStatus(std::to_string(enumToInt(Http::Code::PartialContent)));
+  response_headers_.addCopy("content-range", "bytes */invalid");
+  CacheFilterSharedPtr filter = makeFilter(mock_cache_);
+  EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::Miss));
+  EXPECT_CALL(*mock_cache_, lookup);
+  EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
+              Eq(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*mock_http_source_, getHeaders);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+  EXPECT_CALL(*mock_http_source_, getBody(IsRange(0, Gt(500)), _));
+  captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
+      ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Miss}));
+  captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
+                                 EndStream::More);
+}
+
+TEST_F(CacheFilterTest, PartialContentCodeWithWildContentRangeUsesSize) {
+  response_headers_.setStatus(std::to_string(enumToInt(Http::Code::PartialContent)));
+  response_headers_.addCopy("content-range", "bytes */100");
+  CacheFilterSharedPtr filter = makeFilter(mock_cache_);
+  EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::Miss));
+  EXPECT_CALL(*mock_cache_, lookup);
+  EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
+              Eq(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*mock_http_source_, getHeaders);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+  EXPECT_CALL(*mock_http_source_, getBody(IsRange(0, 100), _));
+  captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
+      ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Miss}));
+  captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
+                                 EndStream::More);
+}
+
+TEST_F(CacheFilterTest, PartialContentCodeWithInvalidRangeElementsDefaultsToZeroAndMax) {
+  response_headers_.setStatus(std::to_string(enumToInt(Http::Code::PartialContent)));
+  response_headers_.addCopy("content-range", "bytes invalid-invalid/100");
+  CacheFilterSharedPtr filter = makeFilter(mock_cache_);
+  EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::Miss));
+  EXPECT_CALL(*mock_cache_, lookup);
+  EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
+              Eq(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*mock_http_source_, getHeaders);
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+  EXPECT_CALL(*mock_http_source_, getBody(IsRange(0, Gt(500)), _));
+  captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
+      ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Miss}));
+  captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
+                                 EndStream::More);
 }
 
 TEST_F(CacheFilterTest, DestroyedDuringEncodeHeadersPreventsGetBody) {
