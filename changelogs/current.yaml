@@ -2,6 +2,9 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: wasm
+  change: |
+    Bumped up V8 version to ``13.8.258.26`` to address multiple CVEs.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
