@@ -29,6 +29,9 @@ behavior_changes:
   change: |
     The Squash HTTP filter in ``contrib`` has been deleted. The project it provided integration with has been idle for
     five years and appears abandoned.
+- area: wasm
+  change: |
+    Bumped up V8 version to ``13.8.258.26`` to address multiple CVEs.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
