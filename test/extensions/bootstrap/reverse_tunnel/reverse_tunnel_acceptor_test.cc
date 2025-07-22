@@ -982,7 +982,7 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteSuccess) {
   const std::string cluster_id = "test-cluster";
   const std::chrono::seconds ping_interval(30);
 
-  // Add sockets first (this will trigger pingConnections via tryEnablePingTimer)
+  // Add sockets first
   socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket1), ping_interval,
                                        false);
   socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket2), ping_interval,
@@ -1011,8 +1011,8 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteSuccess) {
         return Api::IoCallUint64Result{0, Network::IoSocketError::getIoSocketEagainError()};
       }));
 
-  // Manually call pingConnections to test the functionality
-  socket_manager_->pingConnections(node_id);
+  // Manually call pingConnections
+  socket_manager_->pingConnections();
 
   // Verify sockets are still there (no cleanup occurred)
   EXPECT_EQ(verifyAcceptedReverseConnectionsMap(node_id), 2);
@@ -1383,32 +1383,43 @@ TEST_F(TestReverseTunnelAcceptor, CreateEmptyConfigProto) {
 TEST_F(TestReverseTunnelAcceptor, SocketWithoutAddress) {
   // Test socket() without address - should return nullptr
   Network::SocketCreationOptions options;
-  auto result = socket_interface_->socket(Network::Socket::Type::Stream, Network::Address::Type::Ip,
-                                          Network::Address::IpVersion::v4, false, options);
-  EXPECT_EQ(result, nullptr);
+  auto io_handle =
+      socket_interface_->socket(Network::Socket::Type::Stream, Network::Address::Type::Ip,
+                                Network::Address::IpVersion::v4, false, options);
+  EXPECT_EQ(io_handle, nullptr);
 }
 
 TEST_F(TestReverseTunnelAcceptor, SocketWithAddressNoThreadLocal) {
-  // Test socket() with address but no thread local slot initialized - should fall back to default
-  auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
-
+  // Test socket() with reverse connection address but no thread local slot initialized - should
+  // fall back to default socket interface Do not setup thread local slot
+  const std::string node_id = "test-node";
+  auto address = createAddressWithLogicalName(node_id);
   Network::SocketCreationOptions options;
-  auto result = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
-  EXPECT_NE(result, nullptr); // Should return default socket interface
+  auto io_handle = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
+  EXPECT_NE(io_handle, nullptr); // Should return default socket interface
+
+  // Verify that the io_handle is a default IoHandle, not an UpstreamReverseConnectionIOHandle
+  EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle.get()), nullptr);
 }
 
-TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalNoSockets) {
-  // Test socket() with address and thread local slot but no cached sockets
+TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalNoCachedSockets) {
+  // Test socket() with reverse connection address and thread local slot but no cached sockets -
+  // should fall back to default socket interface
   setupThreadLocalSlot();
 
-  auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
+  const std::string node_id = "test-node";
+  auto address = createAddressWithLogicalName(node_id);
 
+  // Call socket() before calling addConnectionSocket() so that no sockets are cached
   Network::SocketCreationOptions options;
-  auto result = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
-  EXPECT_NE(result, nullptr); // Should fall back to default socket interface
+  auto io_handle = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
+  EXPECT_NE(io_handle, nullptr); // Should fall back to default socket interface
+
+  // Verify that the io_handle is a default IoHandle, not an UpstreamReverseConnectionIOHandle
+  EXPECT_EQ(dynamic_cast<UpstreamReverseConnectionIOHandle*>(io_handle.get()), nullptr);
 }
 
-TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalWithSockets) {
+TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalWithCachedSockets) {
   // Test socket() with address and thread local slot with cached sockets
   setupThreadLocalSlot();
 
@@ -1416,7 +1427,7 @@ TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalWithSockets) {
   auto* tls_socket_manager = socket_interface_->getLocalRegistry()->socketManager();
   EXPECT_NE(tls_socket_manager, nullptr);
 
-  // Add a socket to the thread local socket manager (not the test's socket_manager_)
+  // Add a socket to the thread local socket manager
   auto socket = createMockSocket(123);
   const std::string node_id = "test-node";
   const std::string cluster_id = "test-cluster";

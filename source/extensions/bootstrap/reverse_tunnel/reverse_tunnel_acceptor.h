@@ -34,7 +34,7 @@ class UpstreamSocketManager;
 
 /**
  * Custom IoHandle for upstream reverse connections that properly owns a ConnectionSocket.
- * This class uses RAII principles to manage socket lifetime without requiring external storage.
+ * This class uses RAII principles to manage socket lifetime.
  */
 class UpstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
 public:
@@ -76,7 +76,6 @@ private:
   // The name of the cluster this reverse connection belongs to.
   std::string cluster_name_;
   // The socket that this IOHandle owns and manages lifetime for.
-  // This eliminates the need for external storage hacks.
   Network::ConnectionSocketPtr owned_socket_;
 };
 

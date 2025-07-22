@@ -27,25 +27,25 @@ UpstreamReverseConnectionIOHandle::UpstreamReverseConnectionIOHandle(
     : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), cluster_name_(cluster_name),
       owned_socket_(std::move(socket)) {
 
-  ENVOY_LOG(debug, "Created UpstreamReverseConnectionIOHandle for cluster: {} with FD: {}",
+  ENVOY_LOG(trace, "Created UpstreamReverseConnectionIOHandle for cluster: {} with FD: {}",
             cluster_name_, fd_);
 }
 
 UpstreamReverseConnectionIOHandle::~UpstreamReverseConnectionIOHandle() {
-  ENVOY_LOG(debug, "Destroying UpstreamReverseConnectionIOHandle for cluster: {} with FD: {}",
+  ENVOY_LOG(trace, "Destroying UpstreamReverseConnectionIOHandle for cluster: {} with FD: {}",
             cluster_name_, fd_);
   // The owned_socket_ will be automatically destroyed via RAII
 }
 
 Api::SysCallIntResult UpstreamReverseConnectionIOHandle::connect(
     Envoy::Network::Address::InstanceConstSharedPtr address) {
-  ENVOY_LOG(debug,
+  ENVOY_LOG(trace,
             "UpstreamReverseConnectionIOHandle::connect() to {} - connection already established "
             "through reverse tunnel",
             address->asString());
 
-  // For reverse connections, the connection is already established.
-  // We should return success immediately since the reverse tunnel provides the connection.
+  // For reverse connections, the connection is already established, therefore
+  // connect() is a no-op
   return Api::SysCallIntResult{0, 0};
 }
 
@@ -53,7 +53,6 @@ Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
   ENVOY_LOG(debug, "UpstreamReverseConnectionIOHandle::close() called for FD: {}", fd_);
 
   // Reset the owned socket to properly close the connection
-  // This ensures proper cleanup without requiring external storage
   if (owned_socket_) {
     ENVOY_LOG(debug, "Releasing owned socket for cluster: {}", cluster_name_);
     owned_socket_.reset();
@@ -183,9 +182,8 @@ void ReverseTunnelAcceptorExtension::onServerInitialized() {
 
 // Get thread local registry for the current thread
 UpstreamSocketThreadLocal* ReverseTunnelAcceptorExtension::getLocalRegistry() const {
-  ENVOY_LOG(debug, "ReverseTunnelAcceptorExtension::getLocalRegistry()");
   if (!tls_slot_) {
-    ENVOY_LOG(warn, "ReverseTunnelAcceptorExtension::getLocalRegistry() - no thread local slot");
+    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension::getLocalRegistry() - no thread local slot");
     return nullptr;
   }
 
