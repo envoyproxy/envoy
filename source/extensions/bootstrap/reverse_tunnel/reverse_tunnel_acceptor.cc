@@ -563,11 +563,13 @@ std::string UpstreamSocketManager::getNodeID(const std::string& key) {
   // First check if the key exists as a cluster ID by checking global stats
   // This ensures we check across all threads, not just the current thread
   if (auto extension = getUpstreamExtension()) {
-    // Check if any thread has sockets for this cluster by looking at global stats
+    // Check if any thread has sockets for this cluster by looking at global stats.
     std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}", key);
     auto& stats_store = extension->getStatsScope();
-    auto& cluster_gauge =
-        stats_store.gaugeFromString(cluster_stat_name, Stats::Gauge::ImportMode::Accumulate);
+    Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
+                                                            stats_store.symbolTable());
+    auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
+                                                        Stats::Gauge::ImportMode::Accumulate);
 
     if (cluster_gauge.value() > 0) {
       // Key is a cluster ID with active connections, find a node from this cluster
