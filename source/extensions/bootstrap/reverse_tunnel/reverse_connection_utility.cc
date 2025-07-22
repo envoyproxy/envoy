@@ -13,18 +13,9 @@ bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
     return false;
   }
 
-  // Check for exact RPING match (raw)
-  if (data.length() >= PING_MESSAGE.length() &&
-      !memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.length())) {
-    return true;
-  }
-
-  // Check for HTTP-embedded RPING
-  if (data.find(PING_MESSAGE) != absl::string_view::npos) {
-    return true;
-  }
-
-  return false;
+  // Check for exact RPING match
+  return (data.length() == PING_MESSAGE.length() &&
+          !memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.length()));
 }
 
 Buffer::InstancePtr ReverseConnectionUtility::createPingResponse() {
