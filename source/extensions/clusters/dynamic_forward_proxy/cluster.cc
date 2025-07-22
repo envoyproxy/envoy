@@ -17,6 +17,8 @@
 #include "source/common/tls/utility.h"
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
@@ -216,8 +218,18 @@ Upstream::HostSelectionResponse Cluster::chooseHost(absl::string_view host,
   auto dynamic_host = std::string(host_attributes.host_);
   auto port = host_attributes.port_.value_or(default_port);
 
-  // cluster name is prefix + host + port
-  auto cluster_name = "DFPCluster:" + dynamic_host + ":" + std::to_string(port);
+  // For cluster name, we need consistent formatting with brackets for IPv6.
+  // This must match the format used by the proxy filter when creating clusters.
+  std::string cluster_host = dynamic_host;
+  // Check if this is an IPv6 address by looking for colons (IPv6) vs dots (IPv4).
+  if (host_attributes.is_ip_address_ && !dynamic_host.empty() && dynamic_host.front() != '[' &&
+      dynamic_host.find(':') != std::string::npos) {
+    // This is an IPv6 address without brackets, add brackets for cluster name consistency.
+    cluster_host = absl::StrCat("[", dynamic_host, "]");
+  }
+
+  // cluster name is prefix + host (with brackets for IPv6) + port
+  auto cluster_name = "DFPCluster:" + cluster_host + ":" + std::to_string(port);
 
   // try again to get the sub cluster.
   auto cluster = cm_.getThreadLocalCluster(cluster_name);
