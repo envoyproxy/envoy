@@ -1,7 +1,5 @@
 #pragma once
 
-#include <chrono>
-
 #include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
