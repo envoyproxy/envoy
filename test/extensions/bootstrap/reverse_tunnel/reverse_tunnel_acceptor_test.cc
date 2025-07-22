@@ -187,6 +187,34 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   for (const auto& [stat_name, value] : stat_map) {
     EXPECT_TRUE(stat_name.find("worker_0") != std::string::npos);
   }
+
+  // Test StatNameManagedStorage behavior: verify that calling updateConnectionStats
+  // creates the same gauges and increments them correctly
+  extension_->updateConnectionStats("node1", "cluster1", true);
+  extension_->updateConnectionStats("node1", "cluster1", true);
+
+  // Get stats again to verify the same gauges were incremented
+  stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify the gauge values were incremented correctly
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node1"], 3);       // 1 + 2
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"], 3); // 1 + 2
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node2"], 2);       // unchanged
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 2); // unchanged
+
+  // Test decrement operations to cover the decrement code paths
+  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false); // Decrement node1
+  extension_->updatePerWorkerConnectionStats("node2", "cluster2", false); // Decrement node2 once
+  extension_->updatePerWorkerConnectionStats("node2", "cluster2", false); // Decrement node2 again
+
+  // Get stats again to verify the decrements worked correctly
+  stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify the gauge values were decremented correctly
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node1"], 2);       // 3 - 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"], 2); // 3 - 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node2"], 0);       // 2 - 2
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 0); // 2 - 2
 }
 
 // Test cross-thread stat map functions using multiple dispatchers
@@ -231,6 +259,66 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster2"], 1);
   // cluster3: incremented 1 time from worker_1
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster3"], 1);
+
+  // Test StatNameManagedStorage behavior: verify that calling updateConnectionStats again
+  // with the same names increments the existing gauges (not creates new ones)
+  extension_->updateConnectionStats("node1", "cluster1", true);  // Increment again
+  extension_->updateConnectionStats("node2", "cluster2", false); // Decrement
+
+  // Get stats again to verify the same gauges were updated
+  stat_map = extension_->getCrossWorkerStatMap();
+
+  // Verify the gauge values were updated correctly (StatNameManagedStorage ensures same gauge)
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node1"], 4);       // 3 + 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster1"], 4); // 3 + 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node2"], 0);       // 1 - 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster2"], 0); // 1 - 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node3"], 1);       // unchanged
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster3"], 1); // unchanged
+
+  // Test per-worker decrement operations to cover the per-worker decrement code paths
+  // First, test decrements from worker_0 context
+  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false); // Decrement from worker_0
+
+  // Get per-worker stats to verify decrements worked correctly for worker_0
+  auto per_worker_stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify worker_0 stats were decremented correctly
+  EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.node.node1"], 3); // 4 - 1
+  EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"],
+            3); // 4 - 1
+
+  // Test decrementing gauges that are already at 0 (should be safe given the guardrails)
+  extension_->updatePerWorkerConnectionStats("node2", "cluster2",
+                                             false); // Decrement node2/cluster2 from 0
+
+  // Get stats again to verify the guardrails prevented underflow
+  per_worker_stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify that node2/cluster2 remain at 0 (not wrapped around to UINT64_MAX)
+  EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.node.node2"], 0);
+  EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 0);
+
+  // Now test decrements from worker_1 context
+  thread_local_registry_ = another_thread_local_registry_;
+
+  // Decrement some stats from worker_1
+  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false); // Decrement from worker_1
+  extension_->updatePerWorkerConnectionStats("node3", "cluster3", false); // Decrement node3 to 0
+
+  // Get per-worker stats from worker_1 context
+  auto worker1_stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify worker_1 stats were decremented correctly
+  EXPECT_EQ(worker1_stat_map["test_scope.reverse_connections.worker_1.node.node1"], 0); // 1 - 1
+  EXPECT_EQ(worker1_stat_map["test_scope.reverse_connections.worker_1.cluster.cluster1"],
+            0);                                                                         // 1 - 1
+  EXPECT_EQ(worker1_stat_map["test_scope.reverse_connections.worker_1.node.node3"], 0); // 1 - 1
+  EXPECT_EQ(worker1_stat_map["test_scope.reverse_connections.worker_1.cluster.cluster3"],
+            0); // 1 - 1
+
+  // Restore original registry
+  thread_local_registry_ = original_registry;
 }
 
 // Test getConnectionStatsSync using multiple dispatchers
@@ -285,6 +373,31 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetConnectionStatsSyncMultiThread) {
   // cluster3: should be present (incremented 1 time)
   EXPECT_TRUE(std::find(accepted_connections.begin(), accepted_connections.end(), "cluster3") !=
               accepted_connections.end());
+
+  // Test StatNameManagedStorage behavior: verify that calling updateConnectionStats again
+  // with the same names updates the existing gauges and the sync result reflects this
+  extension_->updateConnectionStats("node1", "cluster1", true);  // Increment again
+  extension_->updateConnectionStats("node2", "cluster2", false); // Decrement to 0
+
+  // Get connection stats again to verify the updated values
+  result = extension_->getConnectionStatsSync();
+  auto& [updated_connected_nodes, updated_accepted_connections] = result;
+
+  // Verify that node2 is no longer present (gauge value is 0)
+  EXPECT_TRUE(std::find(updated_connected_nodes.begin(), updated_connected_nodes.end(), "node2") ==
+              updated_connected_nodes.end());
+  EXPECT_TRUE(std::find(updated_accepted_connections.begin(), updated_accepted_connections.end(),
+                        "cluster2") == updated_accepted_connections.end());
+
+  // Verify that node1 and node3 are still present
+  EXPECT_TRUE(std::find(updated_connected_nodes.begin(), updated_connected_nodes.end(), "node1") !=
+              updated_connected_nodes.end());
+  EXPECT_TRUE(std::find(updated_connected_nodes.begin(), updated_connected_nodes.end(), "node3") !=
+              updated_connected_nodes.end());
+  EXPECT_TRUE(std::find(updated_accepted_connections.begin(), updated_accepted_connections.end(),
+                        "cluster1") != updated_accepted_connections.end());
+  EXPECT_TRUE(std::find(updated_accepted_connections.begin(), updated_accepted_connections.end(),
+                        "cluster3") != updated_accepted_connections.end());
 }
 
 // Test getConnectionStatsSync with timeouts
@@ -334,6 +447,7 @@ protected:
 
   void TearDown() override {
     socket_manager_.reset();
+
     extension_.reset();
     socket_interface_.reset();
   }
@@ -1042,7 +1156,8 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
   auto* mock_io_handle2 =
       dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets.back()->ioHandle());
 
-  // Send failed ping on mock_io_handle1 and successful one on mock_io_handle2
+  // First call: Send failed ping on mock_io_handle1
+  // When the first socket fails, the loop breaks and doesn't process the second socket
   EXPECT_CALL(*mock_io_handle1, write(_))
       .Times(1) // Called once
       .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -1050,14 +1165,7 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
       }));
-  EXPECT_CALL(*mock_io_handle2, write(_))
-      .Times(1) // Called once
-      .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
-        // Drain the buffer to simulate successful write
-        buffer.drain(buffer.length());
-        return Api::IoCallUint64Result{
-            0, Network::IoSocketError::getIoSocketEagainError()}; // Second socket succeeds
-      }));
+  // Second socket should NOT be called in the first pingConnections call
 
   // Manually call pingConnections to test the functionality
   socket_manager_->pingConnections(node_id);
@@ -1078,8 +1186,7 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(EPIPE)};
       }));
 
-  // Manually call pingConnections again. This should ping once socket2, fail and trigger node
-  // cleanup
+  // Manually call pingConnections again. This should ping socket2, fail and trigger node cleanup
   socket_manager_->pingConnections(node_id);
 
   // Verify complete cleanup occurred (both sockets removed due to node cleanup)
@@ -1234,10 +1341,13 @@ protected:
   }
 
   void TearDown() override {
+    // Destroy socket manager first so it can still access thread local slot during cleanup
+    socket_manager_.reset();
+
+    // Then destroy thread local components
     tls_slot_.reset();
     thread_local_registry_.reset();
 
-    socket_manager_.reset();
     extension_.reset();
     socket_interface_.reset();
   }

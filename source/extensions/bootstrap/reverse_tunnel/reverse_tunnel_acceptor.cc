@@ -101,6 +101,8 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
   // and check if there are any cached connections available
   auto* tls_registry = getLocalRegistry();
   if (tls_registry && tls_registry->socketManager()) {
+    ENVOY_LOG(trace, "ReverseTunnelAcceptor::socket() - running on dispatcher: {}",
+              tls_registry->dispatcher().name());
     auto* socket_manager = tls_registry->socketManager();
 
     // The address's logical name should already be the node ID
@@ -276,32 +278,51 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
   // Create/update node connection stat
   if (!node_id.empty()) {
     std::string node_stat_name = fmt::format("reverse_connections.nodes.{}", node_id);
-    auto& node_gauge =
-        stats_store.gaugeFromString(node_stat_name, Stats::Gauge::ImportMode::Accumulate);
+    Stats::StatNameManagedStorage node_stat_name_storage(node_stat_name, stats_store.symbolTable());
+    auto& node_gauge = stats_store.gaugeFromStatName(node_stat_name_storage.statName(),
+                                                     Stats::Gauge::ImportMode::Accumulate);
     if (increment) {
       node_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented node stat {} to {}",
                 node_stat_name, node_gauge.value());
     } else {
-      node_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented node stat {} to {}",
-                node_stat_name, node_gauge.value());
+      // Guardrail: only decrement if the gauge value is greater than 0
+      if (node_gauge.value() > 0) {
+        node_gauge.dec();
+        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented node stat {} to {}",
+                  node_stat_name, node_gauge.value());
+      } else {
+        ENVOY_LOG(
+            trace,
+            "ReverseTunnelAcceptorExtension: skipping decrement for node stat {} (already at 0)",
+            node_stat_name);
+      }
     }
   }
 
   // Create/update cluster connection stat
   if (!cluster_id.empty()) {
     std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}", cluster_id);
-    auto& cluster_gauge =
-        stats_store.gaugeFromString(cluster_stat_name, Stats::Gauge::ImportMode::Accumulate);
+    Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
+                                                            stats_store.symbolTable());
+    auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
+                                                        Stats::Gauge::ImportMode::Accumulate);
     if (increment) {
       cluster_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented cluster stat {} to {}",
                 cluster_stat_name, cluster_gauge.value());
     } else {
-      cluster_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented cluster stat {} to {}",
-                cluster_stat_name, cluster_gauge.value());
+      // Guardrail: only decrement if the gauge value is greater than 0
+      if (cluster_gauge.value() > 0) {
+        cluster_gauge.dec();
+        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented cluster stat {} to {}",
+                  cluster_stat_name, cluster_gauge.value());
+      } else {
+        ENVOY_LOG(
+            trace,
+            "ReverseTunnelAcceptorExtension: skipping decrement for cluster stat {} (already at 0)",
+            cluster_stat_name);
+      }
     }
   }
 
@@ -315,27 +336,41 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
   auto& stats_store = context_.scope();
 
   // Get dispatcher name from the thread local dispatcher
-  std::string dispatcher_name = "main_thread"; // Default for main thread
+  std::string dispatcher_name;
   auto* local_registry = getLocalRegistry();
-  if (local_registry) {
-    // Dispatcher name is of the form "worker_x" where x is the worker index
-    dispatcher_name = local_registry->dispatcher().name();
+  if (local_registry == nullptr) {
+    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension: No local registry found");
+    return;
   }
+
+  // Dispatcher name is of the form "worker_x" where x is the worker index
+  dispatcher_name = local_registry->dispatcher().name();
+  ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: Updating stats for worker {}", dispatcher_name);
 
   // Create/update per-worker node connection stat
   if (!node_id.empty()) {
     std::string worker_node_stat_name =
         fmt::format("reverse_connections.{}.node.{}", dispatcher_name, node_id);
-    auto& worker_node_gauge =
-        stats_store.gaugeFromString(worker_node_stat_name, Stats::Gauge::ImportMode::NeverImport);
+    Stats::StatNameManagedStorage worker_node_stat_name_storage(worker_node_stat_name,
+                                                                stats_store.symbolTable());
+    auto& worker_node_gauge = stats_store.gaugeFromStatName(
+        worker_node_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
     if (increment) {
       worker_node_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented worker node stat {} to {}",
                 worker_node_stat_name, worker_node_gauge.value());
     } else {
-      worker_node_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker node stat {} to {}",
-                worker_node_stat_name, worker_node_gauge.value());
+      // Guardrail: only decrement if the gauge value is greater than 0
+      if (worker_node_gauge.value() > 0) {
+        worker_node_gauge.dec();
+        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker node stat {} to {}",
+                  worker_node_stat_name, worker_node_gauge.value());
+      } else {
+        ENVOY_LOG(trace,
+                  "ReverseTunnelAcceptorExtension: skipping decrement for worker node stat {} "
+                  "(already at 0)",
+                  worker_node_stat_name);
+      }
     }
   }
 
@@ -343,16 +378,26 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
   if (!cluster_id.empty()) {
     std::string worker_cluster_stat_name =
         fmt::format("reverse_connections.{}.cluster.{}", dispatcher_name, cluster_id);
-    auto& worker_cluster_gauge = stats_store.gaugeFromString(worker_cluster_stat_name,
-                                                             Stats::Gauge::ImportMode::NeverImport);
+    Stats::StatNameManagedStorage worker_cluster_stat_name_storage(worker_cluster_stat_name,
+                                                                   stats_store.symbolTable());
+    auto& worker_cluster_gauge = stats_store.gaugeFromStatName(
+        worker_cluster_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
     if (increment) {
       worker_cluster_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented worker cluster stat {} to {}",
                 worker_cluster_stat_name, worker_cluster_gauge.value());
     } else {
-      worker_cluster_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker cluster stat {} to {}",
-                worker_cluster_stat_name, worker_cluster_gauge.value());
+      // Guardrail: only decrement if the gauge value is greater than 0
+      if (worker_cluster_gauge.value() > 0) {
+        worker_cluster_gauge.dec();
+        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker cluster stat {} to {}",
+                  worker_cluster_stat_name, worker_cluster_gauge.value());
+      } else {
+        ENVOY_LOG(trace,
+                  "ReverseTunnelAcceptorExtension: skipping decrement for worker cluster stat {} "
+                  "(already at 0)",
+                  worker_cluster_stat_name);
+      }
     }
   }
 }
@@ -565,7 +610,7 @@ std::string UpstreamSocketManager::getNodeID(const std::string& key) {
 }
 
 void UpstreamSocketManager::markSocketDead(const int fd) {
-  ENVOY_LOG(debug, "UpstreamSocketManager: markSocketDead called for fd {}", fd);
+  ENVOY_LOG(trace, "UpstreamSocketManager: markSocketDead called for fd {}", fd);
 
   auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end()) {
@@ -728,13 +773,20 @@ void UpstreamSocketManager::pingConnections(const std::string& node_id) {
   ENVOY_LOG(debug, "UpstreamSocketManager: Pinging connections for node: {}", node_id);
   auto& sockets = accepted_reverse_connections_[node_id];
   ENVOY_LOG(debug, "UpstreamSocketManager: node:{} Number of sockets:{}", node_id, sockets.size());
-  for (auto itr = sockets.begin(); itr != sockets.end(); itr++) {
+
+  auto itr = sockets.begin();
+  while (itr != sockets.end()) {
     int fd = itr->get()->ioHandle().fdDoNotUse();
     auto buffer = ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
         createPingResponse();
 
     auto ping_response_timeout = ping_interval_ / 2;
     fd_to_timer_map_[fd]->enableTimer(ping_response_timeout);
+
+    // Use a flag to signal whether the socket needs to be marked dead. If the socket is marked dead
+    // in markSocketDead(), it is erased from the list, and the iterator becomes invalid. We need to
+    // break out of the loop to avoid a use after free error.
+    bool socket_dead = false;
     while (buffer->length() > 0) {
       Api::IoCallUint64Result result = itr->get()->ioHandle().write(*buffer);
       ENVOY_LOG(trace,
@@ -747,14 +799,25 @@ void UpstreamSocketManager::pingConnections(const std::string& node_id) {
           ENVOY_LOG(error, "UpstreamSocketManager: node:{} FD:{}: failed to send ping", node_id,
                     fd);
           markSocketDead(fd);
+          socket_dead = true;
           break;
         }
       }
     }
 
     if (buffer->length() > 0) {
+      // Move to next socket if current one couldn't be fully written
+      ++itr;
       continue;
     }
+
+    if (socket_dead) {
+      // Socket was marked dead, iterator is now invalid, break out of the loop
+      break;
+    }
+
+    // Move to next socket
+    ++itr;
   }
 }
 
@@ -789,7 +852,7 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   }
 
   for (int fd : fds_to_cleanup) {
-    ENVOY_LOG(debug, "UpstreamSocketManager: marking socket dead in destructor for FD: {}", fd);
+    ENVOY_LOG(trace, "UpstreamSocketManager: marking socket dead in destructor for FD: {}", fd);
     markSocketDead(fd); // false = not used, just cleanup
   }
 
