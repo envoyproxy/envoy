@@ -714,7 +714,7 @@ def _v8():
     external_http_archive(
         name = "v8",
         patches = [
-            "@proxy_wasm_cpp_host//bazel/external:v8.patch",
+            "@envoy//bazel:v8.patch",
             "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
@@ -749,25 +749,25 @@ def _highway():
 def _dragonbox():
     external_http_archive(
         name = "dragonbox",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/dragonbox.BUILD",
+        build_file = "@envoy//bazel/external:dragonbox.BUILD",
     )
 
 def _fp16():
     external_http_archive(
         name = "fp16",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/fp16.BUILD",
+        build_file = "@envoy//bazel/external:fp16.BUILD",
     )
 
 def _simdutf():
     external_http_archive(
         name = "simdutf",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/simdutf.BUILD",
+        build_file = "@envoy//bazel/external:simdutf.BUILD",
     )
 
 def _intel_ittapi():
     external_http_archive(
         name = "intel_ittapi",
-        build_file = "@proxy_wasm_cpp_host//:bazel/external/intel_ittapi.BUILD",
+        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
     )
 
 def _com_github_google_quiche():

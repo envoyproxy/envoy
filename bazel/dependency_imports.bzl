@@ -22,7 +22,6 @@ load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
-load("@v8_python_deps//:requirements.bzl", pip_v8_dependencies = "install_deps")
 
 # go version for rules_go
 GO_VERSION = "1.23.1"
@@ -49,7 +48,6 @@ def envoy_dependency_imports(
     pip_dependencies()
     pip_dev_dependencies()
     pip_fuzzing_dependencies()
-    pip_v8_dependencies()
     rules_pkg_dependencies()
     emscripten_deps(emscripten_version = "4.0.6")
     register_emscripten_toolchains()

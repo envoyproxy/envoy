@@ -26,13 +26,6 @@ def envoy_python_dependencies():
         extra_pip_args = ["--require-hashes"],
     )
 
-    pip_parse(
-        name = "v8_python_deps",
-        python_interpreter_target = "@python3_12_host//:python",
-        extra_pip_args = ["--require-hashes"],
-        requirements_lock = "@v8//:bazel/requirements.txt",
-    )
-
     system_python(
         name = "system_python",
         minimum_python_version = "3.7",
