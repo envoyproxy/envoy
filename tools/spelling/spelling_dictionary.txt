@@ -37,7 +37,6 @@ Millicores
 NID
 NIST
 NORMALISATION
-Radix
 SQLSTATE
 bm
 BSON
@@ -48,7 +47,6 @@ CIO
 cbegin
 cend
 constness
-cstr
 deadcode
 DFP
 Dynatrace
@@ -1187,8 +1185,6 @@ querydetails
 quiesce
 quitquitquit
 qvalue
-radix
-radixtree
 rapidjson
 ratelimit
 ratelimited
