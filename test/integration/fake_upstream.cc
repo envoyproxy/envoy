@@ -255,6 +255,7 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
     if (time_system.waitFor(lock, absl::Condition(&condition), 5ms * TIMEOUT_FACTOR)) {
       return true;
     }
+
     // Run the client dispatcher since we may need to process window updates, etc.
     client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
   }
