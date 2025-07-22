@@ -21,10 +21,16 @@ using ScopedResume = std::unique_ptr<Cleanup>;
 /**
  * All control plane related stats. @see stats_macros.h
  */
-#define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE, TEXT_READOUT)                                      \
+#define ALL_CONTROL_PLANE_STATS(COUNTER, GAUGE, TEXT_READOUT, HISTOGRAM)                           \
   COUNTER(rate_limit_enforced)                                                                     \
   GAUGE(connected_state, NeverImport)                                                              \
   GAUGE(pending_requests, Accumulate)                                                              \
+  COUNTER(discovery_requests)                                                                      \
+  HISTOGRAM(discovery_request_resource_count, Unspecified)                                         \
+  COUNTER(discovery_responses)                                                                     \
+  HISTOGRAM(discovery_response_resource_count, Unspecified)                                        \
+  HISTOGRAM(discovery_response_size, Bytes)                                                        \
+  HISTOGRAM(discovery_request_size, Bytes)                                                         \
   TEXT_READOUT(identifier)
 
 /**
@@ -32,7 +38,7 @@ using ScopedResume = std::unique_ptr<Cleanup>;
  */
 struct ControlPlaneStats {
   ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
-                          GENERATE_TEXT_READOUT_STRUCT)
+                          GENERATE_TEXT_READOUT_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**

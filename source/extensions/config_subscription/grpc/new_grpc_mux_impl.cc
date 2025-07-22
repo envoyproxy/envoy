@@ -166,6 +166,9 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     return;
   }
 
+  control_plane_stats.discovery_response_size_.recordValue(message->ByteSizeLong());
+  control_plane_stats.discovery_response_resource_count_.recordValue(message->resources_size());
+
   if (message->has_control_plane()) {
     control_plane_stats.identifier_.set(message->control_plane().identifier());
 
@@ -401,6 +404,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
       request = sub->second->sub_state_.getNextRequestAckless();
     }
     grpc_stream_->sendMessage(request);
+    grpc_stream_->maybeRecordRequestStats(request.ByteSizeLong(), 0);
   }
   grpc_stream_->maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
 }

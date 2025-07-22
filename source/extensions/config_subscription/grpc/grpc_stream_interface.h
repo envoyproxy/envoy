@@ -29,6 +29,8 @@ public:
   // meaningful value is given.
   virtual void maybeUpdateQueueSizeStat(uint64_t size) PURE;
 
+  virtual void maybeRecordRequestStats(uint64_t payload_size, uint64_t resource_count) PURE;
+
   // Returns true if a message can be sent from the rate-limiting perspective.
   // The rate-limiting counters may be updated by this method.
   virtual bool checkRateLimitAllowsDrain() PURE;

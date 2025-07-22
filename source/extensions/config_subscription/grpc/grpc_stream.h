@@ -80,7 +80,19 @@ public:
 
   bool grpcStreamAvailable() const override { return stream_ != nullptr; }
 
-  void sendMessage(const RequestProto& request) override { stream_->sendMessage(request, false); }
+  void sendMessage(const RequestProto& request) override {
+    control_plane_stats_.discovery_requests_.inc();
+    stream_->sendMessage(request, false);
+  }
+
+  void maybeRecordRequestStats(uint64_t payload_size, uint64_t resource_count) override {
+    if (payload_size > 0) {
+      control_plane_stats_.discovery_request_size_.recordValue(payload_size);
+    }
+    if (resource_count > 0) {
+      control_plane_stats_.discovery_request_resource_count_.recordValue(resource_count);
+    }
+  }
 
   // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override {
@@ -101,6 +113,7 @@ public:
     // have 0 until it is reconnected. Setting here ensures that it is consistent with the state of
     // management server connection.
     control_plane_stats_.connected_state_.set(static_cast<uint64_t>(connected_state_val_));
+    control_plane_stats_.discovery_responses_.inc();
     callbacks_->onDiscoveryResponse(std::move(message), control_plane_stats_);
   }
 
