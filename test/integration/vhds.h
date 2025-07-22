@@ -201,20 +201,20 @@ public:
     RELEASE_ASSERT(result, result.message());
     xds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+    EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                             {"my_route"}, true));
     sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-        Config::TypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
+        Config::TestTypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
 
     result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_);
     RELEASE_ASSERT(result, result.message());
     vhds_stream_->startGrpcStream();
 
-    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {},
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
     sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-        Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
-    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {},
+        Config::TestTypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_.get());
+    EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost, {}, {},
                                              vhds_stream_.get()));
 
     // Wait for our statically specified listener to become ready, and register its port in the
@@ -233,7 +233,7 @@ public:
                                          const std::vector<std::string>& aliases = {}) {
     envoy::service::discovery::v3::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
-    response.set_type_url(Config::TypeUrl::get().VirtualHost);
+    response.set_type_url(Config::TestTypeUrl::get().VirtualHost);
     auto* resource = response.add_resources();
     resource->set_name("my_route/cannot-resolve-alias");
     resource->set_version(version);
@@ -249,7 +249,7 @@ public:
       const std::vector<std::string>& removed, const std::string& version, FakeStreamPtr& stream,
       const std::vector<std::string>& aliases, const std::vector<std::string>& unresolved_aliases) {
     auto response = createDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
-        Config::TypeUrl::get().VirtualHost, added_or_updated, removed, version, aliases, {});
+        Config::TestTypeUrl::get().VirtualHost, added_or_updated, removed, version, aliases, {});
     for (const auto& unresolved_alias : unresolved_aliases) {
       auto* resource = response.add_resources();
       resource->set_name(unresolved_alias);
@@ -266,7 +266,7 @@ public:
   createDeltaDiscoveryResponseWithResourceNameUsedAsAlias() {
     envoy::service::discovery::v3::DeltaDiscoveryResponse ret;
     ret.set_system_version_info("system_version_info_this_is_a_test");
-    ret.set_type_url(Config::TypeUrl::get().VirtualHost);
+    ret.set_type_url(Config::TestTypeUrl::get().VirtualHost);
 
     auto* resource = ret.add_resources();
     resource->set_name("my_route/vhost_1");

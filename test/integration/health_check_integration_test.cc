@@ -196,9 +196,10 @@ public:
     }
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
-    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {cluster_data.cluster_},
+                                                               {cluster_data.cluster_}, {}, "55");
 
     // Wait for upstream to receive health check request.
     ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
@@ -560,9 +561,10 @@ public:
     health_check->mutable_tcp_health_check()->add_receive()->set_text("506F6E67");  // "Pong"
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
-    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {cluster_data.cluster_},
+                                                               {cluster_data.cluster_}, {}, "55");
 
     // Wait for upstream to receive TCP HC request.
     ASSERT_TRUE(
@@ -582,9 +584,10 @@ public:
         proxy_protocol_config);
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
-    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {cluster_data.cluster_},
+                                                               {cluster_data.cluster_}, {}, "55");
 
     // Wait for upstream to receive TCP HC request.
     ASSERT_TRUE(
@@ -713,9 +716,10 @@ public:
     health_check->mutable_grpc_health_check();
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
-    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {cluster_data.cluster_},
+                                                               {cluster_data.cluster_}, {}, "55");
 
     // Wait for upstream to receive HC request.
     grpc::health::v1::HealthCheckRequest request;
@@ -886,9 +890,10 @@ public:
         cluster_data.external_host_upstream_->localAddress()->ip()->port());
 
     // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
-    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                               {cluster_data.cluster_},
+                                                               {cluster_data.cluster_}, {}, "55");
 
     // Wait for upstream to receive EXTERNAL HC request.
     ASSERT_TRUE(cluster_data.external_host_upstream_->waitForRawConnection(
