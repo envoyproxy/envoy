@@ -454,11 +454,11 @@ message Admin {
   // If not specified, the allowlist check will be skipped.
   //
   // Example:
-  // allow_listed_routes:
+  // allow_interfaces:
   // - prefix: foo
   // - exact: foo
   // - exact: bar
-  repeated type.matcher.v3.StringMatcher allow_listed_routes = 7;
+  repeated type.matcher.v3.StringMatcher allow_interfaces = 7;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
