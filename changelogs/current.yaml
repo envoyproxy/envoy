@@ -110,6 +110,9 @@ minor_behavior_changes:
       Starting from this release, these cookies: oauth_hmac,oauth_expires,refresh_token,oauth_nonce,code_verifier will
       not be forwarded to the upstream. This behavior can be reverted by setting the runtime guard
       ``envoy.reloadable_features.oauth2_cleanup_cookies`` to ``false``.
+- area: websocket
+  change: |
+      Added a runtime config to optionally control the websocket handshake response check. 
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
