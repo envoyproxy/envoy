@@ -143,6 +143,8 @@ public:
     bool truncated_and_dropped_{false};
     // The contents of the TOS byte in the IP header.
     uint8_t tos_{0};
+    // The IPv6 flow label, or 0 if not present.
+    uint32_t flow_label_{0};
     // UDP control message specified by save_cmsg_config in QUIC config.
     Buffer::OwnedImpl saved_cmsg_;
   };

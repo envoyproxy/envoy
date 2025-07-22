@@ -42,7 +42,7 @@ quic::WriteResult EnvoyQuicPacketWriter::WritePacket(
       quicAddressToEnvoyAddressInstance(peer_address);
 
   Api::IoCallUint64Result result = envoy_udp_packet_writer_->writePacket(
-      buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr);
+      buf, local_addr == nullptr ? nullptr : local_addr->ip(), *remote_addr, params.flow_label);
 
   return convertToQuicWriteResult(result);
 }

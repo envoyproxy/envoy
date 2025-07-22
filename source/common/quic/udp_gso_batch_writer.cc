@@ -44,7 +44,8 @@ UdpGsoBatchWriter::UdpGsoBatchWriter(Network::IoHandle& io_handle, Stats::Scope&
 
 Api::IoCallUint64Result
 UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Address::Ip* local_ip,
-                               const Network::Address::Instance& peer_address) {
+                               const Network::Address::Instance& peer_address,
+                               uint32_t ipv6_flow_label) {
   // Convert received parameters to relevant forms
   quic::QuicSocketAddress peer_addr = envoyIpAddressToQuicSocketAddress(peer_address.ip());
   quic::QuicSocketAddress self_addr = envoyIpAddressToQuicSocketAddress(local_ip);
@@ -54,6 +55,7 @@ UdpGsoBatchWriter::writePacket(const Buffer::Instance& buffer, const Network::Ad
   // TODO(yugant): Currently we do not use PerPacketOptions with Quic, we may want to
   // specify this parameter here at a later stage.
   quic::QuicPacketWriterParams params;
+  params.flow_label = ipv6_flow_label;
   quic::WriteResult quic_result = WritePacket(static_cast<char*>(buffer.frontSlice().mem_),
                                               payload_len, self_addr.host(), peer_addr,
                                               /*quic::PerPacketOptions=*/nullptr, params);

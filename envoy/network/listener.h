@@ -359,6 +359,7 @@ struct UdpRecvData {
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
   uint8_t tos_ = 0;
+  uint32_t ipv6_flow_label_ = 0;
   Buffer::OwnedImpl saved_cmsg_;
 };
 

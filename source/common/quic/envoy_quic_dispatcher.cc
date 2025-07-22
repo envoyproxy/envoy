@@ -8,6 +8,7 @@
 #include "envoy/common/optref.h"
 
 #include "source/common/common/safe_memcpy.h"
+#include "source/common/network/socket_option_factory.h"
 #include "source/common/quic/envoy_quic_connection_debug_visitor_factory_interface.h"
 #include "source/common/quic/envoy_quic_server_connection.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -47,10 +48,10 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
     quic::QuicVersionManager* version_manager,
     std::unique_ptr<quic::QuicConnectionHelperInterface> helper,
     std::unique_ptr<quic::QuicAlarmFactory> alarm_factory,
-    uint8_t expected_server_connection_id_length, Network::ConnectionHandler& connection_handler,
-    Network::ListenerConfig& listener_config, Server::ListenerStats& listener_stats,
-    Server::PerHandlerListenerStats& per_worker_stats, Event::Dispatcher& dispatcher,
-    Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
+    uint8_t expected_server_connection_id_length, bool enable_black_hole_avoidance_via_flow_label,
+    Network::ConnectionHandler& connection_handler, Network::ListenerConfig& listener_config,
+    Server::ListenerStats& listener_stats, Server::PerHandlerListenerStats& per_worker_stats,
+    Event::Dispatcher& dispatcher, Network::Socket& listen_socket, QuicStatNames& quic_stat_names,
     EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory,
     quic::ConnectionIdGeneratorInterface& generator,
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
@@ -65,6 +66,7 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
       quic_stats_(generateStats(listener_config.listenerScope())),
       connection_stats_({QUIC_CONNECTION_STATS(
           POOL_COUNTER_PREFIX(listener_config.listenerScope(), "quic.connection"))}),
+      enable_black_hole_avoidance_via_flow_label_(enable_black_hole_avoidance_via_flow_label),
       debug_visitor_factory_(debug_visitor_factory) {}
 
 void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_id,
@@ -94,6 +96,9 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
   // ALPN.
   Network::ConnectionSocketPtr connection_socket = createServerConnectionSocket(
       listen_socket_.ioHandle(), self_address, peer_address, std::string(parsed_chlo.sni), "h3");
+  if (enable_black_hole_avoidance_via_flow_label_ && peer_address.host().IsIPv6()) {
+    connection_socket->addOptions(Network::SocketOptionFactory::buildIpV6FlowLabelOptions());
+  }
   auto stream_info = std::make_unique<StreamInfo::StreamInfoImpl>(
       dispatcher_.timeSource(), connection_socket->connectionInfoProviderSharedPtr(),
       StreamInfo::FilterState::LifeSpan::Connection);
@@ -126,6 +131,9 @@ std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
       server_connection_id, self_address, peer_address, *helper(), *alarm_factory(), writer(),
       /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, std::move(connection_socket),
       connection_id_generator, std::move(listener_filter_manager));
+  if (enable_black_hole_avoidance_via_flow_label_) {
+    quic_connection->EnableBlackholeAvoidanceViaFlowLabel();
+  }
   auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       quic_config, quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,

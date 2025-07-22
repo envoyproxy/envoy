@@ -650,7 +650,7 @@ public:
 
   MOCK_METHOD(Api::IoCallUint64Result, writePacket,
               (const Buffer::Instance& buffer, const Address::Ip* local_ip,
-               const Address::Instance& peer_address));
+               const Address::Instance& peer_address, uint32_t ipv6_flow_label));
   MOCK_METHOD(bool, isWriteBlocked, (), (const));
   MOCK_METHOD(void, setWritable, ());
   MOCK_METHOD(uint64_t, getMaxPacketSize, (const Address::Instance& peer_address), (const));
@@ -732,7 +732,8 @@ public:
   MOCK_METHOD(void, processPacket,
               (Address::InstanceConstSharedPtr local_address,
                Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
-               MonotonicTime receive_time, uint8_t tos, Buffer::OwnedImpl saved_cmsg));
+               MonotonicTime receive_time, uint8_t tos, uint32_t ipv6_flow_label,
+               Buffer::OwnedImpl saved_cmsg));
   MOCK_METHOD(void, onDatagramsDropped, (uint32_t dropped));
   MOCK_METHOD(uint64_t, maxDatagramSize, (), (const));
   MOCK_METHOD(size_t, numPacketsExpectedPerEventLoop, (), (const));

@@ -17,7 +17,8 @@ public:
 
   // Following writePacket utilizes Utility::writeToSocket() implementation
   Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer, const Address::Ip* local_ip,
-                                      const Address::Instance& peer_address) override;
+                                      const Address::Instance& peer_address,
+                                      uint32_t ipv6_flow_label) override;
 
   bool isWriteBlocked() const override { return write_blocked_; }
   void setWritable() override { write_blocked_ = false; }
