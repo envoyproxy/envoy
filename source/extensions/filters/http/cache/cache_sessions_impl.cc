@@ -394,7 +394,7 @@ void CacheSession::insertComplete() {
   }
   if (content_length_header_ != 0) {
     ENVOY_LOG(error,
-              "cache insert for {}/{} had content-length header {} but actual size {}. Cache has "
+              "cache insert for {}{} had content-length header {} but actual size {}. Cache has "
               "modified the header to match actual size.",
               key_.host(), key_.path(), content_length_header_, entry_.body_length_.value());
   }

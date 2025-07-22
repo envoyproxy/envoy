@@ -8,6 +8,7 @@
 #include "test/extensions/filters/http/cache/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -703,6 +704,46 @@ TEST_F(CacheSessionsTest, CacheInsertFailureResetsStreamingContexts) {
   EXPECT_CALL(trailers_callback, Call(IsNull(), EndStream::Reset));
   progress->onInsertFailed();
   pumpDispatcher();
+}
+
+TEST_F(CacheSessionsTest, MismatchedSizeAndContentLengthFromUpstreamLogsAnError) {
+  EXPECT_LOG_CONTAINS(
+      "error", "cache insert for test_host/a had content-length header 5 but actual size 3", {
+        EXPECT_CALL(*mock_http_cache_, lookup(LookupHasPath("/a"), _));
+        EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
+        ActiveLookupResultPtr result1;
+        auto response_headers = cacheableResponseHeaders(5);
+        cache_sessions_->lookup(testLookupRequest("/a"),
+                                [&result1](ActiveLookupResultPtr r) { result1 = std::move(r); });
+        pumpDispatcher();
+        // Cache miss.
+        consumeCallback(captured_lookup_callbacks_[0])(LookupResult{});
+        pumpDispatcher();
+        // Upstream request should have been sent.
+        ASSERT_THAT(fake_upstreams_.size(), Eq(1));
+        std::shared_ptr<CacheProgressReceiver> progress;
+        // Cacheable response.
+        EXPECT_CALL(*mock_http_cache_,
+                    insert(_, KeyHasPath("/a"), Pointee(IsSupersetOfHeaders(*response_headers)), _,
+                           NotNull(), _))
+            .WillOnce([&](Event::Dispatcher&, Key, Http::ResponseHeaderMapPtr, ResponseMetadata,
+                          HttpSourcePtr, std::shared_ptr<CacheProgressReceiver> receiver) {
+              progress = receiver;
+            });
+        consumeCallback(fake_upstream_get_headers_callbacks_[0])(
+            Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), EndStream::More);
+        pumpDispatcher();
+        // The upstream was given to the cache; since it's a fake we can forget about
+        // that and just have the cache complete its write operations when we choose.
+        ASSERT_THAT(progress, NotNull());
+        progress->onHeadersInserted(
+            std::make_unique<MockCacheReader>(),
+            Http::createHeaderMap<Http::ResponseHeaderMapImpl>(*response_headers), false);
+        pumpDispatcher();
+        // Actual body only 3 bytes despite content-length 5.
+        progress->onBodyInserted(AdjustedByteRange(0, 3), true);
+        pumpDispatcher();
+      });
 }
 
 TEST_F(CacheSessionsTest, RangeRequestMissGetsFullResourceFromUpstreamAndServesRanges) {
