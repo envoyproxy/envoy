@@ -860,9 +860,7 @@ ActiveClient::ActiveClient(ConnPoolImplBase& parent, uint32_t lifetime_stream_li
   parent_.host()->cluster().resourceManager(parent_.priority()).connections().inc();
 }
 
-ActiveClient::~ActiveClient() { 
-  releaseResourcesBase(); 
-}
+ActiveClient::~ActiveClient() { releaseResourcesBase(); }
 
 void ActiveClient::releaseResourcesBase() {
   if (!resources_released_) {
