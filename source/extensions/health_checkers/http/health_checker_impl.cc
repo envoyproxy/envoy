@@ -276,7 +276,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   stream_info.upstreamInfo()->setUpstreamHost(host_);
   parent_.request_headers_parser_->evaluateHeaders(*request_headers, stream_info);
   auto status = request_encoder->encodeHeaders(*request_headers, true);
-  // Encoding will only fail if required request headers are missing.
+  // Encoding will only fail if required request headers are missing
   ASSERT(status.ok());
 }
 
@@ -330,12 +330,14 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
     if (!PayloadMatcher::match(parent_.receive_bytes_, *response_body_)) {
+      ENVOY_CONN_LOG(debug, "hc response_code={} body_match_failed", *client_, response_code);
       if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
         host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
       }
       return HealthCheckResult::Failed;
     }
-    ENVOY_CONN_LOG(debug, "hc http response body healthcheck passed", *client_);
+    ENVOY_CONN_LOG(debug, "hc response_code={} http response body healthcheck passed", *client_,
+                   response_code);
   }
 
   if (!parent_.http_status_checker_.inExpectedRanges(response_code)) {
@@ -345,13 +347,16 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     // seems like the least surprising behavior and we could consider relaxing this in the future.
     // TODO(mattklein123): This will not force a host set rebuild of the host was already failed.
     // This is something we could do in the future but seems unnecessary right now.
+    ENVOY_CONN_LOG(debug, "hc response_code={} not_in_expected_ranges", *client_, response_code);
     if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
       host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
     }
 
     if (parent_.http_status_checker_.inRetriableRanges(response_code)) {
+      ENVOY_CONN_LOG(debug, "hc response_code={} is_retriable", *client_, response_code);
       return HealthCheckResult::Retriable;
     } else {
+      ENVOY_CONN_LOG(debug, "hc response_code={} failed", *client_, response_code);
       return HealthCheckResult::Failed;
     }
   }
@@ -366,12 +371,18 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
             ? std::string(response_headers_->getEnvoyUpstreamHealthCheckedClusterValue())
             : EMPTY_STRING;
     if (parent_.service_name_matcher_->match(service_cluster_healthchecked)) {
+      ENVOY_CONN_LOG(debug, "hc response_code={} service_name_match_passed degraded={}", *client_,
+                     response_code, degraded);
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
     } else {
+      ENVOY_CONN_LOG(debug, "hc response_code={} service_name_match_failed", *client_,
+                     response_code);
       return HealthCheckResult::Failed;
     }
   }
 
+  ENVOY_CONN_LOG(debug, "hc response_code={} success degraded={}", *client_, response_code,
+                 degraded);
   return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
 }
 
