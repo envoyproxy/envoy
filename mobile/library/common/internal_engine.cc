@@ -565,29 +565,30 @@ Network::Address::InstanceConstSharedPtr InternalEngine::probeAndGetLocalAddr(in
     return nullptr;
   }
 
-  auto address = socket_handle.localAddress();
+  absl::StatusOr<Network::Address::InstanceConstSharedPtr> address = socket_handle.localAddress();
   if (!address.status().ok()) {
     ENVOY_LOG(trace, "Local address error: {}", address.status().message());
     return nullptr;
   }
+
   if ((*address)->ip() == nullptr) {
-    ENVOY_LOG(trace, "Local address is not an IP address: {}.", address->asString());
+    ENVOY_LOG(trace, "Local address is not an IP address: {}.", (*address)->asString());
     return nullptr;
   }
   if ((*address)->ip()->isLinkLocalAddress()) {
-    ENVOY_LOG(trace, "Ignoring link-local address: {}.", address->asString());
+    ENVOY_LOG(trace, "Ignoring link-local address: {}.", (*address)->asString());
     return nullptr;
   }
   if ((*address)->ip()->isUniqueLocalAddress()) {
-    ENVOY_LOG(trace, "Ignoring unique-local address: {}.", address->asString());
+    ENVOY_LOG(trace, "Ignoring unique-local address: {}.", (*address)->asString());
     return nullptr;
   }
   if ((*address)->ip()->isSiteLocalAddress()) {
-    ENVOY_LOG(trace, "Ignoring site-local address: {}.", address->asString());
+    ENVOY_LOG(trace, "Ignoring site-local address: {}.", (*address)->asString());
     return nullptr;
   }
   if ((*address)->ip()->isTeredoAddress()) {
-    ENVOY_LOG(trace, "Ignoring teredo address: {}.", address->asString());
+    ENVOY_LOG(trace, "Ignoring teredo address: {}.", (*address)->asString());
     return nullptr;
   }
 
