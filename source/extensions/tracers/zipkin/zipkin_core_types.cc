@@ -169,6 +169,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
 
   if (!annotations_.empty()) {
     std::vector<ProtobufWkt::Value> annotation_list;
+    annotation_list.reserve(annotations_.size());
     for (auto& annotation : annotations_) {
       annotation_list.push_back(ValueUtil::structValue(annotation.toStruct(replacements)));
     }
@@ -177,6 +178,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
 
   if (!binary_annotations_.empty()) {
     std::vector<ProtobufWkt::Value> binary_annotation_list;
+    binary_annotation_list.reserve(binary_annotations_.size());
     for (auto& binary_annotation : binary_annotations_) {
       binary_annotation_list.push_back(
           ValueUtil::structValue(binary_annotation.toStruct(replacements)));

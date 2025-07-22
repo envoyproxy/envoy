@@ -89,7 +89,7 @@ public:
                              const std::string& operation_name, Tracing::Decision tracing_decision,
                              const SpanContext& previous_span_context);
 
-  void packMessage(MessagePackPacker& packer);
+  void packMessage(MessagePackPacker& packer) override;
 
 private:
   std::map<std::string, std::string> option_;
@@ -171,6 +171,9 @@ public:
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool sampled) override;
+  // The Fluentd tracer never parses the external context and the Envoy tracing decision
+  // is always be used.
+  void setDecision(bool decision) override { setSampled(decision); }
   bool sampled() const { return sampled_; }
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;

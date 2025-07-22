@@ -29,6 +29,16 @@ behavior_changes:
   change: |
     The Squash HTTP filter in ``contrib`` has been deleted. The project it provided integration with has been idle for
     five years and appears abandoned.
+- area: http
+  change: |
+    The route refresh will now results in a tracing refresh. The trace sampling decision and decoration
+    of new route will be applied to the active span.
+    This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.trace_refresh_after_route_refresh`` to ``false``.
+    Note, if :ref:`pack_trace_reason
+    <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>` is set
+    to ``true`` (it is ``true`` by default), then a request have been marked as traced may cannot be
+    unmarked as traced after the tracing refresh.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -107,9 +117,9 @@ minor_behavior_changes:
     Extension status changed from ``alpha`` to ``stable``.
 - area: oauth2
   change: |
-      Starting from this release, these cookies: oauth_hmac,oauth_expires,refresh_token,oauth_nonce,code_verifier will
-      not be forwarded to the upstream. This behavior can be reverted by setting the runtime guard
-      ``envoy.reloadable_features.oauth2_cleanup_cookies`` to ``false``.
+    Starting from this release, these cookies: oauth_hmac,oauth_expires,refresh_token,oauth_nonce,code_verifier will
+    not be forwarded to the upstream. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.oauth2_cleanup_cookies`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

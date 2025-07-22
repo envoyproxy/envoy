@@ -864,6 +864,61 @@ TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
+TEST_F(OpenTelemetryDriverTest, UpdateDecisionTrue) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, false});
+  span->setDecision(true);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, UpdateDecisionFalse) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->setDecision(false);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
+  span->finishSpan();
+  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+TEST_F(OpenTelemetryDriverTest, UpdateDecisionButIgnored) {
+  setupValidDriver();
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"},
+      {":path", "/"},
+      {":method", "GET"},
+      {"traceparent", "00-00000000000000010000000000000002-0000000000000003-01"}};
+
+  // The traceparent header indicates the span is sampled and the Envoy tracing decision is
+  // ignored.
+  Tracing::SpanPtr span =
+      driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
+                         {Tracing::Reason::NotTraceable, false});
+  span->setDecision(false);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
+      .Times(1)
+      .WillRepeatedly(Return(1));
+  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _));
+  span->finishSpan();
+  EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
 // Verifies tracer is "disabled" when no exporter is configured
 TEST_F(OpenTelemetryDriverTest, NoExportWithoutGrpcService) {
   const std::string yaml_string = "{}";

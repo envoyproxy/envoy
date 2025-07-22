@@ -17,7 +17,6 @@
 #include "msgpack.hpp"
 
 using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -70,7 +69,7 @@ public:
     std::map<std::string, std::string> option_ = {{"fluent_signal", "2"},
                                                   {"TimeFormat", "DateTime"}};
     packer.pack(option_);
-    return std::string(buffer.data(), buffer.size());
+    return {buffer.data(), buffer.size()};
   }
 
   std::string tag_ = "test.tag";

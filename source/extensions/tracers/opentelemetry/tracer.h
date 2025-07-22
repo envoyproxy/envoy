@@ -85,7 +85,8 @@ private:
 class Span : Logger::Loggable<Logger::Id::tracing>, public Tracing::Span {
 public:
   Span(const std::string& name, const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
-       Envoy::TimeSource& time_source, Tracer& parent_tracer, OTelSpanKind span_kind);
+       Envoy::TimeSource& time_source, Tracer& parent_tracer, OTelSpanKind span_kind,
+       bool ignore_decision = false);
 
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
@@ -101,11 +102,15 @@ public:
    * Set the span's sampled flag.
    */
   void setSampled(bool sampled) override { sampled_ = sampled; };
+  void setDecision(bool decision) override {
+    if (!ignore_decision_) {
+      setSampled(decision);
+    }
+  }
 
   /**
    * @return whether or not the sampled attribute is set
    */
-
   bool sampled() const { return sampled_; }
 
   std::string getBaggage(absl::string_view /*key*/) override { return EMPTY_STRING; };
@@ -172,6 +177,7 @@ private:
   Tracer& parent_tracer_;
   Envoy::TimeSource& time_source_;
   bool sampled_;
+  const bool ignore_decision_{false};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

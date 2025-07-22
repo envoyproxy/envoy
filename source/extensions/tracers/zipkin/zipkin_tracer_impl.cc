@@ -19,7 +19,8 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
-ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span), tracer_(tracer) {}
+ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer, bool ignore_decision)
+    : span_(span), tracer_(tracer), ignore_decision_(ignore_decision) {}
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
 
@@ -57,6 +58,11 @@ void ZipkinSpan::injectContext(Tracing::TraceContext& trace_context,
 }
 
 void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
+void ZipkinSpan::setDecision(bool decision) {
+  if (!ignore_decision_) {
+    setSampled(decision);
+  }
+}
 
 Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std::string& name,
                                         SystemTime start_time) {
@@ -118,15 +124,17 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
   SpanContextExtractor extractor(trace_context);
-  bool sampled{extractor.extractSampled(tracing_decision)};
+  const absl::optional<bool> sampled = extractor.extractSampled();
+  bool has_parent_context = false;
   TRY_NEEDS_AUDIT {
-    auto ret_span_context = extractor.extractSpanContext(sampled);
+    auto ret_span_context = extractor.extractSpanContext(sampled.value_or(tracing_decision.traced));
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
       new_zipkin_span =
           tracer.startSpan(config, std::string(trace_context.host()), stream_info.startTime());
-      new_zipkin_span->setSampled(sampled);
+      new_zipkin_span->setSampled(sampled.value_or(tracing_decision.traced));
     } else {
+      has_parent_context = true;
       new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()),
                                          stream_info.startTime(), ret_span_context.first);
     }
@@ -134,7 +142,8 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   END_TRY catch (const ExtractorException& e) { return std::make_unique<Tracing::NullSpan>(); }
 
   // Return the active Zipkin span.
-  return std::make_unique<ZipkinSpan>(*new_zipkin_span, tracer);
+  return std::make_unique<ZipkinSpan>(*new_zipkin_span, tracer,
+                                      sampled.has_value() || has_parent_context);
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,

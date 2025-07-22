@@ -40,7 +40,8 @@ public:
   MOCK_METHOD(void, finishSpan, ());
   MOCK_METHOD(void, injectContext,
               (Tracing::TraceContext & request_headers, const Tracing::UpstreamContext& upstream));
-  MOCK_METHOD(void, setSampled, (const bool sampled));
+  MOCK_METHOD(void, setSampled, (bool sampled));
+  MOCK_METHOD(void, setDecision, (bool decision));
   MOCK_METHOD(void, setBaggage, (absl::string_view key, absl::string_view value));
   MOCK_METHOD(std::string, getBaggage, (absl::string_view key));
   MOCK_METHOD(std::string, getTraceId, (), (const));

@@ -18,6 +18,7 @@
 #include "datadog/optional.h"
 #include "datadog/propagation_style.h"
 #include "datadog/sampling_priority.h"
+#include "datadog/tags.h"
 #include "datadog/trace_segment.h"
 #include "datadog/tracer_config.h"
 #include "gtest/gtest.h"
@@ -204,6 +205,98 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   EXPECT_EQ(1234, dd_span.trace_id().low);
   ASSERT_TRUE(dd_span.parent_id());
   EXPECT_EQ(5678, *dd_span.parent_id());
+}
+
+TEST_F(DatadogTracerTest, UpdateDecisionTrue) {
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  // trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{};
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name,
+                       {Tracing::Reason::NotTraceable, false});
+  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
+
+  // Initial decision from Envoy is false and the span is set to `USER_DROP`.
+  EXPECT_EQ(as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority,
+            int(datadog::tracing::SamplingPriority::USER_DROP));
+
+  span->setDecision(true);
+  EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_KEEP),
+            as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority);
+}
+
+TEST_F(DatadogTracerTest, UpdateDecisionFalse) {
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  // trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{};
+
+  const Tracing::SpanPtr span = tracer.startSpan(Tracing::MockConfig{}, context, stream_info_,
+                                                 operation_name, {Tracing::Reason::Sampling, true});
+  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
+
+  // Initial decision from Envoy is true and the span is set to `USER_KEEP`.
+  EXPECT_FALSE(as_dd_span_wrapper->impl()->trace_segment().sampling_decision().has_value());
+
+  span->setDecision(false);
+  EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_DROP),
+            as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority);
+}
+
+TEST_F(DatadogTracerTest, UpdateDecisionButIgnored) {
+  // Verify that if `setDecision` is called on a span with `ignore_decision_`
+  // set to true, then the sampling decision is not updated.
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  // trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{
+      {"x-datadog-trace-id", "1234"},
+      {"x-datadog-parent-id", "5678"},
+      {"x-datadog-sampling-priority", "0"},
+  };
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name,
+                       {Tracing::Reason::NotTraceable, false});
+  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
+
+  // Initial decision from External is '0' and the span is set to `AUTO_DROP`.
+  EXPECT_EQ(as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority,
+            int(datadog::tracing::SamplingPriority::AUTO_DROP));
+
+  span->setDecision(true);
+  EXPECT_EQ(as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority,
+            int(datadog::tracing::SamplingPriority::AUTO_DROP));
+
+  span->setDecision(false);
+  EXPECT_EQ(as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority,
+            int(datadog::tracing::SamplingPriority::AUTO_DROP));
 }
 
 TEST_F(DatadogTracerTest, ExtractionFailure) {

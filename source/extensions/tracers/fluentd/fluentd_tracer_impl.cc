@@ -306,7 +306,6 @@ Tracing::SpanPtr FluentdTracerImpl::startSpan(Tracing::TraceContext& trace_conte
 
   Span new_span(trace_context, start_time, operation_name, tracing_decision, shared_from_this(),
                 span_context, time_source_);
-
   new_span.setSampled(tracing_decision.traced);
 
   return std::make_unique<Span>(new_span);

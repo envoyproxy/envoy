@@ -13,8 +13,6 @@
 #include "gtest/gtest.h"
 #include "msgpack.hpp"
 
-using testing::AssertionResult;
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
@@ -106,6 +104,9 @@ TEST_F(FluentdTracerIntegrationTest, Span) {
   span->setBaggage("test", "foo");
   auto baggage = span->getBaggage("test");
   EXPECT_EQ(baggage, "");
+
+  span->setDecision(false);
+  span->setDecision(true);
 
   span->finishSpan();
 }

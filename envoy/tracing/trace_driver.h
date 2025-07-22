@@ -114,6 +114,26 @@ public:
   virtual void setSampled(bool sampled) PURE;
 
   /**
+   * When the startSpan() of tracer is called, the Envoy tracing decision is passed to the
+   * tracer to help determine whether the span should be sampled.
+   *
+   * When the Envoy tracing decision is refreshed becase route refresh or other reasons, Envoy
+   * may call setDecision() to update the sampling decision.
+   *
+   * But note that the tracer may have its own sampling decision logic (e.g. custom sampler,
+   * external tracing context, etc.), and it may not use the Envoy tracing decision at all,
+   * then the desicion may be ignored by the tracer.
+   *
+   * NOTE: The difference between this method and setSampled() is that the setSampled() may
+   * be called by any custom filters/extensions to update the sampling decision and usually
+   * will not be ignored. And the setDecision() is only called by the Envoy core to set the
+   * calulated tracing decision and may be ignored by the tracer.
+   *
+   * @param decision the tracing decision to set.
+   */
+  virtual void setDecision(bool decision) PURE;
+
+  /**
    * Retrieve a key's value from the span's baggage.
    * This baggage data could've been set by this span or any parent spans.
    * @param key baggage key

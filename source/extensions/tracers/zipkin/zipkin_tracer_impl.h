@@ -46,7 +46,7 @@ public:
    *
    * @param span to be wrapped.
    */
-  ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer);
+  ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer, bool ignore_decision = false);
 
   /**
    * Calls Zipkin::Span::finishSpan() to perform all actions needed to finalize the span.
@@ -78,6 +78,7 @@ public:
                               SystemTime start_time) override;
 
   void setSampled(bool sampled) override;
+  void setDecision(bool decision) override;
 
   // TODO(#11622): Implement baggage storage for zipkin spans
   void setBaggage(absl::string_view, absl::string_view) override;
@@ -96,6 +97,7 @@ public:
 private:
   Zipkin::Span span_;
   Zipkin::Tracer& tracer_;
+  const bool ignore_decision_{false};
 };
 
 using ZipkinSpanPtr = std::unique_ptr<ZipkinSpan>;

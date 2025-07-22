@@ -879,6 +879,54 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
   EXPECT_EQ(SAMPLED, sampled_entry.value());
 }
 
+TEST_F(ZipkinDriverTest, UpdateDecisionTrue) {
+  setupValidDriver("HTTP_JSON");
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, false});
+  span->setDecision(true);
+
+  request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
+
+  auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+  EXPECT_EQ(SAMPLED, sampled_entry.value());
+}
+
+TEST_F(ZipkinDriverTest, UpdateDecisionFalse) {
+  setupValidDriver("HTTP_JSON");
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+
+  span->setDecision(false);
+
+  request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
+
+  auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry.value());
+}
+
+TEST_F(ZipkinDriverTest, UpdateDecisionIgnored) {
+  setupValidDriver("HTTP_JSON");
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED.key(), NOT_SAMPLED);
+
+  // Envoy tracing decision is ignored if the B3 sampled header is set to not sample.
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->setDecision(true);
+
+  request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
+
+  auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry.value());
+}
+
 TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   setupValidDriver("HTTP_JSON");
   request_headers_.set(ZipkinCoreConstants::get().X_B3_TRACE_ID.key(),

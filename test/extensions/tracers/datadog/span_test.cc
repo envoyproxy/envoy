@@ -377,6 +377,84 @@ TEST_F(DatadogTracerSpanTest, SetSampledFalse) {
   EXPECT_EQ(-1, found->second);
 }
 
+TEST_F(DatadogTracerSpanTest, UpdateDecisionButIgnored) {
+  {
+    // First ensure that the trace will be dropped (until we override it by
+    // calling `setDecision`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+
+    Span local_root{std::move(span_), true}; // `ignore_decision_` is true.
+    local_root.setDecision(true);
+
+    // The `setDecision` call should not change the sampling priority, because
+    // `ignore_decision_` is true.
+    local_root.finishSpan();
+  }
+  EXPECT_EQ(1, collector_->chunks.size());
+  const auto& spans = collector_->chunks[0];
+  EXPECT_EQ(1, spans.size());
+  const auto& local_root_ptr = spans[0];
+  EXPECT_NE(nullptr, local_root_ptr);
+  const datadog::tracing::SpanData& local_root = *local_root_ptr;
+  const auto found =
+      local_root.numeric_tags.find(datadog::tracing::tags::internal::sampling_priority);
+  EXPECT_NE(local_root.numeric_tags.end(), found);
+  EXPECT_EQ(-1, found->second);
+}
+
+TEST_F(DatadogTracerSpanTest, UpdateDecisionTrue) {
+  {
+    // First ensure that the trace will be dropped (until we override it by
+    // calling `setDecision`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_DROP));
+
+    Span local_root{std::move(span_), false}; // `ignore_decision_` is true.
+    local_root.setDecision(true);
+
+    // The `setDecision` call should not change the sampling priority, because
+    // `ignore_decision_` is true.
+    local_root.finishSpan();
+  }
+  EXPECT_EQ(1, collector_->chunks.size());
+  const auto& spans = collector_->chunks[0];
+  EXPECT_EQ(1, spans.size());
+  const auto& local_root_ptr = spans[0];
+  EXPECT_NE(nullptr, local_root_ptr);
+  const datadog::tracing::SpanData& local_root = *local_root_ptr;
+  const auto found =
+      local_root.numeric_tags.find(datadog::tracing::tags::internal::sampling_priority);
+  EXPECT_NE(local_root.numeric_tags.end(), found);
+  EXPECT_EQ(2, found->second);
+}
+
+TEST_F(DatadogTracerSpanTest, UpdateDecisionFalse) {
+  {
+    // First ensure that the trace will be dropped (until we override it by
+    // calling `setDecision`, below).
+    span_.trace_segment().override_sampling_priority(
+        static_cast<int>(datadog::tracing::SamplingPriority::USER_KEEP));
+
+    Span local_root{std::move(span_), false}; // `ignore_decision_` is true.
+    local_root.setDecision(false);
+
+    // The `setDecision` call should not change the sampling priority, because
+    // `ignore_decision_` is true.
+    local_root.finishSpan();
+  }
+  EXPECT_EQ(1, collector_->chunks.size());
+  const auto& spans = collector_->chunks[0];
+  EXPECT_EQ(1, spans.size());
+  const auto& local_root_ptr = spans[0];
+  EXPECT_NE(nullptr, local_root_ptr);
+  const datadog::tracing::SpanData& local_root = *local_root_ptr;
+  const auto found =
+      local_root.numeric_tags.find(datadog::tracing::tags::internal::sampling_priority);
+  EXPECT_NE(local_root.numeric_tags.end(), found);
+  EXPECT_EQ(-1, found->second);
+}
+
 TEST_F(DatadogTracerSpanTest, Baggage) {
   // Baggage is not supported by dd-trace-cpp, so `Span::getBaggage` and
   // `Span::setBaggage` do nothing.
