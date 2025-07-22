@@ -112,7 +112,6 @@ private:
 INSTANTIATE_TEST_SUITE_P(IpVersions, AggregateRetryClusterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
-// Test 1: Basic Retry Progression.
 // Verifies that retries progress through clusters in order: cluster_0 -> cluster_1 -> cluster_2.
 TEST_P(AggregateRetryClusterIntegrationTest, BasicRetryProgression) {
   setNumRetries(3);
@@ -160,7 +159,6 @@ TEST_P(AggregateRetryClusterIntegrationTest, BasicRetryProgression) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 
-// Test 2: Successful First Attempt (No Retries).
 // Verifies that successful requests don't trigger retries.
 TEST_P(AggregateRetryClusterIntegrationTest, SuccessfulFirstAttempt) {
   setNumRetries(3);
@@ -191,7 +189,6 @@ TEST_P(AggregateRetryClusterIntegrationTest, SuccessfulFirstAttempt) {
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 
-// Test 3: FAIL Overflow Behavior.
 // Verifies that requests fail when retries exceed available clusters with FAIL behavior.
 TEST_P(AggregateRetryClusterIntegrationTest, FailOverflowBehavior) {
   setOverflowBehavior(envoy::extensions::clusters::aggregate_retry::v3::ClusterConfig::FAIL);
@@ -228,7 +225,6 @@ TEST_P(AggregateRetryClusterIntegrationTest, FailOverflowBehavior) {
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 
-// Test 4: USE_LAST_CLUSTER Overflow Behavior.
 // Verifies that overflow retries continue to use the last cluster.
 TEST_P(AggregateRetryClusterIntegrationTest, UseLastClusterOverflowBehavior) {
   setOverflowBehavior(
@@ -279,7 +275,6 @@ TEST_P(AggregateRetryClusterIntegrationTest, UseLastClusterOverflowBehavior) {
   EXPECT_EQ(3, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 
-// Test 5: Retry Attempt Count Verification.
 // This test specifically verifies the fix for the 1-based retry attempt indexing.
 TEST_P(AggregateRetryClusterIntegrationTest, RetryAttemptCountVerification) {
   setNumRetries(2);
@@ -322,7 +317,6 @@ TEST_P(AggregateRetryClusterIntegrationTest, RetryAttemptCountVerification) {
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 
-// Test 6: No Retries Configuration.
 // Verifies behavior when no retries are configured.
 TEST_P(AggregateRetryClusterIntegrationTest, NoRetriesConfigured) {
   setNumRetries(0); // No retries allowed.
@@ -350,6 +344,168 @@ TEST_P(AggregateRetryClusterIntegrationTest, NoRetriesConfigured) {
   // Verify only cluster_0 was used.
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
+}
+
+// This test validates the HTTP request details are properly passed through the aggregate cluster.
+TEST_P(AggregateRetryClusterIntegrationTest, MixedSuccessFailureWithRequestValidation) {
+  setNumRetries(2);
+  setEnableAttemptCountHeaders(true);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Create a request with specific headers and body.
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"},
+                                     {"x-custom-header", "test-value"}},
+      "{'key': 'value'}");
+
+  // First attempt should go to cluster_0 - return 503 to trigger retry.
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Verify request details are preserved.
+  EXPECT_EQ("POST", upstream_request_->headers().getMethodValue());
+  EXPECT_EQ("/test", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("application/json", upstream_request_->headers().getContentTypeValue());
+  auto custom_header = upstream_request_->headers().get(Http::LowerCaseString("x-custom-header"));
+  EXPECT_FALSE(custom_header.empty());
+  EXPECT_EQ("test-value", custom_header[0]->value().getStringView());
+  EXPECT_EQ("{'key': 'value'}", upstream_request_->body().toString());
+
+  // Return 503 to trigger retry.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  fake_upstream_connection_.reset();
+
+  // First retry should go to cluster_1 - return 200.
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  // Verify request details are still preserved after retry.
+  EXPECT_EQ("POST", upstream_request_->headers().getMethodValue());
+  EXPECT_EQ("/test", upstream_request_->headers().getPathValue());
+  EXPECT_EQ("application/json", upstream_request_->headers().getContentTypeValue());
+  auto custom_header_retry =
+      upstream_request_->headers().get(Http::LowerCaseString("x-custom-header"));
+  EXPECT_FALSE(custom_header_retry.empty());
+  EXPECT_EQ("test-value", custom_header_retry[0]->value().getStringView());
+  EXPECT_EQ("{'key': 'value'}", upstream_request_->body().toString());
+
+  // Return successful response.
+  upstream_request_->encodeHeaders(
+      Http::TestResponseHeaderMapImpl{{":status", "200"}, {"content-type", "application/json"}},
+      false);
+  upstream_request_->encodeData("{'result': 'success'}", true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("2", response->headers().getEnvoyAttemptCountValue());
+  EXPECT_EQ("{'result': 'success'}", response->body());
+
+  // Verify cluster usage.
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
+}
+
+// This test validates that multiple sequential requests are handled correctly with different retry
+// patterns.
+TEST_P(AggregateRetryClusterIntegrationTest, SequentialRequestsWithDifferentOutcomes) {
+  setNumRetries(1);
+  initialize();
+
+  // Request 1: Fail first attempt, succeed on retry.
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response =
+        codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                          {":path", "/request1"},
+                                                                          {":scheme", "http"},
+                                                                          {":authority", "host"}},
+                                           0);
+
+    // First attempt on cluster_0 - fail.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, true);
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    fake_upstream_connection_.reset();
+
+    // Retry on cluster_1 - succeed.
+    ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    fake_upstream_connection_.reset();
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client_->close();
+  }
+
+  // Request 2: Succeed immediately.
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response =
+        codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                          {":path", "/request2"},
+                                                                          {":scheme", "http"},
+                                                                          {":authority", "host"}},
+                                           0);
+
+    // First attempt on cluster_0 - succeed.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    fake_upstream_connection_.reset();
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client_->close();
+  }
+
+  // Request 3: Succeed immediately.
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    auto response =
+        codec_client_->makeRequestWithBody(Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                                                          {":path", "/request3"},
+                                                                          {":scheme", "http"},
+                                                                          {":authority", "host"}},
+                                           0);
+
+    // First attempt on cluster_0 - succeed.
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+    ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    fake_upstream_connection_.reset();
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+    codec_client_->close();
+  }
+
+  // Verify cluster usage - cluster_0 should have 3 requests, cluster_1 should have 1 retry.
+  EXPECT_EQ(3, test_server_->counter("cluster.cluster_0.upstream_rq_total")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_1.upstream_rq_total")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.cluster_2.upstream_rq_total")->value());
 }
 

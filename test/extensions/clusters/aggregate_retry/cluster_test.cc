@@ -1006,6 +1006,179 @@ cluster_type:
   EXPECT_FALSE(overflow_result.has_value());
 }
 
+// This test covers the scenario where cluster index is valid but cluster is not found
+// in cluster manager.
+TEST_F(AggregateRetryClusterTest, ChooseHostWithMissingCluster) {
+  const std::string yaml = R"EOF(
+name: missing_cluster_test
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.aggregate_retry
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.aggregate_retry.v3.ClusterConfig
+    clusters:
+    - missing_cluster_0
+    - missing_cluster_1
+    retry_overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  AggregateRetryClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                       cluster_->clusters_, cluster_->retry_overflow_behavior_);
+
+  // Mock context for retry attempt 1 (should map to cluster index 0).
+  NiceMock<Upstream::MockLoadBalancerContext> mock_context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(mock_context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+
+  // Mock cluster manager to return nullptr for missing_cluster_0.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster_0"))
+      .WillOnce(Return(nullptr));
+
+  // chooseHost should return nullptr when cluster is not found.
+  auto result = lb.chooseHost(&mock_context);
+  EXPECT_EQ(nullptr, result.host);
+}
+
+// Test peekAnotherHost with missing cluster.
+TEST_F(AggregateRetryClusterTest, PeekAnotherHostWithMissingCluster) {
+  const std::string yaml = R"EOF(
+name: missing_cluster_test
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.aggregate_retry
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.aggregate_retry.v3.ClusterConfig
+    clusters:
+    - missing_cluster_0
+    - missing_cluster_1
+    retry_overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  AggregateRetryClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                       cluster_->clusters_, cluster_->retry_overflow_behavior_);
+
+  // Mock context for retry attempt 1 (should map to cluster index 0).
+  NiceMock<Upstream::MockLoadBalancerContext> mock_context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(mock_context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+
+  // Mock cluster manager to return nullptr for missing_cluster_0.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster_0"))
+      .WillOnce(Return(nullptr));
+
+  // peekAnotherHost should return nullptr when cluster is not found.
+  auto result = lb.peekAnotherHost(&mock_context);
+  EXPECT_EQ(nullptr, result);
+}
+
+// Test selectExistingConnection with missing cluster.
+TEST_F(AggregateRetryClusterTest, SelectExistingConnectionWithMissingCluster) {
+  const std::string yaml = R"EOF(
+name: missing_cluster_test
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.aggregate_retry
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.aggregate_retry.v3.ClusterConfig
+    clusters:
+    - missing_cluster_0
+    - missing_cluster_1
+    retry_overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  AggregateRetryClusterLoadBalancer lb(cluster_->info(), cluster_->cluster_manager_,
+                                       cluster_->clusters_, cluster_->retry_overflow_behavior_);
+
+  // Mock context for retry attempt 1 (should map to cluster index 0).
+  NiceMock<Upstream::MockLoadBalancerContext> mock_context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(mock_context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+
+  // Mock cluster manager to return nullptr for missing_cluster_0.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster_0"))
+      .WillOnce(Return(nullptr));
+
+  // Create a mock host and hash key for selectExistingConnection.
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  std::vector<uint8_t> hash_key;
+
+  // selectExistingConnection should return nullopt when cluster is not found.
+  auto result = lb.selectExistingConnection(&mock_context, *mock_host, hash_key);
+  EXPECT_FALSE(result.has_value());
+}
+
+// Test the load balancer context wrapper's selectedClusterIndex method.
+TEST_F(AggregateRetryClusterTest, LoadBalancerContextWrapperClusterIndex) {
+  NiceMock<Upstream::MockLoadBalancerContext> mock_context;
+
+  // Test with different cluster indices.
+  AggregateRetryLoadBalancerContext wrapper1(&mock_context, 0);
+  EXPECT_EQ(0, wrapper1.selectedClusterIndex());
+
+  AggregateRetryLoadBalancerContext wrapper2(&mock_context, 2);
+  EXPECT_EQ(2, wrapper2.selectedClusterIndex());
+
+  AggregateRetryLoadBalancerContext wrapper3(&mock_context, 10);
+  EXPECT_EQ(10, wrapper3.selectedClusterIndex());
+}
+
+// Test load balancer context wrapper with all delegated methods.
+TEST_F(AggregateRetryClusterTest, LoadBalancerContextWrapperDelegation) {
+  NiceMock<Upstream::MockLoadBalancerContext> mock_context;
+
+  // Set up expectations for all delegated methods.
+  const uint64_t test_hash = 12345;
+  EXPECT_CALL(mock_context, computeHashKey()).WillOnce(Return(test_hash));
+
+  auto mock_connection = std::make_shared<NiceMock<Network::MockConnection>>();
+  EXPECT_CALL(mock_context, downstreamConnection()).WillOnce(Return(mock_connection.get()));
+
+  auto mock_metadata = std::make_shared<NiceMock<Router::MockMetadataMatchCriteria>>();
+  EXPECT_CALL(mock_context, metadataMatchCriteria()).WillOnce(Return(mock_metadata.get()));
+
+  auto mock_headers = std::make_shared<Http::TestRequestHeaderMapImpl>();
+  EXPECT_CALL(mock_context, downstreamHeaders()).WillOnce(Return(mock_headers.get()));
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(mock_context, requestStreamInfo()).WillOnce(Return(&stream_info));
+
+  const uint32_t retry_count = 3;
+  EXPECT_CALL(mock_context, hostSelectionRetryCount()).WillOnce(Return(retry_count));
+
+  auto socket_options = std::make_shared<Network::Socket::Options>();
+  EXPECT_CALL(mock_context, upstreamSocketOptions()).WillOnce(Return(socket_options));
+
+  Network::TransportSocketOptionsConstSharedPtr transport_options = nullptr;
+  EXPECT_CALL(mock_context, upstreamTransportSocketOptions()).WillOnce(Return(transport_options));
+
+  AggregateRetryLoadBalancerContext wrapper(&mock_context, 1);
+
+  // Verify all delegated methods work correctly.
+  EXPECT_EQ(test_hash, wrapper.computeHashKey());
+  EXPECT_EQ(mock_connection.get(), wrapper.downstreamConnection());
+  EXPECT_EQ(mock_metadata.get(), wrapper.metadataMatchCriteria());
+  EXPECT_EQ(mock_headers.get(), wrapper.downstreamHeaders());
+  EXPECT_EQ(&stream_info, wrapper.requestStreamInfo());
+  EXPECT_EQ(retry_count, wrapper.hostSelectionRetryCount());
+  EXPECT_EQ(socket_options, wrapper.upstreamSocketOptions());
+  EXPECT_EQ(transport_options, wrapper.upstreamTransportSocketOptions());
+
+  // Verify cluster index is preserved.
+  EXPECT_EQ(1, wrapper.selectedClusterIndex());
+}
+
 } // namespace AggregateRetry
 } // namespace Clusters
 } // namespace Extensions
