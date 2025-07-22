@@ -18,7 +18,7 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "config_test",
-    size = "enormous",
+    size = "large",
     srcs = ["config_test.cc"],
     data = envoy_select_wasm_cpp_tests([
         "//test/extensions/filters/network/wasm/test_data:test_cpp.wasm",
