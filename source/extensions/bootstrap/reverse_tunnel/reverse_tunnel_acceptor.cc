@@ -275,16 +275,10 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented node stat {} to {}",
                 node_stat_name, node_gauge.value());
     } else {
-      // Guardrail: only decrement if the gauge value is greater than 0.
       if (node_gauge.value() > 0) {
         node_gauge.dec();
         ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented node stat {} to {}",
                   node_stat_name, node_gauge.value());
-      } else {
-        ENVOY_LOG(
-            trace,
-            "ReverseTunnelAcceptorExtension: skipping decrement for node stat {} (already at 0)",
-            node_stat_name);
       }
     }
   }
@@ -301,16 +295,10 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented cluster stat {} to {}",
                 cluster_stat_name, cluster_gauge.value());
     } else {
-      // Guardrail: only decrement if the gauge value is greater than 0.
       if (cluster_gauge.value() > 0) {
         cluster_gauge.dec();
         ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented cluster stat {} to {}",
                   cluster_stat_name, cluster_gauge.value());
-      } else {
-        ENVOY_LOG(
-            trace,
-            "ReverseTunnelAcceptorExtension: skipping decrement for cluster stat {} (already at 0)",
-            cluster_stat_name);
       }
     }
   }

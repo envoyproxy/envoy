@@ -486,35 +486,51 @@ protected:
     return socket_manager_->fd_to_timer_map_.find(fd) != socket_manager_->fd_to_timer_map_.end();
   }
 
-  size_t verifyAcceptedReverseConnectionsMap(const std::string& node) {
-    auto it = socket_manager_->accepted_reverse_connections_.find(node);
-    return (it != socket_manager_->accepted_reverse_connections_.end()) ? it->second.size() : 0;
+  size_t getFDToEventMapSize() { return socket_manager_->fd_to_event_map_.size(); }
+
+  size_t getFDToTimerMapSize() { return socket_manager_->fd_to_timer_map_.size(); }
+
+  size_t verifyAcceptedReverseConnectionsMap(const std::string& node_id) {
+    auto it = socket_manager_->accepted_reverse_connections_.find(node_id);
+    if (it == socket_manager_->accepted_reverse_connections_.end()) {
+      return 0;
+    }
+    return it->second.size();
   }
 
-  std::string getNodeToClusterMapping(const std::string& node) {
-    auto it = socket_manager_->node_to_cluster_map_.find(node);
-    return (it != socket_manager_->node_to_cluster_map_.end()) ? it->second : "";
+  std::string getNodeToClusterMapping(const std::string& node_id) {
+    auto it = socket_manager_->node_to_cluster_map_.find(node_id);
+    if (it == socket_manager_->node_to_cluster_map_.end()) {
+      return "";
+    }
+    return it->second;
   }
 
-  std::vector<std::string> getClusterToNodeMapping(const std::string& cluster) {
-    auto it = socket_manager_->cluster_to_node_map_.find(cluster);
-    return (it != socket_manager_->cluster_to_node_map_.end()) ? it->second
-                                                               : std::vector<std::string>{};
+  std::vector<std::string> getClusterToNodeMapping(const std::string& cluster_id) {
+    auto it = socket_manager_->cluster_to_node_map_.find(cluster_id);
+    if (it == socket_manager_->cluster_to_node_map_.end()) {
+      return {};
+    }
+    return it->second;
   }
-
-  size_t getAcceptedReverseConnectionsSize() {
-    return socket_manager_->accepted_reverse_connections_.size();
-  }
-
-  size_t getFDToNodeMapSize() { return socket_manager_->fd_to_node_map_.size(); }
 
   size_t getNodeToClusterMapSize() { return socket_manager_->node_to_cluster_map_.size(); }
 
   size_t getClusterToNodeMapSize() { return socket_manager_->cluster_to_node_map_.size(); }
 
-  size_t getFDToEventMapSize() { return socket_manager_->fd_to_event_map_.size(); }
+  size_t getAcceptedReverseConnectionsSize() {
+    return socket_manager_->accepted_reverse_connections_.size();
+  }
 
-  size_t getFDToTimerMapSize() { return socket_manager_->fd_to_timer_map_.size(); }
+  // Helper methods for the new test cases
+  void addNodeToClusterMapping(const std::string& node_id, const std::string& cluster_id) {
+    socket_manager_->node_to_cluster_map_[node_id] = cluster_id;
+    socket_manager_->cluster_to_node_map_[cluster_id].push_back(node_id);
+  }
+
+  void addFDToNodeMapping(int fd, const std::string& node_id) {
+    socket_manager_->fd_to_node_map_[fd] = node_id;
+  }
 
   // Helper to create a mock socket with proper address setup
   Network::ConnectionSocketPtr createMockSocket(int fd = 123,
@@ -1641,23 +1657,23 @@ TEST_F(TestUpstreamReverseConnectionIOHandle, GetSocketReturnsConstReference) {
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportIPv4) {
-  // Test: IPv4 is supported
+  // Test that IPv4 is supported
   EXPECT_TRUE(socket_interface_->ipFamilySupported(AF_INET));
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportIPv6) {
-  // Test: IPv6 is supported
+  // Test that IPv6 is supported
   EXPECT_TRUE(socket_interface_->ipFamilySupported(AF_INET6));
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportUnknown) {
-  // Test: Unknown families are not supported
+  // Test that unknown families are not supported
   EXPECT_FALSE(socket_interface_->ipFamilySupported(AF_UNIX));
   EXPECT_FALSE(socket_interface_->ipFamilySupported(-1));
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionNotInitialized) {
-  // Test: Handle calls before onServerInitialized
+  // Test that we handle calls before onServerInitialized
   ReverseTunnelAcceptor acceptor(context_);
 
   auto registry = acceptor.getLocalRegistry();
@@ -1665,7 +1681,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionNotInitialized) {
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, CreateEmptyConfigProto) {
-  // Test: createEmptyConfigProto returns valid proto
+  // Test that createEmptyConfigProto returns valid proto
   auto proto = socket_interface_->createEmptyConfigProto();
   EXPECT_NE(proto, nullptr);
 
@@ -1677,7 +1693,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, CreateEmptyConfigProto) {
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, FactoryName) {
-  // Test: Factory returns correct name
+  // Test that factory returns correct name
   EXPECT_EQ(socket_interface_->name(),
             "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
 }
@@ -1701,7 +1717,7 @@ protected:
 };
 
 TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
-  // Test: connect() returns success immediately for reverse connections
+  // Test that connect() returns success immediately for reverse connections
   auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
 
   auto result = handle_->connect(address);
@@ -1711,7 +1727,7 @@ TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
 }
 
 TEST_F(UpstreamReverseConnectionIOHandleTest, GetSocketReturnsValidReference) {
-  // Test: getSocket() returns a valid reference
+  // Test that getSocket() returns a valid reference
   const auto& socket = handle_->getSocket();
   EXPECT_NE(&socket, nullptr);
 }
@@ -1725,7 +1741,7 @@ protected:
 };
 
 TEST_F(ConfigValidationTest, ValidConfiguration) {
-  // Test: Valid configuration is accepted
+  // Test that valid configuration gets accepted
   config_.set_stat_prefix("reverse_tunnel");
 
   ReverseTunnelAcceptor acceptor(context_);
@@ -1735,13 +1751,48 @@ TEST_F(ConfigValidationTest, ValidConfiguration) {
 }
 
 TEST_F(ConfigValidationTest, EmptyStatPrefix) {
-  // Test: Empty stat_prefix should still work with default
-  // (Note: Current implementation uses default if empty)
-
+  // Test that empty stat_prefix still works with default
   ReverseTunnelAcceptor acceptor(context_);
 
   // Should not throw and should use default prefix
   EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
+}
+
+TEST_F(TestUpstreamSocketManager, GetConnectionSocketNoSocketsButValidMapping) {
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+
+  // Manually add mapping without adding any actual sockets
+  addNodeToClusterMapping(node_id, cluster_id);
+
+  // Try to get a socket - should hit the "No available sockets" log and return nullptr
+  auto socket = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_EQ(socket, nullptr);
+}
+
+TEST_F(TestUpstreamSocketManager, MarkSocketDeadInvalidSocketNotInPool) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Add socket to create mappings
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
+                                       false);
+
+  // Get the socket (removes it from pool but keeps fd mapping temporarily)
+  auto retrieved_socket = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_NE(retrieved_socket, nullptr);
+
+  // Manually add the fd back to fd_to_node_map to simulate the edge case
+  addFDToNodeMapping(123, node_id);
+
+  // Now mark socket dead - it should find the node but not find the socket in the pool
+  // This will trigger the "Marking an invalid socket dead" error log
+  socket_manager_->markSocketDead(123);
+
+  // Verify the fd mapping was cleaned up
+  EXPECT_FALSE(verifyFDToNodeMap(123));
 }
 
 } // namespace ReverseConnection
