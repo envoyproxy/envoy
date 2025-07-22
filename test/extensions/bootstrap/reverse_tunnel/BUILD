@@ -1,5 +1,6 @@
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -25,5 +26,18 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "reverse_connection_utility_test",
+    size = "medium",
+    srcs = ["reverse_connection_utility_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/network:connection_lib",
+        "//source/extensions/bootstrap/reverse_tunnel:reverse_connection_utility_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
     ],
 )
