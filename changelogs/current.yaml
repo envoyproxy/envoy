@@ -112,7 +112,7 @@ minor_behavior_changes:
       ``envoy.reloadable_features.oauth2_cleanup_cookies`` to ``false``.
 - area: websocket
   change: |
-      Added a runtime config to optionally control the websocket handshake response check. 
+      Added a runtime config ``http1.websocket_handshake_check`` to optionally control the websocket handshake response check.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
