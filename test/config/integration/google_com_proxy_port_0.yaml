@@ -1,5 +1,5 @@
 admin:
-  allow_listed_routes:
+  allow_interfaces:
   - exact: /quitquitquit
   - exact: "/stats"
   - exact: "/contention"
