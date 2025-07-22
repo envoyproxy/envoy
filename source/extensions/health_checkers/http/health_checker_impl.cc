@@ -91,9 +91,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
     }
 
     // Process the payload and store it in the buffer once during construction.
-    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> send_repeated;
-    send_repeated.Add()->CopyFrom(config.http_health_check().send());
-    auto send_bytes_or_error = PayloadMatcher::loadProtoBytes(send_repeated);
+    auto send_bytes_or_error = PayloadMatcher::loadProtoBytes(config.http_health_check().send());
     THROW_IF_NOT_OK_REF(send_bytes_or_error.status());
 
     // Copy the processed payload into the buffer once.

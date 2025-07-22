@@ -161,6 +161,8 @@ public:
 
   static absl::StatusOr<MatchSegments> loadProtoBytes(
       const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array);
+  static absl::StatusOr<MatchSegments> loadProtoBytes(
+      const envoy::config::core::v3::HealthCheck::Payload& single_payload);
   static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };
 

@@ -4173,6 +4173,34 @@ TEST(PayloadMatcher, loadJsonBytes) {
   }
 }
 
+TEST(PayloadMatcher, loadSinglePayload) {
+  // Test the single payload overload with text.
+  {
+    envoy::config::core::v3::HealthCheck::Payload single_payload;
+    single_payload.set_text("39000000");
+
+    PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(single_payload).value();
+    EXPECT_EQ(1U, segments.size());
+  }
+
+  // Test the single payload overload with binary.
+  {
+    envoy::config::core::v3::HealthCheck::Payload single_payload;
+    single_payload.set_binary(std::string({0x01, 0x02}));
+
+    PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(single_payload).value();
+    EXPECT_EQ(1U, segments.size());
+  }
+
+  // Test the single payload overload with invalid hex.
+  {
+    envoy::config::core::v3::HealthCheck::Payload single_payload;
+    single_payload.set_text("gg");
+
+    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(single_payload).status().ok());
+  }
+}
+
 static void addUint8(Buffer::Instance& buffer, uint8_t addend) {
   buffer.add(&addend, sizeof(addend));
 }

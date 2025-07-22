@@ -113,6 +113,13 @@ absl::StatusOr<PayloadMatcher::MatchSegments> PayloadMatcher::loadProtoBytes(
   return result;
 }
 
+absl::StatusOr<PayloadMatcher::MatchSegments> PayloadMatcher::loadProtoBytes(
+    const envoy::config::core::v3::HealthCheck::Payload& single_payload) {
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
+  repeated_payload.Add()->CopyFrom(single_payload);
+  return loadProtoBytes(repeated_payload);
+}
+
 bool PayloadMatcher::match(const MatchSegments& expected, const Buffer::Instance& buffer) {
   uint64_t start_index = 0;
   for (const std::vector<uint8_t>& segment : expected) {
