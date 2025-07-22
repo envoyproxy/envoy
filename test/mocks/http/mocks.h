@@ -141,7 +141,7 @@ public:
 class MockCodecEventCallbacks : public CodecEventCallbacks {
 public:
   MockCodecEventCallbacks();
-  ~MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks() override;
 
   MOCK_METHOD(void, onCodecEncodeComplete, ());
   MOCK_METHOD(void, onCodecLowLevelReset, ());
@@ -344,7 +344,7 @@ public:
   MOCK_METHOD(void, setReverseConnForceLocalReply, (bool));
 
   Buffer::InstancePtr buffer_;
-  std::list<DownstreamWatermarkCallbacks*> callbacks_{};
+  std::list<DownstreamWatermarkCallbacks*> callbacks_;
   testing::NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;

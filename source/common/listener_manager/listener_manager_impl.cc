@@ -319,21 +319,22 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
-  // Addresses with the "rc://" prefix are reverse connection addresses.
-  std::string logical_name = address->logicalName();
-  if (absl::StartsWith(logical_name, "rc://")) {
-    // Use the address's socket interface for reverse connections. If the
-    // reverse connection socket interface is not registered, the default
-    // socket interface is returned by socketInterface().
-    ENVOY_LOG(debug, "Creating reverse connection socket for logical name: {}", logical_name);
-    const auto& socket_interface = address->socketInterface();
+  // Use the address's socket interface for socket creation.
+  const Network::SocketInterface& socket_interface = address->socketInterface();
+  const Network::SocketInterface& default_interface = Network::SocketInterfaceSingleton::get();
+
+  // Check if this address specifies a custom socket interface.
+  if (&socket_interface != &default_interface) {
+    ENVOY_LOG(debug, "creating socket using custom interface for address: {}",
+              address->logicalName());
     auto io_handle = socket_interface.socket(socket_type, address, creation_options);
     if (!io_handle) {
-      return absl::InternalError("Failed to create reverse connection socket");
+      return absl::InvalidArgumentError("failed to create socket using custom interface");
     }
     return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
   }
 
+  // Continue with standard socket creation for addresses using the default interface.
   // First we try to get the socket from our parent if applicable in each case below.
   if (address->type() == Network::Address::Type::Pipe) {
     if (socket_type != Network::Socket::Type::Stream) {
@@ -419,7 +420,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(worker_factory.createWorker(
         i, server.overloadManager(), server.nullOverloadManager(), absl::StrCat("worker_", i)));
-    ENVOY_LOG(debug, "Starting worker {}", i);
+    ENVOY_LOG(debug, "starting worker: {}", i);
   }
 }
 

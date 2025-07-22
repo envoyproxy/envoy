@@ -8242,6 +8242,228 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, EmptyConnectionBalanceConfig) {
 #endif
 }
 
+// Test mock socket interface for custom address testing.
+class TestCustomSocketInterface : public Network::SocketInterfaceBase {
+public:
+  TestCustomSocketInterface() = default;
+
+  // Network::SocketInterface
+  Network::IoHandlePtr socket(Network::Socket::Type socket_type, Network::Address::Type addr_type,
+                              Network::Address::IpVersion version, bool socket_v6only,
+                              const Network::SocketCreationOptions& options) const override {
+    UNREFERENCED_PARAMETER(socket_v6only);
+    UNREFERENCED_PARAMETER(options);
+    // Create a regular socket for testing
+    if (socket_type == Network::Socket::Type::Stream && addr_type == Network::Address::Type::Ip) {
+      int domain = (version == Network::Address::IpVersion::v4) ? AF_INET : AF_INET6;
+      int sock_fd = ::socket(domain, SOCK_STREAM, 0);
+      if (sock_fd == -1) {
+        return nullptr;
+      }
+      was_called_ = true;
+      return std::make_unique<Network::IoSocketHandleImpl>(sock_fd);
+    }
+    return nullptr;
+  }
+
+  Network::IoHandlePtr socket(Network::Socket::Type socket_type,
+                              const Network::Address::InstanceConstSharedPtr addr,
+                              const Network::SocketCreationOptions& options) const override {
+    // Delegate to the other socket method
+    return socket(socket_type, addr->type(),
+                  addr->ip() ? addr->ip()->version() : Network::Address::IpVersion::v4, false,
+                  options);
+  }
+
+  bool ipFamilySupported(int domain) override { return domain == AF_INET || domain == AF_INET6; }
+
+  // Server::Configuration::BootstrapExtensionFactory
+  Server::BootstrapExtensionPtr
+  createBootstrapExtension(const Protobuf::Message& config,
+                           Server::Configuration::ServerFactoryContext& context) override {
+    UNREFERENCED_PARAMETER(config);
+    UNREFERENCED_PARAMETER(context);
+    return nullptr; // Not used in test
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return nullptr; // Not used in test
+  }
+
+  std::string name() const override { return "test.custom.socket.interface"; }
+
+  // Test helper
+  bool wasCalled() const { return was_called_; }
+  void resetCalled() { was_called_ = false; }
+
+private:
+  mutable bool was_called_{false};
+};
+
+// Test address that returns a custom socket interface
+class TestCustomAddress : public Network::Address::Instance {
+public:
+  TestCustomAddress(const Network::SocketInterface& custom_interface)
+      : address_string_("127.0.0.1:0"), logical_name_("custom://test-address"),
+        custom_interface_(custom_interface),
+        ipv4_instance_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0)) {}
+
+  // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override { return address_string_ == rhs.asString(); }
+  Network::Address::Type type() const override { return Network::Address::Type::Ip; }
+  const std::string& asString() const override { return address_string_; }
+  absl::string_view asStringView() const override { return address_string_; }
+  const std::string& logicalName() const override { return logical_name_; }
+  const Network::Address::Ip* ip() const override { return ipv4_instance_->ip(); }
+  const Network::Address::Pipe* pipe() const override { return nullptr; }
+  const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
+    return nullptr;
+  }
+  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  const sockaddr* sockAddr() const override { return ipv4_instance_->sockAddr(); }
+  socklen_t sockAddrLen() const override { return ipv4_instance_->sockAddrLen(); }
+  absl::string_view addressType() const override { return "test_custom"; }
+
+  // Return the custom socket interface
+  const Network::SocketInterface& socketInterface() const override { return custom_interface_; }
+
+private:
+  std::string address_string_;
+  std::string logical_name_;
+  const Network::SocketInterface& custom_interface_;
+  Network::Address::InstanceConstSharedPtr ipv4_instance_;
+};
+
+// Test address that returns the default socket interface
+class TestDefaultAddress : public Network::Address::Instance {
+public:
+  TestDefaultAddress()
+      : address_string_("127.0.0.1:0"), logical_name_("default://test-address"),
+        ipv4_instance_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0)) {}
+
+  // Network::Address::Instance
+  bool operator==(const Instance& rhs) const override { return address_string_ == rhs.asString(); }
+  Network::Address::Type type() const override { return Network::Address::Type::Ip; }
+  const std::string& asString() const override { return address_string_; }
+  absl::string_view asStringView() const override { return address_string_; }
+  const std::string& logicalName() const override { return logical_name_; }
+  const Network::Address::Ip* ip() const override { return ipv4_instance_->ip(); }
+  const Network::Address::Pipe* pipe() const override { return nullptr; }
+  const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
+    return nullptr;
+  }
+  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
+  const sockaddr* sockAddr() const override { return ipv4_instance_->sockAddr(); }
+  socklen_t sockAddrLen() const override { return ipv4_instance_->sockAddrLen(); }
+  absl::string_view addressType() const override { return "test_default"; }
+
+  // Return the default socket interface
+  const Network::SocketInterface& socketInterface() const override {
+    return Network::SocketInterfaceSingleton::get();
+  }
+
+private:
+  std::string address_string_;
+  std::string logical_name_;
+  Network::Address::InstanceConstSharedPtr ipv4_instance_;
+};
+
+TEST_P(ListenerManagerImplTest, CustomSocketInterfaceIsUsedWhenAddressSpecifiesIt) {
+  auto custom_interface = std::make_unique<TestCustomSocketInterface>();
+  TestCustomSocketInterface* custom_interface_ptr = custom_interface.get();
+
+  auto custom_address = std::make_shared<TestCustomAddress>(*custom_interface);
+
+  // Create listener factory to test the implementation
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  Network::Socket::OptionsSharedPtr options = nullptr;
+  Network::SocketCreationOptions creation_options;
+
+  // Verify that the custom address returns the custom interface
+  EXPECT_NE(&custom_address->socketInterface(), &Network::SocketInterfaceSingleton::get());
+
+  // The listener factory should use the custom socket interface
+  auto socket_result = real_listener_factory.createListenSocket(
+      custom_address, Network::Socket::Type::Stream, options,
+      ListenerComponentFactory::BindType::NoBind, creation_options, 0 /* worker_index */);
+
+  // The socket creation should succeed
+  EXPECT_TRUE(socket_result.ok());
+  if (socket_result.ok()) {
+    auto socket = socket_result.value();
+    EXPECT_NE(socket, nullptr);
+    // Verify the socket was created with the expected address
+    EXPECT_EQ(socket->connectionInfoProvider().localAddress()->logicalName(),
+              custom_address->logicalName());
+  }
+
+  // Verify the custom interface was actually called
+  EXPECT_TRUE(custom_interface_ptr->wasCalled());
+}
+
+TEST_P(ListenerManagerImplTest, DefaultSocketInterfaceIsUsedWhenAddressUsesDefault) {
+  auto default_address = std::make_shared<TestDefaultAddress>();
+
+  // Create listener factory to test the implementation
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  Network::Socket::OptionsSharedPtr options = nullptr;
+  Network::SocketCreationOptions creation_options;
+
+  // Verify that the default address returns the default interface
+  EXPECT_EQ(&default_address->socketInterface(), &Network::SocketInterfaceSingleton::get());
+
+  // The listener factory should use the standard socket creation path
+  auto socket_result = real_listener_factory.createListenSocket(
+      default_address, Network::Socket::Type::Stream, options,
+      ListenerComponentFactory::BindType::NoBind, creation_options, 0 /* worker_index */);
+
+  // The socket creation should succeed
+  EXPECT_TRUE(socket_result.ok());
+  if (socket_result.ok()) {
+    auto socket = socket_result.value();
+    EXPECT_NE(socket, nullptr);
+    // Verify the socket was created with the expected address
+    EXPECT_EQ(socket->connectionInfoProvider().localAddress()->logicalName(),
+              default_address->logicalName());
+  }
+}
+
+TEST_P(ListenerManagerImplTest, CustomSocketInterfaceFailureIsHandledGracefully) {
+  // Create a failing custom socket interface
+  class FailingCustomSocketInterface : public TestCustomSocketInterface {
+  public:
+    Network::IoHandlePtr socket(Network::Socket::Type socket_type,
+                                const Network::Address::InstanceConstSharedPtr addr,
+                                const Network::SocketCreationOptions& options) const override {
+      UNREFERENCED_PARAMETER(socket_type);
+      UNREFERENCED_PARAMETER(addr);
+      UNREFERENCED_PARAMETER(options);
+      // Always return nullptr to simulate failure
+      return nullptr;
+    }
+  };
+
+  auto failing_interface = std::make_unique<FailingCustomSocketInterface>();
+  auto custom_address = std::make_shared<TestCustomAddress>(*failing_interface);
+
+  // Create listener factory to test the implementation
+  ProdListenerComponentFactory real_listener_factory(server_);
+
+  Network::Socket::OptionsSharedPtr options = nullptr;
+  Network::SocketCreationOptions creation_options;
+
+  // The listener factory should handle the failure gracefully
+  auto socket_result = real_listener_factory.createListenSocket(
+      custom_address, Network::Socket::Type::Stream, options,
+      ListenerComponentFactory::BindType::NoBind, creation_options, 0 /* worker_index */);
+
+  // The socket creation should fail with the expected error
+  EXPECT_FALSE(socket_result.ok());
+  EXPECT_EQ(socket_result.status().message(), "failed to create socket using custom interface");
+}
+
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplTest, ::testing::Values(false));
 INSTANTIATE_TEST_SUITE_P(Matcher, ListenerManagerImplWithRealFiltersTest,
                          ::testing::Values(false, true));
