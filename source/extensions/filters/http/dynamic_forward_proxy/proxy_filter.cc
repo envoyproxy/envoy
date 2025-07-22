@@ -337,17 +337,15 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   // For DNS cache operations, we need to ensure IPv6 addresses have brackets to work correctly
   // with normalizeHostForDfp.
-  std::string bracket_buffer;   // Uninitialized buffer for bracketed case
-  absl::string_view cache_host; // Will point to either original or buffer
+  std::string cache_host;
   // Check if this is an IPv6 address by looking for colons (IPv6) vs dots (IPv4).
   if (host_attributes.is_ip_address_ && !dns_host.empty() && dns_host.front() != '[' &&
       dns_host.find(':') != std::string::npos) {
     // This is an IPv6 address without brackets, we need to create bracketed version here.
-    bracket_buffer = absl::StrCat("[", dns_host, "]");
-    cache_host = bracket_buffer;
+    cache_host = absl::StrCat("[", dns_host, "]");
   } else {
     // Not IPv6 or already has brackets.
-    cache_host = dns_host;
+    cache_host = std::string(dns_host);
   }
 
   auto [status_, handle_, host_info_] = config_->cache().loadDnsCacheEntryWithForceRefresh(
@@ -410,21 +408,19 @@ ProxyFilter::loadDynamicCluster(const Common::DynamicForwardProxy::DfpClusterSha
 
   // For cluster name, we need consistent formatting with brackets for IPv6.
   // This ensures cache consistency across different request patterns.
-  std::string cluster_bracket_buffer; // Uninitialized buffer for bracketed case
-  absl::string_view cluster_host;     // Will point to either original or buffer
+  std::string cluster_host;
   // Check if this is an IPv6 address by looking for colons (IPv6) vs dots (IPv4).
   if (host_attributes.is_ip_address_ && !host.empty() && host.front() != '[' &&
       host.find(':') != std::string::npos) {
     // This is an IPv6 address without brackets, we need to create bracketed version.
-    cluster_bracket_buffer = absl::StrCat("[", host, "]");
-    cluster_host = cluster_bracket_buffer;
+    cluster_host = absl::StrCat("[", host, "]");
   } else {
     // Not IPv6 or already has brackets.
-    cluster_host = host;
+    cluster_host = std::string(host);
   }
 
   // cluster name is prefix + host (with brackets for IPv6) + port.
-  const auto cluster_name = absl::StrCat("DFPCluster:", cluster_host, ":", port_u32);
+  const auto cluster_name = "DFPCluster:" + cluster_host + ":" + std::to_string(port_u32);
   const Upstream::ThreadLocalCluster* local_cluster =
       config_->clusterManager().getThreadLocalCluster(cluster_name);
   if (local_cluster && cluster->touch(cluster_name)) {
@@ -440,8 +436,8 @@ ProxyFilter::loadDynamicCluster(const Common::DynamicForwardProxy::DfpClusterSha
 
   // Create a new cluster & register a callback to tls.
   // Pass the unbracketed host for cluster configuration.
-  cluster_load_handle_ = config_->addDynamicCluster(cluster, std::string(cluster_name),
-                                                    std::string(host), port_u32, *this);
+  cluster_load_handle_ =
+      config_->addDynamicCluster(cluster, cluster_name, std::string(host), port_u32, *this);
   if (!cluster_load_handle_) {
     ENVOY_STREAM_LOG(debug, "sub clusters overflow", *this->decoder_callbacks_);
     this->decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,

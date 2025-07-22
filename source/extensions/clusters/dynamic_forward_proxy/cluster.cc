@@ -220,21 +220,19 @@ Upstream::HostSelectionResponse Cluster::chooseHost(absl::string_view host,
 
   // For cluster name, we need consistent formatting with brackets for IPv6.
   // This must match the format used by the proxy filter when creating clusters.
-  std::string bracket_buffer;
-  absl::string_view cluster_host;
+  std::string cluster_host;
   // Check if this is an IPv6 address by looking for colons (IPv6) vs dots (IPv4).
   if (host_attributes.is_ip_address_ && !dynamic_host.empty() && dynamic_host.front() != '[' &&
       dynamic_host.find(':') != std::string::npos) {
     // This is an IPv6 address without brackets, add brackets for cluster name consistency.
-    bracket_buffer = absl::StrCat("[", dynamic_host, "]");
-    cluster_host = bracket_buffer;
+    cluster_host = absl::StrCat("[", dynamic_host, "]");
   } else {
     // Not IPv6 or already has brackets.
     cluster_host = dynamic_host;
   }
 
   // cluster name is prefix + host (with brackets for IPv6) + port
-  auto cluster_name = absl::StrCat("DFPCluster:", cluster_host, ":", port);
+  auto cluster_name = "DFPCluster:" + cluster_host + ":" + std::to_string(port);
 
   // try again to get the sub cluster.
   auto cluster = cm_.getThreadLocalCluster(cluster_name);
