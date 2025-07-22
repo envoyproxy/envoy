@@ -14,7 +14,6 @@
 #include "source/common/stream_info/upstream_address.h"
 #include "source/extensions/common/dynamic_forward_proxy/cluster_store.h"
 
-#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 
 namespace Envoy {
@@ -31,20 +30,20 @@ void latchTime(Http::StreamDecoderFilterCallbacks* decoder_callbacks, absl::stri
 
 // Helper function to apply filter state overrides to host and port.
 // Conditionally checks filter state based on the allow_dynamic_host_from_filter_state flag.
-std::string applyFilterStateOverrides(absl::string_view original_host, uint32_t& port,
-                                      Http::StreamDecoderFilterCallbacks* decoder_callbacks,
-                                      bool allow_dynamic_host_from_filter_state) {
-  std::string result_host = std::string(original_host);
-
+absl::string_view applyFilterStateOverrides(absl::string_view original_host, uint32_t& port,
+                                            Http::StreamDecoderFilterCallbacks* decoder_callbacks,
+                                            bool allow_dynamic_host_from_filter_state,
+                                            std::string& override_host_storage) {
   if (!allow_dynamic_host_from_filter_state) {
-    return result_host;
+    return original_host;
   }
 
   const Router::StringAccessor* dynamic_host_filter_state =
       decoder_callbacks->streamInfo().filterState()->getDataReadOnly<Router::StringAccessor>(
           "envoy.upstream.dynamic_host");
   if (dynamic_host_filter_state) {
-    result_host = dynamic_host_filter_state->asString();
+    override_host_storage = dynamic_host_filter_state->asString();
+    original_host = override_host_storage;
   }
 
   const StreamInfo::UInt32Accessor* dynamic_port_filter_state =
@@ -55,7 +54,7 @@ std::string applyFilterStateOverrides(absl::string_view original_host, uint32_t&
     port = dynamic_port_filter_state->value();
   }
 
-  return result_host;
+  return original_host;
 }
 
 } // namespace
@@ -331,20 +330,24 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   // Apply filter state overrides for host and port.
   uint32_t port_u32 = port;
-  std::string dns_host =
+  std::string override_host_storage;
+  absl::string_view dns_host =
       applyFilterStateOverrides(host_attributes.host_, port_u32, decoder_callbacks_,
-                                config_->allowDynamicHostFromFilterState());
+                                config_->allowDynamicHostFromFilterState(), override_host_storage);
 
-  // For DNS cache operations, we need to ensure IPv6 addresses have brackets
-  // to work correctly with normalizeHostForDfp.
-  std::string cache_host = dns_host;
-
+  // For DNS cache operations, we need to ensure IPv6 addresses have brackets to work correctly
+  // with normalizeHostForDfp.
+  std::string bracket_buffer;   // Uninitialized buffer for bracketed case
+  absl::string_view cache_host; // Will point to either original or buffer
   // Check if this is an IPv6 address by looking for colons (IPv6) vs dots (IPv4).
-  // We already know it's an IP address from host_attributes.is_ip_address_.
   if (host_attributes.is_ip_address_ && !dns_host.empty() && dns_host.front() != '[' &&
       dns_host.find(':') != std::string::npos) {
-    // This is an IPv6 address without brackets, add brackets for cache operations.
-    cache_host = absl::StrCat("[", dns_host, "]");
+    // This is an IPv6 address without brackets, we need to create bracketed version here.
+    bracket_buffer = absl::StrCat("[", dns_host, "]");
+    cache_host = bracket_buffer;
+  } else {
+    // Not IPv6 or already has brackets.
+    cache_host = dns_host;
   }
 
   auto [status_, handle_, host_info_] = config_->cache().loadDnsCacheEntryWithForceRefresh(
@@ -398,23 +401,30 @@ ProxyFilter::loadDynamicCluster(const Common::DynamicForwardProxy::DfpClusterSha
 
   // Apply filter state overrides for host and port.
   uint32_t port_u32 = port;
-  std::string host = applyFilterStateOverrides(host_attributes.host_, port_u32, decoder_callbacks_,
-                                               config_->allowDynamicHostFromFilterState());
+  std::string override_host_storage;
+  absl::string_view host =
+      applyFilterStateOverrides(host_attributes.host_, port_u32, decoder_callbacks_,
+                                config_->allowDynamicHostFromFilterState(), override_host_storage);
 
   latchTime(decoder_callbacks_, DNS_START);
 
   // For cluster name, we need consistent formatting with brackets for IPv6.
   // This ensures cache consistency across different request patterns.
-  std::string cluster_host = host;
+  std::string cluster_bracket_buffer; // Uninitialized buffer for bracketed case
+  absl::string_view cluster_host;     // Will point to either original or buffer
   // Check if this is an IPv6 address by looking for colons (IPv6) vs dots (IPv4).
   if (host_attributes.is_ip_address_ && !host.empty() && host.front() != '[' &&
       host.find(':') != std::string::npos) {
-    // This is an IPv6 address without brackets, add brackets for cluster name consistency.
-    cluster_host = absl::StrCat("[", host, "]");
+    // This is an IPv6 address without brackets, we need to create bracketed version.
+    cluster_bracket_buffer = absl::StrCat("[", host, "]");
+    cluster_host = cluster_bracket_buffer;
+  } else {
+    // Not IPv6 or already has brackets.
+    cluster_host = host;
   }
 
   // cluster name is prefix + host (with brackets for IPv6) + port.
-  const auto cluster_name = "DFPCluster:" + cluster_host + ":" + std::to_string(port_u32);
+  const auto cluster_name = absl::StrCat("DFPCluster:", cluster_host, ":", port_u32);
   const Upstream::ThreadLocalCluster* local_cluster =
       config_->clusterManager().getThreadLocalCluster(cluster_name);
   if (local_cluster && cluster->touch(cluster_name)) {
@@ -430,7 +440,8 @@ ProxyFilter::loadDynamicCluster(const Common::DynamicForwardProxy::DfpClusterSha
 
   // Create a new cluster & register a callback to tls.
   // Pass the unbracketed host for cluster configuration.
-  cluster_load_handle_ = config_->addDynamicCluster(cluster, cluster_name, host, port_u32, *this);
+  cluster_load_handle_ = config_->addDynamicCluster(cluster, std::string(cluster_name),
+                                                    std::string(host), port_u32, *this);
   if (!cluster_load_handle_) {
     ENVOY_STREAM_LOG(debug, "sub clusters overflow", *this->decoder_callbacks_);
     this->decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable,
