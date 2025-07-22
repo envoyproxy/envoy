@@ -23,10 +23,9 @@ public:
   DnsCacheSharedPtr lookUpCacheByName(absl::string_view cache_name) override;
 
 private:
-  struct CacheSessions {
-    CacheSessions(
-        const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
-        DnsCacheSharedPtr cache)
+  struct ActiveCache {
+    ActiveCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config,
+                DnsCacheSharedPtr cache)
         : config_(config), cache_(cache) {}
 
     const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config_;
@@ -34,7 +33,7 @@ private:
   };
 
   Server::GenericFactoryContextImpl context_;
-  absl::flat_hash_map<std::string, CacheSessions> caches_;
+  absl::flat_hash_map<std::string, ActiveCache> caches_;
 };
 
 class DnsCacheManagerFactoryImpl : public DnsCacheManagerFactory {
