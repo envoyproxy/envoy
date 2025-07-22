@@ -1269,7 +1269,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         strip_prefix = "ittapi-{version}",
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2024-10-25",
+        release_date = "2021-05-25",
         cpe = "N/A",
     ),
     com_github_google_quiche = dict(
