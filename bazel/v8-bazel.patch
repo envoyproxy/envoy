@@ -1,0 +1,28 @@
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index 14b90ec6905..8b545a6faed 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -507,6 +507,9 @@ _v8_mksnapshot = rule(
+         "target_os": attr.string(mandatory = True),
+         "prefix": attr.string(mandatory = True),
+         "suffix": attr.string(mandatory = True),
++        "_allowlist_function_transition": attr.label(
++            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
++        ),
+     },
+     cfg = v8_target_cpu_transition,
+ )
+diff --git a/bazel/v8-non-pointer-compression.bzl b/bazel/v8-non-pointer-compression.bzl
+index 8c929454840..1253c2c581c 100644
+--- a/bazel/v8-non-pointer-compression.bzl
++++ b/bazel/v8-non-pointer-compression.bzl
+@@ -47,6 +47,9 @@ v8_binary_non_pointer_compression = rule(
+         # Note specificaly how it's configured with v8_target_cpu_transition, which
+         # ensures that setting propagates down the graph.
+         "binary": attr.label(cfg = v8_disable_pointer_compression),
++        "_allowlist_function_transition": attr.label(
++            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
++        ),
+     },
+     # Making this executable means it works with "$ bazel run".
+     executable = True,
