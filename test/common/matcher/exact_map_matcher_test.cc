@@ -109,7 +109,7 @@ TEST(ExactMapMatcherTest, RecursiveMatching) {
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
       stringOnMatch<TestData>("no_match"));
-  matcher->addChild("match", OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/sub_matcher,
+  matcher->addChild("match", OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/sub_matcher,
                                                /*.keep_matching=*/false});
 
   TestData data;
@@ -127,7 +127,7 @@ TEST(ExactMapMatcherTest, RecursiveMatchingOnNoMatch) {
   std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
-      OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/sub_matcher,
+      OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/sub_matcher,
                         /*.keep_matching=*/false});
   matcher->addChild("match", stringOnMatch<TestData>("match"));
 
@@ -156,14 +156,14 @@ TEST(ExactMapMatcherTest, RecursiveMatchingWithKeepMatching) {
   std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
-      OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/top_on_no_match_matcher,
+      OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/top_on_no_match_matcher,
                         /*.keep_matching=*/false});
-  matcher->addChild("match", OnMatch<TestData>{/*.action_=*/nullptr,
+  matcher->addChild("match", OnMatch<TestData>{/*.action_cb=*/nullptr,
                                                /*.matcher=*/sub_matcher_match_keeps_matching,
                                                /*.keep_matching=*/true});
 
-  std::vector<ActionConstSharedPtr> skipped_results{};
-  SkippedMatchCb skipped_match_cb = [&skipped_results](const ActionConstSharedPtr& cb) {
+  std::vector<ActionFactoryCb> skipped_results{};
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
     skipped_results.push_back(cb);
   };
   TestData data;

@@ -101,6 +101,46 @@ public:
   virtual bool isUnicastAddress() const PURE;
 
   /**
+   * Determines whether the address is a link-local address. For IPv6, the prefix is fe80::/10. For
+   * IPv4, the prefix is 169.254.0.0/16.
+   *
+   * See https://datatracker.ietf.org/doc/html/rfc3513#section-2.4 for details.
+   *
+   * @return true if the address is a link-local address, false otherwise.
+   */
+  virtual bool isLinkLocalAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Unique Local Address. Applies to IPv6 addresses only, where
+   * the prefix is fc00::/7.
+   *
+   * See https://datatracker.ietf.org/doc/html/rfc4193 for details.
+   *
+   * @return true if the address is a Unique Local Address, false otherwise.
+   */
+  virtual bool isUniqueLocalAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Site-Local Address. Applies to IPv6 addresses only, where
+   * the prefix is fec0::/10.
+   *
+   * See https://datatracker.ietf.org/doc/html/rfc3513#section-2.4 for details.
+   *
+   * @return true if the address is a Site-Local Address, false otherwise.
+   */
+  virtual bool isSiteLocalAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Teredo address. Applies to IPv6 addresses only, where the
+   * prefix is 2001:0000::/32.
+   *
+   * See https://datatracker.ietf.org/doc/html/rfc4380 for details.
+   *
+   * @return true if the address is a Teredo address, false otherwise.
+   */
+  virtual bool isTeredoAddress() const PURE;
+
+  /**
    * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise nullptr.
    */
   virtual const Ipv4* ipv4() const PURE;

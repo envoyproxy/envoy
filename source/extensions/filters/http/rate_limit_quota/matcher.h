@@ -51,15 +51,17 @@ class RateLimitOnMatchActionFactory : public Matcher::ActionFactory<RateLimitOnM
 public:
   std::string name() const override { return "rate_limit_quota"; }
 
-  Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& config, RateLimitOnMatchActionContext&,
-               ProtobufMessage::ValidationVisitor& validation_visitor) override {
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RateLimitOnMatchActionContext&,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override {
     // Validate and then retrieve the bucket settings from config.
     const auto bucket_settings =
         MessageUtil::downcastAndValidate<const envoy::extensions::filters::http::rate_limit_quota::
                                              v3::RateLimitQuotaBucketSettings&>(config,
                                                                                 validation_visitor);
-    return std::make_shared<RateLimitOnMatchAction>(std::move(bucket_settings));
+    return [bucket_settings = std::move(bucket_settings)]() {
+      return std::make_unique<RateLimitOnMatchAction>(std::move(bucket_settings));
+    };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
