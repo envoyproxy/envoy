@@ -1,0 +1,221 @@
+diff --git a/BUILD.bazel b/BUILD.bazel
+index f2b2f4da0f8..488c1d63972 100644
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -4282,7 +4282,10 @@ v8_library(
+         ],
+         "//conditions:default": [],
+     }),
+-    copts = ["-Wno-implicit-fallthrough"],
++    copts = [
++        "-Wno-implicit-fallthrough",
++        "-DV8_CACHE_BUST=0",
++    ],
+     icu_deps = [
+         ":icu/generated_torque_definitions_headers",
+         "//external:icu",
+@@ -4299,7 +4302,7 @@ v8_library(
+         ":noicu/generated_torque_definitions",
+     ],
+     deps = [
+-        ":lib_fp16",
++        "@fp16//:FP16",
+         ":v8_libbase",
+         "//external:absl_btree",
+         "//external:absl_flat_hash_map",
+diff --git a/bazel/defs.bzl b/bazel/defs.bzl
+index 6a3c868b002..b51e189d74f 100644
+--- a/bazel/defs.bzl
++++ b/bazel/defs.bzl
+@@ -123,10 +123,12 @@ def _default_args():
+         }) + select({
+             "@v8//bazel/config:is_clang": [
+                 "-Wno-invalid-offsetof",
++                "-Wno-unneeded-internal-declaration",
+                 "-Wno-deprecated-this-capture",
+                 "-std=c++20",
+             ],
+             "@v8//bazel/config:is_gcc": [
++                "-Wno-invalid-offsetof",
+                 "-Wno-extra",
+                 "-Wno-array-bounds",
+                 "-Wno-class-memaccess",
+@@ -139,6 +141,8 @@ def _default_args():
+                 "-Wno-redundant-move",
+                 "-Wno-return-type",
+                 "-Wno-stringop-overflow",
++                "-Wno-nonnull",
++                "-Wno-pessimizing-move",
+                 "-Wno-deprecated-this-capture",
+                 # Use GNU dialect, because GCC doesn't allow using
+                 # ##__VA_ARGS__ when in standards-conforming mode.
+@@ -167,6 +171,24 @@ def _default_args():
+             ],
+             "//conditions:default": [
+             ],
++        }) + select({
++            "@envoy//bazel:no_debug_info": [
++                "-g0",
++            ],
++            "//conditions:default": [],
++        }) + select({
++            "@v8//bazel/config:is_macos": [
++                # The clang available on macOS catalina has a warning that isn't clean on v8 code.
++                "-Wno-range-loop-analysis",
++
++                # To supress warning on deprecated declaration on v8 code. For example:
++                # external/v8/src/base/platform/platform-darwin.cc:56:22: 'getsectdatafromheader_64'
++                # is deprecated: first deprecated in macOS 13.0.
++                # https://bugs.chromium.org/p/v8/issues/detail?id=13428.
++                "-Wno-deprecated-declarations",
++            ],
++            "//conditions:default": [],
++
+         }),
+         includes = ["include"],
+         linkopts = select({
+@@ -316,7 +338,7 @@ def v8_library(
+ # split the set of outputs by using OutputGroupInfo, that way we do not need to
+ # run the torque generator twice.
+ def _torque_files_impl(ctx):
+-    v8root = "."
++    v8root = "external/v8"
+ 
+     # Arguments
+     args = []
+@@ -335,10 +357,10 @@ def _torque_files_impl(ctx):
+     inits = []
+     for src in ctx.files.srcs:
+         root, _period, _ext = src.path.rpartition(".")
+-
+         # Strip v8root
+         if root[:len(v8root)] == v8root:
+             root = root[len(v8root):]
++
+         file = ctx.attr.prefix + "/torque-generated/" + root
+         defs.append(ctx.actions.declare_file(file + "-tq-inl.inc"))
+         defs.append(ctx.actions.declare_file(file + "-tq.inc"))
+diff --git a/src/common/segmented-table-inl.h b/src/common/segmented-table-inl.h
+index 357713e5c8e..28fa17ef525 100644
+--- a/src/common/segmented-table-inl.h
++++ b/src/common/segmented-table-inl.h
+@@ -103,7 +103,7 @@ void SegmentedTable<Entry, size>::TearDown() {
+ }
+ 
+ template <typename Entry, size_t size>
+-SegmentedTable<Entry, size>::FreelistHead
++typename SegmentedTable<Entry, size>::FreelistHead
+ SegmentedTable<Entry, size>::InitializeFreeList(Segment segment,
+                                                 uint32_t start_offset) {
+   DCHECK_LT(start_offset, kEntriesPerSegment);
+diff --git a/src/compiler/turboshaft/assembler.h b/src/compiler/turboshaft/assembler.h
+index 914e53ca4e1..3aef5d6e74e 100644
+--- a/src/compiler/turboshaft/assembler.h
++++ b/src/compiler/turboshaft/assembler.h
+@@ -197,8 +197,8 @@ template <typename T>
+ class IndexRange : public Range<T> {
+  public:
+   using base = Range<T>;
+-  using value_type = base::value_type;
+-  using iterator_type = base::iterator_type;
++  using value_type = typename base::value_type;
++  using iterator_type = typename base::iterator_type;
+ 
+   explicit IndexRange(ConstOrV<T> count) : Range<T>(0, count, 1) {}
+ };
+@@ -226,8 +226,8 @@ class Sequence : private Range<T> {
+   using base = Range<T>;
+ 
+  public:
+-  using value_type = base::value_type;
+-  using iterator_type = base::iterator_type;
++  using value_type = typename base::value_type;
++  using iterator_type = typename base::iterator_type;
+ 
+   explicit Sequence(ConstOrV<T> begin, ConstOrV<T> stride = 1)
+       : base(begin, 0, stride) {}
+@@ -731,7 +731,7 @@ struct LoopLabelForHelper<std::tuple<V<Ts>...>> {
+ }  // namespace detail
+ 
+ template <typename T>
+-using LoopLabelFor = detail::LoopLabelForHelper<T>::type;
++using LoopLabelFor = typename detail::LoopLabelForHelper<T>::type;
+ 
+ Handle<Code> BuiltinCodeHandle(Builtin builtin, Isolate* isolate);
+ 
+diff --git a/src/objects/smi.h b/src/objects/smi.h
+index 421039d1a86..8dd434b29d3 100644
+--- a/src/objects/smi.h
++++ b/src/objects/smi.h
+@@ -29,6 +29,21 @@ class Smi : public AllStatic {
+     return Smi::FromInt(static_cast<uint32_t>(smi.value()));
+   }
+ 
++  // Returns whether value can be represented in a Smi.
++  template <typename T>
++  static std::enable_if_t<std::is_integral_v<T> && std::is_signed_v<T>,
++                          bool> constexpr IsValid(T value) {
++    DCHECK_EQ(Internals::IsValidSmi(value),
++              value >= kMinValue && value <= kMaxValue);
++    return Internals::IsValidSmi(value);
++  }
++  template <typename T>
++  static std::enable_if_t<std::is_integral_v<T> && std::is_unsigned_v<T>,
++                          bool> constexpr IsValid(T value) {
++    DCHECK_EQ(Internals::IsValidSmi(value), value <= kMaxValue);
++    return Internals::IsValidSmi(value);
++  }
++
+   // Convert a Smi object to an int.
+   static inline constexpr int ToInt(const Tagged<Object> object) {
+     return Tagged<Smi>(object.ptr()).value();
+@@ -61,21 +76,6 @@ class Smi : public AllStatic {
+     return FromInt(static_cast<int>(value));
+   }
+ 
+-  // Returns whether value can be represented in a Smi.
+-  template <typename T>
+-  static inline std::enable_if_t<std::is_integral_v<T> && std::is_signed_v<T>,
+-                                 bool> constexpr IsValid(T value) {
+-    DCHECK_EQ(Internals::IsValidSmi(value),
+-              value >= kMinValue && value <= kMaxValue);
+-    return Internals::IsValidSmi(value);
+-  }
+-  template <typename T>
+-  static inline std::enable_if_t<std::is_integral_v<T> && std::is_unsigned_v<T>,
+-                                 bool> constexpr IsValid(T value) {
+-    DCHECK_EQ(Internals::IsValidSmi(value), value <= kMaxValue);
+-    return Internals::IsValidSmi(value);
+-  }
+-
+   // Compare two Smis x, y as if they were converted to strings and then
+   // compared lexicographically. Returns:
+   // -1 if x < y.
+diff --git a/src/objects/string-inl.h b/src/objects/string-inl.h
+index 4287acd0f03..c40da2e7602 100644
+--- a/src/objects/string-inl.h
++++ b/src/objects/string-inl.h
+@@ -978,6 +978,7 @@ uint8_t SeqOneByteString::Get(int index) const {
+   return Get(index, SharedStringAccessGuardIfNeeded::NotNeeded());
+ }
+ 
++V8_CLANG_NO_SANITIZE("undefined")
+ uint8_t SeqOneByteString::Get(
+     int index, const SharedStringAccessGuardIfNeeded& access_guard) const {
+   USE(access_guard);
+@@ -985,6 +986,7 @@ uint8_t SeqOneByteString::Get(
+   return chars()[index];
+ }
+ 
++V8_CLANG_NO_SANITIZE("undefined")
+ void SeqOneByteString::SeqOneByteStringSet(int index, uint16_t value) {
+   DisallowGarbageCollection no_gc;
+   DCHECK_GE(index, 0);
+@@ -993,6 +995,7 @@ void SeqOneByteString::SeqOneByteStringSet(int index, uint16_t value) {
+   chars()[index] = value;
+ }
+ 
++V8_CLANG_NO_SANITIZE("undefined")
+ void SeqOneByteString::SeqOneByteStringSetChars(int index,
+                                                 const uint8_t* string,
+                                                 int string_length) {
