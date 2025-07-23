@@ -10,7 +10,9 @@ bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.shadow_policy_inherit_trace_sampling`` and legacy code paths.
 
 new_features:
 
