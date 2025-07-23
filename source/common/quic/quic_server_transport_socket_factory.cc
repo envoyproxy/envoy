@@ -172,9 +172,9 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
       ctx->findTlsContext(sni, Ssl::CurveNIDVector{NID_X9_62_prime256v1} /* TODO: ecdsa_capable */,
                           false /* TODO: ocsp_capable */, cert_matched_sni);
 
-  // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.
+  // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ssl_ctx.
   // Both of these members are themselves reference counted, so it is safe to use them after
-  // ``ssl_ctx`` goes out of scope after the function returns.
+  // ssl_ctx goes out of scope after the function returns.
   return {tls_context.quic_cert_, tls_context.quic_private_key_};
 }
 

@@ -99,6 +99,43 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "quic_fingerprint_inspector_test",
+    srcs = envoy_select_enable_http3(["quic_fingerprint_inspector_test.cc"]),
+    external_deps = ["ssl"],
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        ":test_utils_lib",
+        "//source/common/quic:quic_fingerprint_inspector_lib",
+        "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ]),
+)
+
+envoy_cc_test(
+    name = "quic_fingerprint_integration_test",
+    srcs = envoy_select_enable_http3(["quic_fingerprint_integration_test.cc"]),
+    external_deps = ["ssl"],
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
+        ":test_utils_lib",
+        "//source/common/common:hex_lib",
+        "//source/common/quic:quic_fingerprint_inspector_lib",
+        "//source/extensions/quic/crypto_stream:envoy_quic_crypto_server_stream_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:utility_lib",
+        "@com_github_google_quiche//:quic_core_versions_lib",
+        "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+    ]),
+)
+
+envoy_cc_test(
     name = "envoy_quic_proof_verifier_test",
     srcs = envoy_select_enable_http3(["envoy_quic_proof_verifier_test.cc"]),
     rbe_pool = "6gig",
