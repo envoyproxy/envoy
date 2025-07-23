@@ -22,6 +22,8 @@ namespace ReverseConn {
 const std::string ReverseConnFilter::reverse_connections_path = "/reverse_connections";
 const std::string ReverseConnFilter::reverse_connections_request_path =
     "/reverse_connections/request";
+const std::string ReverseConnFilter::grpc_service_path =
+    "/envoy.service.reverse_tunnel.v3.ReverseTunnelHandshakeService/EstablishTunnel";
 const std::string ReverseConnFilter::node_id_param = "node_id";
 const std::string ReverseConnFilter::cluster_id_param = "cluster_id";
 const std::string ReverseConnFilter::tenant_id_param = "tenant_id";
@@ -177,7 +179,15 @@ Http::FilterHeadersStatus ReverseConnFilter::getReverseConnectionInfo() {
 
   // Handle based on role
   if (is_responder) {
-    return handleResponderInfo(remote_node, remote_cluster);
+    auto* socket_manager = getUpstreamSocketManager();
+    if (!socket_manager) {
+      ENVOY_LOG(error, "Failed to get upstream socket manager for responder role");
+      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
+                                         "Failed to get socket manager", nullptr, absl::nullopt,
+                                         "");
+      return Http::FilterHeadersStatus::StopIteration;
+    }
+    return handleResponderInfo(socket_manager, remote_node, remote_cluster);
   } else if (is_initiator) {
     auto* downstream_interface = getDownstreamSocketInterface();
     if (!downstream_interface) {
@@ -197,70 +207,110 @@ Http::FilterHeadersStatus ReverseConnFilter::getReverseConnectionInfo() {
 }
 
 Http::FilterHeadersStatus
-ReverseConnFilter::handleResponderInfo(const std::string& remote_node,
+ReverseConnFilter::handleResponderInfo(ReverseConnection::UpstreamSocketManager* socket_manager,
+                                       const std::string& remote_node,
                                        const std::string& remote_cluster) {
+  size_t num_sockets = 0;
+  bool send_all_rc_info = true;
+  // With the local envoy as a responder, the API can be used to get the number
+  // of reverse connections by remote node ID or remote cluster ID.
+  if (!remote_node.empty() || !remote_cluster.empty()) {
+    send_all_rc_info = false;
+    if (!remote_node.empty()) {
+      ENVOY_LOG(debug,
+                "Getting number of reverse connections for remote node: {} with responder role",
+                remote_node);
+      num_sockets = socket_manager->getNumberOfSocketsByNode(remote_node);
+    } else {
+      ENVOY_LOG(debug,
+                "Getting number of reverse connections for remote cluster: {} with responder role",
+                remote_cluster);
+      num_sockets = socket_manager->getNumberOfSocketsByCluster(remote_cluster);
+    }
+  }
+
+  // Send the reverse connection count filtered by node or cluster ID.
+  if (!send_all_rc_info) {
+    std::string response = fmt::format("{{\"available_connections\":{}}}", num_sockets);
+    absl::StatusOr<Json::ObjectSharedPtr> response_or_error =
+        Json::Factory::loadFromString(response);
+    if (!response_or_error.ok()) {
+      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
+                                         "failed to form valid json response", nullptr,
+                                         absl::nullopt, "");
+    }
+    ENVOY_LOG(info, "Sending reverse connection info response: {}", response);
+    decoder_callbacks_->sendLocalReply(Http::Code::OK, response, nullptr, absl::nullopt, "");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   ENVOY_LOG(debug,
-            "ReverseConnFilter: Received reverse connection info request with remote_node: {} remote_cluster: {}",
-            remote_node, remote_cluster);
+            "Getting all reverse connection info with responder role - production stats-based");
 
   // Production-ready cross-thread aggregation for multi-tenant reporting
+  // First try the production stats-based approach for cross-thread aggregation
   auto* upstream_extension = getUpstreamSocketInterfaceExtension();
-  if (!upstream_extension) {
-    ENVOY_LOG(error, "No upstream extension available for stats collection");
-    std::string response = R"({"accepted":[],"connected":[]})";
+  if (upstream_extension) {
+    ENVOY_LOG(debug,
+              "Using production stats-based cross-thread aggregation for multi-tenant reporting");
+
+    // Use the production stats-based approach with Envoy's proven stats system
+    auto [connected_nodes, accepted_connections] =
+        upstream_extension->getConnectionStatsSync(std::chrono::milliseconds(1000));
+
+    // Convert vectors to lists for JSON serialization
+    std::list<std::string> accepted_connections_list(accepted_connections.begin(),
+                                                     accepted_connections.end());
+    std::list<std::string> connected_nodes_list(connected_nodes.begin(), connected_nodes.end());
+
+    ENVOY_LOG(debug,
+              "Stats-based aggregation completed: {} connected nodes, {} accepted connections",
+              connected_nodes.size(), accepted_connections.size());
+
+    // Create production-ready JSON response for multi-tenant environment
+    std::string response = fmt::format("{{\"accepted\":{},\"connected\":{}}}",
+                                       Json::Factory::listAsJsonString(accepted_connections_list),
+                                       Json::Factory::listAsJsonString(connected_nodes_list));
+
+    ENVOY_LOG(info, "handleResponderInfo production stats-based response: {}", response);
     decoder_callbacks_->sendLocalReply(Http::Code::OK, response, nullptr, absl::nullopt, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // For specific node or cluster query
-  if (!remote_node.empty() || !remote_cluster.empty()) {
-    // Get connection count for specific remote node/cluster using stats
-    auto stats_map = upstream_extension->getCrossWorkerStatMap();
-    size_t num_connections = 0;
-    
-    if (!remote_node.empty()) {
-      std::string node_stat_name = fmt::format("reverse_connections.nodes.{}", remote_node);
-      auto it = stats_map.find(node_stat_name);
-      if (it != stats_map.end()) {
-        num_connections = it->second;
-      }
-    } else {
-      std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}", remote_cluster);
-      auto it = stats_map.find(cluster_stat_name);
-      if (it != stats_map.end()) {
-        num_connections = it->second;
-      }
+  // Fallback to current thread approach (for backward compatibility)
+  ENVOY_LOG(warn,
+            "No upstream extension available, falling back to current thread data collection");
+
+  std::list<std::string> accepted_rc_nodes;
+  std::list<std::string> connected_rc_clusters;
+
+  auto node_stats = socket_manager->getConnectionStats();
+  auto cluster_stats = socket_manager->getSocketCountMap();
+
+  ENVOY_LOG(debug, "Fallback stats collected: {} nodes, {} clusters", node_stats.size(),
+            cluster_stats.size());
+
+  // Process current thread's data
+  for (const auto& [node_id, rc_conn_count] : node_stats) {
+    if (rc_conn_count > 0) {
+      accepted_rc_nodes.push_back(node_id);
+      ENVOY_LOG(trace, "Fallback: Node '{}' has {} connections", node_id, rc_conn_count);
     }
-    
-    std::string response = fmt::format("{{\"available_connections\":{}}}", num_connections);
-    ENVOY_LOG(info, "handleResponderInfo response for {}: {}",
-              remote_node.empty() ? remote_cluster : remote_node, response);
-    decoder_callbacks_->sendLocalReply(Http::Code::OK, response, nullptr, absl::nullopt, "");
-    return Http::FilterHeadersStatus::StopIteration;
   }
 
-  ENVOY_LOG(debug,
-            "ReverseConnFilter: Using upstream socket manager to get connection stats");
+  for (const auto& [cluster_id, rc_conn_count] : cluster_stats) {
+    if (rc_conn_count > 0) {
+      connected_rc_clusters.push_back(cluster_id);
+      ENVOY_LOG(trace, "Fallback: Cluster '{}' has {} connections", cluster_id, rc_conn_count);
+    }
+  }
 
-  // Use the production stats-based approach with Envoy's proven stats system
-  auto [connected_nodes, accepted_connections] =
-      upstream_extension->getConnectionStatsSync(std::chrono::milliseconds(1000));
-
-  // Convert vectors to lists for JSON serialization
-  std::list<std::string> accepted_connections_list(accepted_connections.begin(),
-                                                   accepted_connections.end());
-  std::list<std::string> connected_nodes_list(connected_nodes.begin(), connected_nodes.end());
-
-  ENVOY_LOG(debug,
-            "Stats aggregation completed: {} connected nodes, {} accepted connections",
-            connected_nodes.size(), accepted_connections.size());
-
-  // Create production-ready JSON response for multi-tenant environment
+  // Create fallback JSON response
   std::string response = fmt::format("{{\"accepted\":{},\"connected\":{}}}",
-                                     Json::Factory::listAsJsonString(accepted_connections_list),
-                                     Json::Factory::listAsJsonString(connected_nodes_list));
+                                     Json::Factory::listAsJsonString(accepted_rc_nodes),
+                                     Json::Factory::listAsJsonString(connected_rc_clusters));
 
-  ENVOY_LOG(info, "handleResponderInfo production stats-based response: {}", response);
+  ENVOY_LOG(info, "handleResponderInfo fallback response: {}", response);
   decoder_callbacks_->sendLocalReply(Http::Code::OK, response, nullptr, absl::nullopt, "");
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -310,6 +360,25 @@ ReverseConnFilter::handleInitiatorInfo(const std::string& remote_node,
 
 Http::FilterHeadersStatus ReverseConnFilter::decodeHeaders(Http::RequestHeaderMap& request_headers,
                                                            bool) {
+  // Check for gRPC reverse tunnel requests first
+  if (isGrpcReverseTunnelRequest(request_headers)) {
+    ENVOY_STREAM_LOG(info, "Handling gRPC reverse tunnel handshake request", *decoder_callbacks_);
+    request_headers_ = &request_headers;
+    is_accept_request_ = true; // Reuse this flag for gRPC requests
+
+    // Read content length for gRPC request
+    const auto content_length_header = request_headers.getContentLengthValue();
+    if (!content_length_header.empty()) {
+      expected_proto_size_ = static_cast<uint32_t>(std::stoi(std::string(content_length_header)));
+      ENVOY_STREAM_LOG(info, "Expecting gRPC request with {} bytes", *decoder_callbacks_,
+                       expected_proto_size_);
+    } else {
+      expected_proto_size_ = 0; // Will handle streaming
+    }
+
+    return Http::FilterHeadersStatus::StopIteration;
+  }
+
   // check that request path starts with "/reverse_connections"
   const absl::string_view request_path = request_headers.Path()->value().getStringView();
   const bool should_intercept_request =
@@ -350,6 +419,18 @@ bool ReverseConnFilter::matchRequestPath(const absl::string_view& request_path,
   return false;
 }
 
+bool ReverseConnFilter::isGrpcReverseTunnelRequest(const Http::RequestHeaderMap& headers) {
+  // Check for gRPC content type
+  const auto content_type = headers.getContentTypeValue();
+  if (content_type != "application/grpc") {
+    return false;
+  }
+
+  // Check for gRPC reverse tunnel service path
+  const absl::string_view request_path = headers.Path()->value().getStringView();
+  return request_path == grpc_service_path;
+}
+
 void ReverseConnFilter::saveDownstreamConnection(Network::Connection& downstream_connection,
                                                  const std::string& node_id,
                                                  const std::string& cluster_id) {
@@ -372,16 +453,125 @@ void ReverseConnFilter::saveDownstreamConnection(Network::Connection& downstream
 Http::FilterDataStatus ReverseConnFilter::decodeData(Buffer::Instance& data, bool) {
   if (is_accept_request_) {
     accept_rev_conn_proto_.move(data);
-    if (accept_rev_conn_proto_.length() < expected_proto_size_) {
+    if (expected_proto_size_ > 0 && accept_rev_conn_proto_.length() < expected_proto_size_) {
       ENVOY_STREAM_LOG(debug,
                        "Waiting for more data, expected_proto_size_={}, current_buffer_size={}",
                        *decoder_callbacks_, expected_proto_size_, accept_rev_conn_proto_.length());
       return Http::FilterDataStatus::StopIterationAndBuffer;
     } else {
-      return acceptReverseConnection();
+      // Check if this is a gRPC request by examining headers
+      if (isGrpcReverseTunnelRequest(*request_headers_)) {
+        return processGrpcRequest();
+      } else {
+        return acceptReverseConnection();
+      }
     }
   }
   return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterDataStatus ReverseConnFilter::processGrpcRequest() {
+  ENVOY_STREAM_LOG(info, "Processing gRPC request body with {} bytes", *decoder_callbacks_,
+                   accept_rev_conn_proto_.length());
+
+  try {
+    // Parse gRPC request from buffer
+    envoy::service::reverse_tunnel::v3::EstablishTunnelRequest grpc_request;
+    const std::string request_body = accept_rev_conn_proto_.toString();
+
+    // For gRPC over HTTP/2, we need to handle the gRPC frame format
+    // Skip the first 5 bytes (compression flag + message length)
+    if (request_body.length() >= 5) {
+      const std::string grpc_message = request_body.substr(5);
+      if (!grpc_request.ParseFromString(grpc_message)) {
+        ENVOY_STREAM_LOG(error, "Failed to parse gRPC request from body", *decoder_callbacks_);
+        decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "Invalid gRPC request format",
+                                           nullptr, absl::nullopt, "");
+        return Http::FilterDataStatus::StopIterationNoBuffer;
+      }
+    } else {
+      ENVOY_STREAM_LOG(error, "gRPC request too short: {} bytes", *decoder_callbacks_,
+                       request_body.length());
+      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest, "gRPC request too short", nullptr,
+                                         absl::nullopt, "");
+      return Http::FilterDataStatus::StopIterationNoBuffer;
+    }
+
+    ENVOY_STREAM_LOG(debug, "Parsed gRPC request: {}", *decoder_callbacks_,
+                     grpc_request.DebugString());
+
+    // Process the gRPC request directly (without standalone service)
+    envoy::service::reverse_tunnel::v3::EstablishTunnelResponse grpc_response;
+
+    // Validate the request
+    const auto& initiator = grpc_request.initiator();
+    if (initiator.node_id().empty() || initiator.cluster_id().empty()) {
+      grpc_response.set_status(envoy::service::reverse_tunnel::v3::TunnelStatus::REJECTED);
+      grpc_response.set_status_message("Missing required initiator fields");
+    } else {
+      // Accept the tunnel request
+      grpc_response.set_status(envoy::service::reverse_tunnel::v3::TunnelStatus::ACCEPTED);
+      grpc_response.set_status_message("Tunnel established successfully");
+
+      ENVOY_STREAM_LOG(info, "Accepting gRPC reverse tunnel for node='{}', cluster='{}'",
+                       *decoder_callbacks_, initiator.node_id(), initiator.cluster_id());
+    }
+
+    ENVOY_STREAM_LOG(info, "gRPC EstablishTunnel processed: {}", *decoder_callbacks_,
+                     grpc_response.DebugString());
+
+    // Send gRPC response
+    sendGrpcResponse(grpc_response);
+
+    // Handle connection acceptance if successful
+    if (grpc_response.status() == envoy::service::reverse_tunnel::v3::TunnelStatus::ACCEPTED) {
+      Network::Connection* connection =
+          &const_cast<Network::Connection&>(*decoder_callbacks_->connection());
+
+      ENVOY_STREAM_LOG(info, "Saving downstream connection for gRPC request", *decoder_callbacks_);
+
+      saveDownstreamConnection(*connection, initiator.node_id(), initiator.cluster_id());
+      connection->setSocketReused(true);
+      connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn_grpc");
+    }
+
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+
+  } catch (const std::exception& e) {
+    ENVOY_STREAM_LOG(error, "Exception processing gRPC request: {}", *decoder_callbacks_, e.what());
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError, "Internal server error",
+                                       nullptr, absl::nullopt, "");
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  }
+}
+
+void ReverseConnFilter::sendGrpcResponse(
+    const envoy::service::reverse_tunnel::v3::EstablishTunnelResponse& response) {
+  // Serialize the gRPC response
+  std::string response_body = response.SerializeAsString();
+
+  // Add gRPC frame header (compression flag + message length)
+  std::string grpc_frame;
+  grpc_frame.reserve(5 + response_body.size());
+  grpc_frame.append(1, 0); // No compression
+
+  // Message length in big-endian format
+  uint32_t msg_len = htonl(response_body.size());
+  grpc_frame.append(reinterpret_cast<const char*>(&msg_len), 4);
+  grpc_frame.append(response_body);
+
+  ENVOY_STREAM_LOG(info, "Sending gRPC response: {} total bytes", *decoder_callbacks_,
+                   grpc_frame.size());
+
+  // Send gRPC response with proper headers
+  decoder_callbacks_->sendLocalReply(
+      Http::Code::OK, grpc_frame,
+      [](Http::ResponseHeaderMap& headers) {
+        headers.setContentType("application/grpc");
+        headers.addCopy(Http::LowerCaseString("grpc-status"), "0"); // OK
+        headers.addCopy(Http::LowerCaseString("grpc-message"), "");
+      },
+      absl::nullopt, "");
 }
 
 Http::FilterTrailersStatus ReverseConnFilter::decodeTrailers(Http::RequestTrailerMap&) {

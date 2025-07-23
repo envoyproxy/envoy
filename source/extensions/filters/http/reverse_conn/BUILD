@@ -39,5 +39,6 @@ envoy_cc_extension(
         "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_acceptor_lib",
         "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_initiator_lib",
         "@envoy_api//envoy/extensions/filters/http/reverse_conn/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/reverse_tunnel/v3:pkg_cc_proto",
     ],
 )

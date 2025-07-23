@@ -1,0 +1,112 @@
+---
+node:
+  id: cloud-node
+  cluster: cloud
+static_resources:
+  listeners:
+    # Listener for both HTTP and gRPC reverse tunnel handshake requests
+    - name: reverse_tunnel_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 9000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: reverse_tunnel
+                codec_type: AUTO
+                route_config:
+                  name: reverse_tunnel_route
+                  virtual_hosts:
+                    - name: reverse_tunnel_service
+                      domains: ["*"]
+                      routes:
+                        # gRPC reverse tunnel handshake
+                        - match:
+                            prefix: "/envoy.service.reverse_tunnel.v3.ReverseTunnelHandshakeService"
+                            headers:
+                              - name: "content-type"
+                                string_match:
+                                  exact: "application/grpc"
+                          route:
+                            cluster: local_service
+                            timeout: 30s
+                        # Legacy HTTP reverse tunnel handshake  
+                        - match:
+                            prefix: "/reverse_connections"
+                          route:
+                            cluster: local_service
+                            timeout: 30s
+                http_filters:
+                  # Enhanced reverse connection filter with gRPC support
+                  - name: reverse_conn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
+                      ping_interval: 2
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                http2_protocol_options: {}
+
+    # Listener that will route the downstream request to the reverse connection cluster
+    - name: egress_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 8085
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: egress_http
+                codec_type: AUTO
+                route_config:
+                  name: egress_route
+                  virtual_hosts:
+                    - name: reverse_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: reverse_connection_cluster
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    - name: local_service
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: local_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 9000
+
+    - name: reverse_connection_cluster
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: reverse_connection_cluster
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 8080
+
+bootstrap_extensions:
+  - name: envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+      stat_prefix: "upstream_reverse_connection" 

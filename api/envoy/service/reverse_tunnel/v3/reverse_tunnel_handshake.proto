@@ -1,0 +1,232 @@
+syntax = "proto3";
+
+package envoy.service.reverse_tunnel.v3;
+
+import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/grpc_service.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.service.reverse_tunnel.v3";
+option java_outer_classname = "ReverseTunnelHandshakeProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/reverse_tunnel/v3;reverse_tunnelv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Reverse Tunnel Handshake Service]
+// Service definition for establishing reverse tunnel connections between Envoy instances.
+// This service replaces the previous HTTP-based handshake protocol with a robust gRPC-based approach.
+
+// The ReverseTunnelHandshakeService provides secure, reliable handshake protocol for establishing
+// reverse tunnel connections. It supports custom metadata, timeouts, retries, and authentication.
+service ReverseTunnelHandshakeService {
+  // Establishes a reverse tunnel connection between two Envoy instances.
+  // The initiator (typically on-premises Envoy) calls this method to request
+  // a reverse tunnel connection with the acceptor (typically cloud Envoy).
+  rpc EstablishTunnel(EstablishTunnelRequest) returns (EstablishTunnelResponse);
+}
+
+// Request message for establishing a reverse tunnel connection.
+// Contains all necessary information for the acceptor to validate and configure the tunnel.
+message EstablishTunnelRequest {
+  // Required: Identity information of the tunnel initiator.
+  TunnelInitiatorIdentity initiator = 1 [(validate.rules).message = {required: true}];
+
+  // Optional: Custom metadata and properties for the tunnel connection.
+  // This allows for extensible configuration and feature negotiation.
+  google.protobuf.Struct custom_metadata = 2;
+
+  // Optional: Requested tunnel configuration parameters.
+  TunnelConfiguration tunnel_config = 3;
+
+  // Optional: Authentication and authorization information.
+  TunnelAuthentication auth = 4;
+
+  // Optional: Connection-specific attributes for debugging and monitoring.
+  ConnectionAttributes connection_attributes = 5;
+}
+
+// Response message for reverse tunnel establishment.
+// Indicates success/failure and provides configuration for the established tunnel.
+message EstablishTunnelResponse {
+  // Status of the tunnel establishment attempt.
+  TunnelStatus status = 1;
+
+  // Human-readable status message providing additional context.
+  // Required for rejected tunnels, optional for accepted tunnels.
+  string status_message = 2;
+
+  // Optional: Accepted tunnel configuration (may differ from requested).
+  // Present only when status is ACCEPTED.
+  TunnelConfiguration accepted_config = 3;
+
+  // Optional: Custom response metadata from the acceptor.
+  google.protobuf.Struct response_metadata = 4;
+
+  // Optional: Connection monitoring and debugging information.
+  ConnectionInfo connection_info = 5;
+}
+
+// Identity information for the tunnel initiator.
+message TunnelInitiatorIdentity {
+  // Required: Tenant identifier of the initiating Envoy instance.
+  string tenant_id = 1 [(validate.rules).string = {min_len: 1 max_len: 128}];
+
+  // Required: Cluster identifier of the initiating Envoy instance.
+  string cluster_id = 2 [(validate.rules).string = {min_len: 1 max_len: 128}];
+
+  // Required: Node identifier of the initiating Envoy instance.
+  string node_id = 3 [(validate.rules).string = {min_len: 1 max_len: 128}];
+
+  // Optional: Additional identity attributes for advanced routing/filtering.
+  map<string, string> identity_attributes = 4;
+}
+
+// Configuration parameters for the tunnel connection.
+message TunnelConfiguration {
+  // Optional: Preferred ping/keepalive interval for the tunnel.
+  google.protobuf.Duration ping_interval = 1 [(validate.rules).duration = {gt: {seconds: 1}}];
+
+  // Optional: Maximum allowed idle time before tunnel cleanup.
+  google.protobuf.Duration max_idle_time = 2 [(validate.rules).duration = {gt: {seconds: 30}}];
+
+  // Optional: Protocol-specific configuration options.
+  map<string, string> protocol_options = 3;
+
+  // Optional: Quality of Service parameters.
+  QualityOfService qos = 4;
+}
+
+// Quality of Service configuration for tunnel connections.
+message QualityOfService {
+  // Optional: Maximum bandwidth limit in bytes per second.
+  google.protobuf.UInt64Value max_bandwidth_bps = 1;
+
+  // Optional: Connection priority level (higher = more important).
+  google.protobuf.UInt32Value priority_level = 2 [(validate.rules).uint32 = {lte: 10}];
+
+  // Optional: Connection reliability requirements.
+  ReliabilityLevel reliability = 3;
+}
+
+// Authentication and authorization information for tunnel establishment.
+message TunnelAuthentication {
+  // Optional: Authentication token or credential.
+  string auth_token = 1;
+
+  // Optional: Certificate-based authentication information.
+  CertificateAuth certificate_auth = 2;
+
+  // Optional: Custom authentication attributes.
+  map<string, string> auth_attributes = 3;
+}
+
+// Certificate-based authentication information.
+message CertificateAuth {
+  // Certificate fingerprint or identifier.
+  string cert_fingerprint = 1;
+
+  // Optional: Certificate chain validation information.
+  repeated string cert_chain = 2;
+
+  // Optional: Certificate-based attributes (e.g., from SAN extensions).
+  map<string, string> cert_attributes = 3;
+}
+
+// Connection-specific attributes for monitoring and debugging.
+message ConnectionAttributes {
+  // Optional: Source IP address and port of the connection.
+  string source_address = 1;
+
+  // Optional: Target/destination information.
+  string target_address = 2;
+
+  // Optional: Connection tracing and correlation identifiers.
+  string trace_id = 3;
+
+  // Optional: Additional debugging attributes.
+  map<string, string> debug_attributes = 4;
+}
+
+// Status enumeration for tunnel establishment results.
+enum TunnelStatus {
+  // Invalid/unspecified status.
+  TUNNEL_STATUS_UNSPECIFIED = 0;
+
+  // Tunnel establishment was successful.
+  ACCEPTED = 1;
+
+  // Tunnel establishment was rejected due to policy.
+  REJECTED = 2;
+
+  // Authentication failed.
+  AUTHENTICATION_FAILED = 3;
+
+  // Authorization failed (authenticated but not authorized).
+  AUTHORIZATION_FAILED = 4;
+
+  // Rate limiting or quota exceeded.
+  RATE_LIMITED = 5;
+
+  // Internal server error on acceptor side.
+  INTERNAL_ERROR = 6;
+
+  // Requested configuration not supported.
+  UNSUPPORTED_CONFIG = 7;
+}
+
+// Reliability level enumeration for QoS configuration.
+enum ReliabilityLevel {
+  // Best effort reliability (default).
+  BEST_EFFORT = 0;
+
+  // Standard reliability with basic retry logic.
+  STANDARD = 1;
+
+  // High reliability with aggressive retry and failover.
+  HIGH = 2;
+
+  // Critical reliability for mission-critical connections.
+  CRITICAL = 3;
+}
+
+// Information about the established connection.
+message ConnectionInfo {
+  // Assigned connection identifier for tracking.
+  string connection_id = 1;
+
+  // Connection establishment timestamp.
+  google.protobuf.Timestamp established_at = 2;
+
+  // Expected connection lifetime or expiration.
+  google.protobuf.Timestamp expires_at = 3;
+
+  // Monitoring and metrics endpoint information.
+  string metrics_endpoint = 4;
+}
+
+// Configuration for gRPC client options when establishing tunnels.
+message ReverseTunnelGrpcConfig {
+  // Required: gRPC service configuration for the tunnel handshake service.
+  envoy.config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+
+  // Optional: Timeout for tunnel handshake requests.
+  google.protobuf.Duration handshake_timeout = 2 [(validate.rules).duration = {gt: {seconds: 1} lte: {seconds: 30}}];
+
+  // Optional: Number of retry attempts for failed handshakes.
+  google.protobuf.UInt32Value max_retries = 3 [(validate.rules).uint32 = {lte: 10}];
+
+  // Optional: Base interval for exponential backoff retry strategy.
+  google.protobuf.Duration retry_base_interval = 4 [(validate.rules).duration = {gt: {nanos: 100000000}}]; // 100ms minimum
+
+  // Optional: Maximum interval for exponential backoff retry strategy.
+  google.protobuf.Duration retry_max_interval = 5 [(validate.rules).duration = {lte: {seconds: 60}}];
+
+  // Optional: Initial metadata to include with gRPC requests.
+  repeated envoy.config.core.v3.HeaderValue initial_metadata = 6;
+} 

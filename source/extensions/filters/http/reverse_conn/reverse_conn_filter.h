@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/reverse_conn/v3/reverse_conn.pb.h"
+#include "envoy/extensions/filters/http/reverse_conn/v3/reverse_conn.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -13,6 +14,9 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_initiator.h"
+
+// Add gRPC support
+#include "envoy/service/reverse_tunnel/v3/reverse_tunnel_handshake.pb.h"
 
 #include "absl/types/optional.h"
 
@@ -53,6 +57,11 @@ using ReverseConnFilterConfigSharedPtr = std::shared_ptr<ReverseConnFilterConfig
 static const char CRLF[] = "\r\n";
 static const char DOUBLE_CRLF[] = "\r\n\r\n";
 
+/**
+ * Enhanced reverse connection filter with gRPC support.
+ * This filter handles both legacy HTTP requests and modern gRPC requests for reverse tunnel
+ * handshakes.
+ */
 class ReverseConnFilter : Logger::Loggable<Logger::Id::filter>, public Http::StreamDecoderFilter {
 public:
   ReverseConnFilter(ReverseConnFilterConfigSharedPtr config);
@@ -70,6 +79,7 @@ public:
 
   static const std::string reverse_connections_path;
   static const std::string reverse_connections_request_path;
+  static const std::string grpc_service_path; // Add gRPC service path
   static const std::string stats_path;
   static const std::string tenant_path;
   static const std::string node_id_param;
@@ -79,6 +89,16 @@ public:
   static const std::string rc_accepted_response;
 
 private:
+  // Check if request is a gRPC reverse tunnel request
+  bool isGrpcReverseTunnelRequest(const Http::RequestHeaderMap& headers);
+
+  // Process gRPC request body and handle the tunnel establishment
+  Http::FilterDataStatus processGrpcRequest();
+
+  // Send gRPC response with proper framing and headers
+  void
+  sendGrpcResponse(const envoy::service::reverse_tunnel::v3::EstablishTunnelResponse& response);
+
   void saveDownstreamConnection(Network::Connection& downstream_connection,
                                 const std::string& node_id, const std::string& cluster_id);
   std::string getQueryParam(const std::string& key);
@@ -100,7 +120,8 @@ private:
 
   // Handle reverse connection info for responder role (uses upstream socket manager)
   Http::FilterHeadersStatus
-  handleResponderInfo(const std::string& remote_node, const std::string& remote_cluster);
+  handleResponderInfo(ReverseConnection::UpstreamSocketManager* socket_manager,
+                      const std::string& remote_node, const std::string& remote_cluster);
 
   // Handle reverse connection info for initiator role (uses downstream socket interface)
   Http::FilterHeadersStatus handleInitiatorInfo(const std::string& remote_node,

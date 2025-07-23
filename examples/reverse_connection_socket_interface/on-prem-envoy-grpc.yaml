@@ -1,0 +1,112 @@
+---
+node:
+  id: on-prem-node
+  cluster: on-prem
+static_resources:
+  listeners:
+    # Frontend listener accepting requests
+    - name: frontend_listener
+      address:
+        socket_address:
+          address: 127.0.0.1
+          port_value: 8080
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: frontend_http
+                codec_type: AUTO
+                route_config:
+                  name: frontend_route
+                  virtual_hosts:
+                    - name: frontend_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: backend_service
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    # Cloud cluster for reverse tunnel handshakes (gRPC)
+    - name: cloud
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: cloud
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 9000
+
+    # Backend service cluster  
+    - name: backend_service
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: backend_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 8081
+
+admin:
+  access_log_path: "/dev/stdout"
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 8879
+
+layered_runtime:
+  layers:
+  - name: layer
+    static_layer:
+      re2.max_program_size.error_level: 1000
+
+# Enable reverse connection bootstrap extension with gRPC client
+bootstrap_extensions:
+  - name: envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+      src_cluster_id: "on-prem"
+      src_node_id: "on-prem-node"
+      src_tenant_id: "tenant-1"
+      remote_cluster_to_conn_count:
+        - cluster_name: "cloud"
+          reverse_connection_count: 2
+      # gRPC handshake configuration
+      grpc_service_config:
+        grpc_service:
+          envoy_grpc:
+            cluster_name: cloud
+          timeout: 10s
+          retry_policy:
+            retry_back_off:
+              base_interval: 0.15s
+              max_interval: 5s
+            num_retries: 3
+        handshake_timeout: 10s
+        max_retries: 3
+        retry_base_interval: 0.15s
+        retry_max_interval: 5s
+        initial_metadata:
+          - key: "x-service-version"
+            value: "grpc-v1"
+          - key: "x-envoy-node-id"
+            value: "on-prem-node" 
