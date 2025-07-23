@@ -162,10 +162,10 @@ struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
 // Factory for StringAction.
 class StringActionFactory : public ActionFactory<absl::string_view> {
 public:
-  ActionConstSharedPtr createAction(const Protobuf::Message& config, absl::string_view&,
-                                    ProtobufMessage::ValidationVisitor&) override {
+  ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config, absl::string_view&,
+                                        ProtobufMessage::ValidationVisitor&) override {
     const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
-    return std::make_shared<StringAction>(string.value());
+    return [string]() { return std::make_unique<StringAction>(string.value()); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -273,9 +273,14 @@ void PrintTo(const FieldMatchResult& result, std::ostream* os) {
   }
 }
 
+// Creates a StringAction from a provided string.
+std::unique_ptr<StringAction> stringValue(absl::string_view value) {
+  return std::make_unique<StringAction>(std::string(value));
+}
+
 // Creates an OnMatch that evaluates to a StringValue with the provided value.
 template <class T> OnMatch<T> stringOnMatch(absl::string_view value, bool keep_matching = false) {
-  return OnMatch<T>{std::make_shared<StringAction>(std::string(value)), nullptr, keep_matching};
+  return OnMatch<T>{[s = std::string(value)]() { return stringValue(s); }, nullptr, keep_matching};
 }
 
 inline void PrintTo(const Action& action, std::ostream* os) {
@@ -286,14 +291,23 @@ inline void PrintTo(const Action& action, std::ostream* os) {
   *os << "{type=" << action.typeUrl() << "}";
 }
 
+inline void PrintTo(const ActionFactoryCb& action_cb, std::ostream* os) {
+  if (action_cb == nullptr) {
+    *os << "nullptr";
+    return;
+  }
+  ActionPtr action = action_cb();
+  PrintTo(*action, os);
+}
+
 inline void PrintTo(const MatchResult& result, std::ostream* os) {
   if (result.isInsufficientData()) {
     *os << "InsufficientData";
   } else if (result.isNoMatch()) {
     *os << "NoMatch";
   } else if (result.isMatch()) {
-    *os << "Match{Action=";
-    PrintTo(*result.action(), os);
+    *os << "Match{ActionFactoryCb=";
+    PrintTo(result.actionFactory(), os);
     *os << "}";
   } else {
     *os << "UnknownState";
@@ -305,9 +319,9 @@ inline void PrintTo(const MatchTree<TestData>& matcher, std::ostream* os) {
 }
 
 inline void PrintTo(const OnMatch<TestData>& on_match, std::ostream* os) {
-  if (on_match.action_) {
-    *os << "{action_=";
-    PrintTo(on_match.action_, os);
+  if (on_match.action_cb_) {
+    *os << "{action_cb_=";
+    PrintTo(on_match.action_cb_, os);
     *os << "}";
   } else if (on_match.matcher_) {
     *os << "{matcher_=";
@@ -325,25 +339,26 @@ MATCHER(HasInsufficientData, "") {
 }
 
 MATCHER_P(IsActionWithType, matcher, "") {
-  // Takes an ActionConstSharedPtr argument, and compares its action type against matcher.
+  // Takes an ActionFactoryCb argument, and compares its action type against matcher.
   if (arg == nullptr) {
     return false;
   }
-  return ::testing::ExplainMatchResult(testing::Matcher<absl::string_view>(matcher), arg->typeUrl(),
-                                       result_listener);
+  ActionPtr action = arg();
+  return ::testing::ExplainMatchResult(testing::Matcher<absl::string_view>(matcher),
+                                       action->typeUrl(), result_listener);
 }
 
 MATCHER_P(IsStringAction, matcher, "") {
-  // Takes an ActionConstSharedPtr argument, and compares its StringAction's string against matcher.
+  // Takes an ActionFactoryCb argument, and compares its StringAction's string against matcher.
   if (arg == nullptr) {
     return false;
   }
-
-  if (arg->typeUrl() != "google.protobuf.StringValue") {
+  ActionPtr action = arg();
+  if (action->typeUrl() != "google.protobuf.StringValue") {
     return false;
   }
   return ::testing::ExplainMatchResult(testing::Matcher<std::string>(matcher),
-                                       arg->template getTyped<StringAction>().string_,
+                                       action->template getTyped<StringAction>().string_,
                                        result_listener);
 }
 
@@ -353,7 +368,8 @@ MATCHER_P(HasStringAction, matcher, "") {
   if (!arg.isMatch()) {
     return false;
   }
-  return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.action(), result_listener);
+  return ::testing::ExplainMatchResult(IsStringAction(matcher), arg.actionFactory(),
+                                       result_listener);
 }
 
 MATCHER_P(HasActionWithType, matcher, "") {
@@ -362,7 +378,8 @@ MATCHER_P(HasActionWithType, matcher, "") {
   if (!arg.isMatch()) {
     return false;
   }
-  return ::testing::ExplainMatchResult(IsActionWithType(matcher), arg.action(), result_listener);
+  return ::testing::ExplainMatchResult(IsActionWithType(matcher), arg.actionFactory(),
+                                       result_listener);
 }
 
 MATCHER(HasNoMatch, "") {
