@@ -3063,6 +3063,45 @@ TEST_P(Http2CodecImplTestAll, TestCodecHeaderCompression) {
   }
 }
 
+TEST_P(Http2CodecImplTest, TestCanDisableHuffmanEncoding) {
+  // Only implemented for nghttp2.
+  if (http2_implementation_ == Http2Impl::Oghttp2) {
+    GTEST_SKIP();
+  }
+  client_http2_options_.set_disable_huffman(true);
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+  driveToCompletion();
+  auto s = server_wrapper_->buffer_.toString();
+
+  client_http2_options_.set_disable_huffman(false);
+  client_ = std::make_unique<TestClientConnectionImpl>(
+      client_connection_, client_callbacks_, *client_stats_store_.rootScope(),
+      client_http2_options_, random_, max_request_headers_kb_, max_response_headers_count_,
+      ProdNghttp2SessionFactory::get());
+  client_wrapper_ = std::make_unique<ConnectionWrapper>(client_.get());
+  request_encoder_ = &client_->newStream(response_decoder_);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  auto s2 = server_wrapper_->buffer_.toString();
+  driveToCompletion();
+  // client_connection_
+  //  re
+  //   TODO(kbaicho0o): should I do things?
+
+  // TestResponseHeaderMapImpl response_headers{{":status", "200"}, {"compression", "test"}};
+  // EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  // response_encoder_->encodeHeaders(response_headers, true);
+  // driveToCompletion();
+
+  // TODO(kbaichoo): validate response.
+}
+
 // Verify that codec detects PING flood
 TEST_P(Http2CodecImplTest, PingFlood) {
   initialize();
