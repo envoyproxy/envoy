@@ -19,21 +19,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message SinkConfig {
+  // An attribute to be associated with the resource in the OTLP message.
+  message Attribute {
+    // The attribute key.
+    string key = 1;
+
+    // The attribute value.
+    string value = 2;
+  }
+
   oneof protocol_specifier {
     option (validate.required) = true;
 
     // The upstream gRPC cluster that implements the OTLP/gRPC collector.
     config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
-  }
-
-  // An attribute to be associated with the resource in the OTLP message.
-  message Attribute {
-    // The attribute key.
-    string key = 1;
-    // The attribute value.
-    string value = 2;
   }
 
   // Attributes to be associated with the resource in the OTLP message.

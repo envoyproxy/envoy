@@ -52,7 +52,7 @@ private:
   const bool emit_tags_as_attributes_;
   const bool use_tag_extracted_name_;
   const std::string stat_prefix_;
-  const absl::flat_hash_map<std::string, std::string> resource_attributes_;
+  absl::flat_hash_map<std::string, std::string> resource_attributes_;
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;
