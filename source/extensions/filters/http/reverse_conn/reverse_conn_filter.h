@@ -120,8 +120,7 @@ private:
 
   // Handle reverse connection info for responder role (uses upstream socket manager)
   Http::FilterHeadersStatus
-  handleResponderInfo(ReverseConnection::UpstreamSocketManager* socket_manager,
-                      const std::string& remote_node, const std::string& remote_cluster);
+  handleResponderInfo(const std::string& remote_node, const std::string& remote_cluster);
 
   // Handle reverse connection info for initiator role (uses downstream socket interface)
   Http::FilterHeadersStatus handleInitiatorInfo(const std::string& remote_node,
