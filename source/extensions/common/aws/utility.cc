@@ -29,6 +29,7 @@ constexpr char DEFAULT_AWS_CONFIG_FILE[] = "/.aws/config";
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
                              const std::vector<Matchers::StringMatcherPtr>& excluded_headers) {
+  std::map<std::string, std::string> out;
   std::map<std::string, std::vector<std::string>> header_values;
 
   headers.iterate([&header_values,
@@ -65,7 +66,6 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
   });
 
   // Convert the vectors to comma-separated strings
-  std::map<std::string, std::string> out;
   for (const auto& [key, values] : header_values) {
     out[key] = absl::StrJoin(values, ",");
   }
