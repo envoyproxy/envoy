@@ -132,6 +132,72 @@ public:
     EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
   }
 
+  void expectOkWithOnNewConnection() {
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setRemoteAddress(addr_);
+    filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_
+        ->setLocalAddress(addr_);
+    EXPECT_CALL(*client_, check(_, _, testing::A<Tracing::Span&>(), _))
+        .WillOnce(
+            WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+              request_callbacks_ = &callbacks;
+            })));
+
+    // Confirm the values before new connection is called
+    EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
+    EXPECT_EQ(
+        0U,
+        stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
+    Buffer::OwnedImpl data("hello");
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+    // Confirm that the invocation of onNewConnection does increment the active and total count!
+    EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+    EXPECT_EQ(
+        1U,
+        stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
+
+    filter_callbacks_.connection_.dispatcher_.globalTimeSystem().advanceTimeWait(
+        std::chrono::milliseconds(10));
+
+    Filters::Common::ExtAuthz::Response response{};
+    response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+    response.headers_to_set = Filters::Common::ExtAuthz::UnsafeHeaderVector{{"foo", "bar"}};
+
+    auto* fields = response.dynamic_metadata.mutable_fields();
+    (*fields)["foo"] = ValueUtil::stringValue("ok");
+    (*fields)["bar"] = ValueUtil::numberValue(1);
+    (*fields)["ext_authz_duration"] = ValueUtil::numberValue(10);
+
+    EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
+        .WillOnce(Invoke([&response](const std::string& ns,
+                                     const ProtobufWkt::Struct& returned_dynamic_metadata) {
+          EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+          EXPECT_TRUE(
+              returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+          EXPECT_TRUE(
+              TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+          EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                    returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
+        }));
+
+    EXPECT_CALL(filter_callbacks_, continueReading());
+    request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+
+    // Check that the first call to onData does not stop iteration
+    EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+    EXPECT_CALL(*client_, cancel()).Times(0);
+    filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+
+    EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+    EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+    EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+    EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+    EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+    EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+    EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+  }
+
   Stats::TestUtil::TestStore stats_store_;
   ConfigSharedPtr config_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
@@ -147,6 +213,15 @@ grpc_service:
 
 failure_mode_allow: true
 stat_prefix: name
+  )EOF";
+  const std::string on_new_connection_yaml_string_ = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: ext_authz_server
+
+failure_mode_allow: true
+stat_prefix: name
+check_on_new_connection: true
   )EOF";
   const std::string metadata_yaml_string_ = R"EOF(
 grpc_service:
@@ -184,6 +259,11 @@ TEST_F(ExtAuthzFilterTest, OKWithOnData) {
   expectOKWithOnData();
 }
 
+TEST_F(ExtAuthzFilterTest, OKWithOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
+  expectOkWithOnNewConnection();
+}
+
 TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   initialize(default_yaml_string_);
   InSequence s;
@@ -207,6 +287,55 @@ TEST_F(ExtAuthzFilterTest, DeniedWithOnData) {
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
   // Confirm that the invocation of onData does increment the active and total count!
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(
+      1U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(
+      filter_callbacks_.connection_.stream_info_,
+      setResponseCodeDetails(Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied));
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Denied));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+TEST_F(ExtAuthzFilterTest, DeniedWithOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
+  InSequence s;
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  // Confirm the values before new connection is called
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(
+      0U,
+      stats_store_.gauge("ext_authz.name.active", Stats::Gauge::ImportMode::Accumulate).value());
+  Buffer::OwnedImpl data("hello");
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  // Confirm that the invocation of onNewConnection does increment the active and total count!
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
   EXPECT_EQ(
       1U,
@@ -266,6 +395,39 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
+TEST_F(ExtAuthzFilterTest, FailOpenWithOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
+  InSequence s;
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
 TEST_F(ExtAuthzFilterTest, FailClose) {
   initialize(default_yaml_string_);
   InSequence s;
@@ -285,6 +447,42 @@ TEST_F(ExtAuthzFilterTest, FailClose) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(
+      filter_callbacks_.connection_.stream_info_,
+      setResponseCodeDetails(Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError));
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+TEST_F(ExtAuthzFilterTest, FailCloseOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
+  InSequence s;
+  // Explicitly set the failure_mode_allow to false.
+  config_->setFailModeAllow(false);
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_, _));
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
@@ -341,6 +539,42 @@ TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteClose) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
+// Test to verify that when callback from the authorization service has completed the filter
+// does not invoke Cancel on RemoteClose event.
+TEST_F(ExtAuthzFilterTest, DoNotCallCancelonRemoteCloseOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
+  InSequence s;
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_CALL(filter_callbacks_, continueReading());
+  request_callbacks_->onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
 // Test to verify that Cancel is invoked when a RemoteClose event occurs while the call
 // to the authorization service was in progress.
 TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
@@ -373,10 +607,97 @@ TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteClose) {
   EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
+// Test to verify that Cancel is invoked when a RemoteClose event occurs while the call
+// to the authorization service was in progress.
+TEST_F(ExtAuthzFilterTest, VerifyCancelOnRemoteCloseOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
+  InSequence s;
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_CALL(*client_, cancel());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
 // Test to verify that on stack response from the authorization service does NOT
 // result in calling cancel.
 TEST_F(ExtAuthzFilterTest, ImmediateOK) {
   initialize(default_yaml_string_);
+  InSequence s;
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  filter_callbacks_.connection_.dispatcher_.globalTimeSystem().advanceTimeWait(
+      std::chrono::milliseconds(5));
+  ProtobufWkt::Struct dynamic_metadata;
+  (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-ok");
+  (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(12);
+  // Since this is a stack response, duration should be 0;
+  (*dynamic_metadata.mutable_fields())["ext_authz_duration"] = ValueUtil::numberValue(0);
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.dynamic_metadata = dynamic_metadata;
+
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+            callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+          })));
+
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
+                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+        EXPECT_TRUE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
+        EXPECT_TRUE(dynamic_metadata.fields().contains("ext_authz_duration"));
+        EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+
+        EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
+        EXPECT_EQ(dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                  returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
+      }));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Test to verify that on stack response from the authorization service does NOT
+// result in calling cancel.
+TEST_F(ExtAuthzFilterTest, ImmediateOKOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
   InSequence s;
 
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -478,10 +799,90 @@ TEST_F(ExtAuthzFilterTest, ImmediateNOK) {
   EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
 }
 
+// Test to verify that on stack denied response from the authorization service does
+// result in stoppage of the filter chain.
+TEST_F(ExtAuthzFilterTest, ImmediateNOKOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
+  InSequence s;
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  ProtobufWkt::Struct dynamic_metadata;
+  (*dynamic_metadata.mutable_fields())["baz"] = ValueUtil::stringValue("hello-nok");
+  (*dynamic_metadata.mutable_fields())["x"] = ValueUtil::numberValue(15);
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            Filters::Common::ExtAuthz::Response response{};
+            response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+            response.dynamic_metadata = dynamic_metadata;
+            callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+          })));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
+                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+        EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+        EXPECT_FALSE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));
+        EXPECT_FALSE(dynamic_metadata.fields().contains("ext_authz_duration"));
+        EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, dynamic_metadata));
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(
+      filter_callbacks_.connection_.stream_info_,
+      setResponseCodeDetails(Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzDenied));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
 // Test to verify that on stack Error response when failure_mode_allow is configured
 // result in request being allowed.
 TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpen) {
   initialize(default_yaml_string_);
+  InSequence s;
+
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      addr_);
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      addr_);
+  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            callbacks.onComplete(makeAuthzResponse(Filters::Common::ExtAuthz::CheckStatus::Error));
+          })));
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.disabled").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ext_authz.name.failure_mode_allowed").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.denied").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.ok").value());
+  EXPECT_EQ(0U, stats_store_.counter("ext_authz.name.cx_closed").value());
+}
+
+// Test to verify that on stack Error response when failure_mode_allow is configured
+// result in request being allowed.
+TEST_F(ExtAuthzFilterTest, ImmediateErrorFailOpenOnNewConnection) {
+  initialize(on_new_connection_yaml_string_);
   InSequence s;
 
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
