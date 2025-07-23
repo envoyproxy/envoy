@@ -1516,6 +1516,112 @@ TEST_F(TestUpstreamReverseConnectionIOHandle, GetSocketReturnsConstReference) {
   EXPECT_NE(&socket, nullptr);
 }
 
+// Configuration validation tests
+class ConfigValidationTest : public testing::Test {
+protected:
+  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+};
+
+TEST_F(ConfigValidationTest, ValidConfiguration) {
+  // Test that valid configuration gets accepted
+  config_.set_stat_prefix("reverse_tunnel");
+
+  ReverseTunnelAcceptor acceptor(context_);
+
+  // Should not throw when creating bootstrap extension
+  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
+}
+
+TEST_F(ConfigValidationTest, EmptyStatPrefix) {
+  // Test that empty stat_prefix still works with default
+  ReverseTunnelAcceptor acceptor(context_);
+
+  // Should not throw and should use default prefix
+  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportIPv4) {
+  // Test that IPv4 is supported
+  EXPECT_TRUE(socket_interface_->ipFamilySupported(AF_INET));
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportIPv6) {
+  // Test that IPv6 is supported
+  EXPECT_TRUE(socket_interface_->ipFamilySupported(AF_INET6));
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportUnknown) {
+  // Test that unknown families are not supported
+  EXPECT_FALSE(socket_interface_->ipFamilySupported(AF_UNIX));
+  EXPECT_FALSE(socket_interface_->ipFamilySupported(-1));
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, ExtensionNotInitialized) {
+  // Test that we handle calls before onServerInitialized
+  ReverseTunnelAcceptor acceptor(context_);
+
+  auto registry = acceptor.getLocalRegistry();
+  EXPECT_EQ(registry, nullptr);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, CreateEmptyConfigProto) {
+  // Test that createEmptyConfigProto returns valid proto
+  auto proto = socket_interface_->createEmptyConfigProto();
+  EXPECT_NE(proto, nullptr);
+
+  // Should be able to cast to the correct type
+  auto* typed_proto =
+      dynamic_cast<envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+                       UpstreamReverseConnectionSocketInterface*>(proto.get());
+  EXPECT_NE(typed_proto, nullptr);
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, FactoryName) {
+  // Test that factory returns correct name
+  EXPECT_EQ(socket_interface_->name(),
+            "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+}
+
+TEST_F(TestUpstreamSocketManager, GetConnectionSocketNoSocketsButValidMapping) {
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+
+  // Manually add mapping without adding any actual sockets
+  socket_manager_->node_to_cluster_map_[node_id] = cluster_id;
+  socket_manager_->cluster_to_node_map_[cluster_id].push_back(node_id);
+
+  // Try to get a socket - should hit the "No available sockets" log and return nullptr
+  auto socket = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_EQ(socket, nullptr);
+}
+
+TEST_F(TestUpstreamSocketManager, MarkSocketDeadInvalidSocketNotInPool) {
+  auto socket = createMockSocket(123);
+  const std::string node_id = "test-node";
+  const std::string cluster_id = "test-cluster";
+  const std::chrono::seconds ping_interval(30);
+
+  // Add socket to create mappings
+  socket_manager_->addConnectionSocket(node_id, cluster_id, std::move(socket), ping_interval,
+                                       false);
+
+  // Get the socket (removes it from pool but keeps fd mapping temporarily)
+  auto retrieved_socket = socket_manager_->getConnectionSocket(node_id);
+  EXPECT_NE(retrieved_socket, nullptr);
+
+  // Manually add the fd back to fd_to_node_map to simulate the edge case
+  socket_manager_->fd_to_node_map_[123] = node_id;
+
+  // Now mark socket dead - it should find the node but not find the socket in the pool
+  // This will trigger the "Marking an invalid socket dead" error log
+  socket_manager_->markSocketDead(123);
+
+  // Verify the fd mapping was cleaned up
+  EXPECT_FALSE(verifyFDToNodeMap(123));
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

@@ -19,9 +19,10 @@ namespace ReverseConnection {
 
 GrpcReverseTunnelClient::GrpcReverseTunnelClient(
     Upstream::ClusterManager& cluster_manager,
+    const std::string& cluster_name,
     const envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig& config,
     GrpcReverseTunnelCallbacks& callbacks)
-    : cluster_manager_(cluster_manager), config_(config), callbacks_(callbacks),
+    : cluster_manager_(cluster_manager), cluster_name_(cluster_name), config_(config), callbacks_(callbacks),
       service_method_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.reverse_tunnel.v3.ReverseTunnelHandshakeService.EstablishTunnel")) {
 
@@ -49,27 +50,32 @@ GrpcReverseTunnelClient::~GrpcReverseTunnelClient() {
 
 absl::Status GrpcReverseTunnelClient::createGrpcClient() {
   try {
-    // Verify cluster exists in cluster manager
-    if (!config_.has_grpc_service() || !config_.grpc_service().has_envoy_grpc()) {
-      return absl::InvalidArgumentError(
-          "Invalid gRPC service configuration - missing envoy_grpc configuration");
+    // Verify cluster name is provided
+    if (cluster_name_.empty()) {
+      return absl::InvalidArgumentError("Cluster name cannot be empty for gRPC reverse tunnel handshake");
     }
 
-    const std::string& cluster_name = config_.grpc_service().envoy_grpc().cluster_name();
-    auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name);
+    auto thread_local_cluster = cluster_manager_.getThreadLocalCluster(cluster_name_);
     if (!thread_local_cluster) {
       return absl::NotFoundError(
-          fmt::format("Cluster '{}' not found for gRPC reverse tunnel handshake", cluster_name));
+          fmt::format("Cluster '{}' not found for gRPC reverse tunnel handshake", cluster_name_));
+    }
+
+    // Create a basic gRPC service config for this cluster
+    envoy::config::core::v3::GrpcService grpc_service;
+    grpc_service.mutable_envoy_grpc()->set_cluster_name(cluster_name_);
+    if (config_.has_handshake_timeout()) {
+      *grpc_service.mutable_timeout() = config_.handshake_timeout();
     }
 
     // Create raw gRPC client
     auto result = cluster_manager_.grpcAsyncClientManager().getOrCreateRawAsyncClient(
-        config_.grpc_service(), thread_local_cluster->info()->statsScope(),
+        grpc_service, thread_local_cluster->info()->statsScope(),
         false); // skip_cluster_check = false
 
     if (!result.ok()) {
       return absl::InternalError(
-          fmt::format("Failed to create gRPC async client for cluster '{}': {}", cluster_name,
+          fmt::format("Failed to create gRPC async client for cluster '{}': {}", cluster_name_,
                       result.status().message()));
     }
 
@@ -77,7 +83,7 @@ absl::Status GrpcReverseTunnelClient::createGrpcClient() {
 
     if (!raw_client) {
       return absl::InternalError(
-          fmt::format("Failed to create gRPC async client for cluster '{}'", cluster_name));
+          fmt::format("Failed to create gRPC async client for cluster '{}'", cluster_name_));
     }
 
     // Create typed client from raw client
@@ -85,7 +91,7 @@ absl::Status GrpcReverseTunnelClient::createGrpcClient() {
         Grpc::AsyncClient<envoy::service::reverse_tunnel::v3::EstablishTunnelRequest,
                           envoy::service::reverse_tunnel::v3::EstablishTunnelResponse>(raw_client);
 
-    ENVOY_LOG(debug, "Successfully created gRPC client for cluster '{}'", cluster_name);
+    ENVOY_LOG(debug, "Successfully created gRPC client for cluster '{}'", cluster_name_);
     return absl::OkStatus();
 
   } catch (const std::exception& e) {

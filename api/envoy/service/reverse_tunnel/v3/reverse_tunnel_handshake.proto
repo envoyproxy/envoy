@@ -212,9 +212,6 @@ message ConnectionInfo {
 
 // Configuration for gRPC client options when establishing tunnels.
 message ReverseTunnelGrpcConfig {
-  // Required: gRPC service configuration for the tunnel handshake service.
-  envoy.config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
-
   // Optional: Timeout for tunnel handshake requests.
   google.protobuf.Duration handshake_timeout = 2 [(validate.rules).duration = {gt: {seconds: 1} lte: {seconds: 30}}];
 

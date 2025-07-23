@@ -40,6 +40,7 @@ namespace ReverseConnection {
 class RCConnectionWrapper;
 class ReverseTunnelInitiator;
 class ReverseTunnelInitiatorExtension;
+class GrpcReverseTunnelClient;
 
 namespace {
 // HTTP protocol constants.
@@ -129,11 +130,15 @@ struct ReverseConnectionSocketConfig {
   uint32_t connection_timeout_ms;    // Connection timeout in milliseconds.
   bool enable_metrics;               // Whether to enable metrics collection.
   bool enable_circuit_breaker;       // Whether to enable circuit breaker functionality.
+  
+  // gRPC service configuration for reverse tunnel handshake
+  absl::optional<envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig> grpc_service_config;
+  bool enable_legacy_http_handshake; // Whether to enable legacy HTTP handshake
 
   ReverseConnectionSocketConfig()
       : health_check_interval_ms(kDefaultHealthCheckIntervalMs),
         connection_timeout_ms(kDefaultConnectionTimeoutMs), enable_metrics(true),
-        enable_circuit_breaker(true) {}
+        enable_circuit_breaker(true), enable_legacy_http_handshake(true) {}
 };
 
 /**
@@ -317,6 +322,17 @@ public:
   Upstream::ClusterManager& getClusterManager() { return cluster_manager_; }
 
   /**
+   * Get pointer to the gRPC service configuration if available.
+   * @return pointer to the gRPC config, nullptr if not available
+   */
+  const envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig* getGrpcConfig() const {
+    if (!config_.grpc_service_config.has_value()) {
+      return nullptr;
+    }
+    return &config_.grpc_service_config.value();
+  }
+
+  /**
    * Increment the gauge for a specific connection state.
    * @param cluster_stats pointer to cluster-level stats
    * @param host_stats pointer to host-level stats
@@ -388,39 +404,15 @@ private:
 
   // Pipe trigger mechanism helpers
   /**
-   * Initialize the pipe trigger mechanism for waking up accept().
-   * @return absl::OkStatus() if successful, error status otherwise
+   * Create trigger pipe used to wake up accept() when a connection is established.
    */
-  absl::Status initializePipeTrigger();
+  void createTriggerPipe();
 
   /**
-   * Clean up pipe trigger mechanism resources.
-   */
-  void cleanupPipeTrigger();
-
-  /**
-   * Trigger the pipe to wake up accept().
-   * @return true if successful, false otherwise
-   */
-  bool triggerPipe();
-
-  /**
-   * Check if pipe was triggered (non-blocking) and consume trigger data.
-   * @return true if triggered, false if no trigger pending
-   */
-  bool waitForPipeTrigger();
-
-  /**
-   * Check if pipe trigger mechanism is ready for use.
+   * Check if trigger pipe is ready for use.
    * @return true if initialized and ready
    */
-  bool isPipeTriggerReady() const;
-
-  /**
-   * Get the pipe read file descriptor for event loop monitoring.
-   * @return file descriptor, or -1 if not initialized
-   */
-  int getPipeMonitorFd() const;
+  bool isTriggerPipeReady() const;
 
   // Host/cluster mapping management
   /**
@@ -493,6 +485,9 @@ private:
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
+
+  // gRPC reverse tunnel client for handshake operations
+  std::unique_ptr<GrpcReverseTunnelClient> reverse_tunnel_client_;
 
   bool listening_initiated_{false}; // Whether reverse connections have been initiated
 
@@ -597,10 +592,23 @@ public:
    */
   std::vector<std::string> getEstablishedConnections() const;
 
+  // BootstrapExtensionFactory implementation
+  Server::BootstrapExtensionPtr createBootstrapExtension(
+      const Protobuf::Message& config,
+      Server::Configuration::ServerFactoryContext& context) override;
+  
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+  
+  std::string name() const override { 
+    return "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface"; 
+  }
+
 private:
   ReverseTunnelInitiatorExtension* extension_;
   Server::Configuration::ServerFactoryContext* context_;
 };
+
+DECLARE_FACTORY(ReverseTunnelInitiator);
 
 /**
  * Bootstrap extension for ReverseTunnelInitiator.
@@ -614,12 +622,26 @@ public:
           DownstreamReverseConnectionSocketInterface& config);
 
   void onServerInitialized() override;
-  void onWorkerThreadInitialized() override {}
+  void onWorkerThreadInitialized() override;
 
   /**
    * @return pointer to the thread-local registry, or nullptr if not available.
    */
   DownstreamSocketThreadLocal* getLocalRegistry() const;
+
+  /**
+   * @return true if gRPC service config is available in the configuration
+   */
+  bool hasGrpcConfig() const {
+    return config_.has_grpc_service_config();
+  }
+
+  /**
+   * @return reference to the gRPC service config
+   */
+  const envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig& getGrpcConfig() const {
+    return config_.grpc_service_config();
+  }
 
 private:
   Server::Configuration::ServerFactoryContext& context_;
@@ -627,30 +649,6 @@ private:
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
 };
-
-/**
- * Factory for creating ReverseTunnelInitiator bootstrap extensions.
- * Uses the new factory base pattern for better consistency with Envoy conventions.
- */
-class ReverseTunnelInitiatorFactory
-    : public ReverseConnectionBootstrapFactoryBase<
-          envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
-              DownstreamReverseConnectionSocketInterface,
-          ReverseTunnelInitiatorExtension>,
-      public Logger::Loggable<Logger::Id::config> {
-public:
-  ReverseTunnelInitiatorFactory()
-      : ReverseConnectionBootstrapFactoryBase(
-            "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface") {}
-
-private:
-  Server::BootstrapExtensionPtr createBootstrapExtensionTyped(
-      const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
-          DownstreamReverseConnectionSocketInterface& proto_config,
-      Server::Configuration::ServerFactoryContext& context) override;
-};
-
-DECLARE_FACTORY(ReverseTunnelInitiatorFactory);
 
 /**
  * Custom load balancer context for reverse connections. This class enables the

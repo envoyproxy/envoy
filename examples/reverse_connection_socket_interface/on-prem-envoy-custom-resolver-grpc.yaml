@@ -1,0 +1,169 @@
+---
+node:
+  id: on-prem-node
+  cluster: on-prem
+
+# Enable reverse connection bootstrap extension with gRPC configuration
+bootstrap_extensions:
+- name: envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+    stat_prefix: "downstream_reverse_connection"
+    src_cluster_id: "on-prem"
+    src_node_id: "on-prem-node"
+    src_tenant_id: "on-prem"
+    # gRPC handshake configuration (without grpc_service - cluster comes from listener)
+    grpc_service_config:
+      handshake_timeout: 10s
+      max_retries: 3
+      retry_base_interval: 0.15s
+      retry_max_interval: 5s
+      initial_metadata:
+        - key: "x-service-version"
+          value: "grpc-v1"
+        - key: "x-envoy-node-id"
+          value: "on-prem-node"
+
+static_resources:
+  listeners:
+    # Services reverse conn APIs
+    - name: rev_conn_api_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 9001
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: rev_conn_api
+                codec_type: AUTO
+                route_config:
+                  name: rev_conn_api_route
+                  virtual_hosts: []
+                http_filters:
+                  - name: envoy.filters.http.reverse_conn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
+                      ping_interval: 30
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+    # Forwards incoming http requests to backend
+    - name: ingress_http_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 6060
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                route_config:
+                  name: ingress_http_route
+                  virtual_hosts:
+                    - name: backend
+                      domains:
+                        - "*"
+                      routes:
+                        - match:
+                            prefix: '/on_prem_service'
+                          route:
+                            cluster: on-prem-service
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+    # Initiates reverse connections to cloud using custom resolver AND gRPC handshake
+    - name: reverse_conn_listener
+      listener_filters_timeout: 0s
+      listener_filters:
+        # Filter that responds to keepalives on reverse connection sockets
+        - name: envoy.filters.listener.reverse_connection
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.listener.reverse_connection.v3.ReverseConnection
+            ping_wait_timeout: 120
+      # Use custom address with reverse connection metadata encoded in URL format
+      address:
+        socket_address:
+          # This encodes: src_node_id=on-prem-node, src_cluster_id=on-prem, src_tenant_id=on-prem
+          # and remote clusters: cloud with 10 connections (gRPC will be used automatically from bootstrap config)
+          address: "rc://on-prem-node:on-prem:on-prem@cloud:10"
+          port_value: 0
+          # Use custom resolver that can parse reverse connection metadata
+          resolver_name: "envoy.resolvers.reverse_connection"
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: reverse_conn_listener
+                route_config:
+                  virtual_hosts:
+                    - name: backend
+                      domains:
+                        - "*"
+                      routes:
+                        - match:
+                            prefix: '/on_prem_service'
+                          route:
+                            cluster: on-prem-service
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  # Cluster designating cloud-envoy (must support HTTP/2 for gRPC)
+  clusters:
+    - name: cloud
+      type: STRICT_DNS
+      connect_timeout: 30s
+      # Enable HTTP/2 for gRPC support
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}
+      load_assignment:
+        cluster_name: cloud
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: cloud-envoy # Container name of cloud-envoy in docker-compose
+                  port_value: 9000   # Port where cloud-envoy's reverse_tunnel_listener listens
+
+    # Backend HTTP service behind onprem which
+    # we will access via reverse connections
+    - name: on-prem-service
+      type: STRICT_DNS
+      connect_timeout: 30s
+      load_assignment:
+        cluster_name: on-prem-service
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: on-prem-service
+                    port_value: 80
+
+admin:
+  access_log_path: "/dev/stdout"
+  address:
+    socket_address:
+      protocol: TCP
+      address: 0.0.0.0
+      port_value: 8888
+
+layered_runtime:
+  layers:
+  - name: layer
+    static_layer:
+      re2.max_program_size.error_level: 1000 

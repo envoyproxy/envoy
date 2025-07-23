@@ -67,12 +67,14 @@ class GrpcReverseTunnelClient : public Grpc::AsyncRequestCallbacks<
                                 public Logger::Loggable<Logger::Id::connection> {
 public:
   /**
-   * Constructor for GrpcReverseTunnelClient.
-   * @param cluster_manager the cluster manager for gRPC client creation
-   * @param config the gRPC configuration for the handshake service
-   * @param callbacks the callback interface for handshake results
+   * Constructor for gRPC reverse tunnel client.
+   * @param cluster_manager reference to the cluster manager
+   * @param cluster_name name of the cluster to connect to for gRPC handshake
+   * @param config gRPC configuration for timeouts, retries, etc.
+   * @param callbacks callback interface for handshake results
    */
   GrpcReverseTunnelClient(Upstream::ClusterManager& cluster_manager,
+                          const std::string& cluster_name,
                           const envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig& config,
                           GrpcReverseTunnelCallbacks& callbacks);
 
@@ -97,6 +99,19 @@ public:
    */
   void cancel();
 
+  /**
+   * Build the handshake request.
+   * @param tenant_id the tenant identifier
+   * @param cluster_id the cluster identifier
+   * @param node_id the node identifier
+   * @param metadata optional custom metadata
+   * @return the constructed handshake request
+   */
+  envoy::service::reverse_tunnel::v3::EstablishTunnelRequest
+  buildHandshakeRequest(const std::string& tenant_id, const std::string& cluster_id,
+                        const std::string& node_id,
+                        const absl::optional<google::protobuf::Struct>& metadata);
+
   // Grpc::AsyncRequestCallbacks implementation
   void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void
@@ -112,20 +127,8 @@ private:
    */
   absl::Status createGrpcClient();
 
-  /**
-   * Build the handshake request.
-   * @param tenant_id the tenant identifier
-   * @param cluster_id the cluster identifier
-   * @param node_id the node identifier
-   * @param metadata optional custom metadata
-   * @return the constructed handshake request
-   */
-  envoy::service::reverse_tunnel::v3::EstablishTunnelRequest
-  buildHandshakeRequest(const std::string& tenant_id, const std::string& cluster_id,
-                        const std::string& node_id,
-                        const absl::optional<google::protobuf::Struct>& metadata);
-
   Upstream::ClusterManager& cluster_manager_;
+  const std::string cluster_name_;
   const envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig config_;
   GrpcReverseTunnelCallbacks& callbacks_;
 
