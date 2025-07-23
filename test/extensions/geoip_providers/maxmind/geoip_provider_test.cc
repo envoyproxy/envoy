@@ -465,6 +465,26 @@ TEST_F(GeoipProviderTest, ValidConfigAnonHostingSuccessfulLookup) {
   expectStats("anon_db");
 }
 
+TEST_F(GeoipProviderTest, ValidConfigUsingCityDbNoHeadersAddedWhenIpIsNotInDb) {
+  const std::string config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        country: "x-geo-country"
+    city_db_path: "{{ test_rundir }}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb"
+  )EOF";
+
+  initializeProvider(config_yaml, cb_added_nullopt);
+  Network::Address::InstanceConstSharedPtr remote_address =
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
+  Geolocation::LookupRequest lookup_rq{std::move(remote_address)};
+  testing::MockFunction<void(Geolocation::LookupResult&&)> lookup_cb;
+  auto lookup_cb_std = lookup_cb.AsStdFunction();
+  EXPECT_CALL(lookup_cb, Call(_)).WillRepeatedly(SaveArg<0>(&captured_lookup_response_));
+  provider_->lookup(std::move(lookup_rq), std::move(lookup_cb_std));
+  EXPECT_EQ(0, captured_lookup_response_.size());
+  expectStats("city_db", 1, 0, 1);
+}
+
 TEST_F(GeoipProviderTest, ValidConfigAnonTorNodeSuccessfulLookup) {
   const std::string config_yaml = R"EOF(
     common_provider_config:
