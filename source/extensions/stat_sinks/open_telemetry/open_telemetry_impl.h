@@ -42,7 +42,8 @@ public:
   bool emitTagsAsAttributes() { return emit_tags_as_attributes_; }
   bool useTagExtractedName() { return use_tag_extracted_name_; }
   const std::string& statPrefix() { return stat_prefix_; }
-  const absl::flat_hash_map<std::string, std::string>& resource_attributes() {
+  const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
+  resource_attributes() {
     return resource_attributes_;
   }
 
@@ -52,7 +53,7 @@ private:
   const bool emit_tags_as_attributes_;
   const bool use_tag_extracted_name_;
   const std::string stat_prefix_;
-  absl::flat_hash_map<std::string, std::string> resource_attributes_;
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;
@@ -166,7 +167,6 @@ public:
 private:
   const OtlpMetricsFlusherSharedPtr metrics_flusher_;
   const OpenTelemetryGrpcMetricsExporterSharedPtr metrics_exporter_;
-  absl::flat_hash_map<std::string, std::string> attributes_;
 };
 
 } // namespace OpenTelemetry
