@@ -29,9 +29,10 @@ constexpr char DEFAULT_AWS_CONFIG_FILE[] = "/.aws/config";
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
                              const std::vector<Matchers::StringMatcherPtr>& excluded_headers) {
-  std::map<std::string, std::string> out;
+  std::map<std::string, std::set<std::string>> header_values;
+
   headers.iterate(
-      [&out, &excluded_headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+      [&header_values, &excluded_headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
         // Skip empty headers
         if (entry.key().empty() || entry.value().empty()) {
           return Http::HeaderMap::Iterate::Continue;
@@ -48,18 +49,28 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
           return Http::HeaderMap::Iterate::Continue;
         }
 
+        std::string header_key(key);
         std::string value(entry.value().getStringView());
-        // Remove leading, trailing, and deduplicate repeated ascii spaces
-        absl::RemoveExtraAsciiWhitespace(&value);
-        const auto iter = out.find(std::string(entry.key().getStringView()));
-        // If the entry already exists, append the new value to the end
-        if (iter != out.end()) {
-          iter->second += fmt::format(",{}", value);
-        } else {
-          out.emplace(std::string(entry.key().getStringView()), value);
+        
+        // Split by comma and process each value
+        std::vector<std::string> comma_separated = absl::StrSplit(value, ',');
+        for (auto& val : comma_separated) {
+          // Remove leading, trailing, and deduplicate repeated ascii spaces
+          absl::RemoveExtraAsciiWhitespace(&val);
+          if (!val.empty()) {
+            header_values[header_key].insert(val);
+          }
         }
+        
         return Http::HeaderMap::Iterate::Continue;
       });
+
+  // Convert the sorted sets to comma-separated strings
+  std::map<std::string, std::string> out;
+  for (const auto& [key, values] : header_values) {
+    out[key] = absl::StrJoin(values, ",");
+  }
+
   // The AWS SDK has a quirk where it removes "default ports" (80, 443) from the host headers
   // Additionally, we canonicalize the :authority header as "host"
   // TODO(suniltheta): This may need to be tweaked to canonicalize :authority for HTTP/2 requests
