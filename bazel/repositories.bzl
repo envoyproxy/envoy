@@ -191,6 +191,8 @@ def envoy_dependencies(skip_targets = []):
     _com_github_curl()
     _com_github_envoyproxy_sqlparser()
     _v8()
+    _fp16()
+    _intel_ittapi()
     _com_googlesource_chromium_base_trace_event_common()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
@@ -621,6 +623,27 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/time:time",
     )
 
+    native.bind(
+        name = "absl_btree",
+        actual = "@com_google_absl//absl/container:btree",
+    )
+    native.bind(
+        name = "absl_flat_hash_map",
+        actual = "@com_google_absl//absl/container:flat_hash_map",
+    )
+    native.bind(
+        name = "absl_flat_hash_set",
+        actual = "@com_google_absl//absl/container:flat_hash_set",
+    )
+    native.bind(
+        name = "absl_strings",
+        actual = "@com_google_absl//absl/strings:strings",
+    )
+    native.bind(
+        name = "absl_time",
+        actual = "@com_google_absl//absl/time:time",
+    )
+
 def _com_google_protobuf():
     external_http_archive(
         name = "rules_python",
@@ -722,15 +745,33 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
-            "@envoy//bazel:v8_include.patch",
+            "@envoy//bazel:v8-extra.patch",
         ],
         patch_args = ["-p1"],
+        patch_cmds = [
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
+        ],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+        },
     )
 
     # Needed by proxy_wasm_cpp_host.
     native.bind(
         name = "wee8",
         actual = "@v8//:wee8",
+    )
+
+def _fp16():
+    external_http_archive(
+        name = "fp16",
+        build_file = "@envoy//bazel/external:fp16.BUILD",
+    )
+
+def _intel_ittapi():
+    external_http_archive(
+        name = "intel_ittapi",
+        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
     )
 
 def _com_googlesource_chromium_base_trace_event_common():
