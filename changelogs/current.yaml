@@ -390,6 +390,9 @@ new_features:
 - area: alts
   change: |
     Added environment variable-protected gRPC keepalive params to the ALTS handshaker client.
+- area: dns_filter, redis_proxy and prefix_matcher_map
+  change: |
+    Using Radix Tree instead of Trie for performance improvements.
 - area: wasm
   change: |
     Added support for returning ``StopIteration`` from plugin ``onRequestHeader`` and ``onResponseHeader`` callbacks. See
