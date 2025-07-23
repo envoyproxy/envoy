@@ -813,8 +813,6 @@ TEST_F(ProxyFilterWithFilterStateHostTest, NoFilterStatePresent) {
       .Times(AnyNumber())
       .WillRepeatedly(Return(false));
 
-  // Use empty filter state (no filter state values set).
-
   // Should use "foo" from host header when no filter state found.
   Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
       new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
@@ -1088,6 +1086,91 @@ TEST_F(ProxyFilterWithFilterStateHostDisabledTest, IgnoresFilterStatePortWhenFla
   EXPECT_CALL(*handle, onDestroy());
   filter_->onDestroy();
 }
+
+// Test for IPv6.
+TEST_F(ProxyFilterTest, IPv6BracketStrippingBug) {
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+  EXPECT_CALL(callbacks_, streamInfo());
+  EXPECT_CALL(callbacks_, dispatcher());
+  EXPECT_CALL(callbacks_, streamInfo());
+
+  // We expect IPv6 address with brackets to be preserved and port to be detected.
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, loadDnsCacheEntry_(Eq("[::1]"), 8080, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+
+  // Test with IPv6 literal host header.
+  Http::TestRequestHeaderMapImpl headers{{":authority", "[::1]:8080"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(headers, false));
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+// Parameterized test for IPv6 bracket variations.
+struct IPv6TestCase {
+  std::string host_header;
+  std::string expected_host;
+  uint16_t expected_port;
+  std::string test_name;
+};
+
+class ProxyFilterIPv6ParameterizedTest : public ProxyFilterTest,
+                                         public testing::WithParamInterface<IPv6TestCase> {};
+
+TEST_P(ProxyFilterIPv6ParameterizedTest, IPv6BracketVariations) {
+  const auto& test_case = GetParam();
+
+  Upstream::ResourceAutoIncDec* circuit_breakers_(
+      new Upstream::ResourceAutoIncDec(pending_requests_));
+  InSequence s;
+
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(factory_context_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_));
+  EXPECT_CALL(*transport_socket_factory_, implementsSecureTransport()).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, route());
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_, canCreateDnsRequest_())
+      .WillOnce(Return(circuit_breakers_));
+  EXPECT_CALL(callbacks_, streamInfo());
+  EXPECT_CALL(callbacks_, dispatcher());
+  EXPECT_CALL(callbacks_, streamInfo());
+
+  Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle* handle =
+      new Common::DynamicForwardProxy::MockLoadDnsCacheEntryHandle();
+  EXPECT_CALL(*dns_cache_manager_->dns_cache_,
+              loadDnsCacheEntry_(Eq(test_case.expected_host), test_case.expected_port, _, _))
+      .WillOnce(Return(
+          MockLoadDnsCacheEntryResult{LoadDnsCacheEntryStatus::Loading, handle, absl::nullopt}));
+
+  Http::TestRequestHeaderMapImpl headers{{":authority", test_case.host_header}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(headers, false));
+
+  EXPECT_CALL(*handle, onDestroy());
+  filter_->onDestroy();
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    IPv6Formats, ProxyFilterIPv6ParameterizedTest,
+    testing::Values(
+        IPv6TestCase{"[::1]:8080", "[::1]", 8080, "IPv6LoopbackWithPort"},
+        IPv6TestCase{"[2001:db8::1]:443", "[2001:db8::1]", 443, "IPv6AddressWithHTTPSPort"},
+        IPv6TestCase{"[::1]", "[::1]", 80, "IPv6LoopbackDefaultPort"},
+        IPv6TestCase{"[2001:db8:85a3::8a2e:370:7334]:9999", "[2001:db8:85a3::8a2e:370:7334]", 9999,
+                     "IPv6FullAddressWithCustomPort"}),
+    [](const testing::TestParamInfo<IPv6TestCase>& info) { return info.param.test_name; });
 
 } // namespace
 } // namespace DynamicForwardProxy
