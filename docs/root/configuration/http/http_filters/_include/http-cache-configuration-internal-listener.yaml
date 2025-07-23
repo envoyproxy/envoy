@@ -1,7 +1,7 @@
 bootstrap_extensions:
-- typed_config:
-  "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
-  name: envoy.bootstrap.internal_listener
+- name: envoy.bootstrap.internal_listener
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.internal_listener.v3.InternalListener
 static_resources:
   listeners:
   - address:
