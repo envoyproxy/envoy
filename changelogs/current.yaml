@@ -116,6 +116,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: geoip
+  change: |
+    Fixed a bug where the ``apple_private_relay`` header was not populated correctly when isp header wasn't set.
 - area: conn_pool
   change: |
     Fixed an issue that could lead to too many connections when using
@@ -169,6 +172,9 @@ bug_fixes:
   change: |
     Fixed a division by zero bug in the Dynatrace sampling controller that occurred when ``total_wanted`` was less than
     ``top_k_size``. The calculation was refactored to avoid the intermediate division that could result in zero.
+- area: wasm
+  change: |
+    Bumped wasmtime version to 24.0.2 to address CVE.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
