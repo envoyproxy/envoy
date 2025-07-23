@@ -6,30 +6,23 @@ namespace HttpFilters {
 namespace Composite {
 
 void ExecuteFilterAction::createFilters(Http::FilterChainFactoryCallbacks& callbacks) const {
-  if (actionSkip()) {
-    return;
-  }
-
-  if (auto config_value = config_provider_(); config_value.has_value()) {
-    (*config_value)(callbacks);
-    return;
-  }
-  // There is no dynamic config available. Apply missing config filter.
-  Envoy::Http::MissingConfigFilterFactory(callbacks);
+  cb_(callbacks);
 }
 
-const std::string& ExecuteFilterAction::actionName() const { return name_; }
-
-bool ExecuteFilterAction::actionSkip() const {
-  return sample_.has_value()
-             ? !runtime_.snapshot().featureEnabled(sample_->runtime_key(), sample_->default_value())
-             : false;
+bool ExecuteFilterActionFactory::isSampled(
+    const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
+    Envoy::Runtime::Loader& runtime) {
+  if (composite_action.has_sample_percent() &&
+      !runtime.snapshot().featureEnabled(composite_action.sample_percent().runtime_key(),
+                                         composite_action.sample_percent().default_value())) {
+    return false;
+  }
+  return true;
 }
 
-Matcher::ActionConstSharedPtr
-ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
-                                         Http::Matching::HttpFilterActionContext& context,
-                                         ProtobufMessage::ValidationVisitor& validation_visitor) {
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCb(
+    const Protobuf::Message& config, Http::Matching::HttpFilterActionContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& composite_action = MessageUtil::downcastAndValidate<
       const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction&>(
       config, validation_visitor);
@@ -41,20 +34,20 @@ ExecuteFilterActionFactory::createAction(const Protobuf::Message& config,
 
   if (composite_action.has_dynamic_config()) {
     if (context.is_downstream_) {
-      return createDynamicActionDownstream(composite_action, context);
+      return createDynamicActionFactoryCbDownstream(composite_action, context);
     } else {
-      return createDynamicActionUpstream(composite_action, context);
+      return createDynamicActionFactoryCbUpstream(composite_action, context);
     }
   }
 
   if (context.is_downstream_) {
-    return createStaticActionDownstream(composite_action, context, validation_visitor);
+    return createStaticActionFactoryCbDownstream(composite_action, context, validation_visitor);
   } else {
-    return createStaticActionUpstream(composite_action, context, validation_visitor);
+    return createStaticActionFactoryCbUpstream(composite_action, context, validation_visitor);
   }
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createDynamicActionDownstream(
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createDynamicActionFactoryCbDownstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context) {
   if (!context.factory_context_.has_value() || !context.server_factory_context_.has_value()) {
@@ -64,11 +57,11 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createDynamicActionDow
   auto provider_manager =
       Envoy::Http::FilterChainUtility::createSingletonDownstreamFilterConfigProviderManager(
           context.server_factory_context_.value());
-  return createDynamicActionTyped<Server::Configuration::FactoryContext>(
+  return createDynamicActionFactoryCbTyped<Server::Configuration::FactoryContext>(
       composite_action, context, "http", context.factory_context_.value(), provider_manager);
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createDynamicActionUpstream(
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createDynamicActionFactoryCbUpstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context) {
   if (!context.upstream_factory_context_.has_value() ||
@@ -79,12 +72,12 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createDynamicActionUps
   auto provider_manager =
       Envoy::Http::FilterChainUtility::createSingletonUpstreamFilterConfigProviderManager(
           context.server_factory_context_.value());
-  return createDynamicActionTyped<Server::Configuration::UpstreamFactoryContext>(
+  return createDynamicActionFactoryCbTyped<Server::Configuration::UpstreamFactoryContext>(
       composite_action, context, "router upstream http", context.upstream_factory_context_.value(),
       provider_manager);
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createActionCommon(
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createActionFactoryCbCommon(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context, Envoy::Http::FilterFactoryCb& callback,
     bool is_downstream) {
@@ -97,17 +90,16 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createActionCommon(
   std::string name = composite_action.typed_config().name();
   ASSERT(context.server_factory_context_ != absl::nullopt);
   Envoy::Runtime::Loader& runtime = context.server_factory_context_->runtime();
-
-  return std::make_shared<ExecuteFilterAction>(
-      [cb = std::move(callback)]() mutable -> OptRef<Http::FilterFactoryCb> { return cb; }, name,
-      composite_action.has_sample_percent()
-          ? absl::make_optional<envoy::config::core::v3::RuntimeFractionalPercent>(
-                composite_action.sample_percent())
-          : absl::nullopt,
-      runtime);
+  return [cb = std::move(callback), n = std::move(name),
+          composite_action = std::move(composite_action), &runtime, this]() -> Matcher::ActionPtr {
+    if (!isSampled(composite_action, runtime)) {
+      return nullptr;
+    }
+    return std::make_unique<ExecuteFilterAction>(cb, n);
+  };
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionDownstream(
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCbDownstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -134,10 +126,10 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionDown
         *message, context.stat_prefix_, context.server_factory_context_.value());
   }
 
-  return createActionCommon(composite_action, context, callback, true);
+  return createActionFactoryCbCommon(composite_action, context, callback, true);
 }
 
-Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionUpstream(
+Matcher::ActionFactoryCb ExecuteFilterActionFactory::createStaticActionFactoryCbUpstream(
     const envoy::extensions::filters::http::composite::v3::ExecuteFilterAction& composite_action,
     Http::Matching::HttpFilterActionContext& context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
@@ -158,7 +150,7 @@ Matcher::ActionConstSharedPtr ExecuteFilterActionFactory::createStaticActionUpst
     callback = callback_or_status.value();
   }
 
-  return createActionCommon(composite_action, context, callback, false);
+  return createActionFactoryCbCommon(composite_action, context, callback, false);
 }
 
 REGISTER_FACTORY(ExecuteFilterActionFactory,

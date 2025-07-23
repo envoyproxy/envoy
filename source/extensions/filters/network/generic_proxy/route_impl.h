@@ -32,7 +32,7 @@ using ProtoRouteConfiguration =
 using ProtoVirtualHost = envoy::extensions::filters::network::generic_proxy::v3::VirtualHost;
 using ProtoRetryPolicy = envoy::config::core::v3::RetryPolicy;
 
-class RouteEntryImpl : public RouteEntry, public Matcher::ActionBase<ProtoRouteAction> {
+class RouteEntryImpl : public RouteEntry {
 public:
   RouteEntryImpl(const ProtoRouteAction& route,
                  Envoy::Server::Configuration::ServerFactoryContext& context);
@@ -76,6 +76,17 @@ struct RouteActionContext {
   Server::Configuration::ServerFactoryContext& factory_context;
 };
 
+// Action used with the matching tree to specify route to use for an incoming stream.
+class RouteMatchAction : public Matcher::ActionBase<ProtoRouteAction> {
+public:
+  explicit RouteMatchAction(RouteEntryConstSharedPtr route) : route_(std::move(route)) {}
+
+  RouteEntryConstSharedPtr route() const { return route_; }
+
+private:
+  RouteEntryConstSharedPtr route_;
+};
+
 class RouteActionValidationVisitor : public Matcher::MatchTreeValidationVisitor<MatchInput> {
 public:
   absl::Status performDataInputValidation(const Matcher::DataInputFactory<MatchInput>&,
@@ -87,9 +98,9 @@ public:
 // Registered factory for RouteMatchAction.
 class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& config, RouteActionContext& context,
-               ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "envoy.matching.action.generic_proxy.route"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtoRouteAction>();

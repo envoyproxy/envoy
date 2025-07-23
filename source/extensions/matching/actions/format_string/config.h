@@ -17,7 +17,7 @@ namespace FormatString {
 class ActionImpl : public Matcher::ActionBase<envoy::config::core::v3::SubstitutionFormatString,
                                               Server::Configuration::FilterChainBaseAction> {
 public:
-  ActionImpl(Formatter::FormatterConstSharedPtr formatter) : formatter_(std::move(formatter)) {}
+  ActionImpl(const Formatter::FormatterConstSharedPtr& formatter) : formatter_(formatter) {}
   const Network::FilterChain*
   get(const Server::Configuration::FilterChainsByName& filter_chains_by_name,
       const StreamInfo::StreamInfo& info) const override;
@@ -30,9 +30,10 @@ using FilterChainActionFactoryContext = Server::Configuration::ServerFactoryCont
 class ActionFactory : public Matcher::ActionFactory<FilterChainActionFactoryContext> {
 public:
   std::string name() const override { return "envoy.matching.actions.format_string"; }
-  Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& proto_config, FilterChainActionFactoryContext& context,
-               ProtobufMessage::ValidationVisitor& validator) override;
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& proto_config,
+                        FilterChainActionFactoryContext& context,
+                        ProtobufMessage::ValidationVisitor& validator) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::core::v3::SubstitutionFormatString>();
   }
