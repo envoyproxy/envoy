@@ -163,6 +163,8 @@ public:
   Store& store() override { return store_; }
   const Store& constStore() const override { return store_; }
 
+  void evictAndMarkUnused() override {}
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopeSharedPtr wrapped_scope_;
@@ -196,6 +198,7 @@ public:
   uint32_t use_count() const override { return counter_->use_count(); }
   StatName tagExtractedStatName() const override { return counter_->tagExtractedStatName(); }
   bool used() const override { return counter_->used(); }
+  void markUnused() override { counter_->markUnused(); }
   bool hidden() const override { return counter_->hidden(); }
   SymbolTable& symbolTable() override { return counter_->symbolTable(); }
   const SymbolTable& constSymbolTable() const override { return counter_->constSymbolTable(); }

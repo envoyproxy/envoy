@@ -353,6 +353,10 @@ public:
     return textReadoutFromStatName(storage.statName());
   }
 
+  void evictAndMarkUnused() override {
+    // Do nothing. Eviction is only supported on thread local stores.
+  }
+
   StatName prefix() const override { return prefix_.statName(); }
   IsolatedStoreImpl& store() override { return store_; }
   const IsolatedStoreImpl& constStore() const override { return store_; }

@@ -218,6 +218,19 @@ public:
    */
   virtual TextReadoutOptConstRef findTextReadout(StatName name) const PURE;
 
+  // evictAndMarkUsed removes unused stats and marks all the remaining stats
+  // unused. This should be called from a timer to reduce the cardinality
+  // of the time series.
+  //
+  // NOTE: Do not use this function when scope stats are stored on the
+  // workers by reference, since deletion on the worker might invalidate the
+  // reference.
+  //
+  // NOTE: Removal of stats is not deferred until the sink flush. This function
+  // should not be called more frequently than the stats flush interval.
+  // See https://github.com/envoyproxy/envoy/issues/23619.
+  virtual void evictAndMarkUnused() PURE;
+
   /**
    * @return a reference to the symbol table.
    */

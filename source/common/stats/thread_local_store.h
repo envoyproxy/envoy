@@ -60,6 +60,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
+  void markUnused() override { used_ = false; }
   bool hidden() const override { return false; }
 
 private:
@@ -116,6 +117,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
+  void markUnused() override;
   bool hidden() const override;
 
   // RefcountInterface
@@ -438,6 +440,8 @@ private:
     centralCacheNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
       return central_cache_;
     }
+
+    void evictAndMarkUnused() override;
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;

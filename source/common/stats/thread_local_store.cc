@@ -772,6 +772,80 @@ TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName
   return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
 }
 
+void ThreadLocalStoreImpl::ScopeImpl::evictAndMarkUnused() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  // If we are shutting down, we no longer perform eviction as workers may be shutting down
+  // and not able to complete their work.
+  if (!parent_.shutting_down_ && parent_.tls_cache_) {
+    auto stale_counters = std::make_shared<StatNameHashMap<CounterSharedPtr>>();
+    auto stale_gauges = std::make_shared<StatNameHashMap<GaugeSharedPtr>>();
+    auto stale_text_readouts = std::make_shared<StatNameHashMap<TextReadoutSharedPtr>>();
+    auto stale_histograms = std::make_shared<StatNameHashMap<ParentHistogramSharedPtr>>();
+
+    auto collect_stale = []<typename T>(std::shared_ptr<StatNameHashMap<T>>& stale_metrics) {
+      return [stale_metrics](std::pair<StatName, T> kv) {
+        const auto& [name, metric] = kv;
+        if constexpr (std::same_as<T, ParentHistogramSharedPtr>) {
+          // Histograms usage can only be detected after merge (which happens
+          // only during flush). Since eviction is less frequent than flushing,
+          // we can merge histograms here as well.
+          metric->merge();
+        }
+        if (metric->used()) {
+          metric->markUnused();
+          return false;
+        } else {
+          stale_metrics->try_emplace(name, metric);
+          return true;
+        }
+      };
+    };
+
+    {
+      Thread::LockGuard lock(parent_.lock_);
+      absl::erase_if(central_cache_->counters_, collect_stale(stale_counters));
+      absl::erase_if(central_cache_->gauges_, collect_stale(stale_gauges));
+      absl::erase_if(central_cache_->text_readouts_, collect_stale(stale_text_readouts));
+      absl::erase_if(central_cache_->histograms_, collect_stale(stale_histograms));
+    }
+
+    // At this point, central cache no longer returns the evicted stats, but we
+    // need to keep the storage for the evicted stats until after the thread
+    // local caches are cleared.
+    parent_.tls_cache_->runOnAllThreads(
+        [scope_id = scope_id_, stale_counters, stale_gauges, stale_text_readouts,
+         stale_histograms](OptRef<TlsCache> tls_cache) {
+          TlsCacheEntry& entry = tls_cache->insertScope(scope_id);
+          absl::erase_if(entry.counters_,
+                         [=](std::pair<StatName, std::reference_wrapper<Counter>> kv) {
+                           return stale_counters->contains(kv.first);
+                         });
+          absl::erase_if(entry.gauges_, [=](std::pair<StatName, std::reference_wrapper<Gauge>> kv) {
+            return stale_gauges->contains(kv.first);
+          });
+          absl::erase_if(entry.text_readouts_,
+                         [=](std::pair<StatName, std::reference_wrapper<TextReadout>> kv) {
+                           return stale_text_readouts->contains(kv.first);
+                         });
+          absl::erase_if(entry.parent_histograms_,
+                         [=](std::pair<StatName, ParentHistogramSharedPtr> kv) {
+                           return stale_histograms->contains(kv.first);
+                         });
+        },
+        [stale_counters, stale_gauges, stale_text_readouts, stale_histograms]() {
+          // We want to delete stale stats on the main thread since stat destructors lock the stats
+          // allocator. Eventually, we might also want to defer the deletion until the values are
+          // flushes to the sinks. This could happen if an unused stat is updated immediately after
+          // eviction (e.g. on thread local cache), before we get a chance to delete it from the
+          // cache.
+          ENVOY_LOG(info, "deleting stale {} counters, {} gauges, {} text readouts, {} histograms",
+                    stale_counters->size(), stale_gauges->size(), stale_text_readouts->size(),
+                    stale_histograms->size());
+        });
+  }
+}
+
 Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint64_t id) {
   // tlsHistogram() is generally not called for a histogram that is rejected by
   // the matcher, so no further rejection-checking is needed at this level.
@@ -908,6 +982,14 @@ void ParentHistogramImpl::recordValue(uint64_t value) {
 bool ParentHistogramImpl::used() const {
   // Consider ParentHistogram used only if has ever been merged.
   return merged_;
+}
+
+void ParentHistogramImpl::markUnused() {
+  merged_ = false;
+  Thread::ReleasableLockGuard lock(merge_lock_);
+  for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
+    tls_histogram->markUnused();
+  }
 }
 
 bool ParentHistogramImpl::hidden() const { return false; }

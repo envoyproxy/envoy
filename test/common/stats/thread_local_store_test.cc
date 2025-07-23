@@ -606,6 +606,57 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   tls_.shutdownThread();
 }
 
+TEST_F(StatsThreadLocalStoreTest, EvictAndMarkUnused) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  ScopeSharedPtr scope = store_->createScope("scope.");
+  {
+    // References will become invalid.
+    Counter& c1 = scope->counterFromString("c1");
+    c1.add(1);
+    EXPECT_TRUE(c1.used());
+
+    Gauge& g1 = scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate);
+    g1.set(5);
+    EXPECT_TRUE(g1.used());
+
+    TextReadout& t1 = scope->textReadoutFromString("t1");
+    t1.set("hello");
+    EXPECT_TRUE(t1.used());
+
+    // Mark unused.
+    EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+    scope->evictAndMarkUnused();
+
+    EXPECT_EQ(&c1, &scope->counterFromString("c1"));
+    EXPECT_FALSE(c1.used());
+    EXPECT_EQ(1, c1.value());
+    EXPECT_EQ(1UL, store_->counters().size());
+
+    EXPECT_EQ(&g1, &scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
+    EXPECT_FALSE(g1.used());
+    EXPECT_EQ(5, g1.value());
+    EXPECT_EQ(1UL, store_->gauges().size());
+
+    EXPECT_EQ(&t1, &scope->textReadoutFromString("t1"));
+    EXPECT_FALSE(t1.used());
+    EXPECT_EQ("hello", t1.value());
+    EXPECT_EQ(1UL, store_->textReadouts().size());
+  }
+
+  // Remove.
+  EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
+  scope->evictAndMarkUnused();
+  EXPECT_EQ(0UL, store_->counters().size());
+  EXPECT_EQ(0UL, store_->gauges().size());
+  EXPECT_EQ(0UL, store_->textReadouts().size());
+
+  tls_.shutdownGlobalThreading();
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+}
+
 TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
