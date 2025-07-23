@@ -28,6 +28,17 @@ message SinkConfig {
     config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
   }
 
+  // An attribute to be associated with the resource in the OTLP message.
+  message Attribute {
+    // The attribute key.
+    string key = 1;
+    // The attribute value.
+    string value = 2;
+  }
+
+  // Attributes to be associated with the resource in the OTLP message.
+  repeated Attribute resource_attributes = 7;
+
   // If set to true, counters will be emitted as deltas, and the OTLP message will have
   // ``AGGREGATION_TEMPORALITY_DELTA`` set as AggregationTemporality.
   bool report_counters_as_deltas = 2;

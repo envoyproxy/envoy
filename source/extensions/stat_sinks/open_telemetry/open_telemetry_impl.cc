@@ -14,7 +14,11 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
       use_tag_extracted_name_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
-      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : "") {}
+      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : "") {
+  for (const auto& attr : sink_config.resource_attributes()) {
+    resource_attributes_[attr.key()] = attr.value();
+  }
+}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
@@ -46,7 +50,11 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   auto request = std::make_unique<MetricsExportRequest>();
   auto* resource_metrics = request->add_resource_metrics();
   auto* scope_metrics = resource_metrics->add_scope_metrics();
-
+  for (const auto& [key, value] : config_->resource_attributes()) {
+    auto* attribute = resource_metrics->mutable_resource()->add_attributes();
+    attribute->set_key(key);
+    attribute->mutable_value()->set_string_value(value);
+  }
   int64_t snapshot_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                  snapshot.snapshotTime().time_since_epoch())
                                  .count();
