@@ -112,7 +112,7 @@ minor_behavior_changes:
       ``envoy.reloadable_features.oauth2_cleanup_cookies`` to ``false``.
 - area: websocket
   change: |
-      Allow 4xx and 5xx to go through the filter chain for websocket handshake response check, and the behaviour can be disabled 
+      Allow 4xx and 5xx to go through the filter chain for websocket handshake response check, and the behaviour can be disabled
       by a runtime ``envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain``.
 
 bug_fixes:
