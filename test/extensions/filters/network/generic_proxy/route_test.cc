@@ -280,6 +280,16 @@ TEST_F(RouteEntryImplTest, NullRouteSpecificConfig) {
 };
 
 /**
+ * Test the simple route action wrapper.
+ */
+TEST(RouteMatchActionTest, SimpleRouteMatchActionTest) {
+  auto entry = std::make_shared<NiceMock<MockRouteEntry>>();
+  RouteMatchAction action(entry);
+
+  EXPECT_EQ(action.route().get(), entry.get());
+}
+
+/**
  * Test the simple data input validator.
  */
 TEST(RouteActionValidationVisitorTest, SimpleRouteActionValidationVisitorTest) {
@@ -311,11 +321,13 @@ TEST(RouteMatchActionFactoryTest, SimpleRouteMatchActionFactoryTest) {
   TestUtility::loadFromYaml(yaml_config, proto_config);
   RouteActionContext context{server_context};
 
-  auto action =
-      factory.createAction(proto_config, context, server_context.messageValidationVisitor());
+  auto factory_cb = factory.createActionFactoryCb(proto_config, context,
+                                                  server_context.messageValidationVisitor());
 
-  EXPECT_NE(action, nullptr);
-  EXPECT_EQ(action->getTyped<RouteEntryImpl>().clusterName(), "cluster_0");
+  EXPECT_EQ(factory_cb()->getTyped<RouteMatchAction>().route().get(),
+            factory_cb()->getTyped<RouteMatchAction>().route().get());
+
+  EXPECT_EQ(factory_cb()->getTyped<RouteMatchAction>().route()->clusterName(), "cluster_0");
 }
 
 class RouteMatcherImplTest : public testing::Test {

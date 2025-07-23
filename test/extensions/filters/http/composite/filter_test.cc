@@ -86,8 +86,6 @@ public:
     EXPECT_TRUE(MessageDifferencer::Equals(expected, *(info->serializeAsProto())));
   }
 
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-
   testing::NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   testing::NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   Stats::MockCounter error_counter_;
@@ -116,13 +114,12 @@ TEST_F(FilterTest, StreamEncoderFilterDelegation) {
   ON_CALL(encoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);
   };
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -146,13 +143,12 @@ TEST_F(FilterTest, StreamDecoderFilterDelegation) {
   ON_CALL(decoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamDecoderFilter(stream_filter);
   };
 
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -175,15 +171,14 @@ TEST_F(FilterTest, StreamFilterDelegation) {
   ON_CALL(decoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamFilter(stream_filter);
   };
 
   EXPECT_CALL(*stream_filter, setDecoderFilterCallbacks(_));
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   filter_.onMatchCallback(action);
 
   expectFilterStateInfo(filter_state);
@@ -205,13 +200,12 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamFilters) {
   ON_CALL(decoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamFilter(stream_filter);
     cb.addStreamFilter(stream_filter);
   };
 
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -231,13 +225,12 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamDecoderFilters) {
   ON_CALL(decoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamDecoderFilter(decoder_filter);
     cb.addStreamDecoderFilter(decoder_filter);
   };
 
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -257,13 +250,12 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleStreamEncoderFilters) {
   ON_CALL(encoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(encode_filter);
     cb.addStreamEncoderFilter(encode_filter);
   };
 
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(error_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -286,14 +278,13 @@ TEST_F(FilterTest, StreamFilterDelegationMultipleAccessLoggers) {
   ON_CALL(encoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(encode_filter);
     cb.addAccessLogHandler(access_log_1);
     cb.addAccessLogHandler(access_log_2);
   };
 
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(*encode_filter, setEncoderFilterCallbacks(_));
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
@@ -349,7 +340,8 @@ TEST(ConfigTest, TestConfig) {
         .server_factory_context_ = server_factory_context};
     ExecuteFilterActionFactory factory;
     EXPECT_THROW_WITH_MESSAGE(
-        factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+        factory.createActionFactoryCb(config, action_context,
+                                      ProtobufMessage::getStrictValidationVisitor()),
         EnvoyException, "Error: Only one of `dynamic_config` or `typed_config` can be set.");
   }
 }
@@ -379,7 +371,8 @@ TEST(ConfigTest, TestDynamicConfigInDownstream) {
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException, "Failed to get downstream factory context or server factory context.");
 }
 
@@ -407,7 +400,8 @@ TEST(ConfigTest, TestDynamicConfigInUpstream) {
       .server_factory_context_ = absl::nullopt};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException, "Failed to get upstream factory context or server factory context.");
 }
 
@@ -434,7 +428,8 @@ TEST(ConfigTest, CreateFilterFromServerContextDual) {
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException,
       "DualFactoryBase: creating filter factory from server factory context is not supported");
 }
@@ -461,7 +456,8 @@ TEST(ConfigTest, DualFilterNoUpstreamFactoryContext) {
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException, "Failed to get upstream filter factory creation function");
 }
 
@@ -486,7 +482,8 @@ TEST(ConfigTest, DownstreamFilterNoFactoryContext) {
       .server_factory_context_ = absl::nullopt};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException, "Failed to get downstream filter factory creation function");
 }
 
@@ -513,7 +510,8 @@ TEST(ConfigTest, TestDownstreamFilterNoOverridingServerContext) {
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
   EXPECT_THROW_WITH_MESSAGE(
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor()),
+      factory.createActionFactoryCb(config, action_context,
+                                    ProtobufMessage::getStrictValidationVisitor()),
       EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
@@ -528,23 +526,12 @@ TEST(ConfigTest, TestSamplePercentNotSpecifiedl) {
             http_status: 503
    )EOF";
 
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
-  Envoy::Http::Matching::HttpFilterActionContext action_context{
-      .is_downstream_ = true,
-      .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
-  auto action =
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
-
-  EXPECT_FALSE(action->getTyped<ExecuteFilterAction>().actionSkip());
+  EXPECT_TRUE(factory.isSampled(config, runtime));
 }
 
 // Config test to check if sample_percent config is in place and feature enabled.
@@ -562,27 +549,15 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureEnabled) {
           denominator: HUNDRED
    )EOF";
 
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
-  Envoy::Http::Matching::HttpFilterActionContext action_context{
-      .is_downstream_ = true,
-      .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
-  auto action =
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
-
-  EXPECT_CALL(server_factory_context.runtime_loader_.snapshot_,
+  EXPECT_CALL(runtime.snapshot_,
               featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(testing::Return(true));
-
-  EXPECT_FALSE(action->getTyped<ExecuteFilterAction>().actionSkip());
+  EXPECT_TRUE(factory.isSampled(config, runtime));
 }
 
 // Config test to check if sample_percent config is in place and feature not enabled.
@@ -595,32 +570,18 @@ TEST(ConfigTest, TestSamplePercentInPlaceFeatureNotEnabled) {
           abort:
             http_status: 503
       sample_percent:
-        default_value:
-          numerator: 30
-          denominator: HUNDRED
+        runtime_key:
    )EOF";
 
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
+  NiceMock<Runtime::MockLoader>& runtime = server_factory_context.runtime_loader_;
   envoy::extensions::filters::http::composite::v3::ExecuteFilterAction config;
   TestUtility::loadFromYaml(yaml_string, config);
-
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context;
-  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  testing::NiceMock<Server::Configuration::MockUpstreamFactoryContext> upstream_factory_context;
-  Envoy::Http::Matching::HttpFilterActionContext action_context{
-      .is_downstream_ = true,
-      .stat_prefix_ = "test",
-      .factory_context_ = absl::nullopt,
-      .upstream_factory_context_ = absl::nullopt,
-      .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
-  auto action =
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
-
-  EXPECT_CALL(server_factory_context.runtime_loader_.snapshot_,
+  EXPECT_CALL(runtime.snapshot_,
               featureEnabled(_, testing::A<const envoy::type::v3::FractionalPercent&>()))
       .WillOnce(testing::Return(false));
-
-  EXPECT_TRUE(action->getTyped<ExecuteFilterAction>().actionSkip());
+  EXPECT_FALSE(factory.isSampled(config, runtime));
 }
 
 TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConfig) {
@@ -647,8 +608,8 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForDynamicConf
       .upstream_factory_context_ = upstream_factory_context,
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
-  auto action =
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
+  auto action = factory.createActionFactoryCb(config, action_context,
+                                              ProtobufMessage::getStrictValidationVisitor())();
 
   EXPECT_EQ("actionName", action->getTyped<ExecuteFilterAction>().actionName());
 }
@@ -678,8 +639,8 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingActionForTypedConfig
       .upstream_factory_context_ = upstream_factory_context,
       .server_factory_context_ = server_factory_context};
   ExecuteFilterActionFactory factory;
-  auto action =
-      factory.createAction(config, action_context, ProtobufMessage::getStrictValidationVisitor());
+  auto action = factory.createActionFactoryCb(config, action_context,
+                                              ProtobufMessage::getStrictValidationVisitor())();
 
   EXPECT_EQ("actionName", action->getTyped<ExecuteFilterAction>().actionName());
 }
@@ -697,13 +658,12 @@ TEST_F(FilterTest, FilterStateShouldBeUpdatedWithTheMatchingAction) {
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);
   };
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -728,13 +688,12 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
                         StreamInfo::FilterState::StateType::Mutable,
                         StreamInfo::FilterState::LifeSpan::FilterChain);
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);
   };
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 
@@ -765,13 +724,12 @@ TEST_F(UpstreamFilterTest, StreamEncoderFilterDelegationUpstream) {
   ON_CALL(encoder_callbacks_.stream_info_, filterState())
       .WillByDefault(testing::ReturnRef(filter_state));
 
-  Http::FilterFactoryCb factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
+  auto factory_callback = [&](Http::FilterChainFactoryCallbacks& cb) {
     cb.addStreamEncoderFilter(stream_filter);
   };
 
   EXPECT_CALL(*stream_filter, setEncoderFilterCallbacks(_));
-  ExecuteFilterAction action([&]() -> OptRef<Http::FilterFactoryCb> { return factory_callback; },
-                             "actionName", absl::nullopt, context_.runtime_loader_);
+  ExecuteFilterAction action(factory_callback, "actionName");
   EXPECT_CALL(success_counter_, inc());
   filter_.onMatchCallback(action);
 

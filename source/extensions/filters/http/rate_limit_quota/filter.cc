@@ -56,9 +56,8 @@ inline Envoy::Http::Code getDenyResponseCode(const DenyResponseSettings& setting
 
 inline std::function<void(Http::ResponseHeaderMap&)>
 addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
-  if (settings.response_headers_to_add().empty()) {
+  if (settings.response_headers_to_add().empty())
     return nullptr;
-  }
   // Headers copied from settings for thread-safety.
   return [headers_to_add = settings.response_headers_to_add()](Http::ResponseHeaderMap& headers) {
     for (const envoy::config::core::v3::HeaderValueOption& header : headers_to_add) {
@@ -80,7 +79,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
                                                               bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   // First, perform the request matching.
-  absl::StatusOr<Matcher::ActionConstSharedPtr> match_result = requestMatching(headers);
+  absl::StatusOr<Matcher::ActionPtr> match_result = requestMatching(headers);
   if (!match_result.ok()) {
     // When the request is not matched by any matchers, it is ALLOWED by default
     // (i.e., fail-open) and its quota usage will not be reported to RLQS
@@ -185,7 +184,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
 
 // TODO(tyxia) Currently request matching is only performed on the request
 // header.
-absl::StatusOr<Matcher::ActionConstSharedPtr>
+absl::StatusOr<Matcher::ActionPtr>
 RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // Initialize the data pointer on first use and reuse it for subsequent
   // requests. This avoids creating the data object for every request, which
@@ -216,7 +215,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
     return absl::NotFoundError("Matching completed but no match result was found.");
   }
   // Return the matched result for `on_match` case.
-  return match_result.actionByMove();
+  return match_result.action();
 }
 
 void RateLimitQuotaFilter::onDestroy() {

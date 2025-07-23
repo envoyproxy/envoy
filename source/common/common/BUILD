@@ -484,16 +484,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "radix_tree_lib",
-    hdrs = ["radix_tree.h"],
-    deps = [
-        ":assert_lib",
-        "@com_google_absl//absl/container:flat_hash_map",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
