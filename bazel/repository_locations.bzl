@@ -1194,14 +1194,14 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Fast and exact implementation of the C++ from_chars functions for number types: 4x to 10x faster than strtod, part of GCC 12, Chromium, Redis and WebKit/Safari",
         project_url = "https://github.com/fastfloat/fast_float",
         # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "7.0.0",
+        version = "8.0.2",
         # Follow this guide to pick next stable release: https://v8.dev/docs/version-numbers#which-v8-version-should-i-use%3F
         strip_prefix = "fast_float-{version}",
-        sha256 = "d2a08e722f461fe699ba61392cd29e6b23be013d0f56e50c7786d0954bffcb17",
+        sha256 = "e14a33089712b681d74d94e2a11362643bd7d769ae8f7e7caefe955f57f7eacd",
         urls = ["https://github.com/fastfloat/fast_float/archive/refs/tags/v{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2024-11-21",
+        release_date = "2025-03-11",
         cpe = "N/A",
     ),
     highway = dict(
