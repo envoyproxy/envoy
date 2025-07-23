@@ -31,39 +31,38 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
                              const std::vector<Matchers::StringMatcherPtr>& excluded_headers) {
   std::map<std::string, std::vector<std::string>> header_values;
 
-  headers.iterate(
-      [&header_values, &excluded_headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
-        // Skip empty headers
-        if (entry.key().empty() || entry.value().empty()) {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        // Pseudo-headers should not be canonicalized
-        if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
-          return Http::HeaderMap::Iterate::Continue;
-        }
-        const auto key = entry.key().getStringView();
-        if (std::any_of(excluded_headers.begin(), excluded_headers.end(),
-                        [&key](const Matchers::StringMatcherPtr& matcher) {
-                          return matcher->match(key);
-                        })) {
-          return Http::HeaderMap::Iterate::Continue;
-        }
+  headers.iterate([&header_values,
+                   &excluded_headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
+    // Skip empty headers
+    if (entry.key().empty() || entry.value().empty()) {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    // Pseudo-headers should not be canonicalized
+    if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
+      return Http::HeaderMap::Iterate::Continue;
+    }
+    const auto key = entry.key().getStringView();
+    if (std::any_of(
+            excluded_headers.begin(), excluded_headers.end(),
+            [&key](const Matchers::StringMatcherPtr& matcher) { return matcher->match(key); })) {
+      return Http::HeaderMap::Iterate::Continue;
+    }
 
-        std::string header_key(key);
-        std::string value(entry.value().getStringView());
-        
-        // Split by comma and process each value
-        std::vector<std::string> comma_separated = absl::StrSplit(value, ',');
-        for (auto& val : comma_separated) {
-          // Remove leading, trailing, and deduplicate repeated ascii spaces
-          absl::RemoveExtraAsciiWhitespace(&val);
-          if (!val.empty()) {
-            header_values[header_key].push_back(val);
-          }
-        }
-        
-        return Http::HeaderMap::Iterate::Continue;
-      });
+    std::string header_key(key);
+    std::string value(entry.value().getStringView());
+
+    // Split by comma and process each value
+    std::vector<std::string> comma_separated = absl::StrSplit(value, ',');
+    for (auto& val : comma_separated) {
+      // Remove leading, trailing, and deduplicate repeated ascii spaces
+      absl::RemoveExtraAsciiWhitespace(&val);
+      if (!val.empty()) {
+        header_values[header_key].push_back(val);
+      }
+    }
+
+    return Http::HeaderMap::Iterate::Continue;
+  });
 
   // Convert the vectors to comma-separated strings
   std::map<std::string, std::string> out;
