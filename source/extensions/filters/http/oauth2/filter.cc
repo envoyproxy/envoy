@@ -578,11 +578,11 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  // Decrypt the OAuth tokens and update the OAuth tokens in the request headers before forwarding
-  // the request upstream.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
-    decryptAndUpdateOAuthTokenCookies(headers);
-  }
+  // Decrypt the OAuth tokens and update the corresponding cookies in the request headers
+  // before forwarding the request upstream. This step must occur early to ensure that
+  // other parts of the filter can access the decrypted tokens—for example, to calculate
+  // the HMAC for the cookies.
+  decryptAndUpdateOAuthTokenCookies(headers);
 
   // Skip Filter and continue chain if a Passthrough header is matching
   // Must be done before the sanitation of the authorization header,
@@ -590,6 +590,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   for (const auto& matcher : config_->passThroughMatchers()) {
     if (matcher->matchesHeaders(headers)) {
       config_->stats().oauth_passthrough_.inc();
+      // Remove OAuth flow cookies to prevent them from being sent upstream.
+      removeOAuthFlowCookies(headers);
       return Http::FilterHeadersStatus::Continue;
     }
   }
@@ -660,6 +662,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       return Http::FilterHeadersStatus::StopIteration;
     }
 
+    // Remove OAuth flow cookies to prevent them from being sent upstream.
+    removeOAuthFlowCookies(headers);
     // Continue on with the filter stack.
     return Http::FilterHeadersStatus::Continue;
   }
@@ -764,6 +768,10 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
 // Decrypt the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
 // the request upstream.
 void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
+    return;
+  }
+
   absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
   if (cookies.empty()) {
     return;
@@ -1164,6 +1172,8 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   absl::flat_hash_map<std::string, std::string> cookies =
       Http::Utility::parseCookies(*request_headers_);
 
+  // TODO(Huabing): remove oauth_expires_ cookie after
+  // "envoy.reloadable_features.oauth2_cleanup_cookies" runtime flag is removed.
   cookies.insert_or_assign(cookie_names.oauth_expires_, new_expires_);
 
   if (!access_token_.empty()) {
@@ -1172,6 +1182,9 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
   if (!id_token_.empty()) {
     cookies.insert_or_assign(cookie_names.id_token_, id_token_);
   }
+
+  // TODO(Huabing): remove refresh_token_ cookie after
+  // "envoy.reloadable_features.oauth2_cleanup_cookies" runtime flag is removed.
   if (!refresh_token_.empty()) {
     cookies.insert_or_assign(cookie_names.refresh_token_, refresh_token_);
   } else if (cookies.contains(cookie_names.refresh_token_)) {
@@ -1180,6 +1193,8 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
     refresh_token_ = findValue(cookies, cookie_names.refresh_token_);
   }
 
+  // TODO(Huabing): remove oauth_hmac_ cookie after
+  // "envoy.reloadable_features.oauth2_cleanup_cookies" runtime flag is removed.
   cookies.insert_or_assign(cookie_names.oauth_hmac_, getEncodedToken());
 
   std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
@@ -1192,6 +1207,9 @@ void OAuth2Filter::finishRefreshAccessTokenFlow() {
 
   config_->stats().oauth_refreshtoken_success_.inc();
   config_->stats().oauth_success_.inc();
+
+  // Remove OAuth flow cookies to prevent them from being sent upstream.
+  removeOAuthFlowCookies(*request_headers_);
   decoder_callbacks_->continueDecoding();
 }
 
@@ -1348,6 +1366,31 @@ bool OAuth2Filter::validateCsrfToken(const Http::RequestHeaderMap& headers,
     return true;
   }
   return false;
+}
+
+// Removes OAuth flow cookies from the request headers.
+// These cookies are supposed to be used only in the OAuth2 flows and should not be exposed to the
+// backend service.
+// Keep the id_token and access_token cookies as they are user credentials and the backend service
+// may expect them to be present.
+// TODO: we many need a configuration knob in the OAuth2 filter to remove the id_token and
+// access_token.
+void OAuth2Filter::removeOAuthFlowCookies(Http::RequestHeaderMap& headers) const {
+  absl::flat_hash_map<std::string, std::string> cookies = Http::Utility::parseCookies(headers);
+  if (cookies.empty()) {
+    return;
+  }
+  const CookieNames& cookie_names = config_->cookieNames();
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_cleanup_cookies")) {
+    cookies.erase(cookie_names.oauth_hmac_);
+    cookies.erase(cookie_names.oauth_expires_);
+    cookies.erase(cookie_names.refresh_token_);
+    cookies.erase(cookie_names.oauth_nonce_);
+    cookies.erase(cookie_names.code_verifier_);
+    std::string new_cookies(absl::StrJoin(cookies, "; ", absl::PairFormatter("=")));
+    headers.setReferenceKey(Http::Headers::get().Cookie, new_cookies);
+  }
 }
 
 } // namespace Oauth2

@@ -78,8 +78,7 @@ using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedP
  * if that cache is missing either due to alternate configurations, or lifecycle-related timing.
  *
  */
-class ConnectivityManager
-    : public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
+class ConnectivityManager {
 public:
   virtual ~ConnectivityManager() = default;
 
@@ -168,13 +167,10 @@ public:
   virtual void resetConnectivityState() PURE;
 
   /**
-   * @returns the current socket options that should be used for connections.
-   */
-  virtual Socket::OptionsSharedPtr getUpstreamSocketOptions(int network,
-                                                            SocketMode socket_mode) PURE;
-
-  /**
-   * @param options, upstream connection options to which additional options should be appended.
+   * Add socket options to be applied to the upstream connection which could
+   * potentially affect which network interface the requests will be sent on.
+   * @param options, upstream connection options to which additional options relate to the current
+   * network states should be appended.
    * @returns configuration key to associate with any related calls.
    */
   virtual envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) PURE;
@@ -187,11 +183,38 @@ public:
    * @returns the default DNS cache set up in base configuration or nullptr.
    */
   virtual Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() PURE;
+};
 
-  /**
-   * Returns the cluster manager for this Envoy Mobile instance
-   */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
+// Used when draining hosts upon DNS refreshing is desired.
+class RefreshDnsWithPostDrainHandler
+    : public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks,
+      public Logger::Loggable<Logger::Id::upstream> {
+public:
+  RefreshDnsWithPostDrainHandler(DnsCacheManagerSharedPtr dns_cache_manager,
+                                 Upstream::ClusterManager& cluster_manager)
+      : dns_cache_manager_(std::move(dns_cache_manager)), cluster_manager_(cluster_manager) {}
+
+  // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
+  absl::Status onDnsHostAddOrUpdate(
+      const std::string& /*host*/,
+      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override {
+    return absl::OkStatus();
+  }
+  void onDnsHostRemove(const std::string& /*host*/) override {}
+  void onDnsResolutionComplete(const std::string& /*host*/,
+                               const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
+                               Network::DnsResolver::ResolutionStatus) override;
+
+  // Refresh DNS and drain all hosts upon completion.
+  // No-op if the default DNS cache in base configuration is not available.
+  void refreshDnsAndDrainHosts();
+
+private:
+  DnsCacheManagerSharedPtr dns_cache_manager_;
+  Upstream::ClusterManager& cluster_manager_;
+  absl::flat_hash_set<std::string> hosts_to_drain_;
+  Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
+      dns_callbacks_handle_;
 };
 
 class ConnectivityManagerImpl : public ConnectivityManager,
@@ -210,17 +233,6 @@ public:
                           DnsCacheManagerSharedPtr dns_cache_manager)
       : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {}
 
-  // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
-  absl::Status onDnsHostAddOrUpdate(
-      const std::string& /*host*/,
-      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override {
-    return absl::OkStatus();
-  }
-  void onDnsHostRemove(const std::string& /*host*/) override {}
-  void onDnsResolutionComplete(const std::string& /*host*/,
-                               const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
-                               Network::DnsResolver::ResolutionStatus) override;
-
   // ConnectivityManager
   std::vector<InterfacePair> enumerateV4Interfaces() override;
   std::vector<InterfacePair> enumerateV6Interfaces() override;
@@ -236,33 +248,31 @@ public:
   void setInterfaceBindingEnabled(bool enabled) override;
   void refreshDns(envoy_netconf_t configuration_key, bool drain_connections) override;
   void resetConnectivityState() override;
-  Socket::OptionsSharedPtr getUpstreamSocketOptions(int network, SocketMode socket_mode) override;
   envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) override;
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() override;
-  Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
 
 private:
-  struct NetworkState {
+  // The states of the current default network picked by the platform.
+  struct DefaultNetworkState {
     // The configuration key is passed through calls dispatched on the run loop to determine if
     // they're still valid/relevant at time of execution.
-    envoy_netconf_t configuration_key_ ABSL_GUARDED_BY(mutex_);
-    int network_ ABSL_GUARDED_BY(mutex_);
-    uint8_t remaining_faults_ ABSL_GUARDED_BY(mutex_);
-    SocketMode socket_mode_ ABSL_GUARDED_BY(mutex_);
-    Thread::MutexBasicLockable mutex_;
+    envoy_netconf_t configuration_key_;
+    int network_;
+    uint8_t remaining_faults_;
+    SocketMode socket_mode_;
   };
   Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(int network);
   InterfacePair getActiveAlternateInterface(int network, unsigned short family);
+  Socket::OptionsSharedPtr getUpstreamSocketOptions(int network, SocketMode socket_mode);
 
-  bool enable_drain_post_dns_refresh_{false};
   bool enable_interface_binding_{false};
-  absl::flat_hash_set<std::string> hosts_to_drain_;
-  Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
-      dns_callbacks_handle_{nullptr};
   Upstream::ClusterManager& cluster_manager_;
+  // nullptr if draining hosts after refreshing DNS is disabled via setDrainPostDnsRefreshEnabled().
+  std::unique_ptr<RefreshDnsWithPostDrainHandler> dns_refresh_handler_;
   DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;
-  static NetworkState network_state_;
+  static DefaultNetworkState network_state_ ABSL_GUARDED_BY(network_mutex_);
+  static Thread::MutexBasicLockable network_mutex_;
 };
 
 using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
