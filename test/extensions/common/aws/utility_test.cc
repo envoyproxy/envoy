@@ -109,6 +109,18 @@ TEST(UtilityTest, CanonicalizeHeadersJoiningDuplicatesWithCommas) {
   EXPECT_THAT(map, ElementsAre(Pair("a", "a_value1,a_value2,a_value3")));
 }
 
+// Repeated headers with spaces are joined with commas and spaces removed
+TEST(UtilityTest, CanonicalizeHeadersJoiningDuplicatesWithCommasAndSpaces) {
+  Http::TestRequestHeaderMapImpl headers{
+      {"a", "a_value1"},
+      {"a", "a_value2,    a_value_4  "},
+      {"a", "a_value3"},
+  };
+  std::vector<Matchers::StringMatcherPtr> exclusion_list = {};
+  const auto map = Utility::canonicalizeHeaders(headers, exclusion_list);
+  EXPECT_THAT(map, ElementsAre(Pair("a", "a_value1,a_value2,a_value_4,a_value3")));
+}
+
 // We canonicalize the :authority header as host
 TEST(UtilityTest, CanonicalizeHeadersAuthorityToHost) {
   Http::TestRequestHeaderMapImpl headers{
