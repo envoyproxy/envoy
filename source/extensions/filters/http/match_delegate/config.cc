@@ -24,10 +24,10 @@ class SkipActionFactory
     : public Matcher::ActionFactory<Envoy::Http::Matching::HttpFilterActionContext> {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message&,
-                                             Envoy::Http::Matching::HttpFilterActionContext&,
-                                             ProtobufMessage::ValidationVisitor&) override {
-    return std::make_shared<SkipAction>();
+  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
+                                                 Envoy::Http::Matching::HttpFilterActionContext&,
+                                                 ProtobufMessage::ValidationVisitor&) override {
+    return []() { return std::make_unique<SkipAction>(); };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
@@ -120,8 +120,8 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
   match_tree_evaluated_ = match_result.isComplete();
 
   if (match_tree_evaluated_ && match_result.isMatch()) {
-    const auto& result = match_result.action();
-    if (result == nullptr || SkipAction().typeUrl() == result->typeUrl()) {
+    const Matcher::ActionPtr result = match_result.action();
+    if ((result == nullptr) || (SkipAction().typeUrl() == result->typeUrl())) {
       skip_filter_ = true;
     } else {
       ASSERT(base_filter_ != nullptr);

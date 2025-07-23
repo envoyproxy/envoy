@@ -50,9 +50,9 @@ private:
 
 class ActionFactory : public Envoy::Matcher::ActionFactory<ActionContext> {
 public:
-  Envoy::Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& config, ActionContext& context,
-               ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Envoy::Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, ActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "envoy.filters.rbac.action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::rbac::v3::Action>();

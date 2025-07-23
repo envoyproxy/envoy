@@ -38,6 +38,7 @@ using ::Envoy::Matcher::MatchResult;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
 using ::Envoy::Matcher::SkippedMatchCb;
+using ::Envoy::Matcher::StringAction;
 using ::Envoy::Matcher::StringActionFactory;
 using ::Envoy::Matcher::TestData;
 using ::Envoy::Matcher::TestDataInputBoolFactory;
@@ -624,8 +625,8 @@ on_no_match:
   loadConfig(yaml);
 
   validation_visitor_.setSupportKeepMatching(true);
-  std::vector<Envoy::Matcher::ActionConstSharedPtr> skipped_results;
-  skipped_match_cb_ = [&skipped_results](const Envoy::Matcher::ActionConstSharedPtr& cb) {
+  std::vector<Envoy::Matcher::ActionFactoryCb> skipped_results;
+  skipped_match_cb_ = [&skipped_results](Envoy::Matcher::ActionFactoryCb cb) {
     skipped_results.push_back(cb);
   };
 

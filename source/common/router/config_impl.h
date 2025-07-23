@@ -619,7 +619,6 @@ class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
                            public DirectResponseEntry,
                            public PathMatchCriterion,
-                           public Matcher::ActionBase<envoy::config::route::v3::Route>,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
 protected:
@@ -1192,9 +1191,9 @@ private:
 // Registered factory for RouteMatchAction.
 class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& config, RouteActionContext& context,
-               ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::route::v3::Route>();
@@ -1218,9 +1217,9 @@ private:
 // Registered factory for RouteListMatchAction.
 class RouteListMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& config, RouteActionContext& context,
-               ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionFactoryCb
+  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
+                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route_match_action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::route::v3::RouteList>();
