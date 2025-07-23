@@ -198,6 +198,34 @@ private:
   absl::optional<size_t> max_length_;
 };
 
+class PathFormatter : public FormatterProvider {
+public:
+  enum PathFormatterOption {
+    OriginalPathOrPath,
+    PathOnly,
+    OriginalPathOnly,
+  };
+
+  static absl::StatusOr<FormatterProviderPtr>
+  create(absl::string_view with_query, absl::string_view option, absl::optional<size_t> max_length);
+
+  // FormatterProvider
+  absl::optional<std::string>
+  formatWithContext(const HttpFormatterContext& context,
+                    const StreamInfo::StreamInfo& stream_info) const override;
+  ProtobufWkt::Value
+  formatValueWithContext(const HttpFormatterContext& context,
+                         const StreamInfo::StreamInfo& stream_info) const override;
+
+  PathFormatter(bool with_query, PathFormatterOption option, absl::optional<size_t> max_length)
+      : with_query_(with_query), option_(option), max_length_(max_length) {}
+
+private:
+  const bool with_query_{};
+  const PathFormatterOption option_{};
+  absl::optional<size_t> max_length_;
+};
+
 class BuiltInHttpCommandParser : public CommandParser {
 public:
   BuiltInHttpCommandParser() = default;

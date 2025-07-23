@@ -23,10 +23,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AccessLogIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AccessLogIntegrationTest, DownstreamDisconnectBeforeHeadersResponseCode) {
-  useAccessLog("RESPONSE_CODE=%RESPONSE_CODE%");
+  useAccessLog("RESPONSE_CODE=%RESPONSE_CODE%;CEL_METHOD=%CEL(request.headers[':method'])%");
   testRouterDownstreamDisconnectBeforeRequestComplete();
   std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, HasSubstr("RESPONSE_CODE=0"));
+  EXPECT_THAT(log, HasSubstr("RESPONSE_CODE=0;CEL_METHOD=GET"));
 }
 
 TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {

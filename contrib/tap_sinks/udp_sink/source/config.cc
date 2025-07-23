@@ -10,24 +10,14 @@ namespace Extensions {
 namespace TapSinks {
 namespace UDP {
 
-TapCommon::SinkPtr UdpTapSinkFactory::createTransportSinkPtr(
-    const Protobuf::Message& config,
-    Server::Configuration::TransportSocketFactoryContext& tsf_context) {
+TapCommon::SinkPtr
+UdpTapSinkFactory::createSinkPtr(const Protobuf::Message& config,
+                                 Server::Configuration::GenericFactoryContext& context) {
   ENVOY_LOG_MISC(trace, "{}: Create UDP sink in transport context", __func__);
   return std::make_unique<UdpTapSink>(
       MessageUtil::downcastAndValidate<
           const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink&>(
-          config, tsf_context.messageValidationVisitor()));
-}
-
-TapCommon::SinkPtr
-UdpTapSinkFactory::createHttpSinkPtr(const Protobuf::Message& config,
-                                     Server::Configuration::FactoryContext& http_context) {
-  ENVOY_LOG_MISC(trace, "{}: Create UDP sink in http context", __func__);
-  return std::make_unique<UdpTapSink>(
-      MessageUtil::downcastAndValidate<
-          const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink&>(
-          config, http_context.messageValidationVisitor()));
+          config, context.messageValidationVisitor()));
 }
 
 REGISTER_FACTORY(UdpTapSinkFactory, TapCommon::TapSinkFactory);

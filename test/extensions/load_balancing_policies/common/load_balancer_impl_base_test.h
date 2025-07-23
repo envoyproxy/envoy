@@ -98,6 +98,7 @@ protected:
   envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config_;
   envoy::config::cluster::v3::Cluster::RoundRobinLbConfig round_robin_lb_config_;
+  envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin round_robin_lb_policy_;
 };
 
 } // namespace Upstream

@@ -50,6 +50,25 @@ MATCHER_P2(SingleHeaderValueIs, key, value,
   return hdr[0]->value() == value;
 }
 
+template <typename... Args>
+inline void verifyMultipleHeaderValues(const Envoy::Http::HeaderMap& headers,
+                                       Envoy::Http::LowerCaseString const& key, Args... values) {
+  static constexpr size_t num_values = sizeof...(Args);
+  static_assert(num_values > 0);
+  const auto hdr = headers.get(key);
+  EXPECT_EQ(hdr.size(), num_values);
+  if (hdr.size() != num_values) {
+    return;
+  }
+  std::vector<absl::string_view> header_values;
+  for (size_t idx = 0; idx < num_values; ++idx) {
+    header_values.push_back(hdr[idx]->value().getStringView());
+  }
+  EXPECT_THAT(header_values, testing::UnorderedElementsAreArray({
+                                 values...,
+                             }));
+}
+
 MATCHER_P2(SingleProtoHeaderValueIs, key, value,
            absl::StrFormat("Header \"%s\" equals \"%s\"", key, value)) {
   for (const auto& hdr : arg.headers()) {
@@ -65,23 +84,22 @@ envoy::config::core::v3::HeaderValue makeHeaderValue(const std::string& key,
 
 class TestOnProcessingResponse : public OnProcessingResponse {
 public:
-  void
-  afterProcessingRequestHeaders(const envoy::service::ext_proc::v3::ProcessingResponse& response,
-                                absl::Status processing_status,
-                                Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingRequestHeaders(const envoy::service::ext_proc::v3::HeadersResponse& response,
+                                     absl::Status processing_status,
+                                     Envoy::StreamInfo::StreamInfo&) override;
 
-  void afterProcessingResponseHeaders(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingResponseHeaders(const envoy::service::ext_proc::v3::HeadersResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingRequestBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                  absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingResponseBody(const envoy::service::ext_proc::v3::ProcessingResponse&,
-                                   absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingRequestBody(const envoy::service::ext_proc::v3::BodyResponse&, absl::Status,
+                                  Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingResponseBody(const envoy::service::ext_proc::v3::BodyResponse&, absl::Status,
+                                   Envoy::StreamInfo::StreamInfo&) override;
+  void afterProcessingRequestTrailers(const envoy::service::ext_proc::v3::TrailersResponse&,
                                       absl::Status, Envoy::StreamInfo::StreamInfo&) override;
-  void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::ProcessingResponse&,
+  void afterProcessingResponseTrailers(const envoy::service::ext_proc::v3::TrailersResponse&,
                                        absl::Status, Envoy::StreamInfo::StreamInfo&) override;
   void
-  afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ProcessingResponse& response,
+  afterReceivingImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response,
                                   absl::Status processing_status,
                                   Envoy::StreamInfo::StreamInfo&) override;
 

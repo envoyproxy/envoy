@@ -109,6 +109,58 @@ TEST_P(GrpcClientIntegrationTest, BasicStream) {
   stream->waitForReset();
 }
 
+TEST_P(GrpcClientIntegrationTest, BasicStreamWithGracefulClose) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->closeStream();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnRemoteClose) {
+  setOnDeleteCallback();
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->runDispatcherUntilResponseReceived();
+
+  stream->closeStream();
+  stream->waitForRemoteCloseAndDelete();
+  stream->encodeServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  runDispatcherUntilStreamDeletion();
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnTimeout) {
+  // Make remote close timeout small, so that the test does not timeout.
+  remote_close_timeout_ = std::chrono::milliseconds(100);
+  setOnDeleteCallback();
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->runDispatcherUntilResponseReceived();
+
+  stream->closeStream();
+  stream->waitForRemoteCloseAndDelete();
+  runDispatcherUntilStreamDeletion();
+  // Stream is reset if remote close timer expires.
+  if (clientType() == ClientType::EnvoyGrpc) {
+    // Envoy gRPC based AsyncGrpcClient also increments a counter.
+    EXPECT_EQ(
+        cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(), 1);
+  }
+}
+
 // Validate that a simple request-reply stream works.
 TEST_P(GrpcClientIntegrationTest, BasicStreamGracefulClose) {
   initialize();
@@ -500,8 +552,17 @@ TEST_P(GrpcClientIntegrationTest, StreamClientInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"), "こんにちは 世界"},
   };
-  auto stream = createStream(initial_metadata);
+  auto stream = createStream(
+      initial_metadata,
+      TestMetadata{{Http::LowerCaseString("foo"), "bar"},
+                   {Http::LowerCaseString("baz"), "blah"},
+                   {Http::LowerCaseString("hello-world-in-japanese-bin"),
+                    // Google base64 encoding doesn't do padding.
+                    clientType() == ClientType::EnvoyGrpc ? "44GT44KT44Gr44Gh44GvIOS4lueVjA=="
+                                                          : "44GT44KT44Gr44Gh44GvIOS4lueVjA"}});
+
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_, true);
   dispatcher_helper_.runDispatcher();
 }
@@ -529,6 +590,7 @@ TEST_P(GrpcClientIntegrationTest, RequestServiceWideInitialMetadata) {
 }
 
 // Validate that receiving server initial metadata works.
+// And -bin headers stay encoded.
 TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   initialize();
   auto stream = createStream(empty_metadata_);
@@ -536,7 +598,8 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
-      {Http::LowerCaseString("binary-bin"), "help"},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"),
+       "44GT44KT44Gr44Gh44GvIOS4lueVjA==" /*"こんにちは 世界"*/},
   };
   stream->sendServerInitialMetadata(initial_metadata);
   stream->sendReply();
@@ -544,7 +607,7 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that receiving server trailing metadata works.
+// Validates that receiving server trailing metadata works.
 TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
   initialize();
   auto stream = createStream(empty_metadata_);
@@ -553,9 +616,11 @@ TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
   stream->sendReply();
   const TestMetadata trailing_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"), "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
       {Http::LowerCaseString("baz"), "blah"},
   };
-  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", trailing_metadata);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", trailing_metadata,
+                             /*trailers_only=*/false);
   dispatcher_helper_.runDispatcher();
 }
 

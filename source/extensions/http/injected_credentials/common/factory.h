@@ -13,10 +13,9 @@ namespace Common {
 
 class NamedCredentialInjectorConfigFactory : public Config::TypedFactory {
 public:
-  virtual CredentialInjectorSharedPtr
-  createCredentialInjectorFromProto(const Protobuf::Message& config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::ServerFactoryContext& context) PURE;
+  virtual CredentialInjectorSharedPtr createCredentialInjectorFromProto(
+      const Protobuf::Message& config, const std::string& stats_prefix,
+      Server::Configuration::ServerFactoryContext& context, Init::Manager& init_manager) PURE;
 
   std::string category() const override { return "envoy.http.injected_credentials"; }
 };

@@ -7,8 +7,9 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactoryFromProto(
-    const Protobuf::Message& raw_config, const std::string&, FactoryContext& context) {
+absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactoryFromProtoTyped(
+    const FilterConfig& raw_config, const std::string&, DualInfo,
+    Server::Configuration::ServerFactoryContext& context) {
 
   const auto proto_config = Envoy::MessageUtil::downcastAndValidate<const FilterConfig&>(
       raw_config, context.messageValidationVisitor());

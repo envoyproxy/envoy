@@ -4,6 +4,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/common/aws/region_provider.h"
+#include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {

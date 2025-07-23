@@ -12,10 +12,11 @@ static ABSL_ATTRIBUTE_NOINLINE void releaseAssertInAFunction() { RELEASE_ASSERT(
 
 TEST(ReleaseAssertDeathTest, VariousLogs) {
   EXPECT_DEATH({ RELEASE_ASSERT(0, ""); }, ".*assert failure: 0.*");
-  EXPECT_DEATH({ RELEASE_ASSERT(0, "With some logs"); },
-               ".*assert failure: 0. Details: With some logs.*");
-  EXPECT_DEATH({ RELEASE_ASSERT(0 == EAGAIN, fmt::format("using {}", "fmt")); },
-               ".*assert failure: 0 == EAGAIN. Details: using fmt.*");
+  EXPECT_DEATH(
+      { RELEASE_ASSERT(0, "With some logs"); }, ".*assert failure: 0. Details: With some logs.*");
+  EXPECT_DEATH(
+      { RELEASE_ASSERT(0 == EAGAIN, fmt::format("using {}", "fmt")); },
+      ".*assert failure: 0 == EAGAIN. Details: using fmt.*");
 }
 
 TEST(ReleaseAssertDeathTest, AssertIncludesStackTrace) {
@@ -103,8 +104,8 @@ TEST(EnvoyBugDeathTest, VariousLogs) {
 
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "envoy bug failure: false.");
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "envoy bug failure: false.");
-  EXPECT_ENVOY_BUG({ ENVOY_BUG(false, "With some logs"); },
-                   "envoy bug failure: false. Details: With some logs");
+  EXPECT_ENVOY_BUG(
+      { ENVOY_BUG(false, "With some logs"); }, "envoy bug failure: false. Details: With some logs");
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "stacktrace for envoy bug");
   EXPECT_ENVOY_BUG({ ENVOY_BUG(false, ""); }, "#0 ");
 
@@ -163,8 +164,8 @@ TEST(SlowAssertTest, TestSlowAssertInFastAssertInReleaseMode) {
 #ifndef NDEBUG
   EXPECT_DEATH({ SLOW_ASSERT(0); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ SLOW_ASSERT(0, ""); }, ".*assert failure: 0.*");
-  EXPECT_DEATH({ SLOW_ASSERT(0, "With some logs"); },
-               ".*assert failure: 0. Details: With some logs.*");
+  EXPECT_DEATH(
+      { SLOW_ASSERT(0, "With some logs"); }, ".*assert failure: 0. Details: With some logs.*");
   expected_counted_failures = 0;
 #elif defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
   // SLOW_ASSERTs are included in ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE

@@ -434,8 +434,7 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
   };
 
   if (subset_any_ != nullptr) {
-    update_func(
-        subset_any_->lb_subset_, [](const Host&) { return true; }, random_.random());
+    update_func(subset_any_->lb_subset_, [](const Host&) { return true; }, random_.random());
   }
 
   if (subset_default_ != nullptr) {

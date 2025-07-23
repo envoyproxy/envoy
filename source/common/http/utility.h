@@ -149,7 +149,7 @@ public:
    *
    * NOTE: the space character is encoded as %20, NOT as the + character
    */
-  static std::string urlEncodeQueryParameter(absl::string_view value);
+  static std::string urlEncode(absl::string_view value);
 
   /**
    * Exactly the same as above, but returns false when it finds a character that should be %-encoded
@@ -314,6 +314,20 @@ bool isH3UpgradeRequest(const RequestHeaderMap& headers);
  * - Upgrade: websocket
  */
 bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
+
+/**
+ * Removes tokens from `Upgrade` header matching one of the matchers. Removes the `Upgrade`
+ * header if result is empty.
+ */
+void removeUpgrade(RequestOrResponseHeaderMap& headers,
+                   const std::vector<Matchers::StringMatcherPtr>& matchers);
+
+/**
+ * Removes `tokens_to_remove` from the `Connection` header, if present and part of a comma separated
+ * set of values. Removes the `Connection` header if it only contains `tokens_to_remove`.
+ */
+void removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
+                             const StringUtil::CaseUnorderedSet& tokens_to_remove);
 
 struct EncodeFunctions {
   // Function to modify locally generated response headers.

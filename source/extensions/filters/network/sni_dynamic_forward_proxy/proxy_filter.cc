@@ -136,8 +136,7 @@ void ProxyFilter::addHostAddressToFilterState(
   ENVOY_CONN_LOG(trace, "Adding resolved host {} to filter state", read_callbacks_->connection(),
                  address->asString());
 
-  auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
-  address_obj->address_ = address;
+  auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>(address);
 
   read_callbacks_->connection().streamInfo().filterState()->setData(
       StreamInfo::UpstreamAddress::key(), std::move(address_obj),

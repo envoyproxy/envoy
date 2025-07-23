@@ -9,6 +9,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/synchronization/notification.h"
 #include "library/common/mobile_process_wide.h"
 #include "library/common/network/proxy_api.h"
@@ -321,7 +322,7 @@ InternalEngine::~InternalEngine() {
   }
 }
 
-envoy_status_t InternalEngine::setProxySettings(const char* hostname, const uint16_t port) {
+envoy_status_t InternalEngine::setProxySettings(absl::string_view hostname, const uint16_t port) {
   return dispatcher_->post([&, host = std::string(hostname), port]() -> void {
     connectivity_manager_->setProxySettings(Network::ProxySettings::parseHostAndPort(host, port));
   });
@@ -380,7 +381,9 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
   envoy_netconf_t configuration =
       Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
   if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
+          "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.dns_cache_filter_unusable_ip_version")) {
     // The IP version to remove flag must be set first before refreshing the DNS cache so that
     // the DNS cache will be updated with whether or not the IPv6 addresses will need to be
     // removed.

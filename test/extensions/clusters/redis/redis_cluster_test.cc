@@ -932,6 +932,100 @@ TEST_F(RedisClusterTest, AddressAsHostnameFailure) {
   EXPECT_EQ(2UL, cluster_->info()->configUpdateStats().update_failure_.value());
 }
 
+TEST_F(RedisClusterTest, AddressAsHostnamePrimaryEmptyDnsResponse) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  const std::list<std::string> primary_resolved_addresses;
+  const std::list<std::string> primary_empty_addresses{};
+  const std::list<std::string> replica_resolved_addresses{};
+
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+
+  // 1. Primary and replica resolutions are successful.
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com", {"127.0.1.1"});
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org", {"127.0.1.2"});
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  // Primary and replica hosts are healthy.
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+
+  // 2. Primary resolution has empty DNS response, so replica resolution is not called.
+  expectRedisResolve(true);
+  resolve_timer_->invokeCallback();
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com", {});
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22121));
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+  // Empty DNS response.
+  EXPECT_EQ(1UL, cluster_->info()->configUpdateStats().update_empty_.value());
+}
+
+TEST_F(RedisClusterTest, AddressAsHostnameReplicaEmptyDnsResponse) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  const std::list<std::string> primary_resolved_addresses{"127.0.1.1"};
+  const std::list<std::string> replica_resolved_addresses{};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica.org",
+                         replica_resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(singleSlotPrimaryReplica("primary.com", "replica.org", 22120));
+  // Only the primary host is healthy.
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120"}));
+  // Empty DNS response.
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_empty_.value());
+}
+
+TEST_F(RedisClusterTest, AddressAsHostnamePartialReplicaEmptyDnsResponse) {
+  setupFromV3Yaml(BasicConfig);
+  const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};
+  const std::list<std::string> primary_resolved_addresses{"127.0.1.1"};
+  const std::list<std::string> replica1_resolved_addresses{"127.0.1.2"};
+  const std::list<std::string> replica2_resolved_addresses{};
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "foo.bar.com", resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica1.org",
+                         replica1_resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "replica2.org",
+                         replica2_resolved_addresses);
+  expectResolveDiscovery(Network::DnsLookupFamily::V4Only, "primary.com",
+                         primary_resolved_addresses);
+  expectRedisResolve(true);
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(initialized_, ready());
+  cluster_->initialize([&]() {
+    initialized_.ready();
+    return absl::OkStatus();
+  });
+
+  EXPECT_CALL(*cluster_callback_, onClusterSlotUpdate(_, _));
+  expectClusterSlotResponse(
+      singleSlotPrimaryWithTwoReplicas("primary.com", "replica1.org", "replica2.org", 22120));
+  // Only the primary host and one replica are healthy.
+  expectHealthyHosts(std::list<std::string>({"127.0.1.1:22120", "127.0.1.2:22120"}));
+  // Empty DNS response.
+  EXPECT_EQ(1U, cluster_->info()->configUpdateStats().update_empty_.value());
+}
+
 TEST_F(RedisClusterTest, DontWaitForDNSOnInit) {
   setupFromV3Yaml(NoWarmupConfig);
   const std::list<std::string> resolved_addresses{"127.0.0.1", "127.0.0.2"};

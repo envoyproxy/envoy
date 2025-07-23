@@ -82,7 +82,7 @@ class CustomStaticClusterFactoryNoLb
     : public CustomStaticClusterFactoryBase<test::integration::clusters::CustomStaticConfig1> {
 public:
   CustomStaticClusterFactoryNoLb()
-      : CustomStaticClusterFactoryBase("envoy.clusters.custom_static", false){};
+      : CustomStaticClusterFactoryBase("envoy.clusters.custom_static", false) {};
 };
 
 class CustomStaticClusterFactoryWithLb

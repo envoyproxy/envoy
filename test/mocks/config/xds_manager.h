@@ -2,6 +2,8 @@
 
 #include "envoy/config/xds_manager.h"
 
+#include "test/mocks/config/mocks.h"
+
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -18,8 +20,11 @@ public:
   MOCK_METHOD(void, shutdown, ());
   MOCK_METHOD(absl::Status, setAdsConfigSource,
               (const envoy::config::core::v3::ApiConfigSource& config_source));
-  MOCK_METHOD(OptRef<Config::XdsConfigTracker>, xdsConfigTracker, ());
+  MOCK_METHOD(OptRef<XdsConfigTracker>, xdsConfigTracker, ());
   MOCK_METHOD(XdsResourcesDelegateOptRef, xdsResourcesDelegate, ());
+  MOCK_METHOD(SubscriptionFactory&, subscriptionFactory, ());
+
+  testing::NiceMock<MockSubscriptionFactory> subscription_factory_;
 };
 
 } // namespace Config

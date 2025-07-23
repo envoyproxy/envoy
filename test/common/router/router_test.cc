@@ -124,6 +124,9 @@ public:
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_size"), 74ull));
+    EXPECT_CALL(
+        cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_count"), 5ull));
     router_->decodeHeaders(headers, false);
 
     EXPECT_CALL(callbacks_.dispatcher_, createTimer_);
@@ -142,6 +145,9 @@ public:
     EXPECT_CALL(
         cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull));
+    EXPECT_CALL(
+        cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+        deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_count"), 1ull));
     Http::ResponseHeaderMapPtr response_headers(
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     // NOLINTNEXTLINE: Silence null pointer access warning
@@ -2347,11 +2353,19 @@ TEST_F(RouterTest, HedgedPerTryTimeoutThirdRequestSucceeds) {
       .Times(3);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_headers_count"), 5ull))
+      .Times(3);
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_body_size"), 0ull))
       .Times(3);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
       deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_size"), 10ull))
+      .Times(2);
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
+      deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rs_headers_count"), 1ull))
       .Times(2);
   EXPECT_CALL(
       cm_.thread_local_cluster_.cluster_.info_->request_response_size_stats_store_,
@@ -4937,7 +4951,7 @@ TEST_P(RouterShadowingTest, NoShadowForConnect) {
 }
 
 // If the shadow stream watermark callbacks are invoked in the Router filter destructor,
-// it causes a potential use-after-free bug, as the FilterManger may have already been freed.
+// it causes a potential use-after-free bug, as the FilterManager may have already been freed.
 TEST_P(RouterShadowingTest, ShadowCallbacksNotCalledInDestructor) {
   if (!streaming_shadow_) {
     GTEST_SKIP();

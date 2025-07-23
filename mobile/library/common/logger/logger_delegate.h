@@ -34,7 +34,7 @@ public:
   // SinkDelegate
   void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override;
   // Currently unexposed. May be desired in the future.
-  void flush() override{};
+  void flush() override {};
 
 private:
   std::unique_ptr<EnvoyLogger> logger_{nullptr};

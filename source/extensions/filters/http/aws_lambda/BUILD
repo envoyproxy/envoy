@@ -27,8 +27,7 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//source/common/common:base64_lib",
         "//source/common/common:cancel_wrapper_lib",
-        "//source/extensions/common/aws:credentials_provider_impl_lib",
-        "//source/extensions/common/aws:sigv4_signer_impl_lib",
+        "//source/extensions/common/aws/signers:sigv4_signer_impl_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
@@ -40,6 +39,8 @@ envoy_cc_extension(
     deps = [
         ":aws_lambda_filter_lib",
         "//envoy/registry",
+        "//source/extensions/common/aws:credential_provider_chains_lib",
+        "//source/extensions/common/aws/credential_providers:config_credentials_provider_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/aws_lambda/v3:pkg_cc_proto",
     ],

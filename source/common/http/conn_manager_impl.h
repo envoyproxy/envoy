@@ -201,20 +201,10 @@ private:
 
       AccessLog::InstanceSharedPtrVector combined_log_handlers;
       combined_log_handlers.reserve(config_log_handlers.size() + filter_log_handlers.size());
-
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_access_loggers_first")) {
-        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
-                                     filter_log_handlers.end());
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
-                                     config_log_handlers.end());
-
-      } else {
-        combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
-                                     config_log_handlers.end());
-        combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
-                                     filter_log_handlers.end());
-      }
+      combined_log_handlers.insert(combined_log_handlers.end(), config_log_handlers.begin(),
+                                   config_log_handlers.end());
+      combined_log_handlers.insert(combined_log_handlers.end(), filter_log_handlers.begin(),
+                                   filter_log_handlers.end());
       return combined_log_handlers;
     }
     // Hand off headers/trailers and stream info to the codec's response encoder, for logging later

@@ -49,7 +49,7 @@ Configuration example
               city: "x-geo-city"
               asn: "x-geo-asn"
           city_db_path: "geoip/GeoLite2-City-Test.mmdb"
-          isp_db_path: "geoip/GeoLite2-ASN-Test.mmdb"
+          isp_db_path: "geoip/GeoIP2-ISP-Test.mmdb"
 
 
 Statistics

@@ -703,8 +703,8 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       keys_handler_(*router_), split_keys_sum_result_handler_(*router_),
-      transaction_handler_(*router_), stats_{ALL_COMMAND_SPLITTER_STATS(
-                                          POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
+      transaction_handler_(*router_),
+      stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)),
       custom_commands_(std::move(custom_commands)) {
   for (const std::string& command : Common::Redis::SupportedCommands::simpleCommands()) {

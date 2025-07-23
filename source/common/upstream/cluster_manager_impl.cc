@@ -378,12 +378,6 @@ ClusterManagerImpl::ClusterManagerImpl(
   // Now that the async-client manager is set, the xDS-Manager can be initialized.
   absl::Status status = xds_manager_.initialize(bootstrap, this);
   SET_AND_RETURN_IF_NOT_OK(status, creation_status);
-
-  // TODO(adisuissa): refactor and move the following data members to the
-  // xDS-manager class.
-  subscription_factory_ = std::make_unique<Config::SubscriptionFactoryImpl>(
-      local_info, main_thread_dispatcher, *this, validation_context.dynamicValidationVisitor(), api,
-      server, xds_manager_.xdsResourcesDelegate(), xds_manager_.xdsConfigTracker());
 }
 
 absl::Status
@@ -2211,13 +2205,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::httpConnPoolIsIdle(
 HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::chooseHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                            override_host_statuses_, context);
-  if (host != nullptr) {
-    return {std::move(host)};
+  auto host_and_strict_mode = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                              override_host_statuses_, context);
+  if (host_and_strict_mode.first != nullptr) {
+    return {std::move(host_and_strict_mode.first)};
   }
 
-  if (HostUtility::allowLBChooseHost(context)) {
+  if (!host_and_strict_mode.second) {
     Upstream::HostSelectionResponse host_selection = lb_->chooseHost(context);
     if (host_selection.host || host_selection.cancelable) {
       return host_selection;
@@ -2235,11 +2229,12 @@ HostSelectionResponse ClusterManagerImpl::ThreadLocalClusterManagerImpl::Cluster
 HostConstSharedPtr ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::peekAnotherHost(
     LoadBalancerContext* context) {
   auto cross_priority_host_map = priority_set_.crossPriorityHostMap();
-  HostConstSharedPtr host = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
-                                                            override_host_statuses_, context);
-  if (host != nullptr) {
-    return host;
+  auto host_and_strict_mode = HostUtility::selectOverrideHost(cross_priority_host_map.get(),
+                                                              override_host_statuses_, context);
+  if (host_and_strict_mode.first != nullptr) {
+    return std::move(host_and_strict_mode.first);
   }
+  // TODO(wbpcode): should we do strict mode check of override host here?
   return lb_->peekAnotherHost(context);
 }
 
