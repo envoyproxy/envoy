@@ -74,6 +74,12 @@ public:
     ENVOY_LOG_MISC(trace, "TestTracer setSampled: {}", do_sample);
     sampled_ = do_sample;
   }
+  void setDecision(bool decision) override {
+    // NOTE: the trace decsion from Envoy will be ignored in the startSpan() method
+    // of this test implementation. So, the setDecision() method is only for logging
+    // and will also ignore the decision value.
+    ENVOY_LOG_MISC(trace, "TestTracer setDecision: {}", decision);
+  }
 
   void injectContext(Tracing::TraceContext& trace_context,
                      const Tracing::UpstreamContext&) override {
