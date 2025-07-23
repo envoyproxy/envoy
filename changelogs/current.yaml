@@ -1,7 +1,6 @@
-date: Pending
+date: July 23, 2025
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
 - area: aws_iam
   change: |
     As announced in November 2024 (see https://github.com/envoyproxy/envoy/issues/37621), the
@@ -34,7 +33,6 @@ behavior_changes:
     Bumped up V8 version to ``13.8.258.26`` to address multiple CVEs.
 
 minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
 - area: geoip
   change: |
     The lookup for ASN information is fetched from ``asn_db`` if ``asn_db_path`` is defined and from ``isp_db`` if
@@ -110,12 +108,11 @@ minor_behavior_changes:
     Extension status changed from ``alpha`` to ``stable``.
 - area: oauth2
   change: |
-      Starting from this release, these cookies: oauth_hmac,oauth_expires,refresh_token,oauth_nonce,code_verifier will
-      not be forwarded to the upstream. This behavior can be reverted by setting the runtime guard
-      ``envoy.reloadable_features.oauth2_cleanup_cookies`` to ``false``.
+    Starting from this release, these cookies: oauth_hmac,oauth_expires,refresh_token,oauth_nonce,code_verifier will
+    not be forwarded to the upstream. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.oauth2_cleanup_cookies`` to ``false``.
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: geoip
   change: |
     Fixed a bug where the ``apple_private_relay`` header was not populated correctly when isp header wasn't set.
@@ -177,7 +174,6 @@ bug_fixes:
     Bumped wasmtime version to 24.0.2 to address CVE.
 
 removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: websocket
   change: |
     Removed runtime guard ``envoy.reloadable_features.switch_protocol_websocket_handshake`` and legacy code paths.
@@ -405,5 +401,3 @@ new_features:
   change: |
     Added ``assume_role_credential_provider`` to add support for role chaining in AWS filters. This allows envoy to
     assume an additional role before SigV4 signing occurs.
-
-deprecated:
