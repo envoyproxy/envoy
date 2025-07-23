@@ -29,7 +29,7 @@ constexpr char DEFAULT_AWS_CONFIG_FILE[] = "/.aws/config";
 std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
                              const std::vector<Matchers::StringMatcherPtr>& excluded_headers) {
-  std::map<std::string, std::set<std::string>> header_values;
+  std::map<std::string, std::vector<std::string>> header_values;
 
   headers.iterate(
       [&header_values, &excluded_headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
@@ -58,14 +58,14 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
           // Remove leading, trailing, and deduplicate repeated ascii spaces
           absl::RemoveExtraAsciiWhitespace(&val);
           if (!val.empty()) {
-            header_values[header_key].insert(val);
+            header_values[header_key].push_back(val);
           }
         }
         
         return Http::HeaderMap::Iterate::Continue;
       });
 
-  // Convert the sorted sets to comma-separated strings
+  // Convert the vectors to comma-separated strings
   std::map<std::string, std::string> out;
   for (const auto& [key, values] : header_values) {
     out[key] = absl::StrJoin(values, ",");
