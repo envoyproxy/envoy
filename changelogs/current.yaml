@@ -172,6 +172,9 @@ bug_fixes:
   change: |
     Fixed a division by zero bug in the Dynatrace sampling controller that occurred when ``total_wanted`` was less than
     ``top_k_size``. The calculation was refactored to avoid the intermediate division that could result in zero.
+- area: wasm
+  change: |
+    Bumped wasmtime version to 24.0.2 to address CVE.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
