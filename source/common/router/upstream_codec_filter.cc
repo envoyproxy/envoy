@@ -173,7 +173,7 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
                                         StreamInfo::ResponseCodeDetails::get().ViaUpstream);
       return;
     } else {
-      // Other status, e.g., 426 or 200, indicate a failed handshake, Envoy as a proxy will proxy
+      // Other status, e.g., 200, indicate a failed handshake, Envoy as a proxy will proxy
       // back the response header to downstream and then close the request, since WebSocket
       // just needs headers for handshake per RFC-6455. Note: HTTP/2 200 will be normalized to
       // 101 before this point in codec and this patch will skip this scenario from the above
