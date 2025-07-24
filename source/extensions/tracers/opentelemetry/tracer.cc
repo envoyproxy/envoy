@@ -270,18 +270,19 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
                                    OptRef<const Tracing::TraceContext> trace_context,
                                    OTelSpanKind span_kind) {
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
-  Span new_span(operation_name, stream_info, start_time, time_source_, *this, span_kind);
+  auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
+                                         *this, span_kind);
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
-  new_span.setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
+  new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
   uint64_t span_id = random_.random();
-  new_span.setId(Hex::uint64ToHex(span_id));
+  new_span->setId(Hex::uint64ToHex(span_id));
   if (sampler_) {
-    callSampler(sampler_, stream_info, absl::nullopt, new_span, operation_name, trace_context);
+    callSampler(sampler_, stream_info, absl::nullopt, *new_span, operation_name, trace_context);
   } else {
-    new_span.setSampled(tracing_decision.traced);
+    new_span->setSampled(tracing_decision.traced);
   }
-  return std::make_unique<Span>(new_span);
+  return new_span;
 }
 
 Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
@@ -290,26 +291,27 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
                                    OptRef<const Tracing::TraceContext> trace_context,
                                    OTelSpanKind span_kind) {
   // Create a new span and populate details from the span context.
-  Span new_span(operation_name, stream_info, start_time, time_source_, *this, span_kind);
-  new_span.setTraceId(previous_span_context.traceId());
+  auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
+                                         *this, span_kind);
+  new_span->setTraceId(previous_span_context.traceId());
   if (!previous_span_context.parentId().empty()) {
-    new_span.setParentId(previous_span_context.parentId());
+    new_span->setParentId(previous_span_context.parentId());
   }
   // Generate a new identifier for the span id.
   uint64_t span_id = random_.random();
-  new_span.setId(Hex::uint64ToHex(span_id));
+  new_span->setId(Hex::uint64ToHex(span_id));
   if (sampler_) {
     // Sampler should make a sampling decision and set tracestate
-    callSampler(sampler_, stream_info, previous_span_context, new_span, operation_name,
+    callSampler(sampler_, stream_info, previous_span_context, *new_span, operation_name,
                 trace_context);
   } else {
     // Respect the previous span's sampled flag.
-    new_span.setSampled(previous_span_context.sampled());
+    new_span->setSampled(previous_span_context.sampled());
     if (!previous_span_context.tracestate().empty()) {
-      new_span.setTracestate(std::string{previous_span_context.tracestate()});
+      new_span->setTracestate(std::string{previous_span_context.tracestate()});
     }
   }
-  return std::make_unique<Span>(new_span);
+  return new_span;
 }
 
 } // namespace OpenTelemetry
