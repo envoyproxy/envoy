@@ -131,8 +131,7 @@ public:
         Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
     auto proto_message = cluster1->info_->lb_factory_->createEmptyConfigProto();
     cluster1->info_->typed_lb_config_ =
-        cluster1->info_->lb_factory_->loadConfig(*server_.server_factory_context_, *proto_message)
-            .value();
+        cluster1->info_->lb_factory_->loadConfig(factory_.server_context_, *proto_message).value();
 
     InSequence s;
     EXPECT_CALL(factory_, clusterFromProto_(_, _, _))

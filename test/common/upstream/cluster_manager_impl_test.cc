@@ -183,8 +183,9 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   }
   )EOF";
 
-  EXPECT_CALL(log_manager_, createAccessLog(Filesystem::FilePathAndType{
-                                Filesystem::DestinationType::File, "foo"}));
+  EXPECT_CALL(
+      factory_.server_context_.access_log_manager_,
+      createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"}));
   create(parseBootstrapFromV3Json(json));
 }
 
@@ -193,7 +194,7 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   // can be set on.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -229,7 +230,7 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
   // can be set on.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
