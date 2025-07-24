@@ -80,15 +80,6 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
                                                    creation_status);
   }
 
-  if (!Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.explicit_internal_address_config")) {
-    ENVOY_LOG_ONCE_MISC(warn,
-                        "internal_address_config is not configured. The prior default behaviour "
-                        "trusted RFC1918 IP addresses, but this was changed in the 1.32 release. "
-                        "Please explictily config internal address config if you need it before "
-                        "envoy.reloadable_features.explicit_internal_address_config is removed.");
-  }
-
   return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
