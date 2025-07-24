@@ -184,10 +184,10 @@ public:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                               {route_config_name}, true));
       sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-          Config::TypeUrl::get().RouteConfiguration,
+          Config::TestTypeUrl::get().RouteConfiguration,
           {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
               initial_route_config)},
           "1");
@@ -1244,7 +1244,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 
   // Update route config by RDS. Test whether RDS can work normally.
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(UPDATE_ROUTE_CONFIG)},
       "2");
   test_server_->waitForCounterGe("http.config_test.rds.basic_lua_routes.update_success", 2);

@@ -207,7 +207,7 @@ typed_config:
   void sendLdsResponse(const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.set_type_url(Config::TestTypeUrl::get().Listener);
     response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }

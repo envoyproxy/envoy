@@ -223,7 +223,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("", getRuntimeKey("baz"));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
@@ -232,7 +232,7 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
       baz: meh
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
 
   EXPECT_EQ("bar", getRuntimeKey("foo"));
@@ -244,15 +244,15 @@ TEST_P(RtdsIntegrationTest, RtdsReload) {
   EXPECT_EQ(initial_keys_ + 1, test_server_->gauge("runtime.num_keys")->value());
   EXPECT_EQ(3, test_server_->gauge("runtime.num_layers")->value());
 
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_rtds_layer"}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "1", {"some_rtds_layer"},
+                                      {}, {}));
   some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
       baz: saz
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 2);
 
   EXPECT_EQ("whatevs", getRuntimeKey("foo"));
@@ -276,7 +276,7 @@ TEST_P(RtdsIntegrationTest, RtdsUpdate) {
   EXPECT_EQ("yar", getRuntimeKey("bar"));
   EXPECT_EQ("", getRuntimeKey("baz"));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
@@ -287,7 +287,7 @@ TEST_P(RtdsIntegrationTest, RtdsUpdate) {
 
   // Use the Resource wrapper no matter if it is Sotw or Delta.
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1",
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1",
       {{"test", ProtobufWkt::Any()}});
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
 
@@ -337,7 +337,7 @@ TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
 
   // After this xDS connection should be established. Verify that dynamic runtime values are loaded.
   acceptXdsConnection();
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
@@ -346,7 +346,7 @@ TEST_P(RtdsIntegrationTest, RtdsAfterAsyncPrimaryClusterInitialization) {
       baz: meh
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
 
   EXPECT_EQ("bar", getRuntimeKey("foo"));
