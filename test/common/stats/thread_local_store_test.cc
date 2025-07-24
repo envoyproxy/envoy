@@ -625,6 +625,10 @@ TEST_F(StatsThreadLocalStoreTest, EvictAndMarkUnused) {
     t1.set("hello");
     EXPECT_TRUE(t1.used());
 
+    Histogram& h1 = scope->histogramFromString("h1", Histogram::Unit::Unspecified);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+    h1.recordValue(1);
+
     // Mark unused.
     EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
     scope->evictAndMarkUnused();
@@ -643,6 +647,10 @@ TEST_F(StatsThreadLocalStoreTest, EvictAndMarkUnused) {
     EXPECT_FALSE(t1.used());
     EXPECT_EQ("hello", t1.value());
     EXPECT_EQ(1UL, store_->textReadouts().size());
+
+    EXPECT_EQ(&h1, &scope->histogramFromString("h1", Histogram::Unit::Unspecified));
+    EXPECT_FALSE(t1.used());
+    EXPECT_EQ(1UL, store_->histograms().size());
   }
 
   // Remove.
@@ -651,6 +659,7 @@ TEST_F(StatsThreadLocalStoreTest, EvictAndMarkUnused) {
   EXPECT_EQ(0UL, store_->counters().size());
   EXPECT_EQ(0UL, store_->gauges().size());
   EXPECT_EQ(0UL, store_->textReadouts().size());
+  EXPECT_EQ(0UL, store_->histograms().size());
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();
