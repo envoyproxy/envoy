@@ -98,7 +98,7 @@ for how to update or override dependencies.
     ```
 
     ### Linux
-    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 14.
+    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 18.
 
     Extract the tar.xz and run the following:
     ```console
@@ -365,7 +365,7 @@ for more details.
 ## Supported compiler versions
 
 We now require Clang >= 18 due to C++20 support (for Clang >= 14, your mileage may vary) and tcmalloc requirement. GCC >= 13 is also known to work for C++20.
-Currently the CI is running with Clang 14.
+Currently the CI is running with Clang 18.
 
 ## Clang STL debug symbols
 
