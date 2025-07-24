@@ -2376,7 +2376,8 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
 PerFilterConfigs::PerFilterConfigs(
     const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
     Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status) {
+    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status)
+    : runtime_(factory_context.runtime()) {
 
   std::string filter_config_type =
       envoy::config::route::v3::FilterConfig::default_instance().GetTypeName();
@@ -2384,6 +2385,8 @@ PerFilterConfigs::PerFilterConfigs(
   for (const auto& per_filter_config : typed_configs) {
     const std::string& name = per_filter_config.first;
     absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr> config_or_error;
+    absl::optional<envoy::config::core::v3::RuntimeFractionalPercent> filter_enabled;
+    envoy::config::route::v3::FilterConfig filter_config;
 
     if (TypeUtil::typeUrlToDescriptorFullName(per_filter_config.second.type_url()) ==
         filter_config_type) {
@@ -2393,7 +2396,7 @@ PerFilterConfigs::PerFilterConfigs(
 
       // The filter is marked as disabled explicitly and the config is ignored directly.
       if (filter_config.disabled()) {
-        configs_.emplace(name, FilterConfig{nullptr, true});
+        configs_.emplace(name, FilterConfig{nullptr, filter_config, runtime_});
         continue;
       }
 
@@ -2407,13 +2410,14 @@ PerFilterConfigs::PerFilterConfigs(
       // If the field `config` is configured but is empty, we treat the filter is enabled
       // explicitly.
       if (filter_config.config().type_url().empty()) {
-        configs_.emplace(name, FilterConfig{nullptr, false});
+        configs_.emplace(name, FilterConfig{nullptr, filter_config, runtime_});
         continue;
       }
 
       config_or_error = createRouteSpecificFilterConfig(
           name, filter_config.config(), filter_config.is_optional(), factory_context, validator);
     } else {
+      // For non-filter config types, we try to create the config first
       config_or_error = createRouteSpecificFilterConfig(name, per_filter_config.second, false,
                                                         factory_context, validator);
     }
@@ -2421,7 +2425,8 @@ PerFilterConfigs::PerFilterConfigs(
 
     // If a filter is explicitly configured we treat it as enabled.
     // The config may be nullptr because the filter could be optional.
-    configs_.emplace(name, FilterConfig{std::move(config_or_error.value()), false});
+    configs_.emplace(name,
+                     FilterConfig{std::move(config_or_error.value()), filter_config, runtime_});
   }
 }
 
@@ -2437,7 +2442,24 @@ absl::optional<bool> PerFilterConfigs::disabled(absl::string_view name) const {
   }
 
   const auto it = configs_.find(name);
-  return it != configs_.end() ? absl::optional<bool>{it->second.disabled_} : absl::nullopt;
+  return it != configs_.end() ? absl::optional<bool>{!it->second.isEnabled()} : absl::nullopt;
+}
+
+PerFilterConfigs::FilterConfig::FilterConfig(
+    RouteSpecificFilterConfigConstSharedPtr route_specific_config,
+    const envoy::config::route::v3::FilterConfig& filter_config, Runtime::Loader& runtime)
+    : config_(std::move(route_specific_config)),
+      filter_enabled_(filter_config.has_filter_enabled()
+                          ? absl::optional<Runtime::FractionalPercent>(
+                                Runtime::FractionalPercent(filter_config.filter_enabled(), runtime))
+                          : absl::nullopt),
+      disabled_(filter_config.disabled()) {}
+
+bool PerFilterConfigs::FilterConfig::isEnabled() const {
+  if (disabled_) {
+    return false;
+  }
+  return filter_enabled_.has_value() ? filter_enabled_->enabled() : true;
 }
 
 Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(

@@ -11098,6 +11098,126 @@ virtual_hosts:
   EXPECT_TRUE(route5->filterDisabled("test.filter").value());
 }
 
+TEST_F(PerFilterConfigsTest, OverrideDefaultRuntimeValueTest) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["host1"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            config: {}
+            filter_enabled:
+              runtime_key: "test.filter.enabled"
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+)EOF";
+
+  // Initialize mock snapshot
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  // Initialize clusters
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false,
+                        creation_status_);
+
+  EXPECT_CALL(snapshot,
+              featureEnabled("test.filter.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillRepeatedly(Return(false));
+
+  const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
+  EXPECT_TRUE(route1->filterDisabled("test.filter").value());
+}
+
+TEST_F(PerFilterConfigsTest, ChangeRuntimeValueTest) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["host1"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            config: {}
+            filter_enabled:
+              runtime_key: "test.filter.enabled"
+              default_value:
+                numerator: 0
+                denominator: HUNDRED
+)EOF";
+
+  // Initialize mock snapshot
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  // Initialize clusters
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false,
+                        creation_status_);
+
+  EXPECT_CALL(snapshot,
+              featureEnabled("test.filter.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillRepeatedly(Return(true));
+
+  const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
+  EXPECT_FALSE(route1->filterDisabled("test.filter").value());
+
+  EXPECT_CALL(snapshot,
+              featureEnabled("test.filter.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillRepeatedly(Return(false));
+
+  EXPECT_TRUE(route1->filterDisabled("test.filter").value());
+}
+
+TEST_F(PerFilterConfigsTest, DisabledFilterWithRuntimeKeyTest) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["host1"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            config: {}
+            disabled: true
+            filter_enabled:
+              runtime_key: "test.filter.enabled"
+              default_value:
+                numerator: 100
+                denominator: HUNDRED
+)EOF";
+
+  // Initialize mock snapshot
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  // Initialize clusters
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false,
+                        creation_status_);
+
+  EXPECT_CALL(snapshot,
+              featureEnabled("test.filter.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillRepeatedly(Return(true));
+
+  // The filter is disabled and cannot be enabled via runtime key.
+  const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
+  EXPECT_TRUE(route1->filterDisabled("test.filter").value());
+}
+
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteMatchOverrideTest, VerifyAllMatchableRoutes) {

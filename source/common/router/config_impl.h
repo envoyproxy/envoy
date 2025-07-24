@@ -34,6 +34,7 @@
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
+#include "source/common/runtime/runtime_protos.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "absl/container/node_hash_map.h"
@@ -90,7 +91,15 @@ public:
 
   struct FilterConfig {
     RouteSpecificFilterConfigConstSharedPtr config_;
-    bool disabled_{};
+
+    FilterConfig(RouteSpecificFilterConfigConstSharedPtr route_specific_config,
+                 const envoy::config::route::v3::FilterConfig& filter_config,
+                 Runtime::Loader& runtime);
+    bool isEnabled() const;
+
+  private:
+    const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+    bool disabled_;
   };
 
   const RouteSpecificFilterConfig* get(const std::string& name) const;
@@ -113,6 +122,7 @@ private:
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
   absl::flat_hash_map<std::string, FilterConfig> configs_;
+  Runtime::Loader& runtime_;
 };
 
 class RouteEntryImplBase;

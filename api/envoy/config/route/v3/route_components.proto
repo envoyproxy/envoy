@@ -2438,4 +2438,14 @@ message FilterConfig {
   //
   //   This field only make sense for the downstream HTTP filters for now.
   bool disabled = 3;
+
+  // Specifies the % of requests for which the filter is enabled.
+  //
+  // If neither `filter_enabled` nor `disabled` are specified, the filter will be enabled for 100% of requests.
+  //
+  // If the `disabled` field is true, this field has no effect and the filter will always be disabled.
+  //
+  // If :ref:`runtime_key <envoy_v3_api_field_config.core.v3.RuntimeFractionalPercent.runtime_key>` is
+  // specified, Envoy will look up the runtime key to determine the percentage of requests for which the filter is enabled.
+  core.v3.RuntimeFractionalPercent filter_enabled = 4;
 }
