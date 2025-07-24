@@ -62,7 +62,7 @@ public:
     auto status = absl::OkStatus();
     config_ = std::make_shared<FilterConfig>(
         proto_config, factory_context_.local_info_, *factory_context_.store_.rootScope(),
-        factory_context_.runtime_loader_, factory_context_.http_context_, status);
+        factory_context_.runtime_loader_, factory_context_, status);
     EXPECT_TRUE(status.ok());
 
     client_ = new Filters::Common::RateLimit::MockClient();
@@ -175,6 +175,15 @@ public:
     default_value:
       numerator: 100
       denominator: HUNDRED
+  )EOF";
+
+  const std::string inlined_rate_limit_actions_config_ = R"EOF(
+  domain: "bar"
+  rate_limits:
+  - actions:
+    - request_headers:
+        header_name: "x-header-name"
+        descriptor_key: "header-name"
   )EOF";
 
   Filters::Common::RateLimit::MockClient* client_;
@@ -2108,6 +2117,106 @@ TEST_F(HttpRateLimitFilterTest, FailureModeHundredPercentFailsClose) {
                     ->statsScope()
                     .counterFromStatName(ratelimit_failure_mode_allowed_)
                     .value());
+}
+
+TEST_F(HttpRateLimitFilterTest, InlinedRateLimitAction) {
+  setUpTest(inlined_rate_limit_actions_config_);
+  request_headers_.addCopy("x-header-name", "header-value");
+
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string& domain,
+                 const std::vector<Envoy::RateLimit::Descriptor>& descriptors, Tracing::Span&,
+                 OptRef<const StreamInfo::StreamInfo>, uint32_t) -> void {
+            request_callbacks_ = &callbacks;
+            EXPECT_EQ("bar", domain);
+            EXPECT_EQ(1, descriptors.size());
+            EXPECT_EQ("header-name", descriptors[0].entries_[0].key_);
+            EXPECT_EQ("header-value", descriptors[0].entries_[0].value_);
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"},
+      {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True}};
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
+                               nullptr);
+
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_over_limit_)
+                    .value());
+
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_4xx_).value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
+}
+
+TEST_F(HttpRateLimitFilterTest, PerRouteOverridesInlinedRateLimit) {
+  const std::string route_config_yaml = R"EOF(
+  domain: "foo"
+  rate_limits:
+  - actions:
+    - request_headers:
+        header_name: "x-header-name-route"
+        descriptor_key: "header-name-route"
+    )EOF";
+  setUpTest(inlined_rate_limit_actions_config_, route_config_yaml);
+  request_headers_.addCopy("x-header-name-route", "header-value");
+
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string& domain,
+                 const std::vector<Envoy::RateLimit::Descriptor>& descriptors, Tracing::Span&,
+                 OptRef<const StreamInfo::StreamInfo>, uint32_t) -> void {
+            request_callbacks_ = &callbacks;
+            EXPECT_EQ("foo", domain);
+            EXPECT_EQ(1, descriptors.size());
+            EXPECT_EQ("header-name-route", descriptors[0].entries_[0].key_);
+            EXPECT_EQ("header-value", descriptors[0].entries_[0].value_);
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "429"},
+      {"x-envoy-ratelimited", Http::Headers::get().EnvoyRateLimitedValues.True}};
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
+                               nullptr);
+
+  EXPECT_EQ(1U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_over_limit_)
+                    .value());
+
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_4xx_).value());
+  EXPECT_EQ(
+      1U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
+  EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
 }
 
 } // namespace
