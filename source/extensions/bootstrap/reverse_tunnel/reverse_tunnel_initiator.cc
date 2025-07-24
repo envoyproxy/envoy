@@ -18,6 +18,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_interface_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -247,9 +248,11 @@ private:
       }
 
       const std::string data = buffer.toString();
+      ENVOY_LOG(debug, "SimpleConnReadFilter: Received data: {}", data);
 
-      // Look for HTTP response status line first
-      if (data.find("HTTP/1.1 200 OK") != std::string::npos) {
+      // Look for HTTP response status line first (supports both HTTP/1.1 and HTTP/2)
+      if (data.find("HTTP/1.1 200 OK") != std::string::npos || 
+          data.find("HTTP/2 200") != std::string::npos) {
         ENVOY_LOG(debug, "Received HTTP 200 OK response");
         
         // Find the end of headers (double CRLF)
@@ -299,7 +302,7 @@ private:
           ENVOY_LOG(debug, "HTTP headers not complete yet, waiting for more data");
           return Network::FilterStatus::Continue;
         }
-      } else if (data.find("HTTP/1.1 ") != std::string::npos) {
+      } else if (data.find("HTTP/1.1 ") != std::string::npos || data.find("HTTP/2 ") != std::string::npos) {
         // Found HTTP response but not 200 OK - this is an error
         ENVOY_LOG(error, "Received non-200 HTTP response: {}", data.substr(0, 100));
         parent_->onHandshakeFailure(Grpc::Status::WellKnownGrpcStatus::Internal,
@@ -375,6 +378,8 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
     // Create a dummy span for tracing
     auto span = std::make_unique<Tracing::NullSpan>();
 
+    connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
+
     // Initiate the gRPC handshake using the actual interface
     bool success = reverse_tunnel_client_->initiateHandshake(
         src_tenant_id, src_cluster_id, src_node_id, absl::nullopt, *span);
@@ -448,13 +453,13 @@ void RCConnectionWrapper::onHandshakeSuccess(
   if (response) {
     message = response->status_message();
   }
-  ENVOY_LOG(debug, "gRPC handshake succeeded: {}", message);
+  ENVOY_LOG(debug, "handshake succeeded: {}", message);
   parent_.onConnectionDone(message, this, false);
 }
 
 void RCConnectionWrapper::onHandshakeFailure(Grpc::Status::GrpcStatus status,
                                              const std::string& message) {
-  ENVOY_LOG(error, "gRPC handshake failed with status {}: {}", static_cast<int>(status), message);
+  ENVOY_LOG(error, "handshake failed with status {}: {}", static_cast<int>(status), message);
   parent_.onConnectionDone(message, this, false);
 }
 
@@ -598,51 +603,51 @@ void ReverseConnectionIOHandle::cleanup() {
 
 Api::SysCallIntResult ReverseConnectionIOHandle::listen(int backlog) {
   (void)backlog;
-  ENVOY_LOG(debug,
-            "ReverseConnectionIOHandle::listen() - initiating reverse connections to {} clusters",
-            config_.remote_clusters.size());
+  // No-op for reverse connections.
+  return Api::SysCallIntResult{0, 0};
+}
 
-  if (!listening_initiated_) {
-    // Create trigger pipe mechanism on worker thread where TLS is available
+void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatcher,
+                                                    Event::FileReadyCb cb,
+                                                    Event::FileTriggerType trigger,
+                                                    uint32_t events) {
+  // CRITICAL FIX: listen() is called on the main thread, but the reverse connections should be
+  // initialized on a worker thread. initializeFileEvent() is called on a worker thread.
+  ENVOY_LOG(debug, "ReverseConnectionIOHandle::initializeFileEvent() called on thread: {} for fd={}",
+            dispatcher.name(), fd_);
+  
+  if (!is_reverse_conn_started_) {
+    ENVOY_LOG(info, "ReverseConnectionIOHandle: Starting reverse connections on worker thread '{}'", 
+              dispatcher.name());
+    
+    // Store worker dispatcher
+    worker_dispatcher_ = &dispatcher;
+    
+    // Create trigger pipe on worker thread
     if (!isTriggerPipeReady()) {
       createTriggerPipe();
       if (!isTriggerPipeReady()) {
-        ENVOY_LOG(
-            error,
-            "Failed to create trigger pipe mechanism - cannot proceed with reverse connections");
-        return Api::SysCallIntResult{-1, ENODEV};
+        ENVOY_LOG(error, "Failed to create trigger pipe on worker thread");
+        return;
       }
     }
-
-    // Create the retry timer on first use with thread-local dispatcher. The timer is reset
-    // on each invocation of maintainReverseConnections().
+    
+    // Initialize reverse connections on worker thread
     if (!rev_conn_retry_timer_) {
-      try {
-        if (isThreadLocalDispatcherAvailable()) {
-          rev_conn_retry_timer_ = getThreadLocalDispatcher().createTimer([this]() -> void {
-            ENVOY_LOG(debug, "Reverse connection timer triggered - checking all clusters for "
-                             "missing connections.");
-            // Safety check before maintenance
-            if (isThreadLocalDispatcherAvailable()) {
-              maintainReverseConnections();
-            } else {
-              ENVOY_LOG(debug, "Skipping maintenance - dispatcher not available.");
-            }
-          });
-          // Trigger the reverse connection workflow. The function will reset rev_conn_retry_timer_.
-          maintainReverseConnections();
-          ENVOY_LOG(debug, "Created retry timer for periodic connection checks.");
-        } else {
-          ENVOY_LOG(warn, "Cannot create retry timer - dispatcher not available.");
-        }
-      } catch (const std::exception& e) {
-        ENVOY_LOG(error, "Exception creating retry timer: {}.", e.what());
-      }
+      rev_conn_retry_timer_ = dispatcher.createTimer([this]() {
+        ENVOY_LOG(debug, "Reverse connection timer triggered on worker thread");
+        maintainReverseConnections();
+      });
+      maintainReverseConnections();
     }
-    listening_initiated_ = true;
+    
+    is_reverse_conn_started_ = true;
+    ENVOY_LOG(info, "ReverseConnectionIOHandle: Reverse connections started on thread '{}'", 
+              dispatcher.name());
   }
-
-  return Api::SysCallIntResult{0, 0};
+  
+  // Call parent implementation
+  IoSocketHandleImpl::initializeFileEvent(dispatcher, cb, trigger, events);
 }
 
 Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* addr,
@@ -714,17 +719,42 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - got connection key: {}",
                   connection_key);
 
-        auto socket = connection->moveSocket();
-        os_fd_t conn_fd = socket->ioHandle().fdDoNotUse();
-        ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - got fd: {}. Creating IoHandle",
-                  conn_fd);
+        // Instead of moving the socket, duplicate the file descriptor
+        const Network::ConnectionSocketPtr& original_socket = connection->getSocket();
+        if (!original_socket || !original_socket->isOpen()) {
+          ENVOY_LOG(error, "Original socket is not available or not open");
+          return nullptr;
+        }
 
-        // Create RAII-based IoHandle with connection key and parent reference
+        // Duplicate the file descriptor
+        Network::IoHandlePtr duplicated_handle = original_socket->ioHandle().duplicate();
+        if (!duplicated_handle || !duplicated_handle->isOpen()) {
+          ENVOY_LOG(error, "Failed to duplicate file descriptor");
+          return nullptr;
+        }
+
+        os_fd_t original_fd = original_socket->ioHandle().fdDoNotUse();
+        os_fd_t duplicated_fd = duplicated_handle->fdDoNotUse();
+        ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - duplicated fd: original_fd={}, duplicated_fd={}",
+                  original_fd, duplicated_fd);
+
+        // Create a new socket with the duplicated handle
+        Network::ConnectionSocketPtr duplicated_socket = 
+            std::make_unique<Network::ConnectionSocketImpl>(
+                std::move(duplicated_handle),
+                original_socket->connectionInfoProvider().localAddress(),
+                original_socket->connectionInfoProvider().remoteAddress());
+
+        // Reset file events on the duplicated socket to clear any inherited events
+        duplicated_socket->ioHandle().resetFileEvents();
+
+        // Create RAII-based IoHandle with duplicated socket
         auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
-            std::move(socket));
+            std::move(duplicated_socket));
         ENVOY_LOG(debug,
-                  "ReverseConnectionIOHandle::accept() - RAII IoHandle created with owned socket.");
-
+                  "ReverseConnectionIOHandle::accept() - RAII IoHandle created with duplicated socket.");
+        connection->setSocketReused(true);
+        // Close the original connection
         connection->close(Network::ConnectionCloseType::NoFlush);
 
         ENVOY_LOG(debug, "ReverseConnectionIOHandle::accept() - returning io_handle.");
@@ -1658,12 +1688,16 @@ void ReverseTunnelInitiatorExtension::onWorkerThreadInitialized() {
 }
 
 DownstreamSocketThreadLocal* ReverseTunnelInitiatorExtension::getLocalRegistry() const {
-  ENVOY_LOG(debug,
-            "ReverseTunnelInitiatorExtension::getLocalRegistry() - using enhanced thread safety.");
+  if (!tls_slot_) {
+    ENVOY_LOG(error, "ReverseTunnelInitiatorExtension::getLocalRegistry() - no thread local slot");
+    return nullptr;
+  }
 
-  // Use the enhanced factory utilities for safe thread-local access
-  return ReverseConnectionFactoryUtils::safeGetThreadLocal(tls_slot_,
-                                                           "ReverseTunnelInitiatorExtension");
+  if (auto opt = tls_slot_->get(); opt.has_value()) {
+    return &opt.value().get();
+  }
+
+  return nullptr;
 }
 
 Envoy::Network::IoHandlePtr

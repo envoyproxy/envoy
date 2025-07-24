@@ -68,7 +68,10 @@ public:
     RELEASE_ASSERT(socket_ != nullptr, "socket is null.");
     return socket_;
   }
-  void setSocketReused(bool value) override { reuse_socket_ = value; }
+  void setSocketReused(bool value) override { 
+    ENVOY_LOG_MISC(trace, "setSocketReused called with value={}", value);
+    reuse_socket_ = value; 
+  }
   bool isSocketReused() override { return reuse_socket_; }
 
   // Network::Connection

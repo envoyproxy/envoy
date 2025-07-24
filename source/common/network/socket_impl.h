@@ -133,8 +133,14 @@ public:
   IoHandle& ioHandle() override { return *io_handle_; }
   const IoHandle& ioHandle() const override { return *io_handle_; }
   void close() override {
+    ENVOY_LOG_MISC(trace, "SocketImpl::close() called, io_handle_={}, io_handle_isOpen={}", 
+              io_handle_ ? "not_null" : "null", io_handle_ ? io_handle_->isOpen() : false);
     if (io_handle_ && io_handle_->isOpen()) {
+      ENVOY_LOG_MISC(trace, "SocketImpl::close() calling io_handle_->close()");
       io_handle_->close();
+      ENVOY_LOG_MISC(trace, "SocketImpl::close() io_handle_->close() completed");
+    } else {
+      ENVOY_LOG_MISC(trace, "SocketImpl::close() skipping close - io_handle is null or not open");
     }
   }
   bool isOpen() const override { return io_handle_ && io_handle_->isOpen(); }

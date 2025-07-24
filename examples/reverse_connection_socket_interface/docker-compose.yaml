@@ -13,8 +13,8 @@ services:
   on-prem-envoy:
     image: debug/envoy:latest
     volumes:
-      - ./on-prem-envoy-custom-resolver-grpc.yaml:/etc/on-prem-envoy.yaml
-    command: envoy -c /etc/on-prem-envoy.yaml --concurrency 1 -l trace --drain-time-s 3
+      - ./on-prem-envoy-custom-resolver.yaml:/etc/on-prem-envoy.yaml
+    command: envoy -c /etc/on-prem-envoy.yaml --concurrency 2 -l trace --drain-time-s 3
     ports:
       # Admin interface
       - "8888:8888"
@@ -38,7 +38,7 @@ services:
   cloud-envoy:
     image: debug/envoy:latest
     volumes:
-      - ./cloud-envoy-grpc-enhanced.yaml:/etc/cloud-envoy.yaml
+      - ./cloud-envoy.yaml:/etc/cloud-envoy.yaml
     command: envoy -c /etc/cloud-envoy.yaml --concurrency 1 -l trace --drain-time-s 3
     ports:
       # Admin interface

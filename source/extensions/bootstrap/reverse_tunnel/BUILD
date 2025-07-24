@@ -76,6 +76,7 @@ envoy_cc_extension(
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:address_lib",
+        "//source/common/network:connection_socket_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf",

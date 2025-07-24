@@ -212,6 +212,16 @@ public:
    */
   Api::IoCallUint64Result close() override;
 
+  /**
+   * Override of initializeFileEvent to defer work to worker thread.
+   * @param dispatcher the event dispatcher.
+   * @param cb the file ready callback.
+   * @param trigger the file trigger type.
+   * @param events the events to monitor.
+   */
+  void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,
+                          Event::FileTriggerType trigger, uint32_t events) override;
+
   // Network::ConnectionCallbacks.
   /**
    * Called when connection events occur.
@@ -489,7 +499,8 @@ private:
   // gRPC reverse tunnel client for handshake operations
   std::unique_ptr<GrpcReverseTunnelClient> reverse_tunnel_client_;
 
-  bool listening_initiated_{false}; // Whether reverse connections have been initiated
+  bool is_reverse_conn_started_{false}; // Whether reverse connections have been started on worker thread
+  Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
 
   // Store original socket FD for cleanup
   os_fd_t original_socket_fd_{-1};

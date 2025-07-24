@@ -73,13 +73,13 @@ static_resources:
         - name: envoy.filters.listener.reverse_connection
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.listener.reverse_connection.v3.ReverseConnection
-            ping_wait_timeout: 120
+            ping_wait_timeout: 10
       # Use custom address with reverse connection metadata encoded in URL format
       address:
         socket_address:
           # This encodes: src_node_id=on-prem-node, src_cluster_id=on-prem, src_tenant_id=on-prem
           # and remote clusters: cloud with 1 connection
-          address: "rc://on-prem-node:on-prem:on-prem@cloud:10"
+          address: "rc://on-prem-node:on-prem:on-prem@cloud:1"
           port_value: 0
           # Use custom resolver that can parse reverse connection metadata
           resolver_name: "envoy.resolvers.reverse_connection"

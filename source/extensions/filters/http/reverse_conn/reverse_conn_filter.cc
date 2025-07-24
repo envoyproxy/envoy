@@ -11,6 +11,7 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/json/json_loader.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
@@ -151,11 +152,13 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
       },
       absl::nullopt, "");
 
-  connection->setSocketReused(true);
-  connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
+  // connection->setSocketReused(true);
+  // connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
   ENVOY_STREAM_LOG(info, "DEBUG: About to save connection with node_uuid='{}' cluster_uuid='{}'",
                    *decoder_callbacks_, node_uuid, cluster_uuid);
   saveDownstreamConnection(*connection, node_uuid, cluster_uuid);
+  connection->setSocketReused(true);
+  connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
   decoder_callbacks_->setReverseConnForceLocalReply(false);
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
@@ -396,11 +399,40 @@ void ReverseConnFilter::saveDownstreamConnection(Network::Connection& downstream
     return;
   }
 
-  Network::ConnectionSocketPtr downstream_socket = downstream_connection.moveSocket();
-  downstream_socket->ioHandle().resetFileEvents();
+  // Instead of moving the socket, duplicate the file descriptor
+  const Network::ConnectionSocketPtr& original_socket = downstream_connection.getSocket();
+  if (!original_socket || !original_socket->isOpen()) {
+    ENVOY_STREAM_LOG(error, "Original socket is not available or not open", *decoder_callbacks_);
+    return;
+  }
 
-  socket_manager->addConnectionSocket(node_id, cluster_id, std::move(downstream_socket),
+  // Duplicate the file descriptor
+  Network::IoHandlePtr duplicated_handle = original_socket->ioHandle().duplicate();
+  if (!duplicated_handle || !duplicated_handle->isOpen()) {
+    ENVOY_STREAM_LOG(error, "Failed to duplicate file descriptor", *decoder_callbacks_);
+    return;
+  }
+
+  ENVOY_STREAM_LOG(debug, "Successfully duplicated file descriptor: original_fd={}, duplicated_fd={}",
+                   *decoder_callbacks_, original_socket->ioHandle().fdDoNotUse(), 
+                   duplicated_handle->fdDoNotUse());
+
+  // Create a new socket with the duplicated handle
+  Network::ConnectionSocketPtr duplicated_socket = 
+      std::make_unique<Network::ConnectionSocketImpl>(
+          std::move(duplicated_handle),
+          original_socket->connectionInfoProvider().localAddress(),
+          original_socket->connectionInfoProvider().remoteAddress());
+
+  // Reset file events on the duplicated socket to clear any inherited events
+  duplicated_socket->ioHandle().resetFileEvents();
+
+  // Add the duplicated socket to the manager
+  socket_manager->addConnectionSocket(node_id, cluster_id, std::move(duplicated_socket),
                                       config_->pingInterval(), false /* rebalanced */);
+
+  ENVOY_STREAM_LOG(debug, "Successfully added duplicated socket to upstream socket manager. Original connection remains functional.",
+                   *decoder_callbacks_);
 }
 
 Http::FilterDataStatus ReverseConnFilter::decodeData(Buffer::Instance& data, bool) {
@@ -487,11 +519,11 @@ Http::FilterDataStatus ReverseConnFilter::processGrpcRequest() {
 
       ENVOY_STREAM_LOG(info, "Saving downstream connection for gRPC request", *decoder_callbacks_);
 
-      connection->setSocketReused(true);
-      // connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn_grpc");
+      // connection->setSocketReused(true);
       ENVOY_STREAM_LOG(info, "DEBUG: About to save connection with node_uuid='{}' cluster_uuid='{}'",
                    *decoder_callbacks_, initiator.node_id(), initiator.cluster_id());
       saveDownstreamConnection(*connection, initiator.node_id(), initiator.cluster_id());
+      connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn_grpc");
     }
 
     decoder_callbacks_->setReverseConnForceLocalReply(false);

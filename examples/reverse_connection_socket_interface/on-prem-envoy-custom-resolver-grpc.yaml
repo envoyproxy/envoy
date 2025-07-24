@@ -166,4 +166,4 @@ layered_runtime:
   layers:
   - name: layer
     static_layer:
-      re2.max_program_size.error_level: 1000 
+      re2.max_program_size.error_level: 1000

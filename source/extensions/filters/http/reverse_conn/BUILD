@@ -34,6 +34,7 @@ envoy_cc_extension(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/json:json_loader_lib",
+        "//source/common/network:connection_socket_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_acceptor_lib",

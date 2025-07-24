@@ -49,7 +49,7 @@ static_resources:
                   - name: envoy.filters.http.reverse_conn
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
-                      ping_interval: 30
+                      ping_interval: 2
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
@@ -129,6 +129,7 @@ admin:
   access_log_path: "/dev/stdout"
   address:
     socket_address:
+      protocol: TCP
       address: 0.0.0.0
       port_value: 8888
 
@@ -143,4 +144,4 @@ bootstrap_extensions:
 - name: envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.UpstreamReverseConnectionSocketInterface
-    stat_prefix: "upstream_reverse_connection" 
+    stat_prefix: "upstream_reverse_connection"
