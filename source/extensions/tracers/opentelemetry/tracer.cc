@@ -184,9 +184,11 @@ void Span::setTag(absl::string_view name, absl::string_view value) {
 Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
-               const ResourceConstSharedPtr resource, SamplerSharedPtr sampler)
+               const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
+               uint64_t max_cache_size)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
-      tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler) {
+      tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
+      max_cache_size_(max_cache_size) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -245,6 +247,15 @@ void Tracer::flushSpans() {
 }
 
 void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
+  if (span_buffer_.size() >= max_cache_size_) {
+    ENVOY_LOG_EVERY_POW_2(
+        warn,
+        "Span buffer size exceeded maximum limit. Discarding span. Current size: {}, Max size: {}",
+        span_buffer_.size(), max_cache_size_);
+    tracing_stats_.spans_dropped_.inc();
+    flushSpans();
+    return;
+  }
   span_buffer_.push_back(span);
   const uint64_t min_flush_spans =
       runtime_.snapshot().getInteger("tracing.opentelemetry.min_flush_spans", 5U);

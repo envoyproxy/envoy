@@ -46,7 +46,11 @@ public:
         filter_manager_connection_(filter_manager_connection),
         async_stream_blockage_change_(
             filter_manager_connection.dispatcher().createSchedulableCallback(
-                [this]() { switchStreamBlockState(); })) {}
+                [this]() { switchStreamBlockState(); })) {
+    if (http3_options_.disable_connection_flow_control_for_streams()) {
+      quic_stream_.DisableConnectionFlowControlForThisStream();
+    }
+  }
 
   ~EnvoyQuicStream() override = default;
 

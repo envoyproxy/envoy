@@ -445,7 +445,7 @@ absl::Status ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::
     break;
   case ProtobufWkt::Value::kNumberValue:
   case ProtobufWkt::Value::kBoolValue:
-    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
+    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix) && !isLegacyRuntimeFeature(prefix)) {
       IS_ENVOY_BUG(absl::StrCat(
           "Using a removed guard ", prefix,
           ". In future version of Envoy this will be treated as invalid configuration"));

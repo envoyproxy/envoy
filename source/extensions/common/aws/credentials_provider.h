@@ -16,6 +16,13 @@ namespace Aws {
 constexpr char AWS_ACCESS_KEY_ID[] = "AWS_ACCESS_KEY_ID";
 constexpr char AWS_SECRET_ACCESS_KEY[] = "AWS_SECRET_ACCESS_KEY";
 constexpr char AWS_SESSION_TOKEN[] = "AWS_SESSION_TOKEN";
+constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
+constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
+constexpr char TOKEN[] = "Token";
+constexpr char SESSION_TOKEN[] = "SessionToken";
+constexpr char EXPIRATION[] = "Expiration";
+constexpr char CREDENTIALS[] = "Credentials";
+constexpr char STS_SERVICE_NAME[] = "sts";
 constexpr std::chrono::hours REFRESH_INTERVAL{1};
 constexpr std::chrono::seconds REFRESH_GRACE_PERIOD{5};
 constexpr std::chrono::seconds MAX_CACHE_JITTER{30};
@@ -198,7 +205,7 @@ public:
 
   // Store a callback if credentials are pending from a credential provider, to be called when
   // credentials are available
-  bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
+  virtual bool addCallbackIfChainCredentialsPending(CredentialsPendingCallback&&);
 
   // Loop through all credential providers in a chain and return credentials from the first one that
   // has credentials available

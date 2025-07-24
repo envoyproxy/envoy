@@ -1,0 +1,12 @@
+date: July 9, 2025
+
+bug_fixes:
+- area: release
+  change: |
+    Container (Ubuntu) updates to resolve glibc vulnerabilities.
+- area: eds
+  change: |
+    Fixed crash when creating an EDS cluster with invalid configuration.
+- area: http3
+  change: |
+    Validate HTTP/3 pseudo headers. Can be disabled by setting ``envoy.restart_features.validate_http3_pseudo_headers`` to false.
