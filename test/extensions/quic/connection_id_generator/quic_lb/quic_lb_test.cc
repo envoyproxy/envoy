@@ -190,7 +190,6 @@ TEST(QuicLbTest, Unencrypted) {
 }
 
 TEST(QuicLbTest, Base64ServerId) {
-  // String generated with `echo -n testtest | base64`.
   constexpr absl::string_view id_data_base64 = "dGVzdHRlc3Q=";
   constexpr absl::string_view id_data = "testtest";
 
