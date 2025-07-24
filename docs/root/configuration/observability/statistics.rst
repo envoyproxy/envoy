@@ -31,6 +31,7 @@ Server related statistics are rooted at *server.* with following statistics:
   initialization_time_ms, Histogram, Total time taken for Envoy initialization in milliseconds. This is the time from server start-up until the worker threads are ready to accept new connections
   debug_assertion_failures, Counter, Number of debug assertion failures detected in a release build if compiled with ``--define log_debug_assert_in_release=enabled`` or zero otherwise
   envoy_bug_failures, Counter, Number of envoy bug failures detected in a release build. File or report the issue if this increments as this may be serious.
+  envoy_notifications, Counter, Number of envoy notifications detected. File or report the issue if this increments as this may be serious. Please include logs from the ``notification`` component at the debug level. See :ref:`command line option --component-log-level <operations_cli>` for details.
   static_unknown_fields, Counter, Number of messages in static configuration with unknown fields
   dynamic_unknown_fields, Counter, Number of messages in dynamic configuration with unknown fields
   wip_protos, Counter, Number of messages and fields marked as work-in-progress being used
