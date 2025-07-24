@@ -204,8 +204,8 @@ TEST(QuicLbTest, Base64ServerId) {
 
   testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
 
-  auto status = factory_context.transport_socket_factory_context_.server_context_.secretManager()
-                    .addStaticSecret(encryptionParamaters(0));
+  auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryptionParamaters(0));
   absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
       Factory::create(cfg, factory_context);
   auto generator = createTypedIdGenerator(*factory_or_status.value());
