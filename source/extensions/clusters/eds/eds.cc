@@ -46,13 +46,22 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     initialize_phase_ = InitializePhase::Secondary;
   }
   const auto resource_name = getResourceName();
-  subscription_ = THROW_OR_RETURN_VALUE(
-      cluster_context.serverFactoryContext()
-          .clusterManager()
-          .subscriptionFactory()
-          .subscriptionFromConfigSource(eds_config, Grpc::Common::typeUrl(resource_name),
-                                        info_->statsScope(), *this, resource_decoder_, {}),
-      Config::SubscriptionPtr);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cluster_context.serverFactoryContext().xdsManager().subscribeToSingletonResource(
+            edsServiceName(), eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(),
+            *this, resource_decoder_, {}),
+        Config::SubscriptionPtr);
+  } else {
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cluster_context.serverFactoryContext()
+            .clusterManager()
+            .subscriptionFactory()
+            .subscriptionFromConfigSource(eds_config, Grpc::Common::typeUrl(resource_name),
+                                          info_->statsScope(), *this, resource_decoder_, {}),
+        Config::SubscriptionPtr);
+  }
 }
 
 EdsClusterImpl::~EdsClusterImpl() {

@@ -54,6 +54,17 @@ public:
   absl::optional<uint64_t> hash_key_;
 };
 
+class TestHashPolicy : public Http::HashPolicy {
+public:
+  absl::optional<uint64_t> generateHash(OptRef<const Http::RequestHeaderMap>,
+                                        OptRef<const StreamInfo::StreamInfo>,
+                                        AddCookieCallback) const override {
+    return hash_key_;
+  }
+
+  absl::optional<uint64_t> hash_key_;
+};
+
 inline void computeHitStats(::benchmark::State& state,
                             const absl::node_hash_map<std::string, uint64_t>& hit_counter) {
   double mean = 0;

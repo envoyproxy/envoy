@@ -23,6 +23,7 @@
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -647,6 +648,68 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   const std::string ca_cert = "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config->caCert());
+}
+
+// Validate that CertificateValidationContextSdsApi does not add an empty trusted_ca
+// if it was not present in the original config.
+TEST_F(SdsApiTest, CertificateValidationContextNoTrustedCa) {
+  envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
+  CertificateValidationContextSdsApi sds_api(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
+      []() {}, *dispatcher_, *api_);
+  init_manager_.add(*sds_api.initTarget());
+
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  auto handle = sds_api.addUpdateCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+
+  std::string yaml =
+      R"EOF(
+  name: "abc.com"
+  validation_context:
+    allow_expired_certificate: true
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml, typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+  EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
+  initialize();
+  EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+
+  EXPECT_FALSE(sds_api.secret()->has_trusted_ca());
+}
+
+TEST_F(SdsApiTest, CertificateValidationContextNoTrustedCa_NoRejectEmptyTrustedCa) {
+  Envoy::TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.reject_empty_trusted_ca_file", "false"}});
+  envoy::config::core::v3::ConfigSource config_source;
+  setupMocks();
+  CertificateValidationContextSdsApi sds_api(
+      config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
+      []() {}, *dispatcher_, *api_);
+  init_manager_.add(*sds_api.initTarget());
+
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  auto handle = sds_api.addUpdateCallback(
+      [&secret_callback]() { return secret_callback.onAddOrUpdateSecret(); });
+
+  std::string yaml =
+      R"EOF(
+  name: "abc.com"
+  validation_context:
+    allow_expired_certificate: true
+  )EOF";
+
+  envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
+  TestUtility::loadFromYaml(yaml, typed_secret);
+  const auto decoded_resources = TestUtility::decodeResources({typed_secret});
+  EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
+  initialize();
+  EXPECT_TRUE(subscription_factory_.callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+
+  EXPECT_FALSE(sds_api.secret()->has_trusted_ca());
 }
 
 class CvcValidationCallback {

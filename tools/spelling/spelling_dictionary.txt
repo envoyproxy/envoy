@@ -91,6 +91,7 @@ ETB
 ETX
 FS
 FIXME
+decrypted
 gperf
 HEXDIG
 HEXDIGIT
@@ -112,6 +113,7 @@ STX
 SkyWalking
 TIDs
 Timedout
+ULA
 WRSQ
 WASI
 ceil
@@ -1413,6 +1415,7 @@ templating
 templatize
 templatized
 templatizing
+teredo
 testability
 testcase
 testcases

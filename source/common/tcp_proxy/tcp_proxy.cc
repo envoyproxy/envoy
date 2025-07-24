@@ -765,8 +765,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
       // not required by tcp_proxy and move them to a different class
       router_config_(context.serverFactoryContext(), route_stat_name_storage_.statName(),
-                     context.serverFactoryContext().localInfo(), stats_scope,
-                     context.serverFactoryContext().clusterManager(),
+                     stats_scope, context.serverFactoryContext().clusterManager(),
                      context.serverFactoryContext().runtime(),
                      context.serverFactoryContext().api().randomGenerator(),
                      std::make_unique<Router::ShadowWriterImpl>(

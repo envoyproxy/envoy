@@ -107,7 +107,8 @@ using CommonVirtualHostSharedPtr = std::shared_ptr<CommonVirtualHostImpl>;
 
 class SslRedirectRoute : public Route {
 public:
-  SslRedirectRoute(CommonVirtualHostSharedPtr virtual_host) : virtual_host_(virtual_host) {}
+  SslRedirectRoute(VirtualHostConstSharedPtr virtual_host)
+      : virtual_host_(std::move(virtual_host)) {}
 
   // Router::Route
   const DirectResponseEntry* directResponseEntry() const override { return &SSL_REDIRECTOR; }
@@ -122,10 +123,10 @@ public:
   const envoy::config::core::v3::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const std::string& routeName() const override { return EMPTY_STRING; }
-  const VirtualHost& virtualHost() const override;
+  const VirtualHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
 
 private:
-  CommonVirtualHostSharedPtr virtual_host_;
+  const VirtualHostConstSharedPtr virtual_host_;
 
   static const SslRedirector SSL_REDIRECTOR;
   static const envoy::config::core::v3::Metadata metadata_;
@@ -374,6 +375,8 @@ public:
                      const StreamInfo::StreamInfo& stream_info, uint64_t random_value,
                      absl::Span<const RouteEntryImplBaseConstSharedPtr> routes) const;
 
+  VirtualHostConstSharedPtr virtualHost() const { return shared_virtual_host_; }
+
 private:
   enum class SslRequirements : uint8_t { None, ExternalOnly, All };
 
@@ -386,7 +389,7 @@ private:
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher_;
 };
 
-using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
+using VirtualHostImplSharedPtr = std::shared_ptr<VirtualHostImpl>;
 
 /**
  * Implementation of RetryPolicy that reads from the proto route or virtual host config.
@@ -616,6 +619,7 @@ class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
                            public DirectResponseEntry,
                            public PathMatchCriterion,
+                           public Matcher::ActionBase<envoy::config::route::v3::Route>,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
 protected:
@@ -747,7 +751,12 @@ public:
     return getOptionalTimeout<OptionalTimeoutNames::GrpcTimeoutOffset>();
   }
 
-  const VirtualHost& virtualHost() const override { return *vhost_; }
+  const VirtualHostConstSharedPtr& virtualHost() const override {
+    // The method cannot return the vhost_ directly because the vhost_ has different type with
+    // the VirtualHostConstSharedPtr and will create a temporary copy implicitly and result in error
+    // of returning reference to local temporary object.
+    return vhost_copy_;
+  }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool appendXfh() const override { return append_xfh_; }
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -838,26 +847,24 @@ private:
   };
 
   /**
-   * Returns a vector of request header parsers which applied or will apply header transformations
+   * Returns an array of request header parsers which applied or will apply header transformations
    * to the request in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of request header parsers.
+   * @return an array of request header parsers.
    */
-  absl::InlinedVector<const HeaderParser*, 3>
-  getRequestHeaderParsers(bool specificity_ascend) const;
+  std::array<const HeaderParser*, 3> getRequestHeaderParsers(bool specificity_ascend) const;
 
   /**
-   * Returns a vector of response header parsers which applied or will apply header transformations
+   * Returns an array of response header parsers which applied or will apply header transformations
    * to the response in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of request header parsers.
+   * @return an array of request header parsers.
    */
-  absl::InlinedVector<const HeaderParser*, 3>
-  getResponseHeaderParsers(bool specificity_ascend) const;
+  std::array<const HeaderParser*, 3> getResponseHeaderParsers(bool specificity_ascend) const;
 
   std::unique_ptr<const RuntimeData>
   loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
@@ -913,6 +920,9 @@ private:
   // Keep an copy of the shared pointer to the shared part of the virtual host. This is needed
   // to keep the shared part alive while the route is alive.
   const CommonVirtualHostSharedPtr vhost_;
+  // Same with vhost_ but this could be returned as reference. vhost_ is kept to access the
+  // methods that not exposed in the VirtualHost.
+  const VirtualHostConstSharedPtr vhost_copy_;
   const absl::optional<Http::LowerCaseString> auto_host_rewrite_header_;
   const Regex::CompiledMatcherPtr host_rewrite_path_regex_;
   const std::string host_rewrite_path_regex_substitution_;
@@ -1182,9 +1192,9 @@ private:
 // Registered factory for RouteMatchAction.
 class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, RouteActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::route::v3::Route>();
@@ -1208,9 +1218,9 @@ private:
 // Registered factory for RouteListMatchAction.
 class RouteListMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, RouteActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route_match_action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::route::v3::RouteList>();
@@ -1231,8 +1241,8 @@ public:
          Server::Configuration::ServerFactoryContext& factory_context,
          ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
 
-  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
+  VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
   const VirtualHostImpl* findVirtualHost(const Http::RequestHeaderMap& headers) const;
 
@@ -1244,7 +1254,7 @@ private:
                absl::Status& creation_status);
 
   using WildcardVirtualHosts =
-      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
+      std::map<int64_t, absl::node_hash_map<std::string, VirtualHostImplSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<absl::string_view(absl::string_view, int)>;
   const VirtualHostImpl* findWildcardVirtualHost(absl::string_view host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
@@ -1252,10 +1262,10 @@ private:
   bool ignorePortInHostMatching() const { return ignore_port_in_host_matching_; }
 
   Stats::ScopeSharedPtr vhost_scope_;
-  absl::node_hash_map<std::string, VirtualHostSharedPtr> virtual_hosts_;
+  absl::node_hash_map<std::string, VirtualHostImplSharedPtr> virtual_hosts_;
   // std::greater as a minor optimization to iterate from more to less specific
   //
-  // A note on using an unordered_map versus a vector of (string, VirtualHostSharedPtr) pairs:
+  // A note on using an unordered_map versus a vector of (string, VirtualHostImplSharedPtr) pairs:
   //
   // Based on local benchmarks, each vector entry costs around 20ns for recall and (string)
   // comparison with a fixed cost of about 25ns. For unordered_map, the empty map costs about 65ns
@@ -1265,7 +1275,7 @@ private:
   WildcardVirtualHosts wildcard_virtual_host_suffixes_;
   WildcardVirtualHosts wildcard_virtual_host_prefixes_;
 
-  VirtualHostSharedPtr default_virtual_host_;
+  VirtualHostImplSharedPtr default_virtual_host_;
   const bool ignore_port_in_host_matching_{false};
 };
 
@@ -1356,14 +1366,14 @@ public:
   }
 
   // Router::Config
-  RouteConstSharedPtr route(const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info,
-                            uint64_t random_value) const override {
+  VirtualHostRoute route(const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info,
+                         uint64_t random_value) const override {
     return route(nullptr, headers, stream_info, random_value);
   }
-  RouteConstSharedPtr route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
-                            const StreamInfo::StreamInfo& stream_info,
-                            uint64_t random_value) const override;
+  VirtualHostRoute route(const RouteCallback& cb, const Http::RequestHeaderMap& headers,
+                         const StreamInfo::StreamInfo& stream_info,
+                         uint64_t random_value) const override;
   const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
     return shared_config_->internalOnlyHeaders();
   }
@@ -1405,14 +1415,14 @@ private:
 class NullConfigImpl : public Config {
 public:
   // Router::Config
-  RouteConstSharedPtr route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
-                            uint64_t) const override {
-    return nullptr;
+  VirtualHostRoute route(const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
+                         uint64_t) const override {
+    return {};
   }
 
-  RouteConstSharedPtr route(const RouteCallback&, const Http::RequestHeaderMap&,
-                            const StreamInfo::StreamInfo&, uint64_t) const override {
-    return nullptr;
+  VirtualHostRoute route(const RouteCallback&, const Http::RequestHeaderMap&,
+                         const StreamInfo::StreamInfo&, uint64_t) const override {
+    return {};
   }
 
   const std::vector<Http::LowerCaseString>& internalOnlyHeaders() const override {
