@@ -233,22 +233,22 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, CdsPointsToAuthorityEds) {
 
   // Wait for ADS clusters request and send a cluster that points to load
   // assignment in authority1.com.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   auto cluster1 = ConfigHelper::buildCluster("cluster_1");
   cluster1.mutable_eds_cluster_config()->set_service_name(
       "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1");
   cluster1.mutable_eds_cluster_config()->clear_eds_config();
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1}, {cluster1}, {}, "1");
 
   // Authority1 receives an EDS request, and sends a response.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment,
+      Config::TestTypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment(
           "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
           "cluster1")},
@@ -258,27 +258,27 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, CdsPointsToAuthorityEds) {
       {}, "1", {}, authority1_xds_stream_.get());
 
   // Old ADS receives a CDS ACK.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
 
   // Authority1 receives an EDS ACK.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "1",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
 
   // Send the Listener and route config using the old ADS.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      Config::TestTypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                       {"route_config_0"}, {"route_config_0"}, {}));
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {ConfigHelper::buildRouteConfig("route_config_0", "cluster_1")},
       {ConfigHelper::buildRouteConfig("route_config_0", "cluster_1")}, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
@@ -293,49 +293,49 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityEds) {
 
   // Wait for ADS clusters request and send a cluster that points to load
   // assignment in authority1.com.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   auto cluster1 = ConfigHelper::buildCluster("cluster_1");
   cluster1.mutable_eds_cluster_config()->set_service_name(
       "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1");
   cluster1.mutable_eds_cluster_config()->clear_eds_config();
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1}, {cluster1}, {}, "1");
 
   // Authority1 receives an EDS request, and sends a response.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
   envoy::config::endpoint::v3::ClusterLoadAssignment cla = buildClusterLoadAssignment(
       "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1");
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment, {cla}, {cla}, {}, "1", {},
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {cla}, {cla}, {}, "1", {},
       authority1_xds_stream_.get());
 
   // Old ADS receives a CDS ACK.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
 
   // Authority1 receives an EDS ACK.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "1",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
   test_server_->waitForCounterGe("cluster.cluster_1.update_success", 1);
 
   // Send the Listener and route config using the old ADS.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      Config::TestTypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                       {"route_config_0"}, {"route_config_0"}, {}));
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {ConfigHelper::buildRouteConfig("route_config_0", "cluster_1")},
       {ConfigHelper::buildRouteConfig("route_config_0", "cluster_1")}, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
@@ -343,12 +343,12 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityEds) {
   // Update the EDS config.
   cla.mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(50);
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment, {cla}, {cla}, {}, "2", {},
+      Config::TestTypeUrl::get().ClusterLoadAssignment, {cla}, {cla}, {}, "2", {},
       authority1_xds_stream_.get());
 
   // Expect an EDS ACK.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "2",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "2",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
 
@@ -367,22 +367,22 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityToFetchEds) {
 
   // Wait for ADS clusters request and send a cluster that points to load
   // assignment in authority1.com.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   auto cluster1 = ConfigHelper::buildCluster("cluster_1");
   cluster1.mutable_eds_cluster_config()->set_service_name(
       "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1");
   cluster1.mutable_eds_cluster_config()->clear_eds_config();
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1}, {cluster1}, {}, "1");
 
   // Authority1 receives an EDS request, and sends a response.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment,
+      Config::TestTypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment(
           "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
           "cluster1")},
@@ -392,28 +392,28 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityToFetchEds) {
       {}, "1", {}, authority1_xds_stream_.get());
 
   // Old ADS receives a CDS ACK.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
 
   // Authority1 receives an EDS ACK.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "1",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
   test_server_->waitForCounterGe("cluster.cluster_1.update_success", 1);
 
   // Send the Listener and route config using the old ADS.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
+      Config::TestTypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")},
       {buildListener("listener_0", "route_config_0")}, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                       {"route_config_0"}, {"route_config_0"}, {}));
   sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {ConfigHelper::buildRouteConfig("route_config_0", "cluster_1")},
       {ConfigHelper::buildRouteConfig("route_config_0", "cluster_1")}, {}, "1");
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1",
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "1",
                                       {"route_config_0"}, {}, {}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
@@ -424,19 +424,19 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityToFetchEds) {
       "xdstp://default_authority.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
       "cluster1");
 
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
                                                              {cluster1}, {cluster1}, {}, "2");
 
   // Default-authority receives an EDS request, and sends a response.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "",
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "",
       {"xdstp://default_authority.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
        "cluster1"},
       {"xdstp://default_authority.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
        "cluster1"},
       {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", default_authority_xds_stream_.get()));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment,
+      Config::TestTypeUrl::get().ClusterLoadAssignment,
       {buildClusterLoadAssignment(
           "xdstp://default_authority.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
           "cluster1")},
@@ -446,11 +446,11 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityToFetchEds) {
       {}, "2", {}, default_authority_xds_stream_.get());
 
   // Old ADS receives a CDS ACK.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "2", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}, {}, {}));
 
   // Default-authority receives an EDS ACK.
   EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "2",
+      compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "2",
                               {"xdstp://default_authority.com/"
                                "envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
                               {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
@@ -459,7 +459,7 @@ TEST_P(AdsXdsTpConfigsIntegrationTest, UpdateAuthorityToFetchEds) {
 
   // Authority1 subscription is removed.
   EXPECT_TRUE(compareDiscoveryRequest(
-      Config::TypeUrl::get().ClusterLoadAssignment, "", {}, {},
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "", {}, {},
       {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1"},
       false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
 
