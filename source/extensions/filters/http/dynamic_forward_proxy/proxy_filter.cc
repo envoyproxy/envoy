@@ -319,11 +319,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // For any other address type just use the existing unmodified host string.
   std::string host_str;
   absl::string_view host;
-  if (!host_attributes.is_ip_address_ || !absl::StrContains(host_attributes.host_, ":")) {
-    host = host_attributes.host_;
-  } else {
+  if (host_attributes.is_ip_address_ && absl::StrContains(host_attributes.host_, ":")) {
     host_str = absl::StrCat("[", host_attributes.host_, "]");
     host = host_str;
+  } else {
+    host = host_attributes.host_;
   }
   uint16_t port = host_attributes.port_.value_or(default_port);
 
