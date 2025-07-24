@@ -2,7 +2,10 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/router/string_accessor_impl.h"
+#include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/extensions/filters/http/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
@@ -302,6 +305,7 @@ public:
     Filters::Common::Lua::LuaWrappersTestBase<StreamInfoWrapper>::setup(script);
     state_->registerType<DynamicMetadataMapWrapper>();
     state_->registerType<DynamicMetadataMapIterator>();
+    state_->registerType<FilterStateWrapper>();
   }
 
 protected:
@@ -980,6 +984,433 @@ TEST_F(LuaStreamInfoWrapperTest, IterateDynamicTypedMetadata) {
   EXPECT_CALL(printer_, testPrint("found_metadata_two"));
   EXPECT_CALL(printer_, testPrint("value_two"));
   EXPECT_CALL(printer_, testPrint("metadata_three_not_found"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` basic functionality.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateBasic) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local filter_state_obj = object:filterState():get("test_key")
+      if filter_state_obj then
+        testPrint("found_filter_state")
+        testPrint(filter_state_obj)
+      else
+        testPrint("no_filter_state")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Create a simple string accessor for testing.
+  stream_info.filterState()->setData(
+      "test_key", std::make_shared<Router::StringAccessorImpl>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_filter_state"));
+  EXPECT_CALL(printer_, testPrint("test_value"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` with missing object.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateMissing) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local filter_state_obj = object:filterState():get("missing_key")
+      if filter_state_obj == nil then
+        testPrint("filter_state_not_found")
+      else
+        testPrint("filter_state_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("filter_state_not_found"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` with multiple objects.
+TEST_F(LuaStreamInfoWrapperTest, GetMultipleFilterStateObjects) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local obj1 = object:filterState():get("key1")
+      local obj2 = object:filterState():get("key2")
+      local obj3 = object:filterState():get("nonexistent")
+
+      if obj1 then
+        testPrint("found_key1")
+        testPrint(obj1)
+      end
+
+      if obj2 then
+        testPrint("found_key2")
+        testPrint(obj2)
+      end
+
+      if obj3 == nil then
+        testPrint("key3_not_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add multiple filter state objects.
+  stream_info.filterState()->setData("key1", std::make_shared<Router::StringAccessorImpl>("value1"),
+                                     StreamInfo::FilterState::StateType::ReadOnly,
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  stream_info.filterState()->setData("key2", std::make_shared<Router::StringAccessorImpl>("value2"),
+                                     StreamInfo::FilterState::StateType::ReadOnly,
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_key1"));
+  EXPECT_CALL(printer_, testPrint("value1"));
+  EXPECT_CALL(printer_, testPrint("found_key2"));
+  EXPECT_CALL(printer_, testPrint("value2"));
+  EXPECT_CALL(printer_, testPrint("key3_not_found"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` with numeric accessor.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNumericAccessor) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local numeric_obj = object:filterState():get("numeric_key")
+      if numeric_obj then
+        testPrint("found_numeric")
+        testPrint(numeric_obj)
+        -- Test that it's returned as a string (new behavior)
+        if type(numeric_obj) == "string" then
+          testPrint("correct_string_type")
+        end
+      else
+        testPrint("numeric_not_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add numeric filter state object.
+  stream_info.filterState()->setData(
+      "numeric_key", std::make_shared<StreamInfo::UInt64AccessorImpl>(12345),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_numeric"));
+  EXPECT_CALL(printer_, testPrint("12345"));
+  EXPECT_CALL(printer_, testPrint("correct_string_type"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` with boolean accessor.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateBooleanAccessor) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local bool_obj = object:filterState():get("bool_key")
+      if bool_obj ~= nil then
+        testPrint("found_boolean")
+        testPrint(bool_obj)
+        -- Test that it's returned as a string (new behavior)
+        if type(bool_obj) == "string" then
+          testPrint("correct_string_type")
+        end
+      else
+        testPrint("boolean_not_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add boolean filter state object.
+  stream_info.filterState()->setData(
+      "bool_key", std::make_shared<StreamInfo::BoolAccessorImpl>(true),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_boolean"));
+  EXPECT_CALL(printer_, testPrint("true"));
+  EXPECT_CALL(printer_, testPrint("correct_string_type"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test filter state object that supports field access.
+class TestFieldSupportingFilterState : public StreamInfo::FilterState::Object {
+public:
+  TestFieldSupportingFilterState(std::string base_value) : base_value_(base_value) {}
+
+  absl::optional<std::string> serializeAsString() const override { return base_value_; }
+
+  bool hasFieldSupport() const override { return true; }
+
+  FieldType getField(absl::string_view field_name) const override {
+    if (field_name == "string_field") {
+      return absl::string_view("field_string_value");
+    } else if (field_name == "numeric_field") {
+      return int64_t(42);
+    } else if (field_name == "base_value") {
+      return absl::string_view(base_value_);
+    }
+    // Return empty variant for non-existent fields.
+    return {};
+  }
+
+private:
+  std::string base_value_;
+};
+
+// Test for ``filterState()`` field access with string field.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessString) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local field_value = object:filterState():get("field_key", "string_field")
+      if field_value then
+        testPrint("found_string_field")
+        testPrint(field_value)
+        -- Verify it's returned as a string
+        if type(field_value) == "string" then
+          testPrint("correct_string_type")
+        end
+      else
+        testPrint("string_field_not_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add field-supporting filter state object.
+  stream_info.filterState()->setData(
+      "field_key", std::make_shared<TestFieldSupportingFilterState>("base_value"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_string_field"));
+  EXPECT_CALL(printer_, testPrint("field_string_value"));
+  EXPECT_CALL(printer_, testPrint("correct_string_type"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` field access with numeric field.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessNumeric) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local field_value = object:filterState():get("field_key", "numeric_field")
+      if field_value then
+        testPrint("found_numeric_field")
+        testPrint(field_value)
+        -- Verify it's returned as a number
+        if type(field_value) == "number" then
+          testPrint("correct_number_type")
+        end
+      else
+        testPrint("numeric_field_not_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add field-supporting filter state object.
+  stream_info.filterState()->setData(
+      "field_key", std::make_shared<TestFieldSupportingFilterState>("base_value"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_numeric_field"));
+  EXPECT_CALL(printer_, testPrint("42"));
+  EXPECT_CALL(printer_, testPrint("correct_number_type"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` field access with non-existent field.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessNonExistent) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local field_value = object:filterState():get("field_key", "nonexistent_field")
+      if field_value == nil then
+        testPrint("nonexistent_field_returned_nil")
+      else
+        testPrint("nonexistent_field_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add field-supporting filter state object.
+  stream_info.filterState()->setData(
+      "field_key", std::make_shared<TestFieldSupportingFilterState>("base_value"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("nonexistent_field_returned_nil"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` field access on object without field support.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessNoSupport) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local field_value = object:filterState():get("no_field_key", "any_field")
+      if field_value == nil then
+        testPrint("no_field_support_returned_nil")
+      else
+        testPrint("no_field_support_found")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add regular string accessor without field support.
+  stream_info.filterState()->setData(
+      "no_field_key", std::make_shared<Router::StringAccessorImpl>("test_value"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("no_field_support_returned_nil"));
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` field access fallback to string serialization.
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateFieldAccessFallback) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      -- Test accessing the whole object without field parameter first
+      local whole_obj = object:filterState():get("field_key")
+      if whole_obj then
+        testPrint("found_whole_object")
+        testPrint(whole_obj)
+      end
+
+      -- Test field access that matches the base_value
+      local field_value = object:filterState():get("field_key", "base_value")
+      if field_value then
+        testPrint("found_base_value_field")
+        testPrint(field_value)
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Add field-supporting filter state object.
+  stream_info.filterState()->setData(
+      "field_key", std::make_shared<TestFieldSupportingFilterState>("test_base"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("found_whole_object"));
+  EXPECT_CALL(printer_, testPrint("test_base")); // String serialization result
+  EXPECT_CALL(printer_, testPrint("found_base_value_field"));
+  EXPECT_CALL(printer_, testPrint("test_base")); // Field access result
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test for ``filterState()`` with null filter state object (covers lines 398-401).
+TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNullObject) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      -- Test accessing non-existent key which will return nullptr from getDataReadOnly
+      local null_obj = object:filterState():get("completely_nonexistent_key")
+      if null_obj == nil then
+        testPrint("null_filter_state_returned_nil")
+      else
+        testPrint("null_filter_state_found_something")
+      end
+
+      -- Test field access on non-existent key
+      local null_field = object:filterState():get("completely_nonexistent_key", "any_field")
+      if null_field == nil then
+        testPrint("null_filter_state_field_returned_nil")
+      else
+        testPrint("null_filter_state_field_found_something")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain);
+
+  // Here we are deliberately not adding any filter state data, so ``getDataReadOnly``
+  // will return nullptr.
+  Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> wrapper(
+      StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
+  EXPECT_CALL(printer_, testPrint("null_filter_state_returned_nil"));
+  EXPECT_CALL(printer_, testPrint("null_filter_state_field_returned_nil"));
   start("callMe");
   wrapper.reset();
 }

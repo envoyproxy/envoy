@@ -115,11 +115,6 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream(
   return nullptr;
 }
 
-quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream() {
-  IS_ENVOY_BUG("Unexpected function call");
-  return nullptr;
-}
-
 void EnvoyQuicServerSession::setUpRequestDecoder(EnvoyQuicServerStream& stream) {
   ASSERT(http_connection_callbacks_ != nullptr);
   Http::RequestDecoder& decoder = http_connection_callbacks_->newStream(stream);

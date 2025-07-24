@@ -4173,6 +4173,34 @@ TEST(PayloadMatcher, loadJsonBytes) {
   }
 }
 
+TEST(PayloadMatcher, loadSinglePayload) {
+  // Test the single payload overload with text.
+  {
+    envoy::config::core::v3::HealthCheck::Payload single_payload;
+    single_payload.set_text("39000000");
+
+    PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(single_payload).value();
+    EXPECT_EQ(1U, segments.size());
+  }
+
+  // Test the single payload overload with binary.
+  {
+    envoy::config::core::v3::HealthCheck::Payload single_payload;
+    single_payload.set_binary(std::string({0x01, 0x02}));
+
+    PayloadMatcher::MatchSegments segments = PayloadMatcher::loadProtoBytes(single_payload).value();
+    EXPECT_EQ(1U, segments.size());
+  }
+
+  // Test the single payload overload with invalid hex.
+  {
+    envoy::config::core::v3::HealthCheck::Payload single_payload;
+    single_payload.set_text("gg");
+
+    EXPECT_FALSE(PayloadMatcher::loadProtoBytes(single_payload).status().ok());
+  }
+}
+
 static void addUint8(Buffer::Instance& buffer, uint8_t addend) {
   buffer.add(&addend, sizeof(addend));
 }
@@ -6823,6 +6851,402 @@ TEST(HealthCheckProto, Validation) {
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV3Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }
+}
+
+// Tests for HTTP health check payload functionality.
+TEST_F(HttpHealthCheckerImplTest, PayloadPostMethod) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: POST
+      send:
+        text: "48656C6C6F20576F726C64"  # "Hello World" in hex
+    )EOF";
+
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+
+  // Verify that POST method is used and body is sent.
+  Buffer::OwnedImpl expected_payload;
+  expected_payload.add("Hello World");
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool end_stream) -> Http::Status {
+        EXPECT_EQ(headers.getMethodValue(), "POST");
+        EXPECT_EQ(headers.getPathValue(), "/healthcheck");
+        EXPECT_EQ(headers.getContentLengthValue(), "11"); // "Hello World" is 11 bytes
+        EXPECT_FALSE(end_stream); // Should not end stream yet as we have body to send
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_EQ(data.toString(), "Hello World");
+        EXPECT_TRUE(end_stream); // Should end stream after sending body
+      }));
+
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+TEST_F(HttpHealthCheckerImplTest, PayloadPutMethod) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /api/health
+      method: PUT
+      send:
+        text: "7B0A20202270696E67223A20226F6B220A7D"  # {"ping": "ok"} in hex
+    )EOF";
+
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+
+  // Verify that PUT method is used and JSON body is sent.
+  const std::string expected_json = "{\n  \"ping\": \"ok\"\n}";
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool end_stream) -> Http::Status {
+        EXPECT_EQ(headers.getMethodValue(), "PUT");
+        EXPECT_EQ(headers.getPathValue(), "/api/health");
+        EXPECT_EQ(headers.getContentLengthValue(), std::to_string(expected_json.length()));
+        EXPECT_FALSE(end_stream);
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_EQ(data.toString(), expected_json);
+        EXPECT_TRUE(end_stream);
+      }));
+
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+TEST_F(HttpHealthCheckerImplTest, PayloadGetMethodThrowsError) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: GET
+      send:
+        text: "48656C6C6F"  # "Hello" in hex
+    )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      allocHealthChecker(yaml), EnvoyException,
+      "HTTP health check cannot specify a request payload with method 'GET'. "
+      "Only methods that support a request body (POST, PUT, PATCH, OPTIONS) can "
+      "be used with payload.");
+}
+
+TEST_F(HttpHealthCheckerImplTest, PayloadHeadMethodThrowsError) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: HEAD
+      send:
+        text: "48656C6C6F"  # "Hello" in hex
+    )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      allocHealthChecker(yaml), EnvoyException,
+      "HTTP health check cannot specify a request payload with method 'HEAD'. "
+      "Only methods that support a request body (POST, PUT, PATCH, OPTIONS) can be used with "
+      "payload.");
+}
+
+TEST_F(HttpHealthCheckerImplTest, PayloadDeleteMethodThrowsError) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: DELETE
+      send:
+        text: "48656C6C6F"  # "Hello" in hex
+    )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      allocHealthChecker(yaml), EnvoyException,
+      "HTTP health check cannot specify a request payload with method 'DELETE'. "
+      "Only methods that support a request body (POST, PUT, PATCH, OPTIONS) can be used with "
+      "payload.");
+}
+
+TEST_F(HttpHealthCheckerImplTest, PayloadTraceMethodThrowsError) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: TRACE
+      send:
+        text: "48656C6C6F"  # "Hello" in hex
+    )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      allocHealthChecker(yaml), EnvoyException,
+      "HTTP health check cannot specify a request payload with method 'TRACE'. "
+      "Only methods that support a request body (POST, PUT, PATCH, OPTIONS) can be used with "
+      "payload.");
+}
+
+TEST_F(HttpHealthCheckerImplTest, PayloadOptionsMethodSuccess) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: OPTIONS
+      send:
+        text: "48656C6C6F"  # "Hello" in hex
+    )EOF";
+
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool end_stream) -> Http::Status {
+        EXPECT_EQ(headers.getMethodValue(), "OPTIONS");
+        EXPECT_EQ(headers.getContentLengthValue(), "5"); // "Hello" is 5 bytes
+        EXPECT_FALSE(end_stream);
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_EQ(data.toString(), "Hello");
+        EXPECT_TRUE(end_stream);
+      }));
+
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+TEST_F(HttpHealthCheckerImplTest, PayloadPatchMethodSuccess) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: PATCH
+      send:
+        text: "7B2274657374223A2274727565227D"  # {"test":"true"} in hex
+    )EOF";
+
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool end_stream) -> Http::Status {
+        EXPECT_EQ(headers.getMethodValue(), "PATCH");
+        EXPECT_EQ(headers.getContentLengthValue(), "15"); // {"test":"true"} is 15 bytes
+        EXPECT_FALSE(end_stream);
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_EQ(data.toString(), "{\"test\":\"true\"}");
+        EXPECT_TRUE(end_stream);
+      }));
+
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+TEST_F(HttpHealthCheckerImplTest, NoPayloadGetMethodDefault) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+    )EOF";
+
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+
+  // Verify that when no payload is specified, GET method works normally and no body is sent.
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool end_stream) -> Http::Status {
+        EXPECT_EQ(headers.getMethodValue(), "GET");
+        EXPECT_EQ(headers.getPathValue(), "/healthcheck");
+        EXPECT_EQ(headers.ContentLength(), nullptr); // No Content-Length header should be set
+        EXPECT_TRUE(end_stream);                     // Should end stream as there's no body to send
+        return Http::okStatus();
+      }));
+
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
+}
+
+TEST_F(HttpHealthCheckerImplTest, MinimalPayloadPostMethod) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      path: /healthcheck
+      method: POST
+      send:
+        text: "31"  # "1" in hex - minimal valid payload
+    )EOF";
+
+  allocHealthChecker(yaml);
+  addCompletionCallback();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->trafficStats()->upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+
+  // Verify that minimal payload is sent correctly.
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool end_stream) -> Http::Status {
+        EXPECT_EQ(headers.getMethodValue(), "POST");
+        EXPECT_EQ(headers.getContentLengthValue(), "1"); // "1" is 1 byte
+        EXPECT_FALSE(end_stream);
+        return Http::okStatus();
+      }));
+
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool end_stream) -> void {
+        EXPECT_EQ(data.toString(), "1");
+        EXPECT_TRUE(end_stream);
+      }));
+
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+              enableTimer(std::chrono::milliseconds(45000), _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  respond(0, "200", false, false, true);
+  EXPECT_EQ(Host::Health::Healthy,
+            cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->coarseHealth());
 }
 
 } // namespace
