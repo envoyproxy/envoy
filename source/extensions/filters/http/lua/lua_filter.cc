@@ -206,6 +206,7 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<StreamInfoWrapper>();
   lua_state_.registerType<DynamicMetadataMapWrapper>();
   lua_state_.registerType<DynamicMetadataMapIterator>();
+  lua_state_.registerType<FilterStateWrapper>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
   lua_state_.registerType<ConnectionStreamInfoWrapper>();

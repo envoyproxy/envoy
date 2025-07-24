@@ -181,6 +181,7 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:simulated_time_system_lib",
         "@com_github_google_quiche//:quic_test_tools_config_peer_lib",
+        "@com_github_google_quiche//:quic_test_tools_stream_peer_lib",
         "@com_github_google_quiche//:quic_test_tools_server_session_base_peer",
         "@com_github_google_quiche//:quic_test_tools_test_utils_lib",
     ]),

@@ -92,13 +92,7 @@ private:
   }
 
   std::string makeSetCookie(const std::string& address) const {
-    Envoy::Http::CookieAttributeRefVector ref_attributes;
-    ref_attributes.reserve(attributes_.size());
-    for (const auto& attribute : attributes_) {
-      ref_attributes.push_back(attribute);
-    }
-    return Envoy::Http::Utility::makeSetCookieValue(name_, address, path_, ttl_, true,
-                                                    ref_attributes);
+    return Envoy::Http::Utility::makeSetCookieValue(name_, address, path_, ttl_, true, attributes_);
   }
 
   const std::string name_;

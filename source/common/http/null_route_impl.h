@@ -268,10 +268,10 @@ struct NullRouteImpl : public Router::Route {
   }
   absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   const std::string& routeName() const override { return EMPTY_STRING; }
-  const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
+  const Router::VirtualHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
 
   std::unique_ptr<RouteEntryImpl> route_entry_;
-  static const NullVirtualHost virtual_host_;
+  static const Router::VirtualHostConstSharedPtr virtual_host_;
 
 protected:
   NullRouteImpl(const std::string cluster_name, const Router::RetryPolicy& retry_policy,
