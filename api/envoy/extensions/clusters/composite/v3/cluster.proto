@@ -46,7 +46,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 4]
 message ClusterConfig {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.clusters.aggregate_retry.v3.ClusterConfig";
+      "envoy.extensions.clusters.composite.v3.ClusterConfig";
 
   // Individual cluster entries.
   message ClusterEntry {
