@@ -757,6 +757,16 @@ TEST(HttpTraceContextTest, HttpTraceContextTest) {
     // 'host' will be converted to ':authority'.
     EXPECT_EQ(23, size);
   }
+
+  {
+    Http::TestRequestHeaderMapImpl request_headers;
+    ReadOnlyHttpTraceContext trace_context(request_headers);
+
+    // No operations for ReadOnlyHttpTraceContext.
+    trace_context.set("key", "value");
+    trace_context.remove("key");
+    trace_context.requestHeaders();
+  }
 }
 
 } // namespace
