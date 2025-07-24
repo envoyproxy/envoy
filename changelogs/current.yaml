@@ -38,27 +38,6 @@ new_features:
     in the router check tool. The tool now accepts a ``dynamic_metadata`` field in test input to set metadata
     that can be matched by route configuration. This allows comprehensive testing of routes that depend on
     dynamic metadata for routing decisions.
-- area: redis
-  change: |
-    Added support for ``scan`` and ``info``.
-- area: http
-  change: |
-    Added :ref:`x-envoy-original-host <config_http_filters_router_x-envoy-original-host>` that
-    is used to record the original host header value before it is mutated by the router filter.
-- area: stateful_session
-  change: |
-    Supports envelope stateful session extension to keep the existing session header value
-    from upstream server. See :ref:`mode
-    <envoy_v3_api_msg_extensions.http.stateful_session.envelope.v3.EnvelopeSessionState>`
-    for more details.
-- area: transport tap
-  change: |
-    Add counter in transport tap for streaming and buffer trace.
-    streamed trace can sent tapped message based on configured size.
-- area: load_balancing
-  change: |
-    Added Override Host Load Balancing policy. See
-    :ref:`load balancing policies overview <arch_overview_load_balancing_policies>` for more details.
 - area: lua
   change: |
     Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
