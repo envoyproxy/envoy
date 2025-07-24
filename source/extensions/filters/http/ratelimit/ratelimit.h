@@ -44,7 +44,8 @@ class FilterConfig {
 public:
   FilterConfig(const envoy::extensions::filters::http::ratelimit::v3::RateLimit& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-               Runtime::Loader& runtime, Http::Context& http_context, absl::Status& creation_status)
+               Runtime::Loader& runtime, Server::Configuration::ServerFactoryContext& context,
+               absl::Status& creation_status)
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
         request_type_(config.request_type().empty() ? stringToType("both")
                                                     : stringToType(config.request_type())),
@@ -58,7 +59,8 @@ public:
             config.rate_limited_as_resource_exhausted()
                 ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
-        http_context_(http_context), stat_names_(scope.symbolTable(), config.stat_prefix()),
+        http_context_(context.httpContext()),
+        stat_names_(scope.symbolTable(), config.stat_prefix()),
         rate_limited_status_(toErrorCode(config.rate_limited_status().code())),
         status_on_error_(toRatelimitServerErrorCode(config.status_on_error().code())),
         filter_enabled_(
@@ -80,6 +82,8 @@ public:
         Envoy::Router::HeaderParser::configure(config.response_headers_to_add());
     SET_AND_RETURN_IF_NOT_OK(response_headers_parser_or_.status(), creation_status);
     response_headers_parser_ = std::move(response_headers_parser_or_.value());
+    rate_limit_config_ = std::make_unique<Filters::Common::RateLimit::RateLimitConfig>(
+        config.rate_limits(), context, creation_status);
   }
 
   const std::string& domain() const { return domain_; }
@@ -106,6 +110,16 @@ public:
   Http::Code statusOnError() const { return status_on_error_; }
   bool enabled() const;
   bool enforced() const;
+  bool hasRateLimitConfigs() const {
+    ASSERT(rate_limit_config_ != nullptr);
+    return !rate_limit_config_->empty();
+  }
+  void populateDescriptors(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo& info,
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors) const {
+    ASSERT(rate_limit_config_ != nullptr);
+    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors);
+  }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -153,6 +167,7 @@ private:
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
+  std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

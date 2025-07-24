@@ -57,7 +57,7 @@ public:
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionFromConfigSource(
-                                     config, Config::TypeUrl::get().ClusterLoadAssignment,
+                                     config, Config::TestTypeUrl::get().ClusterLoadAssignment,
                                      *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                                  SubscriptionPtr);
   }
@@ -65,7 +65,8 @@ public:
   SubscriptionPtr subscriptionOverAdsGrpcMux(GrpcMuxSharedPtr grpc_mux,
                                              const envoy::config::core::v3::ConfigSource& config) {
     return THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionOverAdsGrpcMux(
-                                     grpc_mux, config, Config::TypeUrl::get().ClusterLoadAssignment,
+                                     grpc_mux, config,
+                                     Config::TestTypeUrl::get().ClusterLoadAssignment,
                                      *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                                  SubscriptionPtr);
   }
@@ -659,7 +660,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
 
   EXPECT_THAT(subscription_factory_
                   .subscriptionFromConfigSource(
-                      config, Config::TypeUrl::get().ClusterLoadAssignment,
+                      config, Config::TestTypeUrl::get().ClusterLoadAssignment,
                       *stats_store_.rootScope(), callbacks_, resource_decoder_, {})
                   .status()
                   .message(),
