@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.set_metadata.v3;
 
+import "envoy/config/core/v3/substitution_format_string.proto";
+
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
@@ -21,6 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#extension: envoy.filters.http.set_metadata]
 
+// [#next-free-field: 6]
 message Metadata {
   // The metadata namespace.
   string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
@@ -28,18 +31,32 @@ message Metadata {
   // Allow the filter to overwrite or merge with an existing value in the namespace.
   bool allow_overwrite = 2;
 
-  // The value to place at the namespace. If ``allow_overwrite``, this will
-  // overwrite or merge with any existing values in that namespace. See
-  // :ref:`the filter documentation <config_http_filters_set_metadata>` for
-  // more information on how this value is merged with potentially existing
-  // ones if ``allow_overwrite`` is configured. Only one of ``value`` and
-  // ``typed_value`` may be set.
-  google.protobuf.Struct value = 3;
+  oneof kind {
+    // The value to place at the namespace. If ``allow_overwrite``, this will
+    // overwrite or merge with any existing values in that namespace. See
+    // :ref:`the filter documentation <config_http_filters_set_metadata>` for
+    // more information on how this value is merged with potentially existing
+    // ones if ``allow_overwrite`` is configured.
+    //
+    // Only one of ``value``, ``typed_value``, or ``format_string`` may be set.
+    google.protobuf.Struct value = 3;
 
-  // The value to place at the namespace. If ``allow_overwrite``, this will
-  // overwrite any existing values in that namespace. Only one of ``value`` and
-  // ``typed_value`` may be set.
-  google.protobuf.Any typed_value = 4;
+    // The value to place at the namespace. If ``allow_overwrite``, this will
+    // overwrite any existing values in that namespace.
+    //
+    // Only one of ``value``, ``typed_value``, or ``format_string`` may be set.
+    google.protobuf.Any typed_value = 4;
+
+    // The value to place at the namespace. It uses the :ref:`format string
+    // <config_access_log_format_strings>` to dynamically set the metadata value.
+    //
+    // It supports placeholder expansion such as ``%VIRTUAL_CLUSTER_NAME%``,
+    // ``%REQ(header-name)%``, etc. The result will be set as a string value in
+    // the metadata.
+    //
+    // Only one of ``value``, ``typed_value``, or ``format_string`` may be set.
+    config.core.v3.SubstitutionFormatString format_string = 5;
+  }
 }
 
 message Config {

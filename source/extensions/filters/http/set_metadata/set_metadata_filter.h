@@ -5,11 +5,16 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
+#include "envoy/formatter/substitution_formatter.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/formatter/substitution_format_string.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/variant.h"
 
@@ -29,26 +34,55 @@ struct UntypedMetadataEntry {
   std::string metadata_namespace;
   ProtobufWkt::Struct value;
 };
+
 struct TypedMetadataEntry {
   bool allow_overwrite{};
   std::string metadata_namespace;
   ProtobufWkt::Any value;
 };
+
+struct FormattedMetadataEntry {
+  bool allow_overwrite{};
+  std::string metadata_namespace;
+  Formatter::FormatterPtr formatter;
+};
+
 class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
                public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(const envoy::extensions::filters::http::set_metadata::v3::Config& config,
-         Stats::Scope& scope, const std::string& stats_prefix);
+  // Factory method for FactoryContext which is used in createFilterFactoryFromProtoTyped.
+  static absl::StatusOr<std::shared_ptr<Config>>
+  create(const envoy::extensions::filters::http::set_metadata::v3::Config& config,
+         Stats::Scope& scope, const std::string& stats_prefix,
+         Server::Configuration::FactoryContext& factory_context);
+
+  // Factory method for GenericFactoryContext which is used in ServerFactoryContext scenarios.
+  static absl::StatusOr<std::shared_ptr<Config>>
+  create(const envoy::extensions::filters::http::set_metadata::v3::Config& config,
+         Stats::Scope& scope, const std::string& stats_prefix,
+         Server::Configuration::GenericFactoryContext& factory_context);
 
   const std::vector<UntypedMetadataEntry>& untyped() { return untyped_; }
   const std::vector<TypedMetadataEntry>& typed() { return typed_; }
+  const std::vector<FormattedMetadataEntry>& formatted() { return formatted_; }
   const FilterStats& stats() const { return stats_; }
 
 private:
+  // Private constructor for status-based creation
+  Config(const envoy::extensions::filters::http::set_metadata::v3::Config& config,
+         Stats::Scope& scope, const std::string& stats_prefix,
+         Server::Configuration::GenericFactoryContext& factory_context,
+         absl::Status& creation_status);
+
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+
+  void parseConfig(const envoy::extensions::filters::http::set_metadata::v3::Config& config,
+                   Server::Configuration::GenericFactoryContext& factory_context,
+                   absl::Status& creation_status);
 
   std::vector<UntypedMetadataEntry> untyped_;
   std::vector<TypedMetadataEntry> typed_;
+  std::vector<FormattedMetadataEntry> formatted_;
   FilterStats stats_;
 };
 
