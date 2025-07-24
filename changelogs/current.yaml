@@ -34,6 +34,12 @@ new_features:
     are validated and will throw an error if combined with payloads. The implementation is optimized to process the
     payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
     <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
+- area: router_check_tool
+  change: |
+    Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
+    in the router check tool. The tool now accepts a ``dynamic_metadata`` field in test input to set metadata
+    that can be matched by route configuration. This allows comprehensive testing of routes that depend on
+    dynamic metadata for routing decisions.
 - area: lua
   change: |
     Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.

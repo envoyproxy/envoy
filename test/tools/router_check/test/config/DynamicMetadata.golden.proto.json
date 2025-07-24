@@ -1,0 +1,218 @@
+{
+  "tests": [
+    {
+      "test_name": "dynamic_metadata_basic_match",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/example",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "bar"
+            }
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster2",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_fallback_no_metadata",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/example",
+        "method": "GET"
+      },
+      "validate": {
+        "cluster_name": "cluster1",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_different_value",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/example",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "baz"
+            }
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster3",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_nested_structure",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/nested",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "nested.meta",
+            "value": {
+              "level1": {
+                "level2": "value"
+              }
+            }
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster4",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_inverted_match",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/inverted",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "different"
+            }
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster5",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_inverted_no_match",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/inverted",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "bar"
+            }
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster1",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_multiple_matchers_match",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/multiple",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "bar"
+            }
+          },
+          {
+            "metadata_namespace": "other.meta",
+            "value": {
+              "status": "active"
+            }
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster6",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_multiple_matchers_partial_match",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/multiple",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "bar"
+            }
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster1",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_allow_overwrite",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/example",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "initial"
+            }
+          },
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "bar"
+            },
+            "allow_overwrite": true
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster2",
+        "virtual_host_name": "default"
+      }
+    },
+    {
+      "test_name": "dynamic_metadata_no_overwrite",
+      "input": {
+        "authority": "edge.example.net",
+        "path": "/example",
+        "method": "GET",
+        "dynamic_metadata": [
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "bar"
+            }
+          },
+          {
+            "metadata_namespace": "example.meta",
+            "value": {
+              "foo": "different"
+            },
+            "allow_overwrite": false
+          }
+        ]
+      },
+      "validate": {
+        "cluster_name": "cluster2",
+        "virtual_host_name": "default"
+      }
+    }
+  ]
+}
