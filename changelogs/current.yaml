@@ -31,7 +31,6 @@ new_features:
     are validated and will throw an error if combined with payloads. The implementation is optimized to process the
     payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
     <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
-    Upgraded Envoy to build with C++20; Envoy developers can use C++20 features now.
 - area: router_check_tool
   change: |
     Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
