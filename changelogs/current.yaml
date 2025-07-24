@@ -13,5 +13,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: quic
+  change: |
+    Added new option to support :ref:`base64 encoded server ID
+   <envoy_v3_api_field_extensions.quic.connection_id_generator.quic_lb.v3.Config.server_id_base64_encoded>`
+   in QUIC-LB.
 
 deprecated:
