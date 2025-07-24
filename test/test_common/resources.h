@@ -28,7 +28,7 @@ public:
   const std::string TypedExtension{"type.googleapis.com/envoy.config.core.v3.TypedExtensionConfig"};
 };
 
-using TypeUrl = ConstSingleton<TypeUrlValues>;
+using TestTypeUrl = ConstSingleton<TypeUrlValues>;
 
 } // namespace Config
 } // namespace Envoy

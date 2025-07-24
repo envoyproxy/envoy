@@ -234,6 +234,12 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
 
     envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config;
     credential_provider_config.CopyFrom(assume_role_config.credential_provider());
+
+    if (credential_provider_config.has_assume_role_credential_provider()) {
+      ENVOY_LOG(warn, "Multiple assume_role_credential_provider configurations are not supported. "
+                      "Ignoring second assume_role_credential_provider.");
+    }
+
     credential_provider_config.clear_assume_role_credential_provider();
     credentials_provider_chain =
         std::make_shared<Extensions::Common::Aws::CommonCredentialsProviderChain>(
