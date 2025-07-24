@@ -30,5 +30,14 @@ new_features:
     This allows Lua scripts to retrieve string, boolean, and numeric values stored by various filters for use in routing decisions,
     header modifications, and other processing logic. See :ref:`Filter State API <config_http_filters_lua_stream_info_filter_state_wrapper>`
     for more details.
+- area: ratelimit
+  change: |
+    Add the :ref:`rate_limits
+    <envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>`
+    field to generate rate limit descriptors. If this field is set, the
+    :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+    :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields will be ignored. However,
+    :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
+    will take precedence over this field.
 
 deprecated:
