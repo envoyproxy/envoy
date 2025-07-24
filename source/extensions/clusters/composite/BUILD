@@ -17,7 +17,6 @@ envoy_cc_extension(
         "cluster.h",
         "lb_context.h",
     ],
-    visibility = ["//test:__subpackages__"],
     deps = [
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:load_balancer_interface",

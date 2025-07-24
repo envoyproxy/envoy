@@ -43,16 +43,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#extension: envoy.clusters.composite]
 
-// [#next-free-field: 4]
 message ClusterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.clusters.composite.v3.ClusterConfig";
-
-  // Individual cluster entries.
-  message ClusterEntry {
-    // Name of the cluster to use. The cluster must be defined elsewhere in the configuration.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
-  }
 
   // Cluster selection strategy determines how clusters are chosen for requests and retries.
   enum SelectionStrategy {
@@ -78,6 +71,12 @@ message ClusterConfig {
     //
     // After exhausting all clusters once, retry attempts cycle back to the first cluster.
     ROUND_ROBIN = 2;
+  }
+
+  // Individual cluster entries.
+  message ClusterEntry {
+    // Name of the cluster to use. The cluster must be defined elsewhere in the configuration.
+    string name = 1 [(validate.rules).string = {min_len: 1}];
   }
 
   // List of clusters with their configurations. Must contain at least one cluster.
