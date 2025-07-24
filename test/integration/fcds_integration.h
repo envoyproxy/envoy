@@ -379,23 +379,23 @@ public:
   }
 
   AssertionResult expectLdsSubscription() {
-    return compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {});
+    return compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {});
   }
 
   AssertionResult expectFcdsSubscription(const std::string& resource_names) {
-    return compareDiscoveryRequest(Config::TypeUrl::get().FilterChain, "", {}, {resource_names},
+    return compareDiscoveryRequest(Config::TestTypeUrl::get().FilterChain, "", {}, {resource_names},
                                    {});
   }
 
   AssertionResult expectExtensionSubscription(const std::string& resource_name,
                                               FakeStreamPtr& stream) {
-    return compareSotwDiscoveryRequest(Config::TypeUrl::get().TypedExtension, "1", {resource_name},
-                                       true, Grpc::Status::WellKnownGrpcStatus::Ok, "",
-                                       stream.get());
+    return compareSotwDiscoveryRequest(Config::TestTypeUrl::get().TypedExtension, "1",
+                                       {resource_name}, true, Grpc::Status::WellKnownGrpcStatus::Ok,
+                                       "", stream.get());
   }
 
   AssertionResult expectFcdsUnsubscribe(const std::string& resource_names) {
-    return compareDiscoveryRequest(Config::TypeUrl::get().FilterChain, "", {}, {},
+    return compareDiscoveryRequest(Config::TestTypeUrl::get().FilterChain, "", {}, {},
                                    {resource_names});
   }
 
@@ -404,21 +404,21 @@ public:
         fmt::format("filter chain '{}' cannot be {} as it was not added by filter chain discovery",
                     filter_name, removed ? "removed" : "updated");
     ASSERT_TRUE(compareDeltaDiscoveryRequest(
-        Config::TypeUrl::get().FilterChain, {}, {}, xds_stream_.get(),
+        Config::TestTypeUrl::get().FilterChain, {}, {}, xds_stream_.get(),
         Grpc::Status::WellKnownGrpcStatus::Internal, error_message_substring));
   }
 
   void expectLdsAck() {
     envoy::service::discovery::v3::DeltaDiscoveryRequest request;
     EXPECT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, request));
-    EXPECT_EQ(request.type_url(), Config::TypeUrl::get().Listener);
+    EXPECT_EQ(request.type_url(), Config::TestTypeUrl::get().Listener);
     EXPECT_FALSE(request.response_nonce().empty());
   }
 
   void expectFcdsAck() {
     envoy::service::discovery::v3::DeltaDiscoveryRequest request;
     EXPECT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, request));
-    EXPECT_EQ(request.type_url(), Config::TypeUrl::get().FilterChain);
+    EXPECT_EQ(request.type_url(), Config::TestTypeUrl::get().FilterChain);
     EXPECT_FALSE(request.response_nonce().empty());
   }
 
@@ -430,7 +430,7 @@ public:
   void sendLdsResponse(std::vector<envoy::config::listener::v3::Listener> listeners,
                        const std::string& version) {
     return sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-        Config::TypeUrl::get().Listener, listeners, listeners, {}, version);
+        Config::TestTypeUrl::get().Listener, listeners, listeners, {}, version);
   }
 
   void sendFcdsResponse(const std::string& version,
@@ -443,7 +443,7 @@ public:
                         std::vector<envoy::config::listener::v3::FilterChain> filter_chains,
                         std::vector<std::string> removed_filter_chains = {}) {
     return sendDiscoveryResponse<envoy::config::listener::v3::FilterChain>(
-        Config::TypeUrl::get().FilterChain, filter_chains, filter_chains, removed_filter_chains,
+        Config::TestTypeUrl::get().FilterChain, filter_chains, filter_chains, removed_filter_chains,
         version);
   }
 
@@ -455,7 +455,7 @@ public:
   void
   sendExtensionResponse(std::vector<envoy::config::core::v3::TypedExtensionConfig> extension_config,
                         FakeStreamPtr& stream, const std::string& version) {
-    sendSotwDiscoveryResponse(Config::TypeUrl::get().TypedExtension, extension_config, version,
+    sendSotwDiscoveryResponse(Config::TestTypeUrl::get().TypedExtension, extension_config, version,
                               stream.get(), {});
   }
 
