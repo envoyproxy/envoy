@@ -26,6 +26,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/common/wasm/plugin.h"
 #include "source/extensions/common/wasm/wasm.h"
@@ -69,6 +70,11 @@ namespace {
 
 // FilterState prefix for CelState values.
 constexpr absl::string_view CelStateKeyPrefix = "wasm.";
+
+// Default behavior for Proxy-Wasm 0.2.* ABI is to not support StopIteration as
+// a return value from onRequestHeaders() or onResponseHeaders() plugin
+// callbacks.
+constexpr bool DefaultAllowOnHeadersStopIteration = false;
 
 using HashPolicy = envoy::config::route::v3::RouteAction::HashPolicy;
 using CelState = Filters::Common::Expr::CelState;
@@ -162,13 +168,19 @@ Context::Context(Wasm* wasm, const PluginSharedPtr& plugin) : ContextBase(wasm, 
   if (wasm != nullptr) {
     abi_version_ = wasm->abi_version_;
   }
-  root_local_info_ = &std::static_pointer_cast<Plugin>(plugin)->localInfo();
+  root_local_info_ = &this->plugin()->localInfo();
+  allow_on_headers_stop_iteration_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      this->plugin()->wasmConfig().config(), allow_on_headers_stop_iteration,
+      DefaultAllowOnHeadersStopIteration);
 }
 Context::Context(Wasm* wasm, uint32_t root_context_id, PluginHandleSharedPtr plugin_handle)
     : ContextBase(wasm, root_context_id, plugin_handle), plugin_handle_(plugin_handle) {
   if (wasm != nullptr) {
     abi_version_ = wasm->abi_version_;
   }
+  allow_on_headers_stop_iteration_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      plugin()->wasmConfig().config(), allow_on_headers_stop_iteration,
+      DefaultAllowOnHeadersStopIteration);
 }
 
 Wasm* Context::wasm() const { return static_cast<Wasm*>(wasm_); }
