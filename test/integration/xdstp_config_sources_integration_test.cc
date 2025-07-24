@@ -427,17 +427,17 @@ TEST_P(XdsTpConfigsIntegrationTest, RdsOnlyConfigAuthority1) {
 
     // Authority1 should receive the RDS request.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().RouteConfiguration, "", {route_config_name}, {route_config_name}, {},
-        true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+        Config::TestTypeUrl::get().RouteConfiguration, "", {route_config_name}, {route_config_name},
+        {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
     sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-        Config::TypeUrl::get().RouteConfiguration,
+        Config::TestTypeUrl::get().RouteConfiguration,
         {ConfigHelper::buildRouteConfig(route_config_name, "cluster_0")},
         {ConfigHelper::buildRouteConfig(route_config_name, "cluster_0")}, {}, "1", {},
         authority1_xds_stream_.get());
 
     // Expect an RDS ACK.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().RouteConfiguration, "1", {route_config_name}, {}, {}, false,
+        Config::TestTypeUrl::get().RouteConfiguration, "1", {route_config_name}, {}, {}, false,
         Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
   };
   initialize();
