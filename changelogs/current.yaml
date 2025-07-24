@@ -13,6 +13,15 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: health_check
+  change: |
+    Added support for request payloads in HTTP health checks. The ``send`` field in ``HttpHealthCheck`` can now be
+    used to specify a request body to be sent during health checking. This feature supports both hex-encoded text
+    and binary payloads, similar to TCP health checks. The payload can only be used with HTTP methods that support
+    request bodies (POST, PUT, PATCH, OPTIONS). Methods that must not have request bodies (GET, HEAD, DELETE, TRACE)
+    are validated and will throw an error if combined with payloads. The implementation is optimized to process the
+    payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
+    <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
 - area: lua
   change: |
     Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
