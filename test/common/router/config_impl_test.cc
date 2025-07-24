@@ -11217,6 +11217,53 @@ virtual_hosts:
   const auto route1 = config.route(genHeaders("host1", "/route1", "GET"), 0);
   EXPECT_TRUE(route1->filterDisabled("test.filter").value());
 }
+TEST_F(PerFilterConfigsTest, FilterConfigValueIsNotOverwritten) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+  - name: bar
+    domains: ["host1"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+        typed_per_filter_config:
+          test.filter:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            filter_enabled:
+              runtime_key: "test.filter.enabled"
+              default_value:
+                numerator: 0
+                denominator: HUNDRED
+            config:
+              "@type": type.googleapis.com/google.protobuf.Timestamp
+              value: { seconds: 42 }
+)EOF";
+  // Initialize mock snapshot
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context_.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  // Initialize clusters
+  factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, false,
+                        creation_status_);
+
+  // Expect the runtime key to be enabled
+  EXPECT_CALL(snapshot,
+              featureEnabled("test.filter.enabled",
+                             testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
+      .WillRepeatedly(Return(true));
+
+  const auto route = config.route(genHeaders("host1", "/", "GET"), 0);
+  ASSERT_NE(route, nullptr);
+  EXPECT_FALSE(route->filterDisabled("test.filter").value());
+
+  const auto* base_config = route->mostSpecificPerFilterConfig("test.filter");
+  auto* typed_cfg = dynamic_cast<const DerivedFilterConfig*>(base_config);
+  ASSERT_NE(typed_cfg, nullptr);
+
+  // Check that the config is the same as the one in the route
+  absl::InlinedVector<uint32_t, 3> expected_traveled_config = {42};
+  ASSERT_EQ(typed_cfg->config_.seconds(), 42);
+}
 
 class RouteMatchOverrideTest : public testing::Test, public ConfigImplTestBase {};
 
