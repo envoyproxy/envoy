@@ -494,12 +494,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     extension->set_name("envoy.http.original_ip_detection.xff");
     extension->mutable_typed_config()->PackFrom(xff_config);
   } else {
-    if (use_remote_address_) {
-      creation_status = absl::InvalidArgumentError(
-          "Original IP detection extensions and use_remote_address may not be mixed");
-      return;
-    }
-
     if (xff_num_trusted_hops_ > 0) {
       creation_status = absl::InvalidArgumentError(
           "Original IP detection extensions and xff_num_trusted_hops may not be mixed");
