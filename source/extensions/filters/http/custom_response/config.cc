@@ -61,7 +61,7 @@ PolicySharedPtr FilterConfig::getPolicy(const ::Envoy::Http::ResponseHeaderMap& 
   if (!match_result.isMatch()) {
     return PolicySharedPtr{};
   }
-  return std::dynamic_pointer_cast<const Policy>(match_result.actionByMove());
+  return match_result.action()->getTyped<CustomResponseMatchAction>().policy_;
 }
 
 } // namespace CustomResponse

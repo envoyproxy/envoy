@@ -324,10 +324,10 @@ private:
           on_match.action().typed_config(), server_factory_context_.messageValidationVisitor(),
           factory);
 
-      auto action = factory.createAction(*message, action_factory_context_,
-                                         server_factory_context_.messageValidationVisitor());
-      return [action, keep_matching = on_match.keep_matching()] {
-        return OnMatch<DataType>{action, {}, keep_matching};
+      auto action_factory = factory.createActionFactoryCb(
+          *message, action_factory_context_, server_factory_context_.messageValidationVisitor());
+      return [action_factory, keep_matching = on_match.keep_matching()] {
+        return OnMatch<DataType>{action_factory, {}, keep_matching};
       };
     }
 
