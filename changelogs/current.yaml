@@ -22,5 +22,11 @@ new_features:
     are validated and will throw an error if combined with payloads. The implementation is optimized to process the
     payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
     <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
+- area: lua
+  change: |
+    Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
+    This allows Lua scripts to retrieve string, boolean, and numeric values stored by various filters for use in routing decisions,
+    header modifications, and other processing logic. See :ref:`Filter State API <config_http_filters_lua_stream_info_filter_state_wrapper>`
+    for more details.
 
 deprecated:

@@ -1020,6 +1020,37 @@ Returns dynamic typed metadata for a given filter name. This provides type-safe 
     end
   end
 
+``filterState()``
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  streamInfo:filterState()
+
+Returns a :ref:`filter state object <config_http_filters_lua_stream_info_filter_state_wrapper>` that provides access to objects stored by filters during request processing.
+
+Filter state contains data shared between filters, such as routing decisions, authentication results, rate limiting state, and other processing information.
+
+Example usage:
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local filter_state = request_handle:streamInfo():filterState()
+
+    -- Get authentication result
+    local auth_result = filter_state:get("auth.result")
+    if auth_result then
+      request_handle:headers():add("x-auth-result", auth_result)
+    end
+
+    -- Check rate limiting decision
+    local rate_limit_remaining = filter_state:get("rate_limit.remaining")
+    if rate_limit_remaining and rate_limit_remaining < 10 then
+      request_handle:headers():add("x-rate-limit-warning", "low")
+    end
+  end
+
 ``downstreamSslConnection()``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1189,6 +1220,59 @@ its keys can only be ``string`` or ``numeric``.
 
 Iterates through every ``dynamicMetadata`` entry. ``key`` is a string that supplies a ``dynamicMetadata``
 key. ``value`` is a ``dynamicMetadata`` entry value.
+
+.. _config_http_filters_lua_stream_info_filter_state_wrapper:
+
+Filter state object API
+------------------------
+
+.. include:: ../../../_include/lua_common.rst
+
+``get()``
+^^^^^^^^^
+
+.. code-block:: lua
+
+  filterState:get(objectName)
+  filterState:get(objectName, fieldName)
+
+Gets a filter state object by name with optional field access. ``objectName`` is a string that specifies the name of the filter state object to retrieve. ``fieldName`` is an optional string that specifies a field name for objects that support field access.
+
+Returns the filter state value as a string. Returns ``nil`` if the object does not exist, cannot be serialized, or if the specified field doesn't exist.
+
+Objects that support field access can have specific fields retrieved using the optional second parameter.
+
+.. code-block:: lua
+
+  function envoy_on_request(request_handle)
+    local filter_state = request_handle:streamInfo():filterState()
+
+    -- All values returned as strings
+    local auth_token = filter_state:get("auth.token")
+    if auth_token then
+      request_handle:headers():add("x-auth-token", auth_token)
+    end
+
+    -- Boolean-like string values
+    local is_authenticated = filter_state:get("auth.authenticated")
+    if is_authenticated == "true" then
+      request_handle:headers():add("x-authenticated", "yes")
+    end
+
+    -- Access specific fields from objects that support field access
+    local user_name = filter_state:get("user.info", "name")
+    if user_name then
+      request_handle:headers():add("x-user-name", user_name)
+    end
+
+    local user_id_str = filter_state:get("user.info", "id")
+    if user_id_str then
+      local user_id = tonumber(user_id_str)
+      if user_id and user_id > 1000 then
+        request_handle:headers():add("x-premium-user", "true")
+      end
+    end
+  end
 
 .. _config_http_filters_lua_connection_wrapper:
 
