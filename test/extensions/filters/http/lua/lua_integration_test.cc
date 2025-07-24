@@ -184,10 +184,10 @@ public:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                               {route_config_name}, true));
       sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-          Config::TypeUrl::get().RouteConfiguration,
+          Config::TestTypeUrl::get().RouteConfiguration,
           {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
               initial_route_config)},
           "1");
@@ -1244,7 +1244,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 
   // Update route config by RDS. Test whether RDS can work normally.
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(UPDATE_ROUTE_CONFIG)},
       "2");
   test_server_->waitForCounterGe("http.config_test.rds.basic_lua_routes.update_success", 2);
@@ -2025,6 +2025,124 @@ typed_config:
 
   cleanup();
 }
+
+// Test ``filterState()`` functionality with simple string values.
+TEST_P(LuaIntegrationTest, FilterStateBasic) {
+  const std::string FILTER_AND_CODE = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local stream_info = request_handle:streamInfo()
+
+        -- Test filterState() function with non-existent key
+        local missing_state = stream_info:filterState():get("nonexistent_key")
+        if missing_state == nil then
+          request_handle:headers():add("missing_state", "nil")
+        else
+          request_handle:headers():add("missing_state", "unexpected")
+        end
+
+        -- Test with another non-existent key
+        local another_missing = stream_info:filterState():get("another_missing")
+        if another_missing == nil then
+          request_handle:headers():add("another_missing", "nil")
+        else
+          request_handle:headers():add("another_missing", "unexpected")
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify both calls return nil as expected for non-existent keys.
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("missing_state"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("another_missing"))[0]
+                       ->value()
+                       .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+#ifdef NDEBUG
+// This test is only run in release mode because in debug mode,
+// the code reaches ENVOY_BUG() which triggers a forced abort
+// that stops execution.
+TEST_P(LuaIntegrationTest, ModifyResponseBodyAndRemoveStatusHeader) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This is a test that only supports http1";
+  }
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        local response_headers = response_handle:headers()
+        response_headers:remove(":status")
+        response_handle:body(true):setBytes("hello world")
+      end
+)EOF";
+
+  const std::string route_config =
+      R"EOF(
+name: basic_lua_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["lua.per.route"]
+  routes:
+  - match:
+      prefix: "/lua"
+    direct_response:
+      status: 200
+      body:
+        inline_string: "hello"
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
+                                                 {":path", "/lua"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "lua.per.route"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("missing required header: :status"));
+
+  cleanup();
+}
+#endif
 
 } // namespace
 } // namespace Envoy

@@ -72,7 +72,7 @@ GeoipProviderConfig::GeoipProviderConfig(
                            : absl::nullopt;
   isp_header_ = !geo_headers_to_add.isp().empty() ? absl::make_optional(geo_headers_to_add.isp())
                                                   : absl::nullopt;
-  apple_private_relay_header_ = !geo_headers_to_add.isp().empty()
+  apple_private_relay_header_ = !geo_headers_to_add.apple_private_relay().empty()
                                     ? absl::make_optional(geo_headers_to_add.apple_private_relay())
                                     : absl::nullopt;
   if (!city_db_path_ && !anon_db_path_ && !asn_db_path_ && !isp_db_path_) {

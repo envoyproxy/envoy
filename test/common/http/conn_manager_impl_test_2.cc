@@ -7,14 +7,11 @@
 #include "test/test_common/test_runtime.h"
 
 using testing::_;
-using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
-using testing::Mock;
 using testing::Ref;
 using testing::Return;
-using testing::ReturnArg;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -1272,7 +1269,7 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
 
   auto mock_route_0 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(mock_route_0));
+      .WillOnce(Return(Router::VirtualHostRoute{mock_route_0->virtual_host_, mock_route_0}));
 
   EXPECT_CALL(*filter, decodeHeaders(_, true))
       .WillOnce(Invoke([](RequestHeaderMap& headers, bool) -> FilterHeadersStatus {
@@ -1297,7 +1294,7 @@ TEST_F(HttpConnectionManagerImplTest, BlockRouteCacheTest) {
 
   // Refresh cached route after cache is cleared.
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(mock_route_1));
+      .WillOnce(Return(Router::VirtualHostRoute{mock_route_1->virtual_host_, mock_route_1}));
   EXPECT_EQ(filter->callbacks_->route().get(), mock_route_1.get());
 
   auto mock_route_2 = std::make_shared<NiceMock<Router::MockRoute>>();
@@ -1350,10 +1347,14 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   std::shared_ptr<Router::MockRoute> route2 = std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(route2->route_entry_, clusterName()).WillRepeatedly(ReturnRef(fake_cluster2_name));
 
+  std::shared_ptr<Router::MockVirtualHost> mock_virtual_host =
+      std::make_shared<NiceMock<Router::MockVirtualHost>>();
+
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(route1))
-      .WillOnce(Return(route2))
-      .WillOnce(Return(nullptr));
+      .WillOnce(Return(Router::VirtualHostRoute{route1->virtual_host_, route1}))
+      .WillOnce(Return(Router::VirtualHostRoute{route2->virtual_host_, route2}))
+      .WillOnce(Return(Router::VirtualHostRoute{mock_virtual_host, nullptr}))
+      .WillOnce(Return(Router::VirtualHostRoute{}));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
@@ -1376,9 +1377,22 @@ TEST_F(HttpConnectionManagerImplTest, Filter) {
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->route());
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
+
+        // Null route but the virtual host is set.
         EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().route());
+        EXPECT_EQ(mock_virtual_host, decoder_filters_[2]->callbacks_->streamInfo().virtualHost());
+
+        // Clear route cache again.
+        decoder_filters_[2]->callbacks_->downstreamCallbacks()->clearRouteCache();
+
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->route());
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->clusterInfo());
+
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().route());
+        EXPECT_EQ(nullptr, decoder_filters_[2]->callbacks_->streamInfo().virtualHost());
+
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filters_[2], decodeComplete());
@@ -1411,13 +1425,17 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   // (cached_route_.has_value() becomes true).
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
       .Times(1)
-      .WillOnce(Return(route1));
+      .WillOnce(Return(Router::VirtualHostRoute{route1->virtual_host_, route1}));
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
-        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
         EXPECT_EQ(fake_cluster1->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+        EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->streamInfo().route());
+        EXPECT_EQ(route1->virtual_host_,
+                  decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
+
         decoder_filters_[0]->callbacks_->downstreamCallbacks()->setRoute(nullptr);
         return FilterHeadersStatus::Continue;
       }));
@@ -1425,8 +1443,11 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToNullPtr) {
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->route());
-        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().route());
         EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->clusterInfo());
+
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().route());
+        EXPECT_EQ(nullptr, decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
+
         return FilterHeadersStatus::StopIteration;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeComplete());

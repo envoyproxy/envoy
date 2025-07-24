@@ -1579,8 +1579,7 @@ TEST_P(ProtocolIntegrationTest, EnvoyProxying104) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
-  if (GetParam().http1_implementation != Http1ParserImpl::BalsaParser ||
-      GetParam().upstream_protocol != Http::CodecType::HTTP1 ||
+  if (GetParam().upstream_protocol != Http::CodecType::HTTP1 ||
       GetParam().downstream_protocol != Http::CodecType::HTTP1) {
     GTEST_SKIP() << "This test is only relevant for HTTP1 BalsaParser";
   }
@@ -1604,14 +1603,15 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
   response->waitFor1xxHeaders();
   upstream_request_->encodeHeaders(default_response_headers_, true);
 
-  EXPECT_FALSE(response->waitForEndStream());
+  EXPECT_TRUE(response->waitForEndStream());
+  // The client balsa parser has done a local reset.
+  EXPECT_EQ(response->resetReason(), Http::StreamResetReason::LocalReset);
 
   cleanupUpstreamAndDownstream();
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitForFirstByte) {
-  if (GetParam().http1_implementation != Http1ParserImpl::BalsaParser ||
-      GetParam().upstream_protocol != Http::CodecType::HTTP1) {
+  if (GetParam().upstream_protocol != Http::CodecType::HTTP1) {
     GTEST_SKIP() << "This test is only relevant for HTTP1 upstream with BalsaParser";
   }
   config_helper_.addConfigModifier(
@@ -1637,8 +1637,7 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102NoDelayBalsaReset) {
-  if (GetParam().http1_implementation != Http1ParserImpl::BalsaParser ||
-      GetParam().upstream_protocol != Http::CodecType::HTTP1) {
+  if (GetParam().upstream_protocol != Http::CodecType::HTTP1) {
     GTEST_SKIP() << "This test is only relevant for HTTP1 upstream with BalsaParser";
   }
   config_helper_.addConfigModifier(
@@ -2660,8 +2659,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
 // :method request headers, since the case of other large headers is
 // covered in the various testLargeRequest-based integration tests here.
 //
-// Both HTTP/1 parsers (http-parser and BalsaParser) reject large method strings
-// by default, because they only accepts known methods from a hardcoded list.
+// BalsaParser rejects large method strings
+// by default, because it only accepts known methods from a hardcoded list.
 // HTTP/2 and HTTP/3 codecs accept large methods. The table below describes the
 // expected behaviors (in addition we should never see an ASSERT or ASAN failure
 // trigger).
@@ -5454,11 +5453,6 @@ TEST_P(DownstreamProtocolIntegrationTest, DuplicatedSchemeHeaders) {
 
 TEST_P(DownstreamProtocolIntegrationTest, DuplicatedMethodHeaders) {
   disable_client_header_validation_ = true;
-  if (downstreamProtocol() == Http::CodecType::HTTP1 &&
-      GetParam().http1_implementation == Http1ParserImpl::BalsaParser) {
-    // this test is unreliable in this case.
-    return;
-  }
 
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();

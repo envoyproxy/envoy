@@ -113,6 +113,7 @@ STX
 SkyWalking
 TIDs
 Timedout
+ULA
 WRSQ
 WASI
 ceil
@@ -1414,6 +1415,7 @@ templating
 templatize
 templatized
 templatizing
+teredo
 testability
 testcase
 testcases
