@@ -22,5 +22,10 @@ new_features:
     are validated and will throw an error if combined with payloads. The implementation is optimized to process the
     payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
     <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
+- area: set_metadata
+  change: |
+    Added ``format_string`` support to the set_metadata filter. This allows dynamic placeholder expansion using Envoy's
+    substitution formatter, enabling values like ``%VIRTUAL_CLUSTER_NAME%``, ``%REQ(header-name)%``, and other
+    :ref:`format strings <config_access_log_format_strings>` to be expanded when setting metadata.
 
 deprecated:
