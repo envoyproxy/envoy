@@ -116,7 +116,7 @@ public:
   /**
    * Sets the span's trace id attribute.
    */
-  void setTraceId(const absl::string_view& trace_id_hex) {
+  void setTraceId(absl::string_view trace_id_hex) {
     span_.set_trace_id(absl::HexStringToBytes(trace_id_hex));
   }
 
@@ -129,12 +129,12 @@ public:
   /**
    * @return the operation name set on the span
    */
-  std::string name() const { return span_.name(); }
+  absl::string_view name() const { return span_.name(); }
 
   /**
    * Sets the span's id.
    */
-  void setId(const absl::string_view& span_id_hex) {
+  void setId(absl::string_view span_id_hex) {
     span_.set_span_id(absl::HexStringToBytes(span_id_hex));
   }
 
@@ -143,16 +143,16 @@ public:
   /**
    * Sets the span's parent id.
    */
-  void setParentId(const absl::string_view& parent_span_id_hex) {
+  void setParentId(absl::string_view parent_span_id_hex) {
     span_.set_parent_span_id(absl::HexStringToBytes(parent_span_id_hex));
   }
 
-  std::string tracestate() const { return span_.trace_state(); }
+  absl::string_view tracestate() const { return span_.trace_state(); }
 
   /**
    * Sets the span's tracestate.
    */
-  void setTracestate(const absl::string_view& tracestate) {
+  void setTracestate(absl::string_view tracestate) {
     span_.set_trace_state(std::string{tracestate});
   }
 

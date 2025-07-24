@@ -24,10 +24,10 @@ public:
   /*
    * Constructor that creates a context object from the supplied attributes.
    */
-  SpanContext(const absl::string_view& version, const absl::string_view& trace_id,
-              const absl::string_view& parent_id, bool sampled, const absl::string_view& tracestate)
-      : version_(version), trace_id_(trace_id), parent_id_(parent_id), sampled_(sampled),
-        tracestate_(tracestate) {}
+  SpanContext(absl::string_view version, absl::string_view trace_id, absl::string_view span_id,
+              bool sampled, std::string tracestate)
+      : version_(version), trace_id_(trace_id), span_id_(span_id), sampled_(sampled),
+        tracestate_(std::move(tracestate)) {}
 
   /**
    * @return the span's version as a hex string.
@@ -35,9 +35,9 @@ public:
   const std::string& version() const { return version_; }
 
   /**
-   * @return the span's parent id as a hex string.
+   * @return the span's id as a hex string.
    */
-  const std::string& parentId() const { return parent_id_; }
+  const std::string& spanId() const { return span_id_; }
 
   /**
    * @return the trace id as an integer.
@@ -57,7 +57,7 @@ public:
 private:
   const std::string version_;
   const std::string trace_id_;
-  const std::string parent_id_;
+  const std::string span_id_;
   const bool sampled_{false};
   const std::string tracestate_;
 };
