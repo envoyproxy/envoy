@@ -40,8 +40,8 @@ TEST(ListMatcherTest, KeepMatching) {
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                      stringOnMatch<TestData>("matched", /*keep_matching=*/false));
 
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+  std::vector<ActionConstSharedPtr> skipped_results;
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
   auto result = matcher.match(TestData(), skipped_match_cb);
@@ -56,8 +56,8 @@ TEST(ListMatcherTest, KeepMatchingOnNoMatch) {
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
                      stringOnMatch<TestData>("keep matching 2", /*keep_matching=*/true));
 
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb skipped_match_cb = [&skipped_results](const ActionFactoryCb cb) {
+  std::vector<ActionConstSharedPtr> skipped_results;
+  SkippedMatchCb skipped_match_cb = [&skipped_results](const ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
   auto result = matcher.match(TestData(), skipped_match_cb);
@@ -84,17 +84,17 @@ TEST(ListMatcherTest, KeepMatchingWithRecursion) {
 
   Envoy::Matcher::ListMatcher<TestData> matcher(stringOnMatch<TestData>("top_level on_no_match"));
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
-                     OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/sub_matcher_1,
+                     OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/sub_matcher_1,
                                        /*.keep_matching=*/false});
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
-                     OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/sub_matcher_2,
+                     OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/sub_matcher_2,
                                        /*.keep_matching=*/true});
   matcher.addMatcher(createSingleMatcher("string", [](auto) { return true; }),
-                     OnMatch<TestData>{/*.action_cb=*/nullptr, /*.matcher=*/sub_matcher_3,
+                     OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/sub_matcher_3,
                                        /*.keep_matching=*/false});
 
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+  std::vector<ActionConstSharedPtr> skipped_results;
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
   MatchResult result = matcher.match(TestData(), skipped_match_cb);
@@ -120,17 +120,17 @@ TEST(ListMatcherTest, KeepMatchingWithRecursiveOnNoMatch) {
       stringOnMatch<TestData>("on_no_match sub match", /*keep_matching=*/true));
 
   Envoy::Matcher::ListMatcher<TestData> matcher(
-      OnMatch<TestData>{/*action_cb=*/nullptr,
+      OnMatch<TestData>{/*action_=*/nullptr,
                         /*matcher=*/on_no_match_sub_matcher, /*keep_matching=*/false});
   matcher.addMatcher(
       createSingleMatcher("string", [](auto) { return true; }),
-      OnMatch<TestData>{/*action_cb=*/nullptr, /*matcher=*/sub_matcher_1, /*keep_matching=*/true});
+      OnMatch<TestData>{/*action_=*/nullptr, /*matcher=*/sub_matcher_1, /*keep_matching=*/true});
   matcher.addMatcher(
       createSingleMatcher("string", [](auto) { return true; }),
-      OnMatch<TestData>{/*action_cb=*/nullptr, /*matcher=*/sub_matcher_2, /*keep_matching=*/false});
+      OnMatch<TestData>{/*action_=*/nullptr, /*matcher=*/sub_matcher_2, /*keep_matching=*/false});
 
-  std::vector<ActionFactoryCb> skipped_results;
-  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionFactoryCb cb) {
+  std::vector<ActionConstSharedPtr> skipped_results;
+  SkippedMatchCb skipped_match_cb = [&skipped_results](ActionConstSharedPtr cb) {
     skipped_results.push_back(cb);
   };
   MatchResult result = matcher.match(TestData(), skipped_match_cb);
