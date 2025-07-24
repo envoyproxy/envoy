@@ -179,7 +179,7 @@ def envoy_select_wasm_wamr(xs):
         "@envoy//bazel:wasm_wamr": xs,
         "@envoy//bazel:wasm_wasmtime": [],
         "@envoy//bazel:wasm_disabled": [],
-        "//conditions:default": xs, # implicit default (wamr)
+        "//conditions:default": xs,  # implicit default (wamr)
     })
 
 # Selects the given values depending on the Wasm runtimes enabled in the current build.
