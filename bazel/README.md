@@ -734,8 +734,8 @@ Note not all extensions can be disabled.
 
 To enable a specific WebAssembly (Wasm) engine, you'll need to pass `--define wasm=[wasm_engine]`, e.g. `--define wasm=wasmtime` to enable the [wasmtime](https://wasmtime.dev/) engine. Supported engines are:
 
-* `v8` (the default included engine)
-* `wamr`
+* `v8` (default included engine)
+* `wamr` (default included engine)
 * `wasmtime`
 
 If you're building from a custom build repository, the parameters need to prefixed with `@envoy`, for example

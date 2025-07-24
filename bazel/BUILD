@@ -541,22 +541,22 @@ config_setting(
 
 config_setting(
     name = "wasm_v8",
-    values = {"define": "wasm=v8"},
+    define_values = {"wasm": "v8"},
 )
 
 config_setting(
     name = "wasm_wamr",
-    values = {"define": "wasm=wamr"},
+    define_values = {"wasm": "wamr"},
 )
 
 config_setting(
     name = "wasm_wasmtime",
-    values = {"define": "wasm=wasmtime"},
+    define_values = {"wasm": "wasmtime"},
 )
 
 config_setting(
     name = "wasm_disabled",
-    values = {"define": "wasm=disabled"},
+    define_values = {"wasm": "disabled"},
 )
 
 # This config setting enables Universal Header Validator and disables
