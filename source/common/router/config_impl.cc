@@ -449,15 +449,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
   // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
   // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
   // disabled.
-  if (config.has_trace_sampled()) {
-    trace_sampled_ = config.trace_sampled().value();
-  } else {
-    // If the shadow policy does not specify trace_sampled, we will inherit the parent's sampling
-    // decision.
-    const bool user_parent_sampling_decision = Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.shadow_policy_inherit_trace_sampling");
-    trace_sampled_ = user_parent_sampling_decision ? absl::nullopt : absl::make_optional(true);
-  }
+  trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
+                                              : absl::nullopt;
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
@@ -1825,14 +1818,13 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
         Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match_result.isMatch()) {
-      const Matcher::ActionPtr result = match_result.action();
+      const auto result = match_result.actionByMove();
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
-        const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
-
-        return getRouteFromRoutes(cb, headers, stream_info, random_value, {route_action.route()});
+        return getRouteFromRoutes(
+            cb, headers, stream_info, random_value,
+            {std::dynamic_pointer_cast<const RouteEntryImplBase>(std::move(result))});
       } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
         const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
-
         return getRouteFromRoutes(cb, headers, stream_info, random_value, action.routes());
       }
       PANIC("Action in router matcher should be Route or RouteList");
@@ -2140,9 +2132,9 @@ const Envoy::Config::TypedMetadata& NullConfigImpl::typedMetadata() const {
   return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
-Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
-    const Protobuf::Message& config, RouteActionContext& context,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+Matcher::ActionConstSharedPtr
+RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActionContext& context,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_config =
       MessageUtil::downcastAndValidate<const envoy::config::route::v3::Route&>(config,
                                                                                validation_visitor);
@@ -2150,14 +2142,14 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
       RouteCreator::createAndValidateRoute(route_config, context.vhost, context.factory_context,
                                            validation_visitor, false),
       RouteEntryImplBaseConstSharedPtr);
-
-  return [route]() { return std::make_unique<RouteMatchAction>(route); };
+  return route;
 }
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
-Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
-    const Protobuf::Message& config, RouteActionContext& context,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+Matcher::ActionConstSharedPtr
+RouteListMatchActionFactory::createAction(const Protobuf::Message& config,
+                                          RouteActionContext& context,
+                                          ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_config =
       MessageUtil::downcastAndValidate<const envoy::config::route::v3::RouteList&>(
           config, validation_visitor);
@@ -2169,7 +2161,7 @@ Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
                                              validation_visitor, false),
         RouteEntryImplBaseConstSharedPtr));
   }
-  return [routes]() { return std::make_unique<RouteListMatchAction>(routes); };
+  return std::make_shared<RouteListMatchAction>(std::move(routes));
 }
 REGISTER_FACTORY(RouteListMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
