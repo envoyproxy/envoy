@@ -261,6 +261,28 @@ private:
 };
 
 /**
+ * Lua wrapper for accessing filter state objects.
+ */
+class FilterStateWrapper : public Filters::Common::Lua::BaseLuaObject<FilterStateWrapper> {
+public:
+  FilterStateWrapper(StreamInfoWrapper& parent) : parent_(parent) {}
+  static ExportedFunctions exportedFunctions() { return {{"get", static_luaGet}}; }
+
+private:
+  /**
+   * Get a filter state object by name, with an optional field name.
+   * @param 1 (string): object name.
+   * @param 2 (string, optional): field name for objects that support field access.
+   * @return filter state value as string, or nil if not found.
+   */
+  DECLARE_LUA_FUNCTION(FilterStateWrapper, luaGet);
+
+  StreamInfo::StreamInfo& streamInfo();
+
+  StreamInfoWrapper& parent_;
+};
+
+/**
  * Lua wrapper for a stream info.
  */
 class StreamInfoWrapper : public Filters::Common::Lua::BaseLuaObject<StreamInfoWrapper> {
@@ -270,6 +292,7 @@ public:
     return {{"protocol", static_luaProtocol},
             {"dynamicMetadata", static_luaDynamicMetadata},
             {"dynamicTypedMetadata", static_luaDynamicTypedMetadata},
+            {"filterState", static_luaFilterState},
             {"downstreamDirectLocalAddress", static_luaDownstreamDirectLocalAddress},
             {"downstreamLocalAddress", static_luaDownstreamLocalAddress},
             {"downstreamDirectRemoteAddress", static_luaDownstreamDirectRemoteAddress},
@@ -298,6 +321,12 @@ private:
    * @return typed metadata wrapped as a Lua table.
    */
   DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaDynamicTypedMetadata);
+
+  /**
+   * Get reference to stream info filter state objects.
+   * @return filter state objects wrapped as a Lua table with string keys and serialized values.
+   */
+  DECLARE_LUA_FUNCTION(StreamInfoWrapper, luaFilterState);
 
   /**
    * Get reference to stream info downstreamSslConnection.
@@ -352,15 +381,18 @@ private:
   // Envoy::Lua::BaseLuaObject
   void onMarkDead() override {
     dynamic_metadata_wrapper_.reset();
+    filter_state_wrapper_.reset();
     downstream_ssl_connection_.reset();
   }
 
   StreamInfo::StreamInfo& stream_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<FilterStateWrapper> filter_state_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::SslConnectionWrapper>
       downstream_ssl_connection_;
 
   friend class DynamicMetadataMapWrapper;
+  friend class FilterStateWrapper;
 };
 
 /**
