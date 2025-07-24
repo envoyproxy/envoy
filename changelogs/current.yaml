@@ -10,10 +10,28 @@ bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 
 removed_config_or_runtime:
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.shadow_policy_inherit_trace_sampling`` and legacy code paths.
 - area: dynamic_forward_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update`` and legacy code paths.
 
 new_features:
+- area: health_check
+  change: |
+    Added support for request payloads in HTTP health checks. The ``send`` field in ``HttpHealthCheck`` can now be
+    used to specify a request body to be sent during health checking. This feature supports both hex-encoded text
+    and binary payloads, similar to TCP health checks. The payload can only be used with HTTP methods that support
+    request bodies (POST, PUT, PATCH, OPTIONS). Methods that must not have request bodies (GET, HEAD, DELETE, TRACE)
+    are validated and will throw an error if combined with payloads. The implementation is optimized to process the
+    payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
+    <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
+- area: lua
+  change: |
+    Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
+    This allows Lua scripts to retrieve string, boolean, and numeric values stored by various filters for use in routing decisions,
+    header modifications, and other processing logic. See :ref:`Filter State API <config_http_filters_lua_stream_info_filter_state_wrapper>`
+    for more details.
 
 deprecated:
