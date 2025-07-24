@@ -18,10 +18,9 @@ namespace Factory {
 class SkipActionFactory : public Matcher::ActionFactory<NetworkFilterActionContext> {
 public:
   std::string name() const override { return "skip"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
-                                                 NetworkFilterActionContext&,
-                                                 ProtobufMessage::ValidationVisitor&) override {
-    return []() { return std::make_unique<SkipAction>(); };
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message&, NetworkFilterActionContext&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return std::make_shared<SkipAction>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::filters::common::matcher::action::v3::SkipFilter>();
@@ -107,8 +106,8 @@ void DelegatingNetworkFilter::FilterMatchState::evaluateMatchTree() {
   match_tree_evaluated_ = match_result.isComplete();
 
   if (match_tree_evaluated_ && match_result.isMatch()) {
-    const Matcher::ActionPtr result = match_result.action();
-    if ((result == nullptr) || (SkipAction().typeUrl() == result->typeUrl())) {
+    const auto& result = match_result.action();
+    if (result == nullptr || SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;
     } else {
       // TODO(botengyao) this would be similar to `base_filter_->onMatchCallback(*result);`
@@ -192,7 +191,7 @@ Envoy::Network::FilterFactoryCb MatchDelegateConfig::createFilterFactory(
   auto message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.extension_config().typed_config(), validation, factory);
   auto filter_factory_or_error = factory.createFilterFactoryFromProto(*message, context);
-  THROW_IF_NOT_OK(filter_factory_or_error.status());
+  THROW_IF_NOT_OK_REF(filter_factory_or_error.status());
   auto filter_factory = filter_factory_or_error.value();
 
   Factory::MatchTreeValidationVisitor validation_visitor(*factory.matchingRequirements());

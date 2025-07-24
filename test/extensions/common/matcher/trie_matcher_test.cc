@@ -27,8 +27,8 @@ namespace Common {
 namespace Matcher {
 namespace {
 
+using ::Envoy::Matcher::ActionConstSharedPtr;
 using ::Envoy::Matcher::ActionFactory;
-using ::Envoy::Matcher::ActionFactoryCb;
 using ::Envoy::Matcher::CustomMatcherFactory;
 using ::Envoy::Matcher::DataInputGetResult;
 using ::Envoy::Matcher::HasInsufficientData;
@@ -36,12 +36,10 @@ using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
 using ::Envoy::Matcher::IsStringAction;
 using ::Envoy::Matcher::MatchResult;
-using ::Envoy::Matcher::MatchTree;
 using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MatchTreePtr;
 using ::Envoy::Matcher::MatchTreeSharedPtr;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
-using ::Envoy::Matcher::StringAction;
 using ::Envoy::Matcher::StringActionFactory;
 using ::Envoy::Matcher::TestData;
 using ::Envoy::Matcher::TestDataInputBoolFactory;
@@ -604,8 +602,10 @@ on_no_match:
   // Skip baz because the nested matcher is set with keep_matching.
   // Skip bag because the nested matcher returns on_no_match, but the top-level matcher is set to
   // keep_matching.
-  std::vector<ActionFactoryCb> skipped_results{};
-  skipped_match_cb_ = [&skipped_results](ActionFactoryCb cb) { skipped_results.push_back(cb); };
+  std::vector<ActionConstSharedPtr> skipped_results{};
+  skipped_match_cb_ = [&skipped_results](const ActionConstSharedPtr& cb) {
+    skipped_results.push_back(cb);
+  };
 
   auto input = TestDataInputStringFactory("192.101.0.1");
   auto nested = TestDataInputBoolFactory("baz");

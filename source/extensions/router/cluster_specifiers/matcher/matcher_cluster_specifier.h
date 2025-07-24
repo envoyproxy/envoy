@@ -26,21 +26,21 @@ struct ClusterActionContext {};
  */
 class ClusterAction : public Envoy::Matcher::ActionBase<ClusterActionProto> {
 public:
-  explicit ClusterAction(std::shared_ptr<std::string> cluster) : cluster_(cluster) {}
+  explicit ClusterAction(absl::string_view cluster) : cluster_(cluster) {}
 
-  const std::string& cluster() const { return *cluster_; }
+  const std::string& cluster() const { return cluster_; }
 
 private:
-  const std::shared_ptr<std::string> cluster_;
+  const std::string cluster_;
 };
 
 // Registered factory for ClusterAction. This factory will be used to load proto configuration
 // from opaque config.
 class ClusterActionFactory : public Envoy::Matcher::ActionFactory<ClusterActionContext> {
 public:
-  Envoy::Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, ClusterActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Envoy::Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, ClusterActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "cluster"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ClusterActionProto>();
