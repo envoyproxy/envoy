@@ -1823,7 +1823,7 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::service::discovery::v3::DiscoveryResponse cds_response;
   cds_response.set_version_info(std::to_string(cds_version_++));
-  cds_response.set_type_url(Config::TypeUrl::get().Cluster);
+  cds_response.set_type_url(Config::TestTypeUrl::get().Cluster);
   for (const auto& cluster : clusters) {
     cds_response.add_resources()->PackFrom(cluster);
   }
@@ -1845,7 +1845,7 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::service::discovery::v3::DiscoveryResponse eds_response;
   eds_response.set_version_info(std::to_string(eds_version_++));
-  eds_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+  eds_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
   for (const auto& cluster_load_assignment : cluster_load_assignments) {
     eds_response.add_resources()->PackFrom(cluster_load_assignment);
   }
