@@ -20,8 +20,12 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/set_metadata:config",
-        "//test/integration:http_integration_lib",
-        "//test/mocks/api:api_mocks",
+        "//source/extensions/filters/http/set_metadata:set_metadata_filter_lib",
+        "//source/server:generic_factory_context_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
     ],
 )
