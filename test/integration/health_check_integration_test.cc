@@ -10,6 +10,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/resources.h"
 
 #include "gtest/gtest.h"
 
@@ -978,9 +979,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithPayload) {
   health_check->mutable_unhealthy_threshold()->set_value(1);
 
   // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+      Config::TestTypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
 
   // Wait for upstream to receive health check request.
   ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
@@ -1033,9 +1034,9 @@ TEST_P(HttpHealthCheckIntegrationTest, SingleEndpointHealthyHttpWithBinaryPayloa
   health_check->mutable_unhealthy_threshold()->set_value(1);
 
   // Introduce the cluster using compareDiscoveryRequest / sendDiscoveryResponse.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
+      Config::TestTypeUrl::get().Cluster, {cluster_data.cluster_}, {cluster_data.cluster_}, {}, "55");
 
   // Wait for upstream to receive health check request.
   ASSERT_TRUE(cluster_data.host_upstream_->waitForHttpConnection(
