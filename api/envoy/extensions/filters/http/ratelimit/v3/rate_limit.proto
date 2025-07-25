@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Rate limit :ref:`configuration overview <config_http_filters_rate_limit>`.
 // [#extension: envoy.filters.http.ratelimit]
 
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.rate_limit.v2.RateLimit";
@@ -167,6 +167,27 @@ message RateLimit {
   // This means that when the rate limit service is unavailable, 50% of requests will be denied
   // (fail closed) and 50% will be allowed (fail open).
   config.core.v3.RuntimeFractionalPercent failure_mode_deny_percent = 16;
+
+  // Rate limit configuration that is used to generate a list of descriptor entries based on
+  // the request context. The generated entries will be sent to the rate limit service.
+  // If this is set, then
+  // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
+  // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+  // will be ignored. However, :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
+  // will take precedence over this field.
+  //
+  // .. note::
+  //   Not all configuration fields of
+  //   :ref:`rate limit config <envoy_v3_api_msg_config.route.v3.RateLimit>` is supported at here.
+  //   Following fields are not supported:
+  //
+  //   1. :ref:`rate limit stage <envoy_v3_api_field_config.route.v3.RateLimit.stage>`.
+  //   2. :ref:`dynamic metadata <envoy_v3_api_field_config.route.v3.RateLimit.Action.dynamic_metadata>`.
+  //   3. :ref:`disable_key <envoy_v3_api_field_config.route.v3.RateLimit.disable_key>`.
+  //   4. :ref:`override limit <envoy_v3_api_field_config.route.v3.RateLimit.limit>`.
+  //   5. :ref:`hits_addend <envoy_v3_api_field_config.route.v3.RateLimit.hits_addend>`.
+  //   6. :ref:`apply_on_stream_done <envoy_v3_api_field_config.route.v3.RateLimit.apply_on_stream_done>`.
+  repeated config.route.v3.RateLimit rate_limits = 17;
 }
 
 message RateLimitPerRoute {
@@ -210,8 +231,9 @@ message RateLimitPerRoute {
   // the request context. The generated entries will be used to find one or multiple matched rate
   // limit rule from the ``descriptors``.
   // If this is set, then
-  // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>` or
-  // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields
+  // :ref:`VirtualHost.rate_limits<envoy_v3_api_field_config.route.v3.VirtualHost.rate_limits>`,
+  // :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` and
+  // :ref:`RateLimit.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimit.rate_limits>` fields
   // will be ignored.
   //
   // .. note::

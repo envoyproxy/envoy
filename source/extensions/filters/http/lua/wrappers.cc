@@ -180,6 +180,15 @@ int StreamInfoWrapper::luaDynamicTypedMetadata(lua_State* state) {
       state, typed_metadata);
 }
 
+int StreamInfoWrapper::luaFilterState(lua_State* state) {
+  if (filter_state_wrapper_.get() != nullptr) {
+    filter_state_wrapper_.pushStack();
+  } else {
+    filter_state_wrapper_.reset(FilterStateWrapper::create(state, *this), true);
+  }
+  return 1;
+}
+
 int ConnectionStreamInfoWrapper::luaConnectionDynamicMetadata(lua_State* state) {
   if (connection_dynamic_metadata_wrapper_.get() != nullptr) {
     connection_dynamic_metadata_wrapper_.pushStack();
@@ -378,6 +387,62 @@ int PublicKeyWrapper::luaGet(lua_State* state) {
     lua_pushlstring(state, public_key_.data(), public_key_.size());
   }
   return 1;
+}
+
+StreamInfo::StreamInfo& FilterStateWrapper::streamInfo() { return parent_.stream_info_; }
+
+int FilterStateWrapper::luaGet(lua_State* state) {
+  const char* object_name = luaL_checkstring(state, 2);
+  const StreamInfo::FilterStateSharedPtr filter_state = streamInfo().filterState();
+
+  // Check if filter state exists.
+  if (filter_state == nullptr) {
+    return 0; // Return nil if filter state is null.
+  }
+
+  // Get the filter state object by name.
+  const StreamInfo::FilterState::Object* object = filter_state->getDataReadOnlyGeneric(object_name);
+  if (object == nullptr) {
+    return 0; // Return nil if object not found.
+  }
+
+  // Check if there's an optional third parameter for field access.
+  if (lua_gettop(state) >= 3 && !lua_isnil(state, 3)) {
+    const char* field_name = luaL_checkstring(state, 3);
+    if (object->hasFieldSupport()) {
+      auto field_value = object->getField(field_name);
+
+      // Convert the field value to the appropriate Lua type.
+      if (absl::holds_alternative<absl::string_view>(field_value)) {
+        const auto& str_value = absl::get<absl::string_view>(field_value);
+        lua_pushlstring(state, str_value.data(), str_value.size());
+        return 1;
+      }
+
+      if (absl::holds_alternative<int64_t>(field_value)) {
+        lua_pushnumber(state, absl::get<int64_t>(field_value));
+        return 1;
+      }
+
+      // Return nil if field is not found.
+      return 0;
+    }
+
+    // Object doesn't support field access, return nil.
+    return 0;
+  }
+
+  absl::optional<std::string> string_value = object->serializeAsString();
+  if (string_value.has_value()) {
+    const std::string& value = string_value.value();
+
+    // Return the filter state value as a string.
+    lua_pushlstring(state, value.data(), value.size());
+    return 1;
+  }
+
+  // If string serialization is not supported, return nil.
+  return 0;
 }
 
 } // namespace Lua

@@ -31,10 +31,11 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // 3. Control connection lifecycle (continue, close gracefully, or reset)
 //
 // Use cases include:
-// * Custom protocol inspection and modification
-// * Advanced traffic manipulation
-// * Security scanning and filtering
-// * Dynamic connection management
+//
+// 1. Custom protocol inspection and modification
+// 2. Advanced traffic manipulation
+// 3. Security scanning and filtering
+// 4. Dynamic connection management
 //
 // The service uses a bidirectional gRPC stream, maintaining state throughout
 // the connection lifetime while allowing asynchronous processing.
