@@ -122,12 +122,7 @@ LoadClusterEntryHandlePtr ProxyFilterConfig::addDynamicCluster(
       // update. As this cluster lifecycle is managed by DFP cluster, it should not be removed by
       // CDS. https://github.com/envoyproxy/envoy/issues/35171
       absl::Status status =
-          cluster_manager_
-              .addOrUpdateCluster(
-                  cluster, version_info,
-                  Runtime::runtimeFeatureEnabled(
-                      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update"))
-              .status();
+          cluster_manager_.addOrUpdateCluster(cluster, version_info, true).status();
       ENVOY_BUG(status.ok(),
                 absl::StrCat("Failed to update DFP cluster due to ", status.message()));
     });
@@ -320,7 +315,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // Get host value from the request headers.
   const auto host_attributes =
       Http::Utility::parseAuthority(headers.Host()->value().getStringView());
-  absl::string_view host = host_attributes.host_;
+  std::string host_str(!host_attributes.is_ip_address_ ||
+                               !absl::StrContains(host_attributes.host_, ":")
+                           ? host_attributes.host_
+                           : absl::StrCat("[", host_attributes.host_, "]"));
+  absl::string_view host = host_str;
   uint16_t port = host_attributes.port_.value_or(default_port);
 
   // Apply filter state overrides for host and port.
