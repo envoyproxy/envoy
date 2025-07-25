@@ -393,6 +393,25 @@ private:
 };
 
 /**
+ * RoleRequest sends the ROLE command to all Redis servers. The ROLE command is used to
+ * get the role of the Redis server.
+ */
+class RoleRequest : public FragmentedRequest {
+public:
+  static SplitRequestPtr create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
+                                SplitCallbacks& callbacks, CommandStats& command_stats,
+                                TimeSource& time_source, bool delay_command_latency,
+                                const StreamInfo::StreamInfo& stream_info);
+
+private:
+  RoleRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
+              bool delay_command_latency)
+      : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
+  // RedisProxy::CommandSplitter::FragmentedRequest
+  void onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) override;
+};
+
+/**
  * MSETRequest takes each key and value pair from the command and sends a SET for each to the
  * appropriate Redis server. The response is an OK if all commands succeeded or an ERR if any
  * failed.
@@ -479,6 +498,7 @@ private:
   CommandHandlerFactory<ScanRequest> scan_handler_;
   CommandHandlerFactory<InfoRequest> info_handler_;
   CommandHandlerFactory<SelectRequest> select_handler_;
+  CommandHandlerFactory<RoleRequest> role_handler_;
   CommandHandlerFactory<SplitKeysSumResultRequest> split_keys_sum_result_handler_;
   CommandHandlerFactory<TransactionRequest> transaction_handler_;
   TrieLookupTable<HandlerDataPtr> handler_lookup_table_;
