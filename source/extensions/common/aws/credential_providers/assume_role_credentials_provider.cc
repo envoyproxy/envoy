@@ -81,7 +81,8 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
   }
 
   if (!external_id_.empty()) {
-    path += fmt::format("&ExternalId={}", external_id_);
+    path +=
+        fmt::format("&ExternalId={}", Envoy::Http::Utility::PercentEncoding::encode(external_id_));
   }
 
   message.headers().setPath(path);

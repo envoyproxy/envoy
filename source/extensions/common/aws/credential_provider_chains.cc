@@ -123,7 +123,7 @@ CommonCredentialsProviderChain::CommonCredentialsProviderChain(
     const auto sts_endpoint = Utility::getSTSEndpoint(region) + ":443";
     const auto cluster_name = stsClusterName(region);
 
-    // Default session name if not provided
+    // Default session name if not provided.
     if (assume_role_config.role_session_name().empty()) {
       assume_role_config.set_role_session_name(sessionName(context.api()));
     }
