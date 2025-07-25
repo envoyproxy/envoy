@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/formatter:substitution_formatter_interface",
         "//envoy/server:filter_config_interface",
+        "//source/common/common:base64_lib",
         "//source/common/config:well_known_names",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/http:utility_lib",

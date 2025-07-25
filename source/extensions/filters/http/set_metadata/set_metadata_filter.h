@@ -29,6 +29,10 @@ struct FilterStats {
   ALL_SET_METADATA_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+using ValueType = envoy::extensions::filters::http::set_metadata::v3::Metadata_ValueType;
+using ValueEncode = envoy::extensions::filters::http::set_metadata::v3::Metadata_ValueEncode;
+using ApplyOn = envoy::extensions::filters::http::set_metadata::v3::Config_ApplyOn;
+
 struct UntypedMetadataEntry {
   bool allow_overwrite{};
   std::string metadata_namespace;
@@ -45,6 +49,8 @@ struct FormattedMetadataEntry {
   bool allow_overwrite{};
   std::string metadata_namespace;
   Formatter::FormatterPtr formatter;
+  ValueType type{envoy::extensions::filters::http::set_metadata::v3::Metadata::STRING};
+  ValueEncode encode{envoy::extensions::filters::http::set_metadata::v3::Metadata::NONE};
 };
 
 class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
@@ -66,9 +72,10 @@ public:
   const std::vector<TypedMetadataEntry>& typed() { return typed_; }
   const std::vector<FormattedMetadataEntry>& formatted() { return formatted_; }
   const FilterStats& stats() const { return stats_; }
+  ApplyOn applyOn() const { return apply_on_; }
 
 private:
-  // Private constructor for status-based creation
+  // Private constructor for status-based creation.
   Config(const envoy::extensions::filters::http::set_metadata::v3::Config& config,
          Stats::Scope& scope, const std::string& stats_prefix,
          Server::Configuration::GenericFactoryContext& factory_context,
@@ -84,12 +91,12 @@ private:
   std::vector<TypedMetadataEntry> typed_;
   std::vector<FormattedMetadataEntry> formatted_;
   FilterStats stats_;
+  ApplyOn apply_on_{envoy::extensions::filters::http::set_metadata::v3::Config::REQUEST};
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
-class SetMetadataFilter : public Http::PassThroughDecoderFilter,
-                          public Logger::Loggable<Logger::Id::filter> {
+class SetMetadataFilter : public Http::StreamFilter, public Logger::Loggable<Logger::Id::filter> {
 public:
   SetMetadataFilter(const ConfigSharedPtr config);
   ~SetMetadataFilter() override;
@@ -97,14 +104,37 @@ public:
   // Http::StreamFilterBase
   void onDestroy() override {}
 
-  // StreamDecoderFilter
+  // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override;
+  Http::FilterTrailersStatus decodeTrailers(Http::RequestTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks&) override;
 
+  // Http::StreamEncoderFilter
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
+  }
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
+  Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override {
+    return Http::FilterTrailersStatus::Continue;
+  }
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) override;
+
 private:
+  void processMetadata(Http::StreamFilterCallbacks& callbacks,
+                       Formatter::HttpFormatterContext& context);
+
   const ConfigSharedPtr config_;
-  Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
+  Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
 };
 
 } // namespace SetMetadataFilter

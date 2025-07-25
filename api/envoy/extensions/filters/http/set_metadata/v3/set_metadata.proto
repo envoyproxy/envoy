@@ -23,8 +23,29 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // [#extension: envoy.filters.http.set_metadata]
 
-// [#next-free-field: 6]
+// [#next-free-field: 8]
 message Metadata {
+  enum ValueType {
+    STRING = 0;
+
+    NUMBER = 1;
+
+    // The value is a serialized `protobuf.Value
+    // <https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/struct.proto#L62>`_.
+    PROTOBUF_VALUE = 2;
+  }
+
+  // ValueEncode defines the encoding algorithm.
+  enum ValueEncode {
+    // The value is not encoded.
+    NONE = 0;
+
+    // The value is encoded in `Base64 <https://tools.ietf.org/html/rfc4648#section-4>`_.
+    // Note: this is mostly used for STRING and PROTOBUF_VALUE to escape the
+    // non-ASCII characters in the value.
+    BASE64 = 1;
+  }
+
   // The metadata namespace.
   string metadata_namespace = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -52,14 +73,37 @@ message Metadata {
     //
     // It supports placeholder expansion such as ``%VIRTUAL_CLUSTER_NAME%``,
     // ``%REQ(header-name)%``, etc. The result will be set as a string value in
-    // the metadata.
+    // the metadata unless ``type`` is specified.
     //
     // Only one of ``value``, ``typed_value``, or ``format_string`` may be set.
     config.core.v3.SubstitutionFormatString format_string = 5;
   }
+
+  // The value's type — defaults to string.
+  // This is only used with ``format_string`` to convert the formatted string
+  // to the specified type before storing in metadata.
+  ValueType type = 6 [(validate.rules).enum = {defined_only: true}];
+
+  // How is the value encoded, default is NONE (not encoded).
+  // The value will be decoded accordingly before storing to metadata.
+  // This is only used with ``format_string``.
+  ValueEncode encode = 7;
 }
 
 message Config {
+  // Controls when the metadata should be applied.
+  enum ApplyOn {
+    // Apply metadata only during request processing (decode path).
+    // This is the default for backward compatibility.
+    REQUEST = 0;
+
+    // Apply metadata only during response processing (encode path).
+    RESPONSE = 1;
+
+    // Apply metadata during both request and response processing.
+    BOTH = 2;
+  }
+
   // The metadata namespace.
   // This field is deprecated; please use ``metadata`` as replacement.
   string metadata_namespace = 1
@@ -75,4 +119,7 @@ message Config {
 
   // Defines changes to be made to dynamic metadata.
   repeated Metadata metadata = 3;
+
+  // Controls when the metadata should be applied. Defaults to REQUEST for backward compatibility.
+  ApplyOn apply_on = 4;
 }
