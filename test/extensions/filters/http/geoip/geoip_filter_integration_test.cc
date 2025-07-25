@@ -309,8 +309,11 @@ TEST_P(GeoipFilterIntegrationTest, GeoipFilterNoCrashOnLdsUpdate) {
     test_server_->waitForGaugeEq("listener_manager.total_listeners_draining", 0);
   }
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-  Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "host"}, {"x-forwarded-for", "216.160.83.56,9.10.11.12"}};
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"x-forwarded-for", "216.160.83.56,9.10.11.12"}};
   auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
   EXPECT_EQ("Milton", headerValue("x-geo-city"));
   EXPECT_EQ("WA", headerValue("x-geo-region"));
