@@ -940,30 +940,24 @@ Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap
     cookie_domain = fmt::format(CookieDomainFormatString, config_->cookieDomain());
   }
 
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_hmac_),
-                   cookie_domain));
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().bearer_token_),
-                   cookie_domain));
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().id_token_),
-                   cookie_domain));
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().refresh_token_),
-                   cookie_domain));
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().oauth_nonce_),
-                   cookie_domain));
-  response_headers->addReferenceKey(
-      Http::Headers::get().SetCookie,
-      absl::StrCat(fmt::format(CookieDeleteFormatString, config_->cookieNames().code_verifier_),
-                   cookie_domain));
+  const std::vector<absl::string_view> cookie_names{
+      config_->cookieNames().oauth_hmac_,  config_->cookieNames().bearer_token_,
+      config_->cookieNames().id_token_,    config_->cookieNames().refresh_token_,
+      config_->cookieNames().oauth_nonce_, config_->cookieNames().code_verifier_,
+  };
+
+  for (const auto& cookie_name : cookie_names) {
+    // Cookie names prefixed with "__Secure-" or "__Host-" are special. They MUST be set with the
+    // Secure attribute so that the browser handles their deletion properly.
+    const bool add_secure_attr =
+        cookie_name.starts_with("__Secure-") || cookie_name.starts_with("__Host-");
+    const absl::string_view maybe_secure_attr = add_secure_attr ? "; Secure" : "";
+
+    response_headers->addReferenceKey(
+        Http::Headers::get().SetCookie,
+        absl::StrCat(fmt::format(CookieDeleteFormatString, cookie_name), cookie_domain,
+                     maybe_secure_attr));
+  }
 
   const std::string post_logout_redirect_url =
       absl::StrCat(headers.getSchemeValue(), "://", host_, "/");
