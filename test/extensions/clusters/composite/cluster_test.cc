@@ -38,7 +38,7 @@ public:
   void initialize(const std::string& yaml) {
     const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
     const auto typed_config =
-        TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::ClusterConfig>(
+        TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::CompositeCluster>(
             config.cluster_type().typed_config());
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
@@ -51,7 +51,7 @@ public:
     EXPECT_TRUE(creation_status.ok()) << "Error: " << creation_status.message();
     cluster_manager_ = &server_context_.cluster_manager_;
 
-    // Create thread-aware load balancer for CLUSTER_PROVIDED policy
+    // Create thread-aware load balancer for CLUSTER_PROVIDED policy.
     thread_aware_lb_ = std::make_unique<CompositeThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     lb_ = lb_factory_->create(lb_params_);
@@ -79,23 +79,25 @@ lb_policy: CLUSTER_PROVIDED
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
     - name: cluster_0
     - name: cluster_1
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
+    retry_config:
+      overflow_behavior: FAIL
 )EOF";
 
   initialize(yaml);
   EXPECT_NE(nullptr, cluster_);
-  EXPECT_EQ(2, cluster_->clusters()->size());
-  EXPECT_EQ("cluster_0", (*cluster_->clusters())[0]);
-  EXPECT_EQ("cluster_1", (*cluster_->clusters())[1]);
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::SEQUENTIAL,
-            cluster_->selectionStrategy());
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::FAIL,
-            cluster_->retryOverflowOption());
+  EXPECT_EQ(2, cluster_->subClusters()->size());
+  EXPECT_EQ("cluster_0", (*cluster_->subClusters())[0]);
+  EXPECT_EQ("cluster_1", (*cluster_->subClusters())[1]);
+  EXPECT_EQ(envoy::extensions::clusters::composite::v3::CompositeCluster::RETRY, cluster_->mode());
+  EXPECT_EQ(envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::FAIL,
+            cluster_->retryConfig().overflow_behavior());
+  EXPECT_TRUE(cluster_->honorRouteRetryPolicy());
+  EXPECT_EQ("composite_cluster", cluster_->name());
 }
 
 // Test USE_LAST_CLUSTER overflow behavior.
@@ -105,27 +107,30 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
     - name: cluster_0
     - name: cluster_1
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: USE_LAST_CLUSTER
+    retry_config:
+      overflow_behavior: USE_LAST_CLUSTER
 )EOF";
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
 
   // Test normal mapping (1-based retry attempts).
   EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(0).has_value()); // Invalid attempt 0
-  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value());     // First attempt -> first cluster
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2).value());     // Second attempt -> second cluster
+  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value()); // First attempt -> first sub-cluster
+  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2).value()); // Second attempt -> second sub-cluster
 
   // Test overflow with USE_LAST_CLUSTER behavior.
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(3).value());  // Should use last cluster (index 1)
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(10).value()); // Should still use last cluster
+  EXPECT_EQ(1,
+            lb.mapRetryAttemptToClusterIndex(3).value()); // Should use last sub-cluster (index 1)
+  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(10).value()); // Should still use last sub-cluster
 }
 
 // Test ROUND_ROBIN overflow behavior.
@@ -135,335 +140,375 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
     - name: cluster_0
     - name: cluster_1
     - name: cluster_2
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: ROUND_ROBIN
+    retry_config:
+      overflow_behavior: ROUND_ROBIN
 )EOF";
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
 
-  // Test normal mapping (1-based retry attempts).
+  // Test normal mapping.
   EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value()); // First attempt -> cluster 0
   EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2).value()); // Second attempt -> cluster 1
   EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(3).value()); // Third attempt -> cluster 2
 
-  // Test round-robin overflow.
+  // Test round-robin overflow behavior.
   EXPECT_EQ(
       0, lb.mapRetryAttemptToClusterIndex(4).value()); // Fourth attempt -> cluster 0 (round-robin)
   EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(5).value()); // Fifth attempt -> cluster 1
   EXPECT_EQ(2, lb.mapRetryAttemptToClusterIndex(6).value()); // Sixth attempt -> cluster 2
-  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(7).value()); // Seventh attempt -> cluster 0
+  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(7).value()); // Seventh attempt -> cluster 0 again
 }
 
-// Test retry attempt extraction from stream info.
-TEST_F(CompositeClusterTest, RetryAttemptExtraction) {
+// Test FAIL overflow behavior.
+TEST_F(CompositeClusterTest, FailOverflowBehavior) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: cluster_0
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
-)EOF";
-
-  initialize(yaml);
-
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
-
-  // Test with null context.
-  EXPECT_EQ(1, lb.getRetryAttemptCount(nullptr));
-
-  // Test with context containing stream info.
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(3)));
-
-  EXPECT_EQ(3, lb.getRetryAttemptCount(&context));
-}
-
-// Test cluster index mapping with FAIL behavior.
-TEST_F(CompositeClusterTest, ClusterIndexMappingFail) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
     - name: cluster_0
     - name: cluster_1
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
+    retry_config:
+      overflow_behavior: FAIL
 )EOF";
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
 
-  // Test normal mapping (1-based retry attempts).
-  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(0).has_value()); // Invalid attempt 0
-  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value());     // First attempt -> first cluster
-  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2).value());     // Second attempt -> second cluster
+  // Test normal mapping.
+  EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value()); // First attempt -> cluster 0
+  EXPECT_EQ(1, lb.mapRetryAttemptToClusterIndex(2).value()); // Second attempt -> cluster 1
 
-  // Test overflow with FAIL behavior.
-  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(3).has_value());  // Out of bounds, should fail
-  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(10).has_value()); // Far out of bounds, should fail
+  // Test fail overflow behavior.
+  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(3).has_value()); // Third attempt should fail
+  EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(4).has_value()); // Fourth attempt should also fail
 }
 
-// Test getClusterByIndex method.
+// Test name configuration.
+TEST_F(CompositeClusterTest, NameConfiguration) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+    name: "custom-name"
+)EOF";
+
+  initialize(yaml);
+  EXPECT_EQ("custom-name", cluster_->name());
+}
+
+// Test honor_route_retry_policy configuration.
+TEST_F(CompositeClusterTest, HonorRouteRetryPolicyConfiguration) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+      honor_route_retry_policy: false
+)EOF";
+
+  initialize(yaml);
+  EXPECT_FALSE(cluster_->honorRouteRetryPolicy());
+}
+
+// Test cluster selection method configuration.
+TEST_F(CompositeClusterTest, ClusterSelectionMethodConfiguration) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+      cluster_selection_method: DEFAULT
+)EOF";
+
+  initialize(yaml);
+  EXPECT_EQ(envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::DEFAULT,
+            cluster_->retryConfig().cluster_selection_method());
+}
+
+// Test error conditions - missing retry_config for RETRY mode.
+TEST(CompositeClusterErrorTest, MissingRetryConfig) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+)EOF";
+
+  const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
+  const auto typed_config =
+      TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::CompositeCluster>(
+          config.cluster_type().typed_config());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context, nullptr, nullptr,
+                                                             false);
+  absl::Status creation_status = absl::OkStatus();
+  auto cluster = std::make_unique<Cluster>(config, typed_config, factory_context, creation_status);
+  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status.message(),
+              testing::HasSubstr("retry_config is required when mode is RETRY"));
+}
+
+// Test error conditions - empty sub_clusters.
+TEST(CompositeClusterErrorTest, EmptySubClusters) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters: []
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
+  const auto typed_config =
+      TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::CompositeCluster>(
+          config.cluster_type().typed_config());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context, nullptr, nullptr,
+                                                             false);
+  absl::Status creation_status = absl::OkStatus();
+  auto cluster = std::make_unique<Cluster>(config, typed_config, factory_context, creation_status);
+  EXPECT_FALSE(creation_status.ok());
+  EXPECT_THAT(creation_status.message(), testing::HasSubstr("must have at least one sub-cluster"));
+}
+
+// Test connection lifetime callbacks.
+TEST_F(CompositeClusterTest, ConnectionLifetimeCallbacks) {
+  CompositeConnectionLifetimeCallbacks callbacks;
+
+  // Create a simple implementation for testing.
+  class TestConnectionLifetimeCallbacks
+      : public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
+  public:
+    void onConnectionOpen(Envoy::Http::ConnectionPool::Instance&, std::vector<uint8_t>&,
+                          const Network::Connection&) override {
+      open_called = true;
+    }
+    void onConnectionDraining(Envoy::Http::ConnectionPool::Instance&, std::vector<uint8_t>&,
+                              const Network::Connection&) override {
+      draining_called = true;
+    }
+    bool open_called = false;
+    bool draining_called = false;
+  };
+
+  TestConnectionLifetimeCallbacks test_callback;
+
+  // Add callback.
+  callbacks.addCallback(&test_callback);
+
+  // Set up mock objects for callback invocation.
+  NiceMock<Envoy::Http::ConnectionPool::MockInstance> mock_pool;
+  std::vector<uint8_t> hash_key = {1, 2, 3};
+  NiceMock<Network::MockConnection> mock_connection;
+
+  // Trigger callbacks.
+  callbacks.onConnectionOpen(mock_pool, hash_key, mock_connection);
+  callbacks.onConnectionDraining(mock_pool, hash_key, mock_connection);
+
+  // Verify callbacks were called.
+  EXPECT_TRUE(test_callback.open_called);
+  EXPECT_TRUE(test_callback.draining_called);
+
+  // Remove callback.
+  callbacks.removeCallback(&test_callback);
+
+  // Clear all callbacks.
+  callbacks.clearCallbacks();
+}
+
+// Test load balancer context functionality.
+TEST_F(CompositeClusterTest, LoadBalancerContext) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    - name: cluster_1
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
+
+  // Mock load balancer context with retry attempt information.
+  NiceMock<Upstream::MockLoadBalancerContext> mock_context;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+
+  ON_CALL(mock_context, requestStreamInfo()).WillByDefault(Return(&mock_stream_info));
+  ON_CALL(mock_stream_info, attemptCount()).WillByDefault(Return(absl::optional<uint32_t>(2)));
+
+  // Test retry attempt count extraction.
+  EXPECT_EQ(2, lb.getRetryAttemptCount(&mock_context));
+
+  // Test null context.
+  EXPECT_EQ(1, lb.getRetryAttemptCount(nullptr));
+}
+
+// Test factory creation.
+TEST_F(CompositeClusterTest, FactoryCreation) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    - name: cluster_1
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context, nullptr, nullptr,
+                                                             false);
+
+  ClusterFactory factory;
+  auto result = factory.create(config, factory_context);
+  EXPECT_TRUE(result.ok());
+  EXPECT_NE(nullptr, result.value().first);
+  EXPECT_NE(nullptr, result.value().second);
+}
+
+// Test getClusterByIndex with valid and invalid indices.
 TEST_F(CompositeClusterTest, GetClusterByIndex) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
     - name: cluster_0
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
+    retry_config:
+      overflow_behavior: FAIL
 )EOF";
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
 
-  auto cluster = lb.getClusterByIndex(5);
-  EXPECT_EQ(nullptr, cluster);
-}
+  // Test out of bounds index.
+  EXPECT_EQ(nullptr, lb.getClusterByIndex(5));
 
-// Test getClusterByIndex when cluster is not found.
-TEST_F(CompositeClusterTest, GetClusterByIndexClusterNotFound) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: missing_cluster
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
-)EOF";
-
-  initialize(yaml);
-
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
-
-  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster"))
+  // Test valid index but cluster not found.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_0"))
       .WillOnce(Return(nullptr));
-
-  auto cluster = lb.getClusterByIndex(0);
-  EXPECT_EQ(nullptr, cluster);
+  EXPECT_EQ(nullptr, lb.getClusterByIndex(0));
 }
 
-// Test load balancer methods when no cluster is found.
-TEST_F(CompositeClusterTest, LoadBalancerMethodsNoCluster) {
+// Test load balancer context with null stream info.
+TEST_F(CompositeClusterTest, LoadBalancerContextNullStreamInfo) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: missing_cluster
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
-)EOF";
-
-  initialize(yaml);
-
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
-
-  NiceMock<Upstream::MockLoadBalancerContext> context;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
-  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
-  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("missing_cluster"))
-      .WillRepeatedly(Return(nullptr));
-
-  // Test chooseHost with missing cluster.
-  auto host_result = lb.chooseHost(&context);
-  EXPECT_EQ(nullptr, host_result.host);
-
-  // Test peekAnotherHost with missing cluster.
-  auto peek_result = lb.peekAnotherHost(&context);
-  EXPECT_EQ(nullptr, peek_result);
-
-  // Test selectExistingConnection with missing cluster.
-  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
-  std::vector<uint8_t> hash_key;
-  auto connection_result = lb.selectExistingConnection(&context, *mock_host, hash_key);
-  EXPECT_FALSE(connection_result.has_value());
-}
-
-// Test cluster update callbacks.
-TEST_F(CompositeClusterTest, ClusterUpdateCallbacks) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
     - name: cluster_0
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
+    retry_config:
+      overflow_behavior: FAIL
 )EOF";
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
 
-  // Test onClusterAddOrUpdate.
-  NiceMock<Upstream::MockThreadLocalCluster> mock_tlc;
-  Upstream::ThreadLocalClusterCommand command = [&mock_tlc]() -> Upstream::ThreadLocalCluster& {
-    return mock_tlc;
-  };
-  lb.onClusterAddOrUpdate("new_cluster", command);
-
-  // Test onClusterRemoval.
-  lb.onClusterRemoval("removed_cluster");
-}
-
-// Test cluster factory name.
-TEST_F(CompositeClusterTest, ClusterFactoryName) {
-  ClusterFactory factory;
-  EXPECT_EQ("envoy.clusters.composite", factory.name());
-}
-
-// Test lifetime callbacks method.
-TEST_F(CompositeClusterTest, LifetimeCallbacks) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: cluster_0
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
-)EOF";
-
-  initialize(yaml);
-
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
-
-  // Test that lifetimeCallbacks() returns a valid OptRef.
-  auto callbacks = lb.lifetimeCallbacks();
-  EXPECT_TRUE(callbacks.has_value());
-}
-
-// Test the getter methods runtime() and random().
-TEST_F(CompositeClusterTest, ClusterGetterMethods) {
-  const std::string yaml = R"EOF(
-name: getter_cluster
-connect_timeout: 0.25s
-lb_policy: CLUSTER_PROVIDED
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: test_cluster
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
-)EOF";
-
-  initialize(yaml);
-
-  EXPECT_NE(nullptr, &cluster_->runtime());
-  EXPECT_NE(nullptr, &cluster_->random());
-}
-
-// Test LoadBalancerContext methods.
-TEST_F(CompositeClusterTest, LoadBalancerContextMethods) {
+  // Mock context returning null stream info.
   NiceMock<Upstream::MockLoadBalancerContext> mock_context;
-  CompositeLoadBalancerContext wrapper(&mock_context, 2);
+  ON_CALL(mock_context, requestStreamInfo()).WillByDefault(Return(nullptr));
 
-  testing::NiceMock<Router::MockMetadataMatchCriteria> criteria;
-  EXPECT_CALL(mock_context, metadataMatchCriteria()).WillOnce(Return(&criteria));
-  EXPECT_EQ(&criteria, wrapper.metadataMatchCriteria());
-
-  absl::optional<std::pair<absl::string_view, bool>> override_host =
-      std::make_pair("override_host", true);
-  EXPECT_CALL(mock_context, overrideHostToSelect()).WillOnce(Return(override_host));
-  EXPECT_EQ(override_host, wrapper.overrideHostToSelect());
-
-  std::function<void(Http::ResponseHeaderMap&)> modifier;
-  EXPECT_CALL(mock_context, setHeadersModifier(_));
-  wrapper.setHeadersModifier(std::move(modifier));
+  EXPECT_EQ(1, lb.getRetryAttemptCount(&mock_context));
 }
 
-// Test factory create method coverage.
-TEST_F(CompositeClusterTest, FactoryCreateMethodCoverage) {
-  ClusterFactory factory;
-  envoy::config::cluster::v3::Cluster cluster_config;
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
-                                                             false);
-
-  cluster_config.set_name("test_factory_cluster");
-  cluster_config.mutable_connect_timeout()->set_seconds(5);
-  cluster_config.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
-
-  auto* cluster_type = cluster_config.mutable_cluster_type();
-  cluster_type->set_name("envoy.clusters.composite");
-  envoy::extensions::clusters::composite::v3::ClusterConfig typed_config;
-  auto* cluster_entry1 = typed_config.add_clusters();
-  cluster_entry1->set_name("factory_cluster_1");
-  auto* cluster_entry2 = typed_config.add_clusters();
-  cluster_entry2->set_name("factory_cluster_2");
-  typed_config.set_selection_strategy(
-      envoy::extensions::clusters::composite::v3::ClusterConfig::SEQUENTIAL);
-  typed_config.set_retry_overflow_option(
-      envoy::extensions::clusters::composite::v3::ClusterConfig::FAIL);
-  cluster_type->mutable_typed_config()->PackFrom(typed_config);
-
-  auto result = factory.create(cluster_config, factory_context);
-  EXPECT_TRUE(result.ok());
-  EXPECT_NE(nullptr, result.value().first);
-  EXPECT_NE(nullptr, result.value().second);
-}
-
-// Test successful chooseHost delegation.
-TEST_F(CompositeClusterTest, ChooseHostSuccessfulDelegation) {
+// Test chooseHost delegation to sub-cluster.
+TEST_F(CompositeClusterTest, ChooseHostDelegation) {
   const std::string yaml = R"EOF(
-name: delegation_cluster
+name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
-    - name: target_cluster
-    selection_strategy: SEQUENTIAL
-    retry_overflow_option: FAIL
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
 )EOF";
 
   initialize(yaml);
 
-  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->clusters(),
-                                  cluster_->selectionStrategy(), cluster_->retryOverflowOption());
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
 
-  // Set up mocks for successful delegation.
+  // Set up mocks.
   NiceMock<Upstream::MockLoadBalancerContext> context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
@@ -473,37 +518,295 @@ cluster_type:
 
   EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
   EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
-  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("target_cluster"))
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_0"))
       .WillRepeatedly(Return(&mock_cluster));
   EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
   EXPECT_CALL(mock_cluster, info()).WillRepeatedly(Return(cluster_info));
-  std::string target_cluster_name = "target_cluster";
-  EXPECT_CALL(*cluster_info, name()).WillRepeatedly(ReturnRef(target_cluster_name));
+  std::string cluster_name = "cluster_0";
+  EXPECT_CALL(*cluster_info, name()).WillRepeatedly(ReturnRef(cluster_name));
   EXPECT_CALL(mock_lb, chooseHost(_)).WillOnce(Return(Upstream::HostSelectionResponse{mock_host}));
 
   auto result = lb.chooseHost(&context);
   EXPECT_EQ(mock_host, result.host);
 }
 
-// Test default configuration values.
-TEST_F(CompositeClusterTest, DefaultConfigurationValues) {
+// Test peekAnotherHost delegation.
+TEST_F(CompositeClusterTest, PeekAnotherHostDelegation) {
   const std::string yaml = R"EOF(
-name: default_cluster
+name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    clusters:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
     - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
 )EOF";
 
   initialize(yaml);
 
-  // When no explicit values are set, should use defaults.
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::SEQUENTIAL,
-            cluster_->selectionStrategy());
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::FAIL,
-            cluster_->retryOverflowOption());
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
+
+  // Set up mocks.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
+  NiceMock<Upstream::MockLoadBalancer> mock_lb;
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_0"))
+      .WillRepeatedly(Return(&mock_cluster));
+  EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
+  EXPECT_CALL(mock_lb, peekAnotherHost(_)).WillOnce(Return(mock_host));
+
+  auto result = lb.peekAnotherHost(&context);
+  EXPECT_EQ(mock_host, result);
+}
+
+// Test selectExistingConnection delegation.
+TEST_F(CompositeClusterTest, SelectExistingConnectionDelegation) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
+
+  // Set up mocks.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
+  NiceMock<Upstream::MockLoadBalancer> mock_lb;
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  std::vector<uint8_t> hash_key = {1, 2, 3};
+
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(1)));
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_0"))
+      .WillRepeatedly(Return(&mock_cluster));
+  EXPECT_CALL(mock_cluster, loadBalancer()).WillRepeatedly(ReturnRef(mock_lb));
+
+  absl::optional<Upstream::SelectedPoolAndConnection> selected = absl::nullopt;
+  EXPECT_CALL(mock_lb, selectExistingConnection(_, _, _)).WillOnce(Return(selected));
+
+  auto result = lb.selectExistingConnection(&context, *mock_host, hash_key);
+  EXPECT_FALSE(result.has_value());
+}
+
+// Test lifetime callbacks getter.
+TEST_F(CompositeClusterTest, LifetimeCallbacksGetter) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
+
+  auto callbacks = lb.lifetimeCallbacks();
+  EXPECT_TRUE(callbacks.has_value());
+}
+
+// Test cluster update callbacks.
+TEST_F(CompositeClusterTest, ClusterUpdateCallbacks) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
+
+  // Test onClusterAddOrUpdate - should be no-op.
+  NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
+  Upstream::ThreadLocalClusterCommand command = [&mock_cluster]() -> Upstream::ThreadLocalCluster& {
+    return mock_cluster;
+  };
+  lb.onClusterAddOrUpdate("new_cluster", command);
+
+  // Test onClusterRemoval - should just log.
+  lb.onClusterRemoval("removed_cluster");
+}
+
+// Test thread aware load balancer initialization.
+TEST_F(CompositeClusterTest, ThreadAwareLoadBalancerInitialization) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  // Verify thread aware LB initializes successfully.
+  EXPECT_NE(nullptr, thread_aware_lb_);
+  EXPECT_NE(nullptr, thread_aware_lb_->factory());
+  EXPECT_TRUE(thread_aware_lb_->initialize().ok());
+}
+
+// Test cluster initialization phase.
+TEST_F(CompositeClusterTest, ClusterInitializePhase) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  EXPECT_EQ(Upstream::Cluster::InitializePhase::Primary, cluster_->initializePhase());
+}
+
+// Test factory name.
+TEST_F(CompositeClusterTest, FactoryName) {
+  ClusterFactory factory;
+  EXPECT_EQ("envoy.clusters.composite", factory.name());
+}
+
+// Test context getters.
+TEST_F(CompositeClusterTest, ContextGetters) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  EXPECT_NE(nullptr, &cluster_->context());
+  EXPECT_NE(nullptr, &cluster_->runtime());
+  EXPECT_NE(nullptr, &cluster_->random());
+}
+
+// Test load balancer methods with no valid cluster index.
+TEST_F(CompositeClusterTest, LoadBalancerMethodsNoValidIndex) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
+
+  // Set up context with attempt that will map to invalid index.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(absl::optional<uint32_t>(10)));
+
+  // All methods should return null/empty.
+  auto host_result = lb.chooseHost(&context);
+  EXPECT_EQ(nullptr, host_result.host);
+
+  auto peek_result = lb.peekAnotherHost(&context);
+  EXPECT_EQ(nullptr, peek_result);
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  std::vector<uint8_t> hash_key;
+  auto conn_result = lb.selectExistingConnection(&context, *mock_host, hash_key);
+  EXPECT_FALSE(conn_result.has_value());
+}
+
+// Test member update callback when stream_info returns no attempt count.
+TEST_F(CompositeClusterTest, LoadBalancerContextNoAttemptCount) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    mode: RETRY
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->mode(), cluster_->retryConfig(),
+                                  cluster_->honorRouteRetryPolicy());
+
+  // Mock context with stream info that returns no attempt count.
+  NiceMock<Upstream::MockLoadBalancerContext> mock_context;
+  NiceMock<StreamInfo::MockStreamInfo> mock_stream_info;
+  ON_CALL(mock_context, requestStreamInfo()).WillByDefault(Return(&mock_stream_info));
+  ON_CALL(mock_stream_info, attemptCount()).WillByDefault(Return(absl::nullopt));
+
+  EXPECT_EQ(1, lb.getRetryAttemptCount(&mock_context));
 }
 
 } // namespace Composite

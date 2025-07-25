@@ -2,29 +2,32 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.composite.v3;
 
+import "google/protobuf/wrappers.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.clusters.composite.v3";
-option java_outer_classname = "ClusterProto";
+option java_outer_classname = "CompositeClusterProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/composite/v3;compositev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Composite cluster configuration]
-// Configuration for the composite cluster. This cluster type provides flexible sub-cluster 
-// selection strategies for various use cases including retry progression, cross-cluster failover, etc.
-// In future, this could be extended for use-cases like stateful session affinity.
+// The composite cluster filter allows Envoy to route requests across multiple upstream clusters
+// based on configurable strategies. This enables sophisticated failover and retry behavior
+// across different clusters with potentially different configurations.
 //
-// The composite cluster enables Envoy to route requests and retries across multiple clusters
-// in a configured order, allowing for sophisticated failover strategies. For example, a primary
-// cluster can be used for initial requests, while retries are directed to secondary clusters.
-// Each cluster can have its own TLS settings, filter chains, and connection pool configurations.
+// The filter supports different modes of operation:
 //
-// See the :ref:`architecture overview <arch_overview_composite_cluster>` for more information.
+// * Retry mode: Automatically progress through clusters on retry attempts
+// * Future modes may include: weighted distribution, hedged requests, mirroring, etc.
 //
-// Example:
+// Each sub-cluster maintains its own configuration including TLS settings, outlier detection,
+// circuit breakers, and connection pool settings. This allows for heterogeneous cluster
+// configurations within a single logical composite cluster.
+//
+// Example configuration for retry-based failover:
 //
 // .. code-block:: yaml
 //
@@ -34,62 +37,107 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //     cluster_type:
 //       name: envoy.clusters.composite
 //       typed_config:
-//         "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-//         clusters:
+//         "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+//         mode: RETRY
+//         retry_config:
+//           overflow_behavior: USE_LAST_CLUSTER
+//         sub_clusters:
 //         - name: primary_cluster
 //         - name: secondary_cluster
-//         selection_strategy: SEQUENTIAL
-//         retry_overflow_option: USE_LAST_CLUSTER
 //
 // [#extension: envoy.clusters.composite]
-
-message ClusterConfig {
+// [#next-free-field: 5]
+message CompositeCluster {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.clusters.composite.v3.ClusterConfig";
+      "envoy.extensions.clusters.composite.v3.CompositeCluster";
 
-  // Cluster selection strategy determines how clusters are chosen for requests and retries.
-  enum SelectionStrategy {
-    // Sequential selection: first cluster for initial request, second for first retry, etc.
-    // This is the primary strategy for retry-based progression where requests fail over
-    // to the next cluster in the list with each retry attempt.
-    SEQUENTIAL = 0;
+  // Specifies the mode of operation for the composite cluster.
+  enum ClusterMode {
+    // In the retry mode, requests progress through sub-clusters based on retry attempts.
+    // The first request goes to the first cluster, first retry to the second cluster,
+    // and so on. This is useful for implementing cross-region failover strategies.
+    RETRY = 0;
   }
 
-  // Options for handling retry overflow when retry attempts exceed available clusters.
-  enum RetryOverflowOption {
-    // Fail when retry attempts exceed the number of configured clusters.
-    //
-    // This is the default behavior.
-    FAIL = 0;
-
-    // Continue using the last cluster in the list for further retry attempts.
-    //
-    // This allows for unlimited retries to the final cluster in the configuration.
-    USE_LAST_CLUSTER = 1;
-
-    // Round-robin through available clusters for overflow attempts.
-    //
-    // After exhausting all clusters once, retry attempts cycle back to the first cluster.
-    ROUND_ROBIN = 2;
-  }
-
-  // Individual cluster entries.
-  message ClusterEntry {
-    // Name of the cluster to use. The cluster must be defined elsewhere in the configuration.
+  // Configuration for an individual sub-cluster within the composite cluster.
+  // [#next-free-field: 2]
+  message SubCluster {
+    // The name of the cluster. This must match a cluster defined in the
+    // Envoy configuration. The cluster can be of any type (EDS, STRICT_DNS, etc.)
+    // and can have its own independent configuration.
     string name = 1 [(validate.rules).string = {min_len: 1}];
   }
 
-  // List of clusters with their configurations. Must contain at least one cluster.
-  // The order of clusters is important for the ``SEQUENTIAL`` selection strategy.
-  repeated ClusterEntry clusters = 1 [(validate.rules).repeated = {min_items: 1}];
+  // Configuration specific to ``RETRY`` mode operation.
+  // [#next-free-field: 4]
+  message RetryConfig {
+    // Specifies the behavior when the number of retry attempts exceeds
+    // the number of configured sub-clusters.
+    enum OverflowBehavior {
+      // Return an error when retry attempts exceed available clusters.
+      // This is the default behavior to prevent unbounded retries.
+      FAIL = 0;
 
-  // Strategy for selecting clusters during request processing.
-  //
-  // If not specified, defaults to ``SEQUENTIAL`` for backward compatibility and retry use cases.
-  SelectionStrategy selection_strategy = 2;
+      // Continue using the last cluster in the list for all subsequent
+      // retry attempts. This allows for multiple retry attempts to the
+      // final cluster in the configuration.
+      USE_LAST_CLUSTER = 1;
 
-  // Controls behavior when the number of retry attempts exceeds the number of configured clusters.
+      // Cycle through the available clusters in round-robin fashion.
+      // After exhausting all clusters, retry attempts restart from the
+      // first cluster.
+      ROUND_ROBIN = 2;
+    }
+
+    // Defines how to select the next cluster for retry attempts.
+    enum ClusterSelectionMethod {
+      // Default selection.
+      //
+      // Envoy progress through clusters in the order they are defined.
+      // First retry uses second cluster, second retry uses third
+      // cluster, etc.
+      DEFAULT = 0;
+    }
+
+    // Controls the behavior when retry attempts exceed the number of
+    // configured sub-clusters.
+    //
+    // If not specified, defaults to ``FAIL``.
+    OverflowBehavior overflow_behavior = 1;
+
+    // Specifies how clusters are selected for retry attempts.
+    //
+    // If not specified, defaults to ``DEFAULT``.
+    ClusterSelectionMethod cluster_selection_method = 2;
+
+    // If ``true``, the composite cluster will honor the retry policy configured
+    // at the route level for determining retry conditions (5xx, reset, etc.).
+    // If ``false``, retries will be triggered based on connection failures only.
+    //
+    // If not specified, defaults to ``true``.
+    google.protobuf.BoolValue honor_route_retry_policy = 3;
+  }
+
+  // The operational mode for this composite cluster.
   //
-  // If not specified, defaults to ``FAIL``.
-  RetryOverflowOption retry_overflow_option = 3;
+  // Currently only ``RETRY`` mode is supported.
+  ClusterMode mode = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // The list of sub-clusters that make up this composite cluster.
+  // Must contain at least one cluster. The order of clusters is important
+  // for modes like ``RETRY`` where progression follows the defined sequence.
+  repeated SubCluster sub_clusters = 2 [(validate.rules).repeated = {min_items: 1}];
+
+  // Mode-specific configuration. The specific configuration must match
+  // the selected mode.
+  oneof mode_config {
+    // Configuration specific to ``RETRY`` mode.
+    // Required when mode is ``RETRY``.
+    RetryConfig retry_config = 3;
+  }
+
+  // Optional human-readable name for this composite cluster used in
+  // stats and logging. If not specified, uses the cluster name from
+  // the top-level cluster configuration.
+  string name = 4;
 }

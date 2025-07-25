@@ -3,115 +3,172 @@
 Composite cluster
 =================
 
-The composite cluster type provides flexible sub-cluster selection strategies for various use cases. Unlike the standard :ref:`aggregate cluster <arch_overview_load_balancing_types_aggregate>` which performs health-based failover, the composite cluster implements configurable cluster selection strategies.
+.. attention::
+
+  The composite cluster type is currently under active development and should be considered experimental.
+  This cluster type provides flexible sub-cluster selection strategies with initial support for retry progression.
+
+The composite cluster type enables sophisticated routing and retry strategies across multiple upstream clusters.
+It provides a configurable framework for selecting among sub-clusters based on various strategies, with the
+initial implementation supporting retry-based progression.
 
 .. note::
 
-  The composite cluster is not related to load balancing in the traditional sense as it cannot be configured with specific health checking or outlier detection settings like other clusters. Instead, health checking and outlier detection are performed by the sub-clusters, and the composite cluster provides the ability to select among them based on configurable strategies.
+  The composite cluster is not a traditional load balancing cluster. It does not perform health checking or
+  outlier detection directly. Instead, it delegates to configured sub-clusters, each maintaining their own
+  health checking, outlier detection, and load balancing policies.
+
+Overview
+--------
+
+The composite cluster acts as a router that selects among multiple configured sub-clusters based on the
+operational mode. Each sub-cluster is a fully configured Envoy cluster with its own settings for:
+
+* Load balancing policy
+* Health checking
+* Outlier detection
+* TLS configuration
+* Connection pool settings
+* Circuit breakers
+
+This design allows heterogeneous cluster configurations within a single logical composite cluster,
+enabling advanced use cases like cross-datacenter failover with different security policies per datacenter.
 
 Use cases
 ---------
 
-The composite cluster addresses several important scenarios:
+**Retry-based Progression**
+  Route initial requests to a primary cluster, with retries automatically progressing through
+  secondary and tertiary clusters. This enables sophisticated cross-datacenter or cross-region
+  failover strategies.
 
-* **Retry-based progression**: Different clusters for retry attempts (primary → secondary → tertiary)
-* **Cross-cluster failover**: More flexible alternative to traditional aggregate clusters
-* **Future extensibility**: Potential for stateful session affinity and advanced routing strategies
-* **Cluster specifier replacement**: More flexible routing decisions than weighted clusters
+**Future Use-Cases**
+  * Weighted distribution across clusters.
+  * Session affinity with cluster stickiness.
 
 Configuration
 -------------
 
-The composite cluster is configured using the :ref:`composite cluster configuration <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>`. This includes a list of clusters with their individual configurations, a selection strategy, and overflow behavior settings.
+The composite cluster is configured using the
+:ref:`CompositeCluster <envoy_v3_api_msg_extensions.clusters.composite.v3.CompositeCluster>` message.
 
-Example configuration
-~~~~~~~~~~~~~~~~~~~~~
+The configuration requires:
 
-The following example shows a composite cluster with three sub-clusters configured for retry progression:
+1. An operational ``mode`` (currently only ``RETRY`` is supported)
+2. A list of ``sub_clusters`` referencing existing cluster names
+3. Mode-specific configuration (e.g., ``retry_config`` for RETRY mode)
+
+Basic example
+~~~~~~~~~~~~~
 
 .. code-block:: yaml
 
-  name: composite_cluster
-  connect_timeout: 0.25s
-  lb_policy: CLUSTER_PROVIDED
-  cluster_type:
-    name: envoy.clusters.composite
+  static_resources:
+    clusters:
+    - name: composite_cluster
+      connect_timeout: 0.25s
+      lb_policy: CLUSTER_PROVIDED  # Required for composite clusters
+      cluster_type:
+        name: envoy.clusters.composite
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+          mode: RETRY
+          sub_clusters:
+          - name: primary_cluster
+          - name: secondary_cluster
+          retry_config:
+            overflow_behavior: FAIL
+
+    # Define the sub-clusters
+    - name: primary_cluster
+      type: STRICT_DNS
+      connect_timeout: 0.25s
+      load_assignment:
+        cluster_name: primary_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: primary.example.com
+                  port_value: 443
+
+    - name: secondary_cluster
+      type: STRICT_DNS
+      connect_timeout: 0.25s
+      load_assignment:
+        cluster_name: secondary_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: secondary.example.com
+                  port_value: 443
+
+Retry mode
+----------
+
+In ``RETRY`` mode, the composite cluster selects sub-clusters based on the retry attempt number:
+
+* **Initial request** (Attempt #1): Routes to the first sub-cluster.
+* **First retry** (Attempt #2): Routes to the second sub-cluster.
+* **Second retry** (Attempt #3): Routes to the third sub-cluster.
+* **Further retries**: Behavior determined by ``overflow_behavior``.
+
+The retry progression works in conjunction with Envoy's
+:ref:`retry policies <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_on>`. The route configuration
+determines what constitutes a retriable failure (5xx, reset, etc.).
+
+Configuration example
+~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: yaml
+
+  static_resources:
+    clusters:
+    - name: multi_region_cluster
+      connect_timeout: 0.25s
+      lb_policy: CLUSTER_PROVIDED
+      cluster_type:
+        name: envoy.clusters.composite
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+          mode: RETRY
+          name: "composite_cluster"
+          sub_clusters:
+          - name: us_east_cluster
+          - name: us_west_cluster
+          - name: eu_west_cluster
+          retry_config:
+            overflow_behavior: USE_LAST_CLUSTER
+            cluster_selection_method: DEFAULT
+            honor_route_retry_policy: true
+
+  # Route configuration with retry policy
+  http_filters:
+  - name: envoy.filters.http.router
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-      clusters:
-      - name: primary_cluster
-      - name: secondary_cluster
-      - name: tertiary_cluster
-      selection_strategy: SEQUENTIAL
-      retry_overflow_option: ROUND_ROBIN
-
-Selection strategies
---------------------
-
-Currently, the composite cluster supports the SEQUENTIAL selection strategy:
-
-SEQUENTIAL
-~~~~~~~~~~
-
-The SEQUENTIAL strategy selects clusters in order based on the retry attempt number:
-
-* **Initial request** (attempt 1): Uses the first cluster
-* **First retry** (attempt 2): Uses the second cluster
-* **Second retry** (attempt 3): Uses the third cluster
-* **Further retries**: Handled according to the overflow option
-
-This strategy is ideal for retry-based progression where you want to try different clusters in a specific order.
-
-.. note::
-
-  Future versions may support additional strategies like WEIGHTED_RANDOM for probabilistic selection, LEAST_REQUEST for load-based selection, CONSISTENT_HASH for session affinity, and HEALTH_BASED for health-aware routing.
-
-Overflow handling
------------------
-
-When retry attempts exceed the number of configured clusters, the behavior is controlled by the ``retry_overflow_option``:
-
-FAIL
-~~~~
-
-Further retry attempts fail with no host available. This is the default behavior and ensures strict adherence to the configured cluster progression.
-
-USE_LAST_CLUSTER
-~~~~~~~~~~~~~~~~~
-
-Continue using the last cluster in the list for all subsequent retry attempts. This provides a fallback mechanism while maintaining the progression for earlier retries.
-
-ROUND_ROBIN
-~~~~~~~~~~~
-
-Round-robin through all available clusters for overflow attempts. For example, with 3 clusters, the 4th attempt uses cluster 1, the 5th uses cluster 2, etc. This provides continued load distribution even for excessive retry scenarios.
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  route_config:
+    virtual_hosts:
+    - name: backend
+      domains: ["*"]
+      routes:
+      - match:
+          prefix: "/"
+        route:
+          cluster: multi_region_cluster
+          retry_policy:
+            retry_on: "5xx,reset,connect-failure,retriable-4xx"
+            num_retries: 5
+            retry_host_predicate:
+            - name: envoy.retry_host_predicates.previous_hosts
 
 Connection lifetime callbacks
 -----------------------------
 
-The composite cluster aggregates connection lifetime callbacks from all sub-clusters, providing a unified interface for monitoring connection events across the entire cluster set. This ensures that upstream connection monitoring works seamlessly regardless of which sub-cluster is selected.
-
-Important considerations
-------------------------
-
-* **Sub-cluster independence**: Each sub-cluster maintains its own health checking, load balancing, and outlier detection
-* **Retry policy coordination**: The composite cluster works with Envoy's retry policies to determine retry attempt numbers
-* **Thread-local clustering**: The cluster selection occurs at the thread-local level for optimal performance
-* **Configuration validation**: All sub-clusters must exist and be properly configured
-
-Comparison with aggregate cluster
----------------------------------
-
-+------------------+---------------------------+-------------------------------+
-| Feature          | Aggregate Cluster         | Composite Cluster             |
-+==================+===========================+===============================+
-| Selection basis  | Health status             | Retry attempts / Strategy     |
-+------------------+---------------------------+-------------------------------+
-| Primary use case | Health-based failover     | Retry progression & routing   |
-+------------------+---------------------------+-------------------------------+
-| Extensibility    | Limited to health logic   | Configurable strategies       |
-+------------------+---------------------------+-------------------------------+
-| Overflow handling| Health-dependent          | Configurable (FAIL/LAST/RR)   |
-+------------------+---------------------------+-------------------------------+
-| Future potential | Health improvements       | Session affinity, weighting   |
-+------------------+---------------------------+-------------------------------+
+The composite cluster aggregates connection lifetime callbacks from all sub-clusters, providing a
+unified interface for monitoring connection events across the entire cluster set. This ensures that
+connection pool metrics and observability features work seamlessly regardless of which sub-cluster
+is selected.
