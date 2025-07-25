@@ -157,6 +157,7 @@ public:
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
               CookieConfig_SameSite_DISABLED,
       int csrf_token_expires_in = 0, int code_verifier_token_expires_in = 0) {
+
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -3758,6 +3759,68 @@ TEST_F(OAuth2Test, RequestIsUnchangedWhenPassThroughMatcherMatches) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
+}
+
+// Verify cookie prefixes "__Secure-" and "__Host-" cause addition of the "Secure" attribute at
+// signout.
+TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
+  auto make_config =
+      [&](absl::string_view prefix) -> envoy::extensions::filters::http::oauth2::v3::OAuth2Config {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    p.set_authorization_endpoint("https://auth2.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    auto* credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+    auto* cookie_names = credentials->mutable_cookie_names();
+    cookie_names->set_oauth_hmac(absl::StrCat(prefix, "OauthHMAC"));
+    cookie_names->set_bearer_token(absl::StrCat(prefix, "BearerToken"));
+    cookie_names->set_id_token(absl::StrCat(prefix, "IdToken"));
+    cookie_names->set_refresh_token(absl::StrCat(prefix, "RefreshToken"));
+    cookie_names->set_oauth_nonce(absl::StrCat(prefix, "OauthNonce"));
+    cookie_names->set_code_verifier(absl::StrCat(prefix, "CodeVerifier"));
+
+    auto* matcher = p.add_pass_through_matcher();
+    matcher->set_name(":method");
+    matcher->mutable_string_match()->set_exact("OPTIONS");
+
+    return p;
+  };
+
+  auto run_test_with_prefix = [&](absl::string_view prefix, bool expect_secure) {
+    auto p = make_config(prefix);
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    init(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
+                                        scope_, "test."));
+
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke([&](Http::ResponseHeaderMap& passed_headers, bool) {
+          EXPECT_EQ(passed_headers.get(Http::Headers::get().SetCookie).size(), 6);
+          const auto& cookie_str =
+              passed_headers.get(Http::Headers::get().SetCookie)[0]->value().getStringView();
+          if (expect_secure) {
+            EXPECT_THAT(cookie_str, testing::HasSubstr("; Secure"));
+          } else {
+            EXPECT_THAT(cookie_str, testing::Not(testing::HasSubstr("; Secure")));
+          }
+        }));
+    auto request_headers = Http::TestRequestHeaderMapImpl{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+    };
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, false));
+  };
+
+  run_test_with_prefix("__Secure-", true);
+  run_test_with_prefix("__Host-", true);
+  run_test_with_prefix("", false);
 }
 
 } // namespace Oauth2
