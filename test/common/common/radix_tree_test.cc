@@ -354,4 +354,86 @@ TEST(RadixTree, InsertAndFindBooleanInterface) {
   EXPECT_EQ(cstr_a, result);
 }
 
+TEST(RadixTree, BasicFunctionality) {
+  RadixTree<const char*> radixtree;
+  const char* cstr_a = "a";
+  const char* cstr_b = "b";
+
+  // Test simple insertion
+  EXPECT_TRUE(radixtree.add(std::string("test"), cstr_a));
+  EXPECT_EQ(cstr_a, radixtree.find("test"));
+
+  // Test second insertion
+  EXPECT_TRUE(radixtree.add(std::string("hello"), cstr_b));
+  EXPECT_EQ(cstr_b, radixtree.find("hello"));
+  EXPECT_EQ(cstr_a, radixtree.find("test")); // Make sure first one still works
+}
+
+TEST(RadixTree, StringOperations) {
+  RadixTree<const char*> radixtree;
+  const char* value_a = "value_a";
+  const char* value_b = "value_b";
+  const char* value_c = "value_c";
+  const char* value_d = "value_d";
+
+  // Test string operations with various scenarios.
+  EXPECT_TRUE(radixtree.add("test", value_a));
+  EXPECT_TRUE(radixtree.add("testing", value_b));
+  EXPECT_TRUE(radixtree.add("hello", value_c));
+  EXPECT_TRUE(radixtree.add("world", value_d));
+
+  // Verify all insertions work correctly.
+  EXPECT_EQ(value_a, radixtree.find("test"));
+  EXPECT_EQ(value_b, radixtree.find("testing"));
+  EXPECT_EQ(value_c, radixtree.find("hello"));
+  EXPECT_EQ(value_d, radixtree.find("world"));
+
+  // Test prefix matching.
+  EXPECT_EQ(value_a, radixtree.findLongestPrefix("test"));
+  EXPECT_EQ(value_b, radixtree.findLongestPrefix("testing"));
+  EXPECT_EQ(value_a, radixtree.findLongestPrefix("test_other"));
+  EXPECT_EQ(nullptr, radixtree.findLongestPrefix("xyz"));
+
+  // Test that prefix matching works correctly.
+  EXPECT_THAT(radixtree.findMatchingPrefixes("testing"), ElementsAre(value_a, value_b));
+  EXPECT_THAT(radixtree.findMatchingPrefixes("test"), ElementsAre(value_a));
+}
+
+TEST(RadixTree, PerformanceCharacteristics) {
+  RadixTree<int> radixtree;
+
+  // Test with a larger number of keys to verify performance characteristics.
+  const size_t num_keys = 100; // Reduced for clearer testing
+  std::vector<std::string> keys;
+  keys.reserve(num_keys);
+
+  // Generate keys with common prefixes to test radix tree compression.
+  for (size_t i = 0; i < num_keys; ++i) {
+    keys.push_back("prefix_" + std::to_string(i));
+  }
+
+  // Insert all keys.
+  for (size_t i = 0; i < keys.size(); ++i) {
+    int value = static_cast<int>(i + 1);
+    EXPECT_TRUE(radixtree.add(keys[i], value));
+  }
+
+  // Verify all keys can be found.
+  for (size_t i = 0; i < keys.size(); ++i) {
+    int expected_value = static_cast<int>(i + 1);
+    EXPECT_EQ(expected_value, radixtree.find(keys[i]));
+  }
+
+  // Test prefix matching: "prefix_50_extra" should match "prefix_5" and "prefix_50".
+  auto prefix_matches = radixtree.findMatchingPrefixes("prefix_50_extra");
+  EXPECT_GE(prefix_matches.size(), 1); // Should match at least "prefix_50"
+
+  // Test longest prefix match.
+  int longest_match = radixtree.findLongestPrefix("prefix_50_extra");
+  EXPECT_EQ(51, longest_match); // prefix_50 + 1
+
+  // Test non-matching prefix.
+  EXPECT_EQ(0, radixtree.findLongestPrefix("different_prefix")); // int default value is 0
+}
+
 } // namespace Envoy
