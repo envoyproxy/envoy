@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 namespace Envoy {
@@ -25,7 +26,7 @@ public:
    * @param trace_id_high The high 64 bits of the trace id.
    * @param trace_id The low 64 bits of the trace id.
    * @param id The span id.
-   * @param parent_id The parent id.
+   * @param parent_id The parent span id.
    * @param sampled The sampled flag.
    * @param inner_context If this context is created base on the inner span.
    */
