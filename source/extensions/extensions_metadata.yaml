@@ -270,7 +270,7 @@ envoy.filters.http.buffer:
 envoy.filters.http.cache:
   categories:
   - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream_and_upstream
+  security_posture: unknown
   status: wip
   type_urls:
   - envoy.extensions.filters.http.cache.v3.CacheConfig
