@@ -508,11 +508,7 @@ FilterStats FilterConfig::generateStats(const std::string& prefix,
 
 bool FilterConfig::shouldUseRefreshToken(
     const envoy::extensions::filters::http::oauth2::v3::OAuth2Config& proto_config) const {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_use_refresh_token")) {
-    return PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, use_refresh_token, true);
-  }
-
-  return proto_config.use_refresh_token().value();
+  return PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, use_refresh_token, true);
 }
 
 void OAuth2CookieValidator::setParams(const Http::RequestHeaderMap& headers,

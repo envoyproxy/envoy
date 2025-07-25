@@ -39,6 +39,9 @@ public:
    * See: https://github.com/msgpack/msgpack/blob/master/spec.md
    */
   static std::vector<uint8_t> jsonToMsgpack(const std::string& json);
+
+  // Serialization helper function for list of items.
+  template <typename T> static std::string serialize(const T& items);
 };
 
 } // namespace Nlohmann

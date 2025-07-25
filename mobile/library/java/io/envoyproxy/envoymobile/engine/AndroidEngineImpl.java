@@ -24,9 +24,11 @@ public class AndroidEngineImpl implements EnvoyEngine {
    */
   public AndroidEngineImpl(Context context, EnvoyOnEngineRunning runningCallback,
                            EnvoyLogger logger, EnvoyEventTracker eventTracker,
-                           Boolean enableProxying, Boolean useNetworkChangeEvent) {
+                           Boolean enableProxying, Boolean useNetworkChangeEvent,
+                           Boolean disableDnsRefreshOnNetworkChange) {
     this.context = context;
-    this.envoyEngine = new EnvoyEngineImpl(runningCallback, logger, eventTracker);
+    this.envoyEngine = new EnvoyEngineImpl(runningCallback, logger, eventTracker,
+                                           disableDnsRefreshOnNetworkChange);
     if (ContextUtils.getApplicationContext() == null) {
       ContextUtils.initApplicationContext(context.getApplicationContext());
     }
