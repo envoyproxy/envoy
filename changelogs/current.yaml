@@ -20,6 +20,9 @@ removed_config_or_runtime:
 - area: oauth2
   change: |
     Removed runtime guard ``envoy.reloadable_features.oauth2_use_refresh_token`` and legacy code paths.
+- area: http_connection_manager
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` and legacy code paths.
 
 new_features:
 - area: health_check
@@ -31,6 +34,12 @@ new_features:
     are validated and will throw an error if combined with payloads. The implementation is optimized to process the
     payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
     <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
+- area: router_check_tool
+  change: |
+    Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
+    in the router check tool. The tool now accepts a ``dynamic_metadata`` field in test input to set metadata
+    that can be matched by route configuration. This allows comprehensive testing of routes that depend on
+    dynamic metadata for routing decisions.
 - area: lua
   change: |
     Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
@@ -46,6 +55,9 @@ new_features:
     :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields will be ignored. However,
     :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
     will take precedence over this field.
+- area: dns_filter, redis_proxy and prefix_matcher_map
+  change: |
+    Switch to using Radix Tree instead of Trie for performance improvements.
 - area: load_reporting
   change: |
     Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
