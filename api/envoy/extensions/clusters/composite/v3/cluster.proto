@@ -3,17 +3,19 @@ syntax = "proto3";
 package envoy.extensions.clusters.composite.v3;
 
 import "google/protobuf/wrappers.proto";
+
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.clusters.composite.v3";
-option java_outer_classname = "CompositeClusterProto";
+option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/composite/v3;compositev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Composite cluster configuration]
+//
 // The composite cluster filter allows Envoy to route requests across multiple upstream clusters
 // based on configurable strategies. This enables sophisticated failover and retry behavior
 // across different clusters with potentially different configurations.
@@ -46,10 +48,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //         - name: secondary_cluster
 //
 // [#extension: envoy.clusters.composite]
-// [#next-free-field: 5]
-message CompositeCluster {
+message ClusterConfig {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.clusters.composite.v3.CompositeCluster";
+      "envoy.extensions.clusters.composite.v3.ClusterConfig";
 
   // Specifies the mode of operation for the composite cluster.
   enum ClusterMode {
@@ -60,7 +61,6 @@ message CompositeCluster {
   }
 
   // Configuration for an individual sub-cluster within the composite cluster.
-  // [#next-free-field: 2]
   message SubCluster {
     // The name of the cluster. This must match a cluster defined in the
     // Envoy configuration. The cluster can be of any type (EDS, STRICT_DNS, etc.)
@@ -69,7 +69,6 @@ message CompositeCluster {
   }
 
   // Configuration specific to ``RETRY`` mode operation.
-  // [#next-free-field: 4]
   message RetryConfig {
     // Specifies the behavior when the number of retry attempts exceeds
     // the number of configured sub-clusters.

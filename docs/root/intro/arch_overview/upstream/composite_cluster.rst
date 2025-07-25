@@ -50,7 +50,7 @@ Configuration
 -------------
 
 The composite cluster is configured using the
-:ref:`CompositeCluster <envoy_v3_api_msg_extensions.clusters.composite.v3.CompositeCluster>` message.
+:ref:`CompositeCluster <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>` message.
 
 The configuration requires:
 
@@ -71,7 +71,7 @@ Basic example
       cluster_type:
         name: envoy.clusters.composite
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+          "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
           mode: RETRY
           sub_clusters:
           - name: primary_cluster
@@ -133,7 +133,7 @@ Configuration example
       cluster_type:
         name: envoy.clusters.composite
         typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+          "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
           mode: RETRY
           name: "composite_cluster"
           sub_clusters:

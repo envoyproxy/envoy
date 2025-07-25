@@ -19,16 +19,16 @@ namespace Clusters {
 namespace Composite {
 
 Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
-                 const envoy::extensions::clusters::composite::v3::CompositeCluster& config,
+                 const envoy::extensions::clusters::composite::v3::ClusterConfig& config,
                  Upstream::ClusterFactoryContext& context, absl::Status& creation_status)
     : ClusterImplBase(cluster, context, creation_status), context_(context) {
 
   // Validate mode is supported.
   mode_ = config.mode();
-  if (mode_ != envoy::extensions::clusters::composite::v3::CompositeCluster::RETRY) {
+  if (mode_ != envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY) {
     creation_status = absl::InvalidArgumentError(fmt::format(
         "composite cluster: unsupported mode: {}",
-        envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode_Name(mode_)));
+        envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode_Name(mode_)));
     return;
   }
 
@@ -46,7 +46,7 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
   }
 
   // Parse mode-specific configuration.
-  if (mode_ == envoy::extensions::clusters::composite::v3::CompositeCluster::RETRY) {
+  if (mode_ == envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY) {
     if (!config.has_retry_config()) {
       creation_status = absl::InvalidArgumentError(
           "composite cluster: retry_config is required when mode is RETRY");
@@ -61,14 +61,14 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
   // Set honor_route_retry_policy (defaults to true if not specified).
   // Only applicable for RETRY mode.
   honor_route_retry_policy_ = true;
-  if (mode_ == envoy::extensions::clusters::composite::v3::CompositeCluster::RETRY &&
+  if (mode_ == envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY &&
       config.retry_config().has_honor_route_retry_policy()) {
     honor_route_retry_policy_ = config.retry_config().honor_route_retry_policy().value();
   }
 
   ENVOY_LOG(debug, "composite cluster '{}' initialized: mode={}, sub_clusters={}, name='{}'",
             cluster.name(),
-            envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode_Name(mode_),
+            envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode_Name(mode_),
             sub_clusters_->size(), name_);
 }
 
@@ -107,8 +107,8 @@ void CompositeConnectionLifetimeCallbacks::clearCallbacks() { callbacks_.clear()
 CompositeClusterLoadBalancer::CompositeClusterLoadBalancer(
     const Upstream::ClusterInfo& cluster_info, Upstream::ClusterManager& cluster_manager,
     const std::vector<std::string>* sub_clusters,
-    envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode mode,
-    const envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig& retry_config,
+    envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode,
+    const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig& retry_config,
     bool honor_route_retry_policy)
     : cluster_info_(cluster_info), cluster_manager_(cluster_manager), sub_clusters_(sub_clusters),
       mode_(mode), retry_config_(retry_config),
@@ -127,7 +127,7 @@ CompositeClusterLoadBalancer::CompositeClusterLoadBalancer(
   ENVOY_LOG(debug,
             "composite cluster load balancer initialized: mode={}, sub_clusters={}, "
             "honor_route_retry_policy={}",
-            envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode_Name(mode_),
+            envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode_Name(mode_),
             sub_clusters_->size(), honor_route_retry_policy_);
 }
 
@@ -162,19 +162,19 @@ CompositeClusterLoadBalancer::mapRetryAttemptToClusterIndex(size_t retry_attempt
 
   // Handle overflow based on configuration.
   switch (retry_config_.overflow_behavior()) {
-  case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::FAIL:
+  case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL:
     ENVOY_LOG(debug, "composite cluster: retry attempt {} exceeds sub-cluster count {}, failing",
               retry_attempt, sub_clusters_->size());
     return absl::nullopt;
 
-  case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::USE_LAST_CLUSTER:
+  case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::USE_LAST_CLUSTER:
     ENVOY_LOG(
         debug,
         "composite cluster: retry attempt {} exceeds sub-cluster count {}, using last cluster",
         retry_attempt, sub_clusters_->size());
     return sub_clusters_->size() - 1;
 
-  case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::ROUND_ROBIN: {
+  case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::ROUND_ROBIN: {
     size_t round_robin_index = cluster_index % sub_clusters_->size();
     ENVOY_LOG(debug, "composite cluster: retry attempt {} round-robin to sub-cluster index {}",
               retry_attempt, round_robin_index);
@@ -290,7 +290,7 @@ void CompositeClusterLoadBalancer::onClusterRemoval(const std::string& cluster_n
 absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::extensions::clusters::composite::v3::CompositeCluster& proto_config,
+    const envoy::extensions::clusters::composite::v3::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
   auto cluster_impl = std::make_shared<Cluster>(cluster, proto_config, context, creation_status);

@@ -29,7 +29,7 @@ namespace Composite {
 class Cluster : public Upstream::ClusterImplBase {
 public:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
-          const envoy::extensions::clusters::composite::v3::CompositeCluster& config,
+          const envoy::extensions::clusters::composite::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context, absl::Status& creation_status);
 
   // Upstream::Cluster
@@ -43,10 +43,10 @@ public:
 
   // Access to configuration for load balancer.
   const std::vector<std::string>* subClusters() const { return sub_clusters_.get(); }
-  envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode mode() const {
+  envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode() const {
     return mode_;
   }
-  const envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig&
+  const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig&
   retryConfig() const {
     return retry_config_;
   }
@@ -60,8 +60,8 @@ private:
 
   Upstream::ClusterFactoryContext& context_;
   std::unique_ptr<std::vector<std::string>> sub_clusters_;
-  envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode mode_;
-  envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig retry_config_;
+  envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode_;
+  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
   std::string name_;
   bool honor_route_retry_policy_;
 };
@@ -103,8 +103,8 @@ public:
   CompositeClusterLoadBalancer(
       const Upstream::ClusterInfo& cluster_info, Upstream::ClusterManager& cluster_manager,
       const std::vector<std::string>* sub_clusters,
-      envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode mode,
-      const envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig& retry_config,
+      envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode,
+      const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig& retry_config,
       bool honor_route_retry_policy);
 
   // Upstream::LoadBalancer
@@ -133,8 +133,8 @@ private:
   const Upstream::ClusterInfo& cluster_info_;
   Upstream::ClusterManager& cluster_manager_;
   const std::vector<std::string>* sub_clusters_;
-  envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode mode_;
-  envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig retry_config_;
+  envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode_;
+  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
   bool honor_route_retry_policy_;
   std::unique_ptr<CompositeConnectionLifetimeCallbacks> composite_callbacks_;
 
@@ -150,8 +150,8 @@ public:
   CompositeClusterLoadBalancerFactory(
       const Upstream::ClusterInfo& cluster_info, Upstream::ClusterManager& cluster_manager,
       const std::vector<std::string>* sub_clusters,
-      envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode mode,
-      const envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig& retry_config,
+      envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode,
+      const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig& retry_config,
       bool honor_route_retry_policy)
       : cluster_info_(cluster_info), cluster_manager_(cluster_manager), sub_clusters_(sub_clusters),
         mode_(mode), retry_config_(retry_config),
@@ -167,8 +167,8 @@ private:
   const Upstream::ClusterInfo& cluster_info_;
   Upstream::ClusterManager& cluster_manager_;
   const std::vector<std::string>* sub_clusters_;
-  envoy::extensions::clusters::composite::v3::CompositeCluster::ClusterMode mode_;
-  envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig retry_config_;
+  envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode_;
+  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
   bool honor_route_retry_policy_;
 };
 
@@ -192,7 +192,7 @@ struct CompositeThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalanc
  * Factory for creating Composite clusters.
  */
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
-                           envoy::extensions::clusters::composite::v3::CompositeCluster> {
+                           envoy::extensions::clusters::composite::v3::ClusterConfig> {
 public:
   ClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.composite") {}
 
@@ -201,7 +201,7 @@ private:
       std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(
       const envoy::config::cluster::v3::Cluster& cluster,
-      const envoy::extensions::clusters::composite::v3::CompositeCluster& proto_config,
+      const envoy::extensions::clusters::composite::v3::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context) override;
 };
 

@@ -12,7 +12,7 @@ namespace {
 
 struct CompositeClusterTestParams {
   Network::Address::IpVersion version;
-  envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::OverflowBehavior
+  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::OverflowBehavior
       overflow_option;
 };
 
@@ -69,10 +69,10 @@ private:
     // Configure the composite cluster type.
     auto* cluster_type = cluster_0->mutable_cluster_type();
     cluster_type->set_name("envoy.clusters.composite");
-    envoy::extensions::clusters::composite::v3::CompositeCluster composite_config;
+    envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
 
     // Set mode to RETRY.
-    composite_config.set_mode(envoy::extensions::clusters::composite::v3::CompositeCluster::RETRY);
+    composite_config.set_mode(envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY);
 
     // Add sub-clusters.
     auto* primary_entry = composite_config.add_sub_clusters();
@@ -86,7 +86,7 @@ private:
     auto* retry_config = composite_config.mutable_retry_config();
     retry_config->set_overflow_behavior(overflow_option_);
     retry_config->set_cluster_selection_method(
-        envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::DEFAULT);
+        envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::DEFAULT);
 
     cluster_type->mutable_typed_config()->PackFrom(composite_config);
   }
@@ -140,11 +140,10 @@ public:
     std::vector<CompositeClusterTestParams> params;
     for (auto ip_version : TestEnvironment::getIpVersionsForTest()) {
       for (auto overflow_option :
-           {envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::FAIL,
-            envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::
+           {envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL,
+            envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::
                 USE_LAST_CLUSTER,
-            envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::
-                ROUND_ROBIN}) {
+            envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::ROUND_ROBIN}) {
         params.push_back({ip_version, overflow_option});
       }
     }
@@ -154,14 +153,13 @@ public:
   static std::string paramToString(const testing::TestParamInfo<CompositeClusterTestParams>& info) {
     std::string overflow_name;
     switch (info.param.overflow_option) {
-    case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::FAIL:
+    case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL:
       overflow_name = "Fail";
       break;
-    case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::
-        USE_LAST_CLUSTER:
+    case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::USE_LAST_CLUSTER:
       overflow_name = "UseLastCluster";
       break;
-    case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::ROUND_ROBIN:
+    case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::ROUND_ROBIN:
       overflow_name = "RoundRobin";
       break;
     default:
@@ -172,16 +170,16 @@ public:
   }
 
 protected:
-  const envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::OverflowBehavior
+  const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::OverflowBehavior
       overflow_option_;
 };
 
-INSTANTIATE_TEST_SUITE_P(CompositeClusterTests, CompositeClusterIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(ClusterConfigTests, CompositeClusterIntegrationTest,
                          testing::ValuesIn(CompositeClusterIntegrationTest::getTestParams()),
                          CompositeClusterIntegrationTest::paramToString);
 
 // Test that the composite cluster loads successfully.
-TEST_P(CompositeClusterIntegrationTest, CompositeClusterLoads) {
+TEST_P(CompositeClusterIntegrationTest, ClusterConfigLoads) {
   initialize();
 
   // Verify that the composite cluster and sub-clusters are properly loaded.
@@ -338,13 +336,13 @@ TEST_P(CompositeClusterIntegrationTest, RetryOverflowBehavior) {
 
   // Fourth attempt behavior depends on overflow option.
   switch (overflow_option_) {
-  case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::FAIL:
+  case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL:
     // No more retries, should fail.
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("503"));
     break;
 
-  case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::USE_LAST_CLUSTER:
+  case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::USE_LAST_CLUSTER:
     // Should use tertiary cluster again.
     if (fake_upstreams_[2]->httpType() == Http::CodecType::HTTP1) {
       ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -363,7 +361,7 @@ TEST_P(CompositeClusterIntegrationTest, RetryOverflowBehavior) {
     EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
     break;
 
-  case envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::ROUND_ROBIN:
+  case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::ROUND_ROBIN:
     // Should round-robin back to primary cluster.
     if (fake_upstreams_[2]->httpType() == Http::CodecType::HTTP1) {
       ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -440,10 +438,10 @@ private:
 
     auto* cluster_type = cluster_0->mutable_cluster_type();
     cluster_type->set_name("envoy.clusters.composite");
-    envoy::extensions::clusters::composite::v3::CompositeCluster composite_config;
+    envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
 
     // Set mode to RETRY.
-    composite_config.set_mode(envoy::extensions::clusters::composite::v3::CompositeCluster::RETRY);
+    composite_config.set_mode(envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY);
 
     // Reference a cluster that doesn't exist.
     auto* missing_entry = composite_config.add_sub_clusters();
@@ -454,7 +452,7 @@ private:
     // Configure retry settings.
     auto* retry_config = composite_config.mutable_retry_config();
     retry_config->set_overflow_behavior(
-        envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::FAIL);
+        envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL);
 
     cluster_type->mutable_typed_config()->PackFrom(composite_config);
   }
@@ -515,11 +513,10 @@ public:
 
       auto* cluster_type = cluster_0->mutable_cluster_type();
       cluster_type->set_name("envoy.clusters.composite");
-      envoy::extensions::clusters::composite::v3::CompositeCluster composite_config;
+      envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
 
       // Set mode to RETRY.
-      composite_config.set_mode(
-          envoy::extensions::clusters::composite::v3::CompositeCluster::RETRY);
+      composite_config.set_mode(envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY);
 
       // Only one sub-cluster.
       auto* single_entry = composite_config.add_sub_clusters();
@@ -527,8 +524,8 @@ public:
 
       // Configure retry settings.
       auto* retry_config = composite_config.mutable_retry_config();
-      retry_config->set_overflow_behavior(envoy::extensions::clusters::composite::v3::
-                                              CompositeCluster::RetryConfig::USE_LAST_CLUSTER);
+      retry_config->set_overflow_behavior(
+          envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::USE_LAST_CLUSTER);
 
       cluster_type->mutable_typed_config()->PackFrom(composite_config);
 

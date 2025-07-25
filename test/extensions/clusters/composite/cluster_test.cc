@@ -38,7 +38,7 @@ public:
   void initialize(const std::string& yaml) {
     const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
     const auto typed_config =
-        TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::CompositeCluster>(
+        TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::ClusterConfig>(
             config.cluster_type().typed_config());
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
@@ -79,7 +79,7 @@ lb_policy: CLUSTER_PROVIDED
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -93,8 +93,8 @@ cluster_type:
   EXPECT_EQ(2, cluster_->subClusters()->size());
   EXPECT_EQ("cluster_0", (*cluster_->subClusters())[0]);
   EXPECT_EQ("cluster_1", (*cluster_->subClusters())[1]);
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::CompositeCluster::RETRY, cluster_->mode());
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::FAIL,
+  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY, cluster_->mode());
+  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL,
             cluster_->retryConfig().overflow_behavior());
   EXPECT_TRUE(cluster_->honorRouteRetryPolicy());
   EXPECT_EQ("composite_cluster", cluster_->name());
@@ -107,7 +107,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -140,7 +140,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -176,7 +176,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -207,7 +207,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -227,7 +227,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -247,7 +247,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -257,7 +257,7 @@ cluster_type:
 )EOF";
 
   initialize(yaml);
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::CompositeCluster::RetryConfig::DEFAULT,
+  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::DEFAULT,
             cluster_->retryConfig().cluster_selection_method());
 }
 
@@ -268,7 +268,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -276,7 +276,7 @@ cluster_type:
 
   const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
   const auto typed_config =
-      TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::CompositeCluster>(
+      TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::ClusterConfig>(
           config.cluster_type().typed_config());
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
@@ -296,7 +296,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters: []
     retry_config:
@@ -305,7 +305,7 @@ cluster_type:
 
   const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
   const auto typed_config =
-      TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::CompositeCluster>(
+      TestUtility::anyConvert<envoy::extensions::clusters::composite::v3::ClusterConfig>(
           config.cluster_type().typed_config());
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
@@ -369,7 +369,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -407,7 +407,7 @@ lb_policy: CLUSTER_PROVIDED
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -436,7 +436,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -466,7 +466,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -494,7 +494,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -537,7 +537,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -576,7 +576,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -618,7 +618,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -643,7 +643,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -675,7 +675,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -698,7 +698,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -724,7 +724,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -746,7 +746,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
@@ -786,7 +786,7 @@ name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.CompositeCluster
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     mode: RETRY
     sub_clusters:
     - name: cluster_0
