@@ -835,11 +835,10 @@ void ThreadLocalStoreImpl::ScopeImpl::evictAndMarkUnused() {
         },
         [stale_counters, stale_gauges, stale_text_readouts, stale_histograms]() {
           // We want to delete stale stats on the main thread since stat destructors lock the stats
-          // allocator. Eventually, we might also want to defer the deletion until the values are
-          // flushes to the sinks. This could happen if an unused stat is updated immediately after
-          // eviction (e.g. on thread local cache), before we get a chance to delete it from the
-          // cache.
-          ENVOY_LOG(info, "deleting stale {} counters, {} gauges, {} text readouts, {} histograms",
+          // allocator. Note that we might have received fresh values on the stale cache-local
+          // stats. Eventually, we might also want to defer the deletion further until the values
+          // are flushed to the sinks.
+          ENVOY_LOG(debug, "deleting stale {} counters, {} gauges, {} text readouts, {} histograms",
                     stale_counters->size(), stale_gauges->size(), stale_text_readouts->size(),
                     stale_histograms->size());
         });
