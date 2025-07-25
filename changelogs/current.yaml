@@ -162,6 +162,9 @@ bug_fixes:
 - area: wasm
   change: |
     Fixed a bug where the Wasm filter hangs when the VM is crashed in the request callbacks.
+- area: aws
+  change: |
+    Fixed a header canonicalization bug when headers containing muliple comma seperated values were not being correctly whitespace cleaned.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
