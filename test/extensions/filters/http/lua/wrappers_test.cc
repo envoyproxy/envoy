@@ -1425,24 +1425,6 @@ public:
     state_->registerType<Filters::Common::Lua::MetadataMapIterator>();
   }
 
-  void setupWrapper(const std::string& filter_config_name) {
-    virtual_host_ = std::make_shared<NiceMock<Router::MockVirtualHost>>();
-    virtual_host_ptr_ = virtual_host_;
-    wrapper_.reset(
-        VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr_, filter_config_name),
-        true);
-  }
-
-  void setupMetadata(const std::string& yaml) {
-    TestUtility::loadFromYaml(yaml, metadata_);
-    ON_CALL(*virtual_host_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
-  }
-
-  std::shared_ptr<NiceMock<Router::MockVirtualHost>> virtual_host_;
-  Router::VirtualHostConstSharedPtr virtual_host_ptr_;
-  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper_;
-  envoy::config::core::v3::Metadata metadata_;
-
   const std::string NO_METADATA_FOUND_SCRIPT{R"EOF(
     function callMe(object)
       for _, _ in pairs(object:metadata()) do
@@ -1475,14 +1457,24 @@ TEST_F(LuaVirtualHostWrapperTest, GetFilterMetadataBasic) {
 
   InSequence s;
   setup(SCRIPT);
-  setupWrapper("lua-filter-config-name");
-  setupMetadata(METADATA);
+
+  // Create a mock virtual host.
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+
+  // Load metadata into the mock virtual host.
+  TestUtility::loadFromYaml(METADATA, virtual_host->metadata_);
+
+  // Set up wrapper with the mock virtual host.
+  const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
+        VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr, "lua-filter-config-name"),
+        true);
 
   EXPECT_CALL(printer_, testPrint("foo"));
   EXPECT_CALL(printer_, testPrint("bar"));
 
   start("callMe");
-  wrapper_.reset();
+  wrapper.reset();
 }
 
 // Test that VirtualHostWrapper returns empty metadata when no metadata exists
@@ -1498,13 +1490,23 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataUnderFilterName) {
 
   InSequence s;
   setup(NO_METADATA_FOUND_SCRIPT);
-  setupWrapper("lua-filter-config-name");
-  setupMetadata(METADATA);
+
+  // Create a mock virtual host.
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+
+  // Load metadata into the mock virtual host.
+  TestUtility::loadFromYaml(METADATA, virtual_host->metadata_);
+
+  // Set up wrapper with the mock virtual host.
+  const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
+        VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr, "lua-filter-config-name"),
+        true);
 
   EXPECT_CALL(printer_, testPrint("No metadata found"));
 
   start("callMe");
-  wrapper_.reset();
+  wrapper.reset();
 }
 
 // Test that VirtualHostWrapper returns empty metadata when no metadata is configured on the
@@ -1513,12 +1515,20 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataUnderFilterName) {
 TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataAtAll) {
   InSequence s;
   setup(NO_METADATA_FOUND_SCRIPT);
-  setupWrapper("lua-filter-config-name");
+
+  // Create a mock virtual host.
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+
+  // Set up wrapper with the mock virtual host.
+  const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
+        VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr, "lua-filter-config-name"),
+        true);
 
   EXPECT_CALL(printer_, testPrint("No metadata found"));
 
   start("callMe");
-  wrapper_.reset();
+  wrapper.reset();
 }
 
 } // namespace
