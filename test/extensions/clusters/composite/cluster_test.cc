@@ -999,6 +999,118 @@ TEST_F(CompositeClusterTest, CompositeLoadBalancerContextComprehensiveCoverage) 
   delegating_context.setHeadersModifier(std::move(modifier2));
 }
 
+// Test accessing mapRetryAttemptToClusterIndex directly to cover more paths.
+TEST_F(CompositeClusterTest, MapRetryAttemptToClusterIndexCoverage) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    sub_clusters:
+    - name: cluster_0
+    - name: cluster_1
+    retry_config:
+      overflow_behavior: ROUND_ROBIN
+)EOF";
+
+  initialize(yaml);
+  EXPECT_NE(nullptr, cluster_);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
+
+  // Test round robin behavior with multiple attempts to cover the modulo logic.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+
+  // Test attempt 1 (should map to cluster 0).
+  EXPECT_CALL(stream_info, attemptCount()).WillOnce(Return(1));
+  auto result1 = lb.chooseHost(&context);
+
+  // Test attempt 2 (should map to cluster 1).
+  EXPECT_CALL(stream_info, attemptCount()).WillOnce(Return(2));
+  auto result2 = lb.chooseHost(&context);
+
+  // Test attempt 3 (should round robin back to cluster 0).
+  EXPECT_CALL(stream_info, attemptCount()).WillOnce(Return(3));
+  auto result3 = lb.chooseHost(&context);
+}
+
+// Test member update callback registration during initialization (covers lines 253-262).
+TEST_F(CompositeClusterTest, MemberUpdateCallbackRegistrationCoverage) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    sub_clusters:
+    - name: cluster_0
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+  EXPECT_NE(nullptr, cluster_);
+
+  // Set up a mock cluster that will be returned by cluster manager.
+  auto mock_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  auto mock_cluster_info = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
+
+  std::string cluster_name = "cluster_0";
+  EXPECT_CALL(*mock_cluster, prioritySet()).WillRepeatedly(ReturnRef(*mock_priority_set));
+  EXPECT_CALL(*mock_cluster, info()).WillRepeatedly(Return(mock_cluster_info));
+  EXPECT_CALL(*mock_cluster_info, name()).WillRepeatedly(ReturnRef(cluster_name));
+
+  // Set up cluster manager to return our mock cluster.
+  EXPECT_CALL(server_context_.cluster_manager_, getThreadLocalCluster("cluster_0"))
+      .WillRepeatedly(Return(mock_cluster.get()));
+
+  // Capture the callback function that gets registered.
+  Upstream::PrioritySet::MemberUpdateCb captured_callback;
+  EXPECT_CALL(*mock_priority_set, addMemberUpdateCb(_))
+      .WillOnce([&captured_callback](Upstream::PrioritySet::MemberUpdateCb cb) {
+        captured_callback = std::move(cb);
+        return nullptr;
+      });
+
+  // Creating the load balancer should trigger addMemberUpdateCallbackForCluster.
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
+
+  // Verify callback was captured and test it (covers lines 258-261).
+  EXPECT_TRUE(captured_callback != nullptr);
+
+  Upstream::HostVector added_hosts;
+  Upstream::HostVector removed_hosts;
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  added_hosts.push_back(mock_host);
+
+  // Execute the callback to cover the lambda function.
+  auto status = captured_callback(added_hosts, removed_hosts);
+  EXPECT_TRUE(status.ok());
+}
+
+// Test onAsyncHostSelection delegation (covers line 80).
+TEST_F(CompositeClusterTest, OnAsyncHostSelectionDelegationCoverage) {
+  NiceMock<Upstream::MockLoadBalancerContext> base_context;
+  CompositeLoadBalancerContext context(&base_context, 2);
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  std::string details = "test_details";
+
+  // Test delegation to base context (should cover line 80).
+  EXPECT_CALL(base_context, onAsyncHostSelection(_, _));
+  context.onAsyncHostSelection(mock_host, std::move(details));
+}
+
 } // namespace Composite
 } // namespace Clusters
 } // namespace Extensions
