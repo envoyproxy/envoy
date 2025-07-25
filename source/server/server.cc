@@ -28,6 +28,7 @@
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/mutex_tracer_impl.h"
+#include "source/common/common/notification.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
@@ -752,6 +753,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
         [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
     envoy_bug_action_registration_ = Assert::addEnvoyBugFailureRecordAction(
         [this](const char*) { server_stats_->envoy_bug_failures_.inc(); });
+    envoy_notification_registration_ = Notification::addEnvoyNotificationRecordAction(
+        [this](absl::string_view) { server_stats_->envoy_notifications_.inc(); });
   }
 
   if (initial_config.admin().address()) {
