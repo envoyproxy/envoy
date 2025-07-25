@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: oauth2
+  change: |
+    Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
+    Secure attribute.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
