@@ -58,5 +58,8 @@ new_features:
 - area: observability
   change: |
     Added ENVOY_NOTIFICATION macro to track specific conditions in produiction environments.
+- area: dns_filter, redis_proxy and prefix_matcher_map
+  change: |
+    Switch to using Radix Tree instead of Trie for performance improvements.
 
 deprecated:
