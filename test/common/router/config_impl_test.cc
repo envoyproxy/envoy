@@ -11373,7 +11373,6 @@ virtual_hosts:
   ASSERT_NE(typed_cfg, nullptr);
 
   // Check that the config is the same as the one in the route
-  absl::InlinedVector<uint32_t, 3> expected_traveled_config = {42};
   ASSERT_EQ(typed_cfg->config_.seconds(), 42);
 }
 
