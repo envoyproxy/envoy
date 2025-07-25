@@ -9,6 +9,7 @@
 #include "source/extensions/filters/http/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -1413,6 +1414,111 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNullObject) {
   EXPECT_CALL(printer_, testPrint("null_filter_state_field_returned_nil"));
   start("callMe");
   wrapper.reset();
+}
+
+class LuaVirtualHostWrapperTest
+    : public Filters::Common::Lua::LuaWrappersTestBase<VirtualHostWrapper> {
+public:
+  void setup(const std::string& script) override {
+    Filters::Common::Lua::LuaWrappersTestBase<VirtualHostWrapper>::setup(script);
+    state_->registerType<Filters::Common::Lua::MetadataMapWrapper>();
+    state_->registerType<Filters::Common::Lua::MetadataMapIterator>();
+  }
+
+  void setupWrapper(const std::string& filter_config_name) {
+    virtual_host_ = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+    virtual_host_ptr_ = virtual_host_;
+    wrapper_.reset(
+        VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr_, filter_config_name),
+        true);
+  }
+
+  void setupMetadata(const std::string& yaml) {
+    TestUtility::loadFromYaml(yaml, metadata_);
+    ON_CALL(*virtual_host_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
+  }
+
+  std::shared_ptr<NiceMock<Router::MockVirtualHost>> virtual_host_;
+  Router::VirtualHostConstSharedPtr virtual_host_ptr_;
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper_;
+  envoy::config::core::v3::Metadata metadata_;
+
+  const std::string NO_METADATA_FOUND_SCRIPT{R"EOF(
+    function callMe(object)
+      for _, _ in pairs(object:metadata()) do
+        return
+      end
+      testPrint("No metadata found")
+    end
+  )EOF"};
+};
+
+// Test that VirtualHostWrapper returns metadata for the specified filter name.
+// This verifies that when virtual host has filter metadata configured under the current filter
+// name, the wrapper successfully retrieves and returns the metadata values from nested structures.
+TEST_F(LuaVirtualHostWrapperTest, GetFilterMetadataBasic) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local metadata = object:metadata()
+      testPrint(metadata:get("foo.bar")["name"])
+      testPrint(metadata:get("foo.bar")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupWrapper("lua-filter-config-name");
+  setupMetadata(METADATA);
+
+  EXPECT_CALL(printer_, testPrint("foo"));
+  EXPECT_CALL(printer_, testPrint("bar"));
+
+  start("callMe");
+  wrapper_.reset();
+}
+
+// Test that VirtualHostWrapper returns empty metadata when no metadata exists
+// under the specified filter name.
+TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataUnderFilterName) {
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.some_filter:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+  setupWrapper("lua-filter-config-name");
+  setupMetadata(METADATA);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper_.reset();
+}
+
+// Test that VirtualHostWrapper returns empty metadata when no metadata is configured on the
+// virtual host. This verifies that the wrapper correctly handles cases where the virtual host has
+// no filter_metadata section, returning empty metadata without crashing.
+TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataAtAll) {
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+  setupWrapper("lua-filter-config-name");
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper_.reset();
 }
 
 } // namespace
