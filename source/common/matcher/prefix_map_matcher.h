@@ -1,6 +1,6 @@
 #pragma once
 
-#include "source/common/common/trie_lookup_table.h"
+#include "source/common/common/radix_tree.h"
 #include "source/common/matcher/map_matcher.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -52,7 +52,7 @@ protected:
   }
 
 private:
-  TrieLookupTable<std::shared_ptr<OnMatch<DataType>>> children_;
+  RadixTree<std::shared_ptr<OnMatch<DataType>>> children_;
 };
 
 } // namespace Matcher
