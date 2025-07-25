@@ -2,9 +2,10 @@
 
 #include "envoy/server/factory_context.h"
 
+#include "source/common/runtime/runtime_protos.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
-#include "source/common/runtime/runtime_protos.h"
 
 namespace Envoy {
 namespace Router {
