@@ -89,20 +89,10 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   // it is invalid and MUST be discarded. Because we're already checking for the
   // traceparent header above, we don't need to check here.
   // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
-  absl::string_view tracestate_key = OpenTelemetryConstants::get().TRACE_STATE.key();
-  std::vector<std::string> tracestate_values;
-  // Multiple tracestate header fields MUST be handled as specified by RFC7230 Section 3.2.2 Field
-  // Order.
-  trace_context_.forEach(
-      [&tracestate_key, &tracestate_values](absl::string_view key, absl::string_view value) {
-        if (key == tracestate_key) {
-          tracestate_values.push_back(std::string{value});
-        }
-        return true;
-      });
-  std::string tracestate = absl::StrJoin(tracestate_values, ",");
+  const auto tracestate_values = OpenTelemetryConstants::get().TRACE_STATE.getAll(trace_context_);
 
-  SpanContext parent_context(version, trace_id, span_id, sampled, std::move(tracestate));
+  SpanContext parent_context(version, trace_id, span_id, sampled,
+                             absl::StrJoin(tracestate_values, ","));
   return parent_context;
 }
 
