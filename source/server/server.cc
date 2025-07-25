@@ -31,6 +31,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/config/xds_manager_impl.h"
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/headers.h"
@@ -85,7 +86,7 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
     : init_manager_(init_manager), live_(false), options_(options),
       validation_context_(options_.allowUnknownStaticFields(),
                           !options.rejectUnknownDynamicFields(),
-                          options.ignoreUnknownDynamicFields()),
+                          options.ignoreUnknownDynamicFields(), options.skipDeprecatedLogs()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
       original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
       random_generator_(std::move(random_generator)),
@@ -102,10 +103,16 @@ InstanceBase::InstanceBase(Init::Manager& init_manager, const Options& options,
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
       router_context_(store.symbolTable()), process_context_(std::move(process_context)),
       hooks_(hooks), quic_stat_names_(store.symbolTable()), server_contexts_(*this),
-      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {}
+      enable_reuse_port_default_(true), stats_flush_in_progress_(false) {
+  // Register the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::initialize(&server_contexts_);
+}
 
 InstanceBase::~InstanceBase() {
   terminate();
+
+  // Clear the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::clear();
 
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
@@ -124,6 +131,7 @@ InstanceBase::~InstanceBase() {
   listener_manager_.reset();
   ENVOY_LOG(debug, "destroyed listener manager");
   dispatcher_->shutdown();
+  ENVOY_LOG(debug, "shut down dispatcher");
 
 #ifdef ENVOY_PERFETTO
   if (tracing_session_ != nullptr) {
@@ -151,7 +159,7 @@ void InstanceBase::drainListeners(OptRef<const Network::ExtraShutdownListenerOpt
   listener_manager_->stopListeners(ListenerManager::StopListenersType::All,
                                    options.has_value() ? *options
                                                        : Network::ExtraShutdownListenerOptions{});
-  drain_manager_->startDrainSequence([] {});
+  drain_manager_->startDrainSequence(Network::DrainDirection::All, [] {});
 }
 
 void InstanceBase::failHealthcheck(bool fail) {
@@ -361,7 +369,7 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   }
 
   if (!config_path.empty()) {
-    MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
+    RETURN_IF_NOT_OK(MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api));
   }
   if (!config_yaml.empty()) {
     envoy::config::bootstrap::v3::Bootstrap bootstrap_override;
@@ -381,12 +389,38 @@ absl::Status InstanceUtil::loadBootstrapConfig(
   return absl::OkStatus();
 }
 
+void InstanceUtil::raiseFileLimits() {
+  if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.raise_file_limits")) {
+    return;
+  }
+  struct rlimit rlim;
+  if (const auto result = Api::OsSysCallsSingleton::get().getrlimit(RLIMIT_NOFILE, &rlim);
+      result.return_value_ != 0) {
+    ENVOY_LOG(warn, "Failed to read file descriptor limit, error {}.", errorDetails(result.errno_));
+    return;
+  }
+  const auto old = rlim.rlim_cur;
+  if (old == rlim.rlim_max) {
+    return;
+  }
+  rlim.rlim_cur = rlim.rlim_max;
+  if (const auto result = Api::OsSysCallsSingleton::get().setrlimit(RLIMIT_NOFILE, &rlim);
+      result.return_value_ != 0) {
+    ENVOY_LOG(warn, "Failed to raise file descriptor limit to maximum, error {}.",
+              errorDetails(result.errno_));
+    return;
+  }
+  ENVOY_LOG(info, "Raised file descriptor limits from {} to {}.", old, rlim.rlim_max);
+}
+
 void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_address,
                               ComponentFactory& component_factory) {
   std::function set_up_logger = [&] {
     TRY_ASSERT_MAIN_THREAD {
-      file_logger_ = std::make_unique<Logger::FileSinkDelegate>(
-          options_.logPath(), access_log_manager_, Logger::Registry::getSink());
+      file_logger_ = THROW_OR_RETURN_VALUE(
+          Logger::FileSinkDelegate::create(options_.logPath(), access_log_manager_,
+                                           Logger::Registry::getSink()),
+          std::unique_ptr<Logger::FileSinkDelegate>);
     }
     END_TRY
     CATCH(const EnvoyException& e, {
@@ -407,9 +441,9 @@ void InstanceBase::initialize(Network::Address::InstanceConstSharedPtr local_add
   MULTI_CATCH(
       const EnvoyException& e,
       {
-        ENVOY_LOG(critical, "error initializing config '{} {} {}': {}",
+        ENVOY_LOG(critical, "error `{}` initializing config '{} {} {}'", e.what(),
                   options_.configProto().DebugString(), options_.configYaml(),
-                  options_.configPath(), e.what());
+                  options_.configPath());
         terminate();
         throw;
       },
@@ -503,7 +537,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   // stats.
   auto producer_or_error =
       Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
-  RETURN_IF_STATUS_NOT_OK(producer_or_error);
+  RETURN_IF_NOT_OK_REF(producer_or_error.status());
   stats_store_.setTagProducer(std::move(producer_or_error.value()));
   stats_store_.setStatsMatcher(std::make_unique<Stats::StatsMatcherImpl>(
       bootstrap_.stats_config(), stats_store_.symbolTable(), server_contexts_));
@@ -619,7 +653,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_ = createOverloadManager();
+  auto overload_manager_or_error = createOverloadManager();
+  RETURN_IF_NOT_OK(overload_manager_or_error.status());
+  overload_manager_ = std::move(*overload_manager_or_error);
   null_overload_manager_ = createNullOverloadManager();
 
   maybeCreateHeapShrinker();
@@ -704,6 +740,13 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   runtime_ = component_factory.createRuntime(*this, initial_config);
   validation_context_.setRuntime(runtime());
 
+#ifndef WIN32
+  // Envoy automatically raises soft file limits, but we do it here in order to allow
+  // a runtime override to disable this feature. Once the feature defaults to always on,
+  // we can move this as the first thing to occur during the process initialization.
+  InstanceUtil::raiseFileLimits();
+#endif
+
   if (!runtime().snapshot().getBoolean("envoy.disallow_global_stats", false)) {
     assert_action_registration_ = Assert::addDebugAssertionFailureRecordAction(
         [this](const char*) { server_stats_->debug_assertion_failures_.inc(); });
@@ -718,6 +761,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     auto typed_admin = dynamic_cast<AdminImpl*>(admin_.get());
     RELEASE_ASSERT(typed_admin != nullptr, "Admin implementation is not an AdminImpl.");
     initial_config.initAdminAccessLog(bootstrap_, typed_admin->factoryContext());
+    ENVOY_LOG(info, "Starting admin HTTP server at {}",
+              initial_config.admin().address()->asString());
     admin_->startHttpListener(initial_config.admin().accessLogs(), initial_config.admin().address(),
                               initial_config.admin().socketOptions());
 #else
@@ -738,10 +783,25 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   ssl_context_manager_ =
       std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(server_contexts_);
 
+  http_server_properties_cache_manager_ =
+      std::make_unique<Http::HttpServerPropertiesCacheManagerImpl>(
+          serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
+          thread_local_);
+
+  // Create the xDS-Manager that will be passed to the cluster manager when it
+  // is initialized below.
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, stats_store_,
+                                                          *local_info_, validation_context_, *this);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
-      serverFactoryContext(), stats_store_, thread_local_, http_context_,
+      serverFactoryContext(),
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
-      *ssl_context_manager_, *secret_manager_, quic_stat_names_, *this);
+      quic_stat_names_);
+
+  // Now that the worker thread are initialized, notify the bootstrap extensions.
+  for (auto&& bootstrap_extension : bootstrap_extensions_) {
+    bootstrap_extension->onWorkerThreadInitialized();
+  }
 
   // Now the configuration gets parsed. The configuration may start setting
   // thread local data per above. See MainImpl::initialize() for why ConfigImpl
@@ -820,25 +880,27 @@ void InstanceBase::onRuntimeReady() {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       // HDS does not support xDS-Failover.
       auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0);
-      THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
-      hds_delegate_ = std::make_unique<Upstream::HdsDelegate>(
+          *async_client_manager_, hds_config, *stats_store_.rootScope(), false, 0, false);
+      THROW_IF_NOT_OK_REF(factory_or_error.status());
+      hds_delegate_ = maybeCreateHdsDelegate(
           serverFactoryContext(), *stats_store_.rootScope(),
-          factory_or_error.value()->createUncachedRawAsyncClient(), stats_store_,
-          *ssl_context_manager_, info_factory_);
+          THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
+                                Grpc::RawAsyncClientPtr),
+          stats_store_, *ssl_context_manager_);
     }
     END_TRY
-    CATCH(const EnvoyException& e, {
-      ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what());
+    CATCH(const EnvoyException& e,
+          { ENVOY_LOG(warn, "Skipping initialization of HDS cluster: {}", e.what()); });
+    if (!hds_delegate_) {
       shutdown();
-    });
+    }
   }
 
   // TODO (nezdolik): Fully deprecate this runtime key in the next release.
   if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
     ENVOY_LOG(warn,
               "Usage of the deprecated runtime key {}, consider switching to "
-              "`envoy.resource_monitors.downstream_connections` instead."
+              "`envoy.resource_monitors.global_downstream_max_connections` instead."
               "This runtime key will be removed in future.",
               Runtime::Keys::GlobalMaxCxRuntimeKey);
   }
@@ -846,21 +908,22 @@ void InstanceBase::onRuntimeReady() {
 
 void InstanceBase::startWorkers() {
   // The callback will be called after workers are started.
-  listener_manager_->startWorkers(makeOptRefFromPtr(worker_guard_dog_.get()), [this]() {
-    if (isShutdown()) {
-      return;
-    }
+  THROW_IF_NOT_OK(
+      listener_manager_->startWorkers(makeOptRefFromPtr(worker_guard_dog_.get()), [this]() {
+        if (isShutdown()) {
+          return;
+        }
 
-    initialization_timer_->complete();
-    // Update server stats as soon as initialization is done.
-    updateServerStats();
-    workers_started_ = true;
-    hooks_.onWorkersStarted();
-    // At this point we are ready to take traffic and all listening ports are up. Notify our
-    // parent if applicable that they can stop listening and drain.
-    restarter_.drainParentListeners();
-    drain_manager_->startParentShutdownSequence();
-  });
+        initialization_timer_->complete();
+        // Update server stats as soon as initialization is done.
+        updateServerStats();
+        workers_started_ = true;
+        hooks_.onWorkersStarted();
+        // At this point we are ready to take traffic and all listening ports are up. Notify our
+        // parent if applicable that they can stop listening and drain.
+        restarter_.drainParentListeners();
+        drain_manager_->startParentShutdownSequence();
+      }));
 }
 
 Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
@@ -872,7 +935,7 @@ Runtime::LoaderPtr InstanceUtil::createRuntime(Instance& server,
       server.dispatcher(), server.threadLocal(), config.runtime(), server.localInfo(),
       server.stats(), server.api().randomGenerator(),
       server.messageValidationContext().dynamicValidationVisitor(), server.api());
-  THROW_IF_NOT_OK(loader.status());
+  THROW_IF_NOT_OK_REF(loader.status());
   return std::move(loader.value());
 }
 
@@ -931,9 +994,11 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // If there is no global limit to the number of active connections, warn on startup.
   if (!overload_manager.getThreadLocalOverloadState().isResourceMonitorEnabled(
           Server::OverloadProactiveResourceName::GlobalDownstreamMaxConnections)) {
-    ENVOY_LOG(warn, "There is no configured limit to the number of allowed active downstream "
-                    "connections. Configure a "
-                    "limit in `envoy.resource_monitors.downstream_connections` resource monitor.");
+    ENVOY_LOG(
+        warn,
+        "There is no configured limit to the number of allowed active downstream "
+        "connections. Configure a "
+        "limit in `envoy.resource_monitors.global_downstream_max_connections` resource monitor.");
   }
 
   // Register for cluster manager init notification. We don't start serving worker traffic until
@@ -981,6 +1046,9 @@ void InstanceBase::run() {
     watchdog = main_thread_guard_dog_->createWatchDog(api_->threadFactory().currentThreadId(),
                                                       "main_thread", *dispatcher_);
   }
+
+  main_dispatch_loop_started_.store(true);
+
   dispatcher_->post([this] { notifyCallbacksForStage(Stage::Startup); });
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   ENVOY_LOG(info, "main dispatch loop exited");

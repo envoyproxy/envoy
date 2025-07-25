@@ -28,3 +28,5 @@ There are 8 identities:
 will cause all files to be regenerated. So if you want to regenerate a
 particular file, please copy the corresponding commands from certs.sh and
 execute them in command line.
+
+NOTE: This requires openssl 1.1

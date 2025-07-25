@@ -56,6 +56,9 @@ TEST(Hash, murmurHash2) {
   EXPECT_EQ(16306510975912980159U, MurmurHash::murmurHash2("foo\nbar"));
   EXPECT_EQ(12847078931730529320U, MurmurHash::murmurHash2("lyft"));
   EXPECT_EQ(6142509188972423790U, MurmurHash::murmurHash2(""));
+  // Murmur hash handles the last zero to seven chars of the input as a special case
+  // so make sure there is a test with longer input.
+  EXPECT_EQ(15194079855121201171U, MurmurHash::murmurHash2("longer than seven chars"));
 }
 
 #if __GLIBCXX__ >= 20130411 && __GLIBCXX__ <= 20180726

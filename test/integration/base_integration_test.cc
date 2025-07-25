@@ -18,7 +18,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/event/libevent.h"
 #include "source/common/network/utility.h"
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 #include "source/server/proto_descriptors.h"
 
@@ -74,7 +74,8 @@ BaseIntegrationTest::BaseIntegrationTest(const InstanceConstSharedPtrFn& upstrea
       }));
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope()).WillByDefault(ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_, sslContextManager()).WillByDefault(ReturnRef(context_manager_));
+  ON_CALL(factory_context_.server_context_, sslContextManager())
+      .WillByDefault(ReturnRef(context_manager_));
   ON_CALL(factory_context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
 
 #ifndef ENVOY_ADMIN_FUNCTIONALITY
@@ -153,7 +154,7 @@ BaseIntegrationTest::createUpstreamTlsContext(const FakeUpstreamConfig& upstream
   }
   if (upstream_config.upstream_protocol_ != Http::CodecType::HTTP3) {
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_);
+        tls_context, factory_context_, false);
     static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
         std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),
@@ -581,7 +582,7 @@ void BaseIntegrationTest::createXdsUpstream() {
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
     auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
-        tls_context, factory_context_);
+        tls_context, factory_context_, false);
 
     upstream_stats_store_ = std::make_unique<Stats::TestIsolatedStoreImpl>();
     auto context = *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
@@ -613,16 +614,17 @@ AssertionResult BaseIntegrationTest::compareDiscoveryRequest(
     const std::vector<std::string>& expected_resource_names_added,
     const std::vector<std::string>& expected_resource_names_removed, bool expect_node,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
-    FakeStream* stream) {
+    FakeStream* stream,
+    OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions) {
   if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw ||
       sotw_or_delta_ == Grpc::SotwOrDelta::UnifiedSotw) {
     return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
                                        expect_node, expected_error_code, expected_error_substring,
                                        stream);
   } else {
-    return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_names_added,
-                                        expected_resource_names_removed, stream,
-                                        expected_error_code, expected_error_substring, expect_node);
+    return compareDeltaDiscoveryRequest(
+        expected_type_url, expected_resource_names_added, expected_resource_names_removed, stream,
+        expected_error_code, expected_error_substring, expect_node, initial_resource_versions);
   }
 }
 
@@ -693,16 +695,18 @@ AssertionResult BaseIntegrationTest::waitForPortAvailable(uint32_t port,
                                                           std::chrono::milliseconds timeout) {
   Event::TestTimeSystem::RealTimeBound bound(timeout);
   while (bound.withinBound()) {
-    try {
+    TRY_NEEDS_AUDIT {
       Network::TcpListenSocket give_me_a_name(
           Network::Utility::getAddressWithPort(
               *Network::Test::getCanonicalLoopbackAddress(version_), port),
           nullptr, true);
       return AssertionSuccess();
-    } catch (const EnvoyException&) {
+    }
+    END_TRY
+    CATCH(const EnvoyException&, {
       // The nature of this function requires using a real sleep here.
       timeSystem().realSleepDoNotUseWithoutScrutiny(std::chrono::milliseconds(100));
-    }
+    });
   }
 
   return AssertionFailure() << "Timeout waiting for port availability";
@@ -728,7 +732,8 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStream* xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring,
-    bool expect_node) {
+    bool expect_node,
+    OptRef<const absl::flat_hash_map<std::string, std::string>> initial_resource_versions) {
   envoy::service::discovery::v3::DeltaDiscoveryRequest request;
   if (xds_stream == nullptr) {
     xds_stream = xds_stream_.get();
@@ -763,7 +768,34 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
   if (!unsub_result) {
     return unsub_result;
   }
-  // (We don't care about response_nonce or initial_resource_versions.)
+  // Validate initial_resource_versions if given (otherwise, we don't care what
+  // the request contains).
+  if (initial_resource_versions.has_value()) {
+    const auto& req_map = request.initial_resource_versions();
+    // Compare size, and that elements in one map appear in the other.
+    if (req_map.size() != initial_resource_versions->size()) {
+      return AssertionFailure() << fmt::format(
+                 "Wrong size of initial_resource_versions. Expected: {}, observed: {}.\n{}",
+                 initial_resource_versions->size(), req_map.size(),
+                 absl::StrJoin(req_map, ", ", absl::PairFormatter("=")));
+    }
+    EXPECT_EQ(req_map.size(), initial_resource_versions->size());
+    for (const auto& [resource_name, resource_version] : *initial_resource_versions) {
+      auto it = req_map.find(resource_name);
+      if (it == req_map.end()) {
+        return AssertionFailure() << fmt::format(
+                   "Could not find resource {} in received initial_resource_versions map: {}",
+                   resource_name, absl::StrJoin(req_map, ", ", absl::PairFormatter("=")));
+      }
+      if (resource_version != it->second) {
+        return AssertionFailure() << fmt::format(
+                   "Incorrect resource version {} in received initial_resource_versions map. "
+                   "Expected: {}, observed: {}",
+                   resource_name, resource_version, it->second);
+      }
+    }
+  }
+  // (We don't care about response_nonce.)
 
   if (request.error_detail().code() != expected_error_code) {
     return AssertionFailure() << fmt::format(
@@ -803,7 +835,7 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
   }
 
   EXPECT_EQ("200", response->headers().getStatusValue());
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
 
   std::vector<std::string> stat_prefixes;
   Json::ObjectCallback find_stat_prefix = [&](const std::string& name,
@@ -812,14 +844,14 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
     // config. If there are other names used for a similar purpose, this check could be expanded
     // to add them also.
     if (name == "stat_prefix") {
-      auto prefix = root.asString();
+      auto prefix = root.asString().value();
       if (!prefix.empty()) {
         stat_prefixes.push_back(prefix);
       }
     } else if (root.isObject()) {
-      root.iterate(find_stat_prefix);
+      THROW_IF_NOT_OK(root.iterate(find_stat_prefix));
     } else if (root.isArray()) {
-      std::vector<Json::ObjectSharedPtr> elements = root.asObjectArray();
+      std::vector<Json::ObjectSharedPtr> elements = root.asObjectArray().value();
       for (const auto& element : elements) {
         find_stat_prefix("", *element);
       }

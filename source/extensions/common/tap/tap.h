@@ -77,9 +77,6 @@ public:
 };
 
 using SinkPtr = std::unique_ptr<Sink>;
-using SinkContext =
-    absl::variant<std::reference_wrapper<Server::Configuration::FactoryContext>,
-                  std::reference_wrapper<Server::Configuration::TransportSocketFactoryContext>>;
 
 /**
  * Abstract tap sink factory. Produces a factory that can instantiate SinkPtr objects
@@ -92,9 +89,10 @@ public:
   /**
    * Create a Sink that can be used for writing out data produced by the tap filter.
    * @param config supplies the protobuf configuration for the sink factory
-   * @param cluster_manager is a ClusterManager from the HTTP/transport socket context
+   * @param  http_context supplies HTTP context
    */
-  virtual SinkPtr createSinkPtr(const Protobuf::Message& config, SinkContext context) PURE;
+  virtual SinkPtr createSinkPtr(const Protobuf::Message& config,
+                                Server::Configuration::GenericFactoryContext& http_context) PURE;
 };
 
 using TapSinkFactoryPtr = std::unique_ptr<TapSinkFactory>;
@@ -153,6 +151,12 @@ public:
    * subject to this limit depending on match status.
    */
   virtual uint32_t maxBufferedTxBytes() const PURE;
+
+  /**
+   * Return the minimum transmitted bytes that can be buffered in memory. Streaming taps are still
+   * subject to this limit depending on match status.
+   */
+  virtual uint32_t minStreamedSentBytes() const PURE;
 
   /**
    * Return a new match status vector that is correctly sized for the number of matchers that are in

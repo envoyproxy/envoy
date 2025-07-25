@@ -27,6 +27,17 @@ namespace Common {
 namespace Wasm {
 namespace {
 
+TEST(EnvoyWasmVmIntegrationTest, EnvoyWasmVmIntegrationTest) {
+  {
+    EnvoyWasmVmIntegration wasm_vm_integration;
+    for (const auto l : {spdlog::level::trace, spdlog::level::debug, spdlog::level::info,
+                         spdlog::level::warn, spdlog::level::err, spdlog::level::critical}) {
+      Logger::Registry::getLog(Logger::Id::wasm).set_level(l);
+      EXPECT_EQ(wasm_vm_integration.getLogLevel(), static_cast<proxy_wasm::LogLevel>(l));
+    }
+  }
+}
+
 class TestNullVmPlugin : public proxy_wasm::NullVmPlugin {
 public:
   TestNullVmPlugin() = default;

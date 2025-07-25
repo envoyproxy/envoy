@@ -18,10 +18,6 @@ deps:
     repository: googleapis
     commit: 62f35d8aed1149c291d606d958a7ce32
   - remote: buf.build
-    owner: opencensus
-    repository: opencensus
-    commit: bc2645b085534e4f8ebae3ef20088165
-  - remote: buf.build
     owner: opentelemetry
     repository: opentelemetry
     commit: 43554dfbbfbd4873bde8993d32ea8332

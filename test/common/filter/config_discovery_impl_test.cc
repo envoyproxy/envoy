@@ -130,6 +130,22 @@ public:
   std::string name() const override { return "envoy.test.filter"; }
 };
 
+class TestUdpSessionFilterFactory
+    : public TestFilterFactory,
+      public Server::Configuration::NamedUdpSessionFilterConfigFactory {
+public:
+  Network::UdpSessionFilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    created_ = true;
+    return [](Network::UdpSessionFilterChainFactoryCallbacks&) -> void {};
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::StringValue>();
+  }
+  std::string name() const override { return "envoy.test.filter"; }
+};
+
 class TestQuicListenerFilterFactory
     : public TestFilterFactory,
       public Server::Configuration::NamedQuicListenerFilterConfigFactory {
@@ -275,7 +291,7 @@ public:
 // HTTP filter test
 class HttpFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          NamedHttpFilterFactoryCb, Server::Configuration::FactoryContext,
+          HttpFilterFactoryCb, Server::Configuration::FactoryContext,
           HttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
           Server::Configuration::NamedHttpFilterConfigFactory,
           Server::Configuration::MockFactoryContext> {
@@ -292,7 +308,7 @@ public:
 // Upstream HTTP filter test
 class HttpUpstreamFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
-          NamedHttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
+          HttpFilterFactoryCb, Server::Configuration::UpstreamFactoryContext,
           UpstreamHttpFilterConfigProviderManagerImpl, TestHttpFilterFactory,
           Server::Configuration::UpstreamHttpFilterConfigFactory,
           Server::Configuration::MockUpstreamFactoryContext> {
@@ -374,6 +390,23 @@ public:
   }
 };
 
+// UDP session filter test
+class UdpSessionFilterConfigDiscoveryImplTest
+    : public FilterConfigDiscoveryImplTest<
+          Network::UdpSessionFilterFactoryCb, Server::Configuration::FactoryContext,
+          UdpSessionFilterConfigProviderManagerImpl, TestUdpSessionFilterFactory,
+          Server::Configuration::NamedUdpSessionFilterConfigFactory,
+          Server::Configuration::MockFactoryContext> {
+public:
+  const std::string getFilterType() const override { return "udp_session"; }
+  const std::string getConfigReloadCounter() const override {
+    return "extension_config_discovery.udp_session_filter.foo.config_reload";
+  }
+  const std::string getConfigFailCounter() const override {
+    return "extension_config_discovery.udp_session_filter.foo.config_fail";
+  }
+};
+
 // QUIC listener filter test
 class QuicListenerFilterConfigDiscoveryImplTest
     : public FilterConfigDiscoveryImplTest<
@@ -393,7 +426,8 @@ public:
 
 /***************************************************************************************
  *                  Parameterized test for                                             *
- *     HTTP filter, Network filter, TCP listener filter And UDP listener filter        *
+ *     HTTP filter, Network filter, TCP listener filter, UDP session filter and        *
+ *     UDP listener filter                                                             *
  *                                                                                     *
  ***************************************************************************************/
 template <typename FilterConfigDiscoveryTestType>
@@ -404,7 +438,7 @@ using FilterConfigDiscoveryTestTypes = ::testing::Types<
     HttpFilterConfigDiscoveryImplTest, HttpUpstreamFilterConfigDiscoveryImplTest,
     NetworkFilterConfigDiscoveryImplTest, NetworkUpstreamFilterConfigDiscoveryImplTest,
     TcpListenerFilterConfigDiscoveryImplTest, UdpListenerFilterConfigDiscoveryImplTest,
-    QuicListenerFilterConfigDiscoveryImplTest>;
+    UdpSessionFilterConfigDiscoveryImplTest, QuicListenerFilterConfigDiscoveryImplTest>;
 
 TYPED_TEST_SUITE(FilterConfigDiscoveryImplTestParameter, FilterConfigDiscoveryTestTypes);
 
@@ -646,7 +680,8 @@ TYPED_TEST(FilterConfigDiscoveryImplTestParameter, TerminalFilterInvalid) {
   EXPECT_CALL(config_discovery_test.init_watcher_, ready());
 
   if (config_discovery_test.getFilterType() == "listener" ||
-      config_discovery_test.getFilterType() == "upstream_network") {
+      config_discovery_test.getFilterType() == "upstream_network" ||
+      config_discovery_test.getFilterType() == "udp_session") {
     ASSERT_TRUE(config_discovery_test.callbacks_
                     ->onConfigUpdate(decoded_resources.refvec_, response.version_info())
                     .ok());

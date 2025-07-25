@@ -502,7 +502,7 @@ static envoy_data ios_get_string(const void *context) {
   }
 
   if (config.respectSystemProxySettings) {
-    registerAppleProxyResolver();
+    registerAppleProxyResolver(/*proxy_settings_refresh_interval_secs=*/10);
   }
 }
 
@@ -589,7 +589,7 @@ static envoy_data ios_get_string(const void *context) {
   NSString *message = [NSString stringWithFormat:@"%@;%@;%@", exception.name, exception.reason,
                                                  exception.callStackSymbols.description];
   ENVOY_LOG_EVENT_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::misc), error,
-                            "handled_cxx_exception", [message UTF8String]);
+                            "handled_cxx_exception", fmt::runtime([message UTF8String]));
 
   [NSNotificationCenter.defaultCenter postNotificationName:@"EnvoyHandledCXXException"
                                                     object:exception];

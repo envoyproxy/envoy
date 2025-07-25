@@ -44,7 +44,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDNSMatched) {
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // All OtherName SAN tests below are matched against an expected OID
@@ -63,7 +63,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameMatched) {
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -79,7 +79,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBooleanTypeMatche
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -95,7 +95,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameEnumeratedTypeMat
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -111,7 +111,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIntegerTypeMatche
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -127,7 +127,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameObjectTypeMatched
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN with a NULL type.
@@ -143,7 +143,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameNullTypeMatched) 
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -159,7 +159,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBitStringTypeMatc
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -175,7 +175,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameOctetStringTypeMa
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -191,7 +191,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNamePrintableStringTy
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -207,7 +207,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameT61StringTypeMatc
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -223,7 +223,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIA5StringTypeMatc
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -239,7 +239,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralStringType
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -255,7 +255,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUniversalStringTy
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -271,7 +271,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUtcTimeTypeMatche
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -287,7 +287,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameGeneralizedTimeTy
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -303,7 +303,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameVisibleStringType
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -319,7 +319,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameUTF8StringTypeMat
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN
@@ -335,7 +335,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameBmpStringTypeMatc
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN with a SET type
@@ -352,7 +352,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSetTypeMatched) {
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 // Test to check if the cert has an OtherName SAN with a SEQUENCE type
@@ -369,7 +369,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameSequenceTypeMatch
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDnsAndOtherNameMatched) {
@@ -385,7 +385,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameDnsAndOtherNameMatched) {
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIncorrectOidMatched) {
@@ -399,7 +399,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIncorrectOidMatch
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIncorrectValueMatched) {
@@ -413,7 +414,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameOtherNameIncorrectValueMat
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(SanMatcherPtr{
       std::make_unique<StringSanMatcher>(GEN_OTHERNAME, matcher, context, std::move(oid))});
-  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameIncorrectTypeMatched) {
@@ -426,36 +428,44 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameIncorrectTypeMatched) {
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
-  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
+}
+
+TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameExactDNSFailure) {
+  // This will only be tested under debug (assertion is triggered) to ensure
+  // that the class will not be initialized in the DNS-exact mode.
+#ifndef NDEBUG
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  envoy::type::matcher::v3::StringMatcher matcher;
+  matcher.set_exact("api.example.com");
+  EXPECT_DEATH(std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context),
+               "general_name_type != 2 || matcher.match_pattern_case() != "
+               "envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact");
+#endif
 }
 
 TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameWildcardDNSMatched) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir "
                                   "}}/test/common/tls/test_data/san_multiple_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("api.example.com");
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>("api.example.com")});
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestMultiLevelMatch) {
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-
   // san_multiple_dns_cert matches *.example.com
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir "
                                   "}}/test/common/tls/test_data/san_multiple_dns_cert.pem"));
-  envoy::type::matcher::v3::StringMatcher matcher;
-  matcher.set_exact("foo.api.example.com");
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
-  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>("foo.api.example.com")});
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameURIMatched) {
@@ -485,7 +495,7 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameURIMatched) {
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
-  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_TRUE(DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestVerifySubjectAltNameNotMatched) {
@@ -512,7 +522,8 @@ TEST(DefaultCertValidatorTest, TestMatchSubjectAltNameNotMatched) {
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_URI, matcher, context)});
   subject_alt_name_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_EMAIL, matcher, context)});
-  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
@@ -533,18 +544,18 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithSANMatcher) {
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
   // Verify the certificate with correct SAN regex matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{}, san_matchers,
-                                                 nullptr, nullptr),
+                                                 {}, nullptr, nullptr),
             Envoy::Ssl::ClientValidationStatus::Validated);
   EXPECT_EQ(stats.fail_verify_san_.value(), 0);
 
   matcher.MergeFrom(TestUtility::createExactMatcher("hello.example.com"));
   std::vector<SanMatcherPtr> invalid_san_matchers;
   invalid_san_matchers.push_back(
-      SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
+      SanMatcherPtr{std::make_unique<DnsExactStringSanMatcher>(matcher.exact())});
   std::string error;
   // Verify the certificate with incorrect SAN exact matcher.
   EXPECT_EQ(default_validator->verifyCertificate(cert.get(), /*verify_san_list=*/{},
-                                                 invalid_san_matchers, &error, nullptr),
+                                                 invalid_san_matchers, {}, &error, nullptr),
             Envoy::Ssl::ClientValidationStatus::Failed);
   EXPECT_EQ(stats.fail_verify_san_.value(), 1);
 }
@@ -559,7 +570,7 @@ TEST(DefaultCertValidatorTest, TestCertificateVerificationWithNoValidationContex
           /*CertificateValidationContextConfig=*/nullptr, stats, context);
 
   EXPECT_EQ(default_validator->verifyCertificate(/*cert=*/nullptr, /*verify_san_list=*/{},
-                                                 /*subject_alt_name_matchers=*/{}, nullptr,
+                                                 /*subject_alt_name_matchers=*/{}, {}, nullptr,
                                                  nullptr),
             Envoy::Ssl::ClientValidationStatus::NotValidated);
   bssl::UniquePtr<X509> cert(X509_new());
@@ -602,7 +613,8 @@ TEST(DefaultCertValidatorTest, NoSanInCert) {
   std::vector<SanMatcherPtr> subject_alt_name_matchers;
   subject_alt_name_matchers.push_back(
       SanMatcherPtr{std::make_unique<StringSanMatcher>(GEN_DNS, matcher, context)});
-  EXPECT_FALSE(DefaultCertValidator::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+  EXPECT_FALSE(
+      DefaultCertValidator::matchSubjectAltName(cert.get(), {}, subject_alt_name_matchers));
 }
 
 TEST(DefaultCertValidatorTest, WithVerifyDepth) {
@@ -681,6 +693,7 @@ public:
   };
   const std::string& caCert() const override { return s_; }
   const std::string& caCertPath() const override { return s_; }
+  const std::string& caCertName() const override { return s_; }
   const std::string& certificateRevocationList() const override { return s_; }
   const std::string& certificateRevocationListPath() const override { return s_; }
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
@@ -698,6 +711,7 @@ public:
   MOCK_METHOD(Api::Api&, api, (), (const override));
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
   absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+  bool autoSniSanMatch() const override { return false; }
 
 private:
   std::string s_;
@@ -719,7 +733,7 @@ TEST(DefaultCertValidatorTest, TestUnexpectedSanMatcherType) {
   auto validator =
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
-  EXPECT_THAT(validator->initializeSslContexts(ctx, false).status().message(),
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
               testing::ContainsRegex("Failed to create string SAN matcher of type.*"));
 }
 
@@ -737,8 +751,70 @@ TEST(DefaultCertValidatorTest, TestInitializeSslContextFailure) {
   auto validator =
       std::make_unique<DefaultCertValidator>(mock_context_config.get(), ssl_stats, context);
   auto ctx = std::vector<SSL_CTX*>();
-  EXPECT_THAT(validator->initializeSslContexts(ctx, false).status().message(),
+  EXPECT_THAT(validator->initializeSslContexts(ctx, false, *store.rootScope()).status().message(),
               testing::ContainsRegex("Failed to load trusted CA certificates from.*"));
+}
+
+class CleanMockCertValidationConfig : public Ssl::CertificateValidationContextConfig {
+public:
+  explicit CleanMockCertValidationConfig(const std::string& ca_name) : ca_name_(ca_name) {}
+
+  const std::string& caCert() const override { return empty_; }
+  const std::string& caCertPath() const override { return empty_; }
+  const std::string& caCertName() const override { return ca_name_; }
+  const std::string& certificateRevocationList() const override { return empty_; }
+  const std::string& certificateRevocationListPath() const override { return empty_; }
+
+  // Return EMPTY vectors to avoid validation errors
+  const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>&
+  subjectAltNameMatchers() const override {
+    return empty_matchers_;
+  }
+  const std::vector<std::string>& verifyCertificateHashList() const override { return empty_strs_; }
+  const std::vector<std::string>& verifyCertificateSpkiList() const override { return empty_strs_; }
+
+  bool allowExpiredCertificate() const override { return false; }
+  envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+      TrustChainVerification
+      trustChainVerification() const override {
+    return envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+        ACCEPT_UNTRUSTED;
+  }
+  const absl::optional<envoy::config::core::v3::TypedExtensionConfig>&
+  customValidatorConfig() const override {
+    return custom_config_;
+  }
+  Api::Api& api() const override { return *api_; }
+  bool onlyVerifyLeafCertificateCrl() const override { return false; }
+  absl::optional<uint32_t> maxVerifyDepth() const override { return absl::nullopt; }
+  bool autoSniSanMatch() const override { return false; }
+
+private:
+  std::string ca_name_;
+  std::string empty_;
+  std::vector<std::string> empty_strs_;
+  std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher> empty_matchers_;
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> custom_config_;
+  Api::ApiPtr api_ = Api::createApiForTest();
+};
+
+TEST(DefaultCertValidatorTest, DefaultValidatorCaExpirationStats) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore store;
+  SslStats stats = generateSslStats(*store.rootScope());
+
+  auto config = std::make_unique<CleanMockCertValidationConfig>("test_ca_cert");
+  auto validator = std::make_unique<DefaultCertValidator>(config.get(), stats, context);
+
+  std::vector<SSL_CTX*> ssl_contexts;
+  auto result = validator->initializeSslContexts(ssl_contexts, true, *store.rootScope());
+  ASSERT_TRUE(result.ok()) << result.status().message();
+
+  std::string expected_metric_name = "ssl.certificate.test_ca_cert.expiration_unix_time_seconds";
+  auto gauge_opt = store.findGaugeByString(expected_metric_name);
+  EXPECT_TRUE(gauge_opt.has_value());
+  // No real certificate, so should get sentinel max value
+  EXPECT_EQ(gauge_opt->get().value(), std::chrono::seconds::max().count());
 }
 
 } // namespace Tls

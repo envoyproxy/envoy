@@ -17,14 +17,8 @@ class Factory {
 public:
   /**
    * Constructs a Json Object from a string.
-   * Throws Json::Exception if unable to parse the string.
    */
-  static ObjectSharedPtr loadFromString(const std::string& json);
-
-  /**
-   * Constructs a Json Object from a string.
-   */
-  static absl::StatusOr<ObjectSharedPtr> loadFromStringNoThrow(const std::string& json);
+  static absl::StatusOr<ObjectSharedPtr> loadFromString(const std::string& json);
 
   /**
    * Constructs a Json Object from a Protobuf struct.
@@ -45,6 +39,9 @@ public:
    * See: https://github.com/msgpack/msgpack/blob/master/spec.md
    */
   static std::vector<uint8_t> jsonToMsgpack(const std::string& json);
+
+  // Serialization helper function for list of items.
+  template <typename T> static std::string serialize(const T& items);
 };
 
 } // namespace Nlohmann

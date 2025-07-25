@@ -50,7 +50,7 @@ ConfigTracker& AdminImpl::getConfigTracker() { return config_tracker_; }
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-void AdminImpl::startHttpListener(std::list<AccessLog::InstanceSharedPtr> access_logs,
+void AdminImpl::startHttpListener(AccessLog::InstanceSharedPtrVector access_logs,
                                   Network::Address::InstanceConstSharedPtr address,
                                   Network::Socket::OptionsSharedPtr socket_options) {
   access_logs_ = std::move(access_logs);
@@ -166,6 +166,13 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
           makeHandler("/heap_dump", "dump current Envoy heap (if supported)",
                       MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerHeapDump), false,
                       false),
+          makeHandler("/allocprofiler", "enable/disable the allocation profiler (if supported)",
+                      MAKE_ADMIN_HANDLER(tcmalloc_profiling_handler_.handlerAllocationProfiler),
+                      false, true,
+                      {{Admin::ParamDescriptor::Type::Enum,
+                        "enable",
+                        "enable/disable the allocation profiler",
+                        {"y", "n"}}}),
           makeHandler("/healthcheck/fail", "cause the server to fail health checks",
                       MAKE_ADMIN_HANDLER(server_cmd_handler_.handlerHealthcheckFail), false, true),
           makeHandler("/healthcheck/ok", "cause the server to pass health checks",
@@ -293,11 +300,12 @@ bool AdminImpl::createNetworkFilterChain(Network::Connection& connection,
   connection.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
       shared_from_this(), server_.drainManager(), server_.api().randomGenerator(),
       server_.httpContext(), server_.runtime(), server_.localInfo(), server_.clusterManager(),
-      server_.nullOverloadManager(), server_.timeSource())});
+      server_.nullOverloadManager(), server_.timeSource(),
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED)});
   return true;
 }
 
-bool AdminImpl::createFilterChain(Http::FilterChainManager& manager, bool,
+bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
                                   const Http::FilterChainOptions&) const {
   Http::FilterFactoryCb factory = [this](Http::FilterChainFactoryCallbacks& callbacks) {
     callbacks.addStreamFilter(std::make_shared<AdminFilter>(*this));

@@ -189,16 +189,33 @@ TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidRegName) {
 TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderValidIPv6) {
   HeaderString valid{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:443"};
   HeaderString valid_no_port{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]"};
+  HeaderString valid_double_colon_all_0{"[::]"};
+  HeaderString valid_double_colon{"[2001::7334]"};
+  HeaderString valid_double_colon_at_beginning{"[::2001:7334]"};
+  HeaderString valid_double_colon_at_end{"[2001:7334::]"};
   auto uhv = createBase(empty_config);
 
   EXPECT_ACCEPT(uhv->validateHostHeader(valid));
   EXPECT_ACCEPT(uhv->validateHostHeader(valid_no_port));
+  EXPECT_ACCEPT(uhv->validateHostHeader(valid_double_colon_all_0));
+  EXPECT_ACCEPT(uhv->validateHostHeader(valid_double_colon));
+  EXPECT_ACCEPT(uhv->validateHostHeader(valid_double_colon_at_beginning));
+  EXPECT_ACCEPT(uhv->validateHostHeader(valid_double_colon_at_end));
 }
 
 TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidIPv6) {
   HeaderString invalid_missing_closing_bracket{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334"};
   HeaderString invalid_chars{"[200z:0db8:85a3:0000:0000:8a2e:0370:7334]"};
   HeaderString invalid_no_brackets{"200z:0db8:85a3:0000:0000:8a2e:0370:7334"};
+  HeaderString invalid_more_than_8_parts{"[2001:0db8:85a3:0000:0000:8a2e:0370:7334:1]:443"};
+  HeaderString invalid_not_16_bits{"[1:1:20012:1:1:1:1:1]:443"};
+  HeaderString invalid_2_double_colons{"[2::1::1]:443"};
+  HeaderString invalid_2_double_colons_at_beginning{"[::1::1]:443"};
+  HeaderString invalid_2_double_colons_at_end{"[1::1::]:443"};
+  HeaderString invalid_2_double_colons_at_beginning_and_end{"[::1:1::]:443"};
+  HeaderString invalid_3_colons{"[:::]:443"};
+  HeaderString invalid_single_colon_at_end{"[1::1:]:443"};
+  HeaderString invalid_single_colon_at_beginning{"[:1::1:2]:443"};
   auto uhv = createBase(empty_config);
 
   EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_missing_closing_bracket),
@@ -206,6 +223,24 @@ TEST_F(BaseHeaderValidatorTest, ValidateHostHeaderInvalidIPv6) {
   EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_chars),
                              UhvResponseCodeDetail::get().InvalidHost);
   EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_no_brackets),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_more_than_8_parts),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_not_16_bits),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_2_double_colons),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_2_double_colons_at_beginning),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_2_double_colons_at_end),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_2_double_colons_at_beginning_and_end),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_3_colons),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_single_colon_at_end),
+                             UhvResponseCodeDetail::get().InvalidHost);
+  EXPECT_REJECT_WITH_DETAILS(uhv->validateHostHeader(invalid_single_colon_at_beginning),
                              UhvResponseCodeDetail::get().InvalidHost);
 }
 

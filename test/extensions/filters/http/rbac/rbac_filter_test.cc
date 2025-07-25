@@ -20,6 +20,7 @@
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 using testing::_;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnPointee;
@@ -576,6 +577,134 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   checkAccessLogMetadata(LogResult::Undecided);
 }
 
+TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideDynamicMetadataStats) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::DENY, "original_rbac_rules_prefix_");
+
+  setDestinationPort(123);
+  setMetadata();
+
+  // Set up an allow route_config that overrides the deny policy.
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
+  route_config.mutable_rbac()->mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+  route_config.mutable_rbac()->mutable_shadow_rules()->set_action(
+      envoy::config::rbac::v3::RBAC::ALLOW);
+  route_config.mutable_rbac()->set_rules_stat_prefix("override_rules_stat_prefix_");
+  route_config.mutable_rbac()->set_shadow_rules_stat_prefix("override_shadow_rules_stat_prefix_");
+
+  envoy::config::rbac::v3::Policy policy;
+  auto policy_rules = policy.add_permissions()->mutable_or_rules();
+  policy_rules->add_rules()->set_destination_port(123);
+  policy.add_principals()->set_any(true);
+
+  envoy::config::rbac::v3::Policy shadow_policy;
+  auto shadow_policy_rules = shadow_policy.add_permissions()->mutable_or_rules();
+  shadow_policy_rules->add_rules()->set_destination_port(123);
+  shadow_policy.add_principals()->set_any(true);
+
+  (*route_config.mutable_rbac()->mutable_rules()->mutable_policies())["foobar"] = policy;
+  (*route_config.mutable_rbac()->mutable_shadow_rules()->mutable_policies())["foobar"] =
+      shadow_policy;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules(), factory_context};
+  NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config,
+                                                                                  context_};
+
+  EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
+
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillRepeatedly(Return(&per_route_config_));
+
+  // Filter iteration should continue since the route-specific policy is ALLOW
+  // and there are enforced and shadow rules.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+
+  // We expect the route-specific rules and prefix to be used for the enforced
+  // engine and the shadow rules and prefix to be used for the shadow engine.
+  ASSERT_TRUE(filter_meta.fields().contains("override_rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ(
+      "allowed",
+      filter_meta.fields().at("override_rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(
+      filter_meta.fields().contains("override_rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ("foobar", filter_meta.fields()
+                          .at("override_rules_stat_prefix_enforced_effective_policy_id")
+                          .string_value());
+
+  ASSERT_TRUE(
+      filter_meta.fields().contains("override_shadow_rules_stat_prefix_shadow_engine_result"));
+  EXPECT_EQ("allowed", filter_meta.fields()
+                           .at("override_shadow_rules_stat_prefix_shadow_engine_result")
+                           .string_value());
+  ASSERT_TRUE(filter_meta.fields().contains(
+      "override_shadow_rules_stat_prefix_shadow_effective_policy_id"));
+  EXPECT_EQ("foobar", filter_meta.fields()
+                          .at("override_shadow_rules_stat_prefix_shadow_effective_policy_id")
+                          .string_value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, NoRouteLocalOverrideDynamicMetadataStatsEmpty) {
+  setupPolicy(envoy::config::rbac::v3::RBAC::DENY, "rules_stat_prefix_");
+
+  setDestinationPort(123);
+  setMetadata();
+
+  // Set up an allow route_config that overrides the deny policy. But do not set up stat prefixes.
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
+  route_config.mutable_rbac()->mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+  route_config.mutable_rbac()->mutable_shadow_rules()->set_action(
+      envoy::config::rbac::v3::RBAC::ALLOW);
+
+  envoy::config::rbac::v3::Policy policy;
+  auto policy_rules = policy.add_permissions()->mutable_or_rules();
+  policy_rules->add_rules()->set_destination_port(123);
+  policy.add_principals()->set_any(true);
+
+  envoy::config::rbac::v3::Policy shadow_policy;
+  auto shadow_policy_rules = shadow_policy.add_permissions()->mutable_or_rules();
+  shadow_policy_rules->add_rules()->set_destination_port(123);
+  shadow_policy.add_principals()->set_any(true);
+
+  (*route_config.mutable_rbac()->mutable_rules()->mutable_policies())["foobar"] = policy;
+  (*route_config.mutable_rbac()->mutable_shadow_rules()->mutable_policies())["foobar"] =
+      shadow_policy;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules(), factory_context};
+  NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config,
+                                                                                  context_};
+
+  EXPECT_CALL(engine, handleAction(_, _, _, _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
+
+  EXPECT_CALL(*callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillRepeatedly(Return(&per_route_config_));
+
+  // Filter iteration should continue since the route-specific policy is ALLOW and there are
+  // enforced and shadow rules.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, true));
+  ASSERT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+
+  // We expect the base rules and prefix to be used since no route-specific stat was set up.
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("allowed",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "foobar",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
+
+  ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_engine_result"));
+  EXPECT_EQ("allowed",
+            filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("shadow_rules_prefix_shadow_effective_policy_id"));
+  EXPECT_EQ(
+      "foobar",
+      filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
+}
+
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverrideWithPerRuleStats) {
   setupPolicy(envoy::config::rbac::v3::RBAC::ALLOW);
 
@@ -1040,18 +1169,12 @@ public:
 
   void upstreamIpTestsFilterStateSetup(NiceMock<Http::MockStreamDecoderFilterCallbacks>& callback,
                                        const std::vector<std::string>& upstream_ips) {
-    auto address_obj = std::make_unique<StreamInfo::UpstreamAddress>();
-
-    for (const auto& ip : upstream_ips) {
-      Network::Address::InstanceConstSharedPtr address =
-          Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(ip, false);
-
-      address_obj->address_ = address;
-    }
-
     // Set the filter state data.
     callback.streamInfo().filterState()->setData(
-        StreamInfo::UpstreamAddress::key(), std::move(address_obj),
+        StreamInfo::UpstreamAddress::key(),
+        std::make_unique<StreamInfo::UpstreamAddress>(
+            Envoy::Network::Utility::parseInternetAddressAndPortNoThrow(upstream_ips.back(),
+                                                                        false)),
         StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Request);
   }
 };
@@ -1342,6 +1465,51 @@ TEST_F(UpstreamIpPortMatcherTests, EmptyUpstreamConfigPolicyDeny) {
       upstreamIpTestsBasicPolicySetup(configs, envoy::config::rbac::v3::RBAC::DENY), EnvoyException,
       "Invalid UpstreamIpPortMatcher configuration - missing `upstream_ip` "
       "and/or `upstream_port_range`");
+}
+
+// This test specifically verifies the fix for issue #39479 by testing the case where:
+// 1. Only an enforced engine exists (explicitly no shadow rules)
+// 2. The enforced engine allows access (returns Continue)
+// 3. Metadata should still be set in this case
+TEST_F(RoleBasedAccessControlFilterTest, EnforcedEngineOnlyAllowsAccessMetadataTest) {
+  // Create RBAC config with ONLY enforced rules (explicitly no shadow rules)
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+  envoy::config::rbac::v3::Policy policy;
+  auto policy_rules = policy.add_permissions()->mutable_or_rules();
+  policy_rules->add_rules()->set_destination_port(123);
+  policy.add_principals()->set_any(true);
+  config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
+  (*config.mutable_rules()->mutable_policies())["enforced_only_policy"] = policy;
+  config.set_rules_stat_prefix("rules_stat_prefix_");
+
+  // Create config with only the enforced engine
+  auto config_ptr = std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor());
+  setupConfig(std::move(config_ptr));
+
+  setDestinationPort(123);
+  setMetadata();
+
+  // Call the filter's decodeHeaders (should continue since policy allows access)
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+
+  // Verify that allowed counter is incremented
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+
+  // Verify that dynamic metadata is set correctly even though there's no shadow
+  // engine and the enforced engine returned Continue
+  EXPECT_TRUE(req_info_.dynamicMetadata().filter_metadata().contains("envoy.filters.http.rbac"));
+
+  // Verify the metadata contents
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at("envoy.filters.http.rbac");
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_engine_result"));
+  EXPECT_EQ("allowed",
+            filter_meta.fields().at("rules_stat_prefix_enforced_engine_result").string_value());
+  ASSERT_TRUE(filter_meta.fields().contains("rules_stat_prefix_enforced_effective_policy_id"));
+  EXPECT_EQ(
+      "enforced_only_policy",
+      filter_meta.fields().at("rules_stat_prefix_enforced_effective_policy_id").string_value());
 }
 
 } // namespace

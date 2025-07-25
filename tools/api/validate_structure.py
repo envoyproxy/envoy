@@ -40,7 +40,7 @@ class ValidationError(Exception):
 
 # Extract major version and full API version string from a proto path.
 def proto_api_version(proto_path):
-    match = re.match('v(\d+).*', proto_path.parent.name)
+    match = re.match(r'v(\d+).*', proto_path.parent.name)
     if match:
         return str(proto_path.parent.name)[1:], int(match.group(1))
     return None, 0
@@ -57,7 +57,7 @@ def validate_proto_path(proto_path):
 
     # Validate that v3+ versions are regular.
     if major_version >= 3:
-        if not re.match('\d+(alpha)?$', version_str):
+        if not re.match(r'\d+(alpha)?$', version_str):
             raise ValidationError('Invalid v3+ version: %s' % version_str)
 
         # Validate v2-only paths.

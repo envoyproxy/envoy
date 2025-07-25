@@ -51,7 +51,8 @@ public:
   static absl::StatusOr<std::unique_ptr<SslSocket>>
   create(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
          const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-         Ssl::HandshakerFactoryCb handshaker_factory_cb);
+         Ssl::HandshakerFactoryCb handshaker_factory_cb,
+         Upstream::HostDescriptionConstSharedPtr host = {});
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -73,6 +74,7 @@ public:
   void onFailure() override;
   Network::TransportSocketCallbacks* transportSocketCallbacks() override { return callbacks_; }
   void onAsynchronousCertValidationComplete() override;
+  void onAsynchronousCertificateSelectionComplete() override;
 
   SSL* rawSslForTest() const { return rawSsl(); }
 
@@ -82,7 +84,8 @@ protected:
 private:
   SslSocket(Envoy::Ssl::ContextSharedPtr ctx,
             const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options);
-  absl::Status initialize(InitialState state, Ssl::HandshakerFactoryCb handshaker_factory_cb);
+  absl::Status initialize(InitialState state, Ssl::HandshakerFactoryCb handshaker_factory_cb,
+                          Upstream::HostDescriptionConstSharedPtr host);
 
   struct ReadResult {
     uint64_t bytes_read_{0};

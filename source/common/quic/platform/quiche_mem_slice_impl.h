@@ -7,7 +7,7 @@
 // porting layer for QUICHE.
 
 #include <cstddef>
-#include <iostream>
+#include <iosfwd>
 #include <memory>
 
 #include "source/common/buffer/buffer_impl.h"
@@ -18,7 +18,7 @@
 namespace quiche {
 
 // Implements the interface required by
-// https://github.com/google/quiche/blob/main/common/platform/api/quiche_mem_slice.h
+// https://github.com/google/quiche/blob/main/quiche/common/quiche_mem_slice.h
 class QuicheMemSliceImpl {
 public:
   // Constructs an empty QuicheMemSliceImpl.

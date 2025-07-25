@@ -12,12 +12,12 @@ envoy_package()
 envoy_cc_test(
     name = "dns_cache_impl_test",
     srcs = ["dns_cache_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         "//source/common/config:utility_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_impl",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
-        "//source/extensions/network/dns_resolver/cares:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -35,6 +35,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dns_cache_resource_manager_test",
     srcs = ["dns_cache_resource_manager_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":mocks",
         "//source/common/config:utility_lib",

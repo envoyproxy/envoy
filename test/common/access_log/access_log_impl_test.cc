@@ -114,7 +114,7 @@ typed_config:
 
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstreamInfo()->setUpstreamHost(
-      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234"));
   stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamConnectionTermination);
 
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
@@ -255,7 +255,7 @@ typed_config:
 TEST_F(AccessLogImplTest, UpstreamHost) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstreamInfo()->setUpstreamHost(
-      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234"));
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -495,7 +495,7 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   Http::TestRequestHeaderMapImpl header_map{};
-  stream_info_.health_check_request_ = true;
+  stream_info_.healthCheck(true);
   EXPECT_CALL(*file_, write(_)).Times(0);
 
   log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
@@ -615,7 +615,7 @@ typed_config:
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestRequestHeaderMapImpl header_map{};
-    stream_info_.health_check_request_ = true;
+    stream_info_.healthCheck(true);
     log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
   }
 }
@@ -694,7 +694,7 @@ typed_config:
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestRequestHeaderMapImpl header_map{};
-    stream_info_.health_check_request_ = true;
+    stream_info_.healthCheck(true);
 
     log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
   }
@@ -1067,6 +1067,7 @@ filter:
       - DF
       - DO
       - DR
+      - UDO
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null

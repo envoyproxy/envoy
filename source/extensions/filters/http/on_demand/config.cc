@@ -20,7 +20,7 @@ Http::FilterFactoryCb OnDemandFilterFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 OnDemandFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
     Server::Configuration::ServerFactoryContext& context,

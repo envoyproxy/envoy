@@ -22,20 +22,20 @@ public:
         connectivity_manager_(std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_)) {
     ON_CALL(*dns_cache_manager_, lookUpCacheByName(_)).WillByDefault(Return(dns_cache_));
     // Toggle network to reset network state.
-    ConnectivityManagerImpl::setPreferredNetwork(NetworkType::Generic);
-    ConnectivityManagerImpl::setPreferredNetwork(NetworkType::WLAN);
+    ConnectivityManagerImpl::setPreferredNetwork(1);
+    ConnectivityManagerImpl::setPreferredNetwork(2);
   }
 
   std::shared_ptr<NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager>>
       dns_cache_manager_;
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCache> dns_cache_;
   NiceMock<Upstream::MockClusterManager> cm_{};
-  ConnectivityManagerSharedPtr connectivity_manager_;
+  std::shared_ptr<ConnectivityManagerImpl> connectivity_manager_;
 };
 
 TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigurationKey) {
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t new_key = ConnectivityManagerImpl::setPreferredNetwork(NetworkType::WWAN);
+  envoy_netconf_t new_key = ConnectivityManagerImpl::setPreferredNetwork(4);
   EXPECT_NE(original_key, new_key);
   EXPECT_EQ(new_key, connectivity_manager_->getConfigurationKey());
 }
@@ -43,7 +43,7 @@ TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigur
 TEST_F(ConnectivityManagerTest,
        DISABLED_SetPreferredNetworkWithUnchangedNetworkReturnsStaleConfigurationKey) {
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t stale_key = ConnectivityManagerImpl::setPreferredNetwork(NetworkType::WLAN);
+  envoy_netconf_t stale_key = ConnectivityManagerImpl::setPreferredNetwork(2);
   EXPECT_NE(original_key, stale_key);
   EXPECT_EQ(original_key, connectivity_manager_->getConfigurationKey());
 }
@@ -61,7 +61,14 @@ TEST_F(ConnectivityManagerTest, RefreshDnsForStaleConfigurationDoesntTriggerDnsR
 }
 
 TEST_F(ConnectivityManagerTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefresh) {
-  EXPECT_CALL(*dns_cache_, addUpdateCallbacks_(Ref(*connectivity_manager_)));
+  Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks* dns_completion_callback{
+      nullptr};
+  EXPECT_CALL(*dns_cache_, addUpdateCallbacks_(_))
+      .WillOnce(Invoke([&dns_completion_callback](
+                           Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks& cb) {
+        dns_completion_callback = &cb;
+        return nullptr;
+      }));
   connectivity_manager_->setDrainPostDnsRefreshEnabled(true);
 
   auto host_info = std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>();
@@ -78,31 +85,28 @@ TEST_F(ConnectivityManagerTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefre
   connectivity_manager_->refreshDns(configuration_key, true);
 
   EXPECT_CALL(cm_, drainConnections(_));
-  connectivity_manager_->onDnsResolutionComplete(
+  dns_completion_callback->onDnsResolutionComplete(
       "cached.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
-  connectivity_manager_->onDnsResolutionComplete(
+      Network::DnsResolver::ResolutionStatus::Completed);
+  dns_completion_callback->onDnsResolutionComplete(
       "not-cached.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
-  connectivity_manager_->onDnsResolutionComplete(
+      Network::DnsResolver::ResolutionStatus::Completed);
+  dns_completion_callback->onDnsResolutionComplete(
       "not-cached2.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
+      Network::DnsResolver::ResolutionStatus::Completed);
 }
 
 TEST_F(ConnectivityManagerTest, WhenDrainPostDnsNotEnabledDoesntDrainPostDnsRefresh) {
+  EXPECT_CALL(*dns_cache_, addUpdateCallbacks_(_)).Times(0);
   connectivity_manager_->setDrainPostDnsRefreshEnabled(false);
 
+  EXPECT_CALL(*dns_cache_, iterateHostMap(_)).Times(0);
   EXPECT_CALL(*dns_cache_, forceRefreshHosts());
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->refreshDns(configuration_key, true);
-
-  EXPECT_CALL(cm_, drainConnections(_)).Times(0);
-  connectivity_manager_->onDnsResolutionComplete(
-      "example.com", std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
-      Network::DnsResolver::ResolutionStatus::Success);
 }
 
 TEST_F(ConnectivityManagerTest,
@@ -168,7 +172,7 @@ TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisablesOverrideAfterThirdFaul
 
 TEST_F(ConnectivityManagerTest, ReportNetworkUsageDisregardsCallsWithStaleConfigurationKey) {
   envoy_netconf_t stale_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t current_key = ConnectivityManagerImpl::setPreferredNetwork(NetworkType::WWAN);
+  envoy_netconf_t current_key = ConnectivityManagerImpl::setPreferredNetwork(4);
   EXPECT_NE(stale_key, current_key);
 
   connectivity_manager_->setInterfaceBindingEnabled(true);
@@ -240,6 +244,23 @@ TEST_F(ConnectivityManagerTest, IgnoresDuplicatedProxySettingsUpdates) {
   const auto proxy_settings2 = ProxySettings::parseHostAndPort("127.0.0.1", 9999);
   connectivity_manager_->setProxySettings(proxy_settings2);
   EXPECT_EQ(proxy_settings1, connectivity_manager_->getProxySettings());
+}
+
+TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash) {
+  auto options1 = std::make_shared<Socket::Options>();
+  connectivity_manager_->addUpstreamSocketOptions(options1);
+  std::vector<uint8_t> hash1;
+  for (const auto& option : *options1) {
+    option->hashKey(hash1);
+  }
+  ConnectivityManagerImpl::setPreferredNetwork(64);
+  auto options2 = std::make_shared<Socket::Options>();
+  connectivity_manager_->addUpstreamSocketOptions(options2);
+  std::vector<uint8_t> hash2;
+  for (const auto& option : *options2) {
+    option->hashKey(hash2);
+  }
+  EXPECT_NE(hash1, hash2);
 }
 
 } // namespace Network

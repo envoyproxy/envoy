@@ -29,6 +29,11 @@ public:
    * Signals that the request should be cancelled. No further callbacks will be invoked.
    */
   virtual void cancel() PURE;
+
+  /**
+   * Returns the underlying stream info.
+   */
+  virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
 };
 
 /**
@@ -60,6 +65,14 @@ public:
    */
   virtual void resetStream() PURE;
 
+  /**
+   * Wait for the server to half-close its stream and then delete the RawAsyncStream object. No
+   * further methods may be invoked on the stream object and no further callbacks will be invoked.
+   * The server is expected to half-close within the interval specific in the StreamOptions,
+   * otherwise the stream is reset.
+   */
+  virtual void waitForRemoteCloseAndDelete() PURE;
+
   /***
    * @returns if the stream has enough buffered outbound data to be over the configured buffer
    * limits
@@ -70,6 +83,7 @@ public:
    * @returns the stream info object associated with this stream.
    */
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
   /***
    * Register a callback to be called when high/low write buffer watermark events occur on the
@@ -77,7 +91,7 @@ public:
    * removeWatermarkCallbacks. If there's already a watermark callback registered, this method
    * will trigger ENVOY_BUG.
    */
-  virtual void setWatermarkCallbacks(Http::DecoderFilterWatermarkCallbacks& callbacks) PURE;
+  virtual void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) PURE;
 
   /***
    * Remove previously set watermark callbacks. If there's no watermark callback registered, this

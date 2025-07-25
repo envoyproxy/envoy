@@ -29,9 +29,9 @@ namespace Server {
 
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  Network::DrainableFilterChainSharedPtr
+  absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain&,
-                   FilterChainFactoryContextCreator&) const override {
+                   FilterChainFactoryContextCreator&, bool) const override {
     // A place holder to be found
     return std::make_shared<Network::MockFilterChain>();
   }
@@ -77,6 +77,7 @@ public:
   absl::string_view detectedTransportProtocol() const override { return transport_protocol_; }
   absl::string_view requestedServerName() const override { return server_name_; }
   absl::string_view ja3Hash() const override { return ja3_hash_; }
+  absl::string_view ja4Hash() const override { return ja4_hash_; }
   const std::vector<std::string>& requestedApplicationProtocols() const override {
     return application_protocols_;
   }
@@ -112,6 +113,7 @@ public:
   const OptionsSharedPtr& options() const override { return options_; }
   void setRequestedServerName(absl::string_view) override {}
   void setJA3Hash(absl::string_view) override {}
+  void setJA4Hash(absl::string_view) override {}
   Api::SysCallIntResult bind(Network::Address::InstanceConstSharedPtr) override { return {0, 0}; }
   Api::SysCallIntResult listen(int) override { return {0, 0}; }
   Api::SysCallIntResult connect(const Network::Address::InstanceConstSharedPtr) override {
@@ -138,6 +140,7 @@ private:
   std::shared_ptr<Network::ConnectionInfoSetterImpl> connection_info_provider_;
   std::string server_name_;
   std::string ja3_hash_;
+  std::string ja4_hash_;
   std::string transport_protocol_;
   std::vector<std::string> application_protocols_;
 };
@@ -233,8 +236,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
     FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
-    filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
-                                         filter_chain_manager);
+    THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr,
+                                                         dummy_builder_, filter_chain_manager));
   }
 }
 
@@ -257,8 +260,8 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
   addresses.emplace_back(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
   FilterChainManagerImpl filter_chain_manager{addresses, factory_context, init_manager_};
 
-  filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr, dummy_builder_,
-                                       filter_chain_manager);
+  THROW_IF_NOT_OK(filter_chain_manager.addFilterChains(nullptr, filter_chains_, nullptr,
+                                                       dummy_builder_, filter_chain_manager));
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);

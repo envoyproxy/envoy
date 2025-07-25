@@ -49,11 +49,11 @@ class FilterChainNameActionFactory : public Matcher::ActionFactory<FilterChainAc
                                      Logger::Loggable<Logger::Id::config> {
 public:
   std::string name() const override { return "filter-chain-name"; }
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message& config,
-                                                 FilterChainActionFactoryContext&,
-                                                 ProtobufMessage::ValidationVisitor&) override {
-    const auto& name = dynamic_cast<const ProtobufWkt::StringValue&>(config);
-    return [value = name.value()]() { return std::make_unique<FilterChainNameAction>(value); };
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
+                                             FilterChainActionFactoryContext&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return std::make_shared<FilterChainNameAction>(
+        dynamic_cast<const ProtobufWkt::StringValue&>(config).value());
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::StringValue>();
@@ -80,8 +80,8 @@ PerFilterChainFactoryContextImpl::PerFilterChainFactoryContextImpl(
       filter_chain_scope_(parent_context_.listenerScope().createScope("")),
       init_manager_(init_manager) {}
 
-bool PerFilterChainFactoryContextImpl::drainClose() const {
-  return is_draining_.load() || parent_context_.drainDecision().drainClose();
+bool PerFilterChainFactoryContextImpl::drainClose(Network::DrainDirection scope) const {
+  return is_draining_.load() || parent_context_.drainDecision().drainClose(scope);
 }
 
 Network::DrainDecision& PerFilterChainFactoryContextImpl::drainDecision() { return *this; }
@@ -92,21 +92,14 @@ const Network::ListenerInfo& PerFilterChainFactoryContextImpl::listenerInfo() co
   return parent_context_.listenerInfo();
 }
 
-ProtobufMessage::ValidationVisitor&
-PerFilterChainFactoryContextImpl::messageValidationVisitor() const {
+ProtobufMessage::ValidationVisitor& PerFilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }
 
 Stats::Scope& PerFilterChainFactoryContextImpl::scope() { return *scope_; }
 
-Configuration::ServerFactoryContext&
-PerFilterChainFactoryContextImpl::serverFactoryContext() const {
+Configuration::ServerFactoryContext& PerFilterChainFactoryContextImpl::serverFactoryContext() {
   return parent_context_.serverFactoryContext();
-}
-
-Configuration::TransportSocketFactoryContext&
-PerFilterChainFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return parent_context_.getTransportSocketFactoryContext();
 }
 
 Stats::Scope& PerFilterChainFactoryContextImpl::listenerScope() { return *filter_chain_scope_; }
@@ -122,133 +115,180 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
 
-void FilterChainManagerImpl::addFilterChains(
+absl::Status FilterChainManagerImpl::addFilterChains(
     const xds::type::matcher::v3::Matcher* filter_chain_matcher,
     absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
     const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
   Cleanup cleanup([this]() { origin_ = absl::nullopt; });
-  absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch, std::string, MessageUtil,
-                      MessageUtil>
-      filter_chains;
+  FilterChainsByMatcher filter_chains;
   uint32_t new_filter_chain_size = 0;
   FilterChainsByName filter_chains_by_name;
 
   for (const auto& filter_chain : filter_chain_span) {
-    const auto& filter_chain_match = filter_chain->filter_chain_match();
-    if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
-      throw EnvoyException(fmt::format(
-          "error adding listener '{}': filter chain '{}' contains "
-          "unimplemented fields",
-          absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain->name()));
-    }
-    if (!filter_chain_matcher) {
-      const auto& matching_iter = filter_chains.find(filter_chain_match);
-      if (matching_iter != filter_chains.end()) {
-        std::string error_msg =
-            fmt::format("error adding listener '{}': filter chain '{}' has "
-                        "the same matching rules defined as '{}'",
-                        absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
-                        filter_chain->name(), matching_iter->second);
-#ifdef ENVOY_ENABLE_YAML
-        error_msg =
-            absl::StrCat(error_msg, ". duplicate matcher is: ",
-                         MessageUtil::getJsonStringFromMessageOrError(filter_chain_match, false));
-#endif
-
-        throw EnvoyException(error_msg);
-      }
-      filter_chains.insert({filter_chain_match, filter_chain->name()});
-    }
+    RETURN_IF_NOT_OK(verifyNoDuplicateMatchers(filter_chain_matcher, filter_chains, *filter_chain));
 
     // Reuse created filter chain if possible.
     // FilterChainManager maintains the lifetime of FilterChainFactoryContext
     // ListenerImpl maintains the dependencies of FilterChainFactoryContext
     auto filter_chain_impl = findExistingFilterChain(*filter_chain);
     if (filter_chain_impl == nullptr) {
-      filter_chain_impl =
-          filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator);
+      auto filter_chain_or_error =
+          filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator, false);
+      RETURN_IF_NOT_OK(filter_chain_or_error.status());
+      filter_chain_impl = filter_chain_or_error.value();
       ++new_filter_chain_size;
     }
 
-    // If using the matcher, require usage of "name" field and skip building the index.
-    if (filter_chain_matcher) {
-      if (filter_chain->name().empty()) {
-        throw EnvoyException(fmt::format(
-            "error adding listener '{}': \"name\" field is required when using a listener matcher",
-            absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
-      }
-      auto [_, inserted] =
-          filter_chains_by_name.try_emplace(filter_chain->name(), filter_chain_impl);
-      if (!inserted) {
-        throw EnvoyException(fmt::format(
-            "error adding listener '{}': \"name\" field is duplicated with value '{}'",
-            absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain->name()));
-      }
-      if (filter_chain->has_filter_chain_match()) {
-        ENVOY_LOG(debug, "filter chain match in chain '{}' is ignored", filter_chain->name());
-      }
-    } else {
-      auto createAddressVector = [](const auto& prefix_ranges) -> std::vector<std::string> {
-        std::vector<std::string> ips;
-        ips.reserve(prefix_ranges.size());
-        for (const auto& ip : prefix_ranges) {
-          const auto& cidr_range = THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(ip),
-                                                         Network::Address::CidrRange);
-          ips.push_back(cidr_range.asString());
-        }
-        return ips;
-      };
-
-      // Validate IP addresses.
-      std::vector<std::string> destination_ips =
-          createAddressVector(filter_chain_match.prefix_ranges());
-      std::vector<std::string> source_ips =
-          createAddressVector(filter_chain_match.source_prefix_ranges());
-      std::vector<std::string> direct_source_ips =
-          createAddressVector(filter_chain_match.direct_source_prefix_ranges());
-
-      std::vector<std::string> server_names;
-      // Reject partial wildcards, we don't match on them.
-      for (const auto& server_name : filter_chain_match.server_names()) {
-        if (absl::StrContains(server_name, '*') && !isWildcardServerName(server_name)) {
-          throw EnvoyException(
-              fmt::format("error adding listener '{}': partial wildcards are not supported in "
-                          "\"server_names\"",
-                          absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
-        }
-        server_names.push_back(absl::AsciiStrToLower(server_name));
-      }
-
-      addFilterChainForDestinationPorts(
-          destination_ports_map_,
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
-          server_names, filter_chain_match.transport_protocol(),
-          filter_chain_match.application_protocols(), direct_source_ips,
-          filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
-          filter_chain_impl);
-    }
-
+    RETURN_IF_NOT_OK(setupFilterChainMatcher(filter_chain_matcher, filter_chains_by_name,
+                                             *filter_chain, filter_chain_impl));
     fc_contexts_[*filter_chain] = filter_chain_impl;
   }
-  convertIPsToTries();
-  copyOrRebuildDefaultFilterChain(default_filter_chain, filter_chain_factory_builder,
-                                  context_creator);
+  RETURN_IF_NOT_OK(convertIPsToTries());
+  RETURN_IF_NOT_OK(copyOrRebuildDefaultFilterChain(default_filter_chain,
+                                                   filter_chain_factory_builder, context_creator));
+  maybeConstructMatcher(filter_chain_matcher, filter_chains_by_name, parent_context_);
+
+  const auto* origin = getOriginFilterChainManager();
+  if (origin != nullptr) {
+    for (const auto& message_and_filter_chain : origin->fc_contexts_) {
+      if (fc_contexts_.find(message_and_filter_chain.first) == fc_contexts_.end()) {
+        origin->draining_filter_chains_.push_back(message_and_filter_chain.second);
+      }
+    }
+  }
+
+  ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
+            fc_contexts_.size(), new_filter_chain_size);
+  return absl::OkStatus();
+}
+
+absl::Status FilterChainManagerImpl::verifyNoDuplicateMatchers(
+    const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+    absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch, std::string, MessageUtil,
+                        MessageUtil>& filter_chains,
+    const envoy::config::listener::v3::FilterChain& filter_chain) {
+  const auto& filter_chain_match = filter_chain.filter_chain_match();
+  if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
+    return absl::InvalidArgumentError(fmt::format(
+        "error adding listener '{}': filter chain '{}' contains "
+        "unimplemented fields",
+        absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain.name()));
+  }
+  if (!filter_chain_matcher) {
+    const auto& matching_iter = filter_chains.find(filter_chain_match);
+    if (matching_iter != filter_chains.end()) {
+      std::string error_msg =
+          fmt::format("error adding listener '{}': filter chain '{}' has "
+                      "the same matching rules defined as '{}'",
+                      absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()),
+                      filter_chain.name(), matching_iter->second);
+#ifdef ENVOY_ENABLE_YAML
+      absl::StrAppend(&error_msg, ". duplicate matcher is: ",
+                      MessageUtil::getJsonStringFromMessageOrError(filter_chain_match, false));
+#endif
+
+      return absl::InvalidArgumentError(error_msg);
+    }
+
+    filter_chains.insert({filter_chain_match, filter_chain.name()});
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status FilterChainManagerImpl::setupFilterChainMatcher(
+    const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+    FilterChainsByName& filter_chains_by_name,
+    const envoy::config::listener::v3::FilterChain& filter_chain,
+    const Network::DrainableFilterChainSharedPtr& filter_chain_impl) {
+  const auto& filter_chain_match = filter_chain.filter_chain_match();
+
+  // If using the matcher, require usage of "name" field and skip building the index.
+  if (filter_chain_matcher) {
+    if (filter_chain.name().empty()) {
+      return absl::InvalidArgumentError(fmt::format(
+          "error adding listener '{}': \"name\" field is required when using a listener matcher",
+          absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
+    }
+    auto [_, inserted] = filter_chains_by_name.try_emplace(filter_chain.name(), filter_chain_impl);
+    if (!inserted) {
+      return absl::InvalidArgumentError(fmt::format(
+          "error adding listener '{}': \"name\" field is duplicated with value '{}'",
+          absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()), filter_chain.name()));
+    }
+    if (filter_chain.has_filter_chain_match()) {
+      ENVOY_LOG(debug, "filter chain match in chain '{}' is ignored", filter_chain.name());
+    }
+  } else {
+    auto createAddressVector = [](const auto& prefix_ranges,
+                                  absl::Status& creation_status) -> std::vector<std::string> {
+      std::vector<std::string> ips;
+      ips.reserve(prefix_ranges.size());
+      for (const auto& ip : prefix_ranges) {
+        auto cidr_range_or_error = Network::Address::CidrRange::create(ip);
+        if (cidr_range_or_error.status().ok()) {
+          ips.push_back(cidr_range_or_error->asString());
+        } else {
+          creation_status = cidr_range_or_error.status();
+        }
+      }
+      return ips;
+    };
+
+    absl::Status creation_status = absl::OkStatus();
+    // Validate IP addresses.
+    std::vector<std::string> destination_ips =
+        createAddressVector(filter_chain_match.prefix_ranges(), creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    std::vector<std::string> source_ips =
+        createAddressVector(filter_chain_match.source_prefix_ranges(), creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    std::vector<std::string> direct_source_ips =
+        createAddressVector(filter_chain_match.direct_source_prefix_ranges(), creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+
+    std::vector<std::string> server_names;
+    // Reject partial wildcards, we don't match on them.
+    for (const auto& server_name : filter_chain_match.server_names()) {
+      if (absl::StrContains(server_name, '*') && !isWildcardServerName(server_name)) {
+        return absl::InvalidArgumentError(
+            fmt::format("error adding listener '{}': partial wildcards are not supported in "
+                        "\"server_names\"",
+                        absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
+      }
+      server_names.push_back(absl::AsciiStrToLower(server_name));
+    }
+
+    RETURN_IF_NOT_OK(addFilterChainForDestinationPorts(
+        destination_ports_map_,
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+        server_names, filter_chain_match.transport_protocol(),
+        filter_chain_match.application_protocols(), direct_source_ips,
+        filter_chain_match.source_type(), source_ips, filter_chain_match.source_ports(),
+        filter_chain_impl));
+  }
+
+  return absl::OkStatus();
+}
+
+void FilterChainManagerImpl::maybeConstructMatcher(
+    const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+    const FilterChainsByName& filter_chains_by_name,
+    Configuration::FactoryContext& parent_context) {
   // Construct matcher if it is present in the listener configuration.
   if (filter_chain_matcher) {
     filter_chains_by_name_ = filter_chains_by_name;
     FilterChain::FilterChainNameActionValidationVisitor validation_visitor;
     Matcher::MatchTreeFactory<Network::MatchingData, FilterChainActionFactoryContext> factory(
-        parent_context_.serverFactoryContext(), parent_context_.serverFactoryContext(),
+        parent_context.serverFactoryContext(), parent_context.serverFactoryContext(),
         validation_visitor);
     matcher_ = factory.create(*filter_chain_matcher)();
   }
-  ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
-            fc_contexts_.size(), new_filter_chain_size);
 }
 
-void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
+absl::Status FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
     const envoy::config::listener::v3::FilterChain* default_filter_chain,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
@@ -257,16 +297,18 @@ void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
 
   // Save the default filter chain message. This message could be used in next listener update.
   if (default_filter_chain == nullptr) {
-    return;
+    return absl::OkStatus();
   }
   default_filter_chain_message_ = absl::make_optional(*default_filter_chain);
 
   // Origin filter chain manager could be empty if the current is the ancestor.
   const auto* origin = getOriginFilterChainManager();
   if (origin == nullptr) {
-    default_filter_chain_ =
-        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
-    return;
+    auto filter_chain_or_error = filter_chain_factory_builder.buildFilterChain(
+        *default_filter_chain, context_creator, false);
+    RETURN_IF_NOT_OK(filter_chain_or_error.status());
+    default_filter_chain_ = *filter_chain_or_error;
+    return absl::OkStatus();
   }
 
   // Copy from original filter chain manager, or build new filter chain if the default filter chain
@@ -276,12 +318,15 @@ void FilterChainManagerImpl::copyOrRebuildDefaultFilterChain(
       eq(origin->default_filter_chain_message_.value(), *default_filter_chain)) {
     default_filter_chain_ = origin->default_filter_chain_;
   } else {
-    default_filter_chain_ =
-        filter_chain_factory_builder.buildFilterChain(*default_filter_chain, context_creator);
+    auto filter_chain_or_error = filter_chain_factory_builder.buildFilterChain(
+        *default_filter_chain, context_creator, false);
+    RETURN_IF_NOT_OK(filter_chain_or_error.status());
+    default_filter_chain_ = *filter_chain_or_error;
   }
+  return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::addFilterChainForDestinationPorts(
+absl::Status FilterChainManagerImpl::addFilterChainForDestinationPorts(
     DestinationPortsMap& destination_ports_map, uint16_t destination_port,
     const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string> server_names, const std::string& transport_protocol,
@@ -295,13 +340,13 @@ void FilterChainManagerImpl::addFilterChainForDestinationPorts(
     destination_ports_map[destination_port] =
         std::make_pair<DestinationIPsMap, DestinationIPsTriePtr>(DestinationIPsMap{}, nullptr);
   }
-  addFilterChainForDestinationIPs(destination_ports_map[destination_port].first, destination_ips,
-                                  server_names, transport_protocol, application_protocols,
-                                  direct_source_ips, source_type, source_ips, source_ports,
-                                  filter_chain);
+  return addFilterChainForDestinationIPs(destination_ports_map[destination_port].first,
+                                         destination_ips, server_names, transport_protocol,
+                                         application_protocols, direct_source_ips, source_type,
+                                         source_ips, source_ports, filter_chain);
 }
 
-void FilterChainManagerImpl::addFilterChainForDestinationIPs(
+absl::Status FilterChainManagerImpl::addFilterChainForDestinationIPs(
     DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
@@ -311,19 +356,21 @@ void FilterChainManagerImpl::addFilterChainForDestinationIPs(
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (destination_ips.empty()) {
-    addFilterChainForServerNames(destination_ips_map[EMPTY_STRING], server_names,
-                                 transport_protocol, application_protocols, direct_source_ips,
-                                 source_type, source_ips, source_ports, filter_chain);
+    RETURN_IF_NOT_OK(addFilterChainForServerNames(
+        destination_ips_map[EMPTY_STRING], server_names, transport_protocol, application_protocols,
+        direct_source_ips, source_type, source_ips, source_ports, filter_chain));
   } else {
     for (const auto& destination_ip : destination_ips) {
-      addFilterChainForServerNames(destination_ips_map[destination_ip], server_names,
-                                   transport_protocol, application_protocols, direct_source_ips,
-                                   source_type, source_ips, source_ports, filter_chain);
+      RETURN_IF_NOT_OK(
+          addFilterChainForServerNames(destination_ips_map[destination_ip], server_names,
+                                       transport_protocol, application_protocols, direct_source_ips,
+                                       source_type, source_ips, source_ports, filter_chain));
     }
   }
+  return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::addFilterChainForServerNames(
+absl::Status FilterChainManagerImpl::addFilterChainForServerNames(
     ServerNamesMapSharedPtr& server_names_map_ptr, const absl::Span<const std::string> server_names,
     const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
@@ -338,26 +385,27 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
   auto& server_names_map = *server_names_map_ptr;
 
   if (server_names.empty()) {
-    addFilterChainForApplicationProtocols(server_names_map[EMPTY_STRING][transport_protocol],
-                                          application_protocols, direct_source_ips, source_type,
-                                          source_ips, source_ports, filter_chain);
+    RETURN_IF_NOT_OK(addFilterChainForApplicationProtocols(
+        server_names_map[EMPTY_STRING][transport_protocol], application_protocols,
+        direct_source_ips, source_type, source_ips, source_ports, filter_chain));
   } else {
     for (const auto& server_name : server_names) {
       if (isWildcardServerName(server_name)) {
         // Add mapping for the wildcard domain, i.e. ".example.com" for "*.example.com".
-        addFilterChainForApplicationProtocols(
+        RETURN_IF_NOT_OK(addFilterChainForApplicationProtocols(
             server_names_map[server_name.substr(1)][transport_protocol], application_protocols,
-            direct_source_ips, source_type, source_ips, source_ports, filter_chain);
+            direct_source_ips, source_type, source_ips, source_ports, filter_chain));
       } else {
-        addFilterChainForApplicationProtocols(server_names_map[server_name][transport_protocol],
-                                              application_protocols, direct_source_ips, source_type,
-                                              source_ips, source_ports, filter_chain);
+        RETURN_IF_NOT_OK(addFilterChainForApplicationProtocols(
+            server_names_map[server_name][transport_protocol], application_protocols,
+            direct_source_ips, source_type, source_ips, source_ports, filter_chain));
       }
     }
   }
+  return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::addFilterChainForApplicationProtocols(
+absl::Status FilterChainManagerImpl::addFilterChainForApplicationProtocols(
     ApplicationProtocolsMap& application_protocols_map,
     const absl::Span<const std::string* const> application_protocols,
     const std::vector<std::string>& direct_source_ips,
@@ -366,36 +414,39 @@ void FilterChainManagerImpl::addFilterChainForApplicationProtocols(
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (application_protocols.empty()) {
-    addFilterChainForDirectSourceIPs(application_protocols_map[EMPTY_STRING].first,
-                                     direct_source_ips, source_type, source_ips, source_ports,
-                                     filter_chain);
+    RETURN_IF_NOT_OK(addFilterChainForDirectSourceIPs(application_protocols_map[EMPTY_STRING].first,
+                                                      direct_source_ips, source_type, source_ips,
+                                                      source_ports, filter_chain));
   } else {
     for (const auto& application_protocol_ptr : application_protocols) {
-      addFilterChainForDirectSourceIPs(application_protocols_map[*application_protocol_ptr].first,
-                                       direct_source_ips, source_type, source_ips, source_ports,
-                                       filter_chain);
+      RETURN_IF_NOT_OK(addFilterChainForDirectSourceIPs(
+          application_protocols_map[*application_protocol_ptr].first, direct_source_ips,
+          source_type, source_ips, source_ports, filter_chain));
     }
   }
+  return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::addFilterChainForDirectSourceIPs(
+absl::Status FilterChainManagerImpl::addFilterChainForDirectSourceIPs(
     DirectSourceIPsMap& direct_source_ips_map, const std::vector<std::string>& direct_source_ips,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (direct_source_ips.empty()) {
-    addFilterChainForSourceTypes(direct_source_ips_map[EMPTY_STRING], source_type, source_ips,
-                                 source_ports, filter_chain);
+    RETURN_IF_NOT_OK(addFilterChainForSourceTypes(direct_source_ips_map[EMPTY_STRING], source_type,
+                                                  source_ips, source_ports, filter_chain));
   } else {
     for (const auto& direct_source_ip : direct_source_ips) {
-      addFilterChainForSourceTypes(direct_source_ips_map[direct_source_ip], source_type, source_ips,
-                                   source_ports, filter_chain);
+      RETURN_IF_NOT_OK(addFilterChainForSourceTypes(direct_source_ips_map[direct_source_ip],
+                                                    source_type, source_ips, source_ports,
+                                                    filter_chain));
     }
   }
+  return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::addFilterChainForSourceTypes(
+absl::Status FilterChainManagerImpl::addFilterChainForSourceTypes(
     SourceTypesArraySharedPtr& source_types_array_ptr,
     const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
@@ -407,30 +458,33 @@ void FilterChainManagerImpl::addFilterChainForSourceTypes(
 
   SourceTypesArray& source_types_array = *source_types_array_ptr;
   if (source_ips.empty()) {
-    addFilterChainForSourceIPs(source_types_array[source_type].first, EMPTY_STRING, source_ports,
-                               filter_chain);
+    RETURN_IF_NOT_OK(addFilterChainForSourceIPs(source_types_array[source_type].first, EMPTY_STRING,
+                                                source_ports, filter_chain));
   } else {
     for (const auto& source_ip : source_ips) {
-      addFilterChainForSourceIPs(source_types_array[source_type].first, source_ip, source_ports,
-                                 filter_chain);
+      RETURN_IF_NOT_OK(addFilterChainForSourceIPs(source_types_array[source_type].first, source_ip,
+                                                  source_ports, filter_chain));
     }
   }
+  return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::addFilterChainForSourceIPs(
+absl::Status FilterChainManagerImpl::addFilterChainForSourceIPs(
     SourceIPsMap& source_ips_map, const std::string& source_ip,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (source_ports.empty()) {
-    addFilterChainForSourcePorts(source_ips_map[source_ip], 0, filter_chain);
+    RETURN_IF_NOT_OK(addFilterChainForSourcePorts(source_ips_map[source_ip], 0, filter_chain));
   } else {
     for (auto source_port : source_ports) {
-      addFilterChainForSourcePorts(source_ips_map[source_ip], source_port, filter_chain);
+      RETURN_IF_NOT_OK(
+          addFilterChainForSourcePorts(source_ips_map[source_ip], source_port, filter_chain));
     }
   }
+  return absl::OkStatus();
 }
 
-void FilterChainManagerImpl::addFilterChainForSourcePorts(
+absl::Status FilterChainManagerImpl::addFilterChainForSourcePorts(
     SourcePortsMapSharedPtr& source_ports_map_ptr, uint32_t source_port,
     const Network::FilterChainSharedPtr& filter_chain) {
   if (source_ports_map_ptr == nullptr) {
@@ -442,34 +496,43 @@ void FilterChainManagerImpl::addFilterChainForSourcePorts(
     // If we got here and found already configured branch, then it means that this FilterChainMatch
     // is a duplicate, and that there is some overlap in the repeated fields with already processed
     // FilterChainMatches.
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("error adding listener '{}': multiple filter chains with "
                     "overlapping matching rules are defined",
                     absl::StrJoin(addresses_, ",", Network::AddressStrFormatter())));
   }
+  return absl::OkStatus();
 }
 
 namespace {
 
 // Template function for creating a CIDR list entry for either source or destination address.
 template <class T>
-std::pair<T, std::vector<Network::Address::CidrRange>> makeCidrListEntry(const std::string& cidr,
-                                                                         const T& data) {
+std::pair<T, std::vector<Network::Address::CidrRange>>
+makeCidrListEntry(const std::string& cidr, const T& data, absl::Status& creation_status) {
   std::vector<Network::Address::CidrRange> subnets;
+  absl::StatusOr<Network::Address::CidrRange> range;
   if (cidr == EMPTY_STRING) {
     if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET)) {
-      subnets.push_back(THROW_OR_RETURN_VALUE(
-          Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress()),
-          Network::Address::CidrRange));
+      range = Network::Address::CidrRange::create(Network::Utility::getIpv4CidrCatchAllAddress());
+      creation_status = range.status();
+      if (range.status().ok()) {
+        subnets.push_back(*range);
+      }
     }
     if (Network::SocketInterfaceSingleton::get().ipFamilySupported(AF_INET6)) {
-      subnets.push_back(THROW_OR_RETURN_VALUE(
-          Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress()),
-          Network::Address::CidrRange));
+      range = Network::Address::CidrRange::create(Network::Utility::getIpv6CidrCatchAllAddress());
+      creation_status = range.status();
+      if (range.status().ok()) {
+        subnets.push_back(*range);
+      }
     }
   } else {
-    subnets.push_back(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(cidr),
-                                            Network::Address::CidrRange));
+    range = Network::Address::CidrRange::create(cidr);
+    creation_status = range.status();
+    if (range.status().ok()) {
+      subnets.push_back(*range);
+    }
   }
   return std::make_pair<T, std::vector<Network::Address::CidrRange>>(T(data), std::move(subnets));
 }
@@ -515,13 +578,12 @@ const Network::FilterChain*
 FilterChainManagerImpl::findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
                                                     const StreamInfo::StreamInfo& info) const {
   Network::Matching::MatchingDataImpl data(socket, info.filterState(), info.dynamicMetadata());
-  const auto& match_result = Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
-  ASSERT(match_result.match_state_ == Matcher::MatchState::MatchComplete,
-         "Matching must complete for network streams.");
-  if (match_result.result_) {
-    const auto result = match_result.result_();
-    return result->getTyped<Configuration::FilterChainBaseAction>().get(filter_chains_by_name_,
-                                                                        info);
+  const Matcher::MatchResult match_result =
+      Matcher::evaluateMatch<Network::MatchingData>(*matcher_, data);
+  ASSERT(match_result.isComplete(), "Matching must complete for network streams.");
+  if (match_result.isMatch()) {
+    return match_result.action()->getTyped<Configuration::FilterChainBaseAction>().get(
+        filter_chains_by_name_, info);
   }
   return default_filter_chain_.get();
 }
@@ -699,7 +761,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceIpAn
   return nullptr;
 }
 
-void FilterChainManagerImpl::convertIPsToTries() {
+absl::Status FilterChainManagerImpl::convertIPsToTries() {
   for (auto& [destination_port, destination_ips_pair] : destination_ports_map_) {
     UNREFERENCED_PARAMETER(destination_port);
     // These variables are used as we build up the destination CIDRs used for the trie.
@@ -709,7 +771,10 @@ void FilterChainManagerImpl::convertIPsToTries() {
     destination_ips_list.reserve(destination_ips_map.size());
 
     for (const auto& [destination_ip, server_names_map_ptr] : destination_ips_map) {
-      destination_ips_list.push_back(makeCidrListEntry(destination_ip, server_names_map_ptr));
+      absl::Status creation_status = absl::OkStatus();
+      destination_ips_list.push_back(
+          makeCidrListEntry(destination_ip, server_names_map_ptr, creation_status));
+      RETURN_IF_NOT_OK(creation_status);
 
       // This hugely nested for loop greatly pains me, but I'm not sure how to make it better.
       // We need to get access to all of the source IP strings so that we can convert them into
@@ -729,7 +794,8 @@ void FilterChainManagerImpl::convertIPsToTries() {
 
             for (auto& [direct_source_ip, source_arrays_ptr] : direct_source_ips_map) {
               direct_source_ips_list.push_back(
-                  makeCidrListEntry(direct_source_ip, source_arrays_ptr));
+                  makeCidrListEntry(direct_source_ip, source_arrays_ptr, creation_status));
+              RETURN_IF_NOT_OK(creation_status);
 
               for (auto& [source_ips_map, source_ips_trie] : *source_arrays_ptr) {
                 std::vector<
@@ -738,7 +804,9 @@ void FilterChainManagerImpl::convertIPsToTries() {
                 source_ips_list.reserve(source_ips_map.size());
 
                 for (auto& [source_ip, source_port_map_ptr] : source_ips_map) {
-                  source_ips_list.push_back(makeCidrListEntry(source_ip, source_port_map_ptr));
+                  source_ips_list.push_back(
+                      makeCidrListEntry(source_ip, source_port_map_ptr, creation_status));
+                  RETURN_IF_NOT_OK(creation_status);
                 }
 
                 source_ips_trie = std::make_unique<SourceIPsTrie>(source_ips_list, true);
@@ -753,6 +821,7 @@ void FilterChainManagerImpl::convertIPsToTries() {
 
     destination_ips_trie = std::make_unique<DestinationIPsTrie>(destination_ips_list, true);
   }
+  return absl::OkStatus();
 }
 
 Network::DrainableFilterChainSharedPtr FilterChainManagerImpl::findExistingFilterChain(

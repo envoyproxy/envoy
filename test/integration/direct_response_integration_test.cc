@@ -116,7 +116,11 @@ TEST_P(DirectResponseIntegrationTest, DefaultDirectResponseBodySize) {
 TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeLarge) {
   // Test with a large direct response body size, and with constrained buffer limits.
   config_helper_.setBufferLimits(1024, 1024);
-  testDirectResponseBodySize(1000 * 4096);
+  // Envoy takes much time to load the big configuration in TSAN mode and will result in the test to
+  // be flaky. See https://github.com/envoyproxy/envoy/issues/33957 for more detail and context.
+  // We reduce the body size from 4MB to 2MB to reduce the size of configuration to make the CI more
+  // stable.
+  testDirectResponseBodySize(/*1000*/ 500 * 4096);
 }
 
 TEST_P(DirectResponseIntegrationTest, DirectResponseBodySizeSmall) {

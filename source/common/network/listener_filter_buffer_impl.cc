@@ -9,12 +9,12 @@ ListenerFilterBufferImpl::ListenerFilterBufferImpl(IoHandle& io_handle,
                                                    Event::Dispatcher& dispatcher,
                                                    ListenerFilterBufferOnCloseCb close_cb,
                                                    ListenerFilterBufferOnDataCb on_data_cb,
-                                                   uint64_t buffer_size)
+                                                   bool on_data_cb_disabled, uint64_t buffer_size)
     : io_handle_(io_handle), dispatcher_(dispatcher), on_close_cb_(close_cb),
-      on_data_cb_(on_data_cb), buffer_(std::make_unique<uint8_t[]>(buffer_size)),
-      base_(buffer_.get()), buffer_size_(buffer_size) {
+      on_data_cb_(on_data_cb), on_data_cb_disabled_(on_data_cb_disabled),
+      buffer_size_(on_data_cb_disabled ? 1 : buffer_size),
+      buffer_(std::make_unique<uint8_t[]>(buffer_size_)), base_(buffer_.get()) {
   // If the buffer_size not greater than 0, it means that doesn't expect any data.
-  ASSERT(buffer_size > 0);
 
   io_handle_.initializeFileEvent(
       dispatcher_, [this](uint32_t events) { return onFileEvent(events); },
@@ -102,7 +102,15 @@ absl::Status ListenerFilterBufferImpl::onFileEvent(uint32_t events) {
   ASSERT(events == Event::FileReadyType::Read);
 
   auto state = peekFromSocket();
-  if (state == PeekState::Done) {
+  if (state == PeekState::Done && !on_data_cb_disabled_) {
+    // buffer_size_ will be set to 1 if the first listener filter in
+    // filter chain has maxReadBytes() of 0. Bypass onData callback of it.
+    // The reason for setting it to 1 is that different platforms have
+    // different libevent implementation, e.g. on macOS the connection
+    // doesn't get early close notification and instead gets the close
+    // after reading the FIN, which means Event::FileReadyType::Read is
+    // required. But on macOS if Read is enabled with 0 buffer size, the
+    // connection will be closed when there is any data sent
     on_data_cb_(*this);
   } else if (state == PeekState::Error) {
     on_close_cb_(true);

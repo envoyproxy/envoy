@@ -694,6 +694,7 @@ TEST_F(ScaledRangeTimerManagerTest, LooksUpConfiguredMinimums) {
   const ScaledTimerTypeMap timer_types{
       {ScaledTimerType::UnscaledRealTimerForTest, ScaledMinimum(UnitFloat::max())},
       {ScaledTimerType::HttpDownstreamIdleConnectionTimeout, ScaledMinimum(UnitFloat(0.3))},
+      {ScaledTimerType::HttpDownstreamMaxConnectionTimeout, ScaledMinimum(UnitFloat(0.4))},
       {ScaledTimerType::HttpDownstreamIdleStreamTimeout, ScaledMinimum(UnitFloat(0.6))},
   };
 

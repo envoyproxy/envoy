@@ -1,7 +1,6 @@
 package io.envoyproxy.envoymobile.engine
 
-import com.google.protobuf.Struct
-import com.google.protobuf.Value
+import android.util.Pair
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilter
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification
@@ -15,6 +14,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.util.regex.Pattern
+import com.google.protobuf.Any
+import com.google.protobuf.ByteString
 
 class TestFilter : EnvoyHTTPFilter {
 
@@ -78,17 +79,16 @@ class EnvoyConfigurationTest {
     dnsPreresolveHostnames: MutableList<String> = mutableListOf("hostname1", "hostname2"),
     enableDNSCache: Boolean = false,
     dnsCacheSaveIntervalSeconds: Int = 101,
+    dnsNumRetries: Int? = 3,
     enableDrainPostDnsRefresh: Boolean = false,
     enableHttp3: Boolean = true,
-    enableCares: Boolean = false,
-    enableGro: Boolean = false,
     http3ConnectionOptions: String = "5RTO",
     http3ClientConnectionOptions: String = "MPQC",
     quicHints: Map<String, Int> = mapOf("www.abc.com" to 443, "www.def.com" to 443),
     quicCanonicalSuffixes: MutableList<String> = mutableListOf(".opq.com", ".xyz.com"),
     enableGzipDecompression: Boolean = true,
     enableBrotliDecompression: Boolean = false,
-    enablePortMigration: Boolean = true,
+    numTimeoutsToTriggerPortMigration: Int = 4,
     enableSocketTagging: Boolean = false,
     enableInterfaceBinding: Boolean = false,
     h2ConnectionKeepaliveIdleIntervalMilliseconds: Int = 222,
@@ -99,15 +99,27 @@ class EnvoyConfigurationTest {
     appVersion: String = "v1.2.3",
     appId: String = "com.example.myapp",
     trustChainVerification: TrustChainVerification = TrustChainVerification.VERIFY_TRUST_CHAIN,
-    filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1", "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }"), EnvoyNativeFilterConfig("buffer_filter_2", "[type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer] { max_request_bytes: { value: 5242880 } }")),
+    filterChain: MutableList<EnvoyNativeFilterConfig> = mutableListOf(EnvoyNativeFilterConfig("buffer_filter_1",
+        Any.newBuilder()
+          .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
+          .setValue(ByteString.empty())
+        .build().toByteArray().toString(Charsets.UTF_8)), EnvoyNativeFilterConfig("buffer_filter_2",
+        Any.newBuilder()
+          .setTypeUrl("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
+          .setValue(ByteString.empty())
+        .build().toByteArray().toString(Charsets.UTF_8))),
     platformFilterFactories: MutableList<EnvoyHTTPFilterFactory> = mutableListOf(TestEnvoyHTTPFilterFactory("name1"), TestEnvoyHTTPFilterFactory("name2")),
     runtimeGuards: Map<String,Boolean> = emptyMap(),
     enablePlatformCertificatesValidation: Boolean = false,
     upstreamTlsSni: String = "",
-
+    h3ConnectionKeepaliveInitialIntervalMilliseconds: Int = 0,
+    disableDnsRefreshOnFailure: Boolean = false,
+    disableDnsRefreshOnNetworkChange: Boolean = false,
   ): EnvoyConfiguration {
     return EnvoyConfiguration(
       connectTimeoutSeconds,
+      disableDnsRefreshOnFailure,
+      disableDnsRefreshOnNetworkChange,
       dnsRefreshSeconds,
       dnsFailureRefreshSecondsBase,
       dnsFailureRefreshSecondsMax,
@@ -116,17 +128,16 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames,
       enableDNSCache,
       dnsCacheSaveIntervalSeconds,
+      dnsNumRetries ?: -1,
       enableDrainPostDnsRefresh,
       enableHttp3,
-      enableCares,
-      enableGro,
       http3ConnectionOptions,
       http3ClientConnectionOptions,
       quicHints,
       quicCanonicalSuffixes,
       enableGzipDecompression,
       enableBrotliDecompression,
-      enablePortMigration,
+      numTimeoutsToTriggerPortMigration,
       enableSocketTagging,
       enableInterfaceBinding,
       h2ConnectionKeepaliveIdleIntervalMilliseconds,
@@ -144,6 +155,7 @@ class EnvoyConfigurationTest {
       runtimeGuards,
       enablePlatformCertificatesValidation,
       upstreamTlsSni,
+      h3ConnectionKeepaliveInitialIntervalMilliseconds,
     )
   }
 
@@ -153,6 +165,7 @@ class EnvoyConfigurationTest {
     val envoyConfiguration = buildTestEnvoyConfiguration()
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
+    println(resolvedTemplate)
     assertThat(resolvedTemplate).contains("connect_timeout { seconds: 123 }")
 
     // DNS
@@ -165,9 +178,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("preresolve_hostnames")
     assertThat(resolvedTemplate).contains("hostname1")
     assertThat(resolvedTemplate).contains("hostname1")
-
-    // Forcing IPv6
-    assertThat(resolvedTemplate).contains("key: \"always_use_v6\" value { bool_value: true }")
+    assertThat(resolvedTemplate).contains("num_retries { value: 3 }")
 
     // H2 Ping
     assertThat(resolvedTemplate).contains("connection_idle_interval { nanos: 222000000 }")
@@ -184,6 +195,7 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains(".xyz.com");
     assertThat(resolvedTemplate).contains("connection_options: \"5RTO\"");
     assertThat(resolvedTemplate).contains("client_connection_options: \"MPQC\"");
+    assertThat(resolvedTemplate).doesNotContain("connection_keepalive { initial_interval {")
 
     // Per Host Limits
     assertThat(resolvedTemplate).contains("max_connections { value: 543 }")
@@ -201,16 +213,13 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("buffer_filter_1")
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
 
-    // Cert Validation
-    assertThat(resolvedTemplate).contains("trusted_ca")
-
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createProtoString doesn't change filter order.
     val resolvedTemplate2 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate2).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createBootstrap also doesn't change filter order.
-    // This may leak memory as the boostrap isn't used.
+    // This may leak memory as the bootstrap isn't used.
     envoyConfiguration.createBootstrap()
     val resolvedTemplate3 = TestJni.createProtoString(envoyConfiguration)
     assertThat(resolvedTemplate3).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
@@ -224,8 +233,6 @@ class EnvoyConfigurationTest {
       enableDNSCache = true,
       dnsCacheSaveIntervalSeconds = 101,
       enableHttp3 = false,
-      enableCares = true,
-      enableGro = true,
       enableGzipDecompression = false,
       enableBrotliDecompression = true,
       enableSocketTagging = true,
@@ -234,7 +241,9 @@ class EnvoyConfigurationTest {
       dnsPreresolveHostnames = mutableListOf(),
       filterChain = mutableListOf(),
       runtimeGuards = mapOf("test_feature_false" to true),
-      trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED
+      trustChainVerification = TrustChainVerification.ACCEPT_UNTRUSTED,
+      h3ConnectionKeepaliveInitialIntervalMilliseconds = 200,
+      disableDnsRefreshOnFailure = true,
     )
 
     val resolvedTemplate = TestJni.createProtoString(envoyConfiguration)
@@ -245,10 +254,7 @@ class EnvoyConfigurationTest {
     // enableDrainPostDnsRefresh = true
     assertThat(resolvedTemplate).contains("enable_drain_post_dns_refresh: true")
 
-    // enableCares = true
-    assertThat(resolvedTemplate).contains("envoy.network.dns_resolver.cares")
-
-    // enableGro = true
+    // UDP GRO enabled by default
     assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
 
     // enableDNSCache = true
@@ -270,6 +276,18 @@ class EnvoyConfigurationTest {
 
     // enablePlatformCertificatesValidation = true
     assertThat(resolvedTemplate).doesNotContain("trusted_ca")
+
+    assertThat(resolvedTemplate).doesNotContain("quic_protocol_options")
+
+    val envoyConfiguration1 = buildTestEnvoyConfiguration(
+      enableHttp3 = true,
+      h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
+    )
+
+    val resolvedTemplate1 = TestJni.createProtoString(envoyConfiguration1)
+    // h3ConnectionKeepaliveInitialIntervalMilliseconds = 200
+    assertThat(resolvedTemplate1).contains("connection_keepalive { initial_interval { nanos: 200000000 }")
+    assertThat(resolvedTemplate).contains("disable_dns_refresh_on_failure: true")
   }
 
   @Test

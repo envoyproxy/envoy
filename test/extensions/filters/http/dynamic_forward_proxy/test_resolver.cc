@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Network {
 
 absl::Mutex TestResolver::resolution_mutex_;
-std::list<std::function<void(absl::optional<std::string> dns_override)>>
+std::list<absl::AnyInvocable<void(absl::optional<std::string> dns_override)>>
     TestResolver::blocked_resolutions_;
 
 REGISTER_FACTORY(TestResolverFactory, DnsResolverFactory);

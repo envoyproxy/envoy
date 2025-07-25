@@ -61,6 +61,13 @@ TEST_F(OptionsImplTest, InvalidMode) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --mode bogus"), MalformedArgvException, "bogus");
 }
 
+TEST_F(OptionsImplTest, InvalidComponentLogLevelWithFineGrainLogging) {
+  EXPECT_THROW_WITH_REGEX(
+      createOptionsImpl("envoy --enable-fine-grain-logging --component-log-level http:info"),
+      MalformedArgvException,
+      "--component-log-level will not work with --enable-fine-grain-logging");
+}
+
 TEST_F(OptionsImplTest, InvalidCommandLine) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --blah"), MalformedArgvException,
                           "Couldn't find match for argument");
@@ -98,7 +105,7 @@ TEST_F(OptionsImplTest, All) {
       "--file-flush-interval-msec 9000 "
       "--skip-hot-restart-on-no-parent "
       "--skip-hot-restart-parent-stats "
-      "--drain-time-s 60 --log-format [%v] --enable-fine-grain-logging --parent-shutdown-time-s 90 "
+      "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 "
       "--log-path "
       "/foo/bar "
       "--disable-hot-restart --cpuset-threads --allow-unknown-static-fields "
@@ -119,7 +126,7 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_TRUE(options->skipHotRestartParentStats());
   EXPECT_TRUE(options->skipHotRestartOnNoParent());
   EXPECT_EQ("/foo/bar", options->logPath());
-  EXPECT_EQ(true, options->enableFineGrainLogging());
+  EXPECT_EQ(false, options->enableFineGrainLogging());
   EXPECT_EQ("cluster", options->serviceClusterName());
   EXPECT_EQ("node", options->serviceNodeName());
   EXPECT_EQ("zone", options->serviceZone());
@@ -139,6 +146,10 @@ TEST_F(OptionsImplTest, All) {
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
+
+  // Tested separately because it's mutually exclusive with --component-log-level.
+  options = createOptionsImpl("envoy --enable-fine-grain-logging");
+  EXPECT_EQ(true, options->enableFineGrainLogging());
 }
 
 // Either variants of allow-unknown-[static-]-fields works.
@@ -319,6 +330,14 @@ TEST_F(OptionsImplTest, DefaultParamsNoConstructorArgs) {
   // This is the only difference between this test and DefaultParams above, as
   // the DefaultParams constructor explicitly sets log level to warn.
   EXPECT_EQ(spdlog::level::info, options->logLevel());
+}
+
+TEST_F(OptionsImplTest, SetEnableFineGrainLogging) {
+  std::unique_ptr<OptionsImplBase> options = std::make_unique<OptionsImplBase>();
+
+  EXPECT_FALSE(options->enableFineGrainLogging());
+  options->setEnableFineGrainLogging(true);
+  EXPECT_TRUE(options->enableFineGrainLogging());
 }
 
 // Validates that the server_info proto is in sync with the options.

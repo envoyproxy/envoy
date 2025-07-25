@@ -55,7 +55,7 @@ private:
         Extensions::Common::Wasm::CustomStatNamespace);
     auto filter_config = std::make_shared<FilterConfig>(proto_config, context);
     return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-      auto filter = filter_config->createFilter();
+      auto filter = filter_config->createContext();
       if (!filter) { // Fail open
         return;
       }

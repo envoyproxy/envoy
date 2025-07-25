@@ -103,7 +103,7 @@ inline bool operator==(const StringViewSaver& saver, const char* str) {
 class MockScopeTrackedObject : public ScopeTrackedObject {
 public:
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
-  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
+  MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));
 };
 
 namespace ConnectionPool {

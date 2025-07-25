@@ -21,7 +21,7 @@ class LookupRequest {
 public:
   LookupRequest() = default;
   LookupRequest(Network::Address::InstanceConstSharedPtr&& remote_address)
-      : remote_address_(std::move(remote_address)){};
+      : remote_address_(std::move(remote_address)) {};
 
   const Network::Address::InstanceConstSharedPtr remoteAddress() const { return remote_address_; }
 

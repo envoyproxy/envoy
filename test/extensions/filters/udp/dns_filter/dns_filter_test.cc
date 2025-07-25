@@ -759,7 +759,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnSingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer()).Times(AnyNumber());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -812,7 +812,7 @@ TEST_F(DnsFilterTest, ExternalResolutionIpv6SingleAddress) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -865,7 +865,7 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnMultipleAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({expected_address}));
 
   // parse the result
@@ -917,7 +917,8 @@ TEST_F(DnsFilterTest, ExternalResolutionReturnNoAddresses) {
   EXPECT_CALL(*timeout_timer, disableTimer());
 
   // Execute resolve callback
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "", TestUtility::makeDnsResponse({}));
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
+             TestUtility::makeDnsResponse({}));
 
   // parse the result
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
@@ -1003,7 +1004,7 @@ TEST_F(DnsFilterTest, ExternalResolutionTimeout2) {
   // Execute resolve callback. This should harmlessly return and not alter
   // the response received by the client. Even though we are returning a successful
   // response, the client does not get an answer
-  resolve_cb(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolve_cb(Network::DnsResolver::ResolutionStatus::Completed, "",
              TestUtility::makeDnsResponse({"130.207.244.251"}));
 
   // parse the result
@@ -1863,12 +1864,11 @@ TEST_F(DnsFilterTest, NotImplementedQueryTest) {
   EXPECT_EQ(0, config_->stats().downstream_rx_invalid_queries_.value());
 }
 
-TEST_F(DnsFilterTest, NoTransactionIdTest) {
+TEST_F(DnsFilterTest, ZeroTransactionIdTest) {
   InSequence s;
 
   setup(forward_query_off_config);
-  // This buffer has an invalid Transaction ID. We should return an error
-  // to the client
+  // This buffer has a Transaction ID of zero. This is not an error.
   constexpr char dns_request[] = {
       0x00, 0x00,                               // Transaction ID
       0x01, 0x20,                               // Flags
@@ -1888,8 +1888,8 @@ TEST_F(DnsFilterTest, NoTransactionIdTest) {
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
-  EXPECT_FALSE(response_ctx_->parse_status_);
-  EXPECT_EQ(DNS_RESPONSE_CODE_FORMAT_ERROR, response_ctx_->getQueryResponseCode());
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NOT_IMPLEMENTED, response_ctx_->getQueryResponseCode());
 }
 
 TEST_F(DnsFilterTest, InvalidShortBufferTest) {
@@ -1910,12 +1910,6 @@ TEST_F(DnsFilterTest, InvalidShortBufferTest) {
 }
 
 TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
-#if defined(__linux__) && defined(__s390x__)
-  // Skip on s390x because this test incorrectly depends on the ordering of
-  // addresses that happens to work on other platforms.
-  // See https://github.com/envoyproxy/envoy/pull/24330
-  GTEST_SKIP() << "Skipping RandomizeFirstAnswerTest on s390x";
-#endif
   InSequence s;
 
   setup(forward_query_off_config);
@@ -1924,6 +1918,9 @@ TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
   const std::string query =
       Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   ASSERT_FALSE(query.empty());
+  // Generate a new "random" value different from the original 3 to make the retrieval and insertion
+  // order in the response_ctx_->answers_ different.
+  ON_CALL(random_, random()).WillByDefault(Return(5));
   sendQueryFromClient("10.0.0.1:1000", query);
 
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
@@ -1933,10 +1930,16 @@ TEST_F(DnsFilterTest, RandomizeFirstAnswerTest) {
   // Although 16 addresses are defined, only 8 are returned
   EXPECT_EQ(8, response_ctx_->answers_.size());
 
-  // We shuffle the list of addresses when we read the config, and in the case of more than
-  // 8 defined addresses, we randomize the initial starting index. We should not end up with
-  // the first answer being the first defined address, or the answers appearing in the same
-  // order as they are defined.
+  // DNS filter shuffles the list of addresses when reading the config, and in the case of more than
+  // 8 defined addresses, it randomizes the initial starting index.
+  // There is 1/16 chance that the answer will return the initial 8 addresses, however since the
+  // test is using the same "random" number, the set of addresses in the answer is well defined, and
+  // should not be the initial 8 addresses.
+  //
+  // NOTE: this depends on the std::unordered_multimap order of retrieval, which is unspecified in
+  // the standard. It is possible that a future version of STL , will produce this exact order when
+  // retrieving elements starting with index 5 hardcoded in this test. In this case the retrieval
+  // order can be tweaked by making RNG return a different number above.
   const std::list<std::string> defined_order{"10.0.16.1", "10.0.16.2", "10.0.16.3", "10.0.16.4",
                                              "10.0.16.5", "10.0.16.6", "10.0.16.7", "10.0.16.8"};
   auto defined_answer_iter = defined_order.begin();
@@ -2427,6 +2430,133 @@ server_config:
   response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
   EXPECT_TRUE(response_ctx_->parse_status_);
   EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, WildcardName) {
+  InSequence s;
+
+  const std::string wildcard_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foobaz.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+)EOF";
+  setup(wildcard_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.1"};
+  const std::string domain("www.foobaz.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, WildcardSubdomainPrevails) {
+  InSequence s;
+
+  const std::string wildcard_with_subdomain_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+      - name: "*.foo2.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.2"
+)EOF";
+  setup(wildcard_with_subdomain_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.2"};
+  const std::string domain("www.foo2.foo1.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
+
+  // Validate stats
+  EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());
+  EXPECT_EQ(1, config_->stats().known_domain_queries_.value());
+}
+
+TEST_F(DnsFilterTest, WildcardExactNamePrevails) {
+  InSequence s;
+
+  const std::string wildcard_and_exact_name_virtual_domain = R"EOF(
+stat_prefix: "my_prefix"
+server_config:
+  inline_dns_table:
+    external_retry_count: 0
+    virtual_domains:
+      - name: "*.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.1"
+      - name: "bar.foo1.com"
+        endpoint:
+          address_list:
+            address:
+            - "10.0.0.2"
+)EOF";
+  setup(wildcard_and_exact_name_virtual_domain);
+
+  const std::list<std::string> expected_address{"10.0.0.2"};
+  const std::string domain("bar.foo1.com");
+
+  const std::string query =
+      Utils::buildQueryForDomain(domain, DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  ASSERT_FALSE(query.empty());
+  sendQueryFromClient("10.0.0.1:1000", query);
+
+  response_ctx_ = ResponseValidator::createResponseContext(udp_response_, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
+
+  for (const auto& answer : response_ctx_->answers_) {
+    EXPECT_EQ(answer.first, domain);
+    Utils::verifyAddress(expected_address, answer.second);
+  }
 
   // Validate stats
   EXPECT_EQ(1, config_->stats().downstream_rx_queries_.value());

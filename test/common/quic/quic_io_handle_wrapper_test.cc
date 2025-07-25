@@ -72,7 +72,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
         *addrlen = sizeof(sockaddr_in6);
         return Api::SysCallIntResult{0, 0};
       }));
-  addr = wrapper_->localAddress();
+  addr = *wrapper_->localAddress();
 
   EXPECT_CALL(os_sys_calls_, getpeername(_, _, _))
       .WillOnce(Invoke([](os_fd_t, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
@@ -80,7 +80,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
         *addrlen = sizeof(sockaddr_in6);
         return Api::SysCallIntResult{0, 0};
       }));
-  addr = wrapper_->peerAddress();
+  addr = *wrapper_->peerAddress();
 
   Network::IoHandle::RecvMsgOutput output(1, nullptr);
   EXPECT_CALL(os_sys_calls_, recvmsg(fd, _, MSG_TRUNC))
@@ -96,7 +96,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
         msg->msg_controllen = 0;
         return Api::SysCallSizeResult{5u, 0};
       }));
-  wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output);
+  wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, {}, output);
 
   size_t num_packet_per_call = 1u;
   Network::IoHandle::RecvMsgOutput output2(num_packet_per_call, nullptr);
@@ -106,7 +106,7 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
       .WillOnce(Invoke([](os_fd_t, struct mmsghdr*, unsigned int, int, struct timespec*) {
         return Api::SysCallIntResult{-1, SOCKET_ERROR_AGAIN};
       }));
-  wrapper_->recvmmsg(slices, /*self_port=*/12345, output2);
+  wrapper_->recvmmsg(slices, /*self_port=*/12345, {}, output2);
 
   EXPECT_TRUE(wrapper_->close().ok());
 
@@ -114,9 +114,9 @@ TEST_F(QuicIoHandleWrapperTest, DelegateIoHandleCalls) {
   wrapper_->readv(5, &slice, 1);
   wrapper_->writev(&slice, 1);
   wrapper_->sendmsg(&slice, 1, 0, /*self_ip=*/nullptr, *addr);
-  EXPECT_DEBUG_DEATH(wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, output),
+  EXPECT_DEBUG_DEATH(wrapper_->recvmsg(&slice, 1, /*self_port=*/12345, {}, output),
                      "recvmmsg is called after close");
-  EXPECT_DEBUG_DEATH(wrapper_->recvmmsg(slices, /*self_port=*/12345, output2),
+  EXPECT_DEBUG_DEATH(wrapper_->recvmmsg(slices, /*self_port=*/12345, {}, output2),
                      "recvmmsg is called after close");
 
   EXPECT_CALL(os_sys_calls_, supportsUdpGro());

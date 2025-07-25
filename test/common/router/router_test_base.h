@@ -83,13 +83,11 @@ public:
   void setUpstreamMaxStreamDuration(uint32_t seconds);
   void enableHedgeOnPerTryTimeout();
 
-  void testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name);
-  void testAppendUpstreamHost(absl::optional<Http::LowerCaseString> hostname_header_name,
-                              absl::optional<Http::LowerCaseString> host_address_header_name);
-  void testDoNotForward(absl::optional<Http::LowerCaseString> not_forwarded_header_name);
   void expectNewStreamWithImmediateEncoder(Http::RequestEncoder& encoder,
                                            Http::ResponseDecoder** decoder,
                                            Http::Protocol protocol);
+  // Recreates filter under test after any values that affect its constructor were changed.
+  void recreateFilter();
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};

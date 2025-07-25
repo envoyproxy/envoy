@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/regex.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/bootstrap_extension_config.h"
@@ -39,7 +40,6 @@
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/secret/secret_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
-#include "source/common/upstream/health_discovery_service.h"
 
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
@@ -146,6 +146,11 @@ public:
                                           const Options& options,
                                           ProtobufMessage::ValidationVisitor& validation_visitor,
                                           Api::Api& api);
+
+  /**
+   * Raises soft file limit to the hard limit.
+   */
+  static void raiseFileLimits();
 };
 
 /**
@@ -178,6 +183,10 @@ public:
 
   // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
+  Config::XdsManager& xdsManager() override { return server_.xdsManager(); }
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return server_.httpServerPropertiesCacheManager();
+  }
   Event::Dispatcher& mainThreadDispatcher() override { return server_.dispatcher(); }
   const Server::Options& options() override { return server_.options(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
@@ -205,22 +214,15 @@ public:
   OverloadManager& overloadManager() override { return server_.overloadManager(); }
   OverloadManager& nullOverloadManager() override { return server_.nullOverloadManager(); }
   bool healthCheckFailed() const override { return server_.healthCheckFailed(); }
+  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
 
   // Configuration::TransportSocketFactoryContext
   ServerFactoryContext& serverFactoryContext() override { return *this; }
-  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
-  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Scope& statsScope() override { return *server_scope_; }
   Init::Manager& initManager() override { return server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
-    // Server has two message validation visitors, one for static and
-    // other for dynamic configuration. Choose the dynamic validation
-    // visitor if server's init manager indicates that the server is
-    // in the Initialized state, as this state is engaged right after
-    // the static configuration (e.g., bootstrap) has been completed.
-    return initManager().state() == Init::Manager::State::Initialized
-               ? server_.messageValidationContext().dynamicValidationVisitor()
-               : server_.messageValidationContext().staticValidationVisitor();
+    return server_.messageValidationVisitor();
   }
 
 private:
@@ -253,9 +255,13 @@ public:
   ~InstanceBase() override;
 
   virtual void maybeCreateHeapShrinker() PURE;
-  virtual std::unique_ptr<OverloadManager> createOverloadManager() PURE;
+  virtual absl::StatusOr<std::unique_ptr<OverloadManager>> createOverloadManager() PURE;
   virtual std::unique_ptr<OverloadManager> createNullOverloadManager() PURE;
   virtual std::unique_ptr<Server::GuardDog> maybeCreateGuardDog(absl::string_view name) PURE;
+  virtual std::unique_ptr<HdsDelegateApi>
+  maybeCreateHdsDelegate(Configuration::ServerFactoryContext& server_context, Stats::Scope& scope,
+                         Grpc::RawAsyncClientPtr&& async_client, Envoy::Stats::Store& stats,
+                         Ssl::ContextManager& ssl_context_manager) PURE;
 
   void run() override;
 
@@ -264,6 +270,9 @@ public:
   Api::Api& api() override { return *api_; }
   Upstream::ClusterManager& clusterManager() override;
   const Upstream::ClusterManager& clusterManager() const override;
+  Http::HttpServerPropertiesCacheManager& httpServerPropertiesCacheManager() override {
+    return *http_server_properties_cache_manager_;
+  }
   Ssl::ContextManager& sslContextManager() override { return *ssl_context_manager_; }
   Event::Dispatcher& dispatcher() override { return *dispatcher_; }
   Network::DnsResolverSharedPtr dnsResolver() override { return dns_resolver_; }
@@ -307,6 +316,14 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Server has two message validation visitors, one for static and
+    // other for dynamic configuration. Choose the dynamic validation
+    // visitor if server main dispatch loop started, as if all configuration
+    // after main dispatch loop started should be dynamic.
+    return main_dispatch_loop_started_.load() ? validation_context_.dynamicValidationVisitor()
+                                              : validation_context_.staticValidationVisitor();
+  }
   void setDefaultTracingConfig(const envoy::config::trace::v3::Tracing& tracing_config) override {
     http_context_.setDefaultTracingConfig(tracing_config);
   }
@@ -317,6 +334,7 @@ public:
   void setSinkPredicates(std::unique_ptr<Envoy::Stats::SinkPredicates>&& sink_predicates) override {
     stats_store_.setSinkPredicates(std::move(sink_predicates));
   }
+  Config::XdsManager& xdsManager() override { return *xds_manager_; }
 
   // ServerLifecycleNotifier
   ServerLifecycleNotifier::HandlePtr registerCallback(Stage stage, StageCallback callback) override;
@@ -339,8 +357,7 @@ private:
   void loadServerFlags(const absl::optional<std::string>& flags_path);
   void startWorkers();
   void terminate();
-  void notifyCallbacksForStage(
-      Stage stage, std::function<void()> completion_cb = [] {});
+  void notifyCallbacksForStage(Stage stage, std::function<void()> completion_cb = [] {});
   void onRuntimeReady();
   void onClusterManagerPrimaryInitializationComplete();
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
@@ -361,6 +378,7 @@ private:
   bool shutdown_{false};
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
+  std::atomic<bool> main_dispatch_loop_started_{false};
   TimeSource& time_source_;
   // Delete local_info_ as late as possible as some members below may reference it during their
   // destruction.
@@ -403,11 +421,12 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
-  Upstream::ProdClusterInfoFactory info_factory_;
-  Upstream::HdsDelegatePtr hds_delegate_;
+  Config::XdsManagerPtr xds_manager_;
+  std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;
   std::vector<BootstrapExtensionPtr> bootstrap_extensions_;
+  std::unique_ptr<Http::HttpServerPropertiesCacheManager> http_server_properties_cache_manager_;
   Envoy::MutexTracer* mutex_tracer_;
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;

@@ -12,7 +12,7 @@ set -e
 export HOMEBREW_NO_AUTO_UPDATE=1
 RETRY_ATTEMPTS=10
 RETRY_INTERVAL=3
-
+XCODE_VERSION=16.1
 
 function retry () {
     local returns=1 i=1
@@ -48,14 +48,14 @@ brew cleanup --prune=all
 # Remove broken symlinks.
 brew cleanup --prune-prefix
 
-DEPS="automake cmake coreutils libtool ninja"
+DEPS="automake coreutils libtool"
 for DEP in ${DEPS}
 do
     install "${DEP}"
 done
 
-# https://github.com/actions/runner-images/blob/main/images/macos/macos-12-Readme.md#xcode
-sudo xcode-select --switch /Applications/Xcode_14.1.app
+# https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md#xcode
+sudo xcode-select --switch "/Applications/Xcode_${XCODE_VERSION}.app"
 
 retry ./bazelw version
 

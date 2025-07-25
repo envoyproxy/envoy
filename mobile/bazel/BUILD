@@ -1,21 +1,8 @@
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@io_bazel_rules_kotlin//kotlin:android.bzl", "kt_android_library")
 
 licenses(["notice"])  # Apache 2
 
 envoy_mobile_package()
-
-kt_android_library(
-    name = "envoy_mobile_test_suite",
-    srcs = [
-        "EnvoyMobileTestSuite.kt",
-    ],
-    visibility = ["//visibility:public"],
-    deps = [
-        "@maven//:io_github_classgraph_classgraph",
-        "@maven//:junit_junit",
-    ],
-)
 
 config_setting(
     name = "exclude_certificates",
@@ -34,7 +21,13 @@ alias(
 
 alias(
     name = "jni",
-    actual = "@bazel_tools//tools/jdk:jni",
+    actual = "@rules_java//toolchains:jni",
+    visibility = ["//library/jni:__pkg__"],
+)
+
+alias(
+    name = "objc_dummy",
+    actual = "@bazel_tools//tools/objc:dummy.c",
     visibility = ["//library/jni:__pkg__"],
 )
 

@@ -23,8 +23,7 @@ envoy_cc_test(
         "//conditions:default": ["-Wno-unused-parameter"],
     }),
     data = ["//test/common/tls/test_data:certs"],
-    external_deps = ["quiche_quic_platform"],
-    tags = ["nofips"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/memory:stats_lib",
         "//source/common/quic/platform:quiche_flags_impl_lib",
@@ -37,6 +36,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@com_github_google_quiche//:quic_core_error_codes_lib",
         "@com_github_google_quiche//:quic_core_types_lib",
+        "@com_github_google_quiche//:quic_platform",
         "@com_github_google_quiche//:quic_platform_expect_bug",
         "@com_github_google_quiche//:quic_platform_test",
         "@com_github_google_quiche//:quic_platform_test_output",
@@ -49,7 +49,6 @@ envoy_cc_test(
 envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_expect_bug_impl_lib",
     hdrs = ["quiche_expect_bug_impl.h"],
-    tags = ["nofips"],
     deps = [
         "@com_github_google_quiche//:quic_platform_base",
     ],
@@ -58,7 +57,6 @@ envoy_quiche_platform_impl_cc_test_library(
 envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_thread_impl_lib",
     hdrs = ["quiche_thread_impl.h"],
-    tags = ["nofips"],
     deps = [
         "//envoy/thread:thread_interface",
         "//source/common/common:assert_lib",
@@ -70,7 +68,6 @@ envoy_quiche_platform_impl_cc_test_library(
     name = "quiche_test_output_impl_lib",
     srcs = ["quiche_test_output_impl.cc"],
     hdrs = ["quiche_test_output_impl.h"],
-    tags = ["nofips"],
     deps = [
         "//test/test_common:file_system_for_test_lib",
         "@com_github_google_quiche//:quic_platform_base",

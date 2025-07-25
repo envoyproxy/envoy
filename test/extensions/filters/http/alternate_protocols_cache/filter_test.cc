@@ -27,23 +27,19 @@ public:
   }
 
   void initialize(bool populate_config) {
-    EXPECT_CALL(alternate_protocols_cache_manager_factory_, get())
-        .WillOnce(Return(alternate_protocols_cache_manager_));
-
     envoy::extensions::filters::http::alternate_protocols_cache::v3::FilterConfig proto_config;
     if (populate_config) {
       EXPECT_CALL(*alternate_protocols_cache_manager_, getCache(_, _))
           .Times(testing::AnyNumber())
           .WillOnce(Return(alternate_protocols_cache_));
     }
-    filter_config_ = std::make_shared<FilterConfig>(
-        proto_config, alternate_protocols_cache_manager_factory_, simTime());
+    filter_config_ = std::make_shared<FilterConfig>(proto_config,
+                                                    *alternate_protocols_cache_manager_, simTime());
     filter_ = std::make_unique<Filter>(filter_config_, dispatcher_);
     filter_->setEncoderFilterCallbacks(callbacks_);
   }
 
   Event::MockDispatcher dispatcher_;
-  Http::MockHttpServerPropertiesCacheManagerFactory alternate_protocols_cache_manager_factory_;
   std::shared_ptr<Http::MockHttpServerPropertiesCacheManager> alternate_protocols_cache_manager_;
   std::shared_ptr<Http::MockHttpServerPropertiesCache> alternate_protocols_cache_;
   FilterConfigSharedPtr filter_config_;

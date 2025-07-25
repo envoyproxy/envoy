@@ -25,7 +25,7 @@ UpstreamHttp11ConnectSocketConfigFactory::createTransportSocketFactory(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-  RETURN_IF_STATUS_NOT_OK(factory_or_error);
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
   return std::make_unique<UpstreamHttp11ConnectSocketFactory>(std::move(factory_or_error.value()));
 }
 

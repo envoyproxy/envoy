@@ -27,8 +27,8 @@ public:
     } else if (default_value == 100) {
       return true;
     } else {
-      throw std::invalid_argument("Not implemented yet. You may want to set expectation of mocked "
-                                  "featureEnabled() instead.");
+      PANIC("Not implemented yet. You may want to set expectation of mocked"
+            "featureEnabled() instead.");
     }
   }
 
@@ -62,7 +62,7 @@ public:
   ~MockLoader() override;
 
   MOCK_METHOD(absl::Status, initialize, (Upstream::ClusterManager & cm));
-  MOCK_METHOD(const Snapshot&, snapshot, ());
+  MOCK_METHOD(const Snapshot&, snapshot, (), (const));
   MOCK_METHOD(SnapshotConstSharedPtr, threadsafeSnapshot, ());
   MOCK_METHOD(absl::Status, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)));
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));

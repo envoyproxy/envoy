@@ -2,6 +2,8 @@
 
 #include "source/common/common/fmt.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -37,7 +39,8 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
 
     auto extractor = extractor_factory.createExtractor(
         *type_finder_,
-        Envoy::Grpc::Common::typeUrlPrefix() + "/" + method->input_type()->full_name(), it.second);
+        absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->input_type()->full_name()),
+        it.second);
     if (!extractor.ok()) {
       throw EnvoyException(fmt::format("couldn't init extractor for method `{}`: {}", it.first,
                                        extractor.status().message()));
@@ -74,7 +77,7 @@ void FilterConfig::initDescriptorPool(Api::Api& api) {
   default: {
     throw Envoy::EnvoyException(
         fmt::format("unsupported DataSource case `{}` for configuring `descriptor_set`",
-                    descriptor_config.specifier_case()));
+                    static_cast<int>(descriptor_config.specifier_case())));
   }
   }
 

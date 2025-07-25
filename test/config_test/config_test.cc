@@ -40,7 +40,7 @@ namespace ConfigTest {
 namespace {
 
 // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
-OptionsImpl asConfigYaml(const OptionsImpl& src, Api::Api& api) {
+OptionsImplBase asConfigYaml(const OptionsImplBase& src, Api::Api& api) {
   return Envoy::Server::createTestOptionsImpl(
       "", api.fileSystem().fileReadToEnd(src.configPath()).value(), src.localAddressIpVersion());
 }
@@ -58,8 +58,11 @@ static std::vector<absl::string_view> unsuported_win32_configs = {
 
 class ConfigTest {
 public:
-  ConfigTest(OptionsImpl& options) : api_(Api::createApiForTest(time_system_)), options_(options) {
-    ON_CALL(*server_.server_factory_context_, api()).WillByDefault(ReturnRef(server_.api_));
+  ConfigTest(OptionsImplBase& options)
+      : api_(Api::createApiForTest(time_system_)),
+        ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()), options_(options) {
+    ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
+    ON_CALL(server_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux_));
     ON_CALL(server_, options()).WillByDefault(ReturnRef(options_));
     ON_CALL(server_, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
     ON_CALL(server_.api_, fileSystem()).WillByDefault(ReturnRef(file_system_));
@@ -120,10 +123,9 @@ public:
     }
 
     cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-        *server_.server_factory_context_, server_.stats(), server_.threadLocal(),
-        server_.httpContext(),
+        server_factory_context_,
         [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-        ssl_context_manager_, server_.secretManager(), server_.quic_stat_names_, server_);
+        server_.quic_stat_names_);
 
     ON_CALL(server_, clusterManager()).WillByDefault(Invoke([&]() -> Upstream::ClusterManager& {
       return *main_config.clusterManager();
@@ -132,8 +134,7 @@ public:
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
-                Server::Configuration::FilterChainFactoryContext& context)
-                -> Filter::NetworkFilterFactoriesList {
+                Server::Configuration::FilterChainFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryListImpl(
                   filters, context, network_config_provider_manager_);
             }));
@@ -143,8 +144,7 @@ public:
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                     filters,
-                Server::Configuration::ListenerFactoryContext& context)
-                -> Filter::ListenerFilterFactoriesList {
+                Server::Configuration::ListenerFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryListImpl(
                   filters, context, *component_factory_.getTcpListenerConfigProviderManager());
             }));
@@ -152,12 +152,10 @@ public:
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>&
                     filters,
-                Server::Configuration::ListenerFactoryContext& context)
-                -> std::vector<Network::UdpListenerFilterFactoryCb> {
+                Server::Configuration::ListenerFactoryContext& context) {
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryListImpl(
                   filters, context);
             }));
-    ON_CALL(server_, serverFactoryContext()).WillByDefault(ReturnRef(server_factory_context_));
 
     try {
       THROW_IF_NOT_OK(main_config.initialize(bootstrap, server_, *cluster_manager_factory_));
@@ -171,10 +169,11 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   Api::ApiPtr api_;
+  std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux_;
   NiceMock<Server::MockInstance> server_;
   Server::ServerFactoryContextImpl server_factory_context_{server_};
   NiceMock<Ssl::MockContextManager> ssl_context_manager_;
-  OptionsImpl& options_;
+  OptionsImplBase& options_;
   std::unique_ptr<Upstream::ProdClusterManagerFactory> cluster_manager_factory_;
   std::unique_ptr<NiceMock<Server::MockListenerComponentFactory>> component_factory_ptr_{
       std::make_unique<NiceMock<Server::MockListenerComponentFactory>>()};
@@ -212,8 +211,8 @@ void testMerge() {
             ]
           }
         })EOF";
-  OptionsImpl options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
-                                                    Network::Address::IpVersion::v6));
+  OptionsImplBase options(Server::createTestOptionsImpl("envoyproxy_io_proxy.yaml", overlay,
+                                                        Network::Address::IpVersion::v6));
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   ASSERT_TRUE(Server::InstanceUtil::loadBootstrapConfig(
                   bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
@@ -238,7 +237,7 @@ uint32_t run(const std::string& directory) {
                      [filename](const absl::string_view& s) {
                        return filename.find(std::string(s)) != std::string::npos;
                      }) == unsuported_win32_configs.end()) {
-      OptionsImpl options(
+      OptionsImplBase options(
           Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
       ConfigTest test1(options);
       envoy::config::bootstrap::v3::Bootstrap bootstrap;
@@ -246,7 +245,7 @@ uint32_t run(const std::string& directory) {
                       bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api)
                       .ok());
       ENVOY_LOG_MISC(info, "testing {} as yaml.", filename);
-      OptionsImpl config = asConfigYaml(options, *api);
+      OptionsImplBase config = asConfigYaml(options, *api);
       ConfigTest test2(config);
     }
     num_tested++;

@@ -1,12 +1,20 @@
 #pragma once
 
-#include "source/extensions/filters/udp/udp_proxy/session_filters/filter.h"
+#include "envoy/network/filter.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
 namespace UdpProxy {
 namespace SessionFilters {
+
+using Filter = Network::UdpSessionFilter;
+using ReadFilter = Network::UdpSessionReadFilter;
+using WriteFilter = Network::UdpSessionWriteFilter;
+using ReadFilterStatus = Network::UdpSessionReadFilterStatus;
+using WriteFilterStatus = Network::UdpSessionWriteFilterStatus;
+using ReadFilterCallbacks = Network::UdpSessionReadFilterCallbacks;
+using WriteFilterCallbacks = Network::UdpSessionWriteFilterCallbacks;
 
 /**
  * Pass through UDP session read filter. Continue at each state within the series of

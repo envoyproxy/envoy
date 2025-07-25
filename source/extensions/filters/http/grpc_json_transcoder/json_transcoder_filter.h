@@ -25,23 +25,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
-/**
- * VariableBinding specifies a value for a single field in the request message.
- * When transcoding HTTP/REST/JSON to gRPC/proto the request message is
- * constructed using the HTTP body and the variable bindings (specified through
- * request url).
- * See https://github.com/googleapis/googleapis/blob/master/google/api/http.proto
- * for details of variable binding.
- */
-struct VariableBinding {
-  // The location of the field in the protobuf message, where the value
-  // needs to be inserted, e.g. "shelf.theme" would mean the "theme" field
-  // of the nested "shelf" message of the request protobuf message.
-  std::vector<std::string> field_path;
-  // The value to be inserted.
-  std::string value;
-};
-
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
   std::vector<const ProtobufWkt::Field*> request_body_field_path;
@@ -78,11 +61,14 @@ public:
    *         is not found, status with Code::NOT_FOUND is returned. If the method is found, but
    * fields cannot be resolved, status with Code::INVALID_ARGUMENT is returned.
    */
-  absl::Status createTranscoder(const Http::RequestHeaderMap& headers,
-                                Protobuf::io::ZeroCopyInputStream& request_input,
-                                google::grpc::transcoding::TranscoderInputStream& response_input,
-                                std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
-                                MethodInfoSharedPtr& method_info) const;
+  absl::Status
+  createTranscoder(const Http::RequestHeaderMap& headers,
+                   Protobuf::io::ZeroCopyInputStream& request_input,
+                   google::grpc::transcoding::TranscoderInputStream& response_input,
+                   std::unique_ptr<google::grpc::transcoding::Transcoder>& transcoder,
+                   MethodInfoSharedPtr& method_info,
+                   envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams&
+                       unknown_params) const;
 
   /**
    * Converts an arbitrary protobuf message to JSON.
@@ -104,6 +90,10 @@ public:
   bool convertGrpcStatus() const;
 
   bool disabled() const { return disabled_; }
+
+  bool isStreamSSEStyleDelimited() const {
+    return response_translate_options_.stream_sse_style_delimited;
+  }
 
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
@@ -135,6 +125,7 @@ private:
 
   bool match_incoming_request_route_{false};
   bool ignore_unknown_query_parameters_{false};
+  bool capture_unknown_query_parameters_{false};
   bool convert_grpc_status_{false};
   bool case_insensitive_enum_parsing_{false};
 
@@ -217,6 +208,7 @@ private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   MethodInfoSharedPtr method_;
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams unknown_params_;
   Http::ResponseHeaderMap* response_headers_{};
   Grpc::Decoder decoder_;
 

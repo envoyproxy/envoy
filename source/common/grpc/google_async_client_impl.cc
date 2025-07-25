@@ -58,7 +58,7 @@ void GoogleAsyncClientThreadLocal::completionThread() {
     const auto& google_async_tag = *reinterpret_cast<GoogleAsyncTag*>(tag);
     const GoogleAsyncTag::Operation op = google_async_tag.op_;
     GoogleAsyncStreamImpl& stream = google_async_tag.stream_;
-    ENVOY_LOG(trace, "completionThread CQ event {} {}", op, ok);
+    ENVOY_LOG(trace, "completionThread CQ event {} {}", static_cast<int>(op), ok);
     Thread::LockGuard lock(stream.completed_ops_lock_);
 
     // It's an invariant that there must only be one pending post for arbitrary
@@ -192,6 +192,9 @@ GoogleAsyncStreamImpl::GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
 
 GoogleAsyncStreamImpl::~GoogleAsyncStreamImpl() {
   ENVOY_LOG(debug, "GoogleAsyncStreamImpl destruct");
+  if (options_.on_delete_callback_for_test_only) {
+    options_.on_delete_callback_for_test_only();
+  }
 }
 
 GoogleAsyncStreamImpl::PendingMessage::PendingMessage(Buffer::InstancePtr request, bool end_stream)
@@ -257,9 +260,11 @@ void GoogleAsyncStreamImpl::notifyRemoteClose(Status::GrpcStatus grpc_status,
     current_span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
   current_span_->finishSpan();
-  callbacks_.onReceiveTrailingMetadata(trailing_metadata ? std::move(trailing_metadata)
-                                                         : Http::ResponseTrailerMapImpl::create());
-  callbacks_.onRemoteClose(grpc_status, message);
+  if (!waiting_to_delete_on_remote_close_) {
+    callbacks_.onReceiveTrailingMetadata(
+        trailing_metadata ? std::move(trailing_metadata) : Http::ResponseTrailerMapImpl::create());
+    callbacks_.onRemoteClose(grpc_status, message);
+  }
 }
 
 void GoogleAsyncStreamImpl::sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) {
@@ -289,6 +294,14 @@ void GoogleAsyncStreamImpl::resetStream() {
     ++inflight_tags_;
   }
   cleanup();
+}
+
+void GoogleAsyncStreamImpl::waitForRemoteCloseAndDelete() {
+  if (!waiting_to_delete_on_remote_close_) {
+    waiting_to_delete_on_remote_close_ = true;
+    remote_close_timer_ = dispatcher_.createTimer([this] { resetStream(); });
+    remote_close_timer_->enableTimer(options_.remote_close_timeout);
+  }
 }
 
 void GoogleAsyncStreamImpl::writeQueued() {
@@ -336,7 +349,8 @@ void GoogleAsyncStreamImpl::onCompletedOps() {
 }
 
 void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, bool ok) {
-  ENVOY_LOG(trace, "handleOpCompletion op={} ok={} inflight={}", op, ok, inflight_tags_);
+  ENVOY_LOG(trace, "handleOpCompletion op={} ok={} inflight={}", static_cast<int>(op), ok,
+            inflight_tags_);
   ASSERT(inflight_tags_ > 0);
   --inflight_tags_;
   if (draining_cq_) {
@@ -383,7 +397,9 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
     ++inflight_tags_;
     Http::ResponseHeaderMapPtr initial_metadata = Http::ResponseHeaderMapImpl::create();
     metadataTranslate(ctxt_.GetServerInitialMetadata(), *initial_metadata);
-    callbacks_.onReceiveInitialMetadata(std::move(initial_metadata));
+    if (!waiting_to_delete_on_remote_close_) {
+      callbacks_.onReceiveInitialMetadata(std::move(initial_metadata));
+    }
     break;
   }
   case GoogleAsyncTag::Operation::Write: {
@@ -402,7 +418,8 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   case GoogleAsyncTag::Operation::Read: {
     ASSERT(ok);
     auto buffer = GoogleGrpcUtils::makeBufferInstance(read_buf_);
-    if (!buffer || !callbacks_.onReceiveMessageRaw(std::move(buffer))) {
+    if (!buffer || (!waiting_to_delete_on_remote_close_ &&
+                    !callbacks_.onReceiveMessageRaw(std::move(buffer)))) {
       // This is basically streamError in Grpc::AsyncClientImpl.
       notifyRemoteClose(Status::WellKnownGrpcStatus::Internal, nullptr, EMPTY_STRING);
       resetStream();
@@ -414,7 +431,7 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   }
   case GoogleAsyncTag::Operation::Finish: {
     ASSERT(finish_pending_);
-    ENVOY_LOG(debug, "Finish with grpc-status code {}", status_.error_code());
+    ENVOY_LOG(debug, "Finish with grpc-status code {}", static_cast<int>(status_.error_code()));
     Http::ResponseTrailerMapPtr trailing_metadata = Http::ResponseTrailerMapImpl::create();
     metadataTranslate(ctxt_.GetServerTrailingMetadata(), *trailing_metadata);
     notifyRemoteClose(static_cast<Status::GrpcStatus>(status_.error_code()),
@@ -469,6 +486,7 @@ void GoogleAsyncStreamImpl::cleanup() {
       deferredDelete();
     }
   }
+  remote_close_timer_ = nullptr;
 }
 
 GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(

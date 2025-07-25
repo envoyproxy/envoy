@@ -22,33 +22,33 @@ using StatusHelpers::HasStatusMessage;
 using ::testing::_;
 using ::testing::Eq;
 using ::testing::HasSubstr;
+using ::testing::MockFunction;
 using ::testing::StrictMock;
-
-std::function<void(absl::Status)> storageSuccessCallback() {
-  return [](absl::Status status) { ASSERT_OK(status); };
-}
-
-template <typename MatcherT>
-std::function<void(absl::Status)> storageFailureCallback(MatcherT matcher) {
-  return [matcher](absl::Status status) { EXPECT_THAT(status, matcher); };
-}
-
-void dispatchImmediately(std::function<void()> callback) { callback(); }
 
 class FileSystemBufferFilterFragmentTest : public ::testing::Test {
 public:
+  void resolveFileActions() { dispatcher_->run(Event::Dispatcher::RunType::Block); }
+
 protected:
   MockAsyncFileHandle handle_ = std::make_shared<StrictMock<MockAsyncFileContext>>();
 
   void moveFragmentToStorage(Fragment* frag) {
-    EXPECT_CALL(*handle_, write(_, _, _))
-        .WillOnce(
-            [frag](Buffer::Instance&, off_t, std::function<void(absl::StatusOr<size_t>)> callback) {
-              callback(frag->size());
-              return []() {};
-            });
-    EXPECT_OK(frag->toStorage(handle_, 123, &dispatchImmediately, storageSuccessCallback()));
+    EXPECT_CALL(*handle_, write(_, _, _, _))
+        .WillOnce([frag](Event::Dispatcher* dispatcher, Buffer::Instance&, off_t,
+                         absl::AnyInvocable<void(absl::StatusOr<size_t>)> callback) {
+          dispatcher->post([frag, callback = std::move(callback)]() mutable {
+            std::move(callback)(frag->size());
+          });
+          return []() {};
+        });
+    MockFunction<void(absl::Status)> callback;
+    EXPECT_OK(frag->toStorage(handle_, 123, *dispatcher_, callback.AsStdFunction()));
+    EXPECT_CALL(callback, Call(absl::OkStatus()));
+    resolveFileActions();
   }
+
+  Api::ApiPtr api_ = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
 };
 
 TEST_F(FileSystemBufferFilterFragmentTest, CreatesAndExtractsWithoutCopying) {
@@ -77,39 +77,42 @@ TEST_F(FileSystemBufferFilterFragmentTest, CreatesFragmentFromPartialBufferAndCo
 TEST_F(FileSystemBufferFilterFragmentTest, WritesAndReadsBack) {
   Buffer::OwnedImpl input("hello");
   Fragment frag(input);
-  std::function<void(absl::StatusOr<size_t>)> captured_write_callback;
-  EXPECT_CALL(*handle_, write(BufferStringEqual("hello"), 123, _))
-      .WillOnce([&captured_write_callback](Buffer::Instance&, off_t,
-                                           std::function<void(absl::StatusOr<size_t>)> callback) {
-        captured_write_callback = std::move(callback);
+  EXPECT_CALL(*handle_, write(_, BufferStringEqual("hello"), 123, _))
+      .WillOnce([](Event::Dispatcher* dispatcher, Buffer::Instance&, off_t,
+                   absl::AnyInvocable<void(absl::StatusOr<size_t>)> callback) {
+        dispatcher->post([callback = std::move(callback)]() mutable { std::move(callback)(5); });
         return []() {};
       });
   // Request the fragment be moved to storage.
-  EXPECT_OK(frag.toStorage(handle_, 123, &dispatchImmediately, storageSuccessCallback()));
+  MockFunction<void(absl::Status)> write_callback;
+  EXPECT_OK(frag.toStorage(handle_, 123, *dispatcher_, write_callback.AsStdFunction()));
   // Before the file confirms written, the state should be neither in memory nor in storage.
   EXPECT_FALSE(frag.isMemory());
   EXPECT_FALSE(frag.isStorage());
   // Fake the file thread confirming 5 bytes were written.
-  captured_write_callback(5);
+  EXPECT_CALL(write_callback, Call(absl::OkStatus()));
+  resolveFileActions();
   // Now the fragment should be tagged as being in storage.
   EXPECT_TRUE(frag.isStorage());
   EXPECT_FALSE(frag.isMemory());
-  std::function<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> captured_read_callback;
-  EXPECT_CALL(*handle_, read(123, 5, _))
+  EXPECT_CALL(*handle_, read(_, 123, 5, _))
       .WillOnce(
-          [&captured_read_callback](
-              off_t, size_t,
-              std::function<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> callback) {
-            captured_read_callback = std::move(callback);
+          [](Event::Dispatcher* dispatcher, off_t, size_t,
+             absl::AnyInvocable<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> callback) {
+            dispatcher->post([callback = std::move(callback)]() mutable {
+              std::move(callback)(std::make_unique<Buffer::OwnedImpl>("hello"));
+            });
             return []() {};
           });
   // Request the fragment be moved from storage.
-  EXPECT_OK(frag.fromStorage(handle_, &dispatchImmediately, storageSuccessCallback()));
+  MockFunction<void(absl::Status)> read_callback;
+  EXPECT_OK(frag.fromStorage(handle_, *dispatcher_, read_callback.AsStdFunction()));
   // Before the file confirms read, the state should be neither in memory nor storage.
   EXPECT_FALSE(frag.isMemory());
   EXPECT_FALSE(frag.isStorage());
   // Fake the file thread completing read.
-  captured_read_callback(std::make_unique<Buffer::OwnedImpl>("hello"));
+  EXPECT_CALL(read_callback, Call(absl::OkStatus()));
+  resolveFileActions();
   // Now the fragment should be tagged as being in memory.
   EXPECT_TRUE(frag.isMemory());
   EXPECT_FALSE(frag.isStorage());
@@ -121,86 +124,81 @@ TEST_F(FileSystemBufferFilterFragmentTest, WritesAndReadsBack) {
 TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnWriteError) {
   Buffer::OwnedImpl input("hello");
   Fragment frag(input);
-  auto write_error = absl::UnknownError("write error");
-  std::function<void(absl::StatusOr<size_t>)> captured_write_callback;
-  EXPECT_CALL(*handle_, write(BufferStringEqual("hello"), 123, _))
-      .WillOnce([&captured_write_callback](Buffer::Instance&, off_t,
-                                           std::function<void(absl::StatusOr<size_t>)> callback) {
-        captured_write_callback = std::move(callback);
+  EXPECT_CALL(*handle_, write(_, BufferStringEqual("hello"), 123, _))
+      .WillOnce([](Event::Dispatcher* dispatcher, Buffer::Instance&, off_t,
+                   absl::AnyInvocable<void(absl::StatusOr<size_t>)> callback) {
+        dispatcher->post([callback = std::move(callback)]() mutable {
+          std::move(callback)(absl::UnknownError("write error"));
+        });
         return []() {};
       });
   // Request the fragment be moved to storage.
-  EXPECT_OK(
-      frag.toStorage(handle_, 123, &dispatchImmediately, storageFailureCallback(Eq(write_error))));
-
-  // Fake file system declares a write error. This should
-  // provoke the expected error in the callback above.
-  captured_write_callback(write_error);
+  MockFunction<void(absl::Status)> callback;
+  EXPECT_OK(frag.toStorage(handle_, 123, *dispatcher_, callback.AsStdFunction()));
+  EXPECT_CALL(callback, Call(Eq(absl::UnknownError("write error"))));
+  resolveFileActions();
 }
 
 TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnWriteIncomplete) {
   Buffer::OwnedImpl input("hello");
   Fragment frag(input);
-  std::function<void(absl::StatusOr<size_t>)> captured_write_callback;
-  EXPECT_CALL(*handle_, write(BufferStringEqual("hello"), 123, _))
-      .WillOnce([&captured_write_callback](Buffer::Instance&, off_t,
-                                           std::function<void(absl::StatusOr<size_t>)> callback) {
-        captured_write_callback = std::move(callback);
+  EXPECT_CALL(*handle_, write(_, BufferStringEqual("hello"), 123, _))
+      .WillOnce([](Event::Dispatcher* dispatcher, Buffer::Instance&, off_t,
+                   absl::AnyInvocable<void(absl::StatusOr<size_t>)> callback) {
+        dispatcher->post([callback = std::move(callback)]() mutable { std::move(callback)(2); });
         return []() {};
       });
   // Request the fragment be moved to storage.
-  EXPECT_OK(frag.toStorage(
-      handle_, 123, &dispatchImmediately,
-      storageFailureCallback(HasStatusMessage(HasSubstr("wrote 2 bytes, wanted 5")))));
-
+  MockFunction<void(absl::Status)> callback;
+  EXPECT_OK(frag.toStorage(handle_, 123, *dispatcher_, callback.AsStdFunction()));
   // Fake file says it wrote 2 bytes when the fragment was of size 5 - this should
   // provoke the expected error in the callback above.
-  captured_write_callback(2);
+  EXPECT_CALL(callback, Call(HasStatusMessage(HasSubstr("wrote 2 bytes, wanted 5"))));
+  resolveFileActions();
 }
 
 TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnReadError) {
   Buffer::OwnedImpl input("hello");
   Fragment frag(input);
   moveFragmentToStorage(&frag);
-  auto read_error = absl::UnknownError("read error");
-  std::function<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> captured_read_callback;
-  EXPECT_CALL(*handle_, read(123, 5, _))
+  EXPECT_CALL(*handle_, read(_, 123, 5, _))
       .WillOnce(
-          [&captured_read_callback](
-              off_t, size_t,
-              std::function<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> callback) {
-            captured_read_callback = std::move(callback);
+          [](Event::Dispatcher* dispatcher, off_t, size_t,
+             absl::AnyInvocable<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> callback) {
+            dispatcher->post([callback = std::move(callback)]() mutable {
+              std::move(callback)(absl::UnknownError("read error"));
+            });
             return []() {};
           });
   // Request the fragment be moved from storage.
-  EXPECT_OK(
-      frag.fromStorage(handle_, &dispatchImmediately, storageFailureCallback(Eq(read_error))));
-  // Fake file system declares a read error. This should
-  // provoke the expected error in the callback above.
-  captured_read_callback(read_error);
+  MockFunction<void(absl::Status)> callback;
+  EXPECT_OK(frag.fromStorage(handle_, *dispatcher_, callback.AsStdFunction()));
+  EXPECT_CALL(callback, Call(Eq(absl::UnknownError("read error"))));
+  resolveFileActions();
 }
 
 TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnReadIncomplete) {
   Buffer::OwnedImpl input("hello");
   Fragment frag(input);
   moveFragmentToStorage(&frag);
-  std::function<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> captured_read_callback;
-  EXPECT_CALL(*handle_, read(123, 5, _))
+  absl::AnyInvocable<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)>
+      captured_read_callback;
+  EXPECT_CALL(*handle_, read(_, 123, 5, _))
       .WillOnce(
-          [&captured_read_callback](
-              off_t, size_t,
-              std::function<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> callback) {
-            captured_read_callback = std::move(callback);
+          [](Event::Dispatcher* dispatcher, off_t, size_t,
+             absl::AnyInvocable<void(absl::StatusOr<std::unique_ptr<Buffer::Instance>>)> callback) {
+            dispatcher->post([callback = std::move(callback)]() mutable {
+              std::move(callback)(std::make_unique<Buffer::OwnedImpl>("he"));
+            });
             return []() {};
           });
+  MockFunction<void(absl::Status)> callback;
   // Request the fragment be moved from storage.
-  EXPECT_OK(frag.fromStorage(
-      handle_, &dispatchImmediately,
-      storageFailureCallback(HasStatusMessage(HasSubstr("read got 2 bytes, wanted 5")))));
-
-  // Fake file system declares a read error. This should
+  EXPECT_OK(frag.fromStorage(handle_, *dispatcher_, callback.AsStdFunction()));
+  // Mock file system declares a read error. This should
   // provoke the expected error in the callback above.
-  captured_read_callback(std::make_unique<Buffer::OwnedImpl>("he"));
+  EXPECT_CALL(callback, Call(HasStatusMessage(HasSubstr("read got 2 bytes, wanted 5"))));
+  resolveFileActions();
 }
 
 } // namespace FileSystemBuffer

@@ -84,7 +84,7 @@ public:
           return logger_;
         });
     auto commands =
-        Formatter::SubstitutionFormatStringUtils::parseFormatters(config_.formatters(), context_);
+        *Formatter::SubstitutionFormatStringUtils::parseFormatters(config_.formatters(), context_);
 
     return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_, commands);
   }

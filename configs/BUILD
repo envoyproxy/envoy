@@ -53,10 +53,11 @@ genrule(
     name = "example_configs",
     srcs = [
         ":configs",
-        "//examples:configs",
-        "//examples:certs",
-        "//examples:lua",
-        "//examples/wasm-cc:configs",
+        "@envoy_examples//:configs",
+        "@envoy_examples//:certs",
+        "@envoy_examples//:lua",
+        # TODO(phlax): re-enable once wasm example is fixed
+        # "@envoy_examples//wasm-cc:configs",
         "//docs:configs",
         "//docs:proto_examples",
         "//test/config/integration/certs",
@@ -65,10 +66,10 @@ genrule(
     cmd = (
         "$(location configgen.sh) $(location configgen) example_configs.tar $(@D) " +
         "$(locations :configs) " +
-        "$(locations //examples:configs) " +
-        "$(locations //examples:certs) " +
-        "$(locations //examples:lua) " +
-        "$(locations //examples/wasm-cc:configs) " +
+        "$(locations @envoy_examples//:configs) " +
+        "$(locations @envoy_examples//:certs) " +
+        "$(locations @envoy_examples//:lua) " +
+        # "$(locations @envoy_examples//wasm-cc:configs) " +
         "$(locations //docs:configs) " +
         "$(locations //docs:proto_examples) " +
         "$(locations //test/config/integration/certs)"
@@ -84,8 +85,8 @@ genrule(
     srcs = [
         "//docs:contrib_configs",
         "//contrib:configs",
-        "//examples:contrib_configs",
-        "//examples:certs",
+        "@envoy_examples//:contrib_configs",
+        "@envoy_examples//:certs",
         "//test/config/integration/certs",
     ],
     outs = ["example_contrib_configs.tar"],
@@ -93,8 +94,8 @@ genrule(
         "$(location configgen.sh) NO_CONFIGGEN example_contrib_configs.tar $(@D) " +
         "$(locations //contrib:configs) " +
         "$(locations //docs:contrib_configs) " +
-        "$(locations //examples:contrib_configs) " +
-        "$(locations //examples:certs) " +
+        "$(locations @envoy_examples//:contrib_configs) " +
+        "$(locations @envoy_examples//:certs) " +
         "$(locations //test/config/integration/certs)"
     ),
     tools = [
@@ -109,14 +110,14 @@ py_binary(
     args = (
         "--descriptor_path=$(location @envoy_api//:v3_proto_set)",
         "$(locations :configs) ",
-        "$(locations //examples:configs) ",
+        "$(locations @envoy_examples//:configs) ",
         "$(locations //docs:configs) ",
     ),
     data = [
         ":configs",
         "//docs:configs",
-        "//examples:configs",
         "@envoy_api//:v3_proto_set",
+        "@envoy_examples//:configs",
     ],
     deps = [requirement("envoy.base.utils")],
 )

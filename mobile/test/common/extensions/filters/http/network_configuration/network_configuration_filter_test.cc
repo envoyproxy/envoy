@@ -33,7 +33,7 @@ public:
   MOCK_METHOD(std::vector<Network::InterfacePair>, enumerateV6Interfaces, ());
   MOCK_METHOD(std::vector<Network::InterfacePair>, enumerateInterfaces,
               (unsigned short family, unsigned int select_flags, unsigned int reject_flags));
-  MOCK_METHOD(NetworkType, getPreferredNetwork, ());
+  MOCK_METHOD(int, getPreferredNetwork, ());
   MOCK_METHOD(Network::SocketMode, getSocketMode, ());
   MOCK_METHOD(envoy_netconf_t, getConfigurationKey, ());
   MOCK_METHOD(Envoy::Network::ProxySettingsConstSharedPtr, getProxySettings, ());
@@ -44,11 +44,11 @@ public:
   MOCK_METHOD(void, refreshDns, (envoy_netconf_t configuration_key, bool drain_connections));
   MOCK_METHOD(void, resetConnectivityState, ());
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, getUpstreamSocketOptions,
-              (NetworkType network, Network::SocketMode socket_mode));
+              (int network, Network::SocketMode socket_mode));
   MOCK_METHOD(envoy_netconf_t, addUpstreamSocketOptions,
               (Network::Socket::OptionsSharedPtr options));
 
-  MOCK_METHOD(void, onDnsHostAddOrUpdate,
+  MOCK_METHOD(absl::Status, onDnsHostAddOrUpdate,
               (const std::string& /*host*/,
                const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&));
   MOCK_METHOD(void, onDnsHostRemove, (const std::string& /*host*/));
@@ -57,6 +57,7 @@ public:
                const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
                Network::DnsResolver::ResolutionStatus));
   MOCK_METHOD(Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr, dnsCache, ());
+  MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
 };
 
 class NetworkConfigurationFilterTest : public testing::Test {
@@ -191,6 +192,7 @@ public:
   MOCK_METHOD(Network::ProxyResolutionResult, resolveProxy,
               (const std::string& target_url_string, std::vector<Network::ProxySettings>& proxies,
                Network::ProxySettingsResolvedCallback proxy_resolution_completed));
+  MOCK_METHOD(void, setDispatcher, (Event::Dispatcher * dispatcher));
 };
 
 class NetworkConfigurationFilterProxyResolverApiTest : public NetworkConfigurationFilterTest {

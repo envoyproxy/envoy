@@ -1,5 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
+import android.net.ConnectivityManager;
+
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
@@ -73,14 +75,17 @@ public class JniLibrary {
    * Send headers over an open HTTP stream. This method can be invoked once and
    * needs to be called before send_data.
    *
-   * @param engine    the stream's associated engine.
-   * @param stream    the stream to send headers over.
-   * @param headers   the headers to send.
-   * @param endStream supplies whether this is headers only.
+   * @param engine     the stream's associated engine.
+   * @param stream     the stream to send headers over.
+   * @param headers    the headers to send.
+   * @param endStream  supplies whether this is headers only.
+   * @param idempotent indicates that the request is idempotent. When idempotent is set to true
+   *                   Envoy Mobile will retry on HTTP/3 post-handshake failures.
    * @return the resulting status of the operation.
    */
   protected static native int sendHeaders(long engine, long stream,
-                                          Map<String, List<String>> headers, boolean endStream);
+                                          Map<String, List<String>> headers, boolean endStream,
+                                          boolean idempotent);
 
   /**
    * Send data over an open HTTP stream. This method can be invoked multiple
@@ -147,10 +152,13 @@ public class JniLibrary {
    * @param runningCallback, called when the engine finishes its async startup and begins running.
    * @param logger,          the logging interface.
    * @param eventTracker     the event tracking interface.
+   * @param disableDnsRefreshOnNetworkChange whether disable dns refreshment or not after the
+   *     network has changed.
    * @return envoy_engine_t, handle to the underlying engine.
    */
   protected static native long initEngine(EnvoyOnEngineRunning runningCallback, EnvoyLogger logger,
-                                          EnvoyEventTracker eventTracker);
+                                          EnvoyEventTracker eventTracker,
+                                          boolean disableDnsRefreshOnNetworkChange);
 
   /**
    * External entry point for library.
@@ -220,14 +228,38 @@ public class JniLibrary {
   protected static native int resetConnectivityState(long engine);
 
   /**
-   * Update the network interface to the preferred network for opening new
-   * streams. Note that this state is shared by all engines.
-   *
-   * @param engine  Handle to the engine whose preferred network will be set.
-   * @param network the network to be preferred for new streams.
-   * @return The resulting status of the operation.
+   * A callback into the Envoy Engine when the default network is available.
    */
-  protected static native int setPreferredNetwork(long engine, int network);
+  protected static native void onDefaultNetworkAvailable(long engine);
+
+  /**
+   * A callback into the Envoy Engine when the default network was changed.
+   */
+  protected static native void onDefaultNetworkChanged(long engine, int networkType);
+  protected static native void onDefaultNetworkChangedV2(long engine, int connectionType,
+                                                         long net_id);
+
+  /**
+   * A callback into the Envoy Engine when the network with the given net_id gets disconnected.
+   */
+  protected static native void onNetworkDisconnect(long engine, long net_id);
+
+  /**
+   * A callback into the Envoy Engine when the network with the given net_id gets connected.
+   */
+  protected static native void onNetworkConnect(long engine, int connectionType, long net_id);
+
+  protected static native void purgeActiveNetworkList(long engine, long[] activeNetIds);
+
+  /**
+   * A more modern callback into the Envoy Engine when the default network was changed.
+   */
+  protected static native void onDefaultNetworkChangeEvent(long engine, int networkType);
+
+  /**
+   * A callback into the Envoy Engine when the default network is unavailable.
+   */
+  protected static native void onDefaultNetworkUnavailable(long engine);
 
   /**
    * Update the proxy settings.
@@ -290,16 +322,24 @@ public class JniLibrary {
    *
    */
   public static native long createBootstrap(
-      long connectTimeoutSeconds, long dnsRefreshSeconds, long dnsFailureRefreshSecondsBase,
-      long dnsFailureRefreshSecondsMax, long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds,
-      byte[][] dnsPreresolveHostnames, boolean enableDNSCache, long dnsCacheSaveIntervalSeconds,
-      boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares, boolean useGro,
-      String http3ConnectionOptions, String http3ClientConnectionOptions, byte[][] quicHints,
-      byte[][] quicCanonicalSuffixes, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, boolean enablePortMigration, boolean enableSocketTagging,
+      long connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
+      boolean disableDnsRefreshOnNetworkChange, long dnsRefreshSeconds,
+      long dnsFailureRefreshSecondsBase, long dnsFailureRefreshSecondsMax,
+      long dnsQueryTimeoutSeconds, long dnsMinRefreshSeconds, byte[][] dnsPreresolveHostnames,
+      boolean enableDNSCache, long dnsCacheSaveIntervalSeconds, int dnsNumRetries,
+      boolean enableDrainPostDnsRefresh, boolean enableHttp3, String http3ConnectionOptions,
+      String http3ClientConnectionOptions, byte[][] quicHints, byte[][] quicCanonicalSuffixes,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
       boolean enableInterfaceBinding, long h2ConnectionKeepaliveIdleIntervalMilliseconds,
       long h2ConnectionKeepaliveTimeoutSeconds, long maxConnectionsPerHost,
       long streamIdleTimeoutSeconds, long perTryIdleTimeoutSeconds, String appVersion, String appId,
       boolean trustChainVerification, byte[][] filterChain,
-      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards);
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni, byte[][] runtimeGuards,
+      long h3ConnectionKeepaliveInitialIntervalMilliseconds);
+
+  /**
+   * Returns true if the runtime feature is enabled.
+   */
+  public static native boolean isRuntimeFeatureEnabled(String featureName);
 }

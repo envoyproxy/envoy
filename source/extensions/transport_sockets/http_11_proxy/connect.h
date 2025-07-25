@@ -28,7 +28,8 @@ public:
                                      size_t& bytes_processed);
 
   UpstreamHttp11ConnectSocket(Network::TransportSocketPtr&& transport_socket,
-                              Network::TransportSocketOptionsConstSharedPtr options);
+                              Network::TransportSocketOptionsConstSharedPtr options,
+                              std::shared_ptr<const Upstream::HostDescription> host);
 
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;

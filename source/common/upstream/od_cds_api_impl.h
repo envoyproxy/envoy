@@ -28,42 +28,17 @@ enum class StartStatus {
 };
 
 /**
- * An interface for on-demand CDS. Defined to allow mocking.
- */
-class OdCdsApi {
-public:
-  virtual ~OdCdsApi() = default;
-
-  // Subscribe to a cluster with a given name. It's meant to eventually send a discovery request
-  // with the cluster name to the management server.
-  virtual void updateOnDemand(std::string cluster_name) PURE;
-};
-
-using OdCdsApiSharedPtr = std::shared_ptr<OdCdsApi>;
-
-/**
- * An interface used by OdCdsApiImpl for sending notifications about the missing cluster that was
- * requested.
- */
-class MissingClusterNotifier {
-public:
-  virtual ~MissingClusterNotifier() = default;
-
-  virtual void notifyMissingCluster(absl::string_view name) PURE;
-};
-
-/**
  * ODCDS API implementation that fetches via Subscription.
  */
 class OdCdsApiImpl : public OdCdsApi,
                      Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>,
                      Logger::Loggable<Logger::Id::upstream> {
 public:
-  static OdCdsApiSharedPtr create(const envoy::config::core::v3::ConfigSource& odcds_config,
-                                  OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
-                                  ClusterManager& cm, MissingClusterNotifier& notifier,
-                                  Stats::Scope& scope,
-                                  ProtobufMessage::ValidationVisitor& validation_visitor);
+  static absl::StatusOr<OdCdsApiSharedPtr>
+  create(const envoy::config::core::v3::ConfigSource& odcds_config,
+         OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
+         MissingClusterNotifier& notifier, Stats::Scope& scope,
+         ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
@@ -81,7 +56,8 @@ private:
   OdCdsApiImpl(const envoy::config::core::v3::ConfigSource& odcds_config,
                OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
                MissingClusterNotifier& notifier, Stats::Scope& scope,
-               ProtobufMessage::ValidationVisitor& validation_visitor);
+               ProtobufMessage::ValidationVisitor& validation_visitor,
+               absl::Status& creation_status);
   void sendAwaiting();
 
   CdsApiHelper helper_;

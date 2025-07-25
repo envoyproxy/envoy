@@ -29,9 +29,7 @@ namespace {
 
 // Validates that the max value of nanoseconds and seconds doesn't cause an
 // overflow in the protobuf time-util computations.
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be renamed to validateDurationNoThrow.
-absl::Status validateDurationUnifiedNoThrow(const ProtobufWkt::Duration& duration) {
+absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration) {
   // Apply a strict max boundary to the `seconds` value to avoid overflow when
   // both seconds and nanoseconds are at their highest values.
   // Note that protobuf internally converts to the input's seconds and
@@ -42,73 +40,26 @@ absl::Status validateDurationUnifiedNoThrow(const ProtobufWkt::Duration& duratio
 
   if (duration.seconds() < 0 || duration.nanos() < 0) {
     return absl::OutOfRangeError(
-        fmt::format("Expected positive duration: {}", duration.DebugString()));
+        fmt::format("Invalid duration: Expected positive duration: {}", duration.DebugString()));
   }
   if (!Protobuf::util::TimeUtil::IsDurationValid(duration)) {
     return absl::OutOfRangeError(
-        fmt::format("Duration out-of-range according to Protobuf: {}", duration.DebugString()));
+        fmt::format("Invalid duration: Duration out-of-range according to Protobuf: {}",
+                    duration.DebugString()));
   }
   if (duration.nanos() > 999999999 || duration.seconds() > kMaxSecondsValue) {
-    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
-  }
-  return absl::OkStatus();
-}
-
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be removed.
-absl::Status validateDurationNoThrow(const ProtobufWkt::Duration& duration,
-                                     int64_t max_seconds_value) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
-    return validateDurationUnifiedNoThrow(duration);
-  }
-  if (duration.seconds() < 0 || duration.nanos() < 0) {
     return absl::OutOfRangeError(
-        fmt::format("Expected positive duration: {}", duration.DebugString()));
-  }
-  if (duration.nanos() > 999999999 || duration.seconds() > max_seconds_value) {
-    return absl::OutOfRangeError(fmt::format("Duration out-of-range: {}", duration.DebugString()));
+        fmt::format("Invalid duration: Duration out-of-range: {}", duration.DebugString()));
   }
   return absl::OkStatus();
 }
 
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should call validateDurationUnifiedNoThrow instead
-// of validateDurationNoThrow.
-void validateDuration(const ProtobufWkt::Duration& duration, int64_t max_seconds_value) {
-  const auto result = validateDurationNoThrow(duration, max_seconds_value);
+void validateDuration(const ProtobufWkt::Duration& duration) {
+  const absl::Status result = validateDurationNoThrow(duration);
   if (!result.ok()) {
     throwEnvoyExceptionOrPanic(std::string(result.message()));
   }
 }
-
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be removed.
-void validateDuration(const ProtobufWkt::Duration& duration) {
-  validateDuration(duration, Protobuf::util::TimeUtil::kDurationMaxSeconds);
-}
-
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be removed.
-void validateDurationAsMilliseconds(const ProtobufWkt::Duration& duration) {
-  // Apply stricter max boundary to the `seconds` value to avoid overflow.
-  // Note that protobuf internally converts to nanoseconds.
-  // The kMaxInt64Nanoseconds = 9223372036, which is about 300 years.
-  constexpr int64_t kMaxInt64Nanoseconds =
-      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-  validateDuration(duration, kMaxInt64Nanoseconds);
-}
-
-// TODO(adisuissa): Once "envoy.reloadable_features.strict_duration_validation"
-// is removed this function should be removed.
-absl::Status validateDurationAsMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
-  constexpr int64_t kMaxInt64Nanoseconds =
-      std::numeric_limits<int64_t>::max() / (1000 * 1000 * 1000);
-  return validateDurationNoThrow(duration, kMaxInt64Nanoseconds);
-}
-
-} // namespace
-
-namespace {
 
 absl::string_view filenameFromPath(absl::string_view full_path) {
   size_t index = full_path.rfind('/');
@@ -159,7 +110,7 @@ void deprecatedFieldHelper(Runtime::Loader* runtime, bool proto_annotated_as_dep
       (runtime_overridden ? "runtime overrides to continue using now fatal-by-default " : ""));
 
   THROW_IF_NOT_OK(validation_visitor.onDeprecatedField(
-      "type " + message.GetTypeName() + " " + with_overridden, warn_only));
+      absl::StrCat("type ", message.GetTypeName(), " ", with_overridden), warn_only));
 }
 
 } // namespace
@@ -207,25 +158,14 @@ void ProtoExceptionUtil::throwMissingFieldException(const std::string& field_nam
 
 void ProtoExceptionUtil::throwProtoValidationException(const std::string& validation_error,
                                                        const Protobuf::Message& message) {
-  std::string error = fmt::format("Proto constraint validation failed ({}): {}", validation_error,
-                                  message.DebugString());
+  std::string error = fmt::format("{}: Proto constraint validation failed ({})",
+                                  message.DebugString(), validation_error);
   throwEnvoyExceptionOrPanic(error);
 }
 
 size_t MessageUtil::hash(const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
-    return DeterministicProtoHash::hash(message);
-  } else {
-    std::string text_format;
-    Protobuf::TextFormat::Printer printer;
-    printer.SetExpandAny(true);
-    printer.SetUseFieldNumber(true);
-    printer.SetSingleLineMode(true);
-    printer.SetHideUnknownFields(true);
-    printer.PrintToString(message, &text_format);
-    return HashUtil::xxHash64(text_format);
-  }
+  return DeterministicProtoHash::hash(message);
 #else
   return HashUtil::xxHash64(message.SerializeAsString());
 #endif
@@ -325,8 +265,8 @@ public:
     }
   }
 
-  void onMessage(const Protobuf::Message& message,
-                 absl::Span<const Protobuf::Message* const> parents, bool) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const> parents, bool) override {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()
             ->options()
@@ -357,7 +297,7 @@ public:
         absl::StrAppend(&error_msg, n > 0 ? ", " : "", unknown_fields.field(n).number());
       }
       if (!error_msg.empty()) {
-        THROW_IF_NOT_OK(validation_visitor_.onUnknownField(
+        RETURN_IF_NOT_OK(validation_visitor_.onUnknownField(
             fmt::format("type {}({}) with unknown field set {{{}}}", message.GetTypeName(),
                         !parents.empty()
                             ? absl::StrJoin(parents, "::",
@@ -368,6 +308,7 @@ public:
                         error_msg)));
       }
     }
+    return absl::OkStatus();
   }
 
 private:
@@ -396,8 +337,8 @@ class DurationFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
   void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
 
-  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
-                 bool) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const>, bool) override {
     const Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     if (reflectable_message->GetDescriptor()->full_name() == "google.protobuf.Duration") {
       ProtobufWkt::Duration duration_message;
@@ -407,30 +348,27 @@ public:
       duration_message.MergeFromCord(message.SerializeAsCord());
 #endif
       // Validate the value of the duration.
-      absl::Status status = validateDurationUnifiedNoThrow(duration_message);
-      if (!status.ok()) {
-        throwEnvoyExceptionOrPanic(fmt::format("Invalid duration: {}", status.message()));
-      }
+      RETURN_IF_NOT_OK(validateDurationNoThrow(duration_message));
     }
+    return absl::OkStatus();
   }
 };
 
 } // namespace
 
 void MessageUtil::validateDurationFields(const Protobuf::Message& message, bool recurse_into_any) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_duration_validation")) {
-    DurationFieldProtoVisitor duration_field_visitor;
-    THROW_IF_NOT_OK(
-        ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any));
-  }
+  DurationFieldProtoVisitor duration_field_visitor;
+  THROW_IF_NOT_OK(
+      ProtobufMessage::traverseMessage(duration_field_visitor, message, recurse_into_any));
 }
 
 namespace {
 
 class PgvCheckVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
-  void onMessage(const Protobuf::Message& message, absl::Span<const Protobuf::Message* const>,
-                 bool was_any_or_top_level) override {
+  absl::Status onMessage(const Protobuf::Message& message,
+                         absl::Span<const Protobuf::Message* const>,
+                         bool was_any_or_top_level) override {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     std::string err;
     // PGV verification is itself recursive up to the point at which it hits an Any message. As
@@ -438,8 +376,11 @@ public:
     // at which PGV would have stopped because it does not itself check within Any messages.
     if (was_any_or_top_level &&
         !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, *reflectable_message);
+      std::string error = fmt::format("{}: Proto constraint validation failed ({})",
+                                      reflectable_message->DebugString(), err);
+      return absl::InvalidArgumentError(error);
     }
+    return absl::OkStatus();
   }
 
   void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
@@ -459,20 +400,6 @@ void MessageUtil::packFrom(ProtobufWkt::Any& any_message, const Protobuf::Messag
   any_message.set_type_url(message.GetTypeName());
   any_message.set_value(message.SerializeAsString());
 #endif
-}
-
-void MessageUtil::unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-#if defined(ENVOY_ENABLE_FULL_PROTOS)
-  if (!any_message.UnpackTo(&message)) {
-    throwEnvoyExceptionOrPanic(fmt::format("Unable to unpack as {}: {}",
-                                           message.GetDescriptor()->full_name(),
-                                           any_message.DebugString()));
-#else
-  if (!message.ParseFromString(any_message.value())) {
-    throwEnvoyExceptionOrPanic(
-        fmt::format("Unable to unpack as {}: {}", message.GetTypeName(), any_message.type_url()));
-#endif
-  }
 }
 
 absl::Status MessageUtil::unpackTo(const ProtobufWkt::Any& any_message,
@@ -726,14 +653,6 @@ void MessageUtil::redact(Protobuf::Message& message) {
   ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
 }
 
-void MessageUtil::wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
-  // This should should generally succeed, but if there are malformed UTF-8 strings in a message,
-  // this can fail.
-  if (!dst.ParseFromString(src.SerializeAsString())) {
-    throwEnvoyExceptionOrPanic("Unable to deserialize during wireCast()");
-  }
-}
-
 std::string MessageUtil::toTextProto(const Protobuf::Message& message) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
   std::string text_format;
@@ -817,7 +736,7 @@ const ProtobufWkt::Value& ValueUtil::nullValue() {
   return *v;
 }
 
-ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
+ProtobufWkt::Value ValueUtil::stringValue(absl::string_view str) {
   ProtobufWkt::Value val;
   val.set_string_value(str);
   return val;
@@ -853,13 +772,13 @@ ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& v
 }
 
 uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& duration) {
-  validateDurationAsMilliseconds(duration);
+  validateDuration(duration);
   return Protobuf::util::TimeUtil::DurationToMilliseconds(duration);
 }
 
 absl::StatusOr<uint64_t>
 DurationUtil::durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration) {
-  const auto result = validateDurationAsMillisecondsNoThrow(duration);
+  const absl::Status result = validateDurationNoThrow(duration);
   if (!result.ok()) {
     return result;
   }
@@ -932,11 +851,11 @@ void StructUtil::update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& wit
   }
 }
 
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor,
-                               Api::Api& api) {
+absl::Status MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       Api::Api& api) {
   auto file_or_error = api.fileSystem().fileReadToEnd(path);
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  RETURN_IF_NOT_OK_REF(file_or_error.status());
   const std::string contents = file_or_error.value();
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoBinary)) {
@@ -944,20 +863,21 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     if (message.ParseFromString(contents)) {
       MessageUtil::checkForUnexpectedFields(message, validation_visitor);
     }
-    // Ideally this would throw an error if ParseFromString fails for consistency
+    // Ideally this would return an error if ParseFromString fails for consistency
     // but instead it will silently fail.
-    return;
+    return absl::OkStatus();
   }
 
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().ProtoText)) {
 #if defined(ENVOY_ENABLE_FULL_PROTOS)
     if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-      return;
+      return absl::OkStatus();
     }
 #endif
-    throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                               message.GetTypeName() + ")");
+    return absl::InvalidArgumentError(absl::StrCat("Unable to parse file \"", path,
+                                                   "\" as a text protobuf (type ",
+                                                   message.GetTypeName(), ")"));
   }
 #ifdef ENVOY_ENABLE_YAML
   if (absl::EndsWithIgnoreCase(path, FileExtensions::get().Yaml) ||
@@ -970,9 +890,10 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
     loadFromJson(contents, message, validation_visitor);
   }
 #else
-  throwEnvoyExceptionOrPanic("Unable to parse file \"" + path + "\" (type " +
-                             message.GetTypeName() + ")");
+  return absl::InvalidArgumentError(
+      absl::StrCat("Unable to parse file \"", path, "\" (type ", message.GetTypeName(), ")"));
 #endif
+  return absl::OkStatus();
 }
 
 } // namespace Envoy

@@ -60,10 +60,10 @@ public:
    * @param added_resources A list of decoded resources to add to the current state.
    * @param removed_resources A list of resources to remove from the current state.
    */
-  virtual void onConfigAccepted(
-      const absl::string_view type_url,
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
+  virtual void
+  onConfigAccepted(const absl::string_view type_url,
+                   absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                   const Protobuf::RepeatedPtrField<std::string>& removed_resources) PURE;
 
   /**
    * Invoked when xds configs are rejected during xDS ingestion.

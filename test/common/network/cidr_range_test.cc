@@ -12,17 +12,7 @@
 
 #include "gtest/gtest.h"
 
-// We are adding things into the std namespace.
-// Note that this is technically undefined behavior!
-namespace std {
-
-// Pair
-template <typename First, typename Second>
-std::ostream& operator<<(std::ostream& out, const std::pair<First, Second>& p) {
-  return out << '(' << p.first << ", " << p.second << ')';
-}
-
-} // namespace std
+using ::testing::PrintToString;
 
 namespace Envoy {
 
@@ -78,12 +68,12 @@ TEST(TruncateIpAddressAndLength, Various) {
     int length_io = kv.first.second;
     InstanceConstSharedPtr outPtr = CidrRange::truncateIpAddressAndLength(inPtr, &length_io);
     if (kv.second.second == -1) {
-      EXPECT_EQ(outPtr, nullptr) << outPtr->asString() << "\n" << kv;
-      EXPECT_EQ(length_io, -1) << kv;
+      EXPECT_EQ(outPtr, nullptr) << outPtr->asString() << "\n" << PrintToString(kv);
+      EXPECT_EQ(length_io, -1) << PrintToString(kv);
     } else {
-      ASSERT_NE(outPtr, nullptr) << kv;
-      EXPECT_EQ(outPtr->ip()->addressAsString(), kv.second.first) << kv;
-      EXPECT_EQ(length_io, kv.second.second) << kv;
+      ASSERT_NE(outPtr, nullptr) << PrintToString(kv);
+      EXPECT_EQ(outPtr->ip()->addressAsString(), kv.second.first) << PrintToString(kv);
+      EXPECT_EQ(length_io, kv.second.second) << PrintToString(kv);
     }
   }
 }

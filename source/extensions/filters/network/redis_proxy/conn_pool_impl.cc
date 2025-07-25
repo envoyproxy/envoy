@@ -8,12 +8,16 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/stats/utility.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
 #include "source/extensions/filters/network/redis_proxy/config.h"
 
 namespace Envoy {
@@ -36,10 +40,6 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 
 static uint16_t default_port = 6379;
 
-bool isClusterProvidedLb(const Upstream::ClusterInfo& info) {
-  return info.loadBalancerFactory().name() == "envoy.load_balancing_policies.cluster_provided";
-}
-
 } // namespace
 
 InstanceImpl::InstanceImpl(
@@ -50,13 +50,16 @@ InstanceImpl::InstanceImpl(
     Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(new Common::Redis::Client::ConfigImpl(config)), api_(api),
-      stats_scope_(std::move(stats_scope)),
-      redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
-                                                     POOL_COUNTER(*stats_scope_))},
-      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache) {}
+      stats_scope_(std::move(stats_scope)), redis_command_stats_(redis_command_stats),
+      redis_cluster_stats_{REDIS_CLUSTER_STATS(POOL_COUNTER(*stats_scope_))},
+      refresh_manager_(std::move(refresh_manager)), dns_cache_(dns_cache),
+      aws_iam_authenticator_(aws_iam_authenticator), aws_iam_config_(aws_iam_config) {}
 
 void InstanceImpl::init() {
   // Note: `this` and `cluster_name` have a a lifetime of the filter.
@@ -67,11 +70,14 @@ void InstanceImpl::init() {
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     if (auto this_shared_ptr = this_weak_ptr.lock()) {
       return std::make_shared<ThreadLocalPool>(
-          this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->dns_cache_);
+          this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->dns_cache_,
+          this_shared_ptr->aws_iam_config_, this_shared_ptr->aws_iam_authenticator_);
     }
     return nullptr;
   });
 }
+
+uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().shardSize(); }
 
 // This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
 // failing due to InstanceImpl going away.
@@ -91,16 +97,31 @@ InstanceImpl::makeRequestToHost(const std::string& host_address,
   return tls_->getTyped<ThreadLocalPool>().makeRequestToHost(host_address, request, callbacks);
 }
 
+// This method is always called from a InstanceSharedPtr we don't have to worry about tls_->getTyped
+// failing due to InstanceImpl going away.
+Common::Redis::Client::PoolRequest*
+InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
+                                 PoolCallbacks& callbacks,
+                                 Common::Redis::Client::Transaction& transaction) {
+  return tls_->getTyped<ThreadLocalPool>().makeRequestToShard(shard_index, std::move(request),
+                                                              callbacks, transaction);
+}
+
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache)
+    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
     : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
       dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
       client_factory_(parent->client_factory_), config_(parent->config_),
       stats_scope_(parent->stats_scope_), redis_command_stats_(parent->redis_command_stats_),
       redis_cluster_stats_(parent->redis_cluster_stats_),
-      refresh_manager_(parent->refresh_manager_) {
+      refresh_manager_(parent->refresh_manager_), aws_iam_authenticator_(aws_iam_authenticator),
+      aws_iam_config_(aws_iam_config) {
+
   cluster_update_handle_ = parent->cm_.addThreadLocalClusterUpdateCallbacks(*this);
   Upstream::ThreadLocalCluster* cluster = parent->cm_.getThreadLocalCluster(cluster_name_);
   if (cluster != nullptr) {
@@ -142,7 +163,8 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   ASSERT(cluster_ == nullptr);
   auto& cluster = get_cluster();
   cluster_ = &cluster;
-  // Update username and password when cluster updates.
+  // Update username and password when cluster updates. authPassword is ignored by the client when
+  // AWS IAM Authentication is enabled.
   auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
   auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), shared_parent->api_);
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
@@ -168,8 +190,7 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   Upstream::ClusterInfoConstSharedPtr info = cluster_->info();
   OptRef<const envoy::config::cluster::v3::Cluster::CustomClusterType> cluster_type =
       info->clusterType();
-  is_redis_cluster_ = isClusterProvidedLb(*info) && cluster_type.has_value() &&
-                      cluster_type->name() == "envoy.clusters.redis";
+  is_redis_cluster_ = cluster_type.has_value() && cluster_type->name() == "envoy.clusters.redis";
 }
 
 void InstanceImpl::ThreadLocalPool::onClusterRemoval(const std::string& cluster_name) {
@@ -264,13 +285,37 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
     } else {
       client = std::make_unique<ThreadLocalActiveClient>(*this);
       client->host_ = host;
-      client->redis_client_ =
-          client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
-                                 auth_username_, auth_password_, false);
+      client->redis_client_ = client_factory_.create(
+          host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), auth_username_,
+          auth_password_, false, aws_iam_config_, aws_iam_authenticator_);
+
       client->redis_client_->addConnectionCallbacks(*client);
     }
   }
   return client;
+}
+
+uint16_t InstanceImpl::ThreadLocalPool::shardSize() {
+  if (cluster_ == nullptr) {
+    ASSERT(client_map_.empty());
+    ASSERT(host_set_member_update_cb_handle_ == nullptr);
+    return 0;
+  }
+
+  Common::Redis::RespValue request;
+  absl::flat_hash_set<Upstream::HostConstSharedPtr> unique_hosts;
+  unique_hosts.reserve(Envoy::Extensions::Clusters::Redis::MaxSlot);
+  for (uint16_t size = 0; size < Envoy::Extensions::Clusters::Redis::MaxSlot; size++) {
+    Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
+        size, request, Common::Redis::Client::ReadPolicy::Primary);
+    Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+        cluster_->loadBalancer().chooseHost(&lb_context));
+    if (!host) {
+      return size;
+    }
+    unique_hosts.insert(std::move(host));
+  }
+  return static_cast<uint16_t>(unique_hosts.size());
 }
 
 Common::Redis::Client::PoolRequest*
@@ -287,48 +332,37 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
       key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
       transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
 
-  Upstream::HostConstSharedPtr host = cluster_->loadBalancer().chooseHost(&lb_context);
+  Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster_->loadBalancer().chooseHost(&lb_context));
   if (!host) {
     ENVOY_LOG(debug, "host not found: '{}'", key);
     return nullptr;
   }
 
-  uint32_t client_idx = transaction.current_client_idx_;
-  // If there is an active transaction, establish a new connection if necessary.
-  if (transaction.active_ && !transaction.connection_established_) {
-    transaction.clients_[client_idx] =
-        client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
-                               auth_username_, auth_password_, true);
-    if (transaction.connection_cb_) {
-      transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
-    }
-  }
+  return makeRequestToHost(host, std::move(request), callbacks, transaction);
+}
 
-  pending_requests_.emplace_back(*this, std::move(request), callbacks, host);
-  PendingRequest& pending_request = pending_requests_.back();
-
-  if (!transaction.active_) {
-    ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
-    if (!client) {
-      ENVOY_LOG(debug, "redis connection is rate limited, erasing empty client");
-      pending_request.request_handler_ = nullptr;
-      onRequestCompleted();
-      client_map_.erase(host);
-      return nullptr;
-    }
-    pending_request.request_handler_ = client->redis_client_->makeRequest(
-        getRequest(pending_request.incoming_request_), pending_request);
-  } else {
-    pending_request.request_handler_ = transaction.clients_[client_idx]->makeRequest(
-        getRequest(pending_request.incoming_request_), pending_request);
-  }
-
-  if (pending_request.request_handler_) {
-    return &pending_request;
-  } else {
-    onRequestCompleted();
+Common::Redis::Client::PoolRequest*
+InstanceImpl::ThreadLocalPool::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
+                                                  PoolCallbacks& callbacks,
+                                                  Common::Redis::Client::Transaction& transaction) {
+  if (cluster_ == nullptr) {
+    ASSERT(client_map_.empty());
+    ASSERT(host_set_member_update_cb_handle_ == nullptr);
     return nullptr;
   }
+
+  Clusters::Redis::RedisSpecifyShardContextImpl lb_context(
+      shard_index, getRequest(request),
+      transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
+
+  Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
+      cluster_->loadBalancer().chooseHost(&lb_context));
+  if (!host) {
+    ENVOY_LOG(debug, "host not found: '{}'", shard_index);
+    return nullptr;
+  }
+  return makeRequestToHost(host, std::move(request), callbacks, transaction);
 }
 
 Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestToHost(
@@ -385,10 +419,13 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
       }
       END_TRY catch (const EnvoyException&) { return nullptr; }
     }
-    Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
-        cluster_->info(), "", address_ptr, nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
-        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::config::core::v3::UNKNOWN, dispatcher_.timeSource())};
+    Upstream::HostSharedPtr new_host{THROW_OR_RETURN_VALUE(
+        Upstream::HostImpl::create(
+            cluster_->info(), "", address_ptr, nullptr, nullptr, 1,
+            envoy::config::core::v3::Locality(),
+            envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
+            envoy::config::core::v3::UNKNOWN),
+        std::unique_ptr<Upstream::HostImpl>)};
     host_address_map_[host_address_map_key] = new_host;
     created_via_redirect_hosts_.push_back(new_host);
     it = host_address_map_.find(host_address_map_key);
@@ -402,6 +439,48 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
   }
 
   return client->redis_client_->makeRequest(request, callbacks);
+}
+
+Common::Redis::Client::PoolRequest*
+InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& host,
+                                                 RespVariant&& request, PoolCallbacks& callbacks,
+                                                 Common::Redis::Client::Transaction& transaction) {
+  uint32_t client_idx = transaction.current_client_idx_;
+  // If there is an active transaction, establish a new connection if necessary.
+  if (transaction.active_ && !transaction.connection_established_) {
+    transaction.clients_[client_idx] = client_factory_.create(
+        host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), auth_username_,
+        auth_password_, true, aws_iam_config_, aws_iam_authenticator_);
+    if (transaction.connection_cb_) {
+      transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
+    }
+  }
+
+  pending_requests_.emplace_back(*this, std::move(request), callbacks, host);
+  PendingRequest& pending_request = pending_requests_.back();
+
+  if (!transaction.active_) {
+    ThreadLocalActiveClientPtr& client = this->threadLocalActiveClient(host);
+    if (!client) {
+      ENVOY_LOG(debug, "redis connection is rate limited, erasing empty client");
+      pending_request.request_handler_ = nullptr;
+      onRequestCompleted();
+      client_map_.erase(host);
+      return nullptr;
+    }
+    pending_request.request_handler_ = client->redis_client_->makeRequest(
+        getRequest(pending_request.incoming_request_), pending_request);
+  } else {
+    pending_request.request_handler_ = transaction.clients_[client_idx]->makeRequest(
+        getRequest(pending_request.incoming_request_), pending_request);
+  }
+
+  if (pending_request.request_handler_) {
+    return &pending_request;
+  } else {
+    onRequestCompleted();
+    return nullptr;
+  }
 }
 
 void InstanceImpl::ThreadLocalPool::onRequestCompleted() {

@@ -43,18 +43,20 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef debug_visitor_factory)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      QuicFilterManagerConnectionImpl(
-          *connection, connection->connection_id(), dispatcher, send_buffer_limit,
-          std::make_shared<QuicSslConnectionInfo>(*this), std::move(stream_info)),
-      quic_connection_(std::move(connection)), quic_stat_names_(quic_stat_names),
-      listener_scope_(listener_scope), crypto_server_stream_factory_(crypto_server_stream_factory),
+      QuicFilterManagerConnectionImpl(*connection, connection->connection_id(), dispatcher,
+                                      send_buffer_limit,
+                                      std::make_shared<QuicSslConnectionInfo>(*this),
+                                      std::move(stream_info), quic_stat_names, listener_scope),
+      quic_connection_(std::move(connection)),
+      crypto_server_stream_factory_(crypto_server_stream_factory),
       connection_stats_(connection_stats) {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   http_datagram_support_ = quic::HttpDatagramSupport::kRfc;
 #endif
   // If a factory is available, create a debug visitor and attach it to the connection.
   if (debug_visitor_factory.has_value()) {
-    debug_visitor_ = debug_visitor_factory->createQuicConnectionDebugVisitor(this, streamInfo());
+    debug_visitor_ =
+        debug_visitor_factory->createQuicConnectionDebugVisitor(dispatcher, *this, streamInfo());
     quic_connection_->set_debug_visitor(debug_visitor_.get());
   }
   quic_connection_->set_context_listener(
@@ -110,11 +112,6 @@ EnvoyQuicServerSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
 
 quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingBidirectionalStream() {
   IS_ENVOY_BUG("Unexpected disallowed server initiated stream");
-  return nullptr;
-}
-
-quic::QuicSpdyStream* EnvoyQuicServerSession::CreateOutgoingUnidirectionalStream() {
-  IS_ENVOY_BUG("Unexpected function call");
   return nullptr;
 }
 
@@ -175,18 +172,10 @@ void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   raiseConnectionEvent(Network::ConnectionEvent::Connected);
 }
 
-void EnvoyQuicServerSession::MaybeSendRstStreamFrame(quic::QuicStreamId id,
-                                                     quic::QuicResetStreamError error,
-                                                     quic::QuicStreamOffset bytes_written) {
-  QuicServerSessionBase::MaybeSendRstStreamFrame(id, error, bytes_written);
-  quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, error, /*from_self*/ true,
-                                                   /*is_upstream*/ false);
-}
-
 void EnvoyQuicServerSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
   QuicServerSessionBase::OnRstStream(frame);
-  quic_stat_names_.chargeQuicResetStreamErrorStats(listener_scope_, frame.error(),
-                                                   /*from_self*/ false, /*is_upstream*/ false);
+  incrementSentQuicResetStreamErrorStats(frame.error(),
+                                         /*from_self*/ false, /*is_upstream*/ false);
 }
 
 void EnvoyQuicServerSession::setHttp3Options(
@@ -199,17 +188,21 @@ void EnvoyQuicServerSession::setHttp3Options(
     const uint64_t max_interval =
         PROTOBUF_GET_MS_OR_DEFAULT(http3_options_->quic_protocol_options().connection_keepalive(),
                                    max_interval, quic::kPingTimeoutSecs);
-    if (max_interval == 0) {
-      return;
-    }
-    if (initial_interval > 0) {
-      connection()->set_keep_alive_ping_timeout(
-          quic::QuicTime::Delta::FromMilliseconds(max_interval));
-      connection()->set_initial_retransmittable_on_wire_timeout(
-          quic::QuicTime::Delta::FromMilliseconds(initial_interval));
+    if (max_interval != 0) {
+      if (initial_interval > 0) {
+        connection()->set_keep_alive_ping_timeout(
+            quic::QuicTime::Delta::FromMilliseconds(max_interval));
+        connection()->set_initial_retransmittable_on_wire_timeout(
+            quic::QuicTime::Delta::FromMilliseconds(initial_interval));
+      }
     }
   }
   set_allow_extended_connect(http3_options_->allow_extended_connect());
+  if (http3_options_->disable_qpack()) {
+    DisableHuffmanEncoding();
+    DisableCookieCrumbling();
+    set_qpack_maximum_dynamic_table_capacity(0);
+  }
 }
 
 void EnvoyQuicServerSession::storeConnectionMapPosition(FilterChainToConnectionMap& connection_map,

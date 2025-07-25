@@ -17,8 +17,12 @@ public:
   void clearRuntime() { runtime_ = {}; } // for tests
   OptRef<Runtime::Loader> runtime() override { return runtime_; }
 
+  void setSkipDeprecatedLogs(bool skip) { skip_deprecated_logs_ = skip; }
+  bool isSkipDeprecatedLogs() const { return skip_deprecated_logs_; }
+
 protected:
   OptRef<Runtime::Loader> runtime_;
+  bool skip_deprecated_logs_{false};
 };
 
 class NullValidationVisitorImpl : public ValidationVisitorBase {
@@ -101,7 +105,7 @@ private:
 class ProdValidationContextImpl : public ValidationContextImpl {
 public:
   ProdValidationContextImpl(bool allow_unknown_static_fields, bool allow_unknown_dynamic_fields,
-                            bool ignore_unknown_dynamic_fields)
+                            bool ignore_unknown_dynamic_fields, bool skip_deprecated_logs)
       : ValidationContextImpl(
             allow_unknown_static_fields
                 ? static_cast<ValidationVisitor&>(static_warning_validation_visitor_)
@@ -109,7 +113,11 @@ public:
             allow_unknown_dynamic_fields
                 ? (ignore_unknown_dynamic_fields ? ProtobufMessage::getNullValidationVisitor()
                                                  : dynamic_warning_validation_visitor_)
-                : strict_validation_visitor_) {}
+                : strict_validation_visitor_) {
+    strict_validation_visitor_.setSkipDeprecatedLogs(skip_deprecated_logs);
+    static_warning_validation_visitor_.setSkipDeprecatedLogs(skip_deprecated_logs);
+    dynamic_warning_validation_visitor_.setSkipDeprecatedLogs(skip_deprecated_logs);
+  }
 
   void setCounters(Stats::Counter& static_unknown_counter, Stats::Counter& dynamic_unknown_counter,
                    Stats::Counter& wip_counter) {

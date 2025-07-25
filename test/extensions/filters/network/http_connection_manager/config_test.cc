@@ -1,6 +1,6 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/trace/v3/http_tracer.pb.h"
-#include "envoy/config/trace/v3/opencensus.pb.h"
+#include "envoy/config/trace/v3/opentelemetry.pb.h"
 #include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
@@ -454,9 +454,9 @@ http_filters:
 
   // Simulate tracer provider configuration in the bootstrap config.
   envoy::config::trace::v3::Tracing bootstrap_tracing_config;
-  bootstrap_tracing_config.mutable_http()->set_name("opencensus");
+  bootstrap_tracing_config.mutable_http()->set_name("opentelemetry");
   bootstrap_tracing_config.mutable_http()->mutable_typed_config()->PackFrom(
-      envoy::config::trace::v3::OpenCensusConfig{});
+      envoy::config::trace::v3::OpenTelemetryConfig{});
   context_.server_factory_context_.http_context_.setDefaultTracingConfig(bootstrap_tracing_config);
 
   // Set up expected tracer provider configuration.
@@ -708,6 +708,25 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
+TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  // Envoy no longer considers RFC1918 IP addresses to be internal if runtime guard is enabled.
+  Network::Address::Ipv4Instance default_ip_address{"10.48.179.130", 0, nullptr};
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
+}
+
 TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
@@ -826,6 +845,29 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersKbMaxConfiguredViaRunti
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
   EXPECT_EQ(9000, config.maxRequestHeadersKb());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeadersCountMaxConfiguredViaRuntime) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  ON_CALL(context_.server_factory_context_.runtime_loader_.snapshot_,
+          getInteger("envoy.reloadable_features.max_request_headers_count", _))
+      .WillByDefault(Return(42));
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(42, config.maxRequestHeadersCount());
 }
 
 // Validated that an explicit zero stream idle timeout disables.
@@ -953,6 +995,27 @@ TEST_F(HttpConnectionManagerConfigTest, MaxRequestHeaderCountConfigurable) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
   EXPECT_EQ(200, config.maxRequestHeadersCount());
+}
+
+// Check that max response header size is invalid on HCM.
+TEST_F(HttpConnectionManagerConfigTest, MaxResponseHeaderKbInvalid) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  common_http_protocol_options:
+    max_response_headers_kb: 200
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  EXPECT_FALSE(creation_status_.ok());
 }
 
 // Checking that default max_requests_per_connection is 0.
@@ -2314,7 +2377,7 @@ public:
   TestRequestIDExtension(const test::http_connection_manager::CustomRequestIDExtension& config)
       : config_(config) {}
 
-  void set(Http::RequestHeaderMap&, bool) override {}
+  void set(Http::RequestHeaderMap&, bool, bool) override {}
   void setInResponse(Http::ResponseHeaderMap&, const Http::RequestHeaderMap&) override {}
   absl::optional<absl::string_view> get(const Http::RequestHeaderMap&) const override {
     return absl::nullopt;
@@ -2524,7 +2587,7 @@ namespace {
 
 class OriginalIPDetectionExtensionNotCreatedFactory : public Http::OriginalIPDetectionFactory {
 public:
-  Http::OriginalIPDetectionSharedPtr
+  absl::StatusOr<Http::OriginalIPDetectionSharedPtr>
   createExtension(const Protobuf::Message&, Server::Configuration::FactoryContext&) override {
     return nullptr;
   }

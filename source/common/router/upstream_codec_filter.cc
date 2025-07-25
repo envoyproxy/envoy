@@ -64,14 +64,18 @@ Http::FilterHeadersStatus UpstreamCodecFilter::decodeHeaders(Http::RequestHeader
       callbacks_->upstreamCallbacks()->upstream()->encodeHeaders(headers, end_stream);
 
   calling_encode_headers_ = false;
-  if (!status.ok() || deferred_reset_) {
-    deferred_reset_ = false;
+  if (!status.ok() || !deferred_reset_status_.ok()) {
     // It is possible that encodeHeaders() fails. This can happen if filters or other extensions
     // erroneously remove required headers.
     callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamProtocolError);
     const std::string details =
-        absl::StrCat(StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders,
-                     "{", StringUtil::replaceAllEmptySpace(status.message()), "}");
+        deferred_reset_status_.ok()
+            ? absl::StrCat(
+                  StreamInfo::ResponseCodeDetails::get().FilterRemovedRequiredRequestHeaders, "{",
+                  StringUtil::replaceAllEmptySpace(status.message()), "}")
+            : absl::StrCat(StreamInfo::ResponseCodeDetails::get().EarlyUpstreamReset, "{",
+                           StringUtil::replaceAllEmptySpace(deferred_reset_status_.message()), "}");
+    deferred_reset_status_ = absl::OkStatus();
     callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, status.message(), nullptr,
                                absl::nullopt, details);
     return Http::FilterHeadersStatus::StopIteration;
@@ -148,10 +152,7 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
       filter_.callbacks_->dispatcher().timeSource());
 
   if (filter_.callbacks_->upstreamCallbacks()->pausedForConnect() &&
-      ((Http::Utility::getResponseStatus(*headers) == 200) ||
-       ((Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.upstream_allow_connect_with_2xx")) &&
-        (Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers)))))) {
+      ((Http::CodeUtility::is2xx(Http::Utility::getResponseStatus(*headers))))) {
     filter_.callbacks_->upstreamCallbacks()->setPausedForConnect(false);
     filter_.callbacks_->continueDecoding();
   }
@@ -217,8 +218,62 @@ void UpstreamCodecFilter::CodecBridge::maybeEndDecode(bool end_stream) {
   }
 }
 
+void UpstreamCodecFilter::CodecBridge::onResetStream(Http::StreamResetReason reason,
+                                                     absl::string_view transport_failure_reason) {
+  if (filter_.calling_encode_headers_) {
+    // If called while still encoding errors, the reset reason won't be appended to the details
+    // string through the reset stream call, so append it here.
+    std::string failure_reason(Http::Utility::resetReasonToString(reason));
+    if (!transport_failure_reason.empty()) {
+      absl::StrAppend(&failure_reason, "|", transport_failure_reason);
+    }
+    filter_.deferred_reset_status_ = absl::InternalError(failure_reason);
+    return;
+  }
+
+  std::string failure_reason(transport_failure_reason);
+  if (reason == Http::StreamResetReason::LocalReset) {
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.report_stream_reset_error_code")) {
+      ASSERT(transport_failure_reason.empty());
+      // Use this to communicate to the upstream request to not force-terminate.
+      failure_reason = "codec_error";
+    } else {
+      failure_reason = absl::StrCat(transport_failure_reason, "|codec_error");
+    }
+  }
+  filter_.callbacks_->resetStream(reason, failure_reason);
+}
+
 REGISTER_FACTORY(UpstreamCodecFilterFactory,
                  Server::Configuration::UpstreamHttpFilterConfigFactory);
+
+class DefaultUpstreamHttpFilterChainFactory : public Http::FilterChainFactory {
+public:
+  DefaultUpstreamHttpFilterChainFactory()
+      : factory_([](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+          callbacks.addStreamDecoderFilter(std::make_shared<UpstreamCodecFilter>());
+        }) {}
+
+  bool createFilterChain(
+      Http::FilterChainManager& manager,
+      const Http::FilterChainOptions& = Http::EmptyFilterChainOptions{}) const override {
+    manager.applyFilterFactoryCb({"envoy.filters.http.upstream_codec"}, factory_);
+    return true;
+  }
+  bool createUpgradeFilterChain(absl::string_view, const UpgradeMap*, Http::FilterChainManager&,
+                                const Http::FilterChainOptions&) const override {
+    // Upgrade filter chains not yet supported for upstream HTTP filters.
+    return false;
+  }
+
+private:
+  mutable Http::FilterFactoryCb factory_;
+};
+
+const Http::FilterChainFactory& defaultUpstreamHttpFilterChainFactory() {
+  CONSTRUCT_ON_FIRST_USE(DefaultUpstreamHttpFilterChainFactory);
+}
 
 } // namespace Router
 } // namespace Envoy

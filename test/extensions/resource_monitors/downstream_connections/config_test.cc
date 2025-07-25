@@ -20,9 +20,9 @@ namespace {
 TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
-          "envoy.resource_monitors.downstream_connections");
+          "envoy.resource_monitors.global_downstream_max_connections");
   ASSERT_NE(factory, nullptr);
-  EXPECT_EQ("envoy.resource_monitors.downstream_connections", factory->name());
+  EXPECT_EQ("envoy.resource_monitors.global_downstream_max_connections", factory->name());
 
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
@@ -42,9 +42,9 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateMonitorInvalidConfig) 
 TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateCustomMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
-          "envoy.resource_monitors.downstream_connections");
+          "envoy.resource_monitors.global_downstream_max_connections");
   ASSERT_NE(factory, nullptr);
-  EXPECT_EQ("envoy.resource_monitors.downstream_connections", factory->name());
+  EXPECT_EQ("envoy.resource_monitors.global_downstream_max_connections", factory->name());
 
   envoy::extensions::resource_monitors::downstream_connections::v3::DownstreamConnectionsConfig
       config;
@@ -61,7 +61,7 @@ TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateCustomMonitor) {
 TEST(ActiveDownstreamConnectionsMonitorFactoryTest, CreateDefaultMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ProactiveResourceMonitorFactory>::getFactory(
-          "envoy.resource_monitors.downstream_connections");
+          "envoy.resource_monitors.global_downstream_max_connections");
   ASSERT_NE(factory, nullptr);
 
   Event::MockDispatcher dispatcher;

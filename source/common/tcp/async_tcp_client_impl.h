@@ -28,8 +28,9 @@ public:
   AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
                      Upstream::ThreadLocalCluster& thread_local_cluster,
                      Upstream::LoadBalancerContext* context, bool enable_half_close);
+  ~AsyncTcpClientImpl() override;
 
-  void close(Network::ConnectionCloseType type) override;
+  void close(Network::ConnectionCloseType type) override { closeImpl(type); }
 
   Network::DetectedCloseType detectedCloseType() const override { return detected_close_; }
 
@@ -67,6 +68,10 @@ public:
   }
 
 private:
+  // This implements the AsyncTcpClient::close but exists as non-virtual to avoid calling it in the
+  // destructor.
+  void closeImpl(Network::ConnectionCloseType type);
+
   struct NetworkReadFilter : public Network::ReadFilterBaseImpl {
     NetworkReadFilter(AsyncTcpClientImpl& parent) : parent_(parent) {}
 
@@ -106,6 +111,7 @@ private:
   Event::TimerPtr connect_timer_;
   AsyncTcpClientCallbacks* callbacks_{};
   Network::DetectedCloseType detected_close_{Network::DetectedCloseType::Normal};
+  bool closing_{false};
   bool connected_{false};
   bool enable_half_close_{false};
 };

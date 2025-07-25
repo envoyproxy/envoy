@@ -27,6 +27,8 @@ namespace Envoy {
 namespace Router {
 class Route;
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
+class VirtualHost;
+using VirtualHostConstSharedPtr = std::shared_ptr<const VirtualHost>;
 } // namespace Router
 
 namespace Upstream {
@@ -95,8 +97,10 @@ enum CoreResponseFlag : uint16_t {
   DropOverLoad,
   // Downstream remote codec level reset was received on the stream.
   DownstreamRemoteReset,
+  // Unconditionally drop all traffic due to drop_overload is set to 100%.
+  UnconditionalDropOverload,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = DownstreamRemoteReset,
+  LastFlag = UnconditionalDropOverload,
 };
 
 class ResponseFlagUtils;
@@ -196,6 +200,9 @@ struct ResponseCodeDetailValues {
   const std::string MaintenanceMode = "maintenance_mode";
   // The request was rejected by the router filter because the DROP_OVERLOAD configuration.
   const std::string DropOverload = "drop_overload";
+  // The request was rejected by the router filter because the DROP_OVERLOAD configuration is set to
+  // 100%.
+  const std::string UnconditionalDropOverload = "unconditional_drop_overload";
   // The request was rejected by the router filter because there was no healthy upstream found.
   const std::string NoHealthyUpstream = "no_healthy_upstream";
   // The request was forwarded upstream but the response timed out.
@@ -354,8 +361,7 @@ struct UpstreamTiming {
   absl::optional<MonotonicTime> upstream_handshake_complete_;
 };
 
-class DownstreamTiming {
-public:
+struct DownstreamTiming {
   void setValue(absl::string_view key, MonotonicTime value) { timings_[key] = value; }
 
   absl::optional<MonotonicTime> getValue(absl::string_view value) const {
@@ -410,7 +416,6 @@ public:
     last_downstream_header_rx_byte_received_ = time_source.monotonicTime();
   }
 
-private:
   absl::flat_hash_map<std::string, MonotonicTime> timings_;
   // The time when the last byte of the request was received.
   absl::optional<MonotonicTime> last_downstream_rx_byte_received_;
@@ -653,6 +658,15 @@ public:
   virtual void
   setConnectionTerminationDetails(absl::string_view connection_termination_details) PURE;
 
+  /*
+   * @param short string type flag to indicate the noteworthy event of this stream. Mutliple flags
+   * could be added and will be concatenated with comma. It should not contain any empty or space
+   * characters (' ', '\t', '\f', '\v', '\n', '\r').
+   *
+   * The short string should not duplicate with the any registered response flags.
+   */
+  virtual void addCustomFlag(absl::string_view) PURE;
+
   /**
    * @return std::string& the name of the route. The name is get from the route() and it is
    *         empty if there is no route.
@@ -806,6 +820,11 @@ public:
   virtual uint64_t legacyResponseFlags() const PURE;
 
   /**
+   * @return all stream flags that are added.
+   */
+  virtual absl::string_view customFlags() const PURE;
+
+  /**
    * @return whether the request is a health check request or not.
    */
   virtual bool healthCheck() const PURE;
@@ -824,6 +843,12 @@ public:
    * @return const Router::RouteConstSharedPtr Get the route selected for this request.
    */
   virtual Router::RouteConstSharedPtr route() const PURE;
+
+  /**
+   * @return const Router::VirtualHostConstSharedPtr& Get the virtual host selected for this
+   * request.
+   */
+  virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
@@ -979,6 +1004,23 @@ public:
    * finished sending and receiving.
    */
   virtual bool shouldDrainConnectionUponCompletion() const PURE;
+
+  /**
+   * Set the parent for this StreamInfo. This is used to associate the
+   * stream info of an async client with the stream info of the downstream
+   * connection.
+   */
+  virtual void setParentStreamInfo(const StreamInfo& parent_stream_info) PURE;
+
+  /**
+   * Get the parent for this StreamInfo, if available.
+   */
+  virtual OptRef<const StreamInfo> parentStreamInfo() const PURE;
+
+  /**
+   * Clear the parent for this StreamInfo.
+   */
+  virtual void clearParentStreamInfo() PURE;
 
   /**
    * Called if the connection decides to drain itself after serving this request.

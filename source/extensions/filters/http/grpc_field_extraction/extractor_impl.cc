@@ -7,7 +7,6 @@
 
 #include "source/common/common/logger.h"
 
-#include "absl/strings/str_format.h"
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_factory.h"
 #include "proto_field_extraction/field_value_extractor/field_value_extractor_interface.h"
 
@@ -21,15 +20,25 @@ using Protobuf::field_extraction::FieldValueExtractorFactory;
 
 } // namespace
 
-absl::Status ExtractorImpl::init() {
-  FieldValueExtractorFactory extractor_factory(type_finder_);
-  for (const auto& it : field_extractions_.request_field_extractions()) {
-    auto extractor = extractor_factory.Create(request_type_url_, it.first);
-    if (!extractor.ok()) {
-      return extractor.status();
-    }
+absl::StatusOr<ExtractorImpl> ExtractorImpl::create(
+    const TypeFinder& type_finder, absl::string_view request_type_url,
+    const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
+        field_extractions) {
+  ExtractorImpl extractor;
+  const absl::Status status = extractor.init(type_finder, request_type_url, field_extractions);
+  RETURN_IF_NOT_OK(status);
+  return extractor;
+}
 
-    per_field_extractors_.emplace(it.first, std::move(extractor.value()));
+absl::Status ExtractorImpl::init(
+    const TypeFinder& type_finder, absl::string_view request_type_url,
+    const envoy::extensions::filters::http::grpc_field_extraction::v3::FieldExtractions&
+        field_extractions) {
+  FieldValueExtractorFactory extractor_factory(type_finder);
+  for (const auto& it : field_extractions.request_field_extractions()) {
+    auto extractor_or_error = extractor_factory.Create(request_type_url, it.first);
+    RETURN_IF_NOT_OK(extractor_or_error.status());
+    per_field_extractors_.emplace(it.first, std::move(extractor_or_error.value()));
   }
   return absl::OkStatus();
 }
@@ -39,18 +48,14 @@ ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) 
 
   ExtractionResult result;
   for (const auto& it : per_field_extractors_) {
-    auto extracted_values = it.second->Extract(message);
-    if (!extracted_values.ok()) {
-      return extracted_values.status();
+    absl::StatusOr<ProtobufWkt::Value> extracted_value = it.second->ExtractValue(message);
+    if (!extracted_value.ok()) {
+      return extracted_value.status();
     }
 
     ENVOY_LOG_MISC(debug, "extracted the following resource values from the {} field: {}", it.first,
-                   std::accumulate(extracted_values.value().begin(), extracted_values.value().end(),
-                                   std::string(),
-                                   [](const std::string& lhs, const std::string& rhs) {
-                                     return absl::StrFormat("%s, %s", lhs, rhs);
-                                   }));
-    result.push_back({it.first, std::move(extracted_values.value())});
+                   extracted_value->DebugString());
+    result.push_back({it.first, std::move(*extracted_value)});
   }
 
   return result;

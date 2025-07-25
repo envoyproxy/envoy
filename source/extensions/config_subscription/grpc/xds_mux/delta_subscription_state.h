@@ -31,7 +31,7 @@ public:
   // Whether there was a change in our subscription interest we have yet to inform the server of.
   bool subscriptionUpdatePending() const override;
 
-  void markStreamFresh() override { any_request_sent_yet_in_current_stream_ = false; }
+  void markStreamFresh(bool should_send_initial_resource_versions) override;
 
   void ttlExpiryCallback(const std::vector<std::string>& expired) override;
 
@@ -44,8 +44,7 @@ private:
 
   void setResourceTtl(const envoy::service::discovery::v3::Resource& resource);
   bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) const;
-  void
-  handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;
+  void handleGoodResponse(envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
 
   class ResourceState {
@@ -100,6 +99,7 @@ private:
 
   bool in_initial_legacy_wildcard_{true};
   bool any_request_sent_yet_in_current_stream_{};
+  bool should_send_initial_resource_versions_{true};
 
   // Tracks changes in our subscription interest since the previous DeltaDiscoveryRequest we sent.
   // TODO: Can't use absl::flat_hash_set due to ordering issues in gTest expectation matching.

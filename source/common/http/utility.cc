@@ -22,6 +22,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
+#include "source/common/network/cidr_range.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
@@ -443,20 +444,21 @@ void Utility::appendVia(RequestOrResponseHeaderMap& headers, const std::string& 
 }
 
 void Utility::updateAuthority(RequestHeaderMap& headers, absl::string_view hostname,
-                              const bool append_xfh) {
-  const auto host = headers.getHostValue();
+                              bool append_xfh, bool keep_old) {
+  if (const absl::string_view host = headers.getHostValue(); !host.empty()) {
+    // Insert the x-envoy-original-host header if required.
+    if (keep_old) {
+      headers.setEnvoyOriginalHost(host);
+    }
 
-  // Only append to x-forwarded-host if the value was not the last value appended.
-  const auto xfh = headers.getForwardedHostValue();
-
-  if (append_xfh && !host.empty()) {
-    if (!xfh.empty()) {
-      const auto xfh_split = StringUtil::splitToken(xfh, ",");
-      if (!xfh_split.empty() && xfh_split.back() != host) {
+    // Append the x-forwarded-host header if required. Only append to x-forwarded-host
+    // if the value was not the last value appended.
+    if (append_xfh) {
+      const absl::InlinedVector<absl::string_view, 4> xfh_split =
+          absl::StrSplit(headers.getForwardedHostValue(), ',', absl::SkipWhitespace());
+      if (xfh_split.empty() || xfh_split.back() != host) {
         headers.appendForwardedHost(host, ",");
       }
-    } else {
-      headers.appendForwardedHost(host, ",");
     }
   }
 
@@ -576,15 +578,15 @@ std::string Utility::parseSetCookieValue(const Http::HeaderMap& headers, const s
   return parseCookie(headers, key, Http::Headers::get().SetCookie);
 }
 
-std::string Utility::makeSetCookieValue(const std::string& key, const std::string& value,
-                                        const std::string& path, const std::chrono::seconds max_age,
+std::string Utility::makeSetCookieValue(absl::string_view name, absl::string_view value,
+                                        absl::string_view path, std::chrono::seconds max_age,
                                         bool httponly,
-                                        const Http::CookieAttributeRefVector attributes) {
+                                        absl::Span<const CookieAttribute> attributes) {
   std::string cookie_value;
   // Best effort attempt to avoid numerous string copies.
   cookie_value.reserve(value.size() + path.size() + 30);
 
-  cookie_value = absl::StrCat(key, "=\"", value, "\"");
+  cookie_value = absl::StrCat(name, "=\"", value, "\"");
   if (max_age != std::chrono::seconds::zero()) {
     absl::StrAppend(&cookie_value, "; Max-Age=", max_age.count());
   }
@@ -593,10 +595,10 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
   }
 
   for (auto const& attribute : attributes) {
-    if (attribute.get().value().empty()) {
-      absl::StrAppend(&cookie_value, "; ", attribute.get().name());
+    if (attribute.value_.empty()) {
+      absl::StrAppend(&cookie_value, "; ", attribute.name_);
     } else {
-      absl::StrAppend(&cookie_value, "; ", attribute.get().name(), "=", attribute.get().value());
+      absl::StrAppend(&cookie_value, "; ", attribute.name_, "=", attribute.value_);
     }
   }
 
@@ -604,6 +606,27 @@ std::string Utility::makeSetCookieValue(const std::string& key, const std::strin
     absl::StrAppend(&cookie_value, "; HttpOnly");
   }
   return cookie_value;
+}
+
+void Utility::removeCookieValue(HeaderMap& headers, const std::string& key) {
+  const LowerCaseString& cookie_header = Http::Headers::get().Cookie;
+  std::vector<std::string> new_cookies;
+
+  forEachCookie(headers, cookie_header,
+                [&new_cookies, &key](absl::string_view k, absl::string_view v) -> bool {
+                  if (key != k) {
+                    new_cookies.emplace_back(fmt::format("{}={}", k, v));
+                  }
+
+                  // continue iterating until all cookies are processed.
+                  return true;
+                });
+
+  // Remove the existing Cookie header
+  headers.remove(cookie_header);
+  if (!new_cookies.empty()) {
+    headers.setReferenceKey(cookie_header, absl::StrJoin(new_cookies, "; "));
+  }
 }
 
 uint64_t Utility::getResponseStatus(const ResponseHeaderMap& headers) {
@@ -646,6 +669,41 @@ bool Utility::isWebSocketUpgradeRequest(const RequestHeaderMap& headers) {
   return (isUpgrade(headers) &&
           absl::EqualsIgnoreCase(headers.getUpgradeValue(),
                                  Http::Headers::get().UpgradeValues.WebSocket));
+}
+
+void Utility::removeUpgrade(RequestOrResponseHeaderMap& headers,
+                            const std::vector<Matchers::StringMatcherPtr>& matchers) {
+  if (headers.Upgrade()) {
+    std::vector<absl::string_view> tokens =
+        Envoy::StringUtil::splitToken(headers.getUpgradeValue(), ",", false, true);
+
+    auto end = std::remove_if(tokens.begin(), tokens.end(), [&](absl::string_view token) {
+      return std::any_of(
+          matchers.begin(), matchers.end(),
+          [&token](const Matchers::StringMatcherPtr& matcher) { return matcher->match(token); });
+    });
+
+    const std::string new_value = absl::StrJoin(tokens.begin(), end, ",");
+
+    if (new_value.empty()) {
+      headers.removeUpgrade();
+    } else {
+      headers.setUpgrade(new_value);
+    }
+  }
+}
+
+void Utility::removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
+                                      const StringUtil::CaseUnorderedSet& tokens_to_remove) {
+  if (headers.Connection()) {
+    const std::string new_value =
+        StringUtil::removeTokens(headers.getConnectionValue(), ",", tokens_to_remove, ",");
+    if (new_value.empty()) {
+      headers.removeConnection();
+    } else {
+      headers.setConnection(new_value);
+    }
+  }
 }
 
 Utility::PreparedLocalReplyPtr Utility::prepareLocalReply(const EncodeFunctions& encode_functions,
@@ -754,6 +812,62 @@ void Utility::sendLocalReply(const bool& is_reset, const EncodeFunctions& encode
       prepareLocalReply(encode_functions, local_reply_data);
 
   encodeLocalReply(is_reset, std::move(prepared_local_reply));
+}
+
+bool Utility::remoteAddressIsTrustedProxy(
+    const Envoy::Network::Address::Instance& remote,
+    absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
+  for (const auto& cidr : trusted_cidrs) {
+    if (cidr.isInRange(remote)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
+    const Http::RequestHeaderMap& request_headers,
+    absl::Span<const Network::Address::CidrRange> trusted_cidrs) {
+  const auto xff_header = request_headers.getForwardedForValue();
+  static constexpr size_t MAX_ALLOWED_XFF_ENTRIES = 20;
+
+  absl::InlinedVector<absl::string_view, 3> xff_entries = absl::StrSplit(xff_header, ',');
+  // If there are more than 20 entries in the XFF header, refuse to parse.
+  // There are very few valid use cases for this many entries and parsing too many has
+  // a performance impact.
+  if (xff_entries.size() > MAX_ALLOWED_XFF_ENTRIES) {
+    ENVOY_LOG_MISC(trace, "Too many entries in x-forwarded-for header");
+    return {nullptr, false};
+  }
+
+  Network::Address::InstanceConstSharedPtr last_valid_addr;
+
+  for (auto it = xff_entries.rbegin(); it != xff_entries.rend(); it++) {
+    const absl::string_view entry = StringUtil::trim(*it);
+    auto addr = Network::Utility::parseInternetAddressNoThrow(std::string(entry));
+    if (addr == nullptr) {
+      return {nullptr, false};
+    }
+    last_valid_addr = addr;
+
+    bool remote_address_is_trusted_proxy = false;
+    for (const auto& cidr : trusted_cidrs) {
+      if (cidr.isInRange(*addr.get())) {
+        remote_address_is_trusted_proxy = true;
+        break;
+      }
+    }
+
+    if (remote_address_is_trusted_proxy) {
+      continue;
+    }
+
+    // If we reach here we found a non-trusted address
+    return {addr, xff_entries.size() == 1};
+  }
+  // If we reach this point all addresses in XFF were considered trusted, so return
+  // first IP in XFF (the last in the reverse-evaluated chain).
+  return {last_valid_addr, xff_entries.size() == 1};
 }
 
 Utility::GetLastAddressFromXffInfo
@@ -954,8 +1068,8 @@ std::string Utility::buildOriginalUri(const Http::RequestHeaderMap& request_head
                       path);
 }
 
-void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
-                                     absl::string_view& path) {
+void Utility::extractSchemeHostPathFromUri(const absl::string_view& uri, absl::string_view& scheme,
+                                           absl::string_view& host, absl::string_view& path) {
   /**
    *  URI RFC: https://www.ietf.org/rfc/rfc2396.txt
    *
@@ -964,13 +1078,18 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
    *  pos:         ^
    *  host_pos:       ^
    *  path_pos:                       ^
+   *  scheme = "https"
    *  host = "example.com:8443"
    *  path = "/certs"
    */
+
+  // Find end of scheme.
   const auto pos = uri.find("://");
-  // Start position of the host
+  scheme = uri.substr(0, (pos == std::string::npos) ? 0 : pos);
+
+  // Start position of the host.
   const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
-  // Start position of the path
+  // Start position of the path.
   const auto path_pos = uri.find('/', host_pos);
   if (path_pos == std::string::npos) {
     // If uri doesn't have "/", the whole string is treated as host.
@@ -982,6 +1101,12 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
   }
 }
 
+void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
+                                     absl::string_view& path) {
+  absl::string_view scheme;
+  extractSchemeHostPathFromUri(uri, scheme, host, path);
+}
+
 std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
   if (file_path.size() >= 3 && file_path[1] == ':' && file_path[2] == '/' &&
       std::isalpha(file_path[0])) {
@@ -990,11 +1115,15 @@ std::string Utility::localPathFromFilePath(const absl::string_view& file_path) {
   return absl::StrCat("/", file_path);
 }
 
-RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri) {
-  absl::string_view host, path;
-  extractHostPathFromUri(http_uri.uri(), host, path);
+RequestMessagePtr Utility::prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri,
+                                          bool include_scheme) {
+  absl::string_view scheme, host, path;
+  extractSchemeHostPathFromUri(http_uri.uri(), scheme, host, path);
 
   RequestMessagePtr message(new RequestMessageImpl());
+  if (include_scheme && !scheme.empty()) {
+    message->headers().setScheme(scheme);
+  }
   message->headers().setPath(path);
   message->headers().setHost(host);
 
@@ -1039,6 +1168,8 @@ const std::string Utility::resetReasonToString(const Http::StreamResetReason res
     return "protocol error";
   case Http::StreamResetReason::OverloadManager:
     return "overload manager reset";
+  case Http::StreamResetReason::Http1PrematureUpstreamHalfClose:
+    return "HTTP/1 premature upstream half close";
   }
 
   return "";
@@ -1212,7 +1343,7 @@ bool shouldPercentEncodeChar(char c) { return testCharInTable(kUrlEncodedCharTab
 bool shouldPercentDecodeChar(char c) { return testCharInTable(kUrlDecodedCharTable, c); }
 } // namespace
 
-std::string Utility::PercentEncoding::urlEncodeQueryParameter(absl::string_view value) {
+std::string Utility::PercentEncoding::urlEncode(absl::string_view value) {
   std::string encoded;
   encoded.reserve(value.size());
   for (char ch : value) {

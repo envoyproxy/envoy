@@ -57,8 +57,7 @@ class Filter : public Http::StreamFilter,
                Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(FilterStats& stats, Event::Dispatcher& dispatcher, bool is_upstream)
-      : dispatcher_(dispatcher), decoded_headers_(false), stats_(stats), is_upstream_(is_upstream) {
-  }
+      : dispatcher_(dispatcher), stats_(stats), is_upstream_(is_upstream) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
@@ -124,7 +123,7 @@ private:
   // time will result in various FM assertions firing.
   // We should be protected against this by the match tree validation that only allows request
   // headers, this just provides some additional sanity checking.
-  bool decoded_headers_ : 1;
+  bool decoded_headers_{false};
 
   // Wraps a stream encoder OR a stream decoder filter into a stream filter, making it easier to
   // delegate calls.
@@ -162,7 +161,7 @@ private:
     Http::StreamEncoderFilterSharedPtr encoder_filter_;
     Http::StreamDecoderFilterSharedPtr decoder_filter_;
   };
-  std::vector<AccessLog::InstanceSharedPtr> access_loggers_;
+  AccessLog::InstanceSharedPtrVector access_loggers_;
 
   Http::StreamFilterSharedPtr delegated_filter_;
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

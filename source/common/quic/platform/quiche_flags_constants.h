@@ -43,7 +43,7 @@
 namespace quiche {
 
 inline constexpr absl::string_view EnvoyQuicheReloadableFlagPrefix =
-    "envoy.reloadable_features.FLAGS_envoy_quic_reloadable_flag_";
+    "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_";
 
 inline constexpr absl::string_view EnvoyFeaturePrefix = "envoy.reloadable_features.";
 

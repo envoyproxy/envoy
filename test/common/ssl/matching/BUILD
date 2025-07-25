@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "inputs_test",
     srcs = ["inputs_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/network:address_lib",
@@ -24,6 +25,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "inputs_integration_test",
     srcs = ["inputs_integration_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http/matching:data_impl_lib",
         "//source/common/network/matching:data_impl_lib",

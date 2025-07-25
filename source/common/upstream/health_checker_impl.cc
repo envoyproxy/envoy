@@ -26,6 +26,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/host_utility.h"
 
+#include "absl/status/statusor.h"
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 
@@ -84,33 +85,49 @@ HealthCheckerFactory::create(const envoy::config::core::v3::HealthCheck& health_
 
   if (!health_check_config.event_log_path().empty() /* deprecated */ ||
       !health_check_config.event_logger().empty()) {
-    HealthCheckEventLoggerPtr event_logger;
-    event_logger = std::make_unique<HealthCheckEventLoggerImpl>(health_check_config, *context);
-    context->setEventLogger(std::move(event_logger));
+    auto logger_or_error = HealthCheckEventLoggerImpl::create(health_check_config, *context);
+    RETURN_IF_NOT_OK_REF(logger_or_error.status());
+    context->setEventLogger(std::move(*logger_or_error));
   }
   return factory->createCustomHealthChecker(health_check_config, *context);
 }
 
+absl::StatusOr<std::vector<uint8_t>>
+PayloadMatcher::decodePayload(const envoy::config::core::v3::HealthCheck::Payload& payload) {
+  std::vector<uint8_t> decoded;
+  if (payload.has_text()) {
+    decoded = Hex::decode(payload.text());
+    if (decoded.empty()) {
+      return absl::InvalidArgumentError(fmt::format("invalid hex string '{}'", payload.text()));
+    }
+  } else {
+    decoded.assign(payload.binary().begin(), payload.binary().end());
+  }
+  return decoded;
+}
+
 absl::StatusOr<PayloadMatcher::MatchSegments> PayloadMatcher::loadProtoBytes(
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload>& byte_array) {
-  MatchSegments result;
-
-  for (const auto& entry : byte_array) {
-    std::vector<uint8_t> decoded;
-    if (entry.has_text()) {
-      decoded = Hex::decode(entry.text());
-      if (decoded.empty()) {
-        return absl::InvalidArgumentError(fmt::format("invalid hex string '{}'", entry.text()));
-      }
-    } else {
-      decoded.assign(entry.binary().begin(), entry.binary().end());
+  MatchSegments segments;
+  for (const auto& payload : byte_array) {
+    auto decoded_or_error = decodePayload(payload);
+    if (!decoded_or_error.ok()) {
+      return decoded_or_error.status();
     }
-    if (!decoded.empty()) {
-      result.push_back(decoded);
+    if (!decoded_or_error.value().empty()) {
+      segments.emplace_back(std::move(decoded_or_error.value()));
     }
   }
+  return segments;
+}
 
-  return result;
+absl::StatusOr<PayloadMatcher::MatchSegments> PayloadMatcher::loadProtoBytes(
+    const envoy::config::core::v3::HealthCheck::Payload& single_payload) {
+  auto decoded_or_error = decodePayload(single_payload);
+  if (!decoded_or_error.ok()) {
+    return decoded_or_error.status();
+  }
+  return MatchSegments{std::move(decoded_or_error.value())};
 }
 
 bool PayloadMatcher::match(const MatchSegments& expected, const Buffer::Instance& buffer) {

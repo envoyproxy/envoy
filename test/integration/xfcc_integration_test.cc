@@ -13,8 +13,8 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/utility.h"
 #include "source/common/tls/client_ssl_socket.h"
-#include "source/common/tls/context_config_impl.h"
 #include "source/common/tls/context_manager_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_ssl_socket.h"
 
 #include "test/test_common/network_utility.h"
@@ -112,8 +112,8 @@ Network::DownstreamTransportSocketFactoryPtr XfccIntegrationTest::createUpstream
   tls_cert->mutable_private_key()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
 
-  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(tls_context,
-                                                                                 factory_context_);
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      tls_context, factory_context_, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), *context_manager_, *(upstream_stats_store->rootScope()),
@@ -601,7 +601,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"cluster.cluster_0.ssl.ocsp_staple_omitted", "cluster.ssl.ocsp_staple_omitted"},
       {"cluster.cluster_0.update_success", "cluster.update_success"},
       {"http.admin.downstream_rq_non_relative_path", "http.downstream_rq_non_relative_path"},
-      {"cluster.cluster_0.lb_zone_number_differs", "cluster.lb_zone_number_differs"},
       {"http.admin.downstream_rq_timeout", "http.downstream_rq_timeout"},
       {"cluster.cluster_0.retry_or_shadow_abandoned", "cluster.retry_or_shadow_abandoned"},
       {"http.admin.downstream_cx_ssl_total", "http.downstream_cx_ssl_total"},

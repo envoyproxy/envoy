@@ -20,7 +20,7 @@
 namespace {
 
 #define QUICHE_RELOADABLE_FLAG_OVERRIDE(flag_name, value)                                          \
-  {STRINGIFY(quic_reloadable_flag_##flag_name), value},
+  {STRINGIFY(quiche_reloadable_flag_##flag_name), value},
 constexpr std::pair<absl::string_view, bool> quiche_reloadable_flag_overrides[]{
     OVERRIDDEN_RELOADABLE_FLAGS(QUICHE_RELOADABLE_FLAG_OVERRIDE)};
 #undef QUICHE_RELOADABLE_FLAG_OVERRIDE
@@ -67,33 +67,15 @@ template <> constexpr int32_t maybeOverride<int32_t>(absl::string_view name, int
 } // namespace
 
 // Flag definitions
-#define QUIC_FLAG(flag, value) ABSL_FLAG(bool, envoy_##flag, maybeOverride(#flag, value), "");
-#include "quiche/quic/core/quic_flags_list.h"
-#undef QUIC_FLAG
+#define QUICHE_FLAG(type, flag, internal_value, external_value, doc)                               \
+  ABSL_FLAG(type, envoy_##flag, maybeOverride(#flag, external_value), doc);
+#include "quiche/common/quiche_feature_flags_list.h"
+#undef QUICHE_FLAG
 
-#define DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, help)                                         \
-  ABSL_FLAG(type, envoy_##flag, maybeOverride(#flag, value), help);
-
-#define DEFINE_PROTOCOL_FLAG_SINGLE_VALUE(type, flag, value, doc)                                  \
-  DEFINE_PROTOCOL_FLAG_IMPL(type, flag, value, doc)
-
-#define DEFINE_PROTOCOL_FLAG_TWO_VALUES(type, flag, internal_value, external_value, doc)           \
-  DEFINE_PROTOCOL_FLAG_IMPL(type, flag, external_value, doc)
-
-// Select the right macro based on the number of arguments.
-#define GET_6TH_ARG(arg1, arg2, arg3, arg4, arg5, arg6, ...) arg6
-
-#define PROTOCOL_FLAG_MACRO_CHOOSER(...)                                                           \
-  GET_6TH_ARG(__VA_ARGS__, DEFINE_PROTOCOL_FLAG_TWO_VALUES, DEFINE_PROTOCOL_FLAG_SINGLE_VALUE)
-
-#define QUICHE_PROTOCOL_FLAG(...) PROTOCOL_FLAG_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
+#define QUICHE_PROTOCOL_FLAG(type, flag, value, doc)                                               \
+  ABSL_FLAG(type, envoy_##flag, maybeOverride(#flag, value), doc);
 #include "quiche/common/quiche_protocol_flags_list.h"
 #undef QUICHE_PROTOCOL_FLAG
-
-#undef PROTOCOL_FLAG_MACRO_CHOOSER
-#undef GET_6TH_ARG
-#undef DEFINE_PROTOCOL_FLAG_TWO_VALUES
-#undef DEFINE_PROTOCOL_FLAG_SINGLE_VALUE
 
 namespace quiche {
 
@@ -102,10 +84,10 @@ namespace {
 absl::flat_hash_map<absl::string_view, ReloadableFlag*> makeReloadableFlagMap() {
   absl::flat_hash_map<absl::string_view, ReloadableFlag*> flags;
 
-  ASSERT(absl::GetFlag(FLAGS_envoy_quic_restart_flag_quic_testonly_default_true) == true);
-#define QUIC_FLAG(flag, ...) flags.emplace("FLAGS_envoy_" #flag, &FLAGS_envoy_##flag);
-#include "quiche/quic/core/quic_flags_list.h"
-#undef QUIC_FLAG
+  ASSERT(absl::GetFlag(FLAGS_envoy_quiche_restart_flag_quic_testonly_default_true) == true);
+#define QUICHE_FLAG(type, flag, ...) flags.emplace("FLAGS_envoy_" #flag, &FLAGS_envoy_##flag);
+#include "quiche/common/quiche_feature_flags_list.h"
+#undef QUICHE_FLAG
   return flags;
 }
 

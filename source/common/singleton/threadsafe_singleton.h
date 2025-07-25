@@ -66,6 +66,9 @@ public:
   }
   static void clear() { loader_ = nullptr; }
 
+  // Atomically replace the value, returning the old value.
+  static T* replaceForTest(T* new_value) { return loader_.exchange(new_value); }
+
 protected:
   static std::atomic<T*> loader_;
 };
@@ -86,24 +89,46 @@ private:
   std::unique_ptr<T> instance_;
 };
 
-// This class saves the singleton object and restore the original singleton at destroy. This class
-// is not thread safe. It can be used in single thread test.
-template <class T>
-class StackedScopedInjectableLoader :
-    // To access the protected loader_.
-    protected InjectableSingleton<T> {
+// This class saves the singleton object and restore the original singleton at destroy.
+template <class T> class StackedScopedInjectableLoaderForTest {
 public:
-  explicit StackedScopedInjectableLoader(std::unique_ptr<T>&& instance) {
-    original_loader_ = InjectableSingleton<T>::getExisting();
-    InjectableSingleton<T>::clear();
+  explicit StackedScopedInjectableLoaderForTest(std::unique_ptr<T>&& instance) {
     instance_ = std::move(instance);
-    InjectableSingleton<T>::initialize(instance_.get());
+    original_loader_ = InjectableSingleton<T>::replaceForTest(instance_.get());
   }
-  ~StackedScopedInjectableLoader() { InjectableSingleton<T>::loader_ = original_loader_; }
+  ~StackedScopedInjectableLoaderForTest() {
+    InjectableSingleton<T>::replaceForTest(original_loader_);
+  }
 
 private:
   std::unique_ptr<T> instance_;
   T* original_loader_;
 };
+
+// An instance of a singleton class which is thread local and could only be initialized
+// and accessed in the same thread. Different threads could have different T instances.
+//
+// As with ThreadSafeSingleton the use of this class is generally discouraged.
+template <class T> class ThreadLocalInjectableSingleton {
+public:
+  static T& get() {
+    RELEASE_ASSERT(loader_, "ThreadLocalInjectableSingleton used prior to initialization");
+    return *loader_;
+  }
+
+  static T* getExisting() { return loader_; }
+
+  static void initialize(T* value) {
+    RELEASE_ASSERT(value, "ThreadLocalInjectableSingleton initialized with null value.");
+    RELEASE_ASSERT(!loader_, "ThreadLocalInjectableSingleton initialized multiple times.");
+    loader_ = value;
+  }
+  static void clear() { loader_ = nullptr; }
+
+protected:
+  static thread_local T* loader_;
+};
+
+template <class T> thread_local T* ThreadLocalInjectableSingleton<T>::loader_ = nullptr;
 
 } // namespace Envoy

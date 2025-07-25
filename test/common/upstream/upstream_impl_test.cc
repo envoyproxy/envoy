@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdint>
+#include <limits>
 #include <list>
 #include <memory>
 #include <string>
@@ -23,7 +24,9 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/static/static_cluster.h"
 #include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
@@ -75,8 +78,25 @@ protected:
                 ClusterFactoryContext& context) {
     StaticClusterFactory factory;
     auto status_or_cluster = factory.createClusterImpl(cluster, context);
-    THROW_IF_STATUS_NOT_OK(status_or_cluster, throw);
+    THROW_IF_NOT_OK_REF(status_or_cluster.status());
     return std::dynamic_pointer_cast<StaticClusterImpl>(status_or_cluster->first);
+  }
+
+  absl::StatusOr<std::shared_ptr<StrictDnsClusterImpl>>
+  createStrictDnsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
+                         ClusterFactoryContext& factory_context,
+                         std::shared_ptr<Network::DnsResolver> dns_resolver) {
+    envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
+
+    ClusterFactoryContextImpl::LazyCreateDnsResolver resolver_fn = [&]() { return dns_resolver; };
+    auto status_or_cluster =
+        ClusterFactoryImplBase::create(cluster_config, factory_context.serverFactoryContext(),
+                                       resolver_fn, nullptr, factory_context.addedViaApi());
+
+    if (!status_or_cluster.ok()) {
+      return status_or_cluster.status();
+    }
+    return (std::dynamic_pointer_cast<StrictDnsClusterImpl>(status_or_cluster->first));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -84,11 +104,10 @@ protected:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_ = Api::createApiForTest(stats_, random_);
   NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
-
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
 };
 
 namespace {
+
 std::list<std::string> hostListToAddresses(const HostVector& hosts) {
   std::list<std::string> addresses;
   for (const HostSharedPtr& host : hosts) {
@@ -191,17 +210,14 @@ public:
 
     EXPECT_CALL(runtime_.snapshot_, getInteger(_, _)).WillRepeatedly(Return(numerator));
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     if (numerator <= 100) {
-      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+      auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
       EXPECT_EQ(drop_ratio, cluster->dropOverload().value());
     } else {
       EXPECT_EQ(
-          StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
-              .status()
-              .message(),
+          createStrictDnsCluster(cluster_config, factory_context, dns_resolver).status().message(),
           fmt::format("load_balancing_policy.drop_overload_limit runtime key config {} is invalid. "
                       "The valid range is 0~100",
                       numerator));
@@ -235,18 +251,20 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
-        cb(Network::DnsResolver::ResolutionStatus::Success, "",
+        cb(Network::DnsResolver::ResolutionStatus::Completed, "",
            TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
 
-  cluster->initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -270,11 +288,11 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
               denominator: MILLION
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
   EXPECT_EQ(0.000035f, cluster->dropOverload().value());
+  EXPECT_EQ("test", cluster->dropCategory());
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
@@ -290,17 +308,17 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
     load_assignment:
         policy:
           drop_overloads:
-            category: test
+            category: foo
             drop_percentage:
               numerator: 1000
               denominator: TEN_THOUSAND
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
   EXPECT_EQ(0.1f, cluster->dropOverload().value());
+  EXPECT_EQ("foo", cluster->dropCategory());
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
@@ -323,13 +341,11 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
-  EXPECT_EQ(StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
-                .status()
-                .message(),
-            "Cluster drop_overloads config denominator setting is invalid : 4. Valid range 0~2.");
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_EQ(
+      createStrictDnsCluster(cluster_config, factory_context, dns_resolver).status().message(),
+      "Cluster drop_overloads config denominator setting is invalid : 4. Valid range 0~2.");
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
@@ -352,13 +368,10 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_EQ(
-      StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
-          .status()
-          .message(),
+      createStrictDnsCluster(cluster_config, factory_context, dns_resolver).status().message(),
       "Cluster drop_overloads config is invalid. drop_ratio=2(Numerator 200 / Denominator 100). "
       "The valid range is 0~1.");
 }
@@ -385,13 +398,11 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
-  EXPECT_EQ(StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver)
-                .status()
-                .message(),
-            "Cluster drop_overloads config has 2 categories. Envoy only support one.");
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_EQ(
+      createStrictDnsCluster(cluster_config, factory_context, dns_resolver).status().message(),
+      "Cluster drop_overloads config has 2 categories. Envoy only support one.");
 }
 
 // Drop overload runtime key configuration test
@@ -431,13 +442,15 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
   EXPECT_CALL(initialized, ready());
-  cluster->initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -464,21 +477,23 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
-  cluster->initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(initialized, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "", {});
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "", {});
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -508,17 +523,19 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher initialized;
 
   // Initialized without completing DNS resolution.
   EXPECT_CALL(initialized, ready());
-  cluster->initialize([&]() -> void { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
@@ -529,7 +546,7 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
 
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 }
 
@@ -589,11 +606,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43))
       .Times(AnyNumber());
@@ -635,12 +651,12 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
         return absl::OkStatus();
       });
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -651,7 +667,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -660,7 +676,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -669,7 +685,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001"}),
@@ -678,7 +694,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -700,7 +716,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({}));
   EXPECT_THAT(
       std::list<std::string>({"10.0.0.1:11002"}),
@@ -758,21 +774,20 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
-  cluster->initialize([&]() -> void {});
+  cluster->initialize([&]() -> absl::Status { return absl::OkStatus(); });
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // Verify that both endpoints are initially marked with FAILED_ACTIVE_HC, then
@@ -790,7 +805,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   }
 
   // Re-resolve the DNS name with only one record
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -818,22 +833,24 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
   ReadyWatcher initialized;
-  cluster->initialize([&initialized]() { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // Verify that both endpoints are initially marked with FAILED_ACTIVE_HC, then
@@ -855,7 +872,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   }
 
   // Re-resolve the DNS name with only one record, we should still have 2 hosts.
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   {
@@ -897,23 +914,25 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
   std::shared_ptr<MockHealthChecker> health_checker(new MockHealthChecker());
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
   ReadyWatcher initialized;
-  cluster->initialize([&initialized]() { initialized.ready(); });
+  cluster->initialize([&]() -> absl::Status {
+    initialized.ready();
+    return absl::OkStatus();
+  });
   EXPECT_CALL(initialized, ready());
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   {
@@ -928,7 +947,7 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
   }
 
   // Re-resolve the DNS name with only one record, we should have 1 host.
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   {
@@ -1011,11 +1030,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
   EXPECT_EQ(43U, cluster->info()->resourceManager(ResourcePriority::Default).connections().max());
@@ -1051,12 +1069,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
         return absl::OkStatus();
       });
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1076,7 +1094,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1090,7 +1108,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1103,7 +1121,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
 
   // We received a new set of hosts for localhost2. Should rebuild the cluster->
@@ -1112,7 +1130,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 
   // We again received the same set as before for localhost1. No rebuild this time.
@@ -1121,7 +1139,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -1129,7 +1147,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -1144,7 +1162,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
   // Make sure that we *don't* de-dup between resolve targets.
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1"}));
 
   const auto hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -1181,12 +1199,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({}));
 
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({}));
 
   // Ensure that we called the update membership callback.
@@ -1255,11 +1273,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
@@ -1268,12 +1285,12 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
         return absl::OkStatus();
       });
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1284,7 +1301,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1293,7 +1310,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.1:11001", "127.0.0.2:11001"}),
@@ -1302,7 +1319,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001"}),
@@ -1311,7 +1328,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
       std::list<std::string>({"127.0.0.3:11001", "10.0.0.1:11002"}),
@@ -1328,7 +1345,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   EXPECT_CALL(membership_updated, ready());
-  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}));
 
   // Make sure we have multiple priorities.
@@ -1373,12 +1390,11 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   EXPECT_THROW_WITH_MESSAGE(
-      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
+      auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
       EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
 }
 
@@ -1406,13 +1422,12 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   // Failing response kicks the failure refresh backoff strategy.
   ON_CALL(random_, random()).WillByDefault(Return(8000));
@@ -1422,7 +1437,7 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
 
   // Successful call should reset the failure backoff strategy.
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({}));
 
   // Therefore, a subsequent failure should get a [0,base * 1] refresh.
@@ -1432,7 +1447,128 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
                          TestUtility::makeDnsResponse({}));
 }
 
-TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
+TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig) {
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.cluster.strict_dns
+    dns_refresh_rate: 4s
+    dns_jitter: 0s
+    respect_dns_ttl: true
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, nullptr,
+      false);
+
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
+  ON_CALL(random_, random()).WillByDefault(Return(8000));
+  resolver.dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
+}
+
+TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.cluster.dns
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_refresh_rate: 4s
+        dns_jitter: 0s
+        respect_dns_ttl: true
+        all_addresses_in_single_endpoint: false
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
+      server_context_, [dns_resolver = this->dns_resolver_]() { return dns_resolver; }, nullptr,
+      false);
+
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
+  ON_CALL(random_, random()).WillByDefault(Return(8000));
+  resolver.dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
+}
+
+TEST_F(StrictDnsClusterImplTest, ClusterTypeConfigTypedDnsResolverConfig) {
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
+  EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, _)).WillOnce(Return(dns_resolver_));
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    cluster_type:
+      name: envoy.cluster.dns
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        dns_refresh_rate: 4s
+        dns_jitter: 0s
+        respect_dns_ttl: true
+        all_addresses_in_single_endpoint: false
+        typed_dns_resolver_config:
+          name: envoy.network.dns_resolver.cares
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  // No `dns_resolver_fn` so test segfaults if trying to use default Dns resolver rather than
+  // creating one from the function>
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, nullptr);
+}
+
+TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1454,11 +1590,10 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
   ReadyWatcher membership_updated;
   auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
@@ -1467,25 +1602,123 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRate) {
         return absl::OkStatus();
       });
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   // TTL is recorded when the DNS response is successful and not empty
   EXPECT_CALL(membership_updated, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(5000), _));
   resolver.dns_callback_(
-      Network::DnsResolver::ResolutionStatus::Success, "",
+      Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(5)));
 
   // If the response is successful but empty, the cluster uses the cluster configured refresh rate.
   EXPECT_CALL(membership_updated, ready());
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Success, "",
+  resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 
   // On failure, the cluster uses the cluster configured refresh rate.
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "",
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
+}
+
+TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
+  const std::string yaml = R"EOF(
+    name: name
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    dns_refresh_rate: 4s
+    dns_jitter: -1s
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  EXPECT_THROW_WITH_REGEX(
+      auto x = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
+      EnvoyException, "(?s)Invalid duration: Expected positive duration:.*seconds: -1\n");
+}
+TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    dns_refresh_rate: 4s
+    dns_jitter: 1s
+    respect_dns_ttl: true
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  uint64_t random_return = 8500;
+  uint64_t jitter_ms = random_return % 1000;
+  uint64_t ttl_s = 6;
+
+  EXPECT_CALL(*resolver.timer_,
+              enableTimer(std::chrono::milliseconds(ttl_s * 1000 + jitter_ms), _));
+  ON_CALL(random_, random()).WillByDefault(Return(random_return));
+  resolver.dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(ttl_s)));
+}
+
+TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
+  ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    dns_refresh_rate: 1s
+    dns_jitter: 1000s
+    respect_dns_ttl: true
+    load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: localhost1
+                    port_value: 11001
+  )EOF";
+  envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+  cluster->initialize([] { return absl::OkStatus(); });
+
+  EXPECT_CALL(*resolver.timer_, enableTimer(testing::Ge(std::chrono::milliseconds(1000)), _));
+  ON_CALL(random_, random()).WillByDefault(Return(std::numeric_limits<int64_t>::min()));
+  resolver.dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(1)));
 }
 
 // Ensures that HTTP/2 user defined SETTINGS parameter validation is enforced on clusters.
@@ -1536,12 +1769,11 @@ TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   EXPECT_THROW_WITH_REGEX(
-      auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver_),
+      auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
       EnvoyException,
       R"(the \{hpack_table_size\} HTTP/2 SETTINGS parameter\(s\) can not be configured through)"
       " both");
@@ -1554,7 +1786,7 @@ protected:
 
 TEST_F(HostImplTest, HostCluster) {
   MockClusterMockPrioritySet cluster;
-  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   EXPECT_EQ(cluster.info_.get(), &host->cluster());
   EXPECT_EQ("", host->hostname());
   EXPECT_FALSE(host->canary());
@@ -1564,14 +1796,13 @@ TEST_F(HostImplTest, HostCluster) {
 TEST_F(HostImplTest, Weight) {
   MockClusterMockPrioritySet cluster;
 
-  EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 0)->weight());
-  EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 128)->weight());
+  EXPECT_EQ(1U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 0)->weight());
+  EXPECT_EQ(128U, makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 128)->weight());
   EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
-            makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(),
-                         std::numeric_limits<uint32_t>::max())
+            makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", std::numeric_limits<uint32_t>::max())
                 ->weight());
 
-  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 50);
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 50);
   EXPECT_EQ(50U, host->weight());
   host->weight(51);
   EXPECT_EQ(51U, host->weight());
@@ -1583,18 +1814,18 @@ TEST_F(HostImplTest, Weight) {
 
 TEST_F(HostImplTest, HostLbPolicyData) {
   MockClusterMockPrioritySet cluster;
-  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
-  EXPECT_TRUE(host->lbPolicyData() == nullptr);
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
+  EXPECT_TRUE(!host->lbPolicyData().has_value());
 
-  class TestLbPolicyData : public Host::HostLbPolicyData {
+  class TestLbPolicyData : public Upstream::HostLbPolicyData {
   public:
     int foo = 42;
   };
 
-  host->setLbPolicyData(std::make_shared<TestLbPolicyData>());
-  EXPECT_TRUE(host->lbPolicyData() != nullptr);
-  auto* test_policy_data = dynamic_cast<TestLbPolicyData*>(host->lbPolicyData().get());
-  EXPECT_TRUE(test_policy_data != nullptr);
+  host->setLbPolicyData(std::make_unique<TestLbPolicyData>());
+  EXPECT_TRUE(host->lbPolicyData().has_value());
+  auto test_policy_data = host->typedLbPolicyData<TestLbPolicyData>();
+  EXPECT_TRUE(test_policy_data.has_value());
   EXPECT_EQ(test_policy_data->foo, 42);
 }
 
@@ -1608,18 +1839,18 @@ TEST_F(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
-  HostImpl host(cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
-                std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1,
-                locality,
-                envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-                envoy::config::core::v3::UNKNOWN, simTime());
-  EXPECT_EQ(cluster.info_.get(), &host.cluster());
-  EXPECT_EQ("lyft.com", host.hostname());
-  EXPECT_TRUE(host.canary());
-  EXPECT_EQ("oceania", host.locality().region());
-  EXPECT_EQ("hello", host.locality().zone());
-  EXPECT_EQ("world", host.locality().sub_zone());
-  EXPECT_EQ(1, host.priority());
+  std::unique_ptr<HostImpl> host = *HostImpl::create(
+      cluster.info_, "lyft.com", *Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
+      std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
+      envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
+      envoy::config::core::v3::UNKNOWN);
+  EXPECT_EQ(cluster.info_.get(), &host->cluster());
+  EXPECT_EQ("lyft.com", host->hostname());
+  EXPECT_TRUE(host->canary());
+  EXPECT_EQ("oceania", host->locality().region());
+  EXPECT_EQ("hello", host->locality().zone());
+  EXPECT_EQ("world", host->locality().sub_zone());
+  EXPECT_EQ(1, host->priority());
 }
 
 TEST_F(HostImplTest, CreateConnection) {
@@ -1634,11 +1865,11 @@ TEST_F(HostImplTest, CreateConnection) {
   locality.set_sub_zone("world");
   Network::Address::InstanceConstSharedPtr address =
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1234");
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime());
+      envoy::config::core::v3::UNKNOWN));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1672,11 +1903,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballs) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1719,11 +1950,11 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   auto proxy_info = std::make_unique<Network::TransportSocketOptions::Http11ProxyInfo>(
@@ -1761,8 +1992,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
   config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
   config.mutable_first_address_family_count()->set_value(2);
-  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig())
-      .WillRepeatedly(Return(absl::make_optional(config)));
+  EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(config));
 
   envoy::config::core::v3::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
@@ -1778,11 +2008,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1831,11 +2061,11 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
       address,
       *Network::Utility::resolveUrl("tcp://10.0.0.1:1235"),
   };
-  auto host = std::make_shared<HostImpl>(
+  auto host = std::shared_ptr<Upstream::HostImpl>(*HostImpl::create(
       cluster.info_, "lyft.com", address,
       std::make_shared<const envoy::config::core::v3::Metadata>(metadata), nullptr, 1, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 1,
-      envoy::config::core::v3::UNKNOWN, simTime(), address_list);
+      envoy::config::core::v3::UNKNOWN, address_list));
 
   testing::StrictMock<Event::MockDispatcher> dispatcher;
   Network::TransportSocketOptionsConstSharedPtr transport_socket_options;
@@ -1864,7 +2094,7 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
 
 TEST_F(HostImplTest, HealthFlags) {
   MockClusterMockPrioritySet cluster;
-  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 
   // To begin with, no flags are set so we're healthy.
   EXPECT_EQ(Host::Health::Healthy, host->coarseHealth());
@@ -1896,8 +2126,8 @@ TEST_F(HostImplTest, HealthFlags) {
 
 TEST_F(HostImplTest, HealthStatus) {
   MockClusterMockPrioritySet cluster;
-  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1, 0,
-                                    Host::HealthStatus::DEGRADED);
+  HostSharedPtr host =
+      makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1, 0, Host::HealthStatus::DEGRADED);
 
   // To begin with, no active flags are set so EDS status is used.
   EXPECT_EQ(Host::HealthStatus::DEGRADED, host->healthStatus());
@@ -1961,7 +2191,7 @@ TEST_F(HostImplTest, HealthStatus) {
 
 TEST_F(HostImplTest, SkipActiveHealthCheckFlag) {
   MockClusterMockPrioritySet cluster;
-  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
 
   // To begin with, the default setting is false.
   EXPECT_EQ(false, host->disableActiveHealthCheck());
@@ -1974,21 +2204,20 @@ TEST_F(HostImplTest, SkipActiveHealthCheckFlag) {
 // This is a regression test for oss-fuzz issue
 // https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=11095
 TEST_F(HostImplTest, HealthPipeAddress) {
-  EXPECT_THROW_WITH_MESSAGE(
-      {
-        std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-        envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
-        config.set_port_value(8000);
-        HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr,
-                                  nullptr, envoy::config::core::v3::Locality().default_instance(),
-                                  config, 1, simTime());
-      },
-      EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
+  std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
+  envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
+  config.set_port_value(8000);
+  EXPECT_EQ(HostDescriptionImpl::create(
+                info, "", *Network::Utility::resolveUrl("unix://foo"), nullptr, nullptr,
+                envoy::config::core::v3::Locality().default_instance(), config, 1)
+                .status()
+                .message(),
+            "Invalid host configuration: non-zero port for non-IP address");
 }
 
 TEST_F(HostImplTest, HostAddressList) {
   MockClusterMockPrioritySet cluster;
-  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), 1);
+  HostSharedPtr host = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", 1);
   const AddressVector address_list = {};
   EXPECT_TRUE(host->addressListOrNull() == nullptr);
 }
@@ -1998,10 +2227,10 @@ TEST_F(HostImplTest, HealthcheckHostname) {
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
   config.set_hostname("foo");
-  HostDescriptionImpl descr(info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr,
-                            nullptr, envoy::config::core::v3::Locality().default_instance(), config,
-                            1, simTime());
-  EXPECT_EQ("foo", descr.hostnameForHealthChecks());
+  std::unique_ptr<HostDescriptionImpl> descr = *HostDescriptionImpl::create(
+      info, "", *Network::Utility::resolveUrl("tcp://1.2.3.4:80"), nullptr, nullptr,
+      envoy::config::core::v3::Locality().default_instance(), config, 1);
+  EXPECT_EQ("foo", descr->hostnameForHealthChecks());
 }
 
 class StaticClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
@@ -2024,12 +2253,11 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   const auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -2061,12 +2289,11 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
@@ -2096,12 +2323,11 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostname) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
@@ -2130,12 +2356,11 @@ TEST_F(StaticClusterImplTest, LoadAssignmentNonEmptyHostnameWithHealthChecks) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("foo", cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->hostname());
@@ -2182,12 +2407,11 @@ TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[1]->healthyHosts().size());
@@ -2226,12 +2450,11 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   auto& hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
@@ -2271,12 +2494,11 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   NiceMock<MockClusterManager> cm;
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->degradedHosts().size());
   EXPECT_EQ(Host::Health::Degraded,
@@ -2302,12 +2524,11 @@ TEST_F(StaticClusterImplTest, AltStatName) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
   // Increment a stat and verify it is emitted with alt_stat_name
   cluster->info()->trafficStats()->upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.staticcluster_stats.upstream_rq_total").value());
@@ -2331,12 +2552,11 @@ TEST_F(StaticClusterImplTest, RingHash) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ("envoy.load_balancing_policies.ring_hash",
@@ -2368,20 +2588,17 @@ TEST_F(StaticClusterImplTest, RoundRobinWithSlowStart) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ("envoy.load_balancing_policies.round_robin",
             cluster->info()->loadBalancerFactory().name());
-  auto slow_start_config =
-      dynamic_cast<const Extensions::LoadBalancingPolices::RoundRobin::LegacyRoundRobinLbConfig*>(
-          cluster->info()->loadBalancerConfig().ptr())
-          ->lbConfig()
-          ->slow_start_config();
+  auto slow_start_config = dynamic_cast<const Upstream::TypedRoundRobinLbConfig*>(
+                               cluster->info()->loadBalancerConfig().ptr())
+                               ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
@@ -2413,21 +2630,19 @@ TEST_F(StaticClusterImplTest, LeastRequestWithSlowStart) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ("envoy.load_balancing_policies.least_request",
             cluster->info()->loadBalancerFactory().name());
   auto slow_start_config =
       dynamic_cast<
-          const Extensions::LoadBalancingPolices::LeastRequest::LegacyLeastRequestLbConfig*>(
+          const Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig*>(
           cluster->info()->loadBalancerConfig().ptr())
-          ->lbConfig()
-          ->slow_start_config();
+          ->lb_config_.slow_start_config();
   EXPECT_EQ(std::chrono::milliseconds(60000),
             std::chrono::milliseconds(
                 DurationUtil::durationToMilliseconds(slow_start_config.slow_start_window())));
@@ -2458,26 +2673,22 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* detector = new Outlier::MockDetector();
   EXPECT_CALL(*detector, addChangedStateCb(_));
   cluster->setOutlierDetector(Outlier::DetectorSharedPtr{detector});
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_EQ(2UL, cluster->info()->endpointStats().membership_healthy_.value());
 
   // Set a single host as having failed and fire outlier detector callbacks. This should result
   // in only a single healthy host.
-  cluster->prioritySet()
-      .hostSetsPerPriority()[0]
-      ->hosts()[0]
-      ->outlierDetector()
-      .putHttpResponseCode(503);
+  cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->outlierDetector().putResult(
+      Outlier::Result::ExtOriginRequestFailed, absl::optional<uint64_t>(503));
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]->healthFlagSet(
       Host::HealthFlag::FAILED_OUTLIER_CHECK);
   detector->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
@@ -2517,9 +2728,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
@@ -2529,7 +2739,10 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   cluster->setHealthChecker(health_checker);
 
   ReadyWatcher initialized;
-  cluster->initialize([&initialized] { initialized.ready(); });
+  cluster->initialize([&initialized] {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -2658,9 +2871,8 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
   Outlier::MockDetector* outlier_detector = new NiceMock<Outlier::MockDetector>();
@@ -2670,7 +2882,10 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   cluster->setHealthChecker(health_checker);
 
   ReadyWatcher initialized;
-  cluster->initialize([&initialized] { initialized.ready(); });
+  cluster->initialize([&initialized] {
+    initialized.ready();
+    return absl::OkStatus();
+  });
 
   // The endpoint with disabled active health check should not be set FAILED_ACTIVE_HC
   // at beginning.
@@ -2717,12 +2932,11 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1024U, cluster->info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U,
@@ -2769,9 +2983,8 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
       {
         envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-        Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-            server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_,
-            nullptr, false);
+        Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr,
+                                                                   nullptr, false);
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
       },
       EnvoyException);
@@ -2806,12 +3019,11 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbPolicy) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_TRUE(cluster->info()->addedViaApi());
@@ -2841,9 +3053,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutConfiguration) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_THROW_WITH_MESSAGE(
       {
@@ -2882,9 +3093,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfig) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_NO_THROW({
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
@@ -2921,9 +3131,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithCommonLbConfigAndSpecificFi
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_THROW_WITH_MESSAGE(
       {
@@ -2967,9 +3176,8 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithLbSubsetConfig) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_THROW_WITH_MESSAGE(
       {
@@ -2998,9 +3206,8 @@ TEST_F(StaticClusterImplTest, EmptyLbSubsetConfig) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   auto cluster = createCluster(cluster_config, factory_context);
 
@@ -3038,9 +3245,8 @@ TEST_F(StaticClusterImplTest, LbPolicyConfigThrowsExceptionIfNoLbPoliciesFound) 
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
 
   EXPECT_THROW_WITH_MESSAGE(
       {
@@ -3082,12 +3288,11 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithOtherLbPolicy) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_TRUE(cluster->info()->addedViaApi());
@@ -3121,11 +3326,10 @@ TEST_F(StaticClusterImplTest, LoadBalancingPolicyWithoutLbPolicy) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      true);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             true);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
   EXPECT_TRUE(cluster->info()->addedViaApi());
@@ -3148,9 +3352,8 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
                                 createCluster(cluster_config, factory_context);
                             , EnvoyException,
@@ -3174,12 +3377,11 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
 
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
 
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -3194,9 +3396,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
         "1.2.3.5");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
@@ -3217,9 +3418,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("2001::1");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3242,9 +3442,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         "1.2.3.5");
     server_context_.cluster_manager_.mutableBindConfig().clear_extra_source_addresses();
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3265,9 +3464,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("1.2.3.6");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3291,9 +3489,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("2001::2");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3312,9 +3509,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("1.2.3.6");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
                                   createCluster(config, factory_context),
@@ -3334,9 +3530,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("2001::1");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3351,9 +3546,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
   config.mutable_upstream_bind_config()->mutable_source_address()->set_address(cluster_address);
   {
     // Verify source address from cluster config is used when present.
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3376,9 +3570,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::2");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3397,9 +3590,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         ->mutable_address()
         ->set_address("2001::1");
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
 
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3416,9 +3608,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
         "1.2.3.5");
     config.mutable_upstream_bind_config()->clear_extra_source_addresses();
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3436,9 +3627,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWitExtraSourceAddress) {
     server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
         "2001::1");
     config.mutable_upstream_bind_config()->clear_extra_source_addresses();
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3467,9 +3657,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         .add_extra_source_addresses()
         ->mutable_address()
         ->set_address("2001::1");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3487,9 +3676,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig()
         .add_additional_source_addresses()
         ->set_address("2001::1");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3511,9 +3699,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
         "1.2.3.5");
     server_context_.cluster_manager_.mutableBindConfig().clear_additional_source_addresses();
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3532,9 +3719,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig()
         .add_additional_source_addresses()
         ->set_address("1.2.3.6");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3555,9 +3741,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig()
         .add_additional_source_addresses()
         ->set_address("2001::2");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     EXPECT_THROW_WITH_MESSAGE(std::shared_ptr<StaticClusterImpl> cluster =
                                   createCluster(config, factory_context),
@@ -3576,9 +3761,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig()
         .add_additional_source_addresses()
         ->set_address("2001::1");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr v6_remote_address =
@@ -3598,9 +3782,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
         "2001::1");
     config.mutable_upstream_bind_config()->add_additional_source_addresses()->set_address(
         "2001::2");
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     EXPECT_THROW_WITH_MESSAGE(
         std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context),
@@ -3615,9 +3798,8 @@ TEST_F(StaticClusterImplTest, SourceAddressPriorityWithDeprecatedAdditionalSourc
     server_context_.cluster_manager_.mutableBindConfig().mutable_source_address()->set_address(
         "1.2.3.5");
     config.mutable_upstream_bind_config()->clear_additional_source_addresses();
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
     ;
     std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
     Network::Address::InstanceConstSharedPtr remote_address =
@@ -3644,9 +3826,8 @@ TEST_F(StaticClusterImplTest, LedsUnsupported) {
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   EXPECT_THROW_WITH_MESSAGE(
       std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context),
       EnvoyException,
@@ -3677,9 +3858,8 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
       ->mutable_address()
       ->set_address("1.2.3.6");
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
 
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(config, factory_context);
 
@@ -3713,20 +3893,19 @@ TEST_F(StaticClusterImplTest, HappyEyeballsConfig) {
         first_address_family_count: 1
   )EOF";
   auto cluster_config = parseClusterFromV3Yaml(yaml);
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
   envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig expected_config;
   expected_config.set_first_address_family_version(
       envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
   uint32_t expected_count(1);
   expected_config.mutable_first_address_family_count()->set_value(expected_count);
   EXPECT_TRUE(cluster->info()->happyEyeballsConfig().has_value());
-  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_version(),
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig()->first_address_family_version(),
             envoy::config::cluster::v3::UpstreamConnectionOptions::V4);
-  EXPECT_EQ(cluster->info()->happyEyeballsConfig().value().first_address_family_count().value(),
+  EXPECT_EQ(cluster->info()->happyEyeballsConfig()->first_address_family_count().value(),
             expected_count);
 }
 
@@ -3755,10 +3934,9 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
-  auto cluster = *StrictDnsClusterImpl::create(cluster_config, factory_context, dns_resolver);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
 
   EXPECT_TRUE(cluster->info()->features() &
               ClusterInfo::Features::CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE);
@@ -3841,8 +4019,7 @@ TEST(PrioritySet, Extend) {
   // Now add hosts for priority 1, and ensure they're added and subscribers are notified.
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  HostVectorSharedPtr hosts(
-      new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", *time_source)}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
   HostMapConstSharedPtr fake_cross_priority_host_map = std::make_shared<HostMap>();
   {
@@ -3904,8 +4081,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
 
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  HostVectorSharedPtr hosts(
-      new HostVector({makeTestHost(info, "tcp://127.0.0.1:80", *time_source)}));
+  HostVectorSharedPtr hosts(new HostVector({makeTestHost(info, "tcp://127.0.0.1:80")}));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
 
   // The host map is initially empty or null.
@@ -3957,20 +4133,20 @@ TEST(PrioritySet, MainPrioritySetTest) {
   EXPECT_EQ(nullptr, priority_set.mutableHostMapForTest().get());
 }
 
-class ClusterInfoImplTest : public testing::Test {
+class ClusterInfoImplTest : public testing::Test, public UpstreamImplTestBase {
 public:
   ClusterInfoImplTest() { ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_)); }
 
-  std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
+  std::shared_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
     cluster_config_ = parseClusterFromV3Yaml(yaml);
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+        server_context_, [this]() { return dns_resolver_; }, nullptr, false);
 
-    return THROW_OR_RETURN_VALUE(
-        StrictDnsClusterImpl::create(cluster_config_, factory_context, dns_resolver_),
-        std::unique_ptr<StrictDnsClusterImpl>);
+    StrictDnsClusterFactory factory{};
+    auto status_or_cluster = factory.create(cluster_config_, factory_context);
+    THROW_IF_NOT_OK_REF(status_or_cluster.status());
+    return std::dynamic_pointer_cast<StrictDnsClusterImpl>(status_or_cluster->first);
   }
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
@@ -3987,7 +4163,6 @@ public:
   Api::ApiPtr api_ = Api::createApiForTest(stats_, random_);
   NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
 
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
 
   ReadyWatcher initialized_;
@@ -4715,7 +4890,7 @@ public:
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { PANIC("not implemented"); }
   ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override { PANIC("not implemented"); }
-  Router::RouteSpecificFilterConfigConstSharedPtr
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfig(const Protobuf::Message&,
                                   Server::Configuration::ServerFactoryContext&,
                                   ProtobufMessage::ValidationVisitor&) override {
@@ -4873,7 +5048,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 
   // This vector is used to gather clusters with extension_protocol_options from the different
   // types of extension factories (network, http).
-  std::vector<std::unique_ptr<StrictDnsClusterImpl>> clusters;
+  std::vector<std::shared_ptr<StrictDnsClusterImpl>> clusters;
 
   {
     // Get the cluster with extension_protocol_options for a network filter factory.
@@ -5550,6 +5725,69 @@ TEST_F(ClusterInfoImplTest, Http2AutoWithNonAlpnMatcherAndValidationOff) {
   EXPECT_NO_THROW(makeCluster(yaml + auto_http2));
 }
 
+TEST_F(ClusterInfoImplTest, MaxResponseHeadersDefault) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_FALSE(cluster->info()->maxResponseHeadersKb().has_value());
+  EXPECT_EQ(100, cluster->info()->maxResponseHeadersCount());
+}
+
+// Test that the runtime override for the defaults is used when specified.
+TEST_F(ClusterInfoImplTest, MaxResponseHeadersRuntimeOverride) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("envoy.reloadable_features.max_response_headers_size_kb", _))
+      .WillRepeatedly(Return(123));
+  EXPECT_CALL(runtime_.snapshot_,
+              getInteger("envoy.reloadable_features.max_response_headers_count", _))
+      .WillRepeatedly(Return(456));
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(absl::make_optional(uint16_t(123)), cluster->info()->maxResponseHeadersKb());
+  EXPECT_EQ(456, cluster->info()->maxResponseHeadersCount());
+}
+
+// Test that the runtime override is ignored if there is a configured value.
+TEST_F(ClusterInfoImplTest, MaxResponseHeadersRuntimeOverrideIgnored) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        common_http_protocol_options:
+          max_response_headers_kb: 1
+          max_headers_count: 2
+        explicit_http_config:
+          http2_protocol_options: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(runtime_.snapshot_,
+              getDouble("envoy.reloadable_features.max_response_headers_size_kb", _))
+      .WillRepeatedly(Return(123));
+  EXPECT_CALL(runtime_.snapshot_,
+              getDouble("envoy.reloadable_features.max_response_headers_count", _))
+      .WillRepeatedly(Return(456));
+
+  auto cluster = makeCluster(yaml);
+  EXPECT_EQ(absl::make_optional(uint16_t(1)), cluster->info()->maxResponseHeadersKb());
+  EXPECT_EQ(2, cluster->info()->maxResponseHeadersCount());
+}
+
 TEST_F(ClusterInfoImplTest, UpstreamFilterTypedAndDynamicConfigThrows) {
   const std::string yaml = R"EOF(
     name: name
@@ -5592,8 +5830,8 @@ TEST_F(HostsWithLocalityImpl, Cons) {
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
-  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), zone_a, 1);
-  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), zone_b, 1);
+  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", zone_a, 1);
+  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", zone_b, 1);
 
   {
     std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
@@ -5618,8 +5856,8 @@ TEST_F(HostsWithLocalityImpl, Filter) {
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
-  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), zone_a, 1);
-  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", simTime(), zone_b, 1);
+  HostSharedPtr host_0 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", zone_a, 1);
+  HostSharedPtr host_1 = makeTestHost(cluster.info_, "tcp://10.0.0.1:1234", zone_b, 1);
 
   {
     std::vector<HostVector> locality_hosts = {{host_0}, {host_1}};
@@ -5665,9 +5903,9 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   zone_b.set_zone("B");
   envoy::config::core::v3::Locality zone_c;
   zone_c.set_zone("C");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
-                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", zone_c)};
 
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts[0]}, {hosts[1]}, {hosts[2]}});
@@ -5685,11 +5923,11 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:83", simTime(), zone_b),
-                   makeTestHost(info_, "tcp://127.0.0.1:84", simTime(), zone_b)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:83", zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:84", zone_b)};
 
   // We have two localities with 3 hosts in A, 2 hosts in B. Two of the hosts in A are not
   // warmed yet, so even though they are unhealthy we should not adjust the locality weight.
@@ -5722,9 +5960,9 @@ TEST_F(HostSetImplLocalityTest, NotWarmedHostsLocality) {
 TEST_F(HostSetImplLocalityTest, EmptyLocality) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_a)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", zone_a)};
 
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts[0], hosts[1], hosts[2]}, {}});
@@ -5745,8 +5983,8 @@ TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_b)};
 
   HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts[0]}, {hosts[1]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{0, 0}};
@@ -5766,9 +6004,9 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   zone_b.set_zone("B");
   envoy::config::core::v3::Locality zone_c;
   zone_c.set_zone("C");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
-                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", zone_c)};
 
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts[0]}, {hosts[1]}, {hosts[2]}});
@@ -5792,8 +6030,8 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_b)};
 
   HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts[0]}, {hosts[1]}});
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
@@ -5818,9 +6056,9 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   zone_b.set_zone("B");
   envoy::config::core::v3::Locality zone_c;
   zone_c.set_zone("C");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
-                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", zone_c)};
 
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts[0]}, {hosts[1]}, {hosts[2]}});
@@ -5841,20 +6079,15 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
 // Validates that with weighted initialization all localities are chosen
 // proportionally to their weight.
 TEST_F(HostSetImplLocalityTest, WeightedAllChosen) {
-  // This test should remain when envoy.reloadable_features.edf_lb_locality_scheduler_init_fix
-  // is deprecated.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.edf_lb_locality_scheduler_init_fix", "true"}});
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
   envoy::config::core::v3::Locality zone_c;
   zone_b.set_zone("C");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b),
-                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_c)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_b),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", zone_c)};
 
   HostsPerLocalitySharedPtr hosts_per_locality =
       makeHostsPerLocality({{hosts[0]}, {hosts[1]}, {hosts[2]}});
@@ -5880,47 +6113,18 @@ TEST_F(HostSetImplLocalityTest, WeightedAllChosen) {
   EXPECT_EQ(locality_picked_count[2], 3);
 }
 
-// Validates that the non-randomized initialization works. This test should be
-// removed when envoy.reloadable_features.edf_lb_locality_scheduler_init_fix
-// is deprecated.
-TEST_F(HostSetImplLocalityTest, WeightedNoRandomization) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.edf_lb_locality_scheduler_init_fix", "false"}});
-  envoy::config::core::v3::Locality zone_a;
-  zone_a.set_zone("A");
-  envoy::config::core::v3::Locality zone_b;
-  zone_b.set_zone("B");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)};
-
-  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts[0]}, {hosts[1]}});
-  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
-  auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
-  host_set_.updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
-                                          std::make_shared<const HealthyHostVector>(hosts),
-                                          hosts_per_locality),
-                        locality_weights, {}, {}, 0, absl::nullopt);
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(0, host_set_.chooseHealthyLocality().value());
-  EXPECT_EQ(1, host_set_.chooseHealthyLocality().value());
-}
-
 // Gentle failover between localities as health diminishes.
 TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
-  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:82", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:83", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:84", simTime(), zone_a),
-                   makeTestHost(info_, "tcp://127.0.0.1:85", simTime(), zone_b)};
+  HostVector hosts{makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:81", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:82", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:83", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:84", zone_a),
+                   makeTestHost(info_, "tcp://127.0.0.1:85", zone_b)};
 
   const auto setHealthyHostCount = [this, hosts](uint32_t host_count) {
     LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
@@ -5977,9 +6181,9 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
     zone_a.set_zone("A");
     envoy::config::core::v3::Locality zone_b;
     zone_b.set_zone("B");
-    HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80", *time_source, zone_a),
-                     makeTestHost(cluster_info, "tcp://127.0.0.1:81", *time_source, zone_a),
-                     makeTestHost(cluster_info, "tcp://127.0.0.1:82", *time_source, zone_b)};
+    HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80", zone_a),
+                     makeTestHost(cluster_info, "tcp://127.0.0.1:81", zone_a),
+                     makeTestHost(cluster_info, "tcp://127.0.0.1:82", zone_b)};
     LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
     HostsPerLocalitySharedPtr hosts_per_locality =
         makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2]}});
@@ -6023,12 +6227,12 @@ TEST(HostPartitionTest, PartitionHosts) {
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
-  HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", *time_source, zone_a),
-                   makeTestHost(info, "tcp://127.0.0.1:81", *time_source, zone_a),
-                   makeTestHost(info, "tcp://127.0.0.1:82", *time_source, zone_b),
-                   makeTestHost(info, "tcp://127.0.0.1:83", *time_source, zone_b),
-                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b),
-                   makeTestHost(info, "tcp://127.0.0.1:84", *time_source, zone_b)};
+  HostVector hosts{makeTestHost(info, "tcp://127.0.0.1:80", zone_a),
+                   makeTestHost(info, "tcp://127.0.0.1:81", zone_a),
+                   makeTestHost(info, "tcp://127.0.0.1:82", zone_b),
+                   makeTestHost(info, "tcp://127.0.0.1:83", zone_b),
+                   makeTestHost(info, "tcp://127.0.0.1:84", zone_b),
+                   makeTestHost(info, "tcp://127.0.0.1:84", zone_b)};
 
   hosts[0]->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   hosts[1]->healthFlagSet(Host::HealthFlag::DEGRADED_ACTIVE_HC);
@@ -6105,7 +6309,8 @@ TEST_F(ClusterInfoImplTest, DeprecatedMaxRequestsPerConnection) {
 }
 
 TEST_F(ClusterInfoImplTest, FilterChain) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
+  {
+    const std::string yaml = TestEnvironment::substitute(R"EOF(
     name: name
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -6115,14 +6320,42 @@ TEST_F(ClusterInfoImplTest, FilterChain) {
         explicit_http_config:
           http2_protocol_options: {}
   )EOF",
-                                                       Network::Address::IpVersion::v4);
+                                                         Network::Address::IpVersion::v4);
 
-  auto cluster = makeCluster(yaml);
-  Http::MockFilterChainManager manager;
-  EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager));
+    auto cluster = makeCluster(yaml);
+    Http::MockFilterChainManager manager;
+    const Http::EmptyFilterChainOptions options;
+    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
 
-  EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
-  cluster->info()->createFilterChain(manager);
+    EXPECT_CALL(manager, applyFilterFactoryCb(_, _)).Times(0);
+    EXPECT_FALSE(cluster->info()->createFilterChain(manager));
+  }
+
+  {
+    const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+        http_filters:
+        - name: envoy.filters.http.upstream_codec
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.upstream_codec.v3.UpstreamCodec
+  )EOF",
+                                                         Network::Address::IpVersion::v4);
+
+    auto cluster = makeCluster(yaml);
+    Http::MockFilterChainManager manager;
+    const Http::EmptyFilterChainOptions options;
+    EXPECT_FALSE(cluster->info()->createUpgradeFilterChain("foo", nullptr, manager, options));
+
+    EXPECT_CALL(manager, applyFilterFactoryCb(_, _));
+    EXPECT_TRUE(cluster->info()->createFilterChain(manager));
+  }
 }
 
 class PriorityStateManagerTest : public Event::TestUsingSimulatedTime,
@@ -6156,11 +6389,10 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   )EOF";
   envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(cluster_yaml);
 
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-      server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-      false);
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
   std::shared_ptr<StaticClusterImpl> cluster = createCluster(cluster_config, factory_context);
-  cluster->initialize([] {});
+  cluster->initialize([] { return absl::OkStatus(); });
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
   NiceMock<Random::MockRandomGenerator> random;
@@ -6170,8 +6402,8 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
                                               random);
 
   auto current_hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
-  HostVector hosts_added{makeTestHost(cluster->info(), "tcp://127.0.0.1:81", simTime(), zone_b),
-                         makeTestHost(cluster->info(), "tcp://127.0.0.1:82", simTime(), zone_a)};
+  HostVector hosts_added{makeTestHost(cluster->info(), "tcp://127.0.0.1:81", zone_b),
+                         makeTestHost(cluster->info(), "tcp://127.0.0.1:82", zone_a)};
 
   envoy::config::endpoint::v3::LocalityLbEndpoints zone_a_endpoints;
   zone_a_endpoints.mutable_locality()->CopyFrom(zone_a);

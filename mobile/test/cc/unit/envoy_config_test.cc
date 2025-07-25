@@ -6,6 +6,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/socket_option.pb.h"
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
 
 #include "test/test_common/utility.h"
 
@@ -47,15 +48,15 @@ DfpClusterConfig getDfpClusterConfig(const Bootstrap& bootstrap) {
   return cluster_config;
 }
 
-template <typename ProtoType>
-bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
-                           const Protobuf::RepeatedPtrField<ProtoType>& rhs) {
+bool socketAddressesEqual(
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>& lhs,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketAddress>& rhs) {
   if (lhs.size() != rhs.size()) {
     return false;
   }
 
   for (int i = 0; i < lhs.size(); ++i) {
-    if (!Protobuf::util::MessageDifferencer::Equals(lhs[i], rhs[i])) {
+    if ((lhs[i].address() != rhs[i].address()) || lhs[i].port_value() != rhs[i].port_value()) {
       return false;
     }
   }
@@ -64,17 +65,15 @@ bool repeatedPtrFieldEqual(const Protobuf::RepeatedPtrField<ProtoType>& lhs,
 
 TEST(TestConfig, ConfigIsApplied) {
   EngineBuilder engine_builder;
-  engine_builder
-#ifdef ENVOY_ENABLE_QUIC
-      .setHttp3ConnectionOptions("5RTO")
+  engine_builder.setHttp3ConnectionOptions("5RTO")
       .setHttp3ClientConnectionOptions("MPQC")
       .addQuicHint("www.abc.com", 443)
       .addQuicHint("www.def.com", 443)
       .addQuicCanonicalSuffix(".opq.com")
       .addQuicCanonicalSuffix(".xyz.com")
-      .enablePortMigration(true)
-#endif
+      .setNumTimeoutsToTriggerPortMigration(4)
       .addConnectTimeoutSeconds(123)
+      .setDisableDnsRefreshOnFailure(true)
       .addDnsRefreshSeconds(456)
       .addDnsMinRefreshSeconds(567)
       .addDnsFailureRefreshSeconds(789, 987)
@@ -86,8 +85,6 @@ TEST(TestConfig, ConfigIsApplied) {
       .addRuntimeGuard("test_feature_false", true)
       .enableDnsCache(true, /* save_interval_seconds */ 101)
       .addDnsPreresolveHostnames({"lyft.com", "google.com"})
-      .setForceAlwaysUsev6(true)
-      .setUseGroIfAvailable(true)
       .setDeviceOs("probably-ubuntu-on-CI");
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
@@ -101,7 +98,6 @@ TEST(TestConfig, ConfigIsApplied) {
       "dns_failure_refresh_rate { base_interval { seconds: 789 } max_interval { seconds: 987 } }",
       "connection_idle_interval { nanos: 222000000 }",
       "connection_keepalive { timeout { seconds: 333 }",
-#ifdef ENVOY_ENABLE_QUIC
       "connection_options: \"5RTO\"",
       "client_connection_options: \"MPQC\"",
       "hostname: \"www.abc.com\"",
@@ -109,18 +105,15 @@ TEST(TestConfig, ConfigIsApplied) {
       "canonical_suffixes: \".opq.com\"",
       "canonical_suffixes: \".xyz.com\"",
       "num_timeouts_to_trigger_port_migration { value: 4 }",
-      "idle_network_timeout { seconds: 30 }",
-#endif
+      "idle_network_timeout { seconds: 60 }",
       "key: \"dns_persistent_cache\" save_interval { seconds: 101 }",
-      "key: \"always_use_v6\" value { bool_value: true }",
       "key: \"prefer_quic_client_udp_gro\" value { bool_value: true }",
       "key: \"test_feature_false\" value { bool_value: true }",
-      "key: \"allow_client_socket_creation_failure\" value { bool_value: true }",
       "key: \"device_os\" value { string_value: \"probably-ubuntu-on-CI\" } }",
       "key: \"app_version\" value { string_value: \"1.2.3\" } }",
       "key: \"app_id\" value { string_value: \"1234-1234-1234\" } }",
-      "validation_context { trusted_ca {",
-  };
+      "initial_stream_window_size { value: 6291456 }",
+      "initial_connection_window_size { value: 15728640 }"};
 
   for (const auto& string : must_contain) {
     EXPECT_THAT(config_str, HasSubstr(string)) << "'" << string << "' not found in " << config_str;
@@ -191,13 +184,11 @@ TEST(TestConfig, SetSocketTag) {
   EXPECT_THAT(bootstrap->DebugString(), HasSubstr("http.socket_tag.SocketTag"));
 }
 
-#ifdef ENVOY_ENABLE_QUIC
 TEST(TestConfig, SetAltSvcCache) {
   EngineBuilder engine_builder;
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->DebugString(), HasSubstr("alternate_protocols_cache"));
 }
-#endif
 
 TEST(TestConfig, StreamIdleTimeout) {
   EngineBuilder engine_builder;
@@ -248,11 +239,23 @@ TEST(TestConfig, SetDnsQueryTimeout) {
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   // The default value.
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 5 }"));
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 120 }"));
 
   engine_builder.addDnsQueryTimeoutSeconds(30);
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("dns_query_timeout { seconds: 30 }"));
+}
+
+TEST(TestConfig, SetDisableDnsRefreshOnFailure) {
+  EngineBuilder engine_builder;
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  // The default value.
+  EXPECT_THAT(bootstrap->ShortDebugString(), Not(HasSubstr("disable_dns_refresh_on_failure")));
+
+  engine_builder.setDisableDnsRefreshOnFailure(true);
+  bootstrap = engine_builder.generateBootstrap();
+  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("disable_dns_refresh_on_failure: true"));
 }
 
 TEST(TestConfig, EnforceTrustChainVerification) {
@@ -291,7 +294,7 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
   auto& host_addr2 = *expected_dns_preresolve_hostnames.Add();
   host_addr2.set_address("lyft.com");
   host_addr2.set_port_value(443);
-  EXPECT_TRUE(repeatedPtrFieldEqual(
+  EXPECT_TRUE(socketAddressesEqual(
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 
@@ -302,7 +305,7 @@ TEST(TestConfig, AddDnsPreresolveHostnames) {
   auto& host_addr3 = *expected_dns_preresolve_hostnames.Add();
   host_addr3.set_address("google.com");
   host_addr3.set_port_value(443);
-  EXPECT_TRUE(repeatedPtrFieldEqual(
+  EXPECT_TRUE(socketAddressesEqual(
       getDfpClusterConfig(*bootstrap).dns_cache_config().preresolve_hostnames(),
       expected_dns_preresolve_hostnames));
 }
@@ -311,27 +314,16 @@ TEST(TestConfig, DisableHttp3) {
   EngineBuilder engine_builder;
 
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
-#ifdef ENVOY_ENABLE_QUIC
   EXPECT_THAT(bootstrap->ShortDebugString(),
               HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig"));
-#endif
-#ifndef ENVOY_ENABLE_QUIC
-  EXPECT_THAT(
-      bootstrap->ShortDebugString(),
-      Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
-#endif
-
-#ifdef ENVOY_ENABLE_QUIC
   engine_builder.enableHttp3(false);
   bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(
       bootstrap->ShortDebugString(),
       Not(HasSubstr("envoy.extensions.filters.http.alternate_protocols_cache.v3.FilterConfig")));
-#endif
 }
 
-#ifdef ENVOY_ENABLE_QUIC
-TEST(TestConfig, SocketReceiveBufferSize) {
+TEST(TestConfig, UdpSocketReceiveBufferSize) {
   EngineBuilder engine_builder;
   engine_builder.enableHttp3(true);
 
@@ -358,9 +350,76 @@ TEST(TestConfig, SocketReceiveBufferSize) {
   // When using an H3 cluster, the UDP receive buffer size option should always be set.
   ASSERT_THAT(rcv_buf_option, NotNull());
   EXPECT_EQ(rcv_buf_option->level(), SOL_SOCKET);
+  EXPECT_TRUE(rcv_buf_option->type().has_datagram());
   EXPECT_EQ(rcv_buf_option->int_value(), 1024 * 1024 /* 1 MB */);
 }
-#endif
+
+TEST(TestConfig, UdpSocketSendBufferSize) {
+  EngineBuilder engine_builder;
+  engine_builder.enableHttp3(true);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  Cluster const* base_cluster = nullptr;
+  for (const Cluster& cluster : bootstrap->static_resources().clusters()) {
+    if (cluster.name() == "base") {
+      base_cluster = &cluster;
+      break;
+    }
+  }
+
+  // The base H3 cluster should always be found.
+  ASSERT_THAT(base_cluster, NotNull());
+
+  SocketOption const* snd_buf_option = nullptr;
+  for (const SocketOption& sock_opt : base_cluster->upstream_bind_config().socket_options()) {
+    if (sock_opt.name() == SO_SNDBUF) {
+      snd_buf_option = &sock_opt;
+      break;
+    }
+  }
+
+  // When using an H3 cluster, the UDP send buffer size option should always be set.
+  ASSERT_THAT(snd_buf_option, NotNull());
+  EXPECT_EQ(snd_buf_option->level(), SOL_SOCKET);
+  EXPECT_TRUE(snd_buf_option->type().has_datagram());
+  EXPECT_EQ(snd_buf_option->int_value(), 1452 * 20);
+}
+
+TEST(TestConfig, AdditionalSocketOptions) {
+  EngineBuilder engine_builder;
+  engine_builder.enableHttp3(true);
+  envoy::config::core::v3::SocketOption socket_opt;
+  socket_opt.set_level(SOL_SOCKET);
+  socket_opt.set_name(123);
+  socket_opt.set_int_value(456);
+  socket_opt.mutable_type()->mutable_datagram();
+  engine_builder.setAdditionalSocketOptions({socket_opt});
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  Cluster const* base_cluster = nullptr;
+  for (const Cluster& cluster : bootstrap->static_resources().clusters()) {
+    if (cluster.name() == "base") {
+      base_cluster = &cluster;
+      break;
+    }
+  }
+
+  // The base H3 cluster should always be found.
+  ASSERT_THAT(base_cluster, NotNull());
+
+  SocketOption const* additional_socket_opt = nullptr;
+  for (const auto& sock_opt : base_cluster->upstream_bind_config().socket_options()) {
+    if (sock_opt.name() == 123) {
+      additional_socket_opt = &sock_opt;
+      break;
+    }
+  }
+
+  ASSERT_THAT(additional_socket_opt, NotNull());
+  EXPECT_EQ(additional_socket_opt->level(), SOL_SOCKET);
+  EXPECT_TRUE(additional_socket_opt->type().has_datagram());
+  EXPECT_EQ(additional_socket_opt->int_value(), 456);
+}
 
 TEST(TestConfig, EnablePlatformCertificatesValidation) {
   EngineBuilder engine_builder;
@@ -368,7 +427,6 @@ TEST(TestConfig, EnablePlatformCertificatesValidation) {
   std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
   EXPECT_THAT(bootstrap->ShortDebugString(),
               Not(HasSubstr("envoy_mobile.cert_validator.platform_bridge_cert_validator")));
-  EXPECT_THAT(bootstrap->ShortDebugString(), HasSubstr("trusted_ca"));
 
   engine_builder.enablePlatformCertificatesValidation(true);
   bootstrap = engine_builder.generateBootstrap();
@@ -396,8 +454,35 @@ private:
   mutable int count_ = 0;
 };
 
-#ifdef ENVOY_ENABLE_FULL_PROTOS
 TEST(TestConfig, AddNativeFilters) {
+  EngineBuilder engine_builder;
+
+  std::string filter_name1 = "envoy.filters.http.buffer1";
+  std::string filter_name2 = "envoy.filters.http.buffer2";
+
+  envoy::extensions::filters::http::buffer::v3::Buffer buffer;
+  buffer.mutable_max_request_bytes()->set_value(5242880);
+  ProtobufWkt::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
+  std::string serialized_buffer;
+  buffer.SerializeToString(&serialized_buffer);
+  typed_config.set_value(serialized_buffer);
+
+  engine_builder.addNativeFilter(filter_name1, typed_config);
+  engine_builder.addNativeFilter(filter_name2, typed_config);
+
+  std::unique_ptr<Bootstrap> bootstrap = engine_builder.generateBootstrap();
+  const std::string hcm_config =
+      bootstrap->static_resources().listeners(0).api_listener().DebugString();
+  EXPECT_THAT(hcm_config, HasSubstr(filter_name1));
+  EXPECT_THAT(hcm_config, HasSubstr(filter_name2));
+  EXPECT_THAT(hcm_config,
+              HasSubstr("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer"));
+  EXPECT_THAT(hcm_config, HasSubstr(std::to_string(5242880)));
+}
+
+#ifdef ENVOY_ENABLE_FULL_PROTOS
+TEST(TestConfig, AddTextProtoNativeFilters) {
   EngineBuilder engine_builder;
 
   std::string filter_name1 = "envoy.filters.http.buffer1";

@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/server/factory_context.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/upstream/load_balancer_factory_base.h"

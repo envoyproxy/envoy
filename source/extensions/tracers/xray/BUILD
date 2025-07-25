@@ -36,7 +36,6 @@ envoy_cc_library(
         "xray_configuration.h",
         "xray_tracer_impl.h",
     ],
-    external_deps = [],
     deps = [
         ":daemon_cc_proto",
         "//envoy/common:time_interface",

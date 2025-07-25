@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <list>
 #include <map>
 #include <memory>
 #include <string>
@@ -96,7 +95,7 @@ public:
   std::string allow_methods_;
   std::string allow_headers_;
   std::string expose_headers_;
-  std::string max_age_{};
+  std::string max_age_;
   absl::optional<bool> allow_credentials_;
   absl::optional<bool> allow_private_network_access_;
   bool enabled_{};
@@ -114,7 +113,7 @@ public:
   bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
   uint32_t initial_requests_{};
-  envoy::type::v3::FractionalPercent additional_request_chance_{};
+  envoy::type::v3::FractionalPercent additional_request_chance_;
   bool hedge_on_per_try_timeout_{};
 };
 
@@ -160,9 +159,9 @@ public:
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
-  absl::optional<std::chrono::milliseconds> base_interval_{};
-  absl::optional<std::chrono::milliseconds> max_interval_{};
-  std::vector<ResetHeaderParserSharedPtr> reset_headers_{};
+  absl::optional<std::chrono::milliseconds> base_interval_;
+  absl::optional<std::chrono::milliseconds> max_interval_;
+  std::vector<ResetHeaderParserSharedPtr> reset_headers_;
   std::chrono::milliseconds reset_max_interval_{300000};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
@@ -220,7 +219,7 @@ public:
                const Http::RequestHeaderMap& original_request, bool& retry_as_early_data));
   MOCK_METHOD(RetryStatus, shouldRetryReset,
               (const Http::StreamResetReason reset_reason, Http3Used alternate_protocol_used,
-               DoRetryResetCallback callback));
+               DoRetryResetCallback callback, bool upstream_request_started));
   MOCK_METHOD(RetryStatus, shouldHedgeRetryPerTryTimeout, (DoRetryCallback callback));
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
@@ -251,6 +250,7 @@ public:
                const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info),
               (const));
+  MOCK_METHOD(bool, applyOnStreamDone, (), (const));
 
   uint64_t stage_{};
   std::string disable_key_;
@@ -319,7 +319,7 @@ public:
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
   MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
   MOCK_METHOD(const CommonConfig&, routeConfig, (), (const));
-  MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (const std::string&),
+  MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (absl::string_view),
               (const));
   MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
   MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
@@ -327,11 +327,10 @@ public:
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
   MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
-  MOCK_METHOD(void, traversePerFilterConfig,
-              (const std::string&, std::function<void(const Router::RouteSpecificFilterConfig&)>),
-              (const));
+  MOCK_METHOD(RouteSpecificFilterConfigs, perFilterConfigs, (absl::string_view), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
+  MOCK_METHOD(const VirtualCluster*, virtualCluster, (const Http::HeaderMap& headers), (const));
 
   Stats::StatName statName() const override {
     stat_name_ = std::make_unique<Stats::StatNameManagedStorage>(name(), *symbol_table_);
@@ -345,6 +344,7 @@ public:
   TestCorsPolicy cors_policy_;
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
+  TestVirtualCluster virtual_cluster_;
 };
 
 class MockHashPolicy : public Http::HashPolicy {
@@ -354,9 +354,9 @@ public:
 
   // Http::HashPolicy
   MOCK_METHOD(absl::optional<uint64_t>, generateHash,
-              (const Network::Address::Instance* downstream_address,
-               const Http::RequestHeaderMap& headers, const AddCookieCallback add_cookie,
-               const StreamInfo::FilterStateSharedPtr filter_state),
+              (OptRef<const Http::RequestHeaderMap> headers,
+               OptRef<const StreamInfo::StreamInfo> info,
+               Http::HashPolicy::AddCookieCallback add_cookie),
               (const));
 };
 
@@ -408,7 +408,7 @@ public:
   MockRouteEntry();
   ~MockRouteEntry() override;
 
-  // Router::Config
+  // Router::RouteEntry
   MOCK_METHOD(const std::string&, clusterName, (), (const));
   MOCK_METHOD(Http::Code, clusterNotFoundResponseCode, (), (const));
   MOCK_METHOD(void, finalizeRequestHeaders,
@@ -442,8 +442,6 @@ public:
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxGrpcTimeout, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutOffset, (), (const));
-  MOCK_METHOD(const VirtualCluster*, virtualCluster, (const Http::HeaderMap& headers), (const));
-  MOCK_METHOD(const VirtualHost&, virtualHost, (), (const));
   MOCK_METHOD(bool, autoHostRewrite, (), (const));
   MOCK_METHOD(bool, appendXfh, (), (const));
   MOCK_METHOD((const std::multimap<std::string, std::string>&), opaqueConfig, (), (const));
@@ -458,10 +456,11 @@ public:
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
   MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
+  MOCK_METHOD(void, refreshRouteCluster,
+              (const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
-  TestVirtualCluster virtual_cluster_;
   TestRetryPolicy retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
   PathMatcherSharedPtr path_matcher_;
@@ -469,7 +468,6 @@ public:
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;
-  testing::NiceMock<MockVirtualHost> virtual_host_;
   MockHashPolicy hash_policy_;
   MockMetadataMatchCriteria metadata_matches_criteria_;
   MockTlsContextMatchCriteria tls_context_matches_criteria_;
@@ -505,7 +503,7 @@ public:
   MOCK_METHOD(const Tracing::CustomTagMap&, getCustomTags, (), (const));
 };
 
-class MockRoute : public Route {
+class MockRoute : public RouteEntryAndRoute {
 public:
   MockRoute();
   ~MockRoute() override;
@@ -516,15 +514,65 @@ public:
   MOCK_METHOD(const Decorator*, decorator, (), (const));
   MOCK_METHOD(const RouteTracing*, tracingConfig, (), (const));
   MOCK_METHOD(absl::optional<bool>, filterDisabled, (absl::string_view), (const));
-  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (const std::string&), (const));
-  MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (const std::string&),
+  MOCK_METHOD(const RouteSpecificFilterConfig*, perFilterConfig, (absl::string_view), (const));
+  MOCK_METHOD(const RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (absl::string_view),
               (const));
-  MOCK_METHOD(void, traversePerFilterConfig,
-              (const std::string&, std::function<void(const Router::RouteSpecificFilterConfig&)>),
-              (const));
+  MOCK_METHOD(RouteSpecificFilterConfigs, perFilterConfigs, (absl::string_view), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
+  MOCK_METHOD(const VirtualHostConstSharedPtr&, virtualHost, (), (const));
+
+  // Router::RouteEntry
+  MOCK_METHOD(const std::string&, clusterName, (), (const));
+  MOCK_METHOD(Http::Code, clusterNotFoundResponseCode, (), (const));
+  MOCK_METHOD(void, finalizeRequestHeaders,
+              (Http::RequestHeaderMap & headers, const StreamInfo::StreamInfo& stream_info,
+               bool insert_envoy_original_path),
+              (const));
+  MOCK_METHOD(Http::HeaderTransforms, requestHeaderTransforms,
+              (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
+  MOCK_METHOD(void, finalizeResponseHeaders,
+              (Http::ResponseHeaderMap & headers, const StreamInfo::StreamInfo& stream_info),
+              (const));
+  MOCK_METHOD(Http::HeaderTransforms, responseHeaderTransforms,
+              (const StreamInfo::StreamInfo& stream_info, bool do_formatting), (const));
+  MOCK_METHOD(const Http::HashPolicy*, hashPolicy, (), (const));
+  MOCK_METHOD(const HedgePolicy&, hedgePolicy, (), (const));
+  MOCK_METHOD(const Router::MetadataMatchCriteria*, metadataMatchCriteria, (), (const));
+  MOCK_METHOD(const Router::TlsContextMatchCriteria*, tlsContextMatchCriteria, (), (const));
+  MOCK_METHOD(Upstream::ResourcePriority, priority, (), (const));
+  MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
+  MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
+  MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
+  MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
+  MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
+  MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
+  MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
+  MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
+  MOCK_METHOD(bool, usingNewTimeouts, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderMax, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutHeaderOffset, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxGrpcTimeout, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, grpcTimeoutOffset, (), (const));
+  MOCK_METHOD(bool, autoHostRewrite, (), (const));
+  MOCK_METHOD(bool, appendXfh, (), (const));
+  MOCK_METHOD((const std::multimap<std::string, std::string>&), opaqueConfig, (), (const));
+  MOCK_METHOD(bool, includeVirtualHostRateLimits, (), (const));
+  MOCK_METHOD(const CorsPolicy*, corsPolicy, (), (const));
+  MOCK_METHOD(absl::optional<std::string>, currentUrlPathAfterRewrite,
+              (const Http::RequestHeaderMap&), (const));
+  MOCK_METHOD(const PathMatchCriterion&, pathMatchCriterion, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInRequest, (), (const));
+  MOCK_METHOD(bool, includeAttemptCountInResponse, (), (const));
+  MOCK_METHOD(const ConnectConfigOptRef, connectConfig, (), (const));
+  MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
+  MOCK_METHOD(const EarlyDataPolicy&, earlyDataPolicy, (), (const));
+  MOCK_METHOD(const RouteStatsContextOptRef, routeStatsContext, (), (const));
+  MOCK_METHOD(void, refreshRouteCluster,
+              (const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&), (const));
 
   testing::NiceMock<MockRouteEntry> route_entry_;
   testing::NiceMock<MockDecorator> decorator_;
@@ -532,6 +580,10 @@ public:
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
   std::string route_name_{"fake_route_name"};
+  std::shared_ptr<testing::NiceMock<MockVirtualHost>> virtual_host_ =
+      std::make_shared<testing::NiceMock<MockVirtualHost>>();
+  // Same with virtual_host_ but this could be returned as VirtualHostConstSharedPtr reference.
+  VirtualHostConstSharedPtr virtual_host_copy_ = virtual_host_;
 };
 
 class MockConfig : public Config {
@@ -540,16 +592,16 @@ public:
   ~MockConfig() override;
 
   // Router::Config
-  MOCK_METHOD(RouteConstSharedPtr, route,
+  MOCK_METHOD(VirtualHostRoute, route,
               (const Http::RequestHeaderMap&, const Envoy::StreamInfo::StreamInfo&,
                uint64_t random_value),
               (const));
-  MOCK_METHOD(RouteConstSharedPtr, route,
+  MOCK_METHOD(VirtualHostRoute, route,
               (const RouteCallback& cb, const Http::RequestHeaderMap&,
                const Envoy::StreamInfo::StreamInfo&, uint64_t random_value),
               (const));
 
-  MOCK_METHOD(const std::list<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
+  MOCK_METHOD(const std::vector<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));
   MOCK_METHOD(bool, mostSpecificHeaderMutationsWins, (), (const));
@@ -558,7 +610,7 @@ public:
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::shared_ptr<MockRoute> route_;
-  std::list<Http::LowerCaseString> internal_only_headers_;
+  std::vector<Http::LowerCaseString> internal_only_headers_;
   std::string name_{"fake_config"};
   envoy::config::core::v3::Metadata metadata_;
   MockRouteMetadata typed_metadata_;
@@ -653,10 +705,10 @@ public:
   MOCK_METHOD(OptRef<const Network::Connection>, connection, (), (const));
 
   MOCK_METHOD(void, decodeData, (Buffer::Instance&, bool));
-  MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr &&));
-  MOCK_METHOD(void, decode1xxHeaders, (Http::ResponseHeaderMapPtr &&));
+  MOCK_METHOD(void, decodeMetadata, (Http::MetadataMapPtr&&));
+  MOCK_METHOD(void, decode1xxHeaders, (Http::ResponseHeaderMapPtr&&));
   MOCK_METHOD(void, decodeHeaders, (Http::ResponseHeaderMapPtr&&, bool));
-  MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr &&));
+  MOCK_METHOD(void, decodeTrailers, (Http::ResponseTrailerMapPtr&&));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 
   MOCK_METHOD(void, onResetStream, (Http::StreamResetReason, absl::string_view));
@@ -689,7 +741,9 @@ public:
   MockClusterSpecifierPlugin();
 
   MOCK_METHOD(RouteConstSharedPtr, route,
-              (RouteConstSharedPtr parent, const Http::RequestHeaderMap& header), (const));
+              (RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap& headers,
+               const StreamInfo::StreamInfo& stream_info, uint64_t random),
+              (const));
 };
 
 class MockClusterSpecifierPluginFactoryConfig : public ClusterSpecifierPluginFactoryConfig {
@@ -697,7 +751,7 @@ public:
   MockClusterSpecifierPluginFactoryConfig();
   MOCK_METHOD(ClusterSpecifierPluginSharedPtr, createClusterSpecifierPlugin,
               (const Protobuf::Message& config,
-               Server::Configuration::CommonFactoryContext& context));
+               Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<ProtobufWkt::Struct>();

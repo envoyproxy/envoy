@@ -12,13 +12,13 @@
 #include "source/common/quic/quic_io_handle_wrapper.h"
 
 #include "openssl/ssl.h"
+#include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_config.h"
 #include "quiche/quic/core/quic_error_codes.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_ip_address.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "quiche/spdy/core/http2_header_block.h"
 
 namespace Envoy {
 namespace Quic {
@@ -57,8 +57,12 @@ quic::QuicSocketAddress envoyIpAddressToQuicSocketAddress(const Network::Address
 class HeaderValidator {
 public:
   virtual ~HeaderValidator() = default;
+  virtual void startHeaderBlock() = 0;
   virtual Http::HeaderUtility::HeaderValidationResult
   validateHeader(absl::string_view name, absl::string_view header_value) = 0;
+  // Returns true if all required pseudo-headers and no extra pseudo-headers are
+  // present for the given header type.
+  virtual bool finishHeaderBlock(bool is_trailing_headers) = 0;
 };
 
 // The returned header map has all keys in lower case.
@@ -67,6 +71,7 @@ std::unique_ptr<T>
 quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidator& validator,
                           uint32_t max_headers_kb, uint32_t max_headers_allowed,
                           absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
+  validator.startHeaderBlock();
   auto headers = T::create(max_headers_kb, max_headers_allowed);
   for (const auto& entry : header_list) {
     if (max_headers_allowed == 0) {
@@ -96,20 +101,25 @@ quicHeadersToEnvoyHeaders(const quic::QuicHeaderList& header_list, HeaderValidat
       }
     }
   }
+  if (!validator.finishHeaderBlock(/*is_trailing_headers=*/false)) {
+    return nullptr;
+  }
   return headers;
 }
 
 template <class T>
 std::unique_ptr<T>
-http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block, uint32_t max_headers_kb,
-                                uint32_t max_headers_allowed, HeaderValidator& validator,
-                                absl::string_view& details, quic::QuicRstStreamErrorCode& rst) {
+http2HeaderBlockToEnvoyTrailers(const quiche::HttpHeaderBlock& header_block,
+                                uint32_t max_headers_kb, uint32_t max_headers_allowed,
+                                HeaderValidator& validator, absl::string_view& details,
+                                quic::QuicRstStreamErrorCode& rst) {
   auto headers = T::create(max_headers_kb, max_headers_allowed);
   if (header_block.size() > max_headers_allowed) {
     details = Http3ResponseCodeDetailValues::too_many_trailers;
     rst = quic::QUIC_STREAM_EXCESSIVE_LOAD;
     return nullptr;
   }
+  validator.startHeaderBlock();
   for (auto entry : header_block) {
     // TODO(danzh): Avoid temporary strings and addCopy() with string_view.
     std::string key(entry.first);
@@ -135,10 +145,13 @@ http2HeaderBlockToEnvoyTrailers(const spdy::Http2HeaderBlock& header_block, uint
       }
     }
   }
+  if (!validator.finishHeaderBlock(/*is_trailing_headers=*/true)) {
+    return nullptr;
+  }
   return headers;
 }
 
-spdy::Http2HeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers);
+quiche::HttpHeaderBlock envoyHeadersToHttp2HeaderBlock(const Http::HeaderMap& headers);
 
 // Called when Envoy wants to reset the underlying QUIC stream.
 quic::QuicRstStreamErrorCode envoyResetReasonToQuicRstError(Http::StreamResetReason reason);
@@ -188,11 +201,6 @@ void convertQuicConfig(const envoy::config::core::v3::QuicProtocolOptions& confi
 // Set initial flow control windows in quic_config according to the given Envoy config.
 void configQuicInitialFlowControlWindow(const envoy::config::core::v3::QuicProtocolOptions& config,
                                         quic::QuicConfig& quic_config);
-
-// Modify new_connection_id according to given old_connection_id to make sure packets with the new
-// one can be routed to the same listener.
-void adjustNewConnectionIdForRouting(quic::QuicConnectionId& new_connection_id,
-                                     const quic::QuicConnectionId& old_connection_id);
 
 // Extract the two ECN bits from the TOS byte in the IP header.
 quic::QuicEcnCodepoint getQuicEcnCodepointFromTosByte(uint8_t tos_byte);

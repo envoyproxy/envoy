@@ -27,6 +27,11 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
       absl::string_view proto_sanitized = Envoy::Json::stripDoubleQuotes(buffer2);
       RELEASE_ASSERT(Envoy::Json::TestUtil::utf8Equivalent(sanitized, proto_sanitized, errmsg),
                      errmsg);
+    } else {
+      std::string decoded, errmsg;
+      EXPECT_TRUE(Json::TestUtil::decodeEscapedJson(sanitized, decoded, errmsg))
+          << input << ": " << errmsg;
+      EXPECT_EQ(input, decoded);
     }
   }
 }

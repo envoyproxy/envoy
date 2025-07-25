@@ -82,8 +82,6 @@ public:
   void Initialize() override;
   void OnCanWrite() override;
   void OnTlsHandshakeComplete() override;
-  void MaybeSendRstStreamFrame(quic::QuicStreamId id, quic::QuicResetStreamError error,
-                               quic::QuicStreamOffset bytes_written) override;
   void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void ProcessUdpPacket(const quic::QuicSocketAddress& self_address,
                         const quic::QuicSocketAddress& peer_address,
@@ -101,6 +99,10 @@ public:
                                   const Network::FilterChain& filter_chain,
                                   ConnectionMapIter position);
 
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
+    return false;
+  }
+
   void setHttp3Options(const envoy::config::core::v3::Http3ProtocolOptions& http3_options) override;
   using quic::QuicSession::PerformActionOnActiveStreams;
 
@@ -116,7 +118,6 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::QuicStreamId id) override;
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
-  quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
 
   quic::HttpDatagramSupport LocalHttpDatagramSupport() override { return http_datagram_support_; }
 
@@ -136,9 +137,6 @@ private:
 
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
-
-  QuicStatNames& quic_stat_names_;
-  Stats::Scope& listener_scope_;
 
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   absl::optional<ConnectionMapPosition> position_;

@@ -102,14 +102,15 @@ private:
   // These operations are asynchronous; the impacted buffer fragments are in an unusable state until
   // the operation completes.
   bool maybeStorage(BufferedStreamState& state, Http::StreamFilterCallbacks& callbacks);
-  std::function<void(absl::Status)> getOnFileActionCompleted();
+  absl::AnyInvocable<void(absl::Status)> getOnFileActionCompleted();
 
   // Called if an unrecoverable error occurs in the filter (e.g. a file operation fails). Internal
   // server error.
   void filterError(absl::string_view err);
 
-  // Returns a safe dispatch function that aborts if the filter has been destroyed.
-  std::function<void(std::function<void()>)> getSafeDispatch();
+  // Dispatch a callback wrapped such that it is not called if the filter has been destroyed
+  // by the time it pops off the dispatch queue.
+  void safeDispatch(absl::AnyInvocable<void()> fn);
 
   // Queue an onStateChange in the dispatcher. This is used to get the next piece of work back
   // into the Envoy thread from an AsyncFiles thread, or to queue work that may not be allowed

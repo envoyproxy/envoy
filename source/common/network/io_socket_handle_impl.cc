@@ -5,6 +5,8 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/safe_memcpy.h"
 #include "source/common/common/utility.h"
 #include "source/common/event/file_event_impl.h"
 #include "source/common/network/address_impl.h"
@@ -230,19 +232,26 @@ Api::IoCallUint64Result IoSocketHandleImpl::sendmsg(const Buffer::RawSlice* slic
 
 Address::InstanceConstSharedPtr
 IoSocketHandleImpl::getOrCreateEnvoyAddressInstance(sockaddr_storage ss, socklen_t ss_len) {
-  if (recent_received_addresses_ == nullptr) {
-    return Address::addressFromSockAddrOrDie(ss, ss_len, fd_,
-                                             socket_v6only_ || !udp_read_normalize_addresses_);
+  if (!recent_received_addresses_) {
+    return Address::addressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
   }
   quic::QuicSocketAddress quic_address(ss);
-  auto it = recent_received_addresses_->Lookup(quic_address);
+  auto it = std::find_if(
+      recent_received_addresses_->begin(), recent_received_addresses_->end(),
+      [&quic_address](const QuicEnvoyAddressPair& pair) { return pair.first == quic_address; });
   if (it != recent_received_addresses_->end()) {
-    return *it->second;
+    Address::InstanceConstSharedPtr cached_addr = it->second;
+    // Move the entry to the back of the list since it's the most recently accessed entry.
+    std::rotate(it, it + 1, recent_received_addresses_->end());
+    return cached_addr;
   }
-  Address::InstanceConstSharedPtr new_address = Address::addressFromSockAddrOrDie(
-      ss, ss_len, fd_, socket_v6only_ || !udp_read_normalize_addresses_);
-  recent_received_addresses_->Insert(
-      quic_address, std::make_unique<Address::InstanceConstSharedPtr>(new_address));
+  Address::InstanceConstSharedPtr new_address =
+      Address::addressFromSockAddrOrDie(ss, ss_len, fd_, socket_v6only_);
+  recent_received_addresses_->push_back(QuicEnvoyAddressPair(quic_address, new_address));
+  if (recent_received_addresses_->size() > address_cache_max_capacity_) {
+    // Over capacity so remove the first element in the list, which is the least recently accessed.
+    recent_received_addresses_->erase(recent_received_addresses_->begin());
+  }
   return new_address;
 }
 
@@ -281,13 +290,53 @@ absl::optional<uint32_t> maybeGetPacketsDroppedFromHeader([[maybe_unused]] const
   return absl::nullopt;
 }
 
+template <typename T> T getUnsignedIntFromHeader(const cmsghdr& cmsg) {
+  static_assert(std::is_unsigned_v<T>, "return type must be unsigned integral");
+  T value;
+  safeMemcpyUnsafeSrc(&value, CMSG_DATA(&cmsg));
+  return value;
+}
+
+template <typename T> absl::optional<T> maybeGetUnsignedIntFromHeader(const cmsghdr& cmsg) {
+  static_assert(std::is_unsigned_v<T>, "return type must be unsigned integral");
+  switch (cmsg.cmsg_len) {
+  case CMSG_LEN(sizeof(uint8_t)):
+    return static_cast<T>(getUnsignedIntFromHeader<uint8_t>(cmsg));
+  case CMSG_LEN(sizeof(uint16_t)):
+    return static_cast<T>(getUnsignedIntFromHeader<uint16_t>(cmsg));
+  case CMSG_LEN(sizeof(uint32_t)):
+    return static_cast<T>(getUnsignedIntFromHeader<uint32_t>(cmsg));
+  case CMSG_LEN(sizeof(uint64_t)):
+    return static_cast<T>(getUnsignedIntFromHeader<uint64_t>(cmsg));
+  default:;
+  }
+  IS_ENVOY_BUG(
+      fmt::format("unexpected cmsg_len value for unsigned integer payload: {}", cmsg.cmsg_len));
+  return absl::nullopt;
+}
+
+absl::optional<uint8_t> maybeGetTosFromHeader(const cmsghdr& cmsg) {
+  if (
+#ifdef __APPLE__
+      (cmsg.cmsg_level == IPPROTO_IP && cmsg.cmsg_type == IP_RECVTOS) ||
+#else
+      (cmsg.cmsg_level == IPPROTO_IP && cmsg.cmsg_type == IP_TOS) ||
+#endif // __APPLE__
+      (cmsg.cmsg_level == IPPROTO_IPV6 && cmsg.cmsg_type == IPV6_TCLASS)) {
+    return maybeGetUnsignedIntFromHeader<uint8_t>(cmsg);
+  }
+  return absl::nullopt;
+}
+
 Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
                                                     const uint64_t num_slice, uint32_t self_port,
+                                                    const UdpSaveCmsgConfig& save_cmsg_config,
                                                     RecvMsgOutput& output) {
   ASSERT(!output.msg_.empty());
 
-  absl::FixedArray<char> cbuf(cmsg_space_);
-  memset(cbuf.begin(), 0, cmsg_space_);
+  size_t cmsg_space = cmsg_space_ + save_cmsg_config.expected_size;
+  absl::FixedArray<char> cbuf(cmsg_space);
+  memset(cbuf.begin(), 0, cmsg_space);
 
   absl::FixedArray<iovec> iov(num_slice);
   uint64_t num_slices_for_read = 0;
@@ -335,6 +384,12 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
     // Get overflow, local address and gso_size from control message.
     for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr;
          cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+      if (save_cmsg_config.hasConfig() &&
+          cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
+          cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
+        Buffer::OwnedImpl cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+        output.msg_[0].saved_cmsg_ = std::move(cmsg_slice);
+      }
       if (output.msg_[0].local_address_ == nullptr) {
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
         if (addr != nullptr) {
@@ -346,23 +401,21 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
       if (output.dropped_packets_ != nullptr) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ += *maybe_dropped;
+          *output.dropped_packets_ = *maybe_dropped;
           continue;
         }
       }
 #ifdef UDP_GRO
       if (cmsg->cmsg_level == SOL_UDP && cmsg->cmsg_type == UDP_GRO) {
-        output.msg_[0].gso_size_ = *reinterpret_cast<uint16_t*>(CMSG_DATA(cmsg));
+        absl::optional<uint16_t> maybe_gso = maybeGetUnsignedIntFromHeader<uint16_t>(*cmsg);
+        if (maybe_gso) {
+          output.msg_[0].gso_size_ = *maybe_gso;
+        }
       }
 #endif
-      if (receive_ecn_ &&
-#ifdef __APPLE__
-          ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
-#else
-          ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
-#endif // __APPLE__
-           (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS))) {
-        output.msg_[0].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
+      absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+      if (maybe_tos) {
+        output.msg_[0].tos_ = *maybe_tos;
       }
     }
   }
@@ -371,6 +424,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmsg(Buffer::RawSlice* slices,
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uint32_t self_port,
+                                                     const UdpSaveCmsgConfig& save_cmsg_config,
                                                      RecvMsgOutput& output) {
   ASSERT(output.msg_.size() == slices.size());
   if (slices.empty()) {
@@ -381,8 +435,9 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
   absl::FixedArray<absl::FixedArray<struct iovec>> iovs(
       num_packets_per_mmsg_call, absl::FixedArray<struct iovec>(slices[0].size()));
   absl::FixedArray<sockaddr_storage> raw_addresses(num_packets_per_mmsg_call);
+  size_t cmsg_space = cmsg_space_ + save_cmsg_config.expected_size;
   absl::FixedArray<absl::FixedArray<char>> cbufs(num_packets_per_mmsg_call,
-                                                 absl::FixedArray<char>(cmsg_space_));
+                                                 absl::FixedArray<char>(cmsg_space));
 
   for (uint32_t i = 0; i < num_packets_per_mmsg_call; ++i) {
     memset(&raw_addresses[i], 0, sizeof(sockaddr_storage));
@@ -439,15 +494,16 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
     if (hdr.msg_controllen > 0) {
       struct cmsghdr* cmsg;
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
+        if (save_cmsg_config.hasConfig() &&
+            cmsg->cmsg_type == static_cast<int>(save_cmsg_config.type.value()) &&
+            cmsg->cmsg_level == static_cast<int>(save_cmsg_config.level.value())) {
+          Buffer::OwnedImpl cmsg_slice{CMSG_DATA(cmsg), cmsg->cmsg_len};
+          output.msg_[i].saved_cmsg_ = std::move(cmsg_slice);
+        }
         Address::InstanceConstSharedPtr addr = maybeGetDstAddressFromHeader(*cmsg, self_port);
-        if (receive_ecn_ &&
-#ifdef __APPLE__
-            ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_RECVTOS) ||
-#else
-            ((cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) ||
-#endif // __APPLE__
-             (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS))) {
-          output.msg_[i].tos_ = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
+        absl::optional<uint8_t> maybe_tos = maybeGetTosFromHeader(*cmsg);
+        if (maybe_tos) {
+          output.msg_[0].tos_ = *maybe_tos;
           continue;
         }
         if (addr != nullptr) {
@@ -466,7 +522,7 @@ Api::IoCallUint64Result IoSocketHandleImpl::recvmmsg(RawSliceArrays& slices, uin
       for (cmsg = CMSG_FIRSTHDR(&hdr); cmsg != nullptr; cmsg = CMSG_NXTHDR(&hdr, cmsg)) {
         absl::optional<uint32_t> maybe_dropped = maybeGetPacketsDroppedFromHeader(*cmsg);
         if (maybe_dropped) {
-          *output.dropped_packets_ += *maybe_dropped;
+          *output.dropped_packets_ = *maybe_dropped;
         }
       }
     }
@@ -524,7 +580,11 @@ Api::SysCallIntResult IoSocketHandleImpl::connect(Address::InstanceConstSharedPt
   }
 #endif
 
-  return Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
+  auto result = Api::OsSysCallsSingleton::get().connect(fd_, sockaddr_to_use, sockaddr_len_to_use);
+  if (result.return_value_ != -1) {
+    was_connected_ = true;
+  }
+  return result;
 }
 
 IoHandlePtr IoSocketHandleImpl::duplicate() {

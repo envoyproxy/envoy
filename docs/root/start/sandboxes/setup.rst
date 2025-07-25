@@ -70,21 +70,21 @@ You can `find instructions for installing Git on various operating systems here 
 
 .. _start_sandboxes_setup_envoy:
 
-Clone the Envoy repository
---------------------------
+Clone the Envoy examples repository
+-----------------------------------
 
-If you have not cloned the `Envoy repository <https://github.com/envoyproxy/envoy>`_ already,
+If you have not cloned the `Envoy examples repository <https://github.com/envoyproxy/examples>`_ already,
 clone it with:
 
 .. tabs::
 
    .. code-tab:: console SSH
 
-      git clone git@github.com:envoyproxy/envoy
+      git clone git@github.com:envoyproxy/examples
 
    .. code-tab:: console HTTPS
 
-      git clone https://github.com/envoyproxy/envoy.git
+      git clone https://github.com/envoyproxy/examples.git
 
 .. _start_sandboxes_setup_additional:
 

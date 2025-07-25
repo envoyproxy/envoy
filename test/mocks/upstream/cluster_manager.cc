@@ -26,12 +26,13 @@ MockClusterManager::MockClusterManager()
   ON_CALL(*this, grpcAsyncClientManager()).WillByDefault(ReturnRef(async_client_manager_));
   ON_CALL(*this, localClusterName()).WillByDefault((ReturnRef(local_cluster_name_)));
   ON_CALL(*this, subscriptionFactory()).WillByDefault(ReturnRef(subscription_factory_));
-  ON_CALL(*this, allocateOdCdsApi(_, _, _))
-      .WillByDefault(Invoke([](const envoy::config::core::v3::ConfigSource&,
-                               OptRef<xds::core::v3::ResourceLocator>,
-                               ProtobufMessage::ValidationVisitor&) -> OdCdsApiHandlePtr {
-        return MockOdCdsApiHandle::create();
-      }));
+  ON_CALL(*this, allocateOdCdsApi(_, _, _, _))
+      .WillByDefault(
+          Invoke([](OdCdsCreationFunction, const envoy::config::core::v3::ConfigSource&,
+                    OptRef<xds::core::v3::ResourceLocator>,
+                    ProtobufMessage::ValidationVisitor&) { return MockOdCdsApiHandle::create(); }));
+  ON_CALL(*this, addOrUpdateCluster(_, _, _)).WillByDefault(Return(false));
+  ON_CALL(*this, hasActiveClusters()).WillByDefault(Return(false));
 }
 
 MockClusterManager::~MockClusterManager() = default;
@@ -50,6 +51,18 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
   // TODO(mattklein123): Add support for warming clusters when needed.
 
   ON_CALL(*this, clusters()).WillByDefault(Return(info_map));
+  ON_CALL(*this, getActiveCluster(_))
+      .WillByDefault(Invoke([this](const std::string& cluster_name) -> OptRef<const Cluster> {
+        if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+          return *it->second;
+        }
+        return absl::nullopt;
+      }));
+  ON_CALL(*this, hasCluster(_))
+      .WillByDefault(Invoke([this](const std::string& cluster_name) -> bool {
+        return active_clusters_.find(cluster_name) != active_clusters_.end();
+      }));
+  ON_CALL(*this, hasActiveClusters()).WillByDefault(Return(!active_cluster_names.empty()));
 }
 
 void MockClusterManager::initializeThreadLocalClusters(

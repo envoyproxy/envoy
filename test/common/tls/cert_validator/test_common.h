@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/ssl_socket_extended_info.h"
 
@@ -34,9 +35,23 @@ public:
   Ssl::ValidateStatus certificateValidationResult() const override { return validate_result_; }
   uint8_t certificateValidationAlert() const override { return SSL_AD_CERTIFICATE_UNKNOWN; }
 
+  Ssl::CertificateSelectionCallbackPtr createCertificateSelectionCallback() override {
+    return nullptr;
+  }
+  void onCertificateSelectionCompleted(OptRef<const Ssl::TlsContext> selected_ctx, bool,
+                                       bool) override {
+    cert_selection_result_ = selected_ctx.has_value() ? Ssl::CertificateSelectionStatus::Successful
+                                                      : Ssl::CertificateSelectionStatus::Failed;
+  }
+  Ssl::CertificateSelectionStatus certificateSelectionResult() const override {
+    return cert_selection_result_;
+  }
+
 private:
   Envoy::Ssl::ClientValidationStatus status_;
   Ssl::ValidateStatus validate_result_{Ssl::ValidateStatus::NotStarted};
+  Ssl::CertificateSelectionStatus cert_selection_result_{
+      Ssl::CertificateSelectionStatus::NotStarted};
 };
 
 class TestCertificateValidationContextConfig
@@ -50,12 +65,13 @@ public:
       std::string ca_cert = "", absl::optional<uint32_t> verify_depth = absl::nullopt)
       : allow_expired_certificate_(allow_expired_certificate), api_(Api::createApiForTest()),
         custom_validator_config_(custom_config), san_matchers_(san_matchers), ca_cert_(ca_cert),
-        max_verify_depth_(verify_depth){};
+        max_verify_depth_(verify_depth) {};
   TestCertificateValidationContextConfig()
-      : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt){};
+      : api_(Api::createApiForTest()), custom_validator_config_(absl::nullopt) {};
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
+  const std::string& caCertName() const override { return ca_cert_name_; }
   const std::string& certificateRevocationList() const override {
     CONSTRUCT_ON_FIRST_USE(std::string, "");
   }
@@ -90,6 +106,7 @@ public:
   bool onlyVerifyLeafCertificateCrl() const override { return false; }
 
   absl::optional<uint32_t> maxVerifyDepth() const override { return max_verify_depth_; }
+  bool autoSniSanMatch() const override { return auto_sni_san_match_; }
 
 private:
   bool allow_expired_certificate_{false};
@@ -99,7 +116,9 @@ private:
       san_matchers_{};
   const std::string ca_cert_;
   const std::string ca_cert_path_{"TEST_CA_CERT_PATH"};
+  const std::string ca_cert_name_{"TEST_CA_CERT_NAME"};
   const absl::optional<uint32_t> max_verify_depth_{absl::nullopt};
+  const bool auto_sni_san_match_{false};
 };
 
 } // namespace Tls

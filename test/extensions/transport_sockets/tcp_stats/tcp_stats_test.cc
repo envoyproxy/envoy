@@ -11,7 +11,7 @@
 #include "test/mocks/network/io_handle.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/network/transport_socket.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -30,6 +30,8 @@ namespace {
 class TcpStatsTest : public testing::Test {
 public:
   void initialize(bool enable_periodic) {
+    // Reset the C struct tcp_info_ members.
+    memset(&tcp_info_, 0, sizeof(tcp_info_));
     envoy::extensions::transport_sockets::tcp_stats::v3::Config proto_config;
     if (enable_periodic) {
       proto_config.mutable_update_period()->MergeFrom(
@@ -278,7 +280,7 @@ TEST_F(TcpStatsSocketFactoryTest, ImplementsSecureTransportCallInnerFactory) {
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

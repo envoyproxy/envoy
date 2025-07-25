@@ -40,10 +40,10 @@ struct HeadersToAddEntry {
   }
 
   std::string original_value_;
-  bool add_if_empty_ = false;
-
   Formatter::FormatterPtr formatter_;
   HeaderAppendAction append_action_;
+  // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
+  bool add_if_empty_ = false;
 
 protected:
   HeadersToAddEntry(const HeaderValue& header_value, HeaderAppendAction append_action,

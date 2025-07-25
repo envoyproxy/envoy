@@ -12,10 +12,8 @@ envoy_cc_library(
     name = "lua_lib",
     srcs = ["lua.cc"],
     hdrs = ["lua.h"],
-    external_deps = [
-        "luajit",
-    ],
     deps = [
+        "//bazel/foreign_cc:luajit",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
@@ -34,5 +32,19 @@ envoy_cc_library(
         "//envoy/buffer:buffer_interface",
         "//source/common/common:hex_lib",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "protobuf_converter_lib",
+    srcs = ["protobuf_converter.cc"],
+    hdrs = ["protobuf_converter.h"],
+    deps = [
+        ":lua_lib",
+        "//bazel/foreign_cc:luajit",
+        "//source/common/protobuf",
+        "//source/common/protobuf:create_reflectable_message_lib",
+        "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/strings",
     ],
 )

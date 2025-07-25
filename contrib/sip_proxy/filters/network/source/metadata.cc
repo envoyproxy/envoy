@@ -177,8 +177,8 @@ void MessageMetadata::addMsgHeader(HeaderType type, absl::string_view value) {
     break;
   default:
     if (type <= HeaderType::TopLine || type >= HeaderType::Other) {
-      ENVOY_LOG(error, "Wrong HeaderType {}, should be in [{},{}]", type, HeaderType::TopLine,
-                HeaderType::Other);
+      ENVOY_LOG(error, "Wrong HeaderType {}, should be in [{},{}]", static_cast<int>(type),
+                static_cast<int>(HeaderType::TopLine), static_cast<int>(HeaderType::Other));
       return;
     }
     headers_[type].emplace_back(SipHeader(type, value));

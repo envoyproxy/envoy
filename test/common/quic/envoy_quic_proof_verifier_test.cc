@@ -64,6 +64,8 @@ public:
     // Getting the last cert in the chain as the root CA cert.
     EXPECT_CALL(cert_validation_ctx_config_, caCert()).WillRepeatedly(ReturnRef(root_ca_cert_));
     EXPECT_CALL(cert_validation_ctx_config_, caCertPath()).WillRepeatedly(ReturnRef(path_string_));
+    EXPECT_CALL(cert_validation_ctx_config_, caCertName()).WillRepeatedly(ReturnRef(cert_name_));
+
     EXPECT_CALL(cert_validation_ctx_config_, trustChainVerification)
         .WillRepeatedly(Return(envoy::extensions::transport_sockets::tls::v3::
                                    CertificateValidationContext::VERIFY_TRUST_CHAIN));
@@ -81,6 +83,7 @@ public:
         .WillRepeatedly(ReturnRef(empty_string_list_));
     EXPECT_CALL(cert_validation_ctx_config_, customValidatorConfig())
         .WillRepeatedly(ReturnRef(custom_validator_config_));
+    EXPECT_CALL(cert_validation_ctx_config_, autoSniSanMatch()).WillRepeatedly(Return(false));
     auto context_or_error = Extensions::TransportSockets::Tls::ClientContextImpl::create(
         *store_.rootScope(), client_context_config_, factory_context_);
     THROW_IF_NOT_OK(context_or_error.status());
@@ -89,6 +92,7 @@ public:
 
 protected:
   const std::string path_string_{"some_path"};
+  const std::string cert_name_{"some_cert_name"};
   const std::string alpn_{"h2,http/1.1"};
   const std::string sig_algs_{"rsa_pss_rsae_sha256"};
   const std::vector<envoy::extensions::transport_sockets::tls::v3::SubjectAltNameMatcher>

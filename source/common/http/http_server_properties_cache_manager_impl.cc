@@ -13,11 +13,10 @@
 namespace Envoy {
 namespace Http {
 
-SINGLETON_MANAGER_REGISTRATION(alternate_protocols_cache_manager);
-
 HttpServerPropertiesCacheManagerImpl::HttpServerPropertiesCacheManagerImpl(
-    AlternateProtocolsData& data, ThreadLocal::SlotAllocator& tls)
-    : data_(data), slot_(tls) {
+    Server::Configuration::ServerFactoryContext& context,
+    ProtobufMessage::ValidationVisitor& validation_visitor, ThreadLocal::SlotAllocator& tls)
+    : data_(context, validation_visitor), slot_(tls) {
   slot_.set([](Event::Dispatcher& /*dispatcher*/) { return std::make_shared<State>(); });
 }
 
@@ -74,10 +73,11 @@ HttpServerPropertiesCacheSharedPtr HttpServerPropertiesCacheManagerImpl::getCach
   return new_cache;
 }
 
-HttpServerPropertiesCacheManagerSharedPtr HttpServerPropertiesCacheManagerFactoryImpl::get() {
-  return singleton_manager_.getTyped<HttpServerPropertiesCacheManager>(
-      SINGLETON_MANAGER_REGISTERED_NAME(alternate_protocols_cache_manager),
-      [this] { return std::make_shared<HttpServerPropertiesCacheManagerImpl>(data_, tls_); });
+void HttpServerPropertiesCacheManagerImpl::forEachThreadLocalCache(CacheFn cache_fn) {
+  for (auto& entry : (*slot_).caches_) {
+    HttpServerPropertiesCache& cache = *entry.second.cache_;
+    cache_fn(cache);
+  }
 }
 
 } // namespace Http

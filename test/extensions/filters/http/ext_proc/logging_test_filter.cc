@@ -22,8 +22,11 @@ namespace ExternalProcessing {
 // A test filter that retrieve the logging info on encodeComplete.
 class LoggingTestFilter : public Http::PassThroughFilter {
 public:
-  LoggingTestFilter(const std::string& logging_id, const std::string& cluster_name)
-      : logging_id_(logging_id), expected_cluster_name_(cluster_name) {}
+  LoggingTestFilter(const std::string& logging_id, const std::string& cluster_name,
+                    bool check_received_bytes,
+                    const std::string& response_code_details = "via_upstream")
+      : logging_id_(logging_id), expected_cluster_name_(cluster_name),
+        check_received_bytes_(check_received_bytes), expected_rcd_(response_code_details) {}
   void encodeComplete() override {
     ASSERT(decoder_callbacks_ != nullptr);
     const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
@@ -32,28 +35,35 @@ public:
         filter_state->getDataReadOnly<ExtProcLoggingInfo>(logging_id_);
     if (ext_proc_logging_info != nullptr) {
       EXPECT_NE(ext_proc_logging_info->bytesSent(), 0);
-      EXPECT_NE(ext_proc_logging_info->bytesReceived(), 0);
+      if (check_received_bytes_) {
+        EXPECT_NE(ext_proc_logging_info->bytesReceived(), 0);
+      }
       ASSERT_TRUE(ext_proc_logging_info->upstreamHost() != nullptr);
       EXPECT_EQ(ext_proc_logging_info->upstreamHost()->cluster().name(), expected_cluster_name_);
+      EXPECT_EQ(ext_proc_logging_info->clusterInfo()->name(), expected_cluster_name_);
+      EXPECT_EQ(ext_proc_logging_info->httpResponseCodeDetails(), expected_rcd_);
     }
   }
 
 private:
   std::string logging_id_;
   std::string expected_cluster_name_;
+  const bool check_received_bytes_;
+  std::string expected_rcd_;
 };
 
 class LoggingTestFilterFactory : public Extensions::HttpFilters::Common::FactoryBase<
                                      test::integration::filters::LoggingTestFilterConfig> {
 public:
-  LoggingTestFilterFactory() : FactoryBase("logging-test-filter"){};
+  LoggingTestFilterFactory() : FactoryBase("logging-test-filter") {};
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filters::LoggingTestFilterConfig& proto_config, const std::string&,
       Server::Configuration::FactoryContext&) override {
     return [=](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<LoggingTestFilter>(
-          proto_config.logging_id(), proto_config.upstream_cluster_name()));
+          proto_config.logging_id(), proto_config.upstream_cluster_name(),
+          proto_config.check_received_bytes(), proto_config.http_rcd()));
     };
   }
 };

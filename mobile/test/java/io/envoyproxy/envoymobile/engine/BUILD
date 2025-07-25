@@ -19,6 +19,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "io.envoyproxy.envoymobile.engine.EnvoyConfigurationTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
@@ -31,6 +32,7 @@ envoy_mobile_android_test(
     srcs = [
         "EnvoyNativeResourceRegistryTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.engine.EnvoyNativeResourceRegistryTest",
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
     ],
@@ -41,6 +43,7 @@ envoy_mobile_android_test(
     srcs = [
         "JvmBridgeUtilityTest.kt",
     ],
+    test_class = "io.envoyproxy.envoymobile.engine.JvmBridgeUtilityTest",
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
     ],
@@ -60,11 +63,39 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorTest",
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//test/kotlin/io/envoyproxy/envoymobile/mocks:mocks_lib",
+        "@maven//:org_robolectric_annotations",
+    ],
+)
+
+envoy_mobile_android_test(
+    name = "android_network_monitor_v2_tests",
+    srcs = [
+        "AndroidNetworkMonitorV2Test.java",
+    ],
+    native_deps = [
+        "//test/jni:libenvoy_jni_with_test_extensions.so",
+    ] + select({
+        "@platforms//os:macos": [
+            "//test/jni:libenvoy_jni_with_test_extensions_jnilib",
+        ],
+        "//conditions:default": [],
+    }),
+    native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2Test",
+    deps = [
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
+        "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
+        "//test/kotlin/io/envoyproxy/envoymobile/mocks:mocks_lib",
+        "@maven//:org_robolectric_annotations",
     ],
 )
 
@@ -82,6 +113,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "io.envoyproxy.envoymobile.engine.ByteBuffersTest",
     deps = [
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",

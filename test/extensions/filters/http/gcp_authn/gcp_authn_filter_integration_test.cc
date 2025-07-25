@@ -7,6 +7,7 @@
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/server/options.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -67,15 +68,21 @@ public:
                 .PackFrom(audience);
       }
 
-      TestUtility::loadFromYaml(default_config_, proto_config_);
+      if (use_new_config_) {
+        TestUtility::loadFromYaml(new_config_, proto_config_);
+      } else {
+        TestUtility::loadFromYaml(default_config_, proto_config_);
+        // Set URI in the config.
+        auto& uri = *proto_config_.mutable_http_uri();
+        uri.set_uri(std::string(Url));
+      }
+
       // Set token_header in the config.
       if (configure_token_header) {
         proto_config_.mutable_token_header()->mutable_name()->append("service-to-service-auth");
         proto_config_.mutable_token_header()->mutable_value_prefix()->append("CustomPrefix ");
       }
-      // Set URI in the config.
-      auto& uri = *proto_config_.mutable_http_uri();
-      uri.set_uri(std::string(Url));
+
       // Create the filter.
       envoy::config::listener::v3::Filter gcp_authn_filter;
       gcp_authn_filter.set_name(std::string(Envoy::Extensions::HttpFilters::GcpAuthn::FilterName));
@@ -208,14 +215,46 @@ public:
     cache_config:
       cache_size: 100
   )EOF";
+
+  const std::string new_config_ = R"EOF(
+    cluster: gcp_authn
+    timeout:
+        seconds: 3
+    cache_config:
+      cache_size: 100
+  )EOF";
   envoy::extensions::filters::http::gcp_authn::v3::GcpAuthnFilterConfig proto_config_{};
+  bool use_new_config_ = true;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GcpAuthnFilterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(GcpAuthnFilterIntegrationTest, Basicflow) {
+TEST_P(GcpAuthnFilterIntegrationTest, DEPRECATED_FEATURE_TEST(Basicflow)) {
+  use_new_config_ = false;
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.gcp_authn_use_fixed_url", "false"}});
+  initializeConfig(/*add_audience=*/true);
+  HttpIntegrationTest::initialize();
+  int num = 2;
+  // Send multiple requests.
+  for (int i = 0; i < num; ++i) {
+    initiateClientConnection();
+    // Send the request to cluster `gcp_authn`.
+    waitForGcpAuthnServerResponse();
+    // Send the request to cluster `cluster_0` and validate the response.
+    sendRequestToDestinationAndValidateResponse(/*with_audience=*/true);
+    // Clean up the codec and connections.
+    cleanup();
+  }
+
+  // Verify request has been routed to both upstream clusters.
+  EXPECT_GE(test_server_->counter("cluster.gcp_authn.upstream_cx_total")->value(), num);
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), num);
+}
+
+TEST_P(GcpAuthnFilterIntegrationTest, BasicflowWithNewConfig) {
   initializeConfig(/*add_audience=*/true);
   HttpIntegrationTest::initialize();
   int num = 2;

@@ -23,13 +23,20 @@ Config::Config(Stats::Scope& scope)
 
 const absl::string_view Filter::HTTP2_CONNECTION_PREFACE = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
 
-Filter::Filter(const ConfigSharedPtr config) : config_(config) {
-  http_parser_init(&parser_, HTTP_REQUEST);
+Filter::Filter(const ConfigSharedPtr config)
+    : config_(config), no_op_callbacks_(),
+      requested_read_bytes_(Config::DEFAULT_INITIAL_BUFFER_SIZE) {
+  // Filter for only Request Message types with NoOp Parser callbacks.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http_inspector_use_balsa_parser")) {
+    // Set both allow_custom_methods and enable_trailers to true with BalsaParser.
+    parser_ = std::make_unique<Http::Http1::BalsaParser>(
+        Http::Http1::MessageType::Request, &no_op_callbacks_, Config::MAX_INSPECT_SIZE + 1024, true,
+        true);
+  } else {
+    parser_ = std::make_unique<Http::Http1::LegacyHttpParserImpl>(Http::Http1::MessageType::Request,
+                                                                  &no_op_callbacks_);
+  }
 }
-
-http_parser_settings Filter::settings_{
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-};
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   auto raw_slice = buffer.rawSlice();
@@ -44,6 +51,24 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
     done(true);
     return Network::FilterStatus::Continue;
   case ParseState::Continue:
+    ENVOY_LOG(trace, "http inspector: need more bytes");
+
+    // If we have requested the maximum amount of data, then close the connection
+    // the request line is too large to determine the http version.
+    if (static_cast<size_t>(nread_) >= Config::MAX_INSPECT_SIZE) {
+      ENVOY_LOG(warn, "http inspector: reached max buffer without determining HTTP version, "
+                      "dropping connection");
+      config_->stats().read_error_.inc();
+      cb_->socket().ioHandle().close();
+      return Network::FilterStatus::StopIteration;
+    }
+
+    // Otherwise, double the buffer size and try again
+    if (static_cast<size_t>(nread_) >= requested_read_bytes_) {
+      requested_read_bytes_ =
+          std::min<uint32_t>(2 * requested_read_bytes_, Config::MAX_INSPECT_SIZE);
+    }
+
     return Network::FilterStatus::StopIteration;
   }
   PANIC_DUE_TO_CORRUPT_ENUM
@@ -81,35 +106,40 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
       return ParseState::Error;
     }
 
-    absl::string_view new_data = data.substr(parser_.nread);
-    const size_t pos = new_data.find_first_of("\r\n");
-
+    absl::string_view new_data = data.substr(nread_);
+    const size_t pos = new_data.find_first_of('\n');
     if (pos != absl::string_view::npos) {
-      // Include \r or \n
+      // Include \n
       new_data = new_data.substr(0, pos + 1);
-      ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
+
+      ssize_t rc = parser_->execute(new_data.data(), new_data.length());
+      nread_ += rc;
       ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
-                HTTP_PARSER_ERRNO(&parser_));
+                parser_->errorMessage());
 
       // Errors in parsing HTTP.
-      if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+      if (parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
+          parser_->getStatus() != Http::Http1::ParserStatus::Paused) {
         return ParseState::Error;
       }
 
-      if (parser_.http_major == 1 && parser_.http_minor == 1) {
+      if (parser_->isHttp11()) {
         protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
       } else {
         // Set other HTTP protocols to HTTP/1.0
         protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
       }
+
       return ParseState::Done;
     } else {
-      ssize_t rc = http_parser_execute(&parser_, &settings_, new_data.data(), new_data.length());
+      ssize_t rc = parser_->execute(new_data.data(), new_data.length());
+      nread_ += rc;
       ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
-                HTTP_PARSER_ERRNO(&parser_));
+                parser_->errorMessage());
 
       // Errors in parsing HTTP.
-      if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
+      if (parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
+          parser_->getStatus() != Http::Http1::ParserStatus::Paused) {
         return ParseState::Error;
       } else {
         return ParseState::Continue;

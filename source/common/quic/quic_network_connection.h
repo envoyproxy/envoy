@@ -43,7 +43,10 @@ public:
   uint64_t id() const;
 
 protected:
+  // REQUIRES: hasConnectionStats() == true.
   Network::Connection::ConnectionStats& connectionStats() const { return *connection_stats_; }
+
+  bool hasConnectionStats() const { return connection_stats_ != nullptr; }
 
   void setConnectionSocket(Network::ConnectionSocketPtr&& connection_socket) {
     connection_sockets_.push_back(std::move(connection_socket));

@@ -34,8 +34,8 @@ make(
         "install",
     ],
     deps = [
+        "//bazel/foreign_cc:zstd",
         "//contrib/qat:qatlib",
-        "//external:zstd",
     ],
 )
 

@@ -1,3 +1,5 @@
+#include "envoy/access_log/access_log_config.h"
+
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -52,7 +54,8 @@ class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
-                          Server::Configuration::FactoryContext& context) override {
+                          Server::Configuration::FactoryContext& context,
+                          std::vector<Formatter::CommandParserPtr>&& = {}) override {
     // Check that expected listener metadata is present
     EXPECT_EQ(1, context.listenerInfo().metadata().typed_filter_metadata().size());
     const auto iter = context.listenerInfo().metadata().typed_filter_metadata().find(

@@ -1,8 +1,0 @@
-services:
-
-  proxy:
-    build:
-      context: .
-      dockerfile: ../shared/envoy/Dockerfile
-    ports:
-    - "${PORT_PROXY:-10000}:10000"

@@ -1,6 +1,5 @@
 load("@base_pip3//:requirements.bzl", "requirement")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
-load("@envoy//tools/base:envoy_python.bzl", "envoy_entry_point")
 load("@envoy//tools/python:namespace.bzl", "envoy_py_namespace")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
@@ -11,13 +10,13 @@ envoy_mobile_package()
 
 envoy_py_namespace()
 
-envoy_entry_point(
+py_console_script_binary(
     name = "sphinx",
     init_data = [
         "//:py-init",
         ":py-init",
     ],
-    pkg = "sphinx",
+    pkg = "@base_pip3//sphinx",
     script = "sphinx-build",
     deps = [
         requirement("sphinx_rtd_theme"),

@@ -68,7 +68,8 @@ protected:
 };
 
 TEST_F(AccessLogManagerImplTest, BadFile) {
-  EXPECT_CALL(*file_, open_(_)).WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, 0))));
+  EXPECT_CALL(*file_, open_(_))
+      .WillOnce(Return(ByMove(Filesystem::resultFailure<bool>(false, -1))));
   EXPECT_FALSE(
       access_log_manager_
           .createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"})

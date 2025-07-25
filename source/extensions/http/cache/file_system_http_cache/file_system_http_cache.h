@@ -47,9 +47,9 @@ public:
 
   // Overrides for HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& lookup,
-                                     Http::StreamDecoderFilterCallbacks& callbacks) override;
+                                     Http::StreamFilterCallbacks& callbacks) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
-                                     Http::StreamEncoderFilterCallbacks& callbacks) override;
+                                     Http::StreamFilterCallbacks& callbacks) override;
   CacheInfo cacheInfo() const override;
   const CacheStats& stats() const;
 
@@ -79,8 +79,7 @@ public:
    */
   void updateHeaders(const LookupContext& lookup_context,
                      const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata,
-                     std::function<void(bool)> on_complete) override;
+                     const ResponseMetadata& metadata, UpdateHeadersCallback on_complete) override;
 
   /**
    * The config of this cache. Used by the factory to ensure there aren't incompatible
@@ -137,9 +136,9 @@ public:
    *     if varied_key was added.
    */
   ABSL_MUST_USE_RESULT std::shared_ptr<Cleanup>
-  setCacheEntryToVary(const Key& key, const Http::ResponseHeaderMap& response_headers,
-                      const Key& varied_key, std::shared_ptr<Cleanup> cleanup)
-      ABSL_LOCKS_EXCLUDED(cache_mu_);
+  setCacheEntryToVary(Event::Dispatcher& dispatcher, const Key& key,
+                      const Http::ResponseHeaderMap& response_headers, const Key& varied_key,
+                      std::shared_ptr<Cleanup> cleanup) ABSL_LOCKS_EXCLUDED(cache_mu_);
 
   /**
    * Returns the extension name.
@@ -187,6 +186,9 @@ public:
 
   using PostEvictionCallback = std::function<void(uint64_t size_bytes, uint64_t count)>;
 
+  // Waits for all queued actions to be completed.
+  void drainAsyncFileActionsForTest() { async_file_manager_->waitForIdle(); };
+
 private:
   /**
    * Writes a vary node to disk for the given key. A vary node in the cache consists of
@@ -196,7 +198,8 @@ private:
    *     be extracted.
    * @param cleanup the cleanup operation to be performed when the write completes.
    */
-  void writeVaryNodeToDisk(const Key& key, const Http::ResponseHeaderMap& response_headers,
+  void writeVaryNodeToDisk(Event::Dispatcher& dispatcher, const Key& key,
+                           const Http::ResponseHeaderMap& response_headers,
                            std::shared_ptr<Cleanup> cleanup);
 
   // A shared_ptr to keep the cache singleton alive as long as any of its caches are in use.

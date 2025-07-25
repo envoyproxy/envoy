@@ -9,7 +9,7 @@
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.h"
 #include "test/integration/autonomous_upstream.h"
 #include "test/mocks/server/server_factory_context.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/integration/server.h"
 
 #include "tools/cpp/runfiles/runfiles.h"
@@ -18,10 +18,11 @@ namespace Envoy {
 
 enum class TestServerType : int {
   HTTP1_WITHOUT_TLS = 0,
-  HTTP2_WITH_TLS = 1,
-  HTTP3 = 2,
-  HTTP_PROXY = 3,
-  HTTPS_PROXY = 4,
+  HTTP1_WITH_TLS = 1,
+  HTTP2_WITH_TLS = 2,
+  HTTP3 = 3,
+  HTTP_PROXY = 4,
+  HTTPS_PROXY = 5,
 };
 
 class TestServer : public ListenerHooks {
@@ -31,7 +32,7 @@ public:
   /**
    * Starts the test server. This function blocks until the test server is ready to accept requests.
    */
-  void start(TestServerType type);
+  void start(TestServerType type, int port = 0);
 
   /**
    * Shutdowns the server server. This function blocks until all the resources have been freed.
@@ -92,7 +93,7 @@ private:
       testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
 
   Network::DownstreamTransportSocketFactoryPtr createUpstreamTlsContext(
-      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&);
+      testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>&, bool);
 };
 
 } // namespace Envoy

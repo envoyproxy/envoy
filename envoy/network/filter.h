@@ -12,9 +12,13 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+namespace quiche {
+class QuicheSocketAddress;
+} // namespace quiche
+
 namespace quic {
-class QuicSocketAddress;
-}
+class QuicReceivedPacket;
+} // namespace quic
 
 namespace Envoy {
 
@@ -55,7 +59,7 @@ public:
   /**
    * @return Socket the socket the filter is operating on.
    */
-  virtual const Socket& socket() PURE;
+  virtual const ConnectionSocket& socket() PURE;
 };
 
 /**
@@ -83,6 +87,33 @@ public:
    *                   in the filter chain.
    */
   virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Control the filter close status for write filters.
+   *
+   * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
+   * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
+   * was previously delayed.
+   *
+   * This method affects the filter's "close status" within the context of the connection closure
+   * process managed by the filter manager:
+   *    - `disableClose(true)` marks the filter as unable to close by delaying the closure process.
+   *    - Calling `disableClose(true)` again has no additional effect, as the closure is already
+   *      marked as pending.
+   *    - `disableClose(false)` mark the filter is ready to be closed. If no further pending
+   * closures exist and there is a latched close action, it will close the connection with the
+   * latched close action.
+   *
+   * Note that this method only takes effect when the connection closure is being managed through
+   * the filter manager.
+   *
+   * @param disabled A boolean flag:
+   *   - `true`: Delays the connection closure process if there is any,
+   *             marking the filter as unable to close.
+   *   - `false`: Resumes the connection closure process if there is any,
+   *              marking the filter as close ready.
+   */
+  virtual void disableClose(bool disabled) PURE;
 };
 
 /**
@@ -174,6 +205,33 @@ public:
    * mode to secure mode.
    */
   virtual bool startUpstreamSecureTransport() PURE;
+
+  /**
+   * Control the filter close status for read filters.
+   *
+   * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
+   * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
+   * was previously delayed.
+   *
+   * This method affects the filter's "close status" within the context of the connection closure
+   * process managed by the filter manager:
+   *    - `disableClose(true)` marks the filter as unable to close by delaying the closure process.
+   *    - Calling `disableClose(true)` again has no additional effect, as the closure is already
+   *      marked as pending.
+   *    - `disableClose(false)` mark the filter is ready to be closed. If no further pending
+   * closures exist and there is a latched close action, it will close the connection with the
+   * latched close action.
+   *
+   * Note that this method only takes effect when the connection closure is being managed through
+   * the filter manager.
+   *
+   * @param disabled A boolean flag:
+   *   - `true`: Delays the connection closure process if there is any,
+   *             marking the filter as unable to close.
+   *   - `false`: Resumes the connection closure process if there is any,
+   *              marking the filter as close ready.
+   */
+  virtual void disableClose(bool disable) PURE;
 };
 
 /**
@@ -383,6 +441,12 @@ public:
   virtual FilterStatus onData(Network::ListenerFilterBuffer& buffer) PURE;
 
   /**
+   * Called when the connection is closed. Only the current filter that has stopped filter
+   * chain iteration will get the callback.
+   */
+  virtual void onClose() {};
+
+  /**
    * Return the size of data the filter want to inspect from the connection.
    * The size can be increased after filter need to inspect more data.
    * @return maximum number of bytes of the data consumed by the filter. 0 means filter does not
@@ -449,7 +513,7 @@ public:
    * if the connection socket's destination address were the preferred address.
    */
   virtual bool isCompatibleWithServerPreferredAddress(
-      const quic::QuicSocketAddress& server_preferred_address) const PURE;
+      const quiche::QuicheSocketAddress& server_preferred_address) const PURE;
 
   /**
    * Called after the peer has migrated to a different address. Check if the connection
@@ -463,8 +527,15 @@ public:
    * @param connection the connection just migrated.
    * @return status used by the filter manager to manage further filter iteration.
    */
-  virtual FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+  virtual FilterStatus onPeerAddressChanged(const quiche::QuicheSocketAddress& new_address,
                                             Connection& connection) PURE;
+
+  /**
+   * Called when the QUIC server session processes its first packet.
+   * @param packet the received packet.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual FilterStatus onFirstPacketReceived(const quic::QuicReceivedPacket&) PURE;
 };
 
 using QuicListenerFilterPtr = std::unique_ptr<QuicListenerFilter>;
@@ -486,10 +557,11 @@ public:
                          QuicListenerFilterPtr&& filter) PURE;
 
   virtual bool shouldAdvertiseServerPreferredAddress(
-      const quic::QuicSocketAddress& server_preferred_address) const PURE;
+      const quiche::QuicheSocketAddress& server_preferred_address) const PURE;
 
-  virtual void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+  virtual void onPeerAddressChanged(const quiche::QuicheSocketAddress& new_address,
                                     Connection& connection) PURE;
+  virtual void onFirstPacketReceived(const quic::QuicReceivedPacket&) PURE;
 };
 
 /**
@@ -540,6 +612,11 @@ public:
    * @return the name of this filter chain.
    */
   virtual absl::string_view name() const PURE;
+
+  /**
+   * @return true if this filter chain configuration was discovered by FCDS.
+   */
+  virtual bool addedViaApi() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
@@ -637,6 +714,218 @@ public:
 
 using UdpListenerFilterFactoryCb = std::function<void(
     UdpListenerFilterManager& udp_listener_filter_manager, UdpReadFilterCallbacks& callbacks)>;
+
+/**
+ * Common interface for UdpSessionReadFilterCallbacks and UdpSessionWriteFilterCallbacks.
+ */
+class UdpSessionFilterCallbacks {
+public:
+  virtual ~UdpSessionFilterCallbacks() = default;
+
+  /**
+   * @return uint64_t the ID of the originating UDP session.
+   */
+  virtual uint64_t sessionId() const PURE;
+
+  /**
+   * @return StreamInfo for logging purposes.
+   */
+  virtual StreamInfo::StreamInfo& streamInfo() PURE;
+
+  /**
+   * Allows a filter to inject a datagram to successive filters in the session filter chain.
+   * The injected datagram will be iterated as a regular received datagram, and may also be
+   * stopped by further filters. This can be used, for example, to continue processing previously
+   * buffered datagrams by a filter after an asynchronous operation ended.
+   */
+  virtual void injectDatagramToFilterChain(Network::UdpRecvData& data) PURE;
+};
+
+class UdpSessionReadFilterCallbacks : public UdpSessionFilterCallbacks {
+public:
+  ~UdpSessionReadFilterCallbacks() override = default;
+
+  /**
+   * If a read filter stopped filter iteration, continueFilterChain() can be called to continue the
+   * filter chain. It will have onNewSession() called if it was not previously called.
+   * @return false if the session is removed and no longer valid, otherwise returns true.
+   */
+  virtual bool continueFilterChain() PURE;
+};
+
+class UdpSessionWriteFilterCallbacks : public UdpSessionFilterCallbacks {};
+
+class UdpSessionFilterBase {
+public:
+  virtual ~UdpSessionFilterBase() = default;
+
+  /**
+   * This routine is called before the access log handlers' final log() is called. Filters can use
+   * this callback to enrich the data passed in to the log handlers.
+   */
+  void onSessionComplete() {
+    if (!on_session_complete_already_called_) {
+      onSessionCompleteInternal();
+      on_session_complete_already_called_ = true;
+    }
+  }
+
+protected:
+  /**
+   * This routine is called by onSessionComplete to enrich the data passed in to the log handlers.
+   */
+  virtual void onSessionCompleteInternal() { ASSERT(!on_session_complete_already_called_); }
+
+private:
+  bool on_session_complete_already_called_{false};
+};
+
+/**
+ * Return codes for read filter invocations.
+ */
+enum class UdpSessionReadFilterStatus {
+  // Continue to further session filters.
+  Continue,
+  // Stop executing further session filters.
+  StopIteration,
+};
+
+/**
+ * Session read filter interface.
+ */
+class UdpSessionReadFilter : public virtual UdpSessionFilterBase {
+public:
+  ~UdpSessionReadFilter() override = default;
+
+  /**
+   * Called when a new UDP session is first established. Filters should do one time long term
+   * processing that needs to be done when a session is established. Filter chain iteration
+   * can be stopped if needed.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual UdpSessionReadFilterStatus onNewSession() PURE;
+
+  /**
+   * Called when UDP datagram is read and matches the session that manages the filter.
+   * @param data supplies the read data which may be modified.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual UdpSessionReadFilterStatus onData(Network::UdpRecvData& data) PURE;
+
+  /**
+   * Initializes the read filter callbacks used to interact with the filter manager. It will be
+   * called by the filter manager a single time when the filter is first registered.
+   *
+   * IMPORTANT: No outbound networking or complex processing should be done in this function.
+   *            That should be done in the context of onNewSession() if needed.
+   *
+   * @param callbacks supplies the callbacks.
+   */
+  virtual void initializeReadFilterCallbacks(UdpSessionReadFilterCallbacks& callbacks) PURE;
+};
+
+using UdpSessionReadFilterSharedPtr = std::shared_ptr<UdpSessionReadFilter>;
+
+/**
+ * Return codes for write filter invocations.
+ */
+enum class UdpSessionWriteFilterStatus {
+  // Continue to further session filters.
+  Continue,
+  // Stop executing further session filters.
+  StopIteration,
+};
+
+/**
+ * Session write filter interface.
+ */
+class UdpSessionWriteFilter : public virtual UdpSessionFilterBase {
+public:
+  ~UdpSessionWriteFilter() override = default;
+
+  /**
+   * Called when data is to be written on the UDP session.
+   * @param data supplies the buffer to be written which may be modified.
+   * @return status used by the filter manager to manage further filter iteration.
+   */
+  virtual UdpSessionWriteFilterStatus onWrite(Network::UdpRecvData& data) PURE;
+
+  /**
+   * Initializes the write filter callbacks used to interact with the filter manager. It will be
+   * called by the filter manager a single time when the filter is first registered.
+   *
+   * IMPORTANT: No outbound networking or complex processing should be done in this function.
+   *            That should be done in the context of ReadFilter::onNewSession() if needed.
+   *
+   * @param callbacks supplies the callbacks.
+   */
+  virtual void initializeWriteFilterCallbacks(UdpSessionWriteFilterCallbacks& callbacks) PURE;
+};
+
+using UdpSessionWriteFilterSharedPtr = std::shared_ptr<UdpSessionWriteFilter>;
+
+/**
+ * A combination read and write filter. This allows a single filter instance to cover
+ * both the read and write paths.
+ */
+class UdpSessionFilter : public virtual UdpSessionReadFilter,
+                         public virtual UdpSessionWriteFilter {};
+using UdpSessionFilterSharedPtr = std::shared_ptr<UdpSessionFilter>;
+
+/**
+ * These callbacks are provided by the UDP session manager to the factory so that the factory
+ * can * build the filter chain in an application specific way.
+ */
+class UdpSessionFilterChainFactoryCallbacks {
+public:
+  virtual ~UdpSessionFilterChainFactoryCallbacks() = default;
+
+  /**
+   * Add a read filter that is used when reading UDP session data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addReadFilter(UdpSessionReadFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a write filter that is used when writing UDP session data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addWriteFilter(UdpSessionWriteFilterSharedPtr filter) PURE;
+
+  /**
+   * Add a bidirectional filter that is used when reading and writing UDP session data.
+   * @param filter supplies the filter to add.
+   */
+  virtual void addFilter(UdpSessionFilterSharedPtr filter) PURE;
+};
+
+/**
+ * This function is used to wrap the creation of a UDP session filter chain for new sessions as they
+ * come in. Filter factories create the function at configuration initialization time, and then
+ * they are used at runtime.
+ * @param callbacks supplies the callbacks for the stream to install filters to. Typically the
+ * function will install a single filter, but it's technically possibly to install more than one
+ * if desired.
+ */
+using UdpSessionFilterFactoryCb =
+    std::function<void(UdpSessionFilterChainFactoryCallbacks& callbacks)>;
+
+/**
+ * A UdpSessionFilterChainFactory is used by a UDP session manager to create a UDP session filter
+ * chain when a new session is created.
+ */
+class UdpSessionFilterChainFactory {
+public:
+  virtual ~UdpSessionFilterChainFactory() = default;
+
+  /**
+   * Called when a new UDP session is created.
+   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
+   *                  UdpSessionFilterChainFactoryCallbacks.
+   * @return true if filter chain was created successfully. Otherwise false.
+   */
+  virtual bool createFilterChain(UdpSessionFilterChainFactoryCallbacks& callbacks) const PURE;
+};
 
 /**
  * Creates a chain of network filters for a new connection.

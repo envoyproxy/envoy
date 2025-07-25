@@ -9,14 +9,9 @@ namespace Envoy {
 namespace Http {
 namespace Utility {
 
-Http::LocalErrorStatus statusForOnLocalReply(const StreamDecoderFilter::LocalReplyData& reply,
-                                             const StreamInfo::StreamInfo& info) {
-  // This is a horrible hack to work around legacy swift direct response API.
-  // TODO(https://github.com/envoyproxy/envoy/issues/24428) remove.
-  if (reply.details_ == "direct_response" && info.getRequestHeaders() &&
-      info.getRequestHeaders()->getHostValue() == "127.0.0.1") {
-    return Http::LocalErrorStatus::Continue;
-  }
+Http::LocalErrorStatus statusForOnLocalReply(const StreamDecoderFilter::LocalReplyData&,
+                                             const StreamInfo::StreamInfo&) {
+  // Avoid sendLocalReply to differentiate Envoy generated errors from peer generated errors.
   return Http::LocalErrorStatus::ContinueAndResetStream;
 }
 

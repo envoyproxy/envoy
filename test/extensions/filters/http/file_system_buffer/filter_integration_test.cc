@@ -71,6 +71,7 @@ TEST_P(FileSystemBufferIntegrationTest, NotFoundBodyBuffer) {
 }
 
 TEST_P(FileSystemBufferIntegrationTest, RequestAndResponseWithGiantBodyBuffer) {
+  async_lb_ = false;
   config_helper_.prependFilter(contentLengthConfig());
   // Not quite as giant as the memory buffer's integration test uses - with
   // disk operations involved that size risks timing out the test.

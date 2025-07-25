@@ -1,6 +1,12 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.assertion.Filter.Assertion
+import io.envoyproxy.envoy.config.common.matcher.v3.HttpHeadersMatch
+import io.envoyproxy.envoy.config.common.matcher.v3.MatchPredicate
+import io.envoyproxy.envoy.config.route.v3.HeaderMatcher
+import io.envoyproxy.envoy.type.matcher.v3.StringMatcher
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -17,19 +23,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-
-private const val ASSERTION_FILTER_TEXT_PROTO =
-  """
-  [type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion] {
-    match_config: {
-      http_request_headers_match: {
-        headers: { name: ':method', exact_match: 'GET' }
-        headers: { name: ':scheme', exact_match: 'https' }
-        headers: { name: ':path', exact_match: '/simple.txt' }
-      }
-    }
-  }
-"""
 
 @RunWith(RobolectricTestRunner::class)
 class SendHeadersTest {
@@ -53,12 +46,40 @@ class SendHeadersTest {
   fun `successful sending of request headers`() {
     val headersExpectation = CountDownLatch(1)
 
+    val match1 =
+      HeaderMatcher.newBuilder()
+        .setName(":method")
+        .setStringMatch(StringMatcher.newBuilder().setExact("GET"))
+        .build()
+    val match2 =
+      HeaderMatcher.newBuilder()
+        .setName(":scheme")
+        .setStringMatch(StringMatcher.newBuilder().setExact("https"))
+        .build()
+    val match3 =
+      HeaderMatcher.newBuilder()
+        .setName(":path")
+        .setStringMatch(StringMatcher.newBuilder().setExact("/simple.txt"))
+        .build()
+    val headersMatch =
+      HttpHeadersMatch.newBuilder().addHeaders(match1).addHeaders(match2).addHeaders(match3)
+    val matchConfig = MatchPredicate.newBuilder().setHttpRequestHeadersMatch(headersMatch).build()
+    val configProto = Assertion.newBuilder().setMatchConfig(matchConfig).build()
+    var anyProto =
+      Any.newBuilder()
+        .setTypeUrl("type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion")
+        .setValue(configProto.toByteString())
+        .build()
+
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
         .setLogger { _, msg -> print(msg) }
         .setTrustChainVerification(EnvoyConfiguration.TrustChainVerification.ACCEPT_UNTRUSTED)
-        .addNativeFilter("envoy.filters.http.assertion", ASSERTION_FILTER_TEXT_PROTO)
+        .addNativeFilter(
+          "envoy.filters.http.assertion",
+          anyProto.toByteArray().toString(Charsets.UTF_8)
+        )
         .build()
     val client = engine.streamClient()
 

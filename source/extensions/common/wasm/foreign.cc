@@ -126,6 +126,14 @@ RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
       return WasmResult::BadArgument;
     });
 
+RegisterForeignFunction registerClearRouteCacheForeignFunction(
+    "clear_route_cache",
+    [](WasmBase&, std::string_view, const std::function<void*(size_t size)>&) -> WasmResult {
+      auto context = static_cast<Context*>(proxy_wasm::current_context_);
+      context->clearRouteCache();
+      return WasmResult::Ok;
+    });
+
 #if defined(WASM_USE_CEL_PARSER)
 class ExpressionFactory : public Logger::Loggable<Logger::Id::wasm> {
 protected:

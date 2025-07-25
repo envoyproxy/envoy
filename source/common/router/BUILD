@@ -35,16 +35,19 @@ envoy_cc_library(
     name = "config_lib",
     srcs = ["config_impl.cc"],
     hdrs = ["config_impl.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":config_utility_lib",
         ":context_lib",
+        ":header_cluster_specifier_lib",
         ":header_parser_lib",
+        ":matcher_visitor_lib",
         ":metadatamatchcriteria_lib",
+        ":per_filter_config_lib",
         ":reset_header_parser_lib",
         ":retry_state_lib",
         ":router_ratelimit_lib",
         ":tls_context_match_criteria_lib",
+        ":weighted_cluster_specifier_lib",
         "//envoy/config:typed_metadata_interface",
         "//envoy/http:header_map_interface",
         "//envoy/router:cluster_specifier_plugin_interface",
@@ -75,9 +78,9 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:retry_factory_lib",
         "//source/extensions/early_data:default_early_data_policy_lib",
-        "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/path/match/uri_template:config",
         "//source/extensions/path/rewrite/uri_template:config",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
@@ -85,6 +88,49 @@ envoy_cc_library(
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
     alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "matcher_visitor_lib",
+    srcs = ["matcher_visitor.cc"],
+    hdrs = ["matcher_visitor.h"],
+    deps = [
+        "//source/common/http/matching:inputs_lib",
+        "//source/common/matcher:matcher_lib",
+        "//source/extensions/matching/network/common:inputs_lib",
+        "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+    ],
+    alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "per_filter_config_lib",
+    srcs = ["per_filter_config.cc"],
+    hdrs = ["per_filter_config.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/server:filter_config_interface",
+        "//source/common/config:utility_lib",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+envoy_cc_library(
+    name = "weighted_cluster_specifier_lib",
+    srcs = ["weighted_cluster_specifier.cc"],
+    hdrs = ["weighted_cluster_specifier.h"],
+    deps = [
+        ":config_utility_lib",
+        ":delegating_route_lib",
+        ":header_parser_lib",
+        ":metadatamatchcriteria_lib",
+        ":per_filter_config_lib",
+        "//envoy/router:cluster_specifier_plugin_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/config:well_known_names",
+    ],
 )
 
 envoy_cc_library(
@@ -124,9 +170,8 @@ envoy_cc_library(
     srcs = ["debug_config.cc"],
     hdrs = ["debug_config.h"],
     deps = [
-        "//envoy/http:header_map_interface",
+        "//envoy/registry",
         "//envoy/stream_info:filter_state_interface",
-        "//source/common/common:macros",
     ],
 )
 
@@ -236,15 +281,13 @@ envoy_cc_library(
     name = "scoped_config_lib",
     srcs = ["scoped_config_impl.cc"],
     hdrs = ["scoped_config_impl.h"],
-    external_deps = [
-        "abseil_str_format",
-    ],
     deps = [
         ":config_lib",
         "//envoy/router:rds_interface",
         "//envoy/router:scopes_interface",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/strings:str_format",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
@@ -285,7 +328,6 @@ envoy_cc_library(
     name = "retry_state_lib",
     srcs = ["retry_state_impl.cc"],
     hdrs = ["retry_state_impl.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/event:timer_interface",
         "//envoy/http:codec_interface",
@@ -301,6 +343,7 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
@@ -361,11 +404,14 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
+        "//source/common/http:sidestream_watermark_lib",
         "//source/common/http:utility_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/network:upstream_socket_options_filter_state_lib",
+        "//source/common/orca:orca_load_metrics_lib",
+        "//source/common/orca:orca_parser",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
@@ -495,5 +541,15 @@ envoy_cc_library(
     deps = [
         "//envoy/router:router_interface",
         "//source/common/config:metadata_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_cluster_specifier_lib",
+    srcs = ["header_cluster_specifier.cc"],
+    hdrs = ["header_cluster_specifier.h"],
+    deps = [
+        ":delegating_route_lib",
+        "//envoy/router:cluster_specifier_plugin_interface",
     ],
 )

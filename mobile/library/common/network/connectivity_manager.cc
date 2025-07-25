@@ -2,6 +2,8 @@
 
 #include <net/if.h>
 
+#include <memory>
+
 #include "envoy/common/platform.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
@@ -13,6 +15,8 @@
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
 #include "fmt/ostream.h"
+#include "library/common/network/network_type_socket_option_impl.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/src_addr_socket_option_impl.h"
 
 // Used on Linux (requires root/CAP_NET_RAW)
@@ -77,12 +81,13 @@ constexpr unsigned int InitialFaultThreshold = 1;
 // L7 bytes) before switching socket mode.
 constexpr unsigned int MaxFaultThreshold = 3;
 
-ConnectivityManagerImpl::NetworkState ConnectivityManagerImpl::network_state_{
-    1, NetworkType::Generic, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode,
-    Thread::MutexBasicLockable{}};
+ConnectivityManagerImpl::DefaultNetworkState ConnectivityManagerImpl::network_state_{
+    1, 0, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode};
 
-envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(NetworkType network) {
-  Thread::LockGuard lock{network_state_.mutex_};
+Thread::MutexBasicLockable ConnectivityManagerImpl::network_mutex_{};
+
+envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(int network) {
+  Thread::LockGuard lock{network_mutex_};
 
   // TODO(goaway): Re-enable this guard. There's some concern that this will miss network updates
   // moving from offline to online states. We should address this then re-enable this guard to
@@ -114,24 +119,22 @@ void ConnectivityManagerImpl::setProxySettings(ProxySettingsConstSharedPtr new_p
     ENVOY_LOG_EVENT(info, "netconf_proxy_change", "{}", new_proxy_settings->asString());
     proxy_settings_ = new_proxy_settings;
   }
-
-  return;
 }
 
 ProxySettingsConstSharedPtr ConnectivityManagerImpl::getProxySettings() { return proxy_settings_; }
 
-NetworkType ConnectivityManagerImpl::getPreferredNetwork() {
-  Thread::LockGuard lock{network_state_.mutex_};
+int ConnectivityManagerImpl::getPreferredNetwork() {
+  Thread::LockGuard lock{network_mutex_};
   return network_state_.network_;
 }
 
 SocketMode ConnectivityManagerImpl::getSocketMode() {
-  Thread::LockGuard lock{network_state_.mutex_};
+  Thread::LockGuard lock{network_mutex_};
   return network_state_.socket_mode_;
 }
 
 envoy_netconf_t ConnectivityManagerImpl::getConfigurationKey() {
-  Thread::LockGuard lock{network_state_.mutex_};
+  Thread::LockGuard lock{network_mutex_};
   return network_state_.configuration_key_;
 }
 
@@ -153,7 +156,7 @@ void ConnectivityManagerImpl::reportNetworkUsage(envoy_netconf_t configuration_k
 
   bool configuration_updated = false;
   {
-    Thread::LockGuard lock{network_state_.mutex_};
+    Thread::LockGuard lock{network_mutex_};
 
     // If the configuration_key isn't current, don't do anything.
     if (configuration_key != network_state_.configuration_key_) {
@@ -201,40 +204,55 @@ void ConnectivityManagerImpl::reportNetworkUsage(envoy_netconf_t configuration_k
   }
 }
 
-void ConnectivityManagerImpl::onDnsResolutionComplete(
+void RefreshDnsWithPostDrainHandler::refreshDnsAndDrainHosts() {
+  Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache =
+      dns_cache_manager_->lookUpCacheByName(BaseDnsCache);
+  if (!dns_cache) {
+    // There may not be a DNS cache during initialization, but if one is available, it should always
+    // exist by the time this handler is instantiated from the NetworkConfigurationFilter.
+    ENVOY_LOG_EVENT(warn, "netconf_dns_cache_missing", "{}", std::string(BaseDnsCache));
+    return;
+  }
+  if (dns_callbacks_handle_ == nullptr) {
+    // Register callbacks once, on demand, using the handler as a sentinel.
+    dns_callbacks_handle_ = dns_cache->addUpdateCallbacks(*this);
+  }
+  dns_cache->iterateHostMap(
+      [&](absl::string_view host,
+          const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
+        hosts_to_drain_.emplace(host);
+      });
+
+  dns_cache->forceRefreshHosts();
+}
+
+void RefreshDnsWithPostDrainHandler::onDnsResolutionComplete(
     const std::string& resolved_host,
     const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
     Network::DnsResolver::ResolutionStatus) {
-  if (enable_drain_post_dns_refresh_) {
-    // Check if the set of hosts pending drain contains the current resolved host.
-    if (hosts_to_drain_.erase(resolved_host) == 0) {
-      return;
-    }
-
-    // We ignore whether DNS resolution has succeeded here. If it failed, we may be offline and
-    // should probably drain connections. If it succeeds, we may have new DNS entries and so we
-    // drain connections. It may be possible to refine this logic in the future.
-    // TODO(goaway): check the set of cached hosts from the last triggered DNS refresh for this
-    // host, and if present, remove it and trigger connection drain for this host specifically.
-    ENVOY_LOG_EVENT(debug, "netconf_post_dns_drain_cx", "{}", resolved_host);
-
-    // Pass predicate to only drain connections to the resolved host (for any cluster).
-    cluster_manager_.drainConnections(
-        [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; });
+  // Check if the set of hosts pending drain contains the current resolved host.
+  if (hosts_to_drain_.erase(resolved_host) == 0) {
+    return;
   }
+
+  // We ignore whether DNS resolution has succeeded here. If it failed, we may be offline and
+  // should probably drain connections. If it succeeds, we may have new DNS entries and so we
+  // drain connections. It may be possible to refine this logic in the future.
+  // TODO(goaway): check the set of cached hosts from the last triggered DNS refresh for this
+  // host, and if present, remove it and trigger connection drain for this host specifically.
+  ENVOY_LOG_EVENT(debug, "netconf_post_dns_drain_cx", "{}", resolved_host);
+
+  // Pass predicate to only drain connections to the resolved host (for any cluster).
+  cluster_manager_.drainConnections(
+      [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; });
 }
 
 void ConnectivityManagerImpl::setDrainPostDnsRefreshEnabled(bool enabled) {
-  enable_drain_post_dns_refresh_ = enabled;
   if (!enabled) {
-    hosts_to_drain_.clear();
-  } else if (!dns_callbacks_handle_) {
-    // Register callbacks once, on demand, using the handle as a sentinel. There may not be
-    // a DNS cache during initialization, but if one is available, it should always exist by the
-    // time this function is called from the NetworkConfigurationFilter.
-    if (auto dns_cache = dnsCache()) {
-      dns_callbacks_handle_ = dns_cache->addUpdateCallbacks(*this);
-    }
+    dns_refresh_handler_ = nullptr;
+  } else if (!dns_refresh_handler_) {
+    dns_refresh_handler_ =
+        std::make_unique<RefreshDnsWithPostDrainHandler>(dns_cache_manager_, cluster_manager_);
   }
 }
 
@@ -245,7 +263,7 @@ void ConnectivityManagerImpl::setInterfaceBindingEnabled(bool enabled) {
 void ConnectivityManagerImpl::refreshDns(envoy_netconf_t configuration_key,
                                          bool drain_connections) {
   {
-    Thread::LockGuard lock{network_state_.mutex_};
+    Thread::LockGuard lock{network_mutex_};
 
     // refreshDns must be queued on Envoy's event loop, whereas network_state_ is updated
     // synchronously. In the event that multiple refreshes become queued on the event loop,
@@ -261,15 +279,11 @@ void ConnectivityManagerImpl::refreshDns(envoy_netconf_t configuration_key,
   if (auto dns_cache = dnsCache()) {
     ENVOY_LOG_EVENT(debug, "netconf_refresh_dns", "{}", std::to_string(configuration_key));
 
-    if (drain_connections && enable_drain_post_dns_refresh_) {
-      dns_cache->iterateHostMap(
-          [&](absl::string_view host,
-              const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) {
-            hosts_to_drain_.emplace(host);
-          });
+    if (drain_connections && (dns_refresh_handler_ != nullptr)) {
+      dns_refresh_handler_->refreshDnsAndDrainHosts();
+    } else {
+      dns_cache->forceRefreshHosts();
     }
-
-    dns_cache->forceRefreshHosts();
   }
 }
 
@@ -284,7 +298,8 @@ Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr ConnectivityManagerIm
 void ConnectivityManagerImpl::resetConnectivityState() {
   envoy_netconf_t configuration_key;
   {
-    Thread::LockGuard lock{network_state_.mutex_};
+    Thread::LockGuard lock{network_mutex_};
+    network_state_.network_ = 0;
     network_state_.remaining_faults_ = 1;
     network_state_.socket_mode_ = SocketMode::DefaultPreferredNetworkMode;
     configuration_key = ++network_state_.configuration_key_;
@@ -301,27 +316,23 @@ std::vector<InterfacePair> ConnectivityManagerImpl::enumerateV6Interfaces() {
   return enumerateInterfaces(AF_INET6, 0, 0);
 }
 
-Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(NetworkType network,
+Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(int network,
                                                                            SocketMode socket_mode) {
   if (enable_interface_binding_ && socket_mode == SocketMode::AlternateBoundInterfaceMode &&
-      network != NetworkType::Generic) {
+      network != 0) {
     return getAlternateInterfaceSocketOptions(network);
   }
 
   // Envoy uses the hash signature of overridden socket options to choose a connection pool.
   // Setting a dummy socket option is a hack that allows us to select a different
   // connection pool without materially changing the socket configuration.
-  ASSERT(static_cast<int>(network) >= 0 && static_cast<int>(network) < 3);
-  int ttl_value = DEFAULT_IP_TTL + static_cast<int>(network);
   auto options = std::make_shared<Socket::Options>();
-  options->push_back(std::make_shared<AddrFamilyAwareSocketOptionImpl>(
-      envoy::config::core::v3::SocketOption::STATE_PREBIND, ENVOY_SOCKET_IP_TTL,
-      ENVOY_SOCKET_IPV6_UNICAST_HOPS, ttl_value));
+  options->push_back(std::make_shared<NetworkTypeSocketOptionImpl>(network));
+
   return options;
 }
 
-Socket::OptionsSharedPtr
-ConnectivityManagerImpl::getAlternateInterfaceSocketOptions(NetworkType network) {
+Socket::OptionsSharedPtr ConnectivityManagerImpl::getAlternateInterfaceSocketOptions(int network) {
   auto v4_pair = getActiveAlternateInterface(network, AF_INET);
   auto v6_pair = getActiveAlternateInterface(network, AF_INET6);
   ENVOY_LOG(debug, "found active alternate interface (ipv4): {} {}", std::get<0>(v4_pair),
@@ -359,11 +370,11 @@ ConnectivityManagerImpl::getAlternateInterfaceSocketOptions(NetworkType network)
 envoy_netconf_t
 ConnectivityManagerImpl::addUpstreamSocketOptions(Socket::OptionsSharedPtr options) {
   envoy_netconf_t configuration_key;
-  NetworkType network;
+  int network;
   SocketMode socket_mode;
 
   {
-    Thread::LockGuard lock{network_state_.mutex_};
+    Thread::LockGuard lock{network_mutex_};
     configuration_key = network_state_.configuration_key_;
     network = network_state_.network_;
     socket_mode = network_state_.socket_mode_;
@@ -374,10 +385,10 @@ ConnectivityManagerImpl::addUpstreamSocketOptions(Socket::OptionsSharedPtr optio
   return configuration_key;
 }
 
-InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(NetworkType network,
+InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(int network,
                                                                    unsigned short family) {
   // Attempt to derive an active interface that differs from the passed network parameter.
-  if (network == NetworkType::WWAN) {
+  if (network & static_cast<int>(NetworkType::WWAN)) {
     // Network is cellular, so look for a WiFi interface.
     // WiFi should always support multicast, and will not be point-to-point.
     auto interfaces =
@@ -391,7 +402,7 @@ InterfacePair ConnectivityManagerImpl::getActiveAlternateInterface(NetworkType n
         return interface;
       }
     }
-  } else if (network == NetworkType::WLAN) {
+  } else if (network & static_cast<int>(NetworkType::WLAN)) {
     // Network is WiFi, so look for a cellular interface.
     // Cellular networks should be point-to-point.
     auto interfaces = enumerateInterfaces(family, IFF_UP | IFF_POINTOPOINT, IFF_LOOPBACK);

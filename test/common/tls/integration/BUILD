@@ -15,6 +15,7 @@ envoy_cc_test_library(
         "ssl_integration_test_base.cc",
     ],
     hdrs = ["ssl_integration_test_base.h"],
+    rbe_pool = "6gig",
     deps = [
         "//test/common/config:dummy_config_proto_cc_proto",
         "//test/integration:http_integration_lib",
@@ -32,6 +33,7 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":sni_to_header_filter_lib",
         ":ssl_integration_test_lib",
@@ -44,6 +46,7 @@ envoy_cc_test(
         "//source/common/tls:ssl_handshaker_lib",
         "//source/extensions/transport_sockets/tls:config",
         "//test/common/config:dummy_config_proto_cc_proto",
+        "//test/common/tls/cert_selector:async_cert_selector",
         "//test/common/tls/cert_validator:timed_cert_validator",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
         "//test/mocks/secret:secret_mocks",
@@ -67,5 +70,24 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/integration/filters:common_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "ssl_upstream_integration_test",
+    size = "large",
+    srcs = [
+        "ssl_upstream_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/extensions/transport_sockets/tls:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
     ],
 )

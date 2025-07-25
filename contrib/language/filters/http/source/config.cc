@@ -51,7 +51,7 @@ Http::FilterFactoryCb LanguageFilterFactory::createFilterFactoryFromProtoTyped(
   if (U_FAILURE(errorCode)) {
     throw EnvoyException(fmt::format("Failed to initialize icu::LocaleMatcher::Builder: ICU error "
                                      "code icu::LocaleMatcher::Builder build: {}",
-                                     errorCode));
+                                     static_cast<int>(errorCode)));
   }
 
   auto config = std::make_shared<LanguageFilterConfigImpl>(

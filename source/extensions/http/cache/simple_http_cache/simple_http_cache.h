@@ -35,13 +35,12 @@ private:
 public:
   // HttpCache
   LookupContextPtr makeLookupContext(LookupRequest&& request,
-                                     Http::StreamDecoderFilterCallbacks& callbacks) override;
+                                     Http::StreamFilterCallbacks& callbacks) override;
   InsertContextPtr makeInsertContext(LookupContextPtr&& lookup_context,
-                                     Http::StreamEncoderFilterCallbacks& callbacks) override;
+                                     Http::StreamFilterCallbacks& callbacks) override;
   void updateHeaders(const LookupContext& lookup_context,
                      const Http::ResponseHeaderMap& response_headers,
-                     const ResponseMetadata& metadata,
-                     std::function<void(bool)> on_complete) override;
+                     const ResponseMetadata& metadata, UpdateHeadersCallback on_complete) override;
   CacheInfo cacheInfo() const override;
 
   Entry lookup(const LookupRequest& request);

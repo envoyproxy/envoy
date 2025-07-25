@@ -1,6 +1,8 @@
 package test.kotlin.integration
 
 import com.google.common.truth.Truth.assertThat
+import com.google.protobuf.Any
+import envoymobile.extensions.filters.http.test_event_tracker.Filter.TestEventTracker
 import io.envoyproxy.envoymobile.EngineBuilder
 import io.envoyproxy.envoymobile.LogLevel
 import io.envoyproxy.envoymobile.RequestHeadersBuilder
@@ -23,6 +25,14 @@ class SetEventTrackerTest {
   @Test
   fun `set eventTracker`() {
     val countDownLatch = CountDownLatch(1)
+    val configProto = TestEventTracker.newBuilder().putAttributes("foo", "bar").build()
+    var anyProto =
+      Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker"
+        )
+        .setValue(configProto.toByteString())
+        .build()
     val engine =
       EngineBuilder()
         .setLogLevel(LogLevel.DEBUG)
@@ -36,7 +46,7 @@ class SetEventTrackerTest {
         }
         .addNativeFilter(
           "envoy.filters.http.test_event_tracker",
-          """[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes { key: "foo" value: "bar" } } }"""
+          anyProto.toByteArray().toString(Charsets.UTF_8)
         )
         .build()
 
@@ -61,11 +71,19 @@ class SetEventTrackerTest {
   @Test
   fun `engine should continue to run if no eventTracker is set and event is emitted`() {
     val countDownLatch = CountDownLatch(1)
+    val configProto = TestEventTracker.newBuilder().putAttributes("foo", "bar").build()
+    var anyProto =
+      Any.newBuilder()
+        .setTypeUrl(
+          "type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker"
+        )
+        .setValue(configProto.toByteString())
+        .build()
     val engine =
       EngineBuilder()
         .addNativeFilter(
           "envoy.filters.http.test_event_tracker",
-          """[type.googleapis.com/envoymobile.extensions.filters.http.test_event_tracker.TestEventTracker] { attributes { key: "foo" value: "bar" } } }"""
+          anyProto.toByteArray().toString(Charsets.UTF_8)
         )
         .build()
 

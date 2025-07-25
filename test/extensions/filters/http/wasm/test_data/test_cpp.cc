@@ -67,7 +67,7 @@ bool TestRootContext::onConfigure(size_t size) {
           "string_state",     "metadata",   "request",        "response",    "connection",
           "connection_id",    "upstream",   "source",         "destination", "cluster_name",
           "cluster_metadata", "route_name", "route_metadata", "upstream_host_metadata",
-          "filter_state",
+          "filter_state", "listener_direction" ,"listener_metadata",
       };
       for (const auto& property : properties) {
         if (getProperty({property}).has_value()) {
@@ -80,8 +80,6 @@ bool TestRootContext::onConfigure(size_t size) {
       std::vector<std::pair<std::vector<std::string>, std::string>> properties = {
           {{"plugin_name"}, "plugin_name"},
           {{"plugin_vm_id"}, "vm_id"},
-          {{"listener_direction"}, std::string("\x1\0\0\0\0\0\0\0\0", 8)}, // INBOUND
-          {{"listener_metadata"}, ""},
           {{"xds", "node", "metadata", "istio.io/metadata"}, "sample_data"},
       };
       for (const auto& property : properties) {
@@ -324,7 +322,7 @@ FilterDataStatus TestContext::onRequestBody(size_t body_buffer_length, bool end_
     }
   } else if (test == "metadata") {
     std::string value;
-    if (!getValue({"node", "metadata", "wasm_node_get_key"}, &value)) {
+    if (!getValue({"xds", "node", "metadata", "wasm_node_get_key"}, &value)) {
       logDebug("missing node metadata");
     }
     logError(std::string("onBody ") + value);
@@ -377,7 +375,7 @@ void TestContext::onLog() {
     }
   } else if (test == "cluster_metadata") {
     std::string cluster_metadata;
-    if (getValue({"cluster_metadata", "filter_metadata", "namespace", "key"}, &cluster_metadata)) {
+    if (getValue({"xds", "cluster_metadata", "filter_metadata", "namespace", "key"}, &cluster_metadata)) {
       logWarn("cluster metadata: " + cluster_metadata);
     }
   } else if (test == "property") {
@@ -386,7 +384,7 @@ void TestContext::onLog() {
     if (path->view() == "/test_context") {
       logWarn("request.path: " + getProperty({"request", "path"}).value()->toString());
       logWarn("node.metadata: " +
-              getProperty({"node", "metadata", "istio.io/metadata"}).value()->toString());
+              getProperty({"xds", "node", "metadata", "istio.io/metadata"}).value()->toString());
       logWarn("metadata: " + getProperty({"metadata", "filter_metadata", "envoy.filters.http.wasm",
                                           "wasm_request_get_key"})
                                  .value()
@@ -396,7 +394,7 @@ void TestContext::onLog() {
         logWarn("response.code: " + std::to_string(responseCode));
       }
       std::string upstream_host_metadata;
-      if (getValue({"upstream_host_metadata", "filter_metadata", "namespace", "key"}, &upstream_host_metadata)) {
+      if (getValue({"xds", "upstream_host_metadata", "filter_metadata", "namespace", "key"}, &upstream_host_metadata)) {
         logWarn("upstream host metadata: " + upstream_host_metadata);
       }
       logWarn("state: " + getProperty({"wasm_state"}).value()->toString());
@@ -588,16 +586,11 @@ void TestContext::onLog() {
       std::vector<std::pair<std::vector<std::string>, std::string>> properties = {
           {{"plugin_name"}, "plugin_name"},
           {{"plugin_vm_id"}, "vm_id"},
-          {{"listener_direction"}, std::string("\x1\0\0\0\0\0\0\0\0", 8)}, // INBOUND
-          {{"listener_metadata"}, ""},
-          {{"route_name"}, "route12"},
-          {{"cluster_name"}, "fake_cluster"},
           {{"connection_id"}, std::string("\x4\0\0\0\0\0\0\0\0", 8)},
           {{"connection", "requested_server_name"}, "w3.org"},
           {{"source", "address"}, "127.0.0.1:0"},
           {{"destination", "address"}, "127.0.0.2:0"},
           {{"upstream", "address"}, "10.0.0.1:443"},
-          {{"route_metadata"}, ""},
       };
       for (const auto& property : properties) {
         std::string value;
@@ -629,22 +622,22 @@ void TestRootContext::onTick() {
     }
   } else if (test_ == "metadata") { // NOLINT(clang-analyzer-optin.portability.UnixAPI)
     std::string value;
-    if (!getValue({"node", "metadata", "wasm_node_get_key"}, &value)) { // NOLINT(clang-analyzer-optin.portability.UnixAPI)
+    if (!getValue({"xds", "node", "metadata", "wasm_node_get_key"}, &value)) { // NOLINT(clang-analyzer-optin.portability.UnixAPI)
       logDebug("missing node metadata");
     }
     logDebug(std::string("onTick ") + value);
 
     std::string list_value;
-    if (!getValue({"node", "metadata", "wasm_node_list_key", "0"}, &list_value)) {
+    if (!getValue({"xds", "node", "metadata", "wasm_node_list_key", "0"}, &list_value)) {
       logDebug("missing node metadata list value");
     }
     if (list_value != "wasm_node_get_value") {
       logWarn("unexpected list value: " + list_value);
     }
-    if (getValue({"node", "metadata", "wasm_node_list_key", "bad_key"}, &list_value)) {
+    if (getValue({"xds", "node", "metadata", "wasm_node_list_key", "bad_key"}, &list_value)) {
       logDebug("unexpected list value for a bad_key");
     }
-    if (getValue({"node", "metadata", "wasm_node_list_key", "1"}, &list_value)) {
+    if (getValue({"xds", "node", "metadata", "wasm_node_list_key", "1"}, &list_value)) {
       logDebug("unexpected list value outside the range");
     }
   } else if (test_ == "property") {

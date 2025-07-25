@@ -212,8 +212,11 @@ A brief outline of the life cycle of a request and response using the example co
     :ref:`opposite order <arch_overview_http_filters_ordering>` from the request, starting at the
     codec filter, traversing any upstream HTTP filters, then going through the router filter and passing
     through CustomFilter, before being sent downstream.
-12. When the response is complete, the stream is destroyed. Post-request processing will update
-    stats, write to the access log and finalize trace spans.
+12. If independent half-close is enabled the stream is destroyed after both request and response are
+    complete (END_STREAM for the HTTP/2 stream is observed in both directions) AND response has success
+    (2xx) status code. Otherwise the stream is destroyed when the response is complete, even if the
+    request has not yet completed. Post-request processing will update stats, write to the access log
+    and finalize trace spans.
 
 We elaborate on each of these steps in the sections below.
 
@@ -533,8 +536,15 @@ directions during a request.
 :ref:`Outlier detection <arch_overview_outlier_detection>` status for the endpoint is revised as the
 request progresses.
 
-A request completes when the upstream response reaches its end-of-stream, i.e. when trailers or the
-response header/body with end-stream set are received. This is handled in
+The point at which the proxying completes and the stream is destroyed for HTTP/2 and HTTP/3 protocols
+is determined by the independent half-close option. If independent half-close is enabled the stream
+is destroyed after both request and response are complete i.e. reach their respective end-of-stream,
+by receiving trailers or the header/body with end-stream set in both directions AND response has
+success (2xx) status code. This is handled in ``FilterManager::checkAndCloseStreamIfFullyClosed()``.
+
+For HTTP/1 protocol or if independent half-close is disabled the stream is destroyed when the response
+is complete and reaches its end-of-stream, i.e. when trailers or the response header/body with
+end-stream set are received, even if the request has not yet completed. This is handled in
 ``Router::Filter::onUpstreamComplete()``.
 
 It is possible for a request to terminate early. This may be due to (but not limited to):

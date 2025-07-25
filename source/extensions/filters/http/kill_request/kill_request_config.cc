@@ -20,7 +20,7 @@ Http::FilterFactoryCb KillRequestFilterFactory::createFilterFactoryFromProtoType
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 KillRequestFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::kill_request::v3::KillRequest& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {

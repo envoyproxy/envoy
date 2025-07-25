@@ -45,9 +45,9 @@ void MockRetryState::expectHedgedPerTryTimeoutRetry() {
 }
 
 void MockRetryState::expectResetRetry() {
-  EXPECT_CALL(*this, shouldRetryReset(_, _, _))
+  EXPECT_CALL(*this, shouldRetryReset(_, _, _, _))
       .WillOnce(Invoke([this](const Http::StreamResetReason, RetryState::Http3Used,
-                              DoRetryResetCallback callback) {
+                              DoRetryResetCallback callback, bool) {
         callback_ = [callback]() { callback(false); };
         return RetryStatus::Yes;
       }));
@@ -76,6 +76,7 @@ MockVirtualHost::MockVirtualHost() {
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
+  ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
 }
 
 MockVirtualHost::~MockVirtualHost() = default;
@@ -96,7 +97,9 @@ MockPathMatchCriterion::MockPathMatchCriterion() {
 
 MockPathMatchCriterion::~MockPathMatchCriterion() = default;
 
-MockRouteEntry::MockRouteEntry() {
+MockRouteEntry::MockRouteEntry()
+    : path_matcher_(std::make_shared<testing::NiceMock<MockPathMatcher>>()),
+      path_rewriter_(std::make_shared<testing::NiceMock<MockPathRewriter>>()) {
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(cluster_name_));
   ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(opaque_config_));
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
@@ -106,8 +109,6 @@ MockRouteEntry::MockRouteEntry() {
       .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
-  ON_CALL(*this, virtualCluster(_)).WillByDefault(Return(&virtual_cluster_));
-  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
   ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(path_match_criterion_));
   ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(upgrade_map_));
@@ -116,9 +117,7 @@ MockRouteEntry::MockRouteEntry() {
     return connect_config_.has_value() ? makeOptRef(connect_config_.value()) : absl::nullopt;
   }));
   ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(early_data_policy_));
-  path_matcher_ = std::make_shared<testing::NiceMock<MockPathMatcher>>();
   ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(path_matcher_));
-  path_rewriter_ = std::make_shared<testing::NiceMock<MockPathRewriter>>();
   ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(path_rewriter_));
   ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
 }
@@ -126,8 +125,10 @@ MockRouteEntry::MockRouteEntry() {
 MockRouteEntry::~MockRouteEntry() = default;
 
 MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
-  ON_CALL(*this, route(_, _, _)).WillByDefault(Return(route_));
-  ON_CALL(*this, route(_, _, _, _)).WillByDefault(Return(route_));
+  ON_CALL(*this, route(_, _, _))
+      .WillByDefault(Return(VirtualHostRoute{route_->virtual_host_, route_}));
+  ON_CALL(*this, route(_, _, _, _))
+      .WillByDefault(Return(VirtualHostRoute{route_->virtual_host_, route_}));
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
@@ -147,12 +148,39 @@ MockRouteTracing::MockRouteTracing() = default;
 MockRouteTracing::~MockRouteTracing() = default;
 
 MockRoute::MockRoute() {
+  // Route methods.
   ON_CALL(*this, routeEntry()).WillByDefault(Return(&route_entry_));
   ON_CALL(*this, decorator()).WillByDefault(Return(&decorator_));
   ON_CALL(*this, tracingConfig()).WillByDefault(Return(nullptr));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
+  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_copy_));
+
+  // Route entry methods.
+  ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(route_entry_.cluster_name_));
+  ON_CALL(*this, opaqueConfig()).WillByDefault(ReturnRef(route_entry_.opaque_config_));
+  ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(route_entry_.rate_limit_policy_));
+  ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(route_entry_.retry_policy_));
+  ON_CALL(*this, internalRedirectPolicy())
+      .WillByDefault(ReturnRef(route_entry_.internal_redirect_policy_));
+  ON_CALL(*this, retryShadowBufferLimit())
+      .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
+  ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(route_entry_.shadow_policies_));
+  ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
+  ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
+  ON_CALL(*this, pathMatchCriterion()).WillByDefault(ReturnRef(route_entry_.path_match_criterion_));
+  ON_CALL(*this, upgradeMap()).WillByDefault(ReturnRef(route_entry_.upgrade_map_));
+  ON_CALL(*this, hedgePolicy()).WillByDefault(ReturnRef(route_entry_.hedge_policy_));
+  ON_CALL(*this, connectConfig()).WillByDefault(Invoke([this]() {
+    return route_entry_.connect_config_.has_value()
+               ? makeOptRef(route_entry_.connect_config_.value())
+               : absl::nullopt;
+  }));
+  ON_CALL(*this, earlyDataPolicy()).WillByDefault(ReturnRef(route_entry_.early_data_policy_));
+  ON_CALL(*this, pathMatcher()).WillByDefault(ReturnRef(route_entry_.path_matcher_));
+  ON_CALL(*this, pathRewriter()).WillByDefault(ReturnRef(route_entry_.path_rewriter_));
+  ON_CALL(*this, routeStatsContext()).WillByDefault(Return(RouteStatsContextOptRef()));
 }
 MockRoute::~MockRoute() = default;
 
@@ -191,7 +219,7 @@ MockGenericConnectionPoolCallbacks::MockGenericConnectionPoolCallbacks() {
 }
 
 MockClusterSpecifierPlugin::MockClusterSpecifierPlugin() {
-  ON_CALL(*this, route(_, _)).WillByDefault(Return(nullptr));
+  ON_CALL(*this, route(_, _, _, _)).WillByDefault(Return(nullptr));
 }
 
 MockClusterSpecifierPluginFactoryConfig::MockClusterSpecifierPluginFactoryConfig() {

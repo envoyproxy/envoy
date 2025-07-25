@@ -16,9 +16,7 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
                  Upstream::ClusterFactoryContext& context, absl::Status& creation_status)
     : Upstream::ClusterImplBase(cluster, context, creation_status),
-      cluster_manager_(context.clusterManager()),
-      runtime_(context.serverFactoryContext().runtime()),
-      random_(context.serverFactoryContext().api().randomGenerator()),
+      cluster_manager_(context.serverFactoryContext().clusterManager()),
       clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
 
 AggregateClusterLoadBalancer::AggregateClusterLoadBalancer(
@@ -150,7 +148,7 @@ absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToL
   }
 }
 
-Upstream::HostConstSharedPtr
+Upstream::HostSelectionResponse
 AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
   const Upstream::HealthyAndDegradedLoad* priority_loads = nullptr;
   if (context != nullptr) {
@@ -174,12 +172,12 @@ AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalance
   return cluster->loadBalancer().chooseHost(&aggregate_context);
 }
 
-Upstream::HostConstSharedPtr
+Upstream::HostSelectionResponse
 AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (load_balancer_) {
     return load_balancer_->chooseHost(context);
   }
-  return nullptr;
+  return {nullptr};
 }
 
 Upstream::HostConstSharedPtr

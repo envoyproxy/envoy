@@ -164,7 +164,7 @@ void ValidatedInputGenerator::handleAnyRules(
   if (any_rules.has_required() && any_rules.required()) {
     // Stop creating any message when a certain depth is reached
     if (max_depth_ > 0 && current_depth_ > max_depth_) {
-      auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(msg);
+      auto* any_message = Protobuf::DynamicCastMessage<ProtobufWkt::Any>(msg);
       any_message->PackFrom(ProtobufWkt::Struct());
       return;
     }
@@ -178,7 +178,7 @@ void ValidatedInputGenerator::handleAnyRules(
         const std::string field_name = std::string(message_path_.back());
         FieldToTypeUrls::const_iterator field_to_typeurls_cand = field_to_typeurls.find(field_name);
         if (field_to_typeurls_cand != any_map_cand->second.end()) {
-          auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(msg);
+          auto* any_message = Protobuf::DynamicCastMessage<ProtobufWkt::Any>(msg);
           inner_message = ProtobufMessage::Helper::typeUrlToMessage(any_message->type_url());
           if (!inner_message || !any_message->UnpackTo(inner_message.get())) {
             const TypeUrlAndFactory& randomed_typeurl = field_to_typeurls_cand->second.at(
@@ -415,7 +415,7 @@ void ValidatedInputGenerator::onEnterMessage(Protobuf::Message& msg,
   const Protobuf::Descriptor* descriptor = msg.GetDescriptor();
   message_path_.push_back(field_name);
   if (descriptor->full_name() == kAny) {
-    auto* any_message = Protobuf::DynamicCastToGenerated<ProtobufWkt::Any>(&msg);
+    auto* any_message = Protobuf::DynamicCastMessage<ProtobufWkt::Any>(&msg);
     std::unique_ptr<Protobuf::Message> inner_message =
         ProtobufMessage::Helper::typeUrlToMessage(any_message->type_url());
     if (!inner_message || !any_message->UnpackTo(inner_message.get())) {

@@ -8,7 +8,6 @@
 #include "test/extensions/filters/http/ext_proc/test_processor.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/integration/http_integration.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_format.h"
@@ -32,7 +31,7 @@ static const uint32_t BufferSize = 100000;
 // for the external processor. This lets us more fully exercise all the things that happen
 // with larger, streamed payloads.
 class StreamingIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing {
+                                 public Grpc::GrpcClientIntegrationParamTest {
 
 protected:
   StreamingIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {}
@@ -46,7 +45,6 @@ protected:
   }
 
   void initializeConfig() {
-    scoped_runtime_.mergeValues({{"envoy.reloadable_features.send_header_raw_value", "false"}});
     skip_tag_extraction_rule_check_ = true;
     // This enables a built-in automatic upstream server.
     autonomous_upstream_ = true;
@@ -94,10 +92,6 @@ protected:
 
     // Make sure that we have control over when buffers will fill up.
     config_helper_.setBufferLimits(BufferSize, BufferSize);
-    // Parameterize with defer processing to prevent bit rot as filter made
-    // assumptions of data flow, prior relying on eager processing.
-    config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams,
-                                      deferredProcessing() ? "true" : "false");
 
     setUpstreamProtocol(Http::CodecType::HTTP2);
     setDownstreamProtocol(Http::CodecType::HTTP2);
@@ -148,14 +142,12 @@ protected:
   IntegrationStreamDecoderPtr client_response_;
   std::atomic<uint64_t> processor_request_hash_;
   std::atomic<uint64_t> processor_response_hash_;
-  TestScopedRuntime scoped_runtime_;
 };
 
 // Ensure that the test suite is run with all combinations the Envoy and Google gRPC clients.
-INSTANTIATE_TEST_SUITE_P(
-    StreamingProtocols, StreamingIntegrationTest,
-    GRPC_CLIENT_INTEGRATION_DEFERRED_PROCESSING_PARAMS,
-    Grpc::GrpcClientIntegrationParamTestWithDeferredProcessing::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(StreamingProtocols, StreamingIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS,
+                         Grpc::GrpcClientIntegrationParamTest::protocolTestParamsToString);
 
 // Send a body that's larger than the buffer limit, and have the processor return immediately
 // after the headers come in. Also check the metadata in this test.
@@ -402,6 +394,55 @@ TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyAndClose) {
   EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
 }
 
+TEST_P(StreamingIntegrationTest, PostAndProcessStreamedRequestBodyObservabilityMode) {
+  const uint32_t num_chunks = 152;
+  const uint32_t chunk_size = 1000;
+  uint32_t total_size = num_chunks * chunk_size;
+
+  test_processor_.start(
+      ipVersion(),
+      [total_size](grpc::ServerReaderWriter<ProcessingResponse, ProcessingRequest>* stream) {
+        // Expect a request_headers message as the first message on the stream,
+        // and send back an empty response.
+        ProcessingRequest header_req;
+        ASSERT_TRUE(stream->Read(&header_req));
+        ASSERT_TRUE(header_req.has_request_headers());
+        ProcessingResponse header_resp;
+        header_resp.mutable_request_headers();
+        stream->Write(header_resp);
+
+        // Now, expect a bunch of request_body messages and respond to each.
+        // Count up the number of bytes we receive and make sure that we get
+        // them all.
+        uint32_t received_size = 0;
+        ProcessingRequest body_req;
+        do {
+          ASSERT_TRUE(stream->Read(&body_req));
+          ASSERT_TRUE(body_req.has_request_body());
+          received_size += body_req.request_body().body().size();
+          ProcessingResponse body_resp;
+          body_resp.mutable_request_body();
+          stream->Write(body_resp);
+        } while (!body_req.request_body().end_of_stream());
+
+        EXPECT_EQ(received_size, total_size);
+      });
+
+  // Enable observability mode.
+  proto_config_.set_observability_mode(true);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  sendPostRequest(num_chunks, chunk_size, [total_size](Http::HeaderMap& headers) {
+    // This header tells the "autonomous upstream" that will respond to our
+    // request to throw an error if it doesn't get the right number of bytes.
+    headers.addCopy(LowerCaseString("expect_request_size_bytes"), total_size);
+  });
+
+  ASSERT_TRUE(client_response_->waitForEndStream());
+  EXPECT_TRUE(client_response_->complete());
+  EXPECT_THAT(client_response_->headers(), Http::HttpStatusIs("200"));
+}
 // Do an HTTP GET that will return a body smaller than the buffer limit, which we process
 // in the processor.
 TEST_P(StreamingIntegrationTest, DISABLED_GetAndProcessBufferedResponseBody) {

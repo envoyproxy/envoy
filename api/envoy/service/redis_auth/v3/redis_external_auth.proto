@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package envoy.service.redis_auth.v3;
+
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.service.redis_auth.v3";
+option java_outer_classname = "RedisExternalAuthProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/redis_auth/v3;redis_authv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Redis external authentication service]
+
+// The messages used by the redis_proxy filter when performing external authentication.
+
+// A generic interface for performing external password authentication on incoming AUTH commands.
+service RedisProxyExternalAuth {
+  // Performs authentication check based on the data sent with the AUTH request.
+  // Returns either an OK status or an error status.
+  rpc Authenticate(RedisProxyExternalAuthRequest) returns (RedisProxyExternalAuthResponse) {
+  }
+}
+
+message RedisProxyExternalAuthRequest {
+  // Username, if applicable. Otherwise, empty.
+  string username = 1;
+
+  // Password sent with the AUTH command.
+  string password = 2;
+}
+
+message RedisProxyExternalAuthResponse {
+  // Status of the authentication check.
+  google.rpc.Status status = 1;
+
+  // Optional expiration time for the authentication.
+  // If set, the authentication will be valid until this time.
+  // If not set, the authentication will be valid indefinitely.
+  google.protobuf.Timestamp expiration = 2;
+
+  // Optional message to be sent back to the client.
+  string message = 3;
+}

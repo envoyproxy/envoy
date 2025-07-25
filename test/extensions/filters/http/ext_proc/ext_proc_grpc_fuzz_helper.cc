@@ -114,7 +114,7 @@ std::string ExtProcFuzzHelper::consumeRepeatedString() {
 // use the envoy::type::v3::StatusCode enum directly.
 StatusCode ExtProcFuzzHelper::randomHttpStatus() {
   const StatusCode rv = provider_->PickValueInArray(HttpStatusCodes);
-  ENVOY_LOG_MISC(trace, "Selected HTTP StatusCode {}", rv);
+  ENVOY_LOG_MISC(trace, "Selected HTTP StatusCode {}", static_cast<int>(rv));
   return rv;
 }
 
@@ -122,7 +122,7 @@ StatusCode ExtProcFuzzHelper::randomHttpStatus() {
 // use the grpc::StatusCode enum directly.
 grpc::StatusCode ExtProcFuzzHelper::randomGrpcStatusCode() {
   const grpc::StatusCode rv = provider_->PickValueInArray(GrpcStatusCodes);
-  ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {}", rv);
+  ENVOY_LOG_MISC(trace, "Selected gRPC StatusCode {}", static_cast<int>(rv));
   return rv;
 }
 
@@ -146,7 +146,7 @@ void ExtProcFuzzHelper::logRequest(const ProcessingRequest* req) {
 
 grpc::Status ExtProcFuzzHelper::randomGrpcStatusWithMessage() {
   const grpc::StatusCode code = randomGrpcStatusCode();
-  ENVOY_LOG_MISC(trace, "Closing stream with StatusCode {}", code);
+  ENVOY_LOG_MISC(trace, "Closing stream with StatusCode {}", static_cast<int>(code));
   return {code, consumeRepeatedString()};
 }
 

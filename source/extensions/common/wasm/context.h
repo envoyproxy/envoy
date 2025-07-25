@@ -299,10 +299,12 @@ protected:
     // Http::AsyncClient::Callbacks
     void onSuccess(const Http::AsyncClient::Request&,
                    Envoy::Http::ResponseMessagePtr&& response) override {
+      request_ = nullptr;
       context_->onHttpCallSuccess(token_, std::move(response));
     }
     void onFailure(const Http::AsyncClient::Request&,
                    Http::AsyncClient::FailureReason reason) override {
+      request_ = nullptr;
       context_->onHttpCallFailure(token_, reason);
     }
     void
@@ -320,10 +322,12 @@ protected:
       context_->onGrpcCreateInitialMetadata(token_, initial_metadata);
     }
     void onSuccessRaw(::Envoy::Buffer::InstancePtr&& response, Tracing::Span& /* span */) override {
+      request_ = nullptr;
       context_->onGrpcReceiveWrapper(token_, std::move(response));
     }
     void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                    Tracing::Span& /* span */) override {
+      request_ = nullptr;
       context_->onGrpcCloseWrapper(token_, status, message);
     }
 
@@ -350,6 +354,7 @@ protected:
     }
     void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override {
       remote_closed_ = true;
+      stream_ = nullptr;
       context_->onGrpcCloseWrapper(token_, status, message);
     }
 
@@ -373,6 +378,14 @@ protected:
 
   Http::HeaderMap* getMap(WasmHeaderMapType type);
   const Http::HeaderMap* getConstMap(WasmHeaderMapType type);
+
+  void onHeadersModified(WasmHeaderMapType type) {
+    if (type != WasmHeaderMapType::RequestHeaders ||
+        abi_version_ > proxy_wasm::AbiVersion::ProxyWasm_0_2_1) {
+      return;
+    }
+    clearRouteCache();
+  }
 
   const LocalInfo::LocalInfo* root_local_info_{nullptr}; // set only for root_context.
   PluginHandleSharedPtr plugin_handle_{nullptr};
@@ -409,8 +422,8 @@ protected:
   // Only available during onHttpCallResponse.
   Envoy::Http::ResponseMessagePtr* http_call_response_{};
 
-  Http::HeaderMapPtr grpc_receive_initial_metadata_{};
-  Http::HeaderMapPtr grpc_receive_trailing_metadata_{};
+  Http::HeaderMapPtr grpc_receive_initial_metadata_;
+  Http::HeaderMapPtr grpc_receive_trailing_metadata_;
 
   // Only available (non-nullptr) during onGrpcReceive.
   ::Envoy::Buffer::InstancePtr grpc_receive_buffer_;
@@ -430,9 +443,7 @@ protected:
   bool buffering_request_body_ = false;
   bool buffering_response_body_ = false;
   bool end_of_stream_ = false;
-  bool local_reply_sent_ = false;
-  bool local_reply_hold_ = false;
-  ProtobufWkt::Struct temporary_metadata_;
+  bool failure_local_reply_sent_ = false;
 
   // MB: must be a node-type map as we take persistent references to the entries.
   std::map<uint32_t, AsyncClientHandler> http_request_;
@@ -450,6 +461,8 @@ protected:
   // Filter state prototype declaration.
   absl::flat_hash_map<std::string, Filters::Common::Expr::CelStatePrototypeConstPtr>
       state_prototypes_;
+
+  proxy_wasm::AbiVersion abi_version_{proxy_wasm::AbiVersion::Unknown};
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

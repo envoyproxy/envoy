@@ -10,7 +10,7 @@ FileAccessLog::FileAccessLog(const Filesystem::FilePathAndType& access_log_file_
                              AccessLog::AccessLogManager& log_manager)
     : ImplBase(std::move(filter)), formatter_(std::move(formatter)) {
   auto file_or_error = log_manager.createAccessLog(access_log_file_info);
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  THROW_IF_NOT_OK_REF(file_or_error.status());
   log_file_ = file_or_error.value();
 }
 

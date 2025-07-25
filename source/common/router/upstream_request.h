@@ -146,7 +146,9 @@ public:
   void encodeBodyAndTrailers();
 
   // Getters and setters
-  Upstream::HostDescriptionConstSharedPtr& upstreamHost() { return upstream_host_; }
+  Upstream::HostDescriptionOptConstRef upstreamHost() {
+    return makeOptRefFromPtr(upstream_host_.get());
+  }
   void outlierDetectionTimeoutRecorded(bool recorded) {
     outlier_detection_timeout_recorded_ = recorded;
   }
@@ -179,8 +181,9 @@ private:
   // queuing.
   void recordConnectionPoolCallbackLatency();
 
-  void addResponseHeadersSize(uint64_t size) {
+  void addResponseHeadersStat(uint64_t size, size_t count) {
     response_headers_size_ = response_headers_size_.value_or(0) + size;
+    response_headers_count_ = response_headers_count_.value_or(0) + count;
   }
   void resetPerTryIdleTimer();
   void onPerTryTimeout();
@@ -201,7 +204,8 @@ private:
   const MonotonicTime start_time_;
   // This is wrapped in an optional, since we want to avoid computing zero size headers when in
   // reality we just didn't get a response back.
-  absl::optional<uint64_t> response_headers_size_{};
+  absl::optional<uint64_t> response_headers_size_;
+  absl::optional<size_t> response_headers_count_;
   // Copies of upstream headers/trailers. These are only set if upstream
   // access logging is configured.
   Http::ResponseHeaderMapPtr upstream_headers_;
@@ -232,7 +236,6 @@ private:
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   // Tracks the number of times the flow of data from downstream has been disabled.
   uint32_t downstream_data_disabled_{};
-  bool calling_encode_headers_ : 1;
   bool upstream_canary_ : 1;
   bool router_sent_end_stream_ : 1;
   bool encode_trailers_ : 1;
@@ -256,7 +259,6 @@ private:
   bool had_upstream_ : 1;
   Http::ConnectionPool::Instance::StreamOptions stream_options_;
   bool grpc_rq_success_deferred_ : 1;
-  bool upstream_wait_for_response_headers_before_disabling_read_ : 1;
   bool enable_half_close_ : 1;
 };
 
@@ -340,15 +342,13 @@ public:
   void disarmRequestTimeout() override {}
   void resetIdleTimer() override {}
   void onLocalReply(Http::Code) override {}
+  void sendGoAwayAndClose() override {}
   // Upgrade filter chains not supported.
   const Router::RouteEntry::UpgradeMap* upgradeMap() override { return nullptr; }
 
   // Unsupported functions.
   void recreateStream(StreamInfo::FilterStateSharedPtr) override {
     IS_ENVOY_BUG("recreateStream called from upstream HTTP filter");
-  }
-  void upgradeFilterChainCreated() override {
-    IS_ENVOY_BUG("upgradeFilterChainCreated called from upstream HTTP filter");
   }
   OptRef<UpstreamStreamFilterCallbacks> upstreamCallbacks() override { return {*this}; }
 

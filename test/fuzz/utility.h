@@ -171,7 +171,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
               stream_info.address().envoy_internal_address().server_listener_name()));
     } else {
       auto address_or_error = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
-      THROW_IF_STATUS_NOT_OK(address_or_error, throw);
+      THROW_IF_NOT_OK_REF(address_or_error.status());
       address = address_or_error.value();
     }
   } else {
@@ -181,7 +181,7 @@ inline std::unique_ptr<TestStreamInfo> fromStreamInfo(const test::fuzz::StreamIn
   if (stream_info.has_upstream_local_address()) {
     auto upstream_local_address_or_error =
         Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address());
-    THROW_IF_STATUS_NOT_OK(upstream_local_address_or_error, throw);
+    THROW_IF_NOT_OK_REF(upstream_local_address_or_error.status());
     upstream_local_address = upstream_local_address_or_error.value();
   } else {
     upstream_local_address = *Network::Utility::resolveUrl("tcp://10.0.0.1:10000");

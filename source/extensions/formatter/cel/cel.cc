@@ -53,8 +53,8 @@ CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContex
 }
 
 ::Envoy::Formatter::FormatterProviderPtr
-CELFormatterCommandParser::parse(const std::string& command, const std::string& subcommand,
-                                 absl::optional<size_t>& max_length) const {
+CELFormatterCommandParser::parse(absl::string_view command, absl::string_view subcommand,
+                                 absl::optional<size_t> max_length) const {
 #if defined(USE_CEL_PARSER)
   if (command == "CEL") {
     auto parse_status = google::api::expr::parser::Parse(subcommand);
@@ -63,8 +63,12 @@ CELFormatterCommandParser::parse(const std::string& command, const std::string& 
                            parse_status.status().ToString());
     }
 
-    return std::make_unique<CELFormatter>(local_info_, expr_builder_, parse_status.value().expr(),
-                                          max_length);
+    Server::Configuration::ServerFactoryContext& context =
+        Server::Configuration::ServerFactoryContextInstance::get();
+
+    return std::make_unique<CELFormatter>(context.localInfo(),
+                                          Extensions::Filters::Common::Expr::getBuilder(context),
+                                          parse_status.value().expr(), max_length);
   }
 
   return nullptr;

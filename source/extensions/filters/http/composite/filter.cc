@@ -22,7 +22,9 @@ RValT delegateFilterActionOr(FilterPtrT& filter, FuncT func, RValT rval, Args&&.
 }
 
 // Own version of lambda overloading since std::overloaded is not available to use yet.
-template <class... Ts> struct Overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> struct Overloaded : Ts... {
+  using Ts::operator()...;
+};
 
 template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
@@ -94,7 +96,6 @@ void Filter::encodeComplete() {
 
 void Filter::onMatchCallback(const Matcher::Action& action) {
   const auto& composite_action = action.getTyped<ExecuteFilterAction>();
-
   FactoryCallbacksWrapper wrapper(*this, dispatcher_);
   composite_action.createFilters(wrapper);
 
@@ -105,10 +106,11 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
                   wrapper.errors_, [](const auto& status) { return status.ToString(); }));
     return;
   }
-  const std::string& action_name = composite_action.actionName();
 
   if (wrapper.filter_to_inject_.has_value()) {
     stats_.filter_delegation_success_.inc();
+
+    const std::string& action_name = composite_action.actionName();
 
     auto createDelegatedFilterFn = Overloaded{
         [this, action_name](Http::StreamDecoderFilterSharedPtr filter) {
@@ -135,7 +137,6 @@ void Filter::onMatchCallback(const Matcher::Action& action) {
     access_loggers_.insert(access_loggers_.end(), wrapper.access_loggers_.begin(),
                            wrapper.access_loggers_.end());
   }
-
   // TODO(snowp): Make it possible for onMatchCallback to fail the stream by issuing a local reply,
   // either directly or via some return status.
 }

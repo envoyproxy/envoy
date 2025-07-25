@@ -1,21 +1,13 @@
-#include <chrono>
-#include <cstddef>
-#include <thread>
-
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/http/utility.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/extensions/filters/http/common/mock.h"
-#include "test/mocks/api/mocks.h"
-#include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
+
+#include "gtest/gtest.h"
 
 using Envoy::Extensions::HttpFilters::Common::MockUpstream;
 using testing::_;
@@ -77,6 +69,20 @@ MATCHER_P(OptionsHasRetryPolicy, policyMatcher, "") {
 class MetadataFetcherTest : public testing::Test {
 public:
   void setupFetcher() {
+
+    mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
+        {"cluster_name"});
+    fetcher_ = MetadataFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
+                                       "cluster_name");
+    EXPECT_TRUE(fetcher_ != nullptr);
+  }
+
+  void setupFetcherShutDown() {
+    ON_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_, getThreadLocalCluster(_))
+        .WillByDefault(Return(nullptr));
+    ON_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_, isShutdown())
+        .WillByDefault(Return(true));
+
     mock_factory_ctx_.server_factory_context_.cluster_manager_.initializeThreadLocalClusters(
         {"cluster_name"});
     fetcher_ = MetadataFetcher::create(mock_factory_ctx_.server_factory_context_.cluster_manager_,
@@ -97,6 +103,18 @@ TEST_F(MetadataFetcherTest, TestGetSuccess) {
   MockUpstream mock_result(mock_factory_ctx_.server_factory_context_.cluster_manager_, "200", body);
   MockMetadataReceiver receiver;
   EXPECT_CALL(receiver, onMetadataSuccess(std::move(body)));
+  EXPECT_CALL(receiver, onMetadataError(_)).Times(0);
+
+  // Act
+  fetcher_->fetch(message, parent_span_, receiver);
+}
+
+TEST_F(MetadataFetcherTest, TestClusterShutdown) {
+  // Setup
+  setupFetcherShutDown();
+  Http::RequestMessageImpl message;
+  MockMetadataReceiver receiver;
+  EXPECT_CALL(receiver, onMetadataSuccess(_)).Times(0);
   EXPECT_CALL(receiver, onMetadataError(_)).Times(0);
 
   // Act
@@ -281,6 +299,8 @@ TEST_F(MetadataFetcherTest, TestFailureToStringConversion) {
             "InvalidMetadata");
   EXPECT_EQ(fetcher_->failureToString(MetadataFetcher::MetadataReceiver::Failure::MissingConfig),
             "MissingConfig");
+  EXPECT_EQ(fetcher_->failureToString(static_cast<MetadataFetcher::MetadataReceiver::Failure>(999)),
+            "");
 }
 
 } // namespace Aws

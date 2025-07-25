@@ -58,19 +58,14 @@ void setAllowHttp10WithDefaultHost(
   hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
 }
 
-std::string testParamToString(
-    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http1ParserImpl>>&
-        params) {
-  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
-                      TestUtility::http1ParserImplToString(std::get<1>(params.param)));
+std::string testParamToString(const testing::TestParamInfo<Network::Address::IpVersion>& params) {
+  return TestUtility::ipVersionToString(params.param);
 }
 
 } // namespace
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, IntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
-                         testParamToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()), testParamToString);
 
 // Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
@@ -523,6 +518,29 @@ TEST_P(IntegrationTest, EnvoyProxying1xxWithDecodeDataPause) {
     "@type": type.googleapis.com/test.integration.filters.StopAndContinueConfig
   )EOF");
   testEnvoyProxying1xx(true);
+}
+
+TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestAfterHeaders) {
+  testRouterRetryOnResetBeforeRequestAfterHeaders();
+}
+
+TEST_P(IntegrationTest, RouterRetryOnResetBeforeRequestBeforeHeaders) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* static_resources = bootstrap.mutable_static_resources();
+    auto* cluster = static_resources->mutable_clusters(0);
+    // Ensure we only have one connection upstream, one request active at a time.
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    protocol_options.mutable_common_http_protocol_options()
+        ->mutable_max_requests_per_connection()
+        ->set_value(1);
+    protocol_options.mutable_use_downstream_protocol_config();
+    auto* circuit_breakers = cluster->mutable_circuit_breakers();
+    circuit_breakers->add_thresholds()->mutable_max_connections()->set_value(1);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+  config_helper_.prependFilter("{ name: buffer-continue-filter }", false);
+  testRouterRetryOnResetBeforeRequestBeforeHeaders();
 }
 
 // Test the x-envoy-is-timeout-retry header is set to false for retries that are not
@@ -1177,27 +1195,6 @@ TEST_P(IntegrationTest, Http09Enabled) {
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
 
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("HTTP/1.0"));
-}
-
-TEST_P(IntegrationTest, Http09WithKeepalive) {
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // HTTP/0.9 does not allow for headers.
-    // BalsaParser correctly ignores data after "\r\n".
-    return;
-  }
-
-  useAccessLog();
-  autonomous_upstream_ = true;
-  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
-  initialize();
-  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
-      ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
-  std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
-                                &response, true);
-  EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
-  EXPECT_THAT(response, HasSubstr("connection: keep-alive\r\n"));
 }
 
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
@@ -1937,10 +1934,8 @@ TEST_P(IntegrationTest, TrailersDroppedDownstream) {
   testTrailers(10, 10, false, false);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, UpstreamEndpointIntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
-                         testParamToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()), testParamToString);
 
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
@@ -2117,6 +2112,45 @@ TEST_P(IntegrationTest, TestUpgradeHeaderInResponseWithTrailers) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("Hello World", response->body());
   EXPECT_NE(response->trailers(), nullptr);
+}
+
+// With the default configuration, an upgrade request is rejected.
+TEST_P(IntegrationTest, TestUpgradeRequestRejected) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/test/long/url"},
+      {":scheme", "http"}, {"connection", "Upgrade"},       {"upgrade", "TLS/1.3"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "403");
+}
+
+// With the default configuration, an upgrade request is rejected.
+TEST_P(IntegrationTest, TestUpgradeRequestStripped) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* matcher = hcm.mutable_http_protocol_options()->add_ignore_http_11_upgrade();
+        matcher->set_prefix("TLS/");
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},  {":authority", "envoyproxy.io"}, {":path", "/test/long/url"},
+      {":scheme", "http"}, {"connection", "Upgrade"},       {"upgrade", "TLS/1.3"}};
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  EXPECT_EQ(nullptr, upstream_request_->headers().Upgrade());
+  EXPECT_EQ(nullptr, upstream_request_->headers().Connection());
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_EQ(response->headers().getStatusValue(), "200");
 }
 
 TEST_P(IntegrationTest, ConnectWithNoBody) {

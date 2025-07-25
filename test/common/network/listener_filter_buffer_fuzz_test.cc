@@ -49,7 +49,7 @@ public:
       FUZZ_ASSERT(data == available_data_.substr(0, max_bytes_read - drained_size_));
     };
     auto listener_buffer = std::make_unique<ListenerFilterBufferImpl>(
-        io_handle_, dispatcher_, [&](bool) {}, on_data_cb, max_bytes_read);
+        io_handle_, dispatcher_, [&](bool) {}, on_data_cb, max_bytes_read == 0, max_bytes_read);
 
     for (auto i = 0; i < input.actions().size(); i++) {
       const char insert_value = 'a' + i % 26;

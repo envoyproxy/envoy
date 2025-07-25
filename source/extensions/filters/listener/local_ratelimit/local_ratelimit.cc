@@ -21,11 +21,11 @@ FilterConfig::FilterConfig(
           Protobuf::RepeatedPtrField<
               envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>()) {}
 
-bool FilterConfig::canCreateConnection() { return rate_limiter_.requestAllowed({}); }
+bool FilterConfig::canCreateConnection() { return rate_limiter_.requestAllowed({}).allowed; }
 
 LocalRateLimitStats FilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  const std::string final_prefix = "listener_local_ratelimit." + prefix;
-  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
+  static constexpr absl::string_view kPrefix = "listener_local_ratelimit.";
+  return {ALL_LOCAL_RATE_LIMIT_STATS(POOL_COUNTER_PREFIX(scope, absl::StrCat(kPrefix, prefix)))};
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {

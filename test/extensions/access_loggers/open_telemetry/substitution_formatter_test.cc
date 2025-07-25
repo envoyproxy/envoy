@@ -895,6 +895,8 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
 TEST(SubstitutionFormatterTest, CELFormatterTest) {
   {
     NiceMock<Server::Configuration::MockFactoryContext> context;
+    ScopedThreadLocalServerContextSetter server_context_setter(context.server_factory_context_);
+
     StreamInfo::MockStreamInfo stream_info;
     Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
     Http::TestResponseHeaderMapImpl response_header{
@@ -909,13 +911,9 @@ TEST(SubstitutionFormatterTest, CELFormatterTest) {
           - key: "cel_field"
             value:
               string_value: "%CEL(request.headers['some_request_header'])% %CEL(response.headers['some_response_header'])%"
-      formatters:
-        - name: envoy.formatter.cel
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
     )EOF",
                               otel_config);
-    auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+    auto commands = *Formatter::SubstitutionFormatStringUtils::parseFormatters(
         otel_config.formatters(), context);
 
     OpenTelemetryFormatter formatter(otel_config.resource_attributes(), commands);

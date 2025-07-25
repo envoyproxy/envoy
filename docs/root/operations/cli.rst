@@ -109,6 +109,7 @@ following are the command line options that Envoy supports.
   never set this option. For example, if you want ``upstream`` component to run at ``debug`` level and
   ``connection`` component to run at ``trace`` level, you should pass ``upstream:debug,connection:trace`` to
   this flag. See ``ALL_LOGGER_IDS`` in :repo:`/source/common/common/logger.h` for a list of components.
+  This option is incompatible with :option:`--enable-fine-grain-logging`.
 
 .. option:: --cpuset-threads
 
@@ -193,7 +194,7 @@ following are the command line options that Envoy supports.
   interface. If enabled, main log macros including ``ENVOY_LOG``, ``ENVOY_CONN_LOG``, ``ENVOY_STREAM_LOG`` and
   ``ENVOY_FLUSH_LOG`` will use a per-file logger, and the usage doesn't need ``Envoy::Logger::Loggable`` any
   more. The administration interface usage is similar. Please see :ref:`Administration interface
-  <operations_admin_interface>` for more detail.
+  <operations_admin_interface>` for more detail. This option is incompatible with :option:`--component-log-level`.
 
 .. option:: --socket-path <path string>
 
@@ -346,6 +347,13 @@ following are the command line options that Envoy supports.
     message and fields. It is *strongly* recommended that this option is not set on at least a
     small portion of the fleet (staging, canary, etc.) in order to monitor for unknown,
     deprecated, or work-in-progress usage.
+
+.. option:: --skip-deprecated-logs
+
+  *(optional)* This option disables the logging of deprecated field warnings during Protobuf message validation.
+  When enabled, deprecated fields will be silently ignored without generating log messages, which can be useful
+  for reducing log verbosity in production environments. By default, deprecated warnings are logged. The suppression
+  of these warnings is only activated when this CLI option is explicitly used.
 
 .. option:: --disable-extensions <extension list>
 

@@ -130,7 +130,6 @@ void WebsocketIntegrationTest::initialize() {
               *bootstrap.mutable_static_resources()->mutable_clusters(0), protocol_options);
         });
   } else if (upstreamProtocol() == Http::CodecType::HTTP3) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
           ConfigHelper::HttpProtocolOptions protocol_options;
@@ -147,7 +146,6 @@ void WebsocketIntegrationTest::initialize() {
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
   } else if (downstreamProtocol() == Http::CodecType::HTTP3) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.use_http3_header_normalisation", true);
     config_helper_.addConfigModifier(
         [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
@@ -238,57 +236,6 @@ TEST_P(WebsocketIntegrationTest, PortStrippingForHttp2) {
   // Verify the final data was received and that the connection is torn down.
   ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "bye!"));
   ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
-}
-
-TEST_P(WebsocketIntegrationTest, EarlyData) {
-  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
-      upstreamProtocol() != Http::CodecType::HTTP1) {
-    return;
-  }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "false"}});
-
-  config_helper_.addConfigModifier(setRouteUsingWebsocket());
-  initialize();
-
-  // Establish the initial connection.
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  const std::string early_data_req_str = "hello";
-  const std::string early_data_resp_str = "world";
-
-  // Send websocket upgrade request with early data.
-  auto encoder_decoder =
-      codec_client_->startRequest(upgradeRequestHeaders("websocket", early_data_req_str.size()));
-  request_encoder_ = &encoder_decoder.first;
-  response_ = std::move(encoder_decoder.second);
-  codec_client_->sendData(*request_encoder_, early_data_req_str, false);
-
-  // Wait for both the upgrade, and the early data.
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hello"));
-
-  // Accept websocket upgrade request
-  upstream_request_->encodeHeaders(upgradeResponseHeaders(), false);
-  // Reply also with early data
-  upstream_request_->encodeData(early_data_resp_str, false);
-  // upstream disconnect
-  ASSERT_TRUE(fake_upstream_connection_->close());
-  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-
-  response_->waitForHeaders();
-  auto upgrade_response_headers(upgradeResponseHeaders());
-  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
-
-  if (downstreamProtocol() == Http::CodecType::HTTP1) {
-    // For H2, the disconnect may result in the terminal data not being proxied.
-    response_->waitForBodyData(5);
-  }
-  waitForClientDisconnectOrReset();
-  EXPECT_EQ("world", response_->body());
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
@@ -643,9 +590,6 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatusCodeOK) {
       upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
@@ -671,9 +615,6 @@ TEST_P(WebsocketIntegrationTest, NonHttp1UpgradeStatusCodeOK) {
       downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
@@ -695,9 +636,6 @@ TEST_P(WebsocketIntegrationTest, NoHttp1UpstreamUpgradeStatus201) {
       downstreamProtocol() == Http::CodecType::HTTP1) {
     return;
   }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
@@ -718,9 +656,6 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatusCodeUpgradeRequired) {
       upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
 
   useAccessLog("%RESPONSE_CODE_DETAILS%");
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
@@ -747,9 +682,6 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeFailedWithPrePayload) {
       upstreamProtocol() != Http::CodecType::HTTP1) {
     return;
   }
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.check_switch_protocol_websocket_handshake", "true"}});
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket());
   initialize();
@@ -782,5 +714,58 @@ TEST_P(WebsocketIntegrationTest, BidirectionalUpgradeFailedWithPrePayload) {
 
   tcp_client->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
+TEST_P(WebsocketIntegrationTest, WebsocketUpgradeWithDisabledSmallBufferFilter) {
+  if (downstreamProtocol() != Http::CodecType::HTTP1 ||
+      upstreamProtocol() != Http::CodecType::HTTP1) {
+    return;
+  }
+
+  const std::string WebsocketUpgradeWithDisabledSmallBufferConfig = R"EOF(
+    name: typed-per-filter-config-for-ws
+    virtual_hosts:
+    - name: app-ws
+      domains:
+      - "*"
+      routes:
+      - match:
+          prefix: "/websocket/test"
+        route:
+          cluster: cluster_0
+          upgrade_configs:
+          - upgrade_type: websocket
+        typed_per_filter_config:
+          buffer:
+            "@type": type.googleapis.com/envoy.config.route.v3.FilterConfig
+            disabled: true
+)EOF";
+
+  const std::string TinyBufferFilter = R"EOF(
+    name: buffer
+    typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer
+        max_request_bytes : 1
+)EOF";
+
+  config_helper_.prependFilter(TinyBufferFilter);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto route_config = hcm.mutable_route_config();
+        TestUtility::loadFromYaml(WebsocketUpgradeWithDisabledSmallBufferConfig, *route_config);
+      });
+  initialize();
+
+  performUpgrade(upgradeRequestHeaders(), upgradeResponseHeaders());
+  sendBidirectionalData();
+
+  // Send some final data from the client, and disconnect.
+  codec_client_->sendData(*request_encoder_, "bye!", false);
+  codec_client_->close();
+
+  // Verify the final data was received and that the connection is torn down.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, "hellobye!"));
+  ASSERT_TRUE(waitForUpstreamDisconnectOrReset());
 }
 } // namespace Envoy

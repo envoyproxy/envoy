@@ -10,9 +10,6 @@ envoy_mobile_android_test(
     srcs = [
         "ProxyInfoIntentPerformHTTPRequestUsingProxyTest.kt",
     ],
-    exec_properties = {
-        "dockerNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
@@ -22,11 +19,13 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_and_listener_extensions",
+    test_class = "test.kotlin.integration.proxying.ProxyInfoIntentPerformHTTPRequestUsingProxyTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -35,9 +34,6 @@ envoy_mobile_android_test(
     srcs = [
         "ProxyInfoIntentPerformHTTPSRequestUsingProxyTest.kt",
     ],
-    exec_properties = {
-        "dockerNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
@@ -47,11 +43,13 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_and_listener_extensions",
+    test_class = "test.kotlin.integration.proxying.ProxyInfoIntentPerformHTTPSRequestUsingProxyTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -60,9 +58,6 @@ envoy_mobile_android_test(
     srcs = [
         "ProxyInfoIntentPerformHTTPSRequestUsingAsyncProxyTest.kt",
     ],
-    exec_properties = {
-        "dockerNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
@@ -72,11 +67,13 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_and_listener_extensions",
+    test_class = "test.kotlin.integration.proxying.ProxyInfoIntentPerformHTTPSRequestUsingAsyncProxyTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -85,9 +82,6 @@ envoy_mobile_android_test(
     srcs = [
         "ProxyInfoIntentPerformHTTPSRequestBadHostnameTest.kt",
     ],
-    exec_properties = {
-        "dockerNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
@@ -97,11 +91,13 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_and_listener_extensions",
+    test_class = "test.kotlin.integration.proxying.ProxyInfoIntentPerformHTTPSRequestBadHostnameTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -110,9 +106,6 @@ envoy_mobile_android_test(
     srcs = [
         "ProxyPollPerformHTTPRequestUsingProxyTest.kt",
     ],
-    exec_properties = {
-        "dockerNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
@@ -122,11 +115,13 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_and_listener_extensions",
+    test_class = "test.kotlin.integration.proxying.ProxyPollPerformHTTPRequestUsingProxyTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )
 
@@ -135,9 +130,6 @@ envoy_mobile_android_test(
     srcs = [
         "ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest.kt",
     ],
-    exec_properties = {
-        "dockerNetwork": "standard",
-    },
     native_deps = [
         "//test/jni:libenvoy_jni_with_test_and_listener_extensions.so",
     ] + select({
@@ -147,10 +139,12 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_and_listener_extensions",
+    test_class = "test.kotlin.integration.proxying.ProxyPollPerformHTTPRequestWithoutUsingPACProxyTest",
     deps = [
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_interfaces_lib",
         "//library/kotlin/io/envoyproxy/envoymobile:envoy_lib",
         "//test/java/io/envoyproxy/envoymobile/engine/testing",
         "//test/java/io/envoyproxy/envoymobile/engine/testing:http_proxy_test_server_factory_lib",
+        "//test/java/io/envoyproxy/envoymobile/engine/testing:http_test_server_factory_lib",
     ],
 )

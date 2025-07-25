@@ -1,0 +1,22 @@
+diff --git a/cpp2sky/BUILD b/cpp2sky/BUILD
+index 61d0ab4..1306c75 100644
+--- a/cpp2sky/BUILD
++++ b/cpp2sky/BUILD
+@@ -1,4 +1,5 @@
+-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
++load("@rules_cc//cc:defs.bzl", "cc_library")
++load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+ load("@rules_proto//proto:defs.bzl", "proto_library")
+ 
+ licenses(["notice"])  # Apache 2
+diff --git a/cpp2sky/internal/BUILD b/cpp2sky/internal/BUILD
+index b68a5f4..ac6b2e5 100644
+--- a/cpp2sky/internal/BUILD
++++ b/cpp2sky/internal/BUILD
+@@ -1,4 +1,5 @@
+-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_proto_library")
++load("@rules_cc//cc:defs.bzl", "cc_library")
++load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+ load("@rules_proto//proto:defs.bzl", "proto_library")
+ 
+ licenses(["notice"])  # Apache 2

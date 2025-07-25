@@ -2,7 +2,9 @@ package org.chromium.net.impl;
 
 import static io.envoyproxy.envoymobile.engine.EnvoyConfiguration.TrustChainVerification.VERIFY_TRUST_CHAIN;
 
+import java.nio.charset.StandardCharsets;
 import android.content.Context;
+import android.util.Pair;
 import androidx.annotation.VisibleForTesting;
 import com.google.protobuf.Struct;
 import io.envoyproxy.envoymobile.engine.AndroidEngineImpl;
@@ -22,8 +24,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+
 import org.chromium.net.ExperimentalCronetEngine;
 import org.chromium.net.ICronetEngineBuilder;
+import com.google.protobuf.Any;
 
 /**
  * Implementation of {@link ICronetEngineBuilder} that builds native Cronvoy engine.
@@ -33,8 +38,10 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   // TODO(refactor) move unshared variables into their specific methods.
   private final List<EnvoyNativeFilterConfig> nativeFilterChain = new ArrayList<>();
   private final EnvoyEventTracker mEnvoyEventTracker = null;
-  private final int mConnectTimeoutSeconds = 30;
+  private int mConnectTimeoutSeconds = 10;
   private final int mDnsRefreshSeconds = 60;
+  private boolean mDisableDnsRefreshOnFailure = false;
+  private boolean mDisableDnsRefreshOnNetworkChange = false;
   private final int mDnsFailureRefreshSecondsBase = 2;
   private final int mDnsFailureRefreshSecondsMax = 10;
   private int mDnsQueryTimeoutSeconds = 5;
@@ -42,10 +49,9 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private final List<String> mDnsPreresolveHostnames = Collections.emptyList();
   private final boolean mEnableDNSCache = false;
   private final int mDnsCacheSaveIntervalSeconds = 1;
+  private Optional<Integer> mDnsNumRetries = Optional.empty();
   private final List<String> mDnsFallbackNameservers = Collections.emptyList();
   private final boolean mEnableDnsFilterUnroutableFamilies = true;
-  private boolean mUseCares = false;
-  private boolean mUseGro = false;
   private boolean mEnableDrainPostDnsRefresh = false;
   private final boolean mEnableGzipDecompression = true;
   private final boolean mEnableSocketTag = true;
@@ -61,6 +67,8 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private TrustChainVerification mTrustChainVerification = VERIFY_TRUST_CHAIN;
   private final boolean mEnablePlatformCertificatesValidation = true;
   private String mUpstreamTlsSni = "";
+  private int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
+  private boolean mUseNetworkChangeEvent = false;
 
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
@@ -79,27 +87,6 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setEnableDrainPostDnsRefresh(boolean enable) {
     mEnableDrainPostDnsRefresh = enable;
-    return this;
-  }
-
-  /**
-   * Enable using the c_ares DNS resolver.
-   *
-   * @param enable If true, use c_ares.
-   */
-  public NativeCronvoyEngineBuilderImpl setUseCares(boolean enable) {
-    mUseCares = enable;
-    return this;
-  }
-
-  /**
-   * Specify whether to use UDP GRO for upstream QUIC/HTTP3 sockets, if GRO is available on the
-   * system.
-   *
-   * @param enable If true, use UDP GRO.
-   */
-  public NativeCronvoyEngineBuilderImpl setUseGro(boolean enable) {
-    mUseGro = enable;
     return this;
   }
 
@@ -127,6 +114,29 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   }
 
   /**
+   * Use a more modern network change API.
+   *
+   * @param enable If true, use the new API; otherwise, don't.
+   */
+  public NativeCronvoyEngineBuilderImpl setUseNetworkChangeEvent(boolean use) {
+    mUseNetworkChangeEvent = use;
+    return this;
+  }
+
+  /** Disables the DNS refresh on failure. */
+  public NativeCronvoyEngineBuilderImpl
+  setDisableDnsRefreshOnFailure(boolean disableDnsRefreshOnFailure) {
+    mDisableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
+    return this;
+  }
+
+  public NativeCronvoyEngineBuilderImpl
+  setDisableDnsRefreshOnNetworkChange(boolean disableDnsRefreshOnNetworkChange) {
+    mDisableDnsRefreshOnNetworkChange = disableDnsRefreshOnNetworkChange;
+    return this;
+  }
+
+  /**
    * Set the DNS minimum refresh time, in seconds, which ensures that we wait to refresh a DNS
    * entry for at least the minimum refresh time. For example, if the DNS record TTL is 60 seconds
    * and setMinDnsRefreshSeconds(120) is invoked, then at least 120 seconds will transpire before
@@ -138,6 +148,18 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   public NativeCronvoyEngineBuilderImpl setMinDnsRefreshSeconds(int minRefreshSeconds) {
     mDnsMinRefreshSeconds = minRefreshSeconds;
+    return this;
+  }
+
+  /**
+   * Specifies the number of retries before the resolver gives up. If not specified, the resolver
+   * will retry indefinitely until it succeeds or the DNS query times out.
+   *
+   * @param dnsNumRetries the number of retries
+   * @return this builder
+   */
+  public NativeCronvoyEngineBuilderImpl setDnsNumRetries(int dnsNumRetries) {
+    mDnsNumRetries = Optional.of(dnsNumRetries);
     return this;
   }
 
@@ -193,6 +215,17 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     return this;
   }
 
+  public NativeCronvoyEngineBuilderImpl
+  setH3ConnectionKeepaliveInitialIntervalMilliseconds(int interval) {
+    mH3ConnectionKeepaliveInitialIntervalMilliseconds = interval;
+    return this;
+  }
+
+  public NativeCronvoyEngineBuilderImpl setConnectTimeoutSeconds(int connectTimeout) {
+    mConnectTimeoutSeconds = connectTimeout;
+    return this;
+  }
+
   /**
    * Indicates to skip the TLS certificate verification.
    *
@@ -211,9 +244,14 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
    */
   @VisibleForTesting
   public CronvoyEngineBuilderImpl addUrlInterceptorsForTesting() {
-    nativeFilterChain.add(new EnvoyNativeFilterConfig(
-        "envoy.filters.http.test_read",
-        "[type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead] {}"));
+    Any anyProto =
+        Any.newBuilder()
+            .setTypeUrl(
+                "type.googleapis.com/envoymobile.test.integration.filters.http.test_read.TestRead")
+            .setValue(com.google.protobuf.ByteString.empty())
+            .build();
+    String config = new String(anyProto.toByteArray(), StandardCharsets.UTF_8);
+    nativeFilterChain.add(new EnvoyNativeFilterConfig("envoy.filters.http.test_read", config));
     return this;
   }
 
@@ -227,9 +265,9 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
 
   EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning, EnvoyLogger envoyLogger,
                            String logLevel) {
-    AndroidEngineImpl engine = new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger,
-                                                     mEnvoyEventTracker, mEnableProxying);
-    AndroidNetworkMonitor.load(getContext(), engine);
+    AndroidEngineImpl engine = new AndroidEngineImpl(
+        getContext(), onEngineRunning, envoyLogger, mEnvoyEventTracker, mEnableProxying,
+        mUseNetworkChangeEvent, mDisableDnsRefreshOnNetworkChange);
     engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;
   }
@@ -240,16 +278,17 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
     Map<String, EnvoyKeyValueStore> keyValueStores = Collections.emptyMap();
 
     return new EnvoyConfiguration(
-        mConnectTimeoutSeconds, mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase,
-        mDnsFailureRefreshSecondsMax, mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds,
-        mDnsPreresolveHostnames, mEnableDNSCache, mDnsCacheSaveIntervalSeconds,
-        mEnableDrainPostDnsRefresh, quicEnabled(), mUseCares, mUseGro, quicConnectionOptions(),
-        quicClientConnectionOptions(), quicHints(), quicCanonicalSuffixes(),
-        mEnableGzipDecompression, brotliEnabled(), portMigrationEnabled(), mEnableSocketTag,
-        mEnableInterfaceBinding, mH2ConnectionKeepaliveIdleIntervalMilliseconds,
-        mH2ConnectionKeepaliveTimeoutSeconds, mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds,
-        mPerTryIdleTimeoutSeconds, mAppVersion, mAppId, mTrustChainVerification, nativeFilterChain,
-        platformFilterChain, stringAccessors, keyValueStores, mRuntimeGuards,
-        mEnablePlatformCertificatesValidation, mUpstreamTlsSni);
+        mConnectTimeoutSeconds, mDisableDnsRefreshOnFailure, mDisableDnsRefreshOnNetworkChange,
+        mDnsRefreshSeconds, mDnsFailureRefreshSecondsBase, mDnsFailureRefreshSecondsMax,
+        mDnsQueryTimeoutSeconds, mDnsMinRefreshSeconds, mDnsPreresolveHostnames, mEnableDNSCache,
+        mDnsCacheSaveIntervalSeconds, mDnsNumRetries.orElse(-1), mEnableDrainPostDnsRefresh,
+        quicEnabled(), quicConnectionOptions(), quicClientConnectionOptions(), quicHints(),
+        quicCanonicalSuffixes(), mEnableGzipDecompression, brotliEnabled(),
+        numTimeoutsToTriggerPortMigration(), mEnableSocketTag, mEnableInterfaceBinding,
+        mH2ConnectionKeepaliveIdleIntervalMilliseconds, mH2ConnectionKeepaliveTimeoutSeconds,
+        mMaxConnectionsPerHost, mStreamIdleTimeoutSeconds, mPerTryIdleTimeoutSeconds, mAppVersion,
+        mAppId, mTrustChainVerification, nativeFilterChain, platformFilterChain, stringAccessors,
+        keyValueStores, mRuntimeGuards, mEnablePlatformCertificatesValidation, mUpstreamTlsSni,
+        mH3ConnectionKeepaliveInitialIntervalMilliseconds);
   }
 }

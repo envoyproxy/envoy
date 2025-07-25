@@ -18,6 +18,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
+#include "absl/strings/str_join.h"
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
 #include "google/api/httpbody.pb.h"
@@ -43,6 +44,8 @@ using google::grpc::transcoding::Transcoder;
 using TranscoderPtr = std::unique_ptr<Transcoder>;
 using google::grpc::transcoding::TranscoderInputStream;
 using TranscoderInputStreamPtr = std::unique_ptr<TranscoderInputStream>;
+using envoy::extensions::filters::http::grpc_json_transcoder::v3::UnknownQueryParams;
+using google::grpc::transcoding::VariableBinding;
 
 namespace Envoy {
 namespace Extensions {
@@ -122,7 +125,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptor: {
     auto file_or_error = api.fileSystem().fileReadToEnd(proto_config.proto_descriptor());
-    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     if (!descriptor_set.ParseFromString(file_or_error.value())) {
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
     }
@@ -176,7 +179,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
       if (method->options().HasExtension(google::api::http)) {
         http_rule = method->options().GetExtension(google::api::http);
       } else if (proto_config.auto_mapping()) {
-        auto post = "/" + service->full_name() + "/" + method->name();
+        auto post = absl::StrCat("/", service->full_name(), "/", method->name());
         http_rule.set_post(post);
         http_rule.set_body("*");
       }
@@ -226,9 +229,12 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   response_translate_options_.json_print_options.preserve_proto_field_names =
       print_config.preserve_proto_field_names();
   response_translate_options_.stream_newline_delimited = print_config.stream_newline_delimited();
+  response_translate_options_.stream_sse_style_delimited =
+      print_config.stream_sse_style_delimited();
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
+  capture_unknown_query_parameters_ = proto_config.capture_unknown_query_parameters();
   request_validation_options_ = proto_config.request_validation_options();
   case_insensitive_enum_parsing_ = proto_config.case_insensitive_enum_parsing();
   if (proto_config.has_max_request_body_size()) {
@@ -268,7 +274,8 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
   const ProtobufWkt::Type* message_type =
       type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
   if (message_type == nullptr) {
-    return {StatusCode::kNotFound, "Could not resolve type: " + descriptor->full_name()};
+    return {StatusCode::kNotFound,
+            absl::StrCat("Could not resolve type: ", descriptor->full_name())};
   }
 
   Status status = type_helper_->ResolveFieldPath(
@@ -311,8 +318,8 @@ Status JsonTranscoderConfig::createMethodInfo(const Protobuf::MethodDescriptor* 
   if (!method_info->response_body_field_path.empty() && !method_info->response_type_is_http_body_) {
     // TODO(euroelessar): Implement https://github.com/envoyproxy/envoy/issues/11136.
     return {StatusCode::kUnimplemented,
-            "Setting \"response_body\" is not supported yet for non-HttpBody fields: " +
-                descriptor->full_name()};
+            absl::StrCat("Setting \"response_body\" is not supported yet for non-HttpBody fields: ",
+                         descriptor->full_name())};
   }
 
   return {};
@@ -327,7 +334,8 @@ bool JsonTranscoderConfig::convertGrpcStatus() const { return convert_grpc_statu
 absl::Status JsonTranscoderConfig::createTranscoder(
     const Http::RequestHeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
-    std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info) const {
+    std::unique_ptr<Transcoder>& transcoder, MethodInfoSharedPtr& method_info,
+    UnknownQueryParams& unknown_params) const {
 
   ASSERT(!disabled_);
   const std::string method(headers.getMethodValue());
@@ -361,7 +369,11 @@ absl::Status JsonTranscoderConfig::createTranscoder(
     status = type_helper_->ResolveFieldPath(*request_info.message_type, binding.field_path,
                                             &resolved_binding.field_path);
     if (!status.ok()) {
-      if (ignore_unknown_query_parameters_) {
+      if (capture_unknown_query_parameters_) {
+        auto binding_key = absl::StrJoin(binding.field_path, ".");
+        (*unknown_params.mutable_key())[binding_key].add_values(binding.value);
+        continue;
+      } else if (ignore_unknown_query_parameters_) {
         continue;
       }
       return status;
@@ -406,12 +418,13 @@ absl::Status JsonTranscoderConfig::createTranscoder(
 absl::Status
 JsonTranscoderConfig::methodToRequestInfo(const MethodInfoSharedPtr& method_info,
                                           google::grpc::transcoding::RequestInfo* info) const {
-  const std::string& request_type_full_name = method_info->descriptor_->input_type()->full_name();
+  absl::string_view request_type_full_name = method_info->descriptor_->input_type()->full_name();
   auto request_type_url = Grpc::Common::typeUrl(request_type_full_name);
   info->message_type = type_helper_->Info()->GetTypeByTypeUrl(request_type_url);
   if (info->message_type == nullptr) {
     ENVOY_LOG(debug, "Cannot resolve input-type: {}", request_type_full_name);
-    return {StatusCode::kNotFound, "Could not resolve type: " + request_type_full_name};
+    return {StatusCode::kNotFound,
+            absl::StrCat("Could not resolve type: ", request_type_full_name)};
   }
 
   return {};
@@ -464,8 +477,9 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
     return Http::FilterHeadersStatus::Continue;
   }
 
-  const auto status =
-      per_route_config_->createTranscoder(headers, request_in_, response_in_, transcoder_, method_);
+  const auto status = per_route_config_->createTranscoder(headers, request_in_, response_in_,
+                                                          transcoder_, method_, unknown_params_);
+
   if (!status.ok()) {
     ENVOY_STREAM_LOG(debug, "Failed to transcode request headers: {}", *decoder_callbacks_,
                      status.message());
@@ -538,8 +552,8 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::RequestHeade
   headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
   headers.setEnvoyOriginalPath(headers.getPathValue());
   headers.addReferenceKey(Http::Headers::get().EnvoyOriginalMethod, headers.getMethodValue());
-  headers.setPath("/" + method_->descriptor_->service()->full_name() + "/" +
-                  method_->descriptor_->name());
+  headers.setPath(absl::StrCat("/", method_->descriptor_->service()->full_name(), "/",
+                               method_->descriptor_->name()));
   headers.setReferenceMethod(Http::Headers::get().MethodValues.Post);
   headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
 
@@ -671,9 +685,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
 
   if (end_stream) {
     if (method_->descriptor_->server_streaming()) {
-      // When there is no body in a streaming response, a empty JSON array is
-      // returned by default. Set the content type correctly.
-      headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+      if (per_route_config_->isStreamSSEStyleDelimited()) {
+        headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
+      } else {
+        headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+      }
     }
 
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
@@ -683,7 +699,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  if (per_route_config_->isStreamSSEStyleDelimited()) {
+    headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
+  } else {
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  }
 
   // In case of HttpBody in response - content type is unknown at this moment.
   // So "Continue" only for regular streaming use case and StopIteration for
@@ -904,7 +924,8 @@ void JsonTranscoderFilter::maybeSendHttpBodyRequestMessage(Buffer::Instance* dat
   stats_->transcoder_request_buffer_bytes_.sub(initial_request_data_.length());
   message_payload.move(initial_request_data_);
   HttpBodyUtils::appendHttpBodyEnvelope(message_payload, method_->request_body_field_path,
-                                        std::move(content_type_), request_data_.length());
+                                        std::move(content_type_), request_data_.length(),
+                                        unknown_params_);
   content_type_.clear();
   stats_->transcoder_request_buffer_bytes_.sub(request_data_.length());
   message_payload.move(request_data_);

@@ -200,6 +200,11 @@ extractions_by_method: {
       value: {
       }
     }
+    request_field_extractions: {
+      key: "repeated_supported_types.map"
+      value: {
+      }
+    }
   }
 })pb");
   *proto_config_.mutable_descriptor_set()->mutable_filename() =

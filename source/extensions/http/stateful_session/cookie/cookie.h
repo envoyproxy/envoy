@@ -30,8 +30,7 @@ public:
         : upstream_address_(std::move(address)), factory_(factory), time_source_(time_source) {}
 
     absl::optional<absl::string_view> upstreamAddress() const override { return upstream_address_; }
-    void onUpdate(const Upstream::HostDescription& host,
-                  Envoy::Http::ResponseHeaderMap& headers) override;
+    void onUpdate(absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) override;
 
   private:
     absl::optional<std::string> upstream_address_;
@@ -42,7 +41,7 @@ public:
   CookieBasedSessionStateFactory(const CookieBasedSessionStateProto& config,
                                  TimeSource& time_source);
 
-  Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap& headers) const override {
+  Envoy::Http::SessionStatePtr create(Envoy::Http::RequestHeaderMap& headers) const override {
     if (!requestPathMatch(headers.getPathValue())) {
       return nullptr;
     }
@@ -99,7 +98,7 @@ private:
   const std::string name_;
   const std::chrono::seconds ttl_;
   const std::string path_;
-  const Envoy::Http::CookieAttributeRefVector attributes_;
+  std::vector<Envoy::Http::CookieAttribute> attributes_;
   TimeSource& time_source_;
 
   std::function<bool(absl::string_view)> path_matcher_;

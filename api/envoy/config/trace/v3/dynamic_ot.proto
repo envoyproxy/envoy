@@ -20,10 +20,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynamically loadable OpenTracing tracer]
 
-// DynamicOtConfig is used to dynamically load a tracer from a shared library
+// DynamicOtConfig was used to dynamically load a tracer from a shared library
 // that implements the `OpenTracing dynamic loading API
 // <https://github.com/opentracing/opentracing-cpp>`_.
-// [#extension: envoy.tracers.dynamic_ot]
+// [#not-implemented-hide:]
 message DynamicOtConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.trace.v2.DynamicOtConfig";

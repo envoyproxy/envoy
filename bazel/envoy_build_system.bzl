@@ -35,12 +35,14 @@ load(
     _envoy_select_boringssl = "envoy_select_boringssl",
     _envoy_select_disable_exceptions = "envoy_select_disable_exceptions",
     _envoy_select_disable_logging = "envoy_select_disable_logging",
+    _envoy_select_enable_exceptions = "envoy_select_enable_exceptions",
     _envoy_select_enable_http3 = "envoy_select_enable_http3",
     _envoy_select_enable_http_datagrams = "envoy_select_enable_http_datagrams",
     _envoy_select_enable_yaml = "envoy_select_enable_yaml",
     _envoy_select_envoy_mobile_listener = "envoy_select_envoy_mobile_listener",
     _envoy_select_google_grpc = "envoy_select_google_grpc",
     _envoy_select_hot_restart = "envoy_select_hot_restart",
+    _envoy_select_nghttp2 = "envoy_select_nghttp2",
     _envoy_select_signal_trace = "envoy_select_signal_trace",
     _envoy_select_static_extension_registration = "envoy_select_static_extension_registration",
     _envoy_select_wasm_cpp_tests = "envoy_select_wasm_cpp_tests",
@@ -95,6 +97,7 @@ def _envoy_directory_genrule_impl(ctx):
         outputs = [tree],
         command = "mkdir -p " + tree.path + " && " + ctx.expand_location(ctx.attr.cmd),
         env = {"GENRULE_OUTPUT_DIR": tree.path},
+        use_default_shell_env = True,
         toolchain = None,
     )
     return [DefaultInfo(files = depset([tree]))]
@@ -209,13 +212,13 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     options.extend(["-I" + include_path for include_path in include_paths])
     options.append("--descriptor_set_out=$@")
 
-    cmd = "$(location //external:protoc) " + " ".join(options + input_files)
+    cmd = "$(location @com_google_protobuf//:protoc) " + " ".join(options + input_files)
     native.genrule(
         name = name,
         srcs = srcs,
         outs = [out],
         cmd = cmd,
-        tools = ["//external:protoc"],
+        tools = ["@com_google_protobuf//:protoc"],
     )
 
 # Dependencies on Google grpc should be wrapped with this function.
@@ -239,7 +242,9 @@ envoy_select_google_grpc = _envoy_select_google_grpc
 envoy_select_enable_http3 = _envoy_select_enable_http3
 envoy_select_enable_yaml = _envoy_select_enable_yaml
 envoy_select_disable_exceptions = _envoy_select_disable_exceptions
+envoy_select_enable_exceptions = _envoy_select_enable_exceptions
 envoy_select_hot_restart = _envoy_select_hot_restart
+envoy_select_nghttp2 = _envoy_select_nghttp2
 envoy_select_enable_http_datagrams = _envoy_select_enable_http_datagrams
 envoy_select_signal_trace = _envoy_select_signal_trace
 envoy_select_wasm_cpp_tests = _envoy_select_wasm_cpp_tests

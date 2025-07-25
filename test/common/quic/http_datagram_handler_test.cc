@@ -20,7 +20,7 @@ constexpr quic::QuicStreamId kStreamId = UINT64_C(0x01020304);
 class MockSession : public quic::test::MockQuicSpdySession {
 public:
   explicit MockSession(quic::QuicConnection* connection)
-      : quic::test::MockQuicSpdySession(connection){};
+      : quic::test::MockQuicSpdySession(connection) {};
 
   MOCK_METHOD(void, OnStreamClosed, (quic::QuicStreamId stream_id), (override));
 };
@@ -100,10 +100,19 @@ TEST_F(HttpDatagramHandlerTest, SendCapsulesWithUnknownType) {
                                                            /*end_stream=*/false));
 }
 
-TEST_F(HttpDatagramHandlerTest, SendHttp3DatagramError) {
+TEST_F(HttpDatagramHandlerTest, SendHttp3DatagramInternalError) {
   EXPECT_CALL(stream_, SendHttp3Datagram(_))
       .WillOnce(testing::Return(quic::MessageStatus::MESSAGE_STATUS_INTERNAL_ERROR));
   EXPECT_FALSE(
+      http_datagram_handler_.encodeCapsuleFragment(capsule_fragment_, /*end_stream*/ false));
+}
+
+TEST_F(HttpDatagramHandlerTest, SendHttp3DatagramTooEarly) {
+  // If SendHttp3Datagram is called before receiving SETTINGS from a peer, HttpDatagramHandler
+  // drops the datagram without resetting the stream.
+  EXPECT_CALL(stream_, SendHttp3Datagram(_))
+      .WillOnce(testing::Return(quic::MessageStatus::MESSAGE_STATUS_SETTINGS_NOT_RECEIVED));
+  EXPECT_TRUE(
       http_datagram_handler_.encodeCapsuleFragment(capsule_fragment_, /*end_stream*/ false));
 }
 

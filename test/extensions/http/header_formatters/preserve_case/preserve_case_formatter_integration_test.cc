@@ -19,7 +19,7 @@ struct FormatterOnEnvoyHeadersTestParams {
 std::string formatterOnEnvoyHeadersTestParamsToString(
     const ::testing::TestParamInfo<FormatterOnEnvoyHeadersTestParams>& p) {
   return fmt::format("{}_{}", TestUtility::ipVersionToString(p.param.ip_version),
-                     p.param.formatter_type_on_envoy_headers);
+                     static_cast<int>(p.param.formatter_type_on_envoy_headers));
 }
 
 std::vector<FormatterOnEnvoyHeadersTestParams> getFormatterOnEnvoyHeadersTestParams() {
@@ -81,7 +81,7 @@ public:
           auto config = TestUtility::parseYaml<envoy::extensions::http::header_formatters::
                                                    preserve_case::v3::PreserveCaseFormatterConfig>(
               fmt::format("formatter_type_on_envoy_headers: {}",
-                          GetParam().formatter_type_on_envoy_headers));
+                          static_cast<int>(GetParam().formatter_type_on_envoy_headers)));
           typed_extension_config->mutable_typed_config()->PackFrom(config);
         });
 
@@ -92,10 +92,10 @@ public:
                                         ->mutable_header_key_format()
                                         ->mutable_stateful_formatter();
       typed_extension_config->set_name("preserve_case");
-      auto config =
-          TestUtility::parseYaml<envoy::extensions::http::header_formatters::preserve_case::v3::
-                                     PreserveCaseFormatterConfig>(fmt::format(
-              "formatter_type_on_envoy_headers: {}", GetParam().formatter_type_on_envoy_headers));
+      auto config = TestUtility::parseYaml<envoy::extensions::http::header_formatters::
+                                               preserve_case::v3::PreserveCaseFormatterConfig>(
+          fmt::format("formatter_type_on_envoy_headers: {}",
+                      static_cast<int>(GetParam().formatter_type_on_envoy_headers)));
       typed_extension_config->mutable_typed_config()->PackFrom(config);
       ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
                                        protocol_options);

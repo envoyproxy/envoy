@@ -4,6 +4,7 @@
 
 #include "envoy/extensions/transport_sockets/quic/v3/quic_transport.pb.validate.h"
 
+#include "source/common/quic/cert_compression.h"
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/context_config_impl.h"
@@ -46,7 +47,8 @@ QuicClientTransportSocketFactory::QuicClientTransportSocketFactory(
     : QuicTransportSocketFactoryBase(factory_context.statsScope(), "client"),
       tls_slot_(factory_context.serverFactoryContext().threadLocal()) {
   auto factory_or_error = Extensions::TransportSockets::Tls::ClientSslSocketFactory::create(
-      std::move(config), factory_context.sslContextManager(), factory_context.statsScope());
+      std::move(config), factory_context.serverFactoryContext().sslContextManager(),
+      factory_context.statsScope());
   SET_AND_RETURN_IF_NOT_OK(factory_or_error.status(), creation_status);
   fallback_factory_ = std::move(*factory_or_error);
   tls_slot_.set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalQuicConfig>(); });
@@ -76,11 +78,18 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
   ThreadLocalQuicConfig& tls_config = *tls_slot_;
 
   if (tls_config.client_context_ != context) {
+    bool accept_untrusted =
+        clientContextConfig() && clientContextConfig()->certificateValidationContext() &&
+        clientContextConfig()->certificateValidationContext()->trustChainVerification() ==
+            envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext::
+                ACCEPT_UNTRUSTED;
     // If the context has been updated, update the crypto config.
     tls_config.client_context_ = context;
     tls_config.crypto_config_ = std::make_shared<quic::QuicCryptoClientConfig>(
-        std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context)),
+        std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted),
         std::make_unique<quic::QuicClientSessionCache>());
+
+    CertCompression::registerSslContext(tls_config.crypto_config_->ssl_ctx());
   }
   // Return the latest crypto config.
   return tls_config.crypto_config_;

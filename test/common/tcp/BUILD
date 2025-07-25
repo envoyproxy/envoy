@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = ["conn_pool_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -21,6 +22,7 @@ envoy_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/tcp:tcp_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
@@ -33,6 +35,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "async_tcp_client_impl_test",
     srcs = ["async_tcp_client_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/network:utility_lib",
         "//source/common/tcp:async_tcp_client_lib",

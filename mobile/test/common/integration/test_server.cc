@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/clusters/dynamic_forward_proxy/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/network/dns_resolver/getaddrinfo/v3/getaddrinfo_dns_resolver.pb.h"
 
 #include "source/common/listener_manager/connection_handler_impl.h"
@@ -10,9 +11,9 @@
 #include "source/common/quic/server_codec_impl.h"
 #include "source/common/stats/thread_local_store.h"
 #include "source/common/thread_local/thread_local_impl.h"
-#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/server_context_config_impl.h"
 #include "source/common/tls/server_context_impl.h"
-#include "source/extensions/quic/connection_id_generator/envoy_deterministic_connection_id_generator_config.h"
+#include "source/extensions/quic/connection_id_generator/deterministic/envoy_deterministic_connection_id_generator_config.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_server_stream.h"
 #include "source/extensions/quic/proof_source/envoy_quic_proof_source_factory_impl.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
@@ -24,11 +25,13 @@
 #include "test/test_common/network_utility.h"
 
 #include "extension_registry.h"
+#include "library/common/engine_common.h"
 
 namespace Envoy {
 namespace {
 
-std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool http) {
+std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap>
+baseProxyConfig(Network::Address::IpVersion version, bool http, int port) {
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap =
       std::make_unique<envoy::config::bootstrap::v3::Bootstrap>();
 
@@ -38,8 +41,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool ht
   listener->set_name("base_api_listener");
   auto* base_address = listener->mutable_address();
   base_address->mutable_socket_address()->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
-  base_address->mutable_socket_address()->set_address("127.0.0.1");
-  base_address->mutable_socket_address()->set_port_value(0);
+  base_address->mutable_socket_address()->set_address(
+      version == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1");
+  base_address->mutable_socket_address()->set_port_value(port);
 
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager hcm;
   hcm.set_stat_prefix("remote hcm");
@@ -54,7 +58,9 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> baseProxyConfig(bool ht
     route->mutable_match()->set_prefix("/");
   } else {
     route->mutable_match()->mutable_connect_matcher();
-    route->mutable_route()->add_upgrade_configs()->set_upgrade_type("CONNECT");
+    auto* upgrade_config = route->mutable_route()->add_upgrade_configs();
+    upgrade_config->set_upgrade_type("CONNECT");
+    upgrade_config->mutable_connect_config();
   }
 
   auto* header_value_option = route->mutable_response_headers_to_add()->Add();
@@ -130,13 +136,14 @@ TestServer::TestServer()
   ON_CALL(factory_context_.server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
   ON_CALL(factory_context_, statsScope())
       .WillByDefault(testing::ReturnRef(*stats_store_.rootScope()));
-  ON_CALL(factory_context_, sslContextManager())
+  ON_CALL(factory_context_.server_context_, sslContextManager())
       .WillByDefault(testing::ReturnRef(context_manager_));
 
   Envoy::ExtensionRegistry::registerFactories();
 }
 
-void TestServer::start(TestServerType type) {
+void TestServer::start(TestServerType type, int port) {
+  port_ = port;
   ASSERT(!upstream_);
   // pre-setup: see https://github.com/envoyproxy/envoy/blob/main/test/test_runner.cc
   Logger::Context logging_state(spdlog::level::level_enum::err,
@@ -154,7 +161,8 @@ void TestServer::start(TestServerType type) {
     Quic::forceRegisterEnvoyQuicCryptoServerStreamFactoryImpl();
     Quic::forceRegisterQuicServerTransportSocketConfigFactory();
     Quic::forceRegisterEnvoyQuicProofSourceFactoryImpl();
-    Quic::forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
+    Quic::Extensions::ConnectionIdGenerator::Deterministic::
+        forceRegisterEnvoyDeterministicConnectionIdGeneratorConfigFactory();
 
     // envoy.quic.crypto_stream.server.quiche
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP3;
@@ -163,21 +171,27 @@ void TestServer::start(TestServerType type) {
     break;
   case TestServerType::HTTP2_WITH_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP2;
-    factory = createUpstreamTlsContext(factory_context_);
+    factory = createUpstreamTlsContext(factory_context_, /* add_alpn= */ true);
     break;
   case TestServerType::HTTP1_WITHOUT_TLS:
     upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
     factory = Network::Test::createRawBufferDownstreamSocketFactory();
     break;
+  case TestServerType::HTTP1_WITH_TLS:
+    upstream_config_.upstream_protocol_ = Http::CodecType::HTTP1;
+    factory = createUpstreamTlsContext(factory_context_, /* add_alpn= */ false);
+    break;
   case TestServerType::HTTP_PROXY: {
     Server::forceRegisterDefaultListenerManagerFactoryImpl();
     Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
     Server::forceRegisterConnectionHandlerFactoryImpl();
-
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+    registerMobileProtoDescriptors();
+#endif
     test_server_ = IntegrationTestServer::create(
-        "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
-        absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
-        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(true));
+        "", version_, nullptr, nullptr, {}, time_system_, *api_, false, absl::nullopt,
+        Server::FieldValidationConfig(), 1, std::chrono::seconds(1), Server::DrainStrategy::Gradual,
+        nullptr, false, false, baseProxyConfig(version_, true, port_), false);
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Http proxy is now running");
     return;
@@ -186,18 +200,35 @@ void TestServer::start(TestServerType type) {
     Server::forceRegisterDefaultListenerManagerFactoryImpl();
     Extensions::TransportSockets::RawBuffer::forceRegisterDownstreamRawBufferSocketFactory();
     Server::forceRegisterConnectionHandlerFactoryImpl();
+#if !defined(ENVOY_ENABLE_FULL_PROTOS)
+    registerMobileProtoDescriptors();
+#endif
     test_server_ = IntegrationTestServer::create(
-        "", Network::Address::IpVersion::v4, nullptr, nullptr, {}, time_system_, *api_, false,
-        absl::nullopt, Server::FieldValidationConfig(), 1, std::chrono::seconds(1),
-        Server::DrainStrategy::Gradual, nullptr, false, false, baseProxyConfig(false));
+        "", version_, nullptr, nullptr, {}, time_system_, *api_, false, absl::nullopt,
+        Server::FieldValidationConfig(), 1, std::chrono::seconds(1), Server::DrainStrategy::Gradual,
+        nullptr, false, false, baseProxyConfig(version_, false, port_), false);
     test_server_->waitUntilListenersReady();
     ENVOY_LOG_MISC(debug, "Https proxy is now running");
     return;
   }
   }
 
-  upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
-                                                   upstream_config_, true);
+// We have series of Cronvoy tests which don't bind to port 0, and often hit
+// port conflicts with other processes using 127.0.0.1. Default non-apple
+// builds to 127.0.0.1 (this fails on iOS and probably OSX with Can't assign
+// requested address)
+#if !defined(__APPLE__)
+  if (version_ == Network::Address::IpVersion::v4) {
+#else
+  if (false) {
+#endif
+    auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.3", port_);
+    upstream_ =
+        std::make_unique<AutonomousUpstream>(std::move(factory), address, upstream_config_, true);
+  } else {
+    upstream_ = std::make_unique<AutonomousUpstream>(std::move(factory), port_, version_,
+                                                     upstream_config_, true);
+  }
 
   // Legacy behavior for cronet tests.
   if (type == TestServerType::HTTP3) {
@@ -225,8 +256,12 @@ std::string TestServer::getAddress() const {
 }
 
 std::string TestServer::getIpAddress() const {
-  ASSERT(upstream_);
-  return upstream_->localAddress()->ip()->addressAsString();
+  if (upstream_) {
+    return upstream_->localAddress()->ip()->addressAsString();
+  }
+  // Return the proxy server IP address.
+  ASSERT(test_server_);
+  return version_ == Network::Address::IpVersion::v4 ? "127.0.0.1" : "::1";
 }
 
 int TestServer::getPort() const {
@@ -298,7 +333,8 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createQuicUpstreamTlsCo
 }
 
 Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContext(
-    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context) {
+    testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext>& factory_context,
+    bool add_alpn) {
   envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
   envoy::extensions::transport_sockets::tls::v3::TlsCertificate* certs =
       tls_context.mutable_common_tls_context()->add_tls_certificates();
@@ -309,9 +345,11 @@ Network::DownstreamTransportSocketFactoryPtr TestServer::createUpstreamTlsContex
   auto* ctx = tls_context.mutable_common_tls_context()->mutable_validation_context();
   ctx->mutable_trusted_ca()->set_filename(
       TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-  tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
-  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(tls_context,
-                                                                                 factory_context);
+  if (add_alpn) {
+    tls_context.mutable_common_tls_context()->add_alpn_protocols("h2");
+  }
+  auto cfg = *Extensions::TransportSockets::Tls::ServerContextConfigImpl::create(
+      tls_context, factory_context, false);
   static auto* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return *Extensions::TransportSockets::Tls::ServerSslSocketFactory::create(
       std::move(cfg), context_manager_, *upstream_stats_store->rootScope(),

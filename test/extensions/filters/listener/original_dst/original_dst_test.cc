@@ -45,7 +45,7 @@ TEST_F(OriginalDstTest, Pipe) {
   NiceMock<Network::MockIoHandle> io_handle;
   NiceMock<Event::MockDispatcher> dispatcher;
   Network::ListenerFilterBufferImpl buffer(
-      io_handle, dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, 1);
+      io_handle, dispatcher, [](bool) {}, [](Network::ListenerFilterBuffer&) {}, false, 1);
   EXPECT_EQ(Network::FilterStatus::Continue, filter_.onData(buffer));
 }
 

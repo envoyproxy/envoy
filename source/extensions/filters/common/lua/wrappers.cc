@@ -257,6 +257,17 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
   return 1;
 }
 
+int ParsedX509NameWrapper::luaCommonName(lua_State* state) {
+  const std::string& commonName = parsed_name_.commonName_;
+  lua_pushlstring(state, commonName.data(), commonName.size());
+  return 1;
+}
+
+int ParsedX509NameWrapper::luaOrganizationName(lua_State* state) {
+  createLuaTableFromStringList(state, parsed_name_.organizationName_);
+  return 1;
+}
+
 int SslConnectionWrapper::luaPeerCertificatePresented(lua_State* state) {
   lua_pushboolean(state, connection_info_.peerCertificatePresented());
   return 1;
@@ -296,6 +307,21 @@ int SslConnectionWrapper::luaSubjectPeerCertificate(lua_State* state) {
   return 1;
 }
 
+int SslConnectionWrapper::luaParsedSubjectPeerCertificate(lua_State* state) {
+  auto parsed_name = connection_info_.parsedSubjectPeerCertificate();
+  if (parsed_name.has_value()) {
+    if (parsed_subject_peer_certificate_.get() != nullptr) {
+      parsed_subject_peer_certificate_.pushStack();
+    } else {
+      parsed_subject_peer_certificate_.reset(
+          ParsedX509NameWrapper::create(state, parsed_name.ref()), true);
+    }
+  } else {
+    lua_pushnil(state);
+  }
+  return 1;
+}
+
 int SslConnectionWrapper::luaUriSanPeerCertificate(lua_State* state) {
   createLuaTableFromStringList(state, connection_info_.uriSanPeerCertificate());
   return 1;
@@ -314,6 +340,16 @@ int SslConnectionWrapper::luaDnsSansPeerCertificate(lua_State* state) {
 
 int SslConnectionWrapper::luaDnsSansLocalCertificate(lua_State* state) {
   createLuaTableFromStringList(state, connection_info_.dnsSansLocalCertificate());
+  return 1;
+}
+
+int SslConnectionWrapper::luaOidsPeerCertificate(lua_State* state) {
+  createLuaTableFromStringList(state, connection_info_.oidsPeerCertificate());
+  return 1;
+}
+
+int SslConnectionWrapper::luaOidsLocalCertificate(lua_State* state) {
+  createLuaTableFromStringList(state, connection_info_.oidsLocalCertificate());
   return 1;
 }
 

@@ -58,12 +58,6 @@ bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //configs:ex
 CURRENT=spelling
 "${ENVOY_SRCDIR}/tools/spelling/check_spelling_pedantic.py" --mark check
 
-# TODO(phlax): move clang/buildifier checks to bazel rules (/aspects)
-if [[ -n "$CI_BRANCH" ]]; then
-    CURRENT=check_format_test
-    "${ENVOY_SRCDIR}/tools/code_format/check_format_test_helper.sh" --log=WARN
-fi
-
 CURRENT=check_format
 bazel "${BAZEL_STARTUP_OPTIONS[@]}" run "${BAZEL_BUILD_OPTIONS[@]}" //tools/code_format:check_format -- fix --fail_on_diff
 

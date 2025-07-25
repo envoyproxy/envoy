@@ -80,7 +80,7 @@ type httpRequest struct {
 
 	// decodingState and encodingState are part of httpRequest, not another GC object.
 	// So, no cycle reference, GC finalizer could work well.
-	decodingState processState
+	decodingState decodingProcessState
 	encodingState processState
 	streamInfo    streamInfo
 }
@@ -89,6 +89,11 @@ type httpRequest struct {
 type processState struct {
 	request      *httpRequest
 	processState *C.processState
+}
+
+// processState implements the DecoderFilterCallbacks interface.
+type decodingProcessState struct {
+	processState
 }
 
 const (
@@ -167,6 +172,18 @@ func (s *processState) RecoverPanic() {
 	}
 }
 
+func (s *processState) AddData(data []byte, isStreaming bool) {
+	cAPI.HttpAddData(unsafe.Pointer(s), data, isStreaming)
+}
+
+func (s *processState) InjectData(data []byte) {
+	cAPI.HttpInjectData(unsafe.Pointer(s), data)
+}
+
+func (s *decodingProcessState) SetUpstreamOverrideHost(host string, strict bool) error {
+	return cAPI.HttpSetUpstreamOverrideHost(unsafe.Pointer(&s.processState), host, strict)
+}
+
 func (r *httpRequest) StreamInfo() api.StreamInfo {
 	return &r.streamInfo
 }
@@ -237,7 +254,11 @@ func (r *httpRequest) recoverPanic() {
 }
 
 func (r *httpRequest) ClearRouteCache() {
-	cAPI.ClearRouteCache(unsafe.Pointer(r))
+	cAPI.ClearRouteCache(unsafe.Pointer(r), false)
+}
+
+func (r *httpRequest) RefreshRouteCache() {
+	cAPI.ClearRouteCache(unsafe.Pointer(r), true)
 }
 
 func (r *httpRequest) Continue(status api.StatusType) {
@@ -270,6 +291,14 @@ func (r *httpRequest) GetProperty(key string) (string, error) {
 
 func (r *httpRequest) Finalize(reason int) {
 	cAPI.HttpFinalize(unsafe.Pointer(r), reason)
+}
+
+func (r *httpRequest) SecretManager() api.SecretManager {
+	return r
+}
+
+func (r *httpRequest) GetGenericSecret(name string) (string, bool) {
+	return cAPI.HttpGetStringSecret(unsafe.Pointer(r), name)
 }
 
 type streamInfo struct {

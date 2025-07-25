@@ -88,10 +88,11 @@ public:
             bool enable_periodic_upstream_log = false) {
     envoy::extensions::filters::http::router::v3::Router router_proto;
     static const std::string cluster_name = "cluster_0";
+    static const std::string observability_name = "cluster-0";
 
     cluster_info_ = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
     ON_CALL(*cluster_info_, name()).WillByDefault(ReturnRef(cluster_name));
-    ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(cluster_name));
+    ON_CALL(*cluster_info_, observabilityName()).WillByDefault(ReturnRef(observability_name));
     ON_CALL(callbacks_.stream_info_, upstreamClusterInfo()).WillByDefault(Return(cluster_info_));
     callbacks_.stream_info_.downstream_bytes_meter_ = std::make_shared<StreamInfo::BytesMeter>();
     EXPECT_CALL(callbacks_.dispatcher_, deferredDelete_).Times(testing::AnyNumber());
@@ -114,8 +115,8 @@ public:
     }
 
     Stats::StatNameManagedStorage prefix("prefix", context_.scope().symbolTable());
-    config_ = std::make_shared<FilterConfig>(prefix.statName(), context_,
-                                             ShadowWriterPtr(new MockShadowWriter()), router_proto);
+    config_ = *FilterConfig::create(prefix.statName(), context_,
+                                    ShadowWriterPtr(new MockShadowWriter()), router_proto);
     mock_upstream_log_ = std::make_shared<NiceMock<AccessLog::MockInstance>>();
     config_->upstream_logs_.push_back(mock_upstream_log_);
     router_ = std::make_shared<TestFilter>(config_, config_->default_stats_);
@@ -130,6 +131,11 @@ public:
         *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
         address())
         .WillByDefault(Return(host_address_));
+    ON_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_, chooseHost(_))
+        .WillByDefault(Invoke([this] {
+          return Upstream::HostSelectionResponse{
+              context_.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_.host_};
+        }));
     ON_CALL(
         *context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_.host_,
         locality())
@@ -190,7 +196,7 @@ public:
 
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                     .host_->outlier_detector_,
-                putHttpResponseCode(response_code));
+                putResult(_, absl::optional<uint64_t>(response_code)));
     // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage)
     response_decoder->decodeHeaders(std::move(response_headers), false);
 
@@ -265,7 +271,7 @@ public:
         new Http::TestResponseHeaderMapImpl{{":status", "200"}});
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                     .host_->outlier_detector_,
-                putHttpResponseCode(200));
+                putResult(_, absl::optional<uint64_t>(200)));
     if (response_decoder != nullptr) {
       response_decoder->decodeHeaders(std::move(response_headers), true);
     }
@@ -436,6 +442,27 @@ typed_config:
   run();
 
   EXPECT_EQ(output_.size(), 1U);
+  EXPECT_EQ(output_.front(), "cluster-0");
+}
+
+// Test UPSTREAM_CLUSTER_RAW log formatter.
+TEST_F(RouterUpstreamLogTest, RawUpstreamCluster) {
+  const std::string yaml = R"EOF(
+name: accesslog
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  log_format:
+    text_format_source:
+      inline_string: "%UPSTREAM_CLUSTER_RAW%"
+  path: "/dev/null"
+  )EOF";
+
+  envoy::config::accesslog::v3::AccessLog upstream_log;
+  TestUtility::loadFromYaml(yaml, upstream_log);
+  init(absl::optional<envoy::config::accesslog::v3::AccessLog>(upstream_log));
+  run();
+
+  EXPECT_EQ(output_.size(), 1U);
   EXPECT_EQ(output_.front(), "cluster_0");
 }
 
@@ -461,9 +488,9 @@ typed_config:
   EXPECT_EQ(output_.size(), 2U);
   EXPECT_EQ(
       output_.front(),
-      absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamPoolReady)));
+      absl::StrCat("cluster-0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamPoolReady)));
   EXPECT_EQ(output_.back(),
-            absl::StrCat("cluster_0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamEnd)));
+            absl::StrCat("cluster-0 ", AccessLogType_Name(AccessLog::AccessLogType::UpstreamEnd)));
 }
 
 TEST_F(RouterUpstreamLogTest, PeriodicLog) {
@@ -551,7 +578,7 @@ TEST_F(RouterUpstreamLogTest, PeriodicLog) {
 
   EXPECT_CALL(context_.server_factory_context_.cluster_manager_.thread_local_cluster_.conn_pool_
                   .host_->outlier_detector_,
-              putHttpResponseCode(200));
+              putResult(_, absl::optional<uint64_t>(200)));
   EXPECT_CALL(*mock_upstream_log_, log(_, _))
       .WillOnce(Invoke([](const Formatter::HttpFormatterContext& log_context,
                           const StreamInfo::StreamInfo& stream_info) {

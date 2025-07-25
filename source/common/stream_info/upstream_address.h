@@ -11,13 +11,13 @@ namespace StreamInfo {
 /*
  * A FilterState object that wraps a network address shared pointer.
  */
-class UpstreamAddress : public FilterState::Object {
+class UpstreamAddress : public Network::Address::InstanceAccessor {
 public:
+  UpstreamAddress(Network::Address::InstanceConstSharedPtr ip)
+      : Network::Address::InstanceAccessor(ip) {}
   static const std::string& key() {
     CONSTRUCT_ON_FIRST_USE(std::string, "envoy.stream.upstream_address");
   }
-
-  Network::Address::InstanceConstSharedPtr address_;
 };
 
 } // namespace StreamInfo

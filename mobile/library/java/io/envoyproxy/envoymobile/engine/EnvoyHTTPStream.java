@@ -38,11 +38,14 @@ public class EnvoyHTTPStream {
    * Send headers over an open HTTP streamHandle. This method can be invoked once
    * and needs to be called before send_data.
    *
-   * @param headers,   the headers to send.
-   * @param endStream, supplies whether this is headers only.
+   * @param headers    the headers to send.
+   * @param endStream  supplies whether this is headers only.
+   * @param idempotent indicates that the request is idempotent. When idempotent is set to true
+   *                   Envoy Mobile will retry on HTTP/3 post-handshake failures.
    */
-  public void sendHeaders(Map<String, List<String>> headers, boolean endStream) {
-    JniLibrary.sendHeaders(engineHandle, streamHandle, headers, endStream);
+  public void sendHeaders(Map<String, List<String>> headers, boolean endStream,
+                          boolean idempotent) {
+    JniLibrary.sendHeaders(engineHandle, streamHandle, headers, endStream, idempotent);
   }
 
   /**

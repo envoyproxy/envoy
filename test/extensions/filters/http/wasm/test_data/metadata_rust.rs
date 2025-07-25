@@ -59,7 +59,7 @@ impl HttpContext for TestStream {
     }
 
     fn on_http_request_body(&mut self, _: usize, _: bool) -> Action {
-        if let Some(value) = self.get_property(vec!["node", "metadata", "wasm_node_get_key"]) {
+        if let Some(value) = self.get_property(vec!["xds", "node", "metadata", "wasm_node_get_key"]) {
             error!("onBody {}", String::from_utf8(value).unwrap());
         } else {
             debug!("missing node metadata");

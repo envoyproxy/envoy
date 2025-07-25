@@ -300,25 +300,6 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
-
-  /**
-   * Base interface for attaching LbPolicy-specific data to individual hosts.
-   */
-  class HostLbPolicyData {
-  public:
-    virtual ~HostLbPolicyData() = default;
-  };
-  using HostLbPolicyDataPtr = std::shared_ptr<HostLbPolicyData>;
-
-  /* Takes ownership of lb_policy_data and attaches it to the host.
-   * Must be called before the host is used across threads.
-   */
-  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
-
-  /*
-   * @return a reference to the LbPolicyData attached to the host.
-   */
-  virtual const HostLbPolicyDataPtr& lbPolicyData() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -697,7 +678,6 @@ public:
   COUNTER(lb_subsets_selected)                                                                     \
   COUNTER(lb_zone_cluster_too_small)                                                               \
   COUNTER(lb_zone_no_capacity_left)                                                                \
-  COUNTER(lb_zone_number_differs)                                                                  \
   COUNTER(lb_zone_routing_all_directly)                                                            \
   COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(lb_zone_routing_sampled)                                                                 \
@@ -809,8 +789,10 @@ public:
  */
 #define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME) \
   HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rq_headers_count, Unspecified)                                                \
   HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
   HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rs_headers_count, Unspecified)                                                \
   HISTOGRAM(upstream_rs_body_size, Bytes)
 
 /**
@@ -1056,17 +1038,22 @@ public:
   virtual bool maintenanceMode() const PURE;
 
   /**
-   * @return uint64_t the maximum number of outbound requests that a connection pool will make on
+   * @return uint32_t the maximum number of outbound requests that a connection pool will make on
    *         each upstream connection. This can be used to increase spread if the backends cannot
    *         tolerate imbalance. 0 indicates no maximum.
    */
-  virtual uint64_t maxRequestsPerConnection() const PURE;
+  virtual uint32_t maxRequestsPerConnection() const PURE;
 
   /**
    * @return uint32_t the maximum number of response headers. The default value is 100. Results in a
    * reset if the number of headers exceeds this value.
    */
   virtual uint32_t maxResponseHeadersCount() const PURE;
+
+  /**
+   * @return uint32_t the maximum total size of response headers in KB.
+   */
+  virtual absl::optional<uint16_t> maxResponseHeadersKb() const PURE;
 
   /**
    * @return the human readable name of the cluster.
@@ -1141,7 +1128,7 @@ public:
   virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
-   * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
+   * @return std::shared_ptr<const UpstreamLocalAddressSelector> as upstream local address selector.
    */
   virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 
@@ -1229,12 +1216,16 @@ public:
   virtual Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const PURE;
 
   /**
-   * @return absl::optional<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
+   * @return OptRef<const envoy::config::cluster::v3::Cluster::HappyEyeballsConfig>
    * an optional value of the configuration for happy eyeballs for this cluster.
    */
-  virtual const absl::optional<
-      envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
+  virtual OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const PURE;
+
+  /**
+   * @return Reference to the optional config for LRS endpoint metric reporting.
+   */
+  virtual OptRef<const std::vector<std::string>> lrsReportMetricNames() const PURE;
 
 protected:
   /**
@@ -1287,7 +1278,7 @@ public:
    *        time initialization. E.g., for a dynamic DNS cluster the initialize callback will be
    *        called when initial DNS resolution is complete.
    */
-  virtual void initialize(std::function<void()> callback) PURE;
+  virtual void initialize(std::function<absl::Status()> callback) PURE;
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
@@ -1312,9 +1303,19 @@ public:
   virtual UnitFloat dropOverload() const PURE;
 
   /**
+   * @return the cluster drop_category_ configuration.
+   */
+  virtual const std::string& dropCategory() const PURE;
+
+  /**
    * Set up the drop_overload value for the cluster.
    */
   virtual void setDropOverload(UnitFloat drop_overload) PURE;
+
+  /**
+   * Set up the drop_category value for the thread local cluster.
+   */
+  virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;
@@ -1329,7 +1330,7 @@ namespace fmt {
 // fmt formatter class for Host
 template <> struct formatter<Envoy::Upstream::Host> : formatter<absl::string_view> {
   template <typename FormatContext>
-  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) -> decltype(ctx.out()) {
+  auto format(const Envoy::Upstream::Host& host, FormatContext& ctx) const -> decltype(ctx.out()) {
     absl::string_view out = !host.hostname().empty() ? host.hostname()
                             : host.address()         ? host.address()->asStringView()
                                                      : "<empty>";

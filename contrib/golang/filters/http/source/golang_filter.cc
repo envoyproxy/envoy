@@ -19,6 +19,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/common/expr/context.h"
 
@@ -77,6 +78,8 @@ Http::FilterTrailersStatus Filter::decodeTrailers(Http::RequestTrailerMap& trail
   ProcessorState& state = decoding_state_;
   ENVOY_LOG(debug, "golang filter decodeTrailers, decoding state: {}", state.stateStr());
 
+  request_trailers_ = &trailers;
+
   bool done = doTrailer(state, trailers);
 
   return done ? Http::FilterTrailersStatus::Continue : Http::FilterTrailersStatus::StopIteration;
@@ -91,10 +94,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
   activation_response_headers_ = dynamic_cast<const Http::ResponseHeaderMap*>(&headers);
 
   // NP: may enter encodeHeaders in any state,
-  // since other filters or filtermanager could call encodeHeaders or sendLocalReply in any time.
-  // eg. filtermanager may invoke sendLocalReply, when scheme is invalid,
-  // with "Sending local reply with details // http1.invalid_scheme" details.
-  // This means DecodeXXX & EncodeXXX may run concurrently in Golang side.
+  // since other filters or filtermanager could call encodeHeaders or sendLocalReply in any
+  // time. eg. filtermanager may invoke sendLocalReply, when scheme is invalid, with "Sending
+  // local reply with details // http1.invalid_scheme" details. This means DecodeXXX & EncodeXXX
+  // may run concurrently in Golang side.
 
   bool done = doHeaders(encoding_state_, headers, end_stream);
 
@@ -129,13 +132,21 @@ Http::FilterTrailersStatus Filter::encodeTrailers(Http::ResponseTrailerMap& trai
   return done ? Http::FilterTrailersStatus::Continue : Http::FilterTrailersStatus::StopIteration;
 }
 
+void Filter::onStreamComplete() {
+  // We reuse the same flag for both onStreamComplete & log to save the space,
+  // since they are exclusive and serve for the access log purpose.
+  req_->is_golang_processing_log = 1;
+  dynamic_lib_->envoyGoFilterOnHttpStreamComplete(req_);
+  req_->is_golang_processing_log = 0;
+}
+
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "golang filter on destroy");
 
   // initRequest haven't be called yet, which mean haven't called into Go.
   if (req_->configId == 0) {
     // should release the req object, since stream reset may happen before calling into Go side,
-    // which means no GC finializer will be invoked to release this C++ object.
+    // which means no GC finalizer will be invoked to release this C++ object.
     delete req_;
     return;
   }
@@ -159,6 +170,18 @@ void Filter::onDestroy() {
 // access_log is executed before the log of the stream filter
 void Filter::log(const Formatter::HttpFormatterContext& log_context,
                  const StreamInfo::StreamInfo&) {
+  uint64_t req_header_num = 0;
+  uint64_t req_header_bytes = 0;
+  uint64_t req_trailer_num = 0;
+  uint64_t req_trailer_bytes = 0;
+  uint64_t resp_header_num = 0;
+  uint64_t resp_header_bytes = 0;
+  uint64_t resp_trailer_num = 0;
+  uint64_t resp_trailer_bytes = 0;
+
+  auto decoding_state = dynamic_cast<processState*>(&decoding_state_);
+  auto encoding_state = dynamic_cast<processState*>(&encoding_state_);
+
   // `log` may be called multiple times with different log type
   switch (log_context.accessLogType()) {
   case Envoy::AccessLog::AccessLogType::DownstreamStart:
@@ -166,14 +189,42 @@ void Filter::log(const Formatter::HttpFormatterContext& log_context,
   case Envoy::AccessLog::AccessLogType::DownstreamEnd:
     // log called by AccessLogDownstreamStart will happen before doHeaders
     if (initRequest()) {
-      request_headers_ = static_cast<Http::RequestOrResponseHeaderMap*>(
-          const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders()));
+      request_headers_ = const_cast<Http::RequestHeaderMap*>(&log_context.requestHeaders());
     }
 
-    // This only run in the work thread, it's safe even without lock.
-    is_golang_processing_log_ = true;
-    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()));
-    is_golang_processing_log_ = false;
+    if (request_headers_ != nullptr) {
+      req_header_num = request_headers_->size();
+      req_header_bytes = request_headers_->byteSize();
+      decoding_state_.headers = request_headers_;
+    }
+
+    if (request_trailers_ != nullptr) {
+      req_trailer_num = request_trailers_->size();
+      req_trailer_bytes = request_trailers_->byteSize();
+      decoding_state_.trailers = request_trailers_;
+    }
+
+    activation_response_headers_ = &log_context.responseHeaders();
+    if (activation_response_headers_ != nullptr) {
+      resp_header_num = activation_response_headers_->size();
+      resp_header_bytes = activation_response_headers_->byteSize();
+      encoding_state_.headers = const_cast<Http::ResponseHeaderMap*>(activation_response_headers_);
+    }
+
+    activation_response_trailers_ = &log_context.responseTrailers();
+    if (activation_response_trailers_ != nullptr) {
+      resp_trailer_num = activation_response_trailers_->size();
+      resp_trailer_bytes = activation_response_trailers_->byteSize();
+      encoding_state_.trailers =
+          const_cast<Http::ResponseTrailerMap*>(activation_response_trailers_);
+    }
+
+    req_->is_golang_processing_log = 1;
+    dynamic_lib_->envoyGoFilterOnHttpLog(req_, int(log_context.accessLogType()), decoding_state,
+                                         encoding_state, req_header_num, req_header_bytes,
+                                         req_trailer_num, req_trailer_bytes, resp_header_num,
+                                         resp_header_bytes, resp_trailer_num, resp_trailer_bytes);
+    req_->is_golang_processing_log = 0;
     break;
   default:
     // skip calling with unsupported log types
@@ -476,6 +527,83 @@ CAPIStatus Filter::continueStatus(ProcessorState& state, GolangStatus status) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::addData(ProcessorState& state, absl::string_view data, bool is_streaming) {
+  if (state.filterState() == FilterState::ProcessingData) {
+    // Calling add{Decoded,Encoded}Data when processing data will mess up the buffer management
+    // in Golang filter. And more importantly, there is no need to use it to add data for now.
+    ENVOY_LOG(error, "golang filter calls addData when processing data is not supported, use "
+                     "`BufferInstance.Append` instead.");
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+
+  if (state.isThreadSafe()) {
+    Buffer::OwnedImpl buffer;
+    buffer.add(data);
+    state.addData(buffer, is_streaming);
+    return CAPIStatus::CAPIOK;
+  }
+
+  auto weak_ptr = weak_from_this();
+  auto data_str = std::string(data);
+  state.getDispatcher().post([this, weak_ptr, &state, data_str, is_streaming] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      Buffer::OwnedImpl buffer;
+      buffer.add(data_str);
+      state.addData(buffer, is_streaming);
+    } else {
+      ENVOY_LOG(debug, "golang filter has gone or destroyed in addData");
+    }
+  });
+  return CAPIStatus::CAPIYield;
+}
+
+CAPIStatus Filter::injectData(ProcessorState& state, absl::string_view data) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  if (state.filterState() != FilterState::ProcessingData) {
+    ENVOY_LOG(error, "injectData is not supported when calling without processing data, use "
+                     "`addData` instead.");
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  if (state.isThreadSafe()) {
+    ENVOY_LOG(error, "injectData is not supported when calling inside the callback context");
+    return CAPIStatus::CAPIInvalidScene;
+  }
+
+  auto data_to_write = std::make_shared<Buffer::OwnedImpl>(data);
+  auto weak_ptr = weak_from_this();
+  state.getDispatcher().post([this, &state, weak_ptr, data_to_write] {
+    if (!weak_ptr.expired() && !hasDestroyed()) {
+      ENVOY_LOG(debug, "golang filter inject data to filter chain, length: {}",
+                data_to_write->length());
+      state.injectDataToFilterChain(*data_to_write, false);
+    } else {
+      ENVOY_LOG(debug, "golang filter has gone or destroyed in injectData event");
+    }
+  });
+
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint64_t* value_data,
                              int* value_len) {
   Thread::LockGuard lock(mutex_);
@@ -505,8 +633,9 @@ CAPIStatus Filter::getHeader(ProcessorState& state, absl::string_view key, uint6
 void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
   auto i = 0;
   m.iterate([&i, &go_strs, &go_buf](const Http::HeaderEntry& header) -> Http::HeaderMap::Iterate {
-    auto key = std::string(header.key().getStringView());
-    auto value = std::string(header.value().getStringView());
+    // It's safe to use StringView here, since we will copy them into Golang.
+    auto key = header.key().getStringView();
+    auto value = header.value().getStringView();
 
     auto len = key.length();
     // go_strs is the heap memory of go, and the length is twice the number of headers. So range it
@@ -521,9 +650,12 @@ void copyHeaderMapToGo(Http::HeaderMap& m, GoString* go_strs, char* go_buf) {
 
     len = value.length();
     go_strs[i].n = len;
-    go_strs[i].p = go_buf;
-    memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
-    go_buf += len;
+    // go_buf may be an invalid pointer in Golang side when len is 0.
+    if (len > 0) {
+      go_strs[i].p = go_buf;
+      memcpy(go_buf, value.data(), len); // NOLINT(safe-memcpy)
+      go_buf += len;
+    }
     i++;
     return Http::HeaderMap::Iterate::Continue;
   });
@@ -548,7 +680,7 @@ CAPIStatus Filter::copyHeaders(ProcessorState& state, GoString* go_strs, char* g
   return CAPIStatus::CAPIOK;
 }
 
-// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// It won't take affect immediately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
 CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl::string_view value,
                              headerAction act) {
@@ -582,7 +714,7 @@ CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl:
       RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
     }
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
     auto value_str = std::string(value);
 
@@ -613,7 +745,7 @@ CAPIStatus Filter::setHeader(ProcessorState& state, absl::string_view key, absl:
   return CAPIStatus::CAPIOK;
 }
 
-// It won't take affect immidiately while it's invoked from a Go thread, instead, it will post a
+// It won't take affect immediately while it's invoked from a Go thread, instead, it will post a
 // callback to run in the envoy worker thread.
 CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
   Thread::LockGuard lock(mutex_);
@@ -634,7 +766,7 @@ CAPIStatus Filter::removeHeader(ProcessorState& state, absl::string_view key) {
     // it's safe to write header in the safe thread.
     headers->remove(Http::LowerCaseString(key));
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
 
     auto weak_ptr = weak_from_this();
@@ -772,7 +904,7 @@ CAPIStatus Filter::setTrailer(ProcessorState& state, absl::string_view key, absl
       RELEASE_ASSERT(false, absl::StrCat("unknown header action: ", act));
     }
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
     auto value_str = std::string(value);
 
@@ -820,7 +952,7 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
   if (state.isThreadSafe()) {
     trailers->remove(Http::LowerCaseString(key));
   } else {
-    // should deep copy the string_view before post to dipatcher callback.
+    // should deep copy the string_view before post to dispatcher callback.
     auto key_str = std::string(key);
 
     auto weak_ptr = weak_from_this();
@@ -838,28 +970,85 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
   return CAPIStatus::CAPIOK;
 }
 
-CAPIStatus Filter::clearRouteCache() {
+CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_view host,
+                                           bool strict) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  auto* s = dynamic_cast<DecodingProcessorState*>(&state);
+  if (s == nullptr) {
+    ENVOY_LOG(debug,
+              "golang filter invoking cgo api setUpstreamOverrideHost at invalid state: {}, "
+              "which must be DecodingProcessorState",
+              __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  if (!Http::Utility::parseAuthority(host).is_ip_address_) {
+    ENVOY_LOG(debug, "host is not a valid IP address");
+    return CAPIStatus::CAPIInvalidIPAddress;
+  }
+
+  if (state.isThreadSafe()) {
+    // it's safe to write header in the safe thread.
+    s->setUpstreamOverrideHost(std::make_pair(std::string(host), strict));
+  } else {
+    // should deep copy the string_view before post to dispatcher callback.
+    auto host_str = std::string(host);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write header in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
+    state.getDispatcher().post([this, s, weak_ptr, host_str] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        s->setUpstreamOverrideHost(std::make_pair(std::string(host_str), false));
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in setUpstreamOverrideHost");
+      }
+    });
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
+CAPIStatus Filter::clearRouteCache(bool refresh) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
     ENVOY_LOG(debug, "golang filter has been destroyed");
     return CAPIStatus::CAPIFilterIsDestroy;
   }
   if (isThreadSafe()) {
-    ENVOY_LOG(debug, "golang filter clearing route cache");
-    decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+    clearRouteCacheInternal(refresh);
   } else {
     ENVOY_LOG(debug, "golang filter posting clear route cache callback");
     auto weak_ptr = weak_from_this();
-    getDispatcher().post([this, weak_ptr] {
+    getDispatcher().post([this, weak_ptr, refresh] {
       if (!weak_ptr.expired() && !hasDestroyed()) {
-        ENVOY_LOG(debug, "golang filter clearing route cache");
-        decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+        clearRouteCacheInternal(refresh);
       } else {
         ENVOY_LOG(info, "golang filter has gone or destroyed in clearRouteCache");
       }
     });
   }
   return CAPIStatus::CAPIOK;
+}
+
+void Filter::clearRouteCacheInternal(bool refresh) {
+  ENVOY_LOG(debug, "golang filter clearing route cache, refresh: {}", refresh);
+  decoding_state_.getFilterCallbacks()->downstreamCallbacks()->clearRouteCache();
+  if (refresh) {
+    // When the route cache is clear, the next call to route() will refresh the cache and return the
+    // pointer to the latest matched route. We don't need the returned pointer.
+    decoding_state_.getFilterCallbacks()->route();
+  }
 }
 
 CAPIStatus Filter::getIntegerValue(int id, uint64_t* value) {
@@ -1127,7 +1316,7 @@ CAPIStatus Filter::getStringProperty(absl::string_view path, uint64_t* value_dat
   }
 
   // to access the headers_ and its friends we need to hold the lock
-  activation_request_headers_ = dynamic_cast<const Http::RequestHeaderMap*>(request_headers_);
+  activation_request_headers_ = request_headers_;
 
   if (isThreadSafe()) {
     return getStringPropertyCommon(path, value_data, value_len);
@@ -1317,24 +1506,59 @@ void Filter::deferredDeleteRequest(HttpRequestInternal* req) {
   }
 }
 
+CAPIStatus Filter::getSecret(const absl::string_view name, uint64_t* value_data, int* value_len) {
+  // lock until this function return since it may running in a Go thread.
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  auto populateFilter = [](Filter& f, const absl::string_view name, uint64_t* value_data,
+                           int* value_len) {
+    auto maybe_secret = f.config_->getSecretReader().secret(std::string(name));
+    if (!maybe_secret.has_value()) {
+      *value_len = -1;
+    } else {
+      f.req_->strValue = maybe_secret.value();
+      *value_data = reinterpret_cast<uint64_t>(f.req_->strValue.data());
+      *value_len = f.req_->strValue.length();
+    }
+  };
+  ENVOY_LOG(debug, "golang filter getSecret '{}'", name);
+  if (isThreadSafe()) {
+    ENVOY_LOG(debug, "golang filter getSecret replying directly");
+    populateFilter(*this, name, value_data, value_len);
+    return CAPIStatus::CAPIOK;
+  } else {
+    ENVOY_LOG(debug, "golang filter getSecret posting request to dispatcher");
+    auto weak_ptr = weak_from_this();
+    getDispatcher().post(
+        [this, populateFilter, weak_ptr, name = std::string(name), value_data, value_len] {
+          ENVOY_LOG(debug, "golang filter getSecret request in worker thread");
+          if (!weak_ptr.expired() && !hasDestroyed()) {
+            populateFilter(*this, name, value_data, value_len);
+            dynamic_lib_->envoyGoRequestSemaDec(req_);
+          } else {
+            ENVOY_LOG(info, "golang filter has gone or destroyed in getSecret");
+          }
+        });
+    return CAPIStatus::CAPIYield;
+  }
+}
+
 /* ConfigId */
 
 uint64_t Filter::getMergedConfigId() {
   Http::StreamFilterCallbacks* callbacks = decoding_state_.getFilterCallbacks();
 
-  // get all of the per route config
-  std::list<const FilterConfigPerRoute*> route_config_list;
-  callbacks->traversePerFilterConfig(
-      [&route_config_list](const Router::RouteSpecificFilterConfig& cfg) {
-        route_config_list.push_back(dynamic_cast<const FilterConfigPerRoute*>(&cfg));
-      });
-
-  ENVOY_LOG(debug, "golang filter route config list length: {}.", route_config_list.size());
-
   auto id = config_->getConfigId();
-  for (auto it : route_config_list) {
-    auto route_config = *it;
-    id = route_config.getPluginConfigId(id, config_->pluginName());
+
+  // get all of the per route config
+  auto route_config_list = Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(callbacks);
+  ENVOY_LOG(debug, "golang filter route config list length: {}.", route_config_list.size());
+  for (const FilterConfigPerRoute& typed_config : route_config_list) {
+    id = typed_config.getPluginConfigId(id, config_->pluginName());
   }
 
   return id;
@@ -1350,7 +1574,8 @@ FilterConfig::FilterConfig(
       so_path_(proto_config.library_path()), plugin_config_(proto_config.plugin_config()),
       concurrency_(context.serverFactoryContext().options().concurrency()),
       stats_(GolangFilterStats::generateStats(stats_prefix, context.scope())), dso_lib_(dso_lib),
-      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))){};
+      metric_store_(std::make_shared<MetricStore>(context.scope().createScope(""))),
+      secret_reader_(std::make_shared<SecretReader>(proto_config, context)) {};
 
 void FilterConfig::newGoPluginConfig() {
   ENVOY_LOG(debug, "initializing golang filter config");
@@ -1602,6 +1827,55 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
   cached_parent_id_ = parent_id;
   return merged_config_id_;
 };
+
+/* Secret manager */
+
+namespace {
+Secret::GenericSecretConfigProviderSharedPtr
+secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
+                Server::Configuration::ServerFactoryContext& server_context,
+                Init::Manager& init_manager) {
+  if (config.has_sds_config()) {
+    return server_context.secretManager().findOrCreateGenericSecretProvider(
+        config.sds_config(), config.name(), server_context, init_manager);
+  } else {
+    return server_context.secretManager().findStaticGenericSecretProvider(config.name());
+  }
+}
+} // namespace
+
+SecretReader::SecretReader(
+    const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
+    Server::Configuration::FactoryContext& context) {
+  if (proto_config.generic_secrets_size() > 0) {
+    auto& server_context = context.serverFactoryContext();
+    auto& init_manager = context.initManager();
+    auto& tls = server_context.threadLocal();
+    auto& api = server_context.api();
+    for (auto& secret : proto_config.generic_secrets()) {
+      // Check here to avoid creating unecessary sds provider
+      if (secrets_.contains(secret.name())) {
+        throw EnvoyException(absl::StrCat("duplicate secret ", secret.name()));
+      }
+      auto secret_provider = secretsProvider(secret, server_context, init_manager);
+      if (secret_provider == nullptr) {
+        throw EnvoyException(absl::StrCat("no secret provider found for ", secret.name()));
+      }
+      auto tlsp = THROW_OR_RETURN_VALUE(
+          Secret::ThreadLocalGenericSecretProvider::create(std::move(secret_provider), tls, api),
+          std::unique_ptr<Secret::ThreadLocalGenericSecretProvider>);
+      secrets_.emplace(secret.name(), std::move(tlsp));
+    }
+  }
+}
+
+absl::optional<const std::string> SecretReader::secret(const std::string& name) const {
+  auto secret = secrets_.find(name);
+  if (secret != secrets_.end()) {
+    return secret->second->secret();
+  }
+  return absl::nullopt;
+}
 
 } // namespace Golang
 } // namespace HttpFilters

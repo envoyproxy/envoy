@@ -12,8 +12,8 @@ envoy_cc_library(
     name = "zlib_base_lib",
     srcs = ["base.cc"],
     hdrs = ["base.h"],
-    external_deps = ["zlib"],
     deps = [
+        "//bazel/foreign_cc:zlib",
         "//source/common/buffer:buffer_lib",
     ],
 )

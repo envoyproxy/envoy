@@ -18,6 +18,15 @@ using testing::Return;
 namespace Envoy {
 namespace Tcp {
 
+class CustomMockClientConnection : public Network::MockClientConnection {
+public:
+  ~CustomMockClientConnection() {
+    if (state_ != Connection::State::Closed) {
+      raiseEvent(Network::ConnectionEvent::LocalClose);
+    }
+  };
+};
+
 class AsyncTcpClientImplTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
   AsyncTcpClientImplTest() = default;
@@ -32,13 +41,13 @@ public:
   }
 
   void expectCreateConnection(bool trigger_connected = true) {
-    connection_ = new NiceMock<Network::MockClientConnection>();
+    connection_ = new NiceMock<CustomMockClientConnection>();
     Upstream::MockHost::MockCreateConnectionData conn_info;
     connection_->streamInfo().setAttemptCount(1);
     conn_info.connection_ = connection_;
 
     conn_info.host_description_ = Upstream::makeTestHost(
-        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80", simTime());
+        std::make_unique<NiceMock<Upstream::MockClusterInfo>>(), "tcp://127.0.0.1:80");
 
     EXPECT_CALL(cluster_manager_.thread_local_cluster_, tcpConn_(_)).WillOnce(Return(conn_info));
     EXPECT_CALL(*connection_, connect());
@@ -59,7 +68,7 @@ public:
   NiceMock<Event::MockTimer>* connect_timer_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  Network::MockClientConnection* connection_{};
+  CustomMockClientConnection* connection_{};
 
   NiceMock<Tcp::AsyncClient::MockAsyncTcpClientCallbacks> callbacks_;
 };

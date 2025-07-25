@@ -33,6 +33,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "postgres_encoder_tests",
+    srcs = [
+        "postgres_encoder_test.cc",
+    ],
+    deps = [
+        "//contrib/postgres_proxy/filters/network/source:filter",
+        "//test/mocks/network:network_mocks",
+    ],
+)
+
+envoy_cc_test(
     name = "postgres_message_tests",
     srcs = [
         "postgres_message_test.cc",
@@ -69,6 +80,7 @@ envoy_cc_test(
         "postgres_test_config.yaml-template",
         "//test/config/integration/certs",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":postgres_integration_proto_cc_proto",
         ":postgres_test_utils_lib",

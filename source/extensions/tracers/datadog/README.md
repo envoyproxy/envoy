@@ -47,7 +47,7 @@ Contains `class AgentHTTPClient`, which is an implementation of
 [🐶::HTTPClient][3] in terms of `Http::AsyncClient::Callbacks`.
 
 The HTTP client is passed to the configuration of
-[🐶::DatadogAgent][10], a [🐶::Collector][11]
+[🐶::DatadogAgent][9], a [🐶::Collector][10]
 implementation that uses the HTTP client to send traces to the Datadog Agent.
 
 #### `BUILD`
@@ -69,7 +69,7 @@ Contains `class EventScheduler`, which is an implementation of
 [🐶::EventScheduler][4] in terms of `Event::Dispatcher`.
 
 The event scheduler is passed to the configuration of
-[🐶::DatadogAgent][10], a [🐶::Collector][11]
+[🐶::DatadogAgent][9], a [🐶::Collector][10]
 implementation that uses the event scheduler to periodically send batched traces
 to the Datadog Agent.
 
@@ -112,62 +112,6 @@ Each instance of `Tracer` is local to a worker thread.
 
 `Tracer` is what is returned by `DatadogTracerFactory::createTracerDriverTyped`.
 
-Demo
-----
-[demo/](demo/) contains a [docker compose][9] setup and supporting
-configuration that can be used to manually test Datadog tracing in a local
-build of Envoy.
-
-The local build of Envoy runs on the host, while the Datadog Agent and an
-upstream HTTP server are services within the [docker compose setup](demo/docker-compose.yaml).
-
-See [demo/envoy](demo/envoy) and
-[demo/docker-compose.yaml](demo/docker-compose.yaml).
-
-### Example Usage
-In a command shell:
-```console
-$ cd demo
-$ DD_API_KEY=your_datadog_api_key_here docker compose up --build
-[...]
-demo-http-1      | http node.js web server is running
-demo-dd-agent-1  | system-probe exited with code 0, disabling
-```
-
-In another command shell:
-```console
-$ cd demo
-$ ./envoy
-[...]
-[2022-11-10 20:06:10.217][264507][info][main] [source/server/server.cc:907] starting main dispatch loop
-```
-
-In a third command shell:
-```console
-$ curl 'http://localhost:1337'
-{
-  "service": "http",
-  "headers": {
-    "host": "localhost:1337",
-    "user-agent": "curl/7.81.0",
-    "accept": "*/*",
-    "x-forwarded-for": "172.16.14.142",
-    "x-forwarded-proto": "http",
-    "x-envoy-internal": "true",
-    "x-request-id": "cfa52b85-8660-9532-b347-bd484da76166",
-    "x-envoy-expected-rq-timeout-ms": "15000",
-    "x-foobar-banana": "",
-    "x-datadog-tags": "_dd.p.dm=-0",
-    "x-datadog-trace-id": "6487770461011569198",
-    "x-datadog-parent-id": "6487770461011569198",
-    "x-datadog-sampling-priority": "1"
-  }
-}
-```
-
-If all went well, then the resulting trace will be visible in Datadog's UI. The
-service name is `envoy-demo`. See the [Envoy config](demo/envoy.yaml).
-
 [1]: ../../../../test/extensions/tracers/datadog/
 [2]: https://github.com/DataDog/dd-trace-cpp
 [3]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/http_client.h
@@ -176,6 +120,5 @@ service name is `envoy-demo`. See the [Envoy config](demo/envoy.yaml).
 [6]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/span.h
 [7]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/clock.h
 [8]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/tracer.h
-[9]: https://docs.docker.com/compose/
-[10]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/datadog_agent.h
-[11]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/collector.h
+[9]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/datadog_agent.h
+[10]: https://github.com/DataDog/dd-trace-cpp/blob/main/src/datadog/collector.h

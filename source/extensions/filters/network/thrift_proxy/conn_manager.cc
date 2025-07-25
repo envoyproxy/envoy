@@ -353,7 +353,7 @@ FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSha
   // should be set before the encodeFrame() call. It should be set at or after the messageBegin
   // call so that the header is added after all upstream headers passed, due to messageBegin
   // possibly not getting headers in transportBegin.
-  if (cm.drain_decision_.drainClose()) {
+  if (cm.drain_decision_.drainClose(Network::DrainDirection::All)) {
     ENVOY_STREAM_LOG(debug, "propogate Drain header for drain close decision", parent_);
     // TODO(rgs1): should the key value contain something useful (e.g.: minutes til drain is
     // over)?

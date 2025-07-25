@@ -57,6 +57,7 @@ cc_library(
 filegroup(
     name = "envoy_proxy_wasm_api_js",
     srcs = ["envoy_proxy_wasm_api.js"],
+    visibility = ["//visibility:public"],
 )
 
 # NB: this target is compiled both to native code and to Wasm. Hence the generic rule.
@@ -97,7 +98,7 @@ cc_proto_library(
     name = "node_subset_cc_proto",
     deps = [
         ":node_subset_proto",
-        # "//external:protobuf_clib",
+        # "@com_google_protobuf//:protoc_lib",
     ],
 )
 

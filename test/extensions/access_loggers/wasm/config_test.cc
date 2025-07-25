@@ -88,7 +88,7 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromEmpty) {
   AccessLog::InstanceSharedPtr instance;
   EXPECT_THROW_WITH_MESSAGE(
       instance = factory->createAccessLogInstance(*message, std::move(filter), context_),
-      Common::Wasm::WasmException, "Unable to create Wasm access log ");
+      Common::Wasm::WasmException, "Unable to create Wasm plugin ");
 }
 
 TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
@@ -161,7 +161,7 @@ TEST_P(WasmAccessLogConfigTest, YamlLoadFromFileWasmInvalidConfig) {
   TestUtility::loadFromYaml(invalid_yaml, proto_config);
   EXPECT_THROW_WITH_MESSAGE(factory->createAccessLogInstance(proto_config, nullptr, context_),
                             Envoy::Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm access log ");
+                            "Unable to create Wasm plugin ");
   const std::string valid_yaml =
       TestEnvironment::substitute(absl::StrCat(R"EOF(
   config:

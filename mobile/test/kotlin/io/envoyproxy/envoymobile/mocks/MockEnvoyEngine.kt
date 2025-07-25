@@ -3,8 +3,8 @@ package io.envoyproxy.envoymobile.mocks
 import io.envoyproxy.envoymobile.engine.EnvoyConfiguration
 import io.envoyproxy.envoymobile.engine.EnvoyEngine
 import io.envoyproxy.envoymobile.engine.EnvoyHTTPStream
+import io.envoyproxy.envoymobile.engine.types.EnvoyConnectionType
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks
-import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor
 
@@ -40,7 +40,21 @@ class MockEnvoyEngine : EnvoyEngine {
 
   override fun resetConnectivityState() = Unit
 
-  override fun setPreferredNetwork(network: EnvoyNetworkType) = Unit
+  override fun onDefaultNetworkAvailable() = Unit
+
+  override fun onDefaultNetworkChanged(network: Int) = Unit
+
+  override fun onDefaultNetworkChangeEvent(network: Int) = Unit
+
+  override fun onDefaultNetworkChangedV2(network_type: EnvoyConnectionType, net_id: Long) = Unit
+
+  override fun onNetworkDisconnect(net_id: Long) = Unit
+
+  override fun onNetworkConnect(network_type: EnvoyConnectionType, net_id: Long) = Unit
+
+  override fun purgeActiveNetworkList(activeNetIds: LongArray) = Unit
+
+  override fun onDefaultNetworkUnavailable() = Unit
 
   override fun setProxySettings(host: String, port: Int) = Unit
 

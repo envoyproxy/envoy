@@ -44,7 +44,8 @@ TEST_P(RegexEngineIntegrationTest, GoogleRE2) {
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_regex() = ".*";
 
-  EXPECT_NO_THROW(Regex::Utility::parseRegex(matcher, test_server_->server().regexEngine()));
+  EXPECT_TRUE(
+      Regex::Utility::parseRegex(matcher, test_server_->server().regexEngine()).status().ok());
 };
 
 } // namespace

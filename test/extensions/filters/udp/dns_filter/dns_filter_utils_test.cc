@@ -108,6 +108,9 @@ TEST_F(DnsFilterUtilsTest, GetDomainSuffixTest) {
       {"_ldap._tcp.Default-First-Site-Name._sites.dc._msdcs.utelsystems.local",
        "utelsystems.local"},
       {"primary.voip.subzero.com", "subzero.com"},
+      {"*.voip.subzero.com", "subzero.com"},
+      {"*.subzero.com", "subzero.com"},
+      {".subzero.com", "subzero.com"},
       {"subzero.com", "subzero.com"},
       {"subzero", "subzero"},
       {".com", "com"},
@@ -117,6 +120,29 @@ TEST_F(DnsFilterUtilsTest, GetDomainSuffixTest) {
   for (auto& ptr : suffix_data) {
     const absl::string_view result = Utils::getDomainSuffix(ptr.domain);
     EXPECT_EQ(ptr.expected_suffix, result);
+  }
+}
+
+TEST_F(DnsFilterUtilsTest, GetVirtualDomainName) {
+  struct DomainSuffixTestData {
+    const std::string domain;
+    const std::string expected_name;
+  } suffix_data[] = {
+      {"_ldap._tcp.Default-First-Site-Name._sites.dc._msdcs.utelsystems.local",
+       "_ldap._tcp.Default-First-Site-Name._sites.dc._msdcs.utelsystems.local"},
+      {"primary.voip.subzero.com", "primary.voip.subzero.com"},
+      {"*.subzero.com", ".subzero.com"},
+      {"*www.subzero.com", "*www.subzero.com"},
+      {"subzero", "subzero"},
+      {".com", ".com"},
+      {"*.", "."},
+      {".", "."},
+      {"", ""},
+  };
+
+  for (auto& ptr : suffix_data) {
+    const absl::string_view result = Utils::getVirtualDomainName(ptr.domain);
+    EXPECT_EQ(ptr.expected_name, result);
   }
 }
 

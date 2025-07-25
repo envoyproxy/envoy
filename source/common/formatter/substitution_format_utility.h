@@ -24,8 +24,8 @@ public:
   static constexpr CommandSyntaxFlags LENGTH_ALLOWED = 1 << 2;
 
   static absl::Status verifySyntax(CommandSyntaxChecker::CommandSyntaxFlags flags,
-                                   const std::string& command, const std::string& subcommand,
-                                   const absl::optional<size_t>& length);
+                                   absl::string_view command, absl::string_view subcommand,
+                                   absl::optional<size_t> length);
 };
 
 /**
@@ -66,43 +66,41 @@ public:
    * See doc:
    * https://envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/access_log#format-rules
    */
-  static absl::Status parseSubcommandHeaders(const std::string& subcommand,
-                                             std::string& main_header,
-                                             std::string& alternative_header);
+  using HeaderPair = std::pair<absl::string_view, absl::string_view>;
+  static absl::StatusOr<HeaderPair> parseSubcommandHeaders(absl::string_view subcommand);
 
-  /* Variadic function template to parse the
-     subcommand and assign found tokens to sequence of params.
-     subcommand must be a sequence
-     of tokens separated by the same separator, like: header1:header2 or header1?header2?header3.
-     params must be a sequence of std::string& with optional container storing std::string. Here are
-     examples of params:
-     - std::string& token1
-     - std::string& token1, std::string& token2
-     - std::string& token1, std::string& token2, std::vector<std::string>& remaining
-
-     If command contains more tokens than number of passed params, unassigned tokens will be
-     ignored. If command contains less tokens than number of passed params, some params will be left
-     untouched.
-  */
+  /**
+   * Variadic function template to parse the subcommand and assign found tokens to sequence of
+   * params. subcommand must be a sequence of tokens separated by the same separator, like:
+   * header1:header2 or header1?header2?header3.
+   * params must be a sequence of absl::string_view& with optional container storing
+   * absl::string_view. Here are examples of params:
+   *  - absl::string_view& token1
+   *  - absl::string_view& token1, absl::string_view& token2
+   *  - absl::string_view& token1, absl::string_view& token2, std::vector<absl::string_view>& others
+   *
+   * If command contains more tokens than number of passed params, unassigned tokens will be
+   * ignored. If command contains less tokens than number of passed params, some params will be left
+   * untouched.
+   */
   template <typename... Tokens>
-  static void parseSubcommand(const std::string& subcommand, const char separator,
+  static void parseSubcommand(absl::string_view subcommand, const char separator,
                               Tokens&&... params) {
-    std::vector<absl::string_view> tokens;
-    tokens = absl::StrSplit(subcommand, separator);
+    std::vector<absl::string_view> tokens = absl::StrSplit(subcommand, separator);
     std::vector<absl::string_view>::iterator it = tokens.begin();
     (
         [&](auto& param) {
           if (it != tokens.end()) {
             if constexpr (std::is_same_v<typename std::remove_reference<decltype(param)>::type,
-                                         std::string>) {
-              // Compile time handler for std::string.
-              param = std::string(*it);
+                                         absl::string_view>) {
+              // Compile time handler for absl::string_view.
+              param = *it;
               it++;
             } else {
               // Compile time handler for container type. It will catch all remaining tokens and
               // move iterator to the end.
               do {
-                param.push_back(std::string(*it));
+                param.push_back(*it);
                 it++;
               } while (it != tokens.end());
             }

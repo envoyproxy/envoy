@@ -23,6 +23,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.geoip"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":geoip_mocks",
@@ -40,6 +41,7 @@ envoy_extension_cc_test(
     size = "small",
     srcs = ["geoip_filter_test.cc"],
     extension_names = ["envoy.filters.http.geoip"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         ":dummy_cc_proto",
@@ -67,6 +69,7 @@ envoy_extension_cc_test(
     extension_names = [
         "envoy.filters.http.geoip",
     ],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/http/geoip:config",

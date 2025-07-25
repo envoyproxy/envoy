@@ -143,7 +143,7 @@ TEST_P(ConnectionLimitIntegrationTest, TestDeprecationWarningForGlobalCxRuntimeL
   };
   const std::string log_line =
       "Usage of the deprecated runtime key overload.global_downstream_max_connections, "
-      "consider switching to `envoy.resource_monitors.downstream_connections` instead."
+      "consider switching to `envoy.resource_monitors.global_downstream_max_connections` instead."
       "This runtime key will be removed in future.";
   EXPECT_LOG_CONTAINS("warn", log_line, { init_func(); });
 }
@@ -154,7 +154,7 @@ TEST_P(ConnectionLimitIntegrationTest, TestEmptyGlobalCxRuntimeLimit) {
   const std::string log_line =
       "There is no configured limit to the number of allowed active downstream connections. "
       "Configure a "
-      "limit in `envoy.resource_monitors.downstream_connections` resource monitor.";
+      "limit in `envoy.resource_monitors.global_downstream_max_connections` resource monitor.";
   EXPECT_LOG_CONTAINS("warn", log_line, { initialize(); });
 }
 

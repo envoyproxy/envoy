@@ -19,7 +19,7 @@ import sys
 import tempfile
 from typing import Awaitable
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from aiohttp import client_exceptions, web, ClientSession
 
 
@@ -451,7 +451,7 @@ class IntegrationTest(unittest.IsolatedAsyncioTestCase):
             "slow request should be incomplete when the test waits for it, otherwise the test is not necessarily validating during-drain behavior",
         )
         for response in slow_responses:
-            self.assertEquals(await response.join(), 0)
+            self.assertEqual(await response.join(), 0)
         log.info("waiting for parent instance to terminate")
         await envoy_process_1.wait()
         log.info("sending second request to fast upstream")
@@ -507,7 +507,7 @@ def generate_server_cert(
     alt_names.append(x509.IPAddress(ip_address(ENVOY_HOST)))
     san = x509.SubjectAlternativeName(alt_names)
     basic_constraints = x509.BasicConstraints(ca=True, path_length=0)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     cert = (
         x509.CertificateBuilder()  # Comment to keep linter from uglifying!
         .subject_name(name).issuer_name(ca_cert.subject).public_key(key.public_key()).serial_number(

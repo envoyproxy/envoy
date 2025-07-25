@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "lua_cluster_specifier_test",
     srcs = ["lua_cluster_specifier_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.lua"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/router/cluster_specifiers/lua:lua_cluster_specifier_lib",
         "//test/mocks/router:router_mocks",
@@ -28,6 +29,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.router.cluster_specifier_plugin.lua"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/router/cluster_specifiers/lua:config",
         "//test/mocks/server:factory_context_mocks",

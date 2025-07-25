@@ -1,6 +1,6 @@
-load("@build_bazel_rules_android//android:rules.bzl", "android_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy_mobile//bazel:envoy_mobile_android_test.bzl", "envoy_mobile_android_test")
+load("@rules_android//android:rules.bzl", "android_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -67,6 +67,7 @@ envoy_mobile_android_test(
         "//conditions:default": [],
     }),
     native_lib_name = "envoy_jni_with_test_extensions",
+    test_class = "io.envoyproxy.envoymobile.engine.testing.QuicTestServerTest",
     deps = [
         ":http_test_server_factory_lib",
         ":testing",

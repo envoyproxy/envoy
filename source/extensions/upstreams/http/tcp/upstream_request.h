@@ -5,7 +5,6 @@
 
 #include "envoy/http/codec.h"
 #include "envoy/tcp/conn_pool.h"
-#include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/cleanup.h"
@@ -22,9 +21,9 @@ namespace Tcp {
 
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  TcpConnPool(Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
               Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx) {
-    conn_pool_data_ = thread_local_cluster.tcpConnPool(priority, ctx);
+    conn_pool_data_ = thread_local_cluster.tcpConnPool(host, priority, ctx);
   }
   ~TcpConnPool() override {
     ENVOY_BUG(upstream_handle_ == nullptr, "upstream_handle not null");
@@ -78,7 +77,7 @@ public:
   void encodeMetadata(const Envoy::Http::MetadataMapVector&) override {}
   Envoy::Http::Status encodeHeaders(const Envoy::Http::RequestHeaderMap&, bool end_stream) override;
   void encodeTrailers(const Envoy::Http::RequestTrailerMap&) override;
-  void enableHalfClose() override {}
+  void enableTcpTunneling() override {}
   void readDisable(bool disable) override;
   void resetStream() override;
   void setAccount(Buffer::BufferMemoryAccountSharedPtr) override {}
@@ -94,6 +93,8 @@ private:
   Router::UpstreamToDownstream* upstream_request_;
   Envoy::Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   StreamInfo::BytesMeterSharedPtr bytes_meter_{std::make_shared<StreamInfo::BytesMeter>()};
+  bool downstream_complete_ = false;
+  const bool force_reset_on_upstream_half_close_{};
 };
 
 } // namespace Tcp

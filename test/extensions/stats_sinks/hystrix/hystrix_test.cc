@@ -188,32 +188,33 @@ public:
                        uint64_t timeout_step, uint64_t timeout_retry_step, uint64_t rejected_step,
                        uint64_t window_size) {
     // Convert to json object.
-    Json::ObjectSharedPtr json_data_message = Json::Factory::loadFromString(data_message);
-    EXPECT_EQ(json_data_message->getInteger("rollingCountSemaphoreRejected"),
+    Json::ObjectSharedPtr json_data_message = Json::Factory::loadFromString(data_message).value();
+    EXPECT_EQ(json_data_message->getInteger("rollingCountSemaphoreRejected").value(),
               (window_size * rejected_step))
         << "window_size=" << window_size << ", rejected_step=" << rejected_step;
-    EXPECT_EQ(json_data_message->getInteger("rollingCountSuccess"), (window_size * success_step))
+    EXPECT_EQ(json_data_message->getInteger("rollingCountSuccess").value(),
+              (window_size * success_step))
         << "window_size=" << window_size << ", success_step=" << success_step;
-    EXPECT_EQ(json_data_message->getInteger("rollingCountTimeout"),
+    EXPECT_EQ(json_data_message->getInteger("rollingCountTimeout").value(),
               (window_size * (timeout_step + timeout_retry_step)))
         << "window_size=" << window_size << ", timeout_step=" << timeout_step
         << ", timeout_retry_step=" << timeout_retry_step;
-    EXPECT_EQ(json_data_message->getInteger("errorCount"),
+    EXPECT_EQ(json_data_message->getInteger("errorCount").value(),
               (window_size * (error_step - timeout_step)))
         << "window_size=" << window_size << ", error_step=" << error_step
         << ", timeout_step=" << timeout_step;
     uint64_t total = error_step + success_step + rejected_step + timeout_retry_step;
-    EXPECT_EQ(json_data_message->getInteger("requestCount"), (window_size * total))
+    EXPECT_EQ(json_data_message->getInteger("requestCount").value(), (window_size * total))
         << "window_size=" << window_size << ", total=" << total;
 
     if (total != 0) {
-      EXPECT_EQ(json_data_message->getInteger("errorPercentage"),
+      EXPECT_EQ(json_data_message->getInteger("errorPercentage").value(),
                 (static_cast<uint64_t>(100 * (static_cast<double>(total - success_step) /
                                               static_cast<double>(total)))))
           << "total=" << total << ", success_step=" << success_step;
 
     } else {
-      EXPECT_EQ(json_data_message->getInteger("errorPercentage"), 0);
+      EXPECT_EQ(json_data_message->getInteger("errorPercentage").value(), 0);
     }
   }
 
@@ -225,9 +226,9 @@ public:
       // Arrange message to remove ":" that comes from the keepalive sync.
       absl::RemoveExtraAsciiWhitespace(&message);
       std::string clear_message(absl::StripSuffix(message, ":"));
-      Json::ObjectSharedPtr json_message = Json::Factory::loadFromString(clear_message);
-      if (absl::StrContains(json_message->getString("type"), "HystrixCommand")) {
-        std::string cluster_name(json_message->getString("name"));
+      Json::ObjectSharedPtr json_message = Json::Factory::loadFromString(clear_message).value();
+      if (absl::StrContains(json_message->getString("type").value(), "HystrixCommand")) {
+        std::string cluster_name(json_message->getString("name").value());
         cluster_message_map[cluster_name] = message;
       }
     }
@@ -286,11 +287,11 @@ TEST_F(HystrixSinkTest, BasicFlow) {
       buildClusterMap(cluster_stats_buffer_.toString());
 
   Json::ObjectSharedPtr json_buffer =
-      Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
-  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), traffic_counter);
-  EXPECT_EQ(json_buffer->getInteger("requestCount"), traffic_counter);
-  EXPECT_EQ(json_buffer->getInteger("errorCount"), 0);
-  EXPECT_EQ(json_buffer->getInteger("errorPercentage"), 0);
+      Json::Factory::loadFromString(cluster_message_map[cluster1_name_]).value();
+  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess").value(), traffic_counter);
+  EXPECT_EQ(json_buffer->getInteger("requestCount").value(), traffic_counter);
+  EXPECT_EQ(json_buffer->getInteger("errorCount").value(), 0);
+  EXPECT_EQ(json_buffer->getInteger("errorPercentage").value(), 0);
 
   // Check mixed traffic.
   // Values are unimportant - they represent traffic statistics, and for the purpose of the test any
@@ -357,8 +358,8 @@ TEST_F(HystrixSinkTest, Disconnect) {
   absl::node_hash_map<std::string, std::string> cluster_message_map =
       buildClusterMap(cluster_stats_buffer_.toString());
   Json::ObjectSharedPtr json_buffer =
-      Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
-  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), (success_step * window_size_));
+      Json::Factory::loadFromString(cluster_message_map[cluster1_name_]).value();
+  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess").value(), (success_step * window_size_));
 
   // Disconnect.
   cluster_stats_buffer_.drain(cluster_stats_buffer_.length());
@@ -373,8 +374,8 @@ TEST_F(HystrixSinkTest, Disconnect) {
   sink_->flush(snapshot_);
   EXPECT_NE(cluster_stats_buffer_.length(), 0);
   cluster_message_map = buildClusterMap(cluster_stats_buffer_.toString());
-  json_buffer = Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
-  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), 0);
+  json_buffer = Json::Factory::loadFromString(cluster_message_map[cluster1_name_]).value();
+  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess").value(), 0);
 }
 
 TEST_F(HystrixSinkTest, AddCluster) {
@@ -491,13 +492,15 @@ TEST_F(HystrixSinkTest, HistogramTest) {
       buildClusterMap(cluster_stats_buffer_.toString());
 
   Json::ObjectSharedPtr latency = Json::Factory::loadFromString(cluster_message_map[cluster1_name_])
-                                      ->getObject("latencyExecute");
+                                      .value()
+                                      ->getObject("latencyExecute")
+                                      .value();
 
   // Data was added such that the value equals the quantile:
   // "latencyExecute": {"99.5": 99.500000, "95": 95.000000, "90": 90.000000, "100": 100.000000, "0":
   // 0.000000, "25": 25.000000, "99": 99.000000, "50": 50.000000, "75": 75.000000}.
   for (const double quantile : hystrix_quantiles) {
-    EXPECT_EQ(quantile * 100, latency->getDouble(fmt::sprintf("%g", quantile * 100)));
+    EXPECT_EQ(quantile * 100, latency->getDouble(fmt::sprintf("%g", quantile * 100)).value());
   }
 }
 

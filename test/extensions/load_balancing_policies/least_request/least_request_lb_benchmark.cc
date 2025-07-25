@@ -10,11 +10,11 @@ namespace {
 class LeastRequestTester : public BaseTester {
 public:
   LeastRequestTester(uint64_t num_hosts, uint32_t choice_count) : BaseTester(num_hosts) {
-    envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
+    envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest lr_lb_config;
     lr_lb_config.mutable_choice_count()->set_value(choice_count);
-    lb_ = std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
-                                                     runtime_, random_, common_config_,
-                                                     lr_lb_config, simTime());
+    lb_ =
+        std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
+                                                   runtime_, random_, 50, lr_lb_config, simTime());
   }
 
   std::unique_ptr<LeastRequestLoadBalancer> lb_;
@@ -38,7 +38,7 @@ void benchmarkLeastRequestLoadBalancerChooseHost(::benchmark::State& state) {
     state.ResumeTiming();
 
     for (uint64_t i = 0; i < keys_to_simulate; ++i) {
-      hit_counter[tester.lb_->chooseHost(&context)->address()->asString()] += 1;
+      hit_counter[tester.lb_->chooseHost(&context).host->address()->asString()] += 1;
     }
 
     // Do not time computation of mean, standard deviation, and relative standard deviation.

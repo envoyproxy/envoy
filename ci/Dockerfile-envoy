@@ -1,5 +1,6 @@
 ARG BUILD_OS=ubuntu
-ARG BUILD_TAG=22.04@sha256:a6d2b38300ce017add71440577d5b0a90460d0e57fd7aec21dd0d1b0761bbfb2
+ARG BUILD_TAG=22.04
+ARG BUILD_SHA=1ec65b2719518e27d4d25f104d93f9fac60dc437f81452302406825c46fcc9cb
 ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
@@ -13,7 +14,7 @@ ADD "${TARGETPLATFORM}/release.tar.zst" /usr/local/bin/
 
 
 # STAGE: envoy-base
-FROM ${BUILD_OS}:${BUILD_TAG} AS envoy-base
+FROM ${BUILD_OS}:${BUILD_TAG}@sha256:${BUILD_SHA} AS envoy-base
 ENV DEBIAN_FRONTEND=noninteractive
 EXPOSE 10000
 CMD ["envoy", "-c", "/etc/envoy/envoy.yaml"]
@@ -54,14 +55,16 @@ FROM envoy AS envoy-tools
 ARG TARGETPLATFORM
 ENV TARGETPLATFORM="${TARGETPLATFORM:-linux/amd64}"
 COPY --chown=0:0 --chmod=755 \
-    "${TARGETPLATFORM}/schema_validator_tool" "${TARGETPLATFORM}/router_check_tool" /usr/local/bin/
+    "${TARGETPLATFORM}/schema_validator_tool" "${TARGETPLATFORM}/router_check_tool" "${TARGETPLATFORM}/config_load_check_tool" /usr/local/bin/
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:8a09e5752fb3ab9c9534fcc627eb1f451cd9bcfe66a6b149df62dcb84fb841a6 AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:fa7b50f111719aaf5f7435383b6d05f12277f3ce9514bc0a62759374a04d6bae AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]
+COPY --from=binary --chown=0:0 --chmod=755 \
+    /etc/envoy /etc/envoy
 COPY --from=binary --chown=0:0 --chmod=644 \
     /etc/envoy/envoy.yaml /etc/envoy/envoy.yaml
 COPY --from=binary --chown=0:0 --chmod=755 \
@@ -93,13 +96,13 @@ ADD --chown=0:0 --chmod=755 configs/google-vrp/supervisor.conf /etc/supervisor.c
 
 
 # STAGE: envoy-google-vrp
-FROM envoy-google-vrp-base as envoy-google-vrp
+FROM envoy-google-vrp-base AS envoy-google-vrp
 COPY  --from=binary --chown=0:0 --chmod=755 \
     /usr/local/bin/envoy /usr/local/bin/envoy
 
 
 # STAGE: envoy-google-vrp-custom
-FROM envoy-google-vrp-base as envoy-google-vrp-custom
+FROM envoy-google-vrp-base AS envoy-google-vrp-custom
 ARG ENVOY_CTX_BINARY_PATH
 ADD "${ENVOY_CTX_BINARY_PATH}" /usr/local/bin/envoy
 

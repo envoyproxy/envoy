@@ -33,11 +33,12 @@ public:
   virtual ~FilterChainFactoryBuilder() = default;
   /**
    * @return Shared filter chain where builder is allowed to determine and reuse duplicated filter
-   * chain. Throw exception if failed.
+   * chain or an error status.
    */
-  virtual Network::DrainableFilterChainSharedPtr
+  virtual absl::StatusOr<Network::DrainableFilterChainSharedPtr>
   buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
-                   FilterChainFactoryContextCreator& context_creator) const PURE;
+                   FilterChainFactoryContextCreator& context_creator,
+                   bool added_via_api) const PURE;
 };
 
 // PerFilterChainFactoryContextImpl is supposed to be used by network filter chain.
@@ -51,8 +52,9 @@ public:
                                             Init::Manager& init_manager);
 
   // DrainDecision
-  bool drainClose() const override;
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+  bool drainClose(Network::DrainDirection) const override;
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
     IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }
@@ -62,9 +64,8 @@ public:
   Init::Manager& initManager() override;
   Stats::Scope& scope() override;
   const Network::ListenerInfo& listenerInfo() const override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
-  Configuration::ServerFactoryContext& serverFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Configuration::ServerFactoryContext& serverFactoryContext() override;
   Stats::Scope& listenerScope() override;
 
   void startDraining() override { is_draining_.store(true); }
@@ -81,16 +82,19 @@ private:
 
 using FilterChainActionFactoryContext = Configuration::ServerFactoryContext;
 using FilterChainsByName = absl::flat_hash_map<std::string, Network::DrainableFilterChainSharedPtr>;
+using FilterChainsByMatcher = absl::node_hash_map<envoy::config::listener::v3::FilterChainMatch,
+                                                  std::string, MessageUtil, MessageUtil>;
 
 class FilterChainImpl : public Network::DrainableFilterChain {
 public:
   FilterChainImpl(Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory,
                   Filter::NetworkFilterFactoriesList&& filters_factory,
                   std::chrono::milliseconds transport_socket_connect_timeout,
-                  absl::string_view name)
+                  absl::string_view name, bool added_via_api)
       : transport_socket_factory_(std::move(transport_socket_factory)),
         filters_factory_(std::move(filters_factory)),
-        transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name) {}
+        transport_socket_connect_timeout_(transport_socket_connect_timeout), name_(name),
+        added_via_api_(added_via_api) {}
 
   // Network::FilterChain
   const Network::DownstreamTransportSocketFactory& transportSocketFactory() const override {
@@ -112,12 +116,15 @@ public:
 
   absl::string_view name() const override { return name_; }
 
+  bool addedViaApi() const override { return added_via_api_; }
+
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;
   const Network::DownstreamTransportSocketFactoryPtr transport_socket_factory_;
   const Filter::NetworkFilterFactoriesList filters_factory_;
   const std::chrono::milliseconds transport_socket_connect_timeout_;
   const std::string name_;
+  const bool added_via_api_;
 };
 
 /**
@@ -149,7 +156,7 @@ public:
 
   // Add all filter chains into this manager. During the lifetime of FilterChainManagerImpl this
   // should be called at most once.
-  void addFilterChains(
+  absl::Status addFilterChains(
       const xds::type::matcher::v3::Matcher* filter_chain_matcher,
       absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
@@ -157,6 +164,10 @@ public:
       FilterChainFactoryContextCreator& context_creator);
 
   static bool isWildcardServerName(const std::string& name);
+
+  const std::vector<Network::DrainableFilterChainSharedPtr>& drainingFilterChains() const {
+    return draining_filter_chains_;
+  }
 
   // Return the current view of filter chains, keyed by filter chain message. Used by the owning
   // listener to calculate the intersection of filter chains with another listener.
@@ -170,14 +181,14 @@ public:
   }
 
 private:
-  void convertIPsToTries();
+  absl::Status convertIPsToTries();
   const Network::FilterChain* findFilterChainUsingMatcher(const Network::ConnectionSocket& socket,
                                                           const StreamInfo::StreamInfo& info) const;
 
   // Build default filter chain from filter chain message. Skip the build but copy from original
   // filter chain manager if the default filter chain message duplicates the message in origin
   // filter chain manager. Called by addFilterChains().
-  void copyOrRebuildDefaultFilterChain(
+  absl::Status copyOrRebuildDefaultFilterChain(
       const envoy::config::listener::v3::FilterChain* default_filter_chain,
       FilterChainFactoryBuilder& filter_chain_factory_builder,
       FilterChainFactoryContextCreator& context_creator);
@@ -214,7 +225,20 @@ private:
   using DestinationPortsMap =
       absl::flat_hash_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>;
 
-  void addFilterChainForDestinationPorts(
+  absl::Status
+  verifyNoDuplicateMatchers(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                            FilterChainsByMatcher& filter_chains,
+                            const envoy::config::listener::v3::FilterChain& filter_chain);
+  absl::Status
+  setupFilterChainMatcher(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                          FilterChainsByName& filter_chains_by_name,
+                          const envoy::config::listener::v3::FilterChain& filter_chain,
+                          const Network::DrainableFilterChainSharedPtr& filter_chain_impl);
+  void maybeConstructMatcher(const xds::type::matcher::v3::Matcher* filter_chain_matcher,
+                             const FilterChainsByName& filter_chains_by_name,
+                             Configuration::FactoryContext& parent_context);
+
+  absl::Status addFilterChainForDestinationPorts(
       DestinationPortsMap& destination_ports_map, uint16_t destination_port,
       const std::vector<std::string>& destination_ips,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
@@ -224,7 +248,7 @@ private:
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForDestinationIPs(
+  absl::Status addFilterChainForDestinationIPs(
       DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
@@ -233,7 +257,7 @@ private:
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForServerNames(
+  absl::Status addFilterChainForServerNames(
       ServerNamesMapSharedPtr& server_names_map_ptr,
       const absl::Span<const std::string> server_names, const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
@@ -242,7 +266,7 @@ private:
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForApplicationProtocols(
+  absl::Status addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
       const absl::Span<const std::string* const> application_protocols,
       const std::vector<std::string>& direct_source_ips,
@@ -250,24 +274,25 @@ private:
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForDirectSourceIPs(
+  absl::Status addFilterChainForDirectSourceIPs(
       DirectSourceIPsMap& direct_source_ips_map, const std::vector<std::string>& direct_source_ips,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForSourceTypes(
+  absl::Status addFilterChainForSourceTypes(
       SourceTypesArraySharedPtr& source_types_array_ptr,
       const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForSourceIPs(SourceIPsMap& source_ips_map, const std::string& source_ip,
-                                  const absl::Span<const Protobuf::uint32> source_ports,
-                                  const Network::FilterChainSharedPtr& filter_chain);
-  void addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_ports_map_ptr,
-                                    uint32_t source_port,
-                                    const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForSourceIPs(SourceIPsMap& source_ips_map,
+                                          const std::string& source_ip,
+                                          const absl::Span<const Protobuf::uint32> source_ports,
+                                          const Network::FilterChainSharedPtr& filter_chain);
+  absl::Status addFilterChainForSourcePorts(SourcePortsMapSharedPtr& source_ports_map_ptr,
+                                            uint32_t source_port,
+                                            const Network::FilterChainSharedPtr& filter_chain);
 
   const Network::FilterChain*
   findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,
@@ -329,6 +354,9 @@ private:
 
   // Index filter chains by name, used by the matcher actions.
   FilterChainsByName filter_chains_by_name_;
+
+  // Used to hint listener which filter chains it should drain.
+  mutable std::vector<Network::DrainableFilterChainSharedPtr> draining_filter_chains_;
 };
 
 namespace FilterChain {

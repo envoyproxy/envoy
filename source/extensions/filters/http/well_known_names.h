@@ -44,12 +44,16 @@ public:
   const std::string GcpAuthn = "envoy.filters.http.gcp_authn";
   // GRPC http1 bridge filter
   const std::string GrpcHttp1Bridge = "envoy.filters.http.grpc_http1_bridge";
+  // GRPC json reverse transcoder filter
+  const std::string GrpcJsonReverseTranscoder = "envoy.filters.http.grpc_json_reverse_transcoder";
   // GRPC json transcoder filter
   const std::string GrpcJsonTranscoder = "envoy.filters.http.grpc_json_transcoder";
   // GRPC web filter
   const std::string GrpcWeb = "envoy.filters.http.grpc_web";
   // GRPC Field Extraction filter
   const std::string GrpcFieldExtraction = "envoy.filters.http.grpc_field_extraction";
+  // Proto Message Extraction filter
+  const std::string ProtoMessageExtraction = "envoy.filters.http.proto_message_extraction";
   // GRPC http1 reverse bridge filter
   const std::string GrpcHttp1ReverseBridge = "envoy.filters.http.grpc_http1_reverse_bridge";
   // GRPC telemetry
@@ -66,8 +70,6 @@ public:
   const std::string Lua = "envoy.filters.http.lua";
   // On-demand RDS updates filter
   const std::string OnDemand = "envoy.filters.http.on_demand";
-  // Squash filter
-  const std::string Squash = "envoy.filters.http.squash";
   // External Authorization filter
   const std::string ExtAuthorization = "envoy.filters.http.ext_authz";
   // RBAC HTTP Authorization filter

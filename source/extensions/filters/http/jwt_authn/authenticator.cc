@@ -200,7 +200,7 @@ void AuthenticatorImpl::startVerify() {
     }
   }
 
-  ENVOY_LOG(debug, "{}: Verifying JWT token of issuer {}", name(), jwt_->iss_);
+  ENVOY_LOG(debug, "{}: Verifying JWT of issuer {}", name(), jwt_->iss_);
   // Check if `iss` is allowed.
   if (!curr_token_->isIssuerAllowed(jwt_->iss_)) {
     doneWithStatus(Status::JwtUnknownIssuer);
@@ -361,7 +361,7 @@ bool AuthenticatorImpl::addJWTClaimToHeader(const std::string& claim_name,
     }
     default:
       ENVOY_LOG(debug, "[jwt_auth] claim : {} is of an unknown type '{}'", claim_name,
-                claim_value->kind_case());
+                static_cast<int>(claim_value->kind_case()));
       break;
     }
 
@@ -444,7 +444,7 @@ void AuthenticatorImpl::setPayloadMetadata(const ProtobufWkt::Struct& jwt_payloa
 }
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
-  ENVOY_LOG(debug, "{}: JWT token verification completed with: {}", name(),
+  ENVOY_LOG(debug, "{}: JWT verification completed with: {}", name(),
             ::google::jwt_verify::getStatusString(status));
 
   if (Status::Ok != status) {
@@ -480,6 +480,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
   // Unless allowing failed or missing, all tokens must be verified successfully.
   if ((Status::Ok != status && !is_allow_failed_ && !is_allow_missing_) || tokens_.empty()) {
     tokens_.clear();
+    if (clear_route_cache_ && clear_route_cb_) {
+      clear_route_cb_();
+    }
+    clear_route_cb_ = nullptr;
+
     if (is_allow_failed_) {
       callback_(Status::Ok);
     } else if (is_allow_missing_ && status == Status::JwtMissed) {
@@ -488,11 +493,6 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
       callback_(status);
     }
     callback_ = nullptr;
-
-    if (clear_route_cache_ && clear_route_cb_) {
-      clear_route_cb_();
-    }
-    clear_route_cb_ = nullptr;
 
     return;
   }

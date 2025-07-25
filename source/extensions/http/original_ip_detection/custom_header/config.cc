@@ -13,11 +13,11 @@ namespace Http {
 namespace OriginalIPDetection {
 namespace CustomHeader {
 
-Envoy::Http::OriginalIPDetectionSharedPtr
+absl::StatusOr<Envoy::Http::OriginalIPDetectionSharedPtr>
 CustomHeaderIPDetectionFactory::createExtension(const Protobuf::Message& message,
                                                 Server::Configuration::FactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      *Envoy::Protobuf::DynamicCastToGenerated<const ProtobufWkt::Any>(&message),
+      *Envoy::Protobuf::DynamicCastMessage<const ProtobufWkt::Any>(&message),
       context.messageValidationVisitor(), *this);
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::http::original_ip_detection::custom_header::v3::CustomHeaderConfig&>(

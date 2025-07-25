@@ -17,6 +17,8 @@
 #include "eval/public/cel_expression.h"
 #include "eval/public/cel_value.h"
 
+#include "xds/type/v3/cel.pb.h"
+
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
@@ -91,6 +93,10 @@ BuilderPtr createBuilder(Protobuf::Arena* arena);
 
 // Gets the singleton expression builder. Must be called on the main thread.
 BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context);
+
+// Converts from CEL canonical to CEL v1alpha1
+absl::optional<google::api::expr::v1alpha1::Expr>
+getExpr(const ::xds::type::v3::CelExpression& expression);
 
 // Creates an interpretable expression from a protobuf representation.
 // Throws an exception if fails to construct a runtime expression.

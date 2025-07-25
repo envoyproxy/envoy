@@ -2,6 +2,7 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -39,12 +40,14 @@ TEST(EnvoyQuicUtilsTest, ConversionBetweenQuicAddressAndEnvoyAddress) {
 class MockServerHeaderValidator : public HeaderValidator {
 public:
   ~MockServerHeaderValidator() override = default;
+  MOCK_METHOD(void, startHeaderBlock, ());
+  MOCK_METHOD(bool, finishHeaderBlock, (bool is_trailing_headers));
   MOCK_METHOD(Http::HeaderUtility::HeaderValidationResult, validateHeader,
               (absl::string_view header_name, absl::string_view header_value));
 };
 
 TEST(EnvoyQuicUtilsTest, HeadersConversion) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
@@ -58,6 +61,8 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   NiceMock<MockServerHeaderValidator> validator;
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
+  EXPECT_CALL(validator, startHeaderBlock());
+  EXPECT_CALL(validator, finishHeaderBlock(true)).WillOnce(Return(true));
   auto envoy_headers = http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
       headers_block, 60, 100, validator, details, rst);
   // Envoy header block is 3 headers larger because QUICHE header block does coalescing.
@@ -76,7 +81,6 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers;
-  quic_headers.OnHeaderBlockStart();
   quic_headers.OnHeader(":authority", "www.google.com");
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");
@@ -87,6 +91,7 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
   quic_headers.OnHeader("key1", "value2");
   quic_headers.OnHeader("key-to-drop", "");
   quic_headers.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(validator, startHeaderBlock());
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly([](absl::string_view header_name, absl::string_view) {
         if (header_name == "key-to-drop") {
@@ -94,18 +99,19 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
         }
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
+  EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
   auto envoy_headers2 = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
       quic_headers, validator, 60, 100, details, rst);
   EXPECT_EQ(*envoy_headers, *envoy_headers2);
   EXPECT_EQ(rst, quic::QUIC_REFUSED_STREAM); // With no error it will be untouched.
 
   quic::QuicHeaderList quic_headers2;
-  quic_headers2.OnHeaderBlockStart();
   quic_headers2.OnHeader(":authority", "www.google.com");
   quic_headers2.OnHeader(":path", "/index.hml");
   quic_headers2.OnHeader(":scheme", "https");
   quic_headers2.OnHeader("invalid_key", "");
   quic_headers2.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(validator, startHeaderBlock());
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly([](absl::string_view header_name, absl::string_view) {
         if (header_name == "invalid_key") {
@@ -119,52 +125,64 @@ TEST(EnvoyQuicUtilsTest, HeadersConversion) {
 }
 
 TEST(EnvoyQuicUtilsTest, HeadersSizeBounds) {
-  spdy::Http2HeaderBlock headers_block;
+  quic::QuicHeaderList quic_headers;
+  quic_headers.OnHeader(":authority", "www.google.com");
+  quic_headers.OnHeader(":path", "/index.hml");
+  quic_headers.OnHeader(":scheme", "https");
+  quic_headers.OnHeader("foo1", "bar");
+  quic_headers.OnHeader("foo2", "bar");
+  quic_headers.OnHeader("foo3", "bar");
+  quic_headers.OnHeaderBlockEnd(0, 0);
+  absl::string_view details;
+  NiceMock<MockServerHeaderValidator> validator;
+  quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
+  EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
+  // 6 headers are allowed.
+  EXPECT_NE(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 6, details, rst));
+  // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
+  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 5, details, rst));
+  EXPECT_EQ("http3.too_many_headers", details);
+  EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+  EXPECT_EQ(nullptr, quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(quic_headers, validator,
+                                                                           60, 4, details, rst));
+  EXPECT_EQ("http3.too_many_headers", details);
+  EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
+}
+
+TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
   headers_block["foo"] = std::string("bar\0eep\0baz", 11);
   absl::string_view details;
-  // 6 headers are allowed.
   NiceMock<MockServerHeaderValidator> validator;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
+  EXPECT_CALL(validator, finishHeaderBlock(true)).WillOnce(Return(true));
+  // 6 headers are allowed.
   EXPECT_NE(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 60, 6, validator, details, rst));
   // Given the cap is 6, make sure anything lower, exact or otherwise, is rejected.
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 60, 5, validator, details, rst));
   EXPECT_EQ("http3.too_many_trailers", details);
+  EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
   EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
                          headers_block, 60, 4, validator, details, rst));
-  EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
-}
-
-TEST(EnvoyQuicUtilsTest, TrailersSizeBounds) {
-  spdy::Http2HeaderBlock headers_block;
-  headers_block[":authority"] = "www.google.com";
-  headers_block[":path"] = "/index.hml";
-  headers_block[":scheme"] = "https";
-  headers_block["foo"] = std::string("bar\0eep\0baz", 11);
-  absl::string_view details;
-  NiceMock<MockServerHeaderValidator> validator;
-  quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
-  EXPECT_NE(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 60, 6, validator, details, rst));
-  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 60, 2, validator, details, rst));
   EXPECT_EQ("http3.too_many_trailers", details);
-  EXPECT_EQ(nullptr, http2HeaderBlockToEnvoyTrailers<Http::RequestHeaderMapImpl>(
-                         headers_block, 60, 2, validator, details, rst));
   EXPECT_EQ(rst, quic::QUIC_STREAM_EXCESSIVE_LOAD);
 }
 
 TEST(EnvoyQuicUtilsTest, TrailerCharacters) {
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
   absl::string_view details;
   NiceMock<MockServerHeaderValidator> validator;
+  EXPECT_CALL(validator, startHeaderBlock());
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly(Return(Http::HeaderUtility::HeaderValidationResult::REJECT));
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
@@ -225,15 +243,16 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   absl::string_view details;
   quic::QuicRstStreamErrorCode rst = quic::QUIC_REFUSED_STREAM;
   quic::QuicHeaderList quic_headers;
-  quic_headers.OnHeaderBlockStart();
   quic_headers.OnHeader(":authority", "www.google.com");
   quic_headers.OnHeader(":path", "/index.hml");
   quic_headers.OnHeader(":scheme", "https");
   quic_headers.OnHeaderBlockEnd(0, 0);
+  EXPECT_CALL(validator, startHeaderBlock());
   EXPECT_CALL(validator, validateHeader(_, _))
       .WillRepeatedly([](absl::string_view, absl::string_view) {
         return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
       });
+  EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
   // Request header map test.
   auto request_header = quicHeadersToEnvoyHeaders<Http::RequestHeaderMapImpl>(
       quic_headers, validator, 60, 100, details, rst);
@@ -241,27 +260,181 @@ TEST(EnvoyQuicUtilsTest, HeaderMapMaxSizeLimit) {
   EXPECT_EQ(request_header->maxHeadersKb(), 60);
 
   // Response header map test.
+  EXPECT_CALL(validator, startHeaderBlock());
+  EXPECT_CALL(validator, finishHeaderBlock(false)).WillOnce(Return(true));
   auto response_header = quicHeadersToEnvoyHeaders<Http::ResponseHeaderMapImpl>(
       quic_headers, validator, 60, 100, details, rst);
   EXPECT_EQ(response_header->maxHeadersCount(), 100);
   EXPECT_EQ(response_header->maxHeadersKb(), 60);
 
-  spdy::Http2HeaderBlock headers_block;
+  quiche::HttpHeaderBlock headers_block;
   headers_block[":authority"] = "www.google.com";
   headers_block[":path"] = "/index.hml";
   headers_block[":scheme"] = "https";
 
   // Request trailer map test.
+  EXPECT_CALL(validator, startHeaderBlock());
+  EXPECT_CALL(validator, finishHeaderBlock(true)).WillOnce(Return(true));
   auto request_trailer = http2HeaderBlockToEnvoyTrailers<Http::RequestTrailerMapImpl>(
       headers_block, 60, 100, validator, details, rst);
   EXPECT_EQ(request_trailer->maxHeadersCount(), 100);
   EXPECT_EQ(request_trailer->maxHeadersKb(), 60);
 
   // Response trailer map test.
+  EXPECT_CALL(validator, startHeaderBlock());
+  EXPECT_CALL(validator, finishHeaderBlock(true)).WillOnce(Return(true));
   auto response_trailer = http2HeaderBlockToEnvoyTrailers<Http::ResponseTrailerMapImpl>(
       headers_block, 60, 100, validator, details, rst);
   EXPECT_EQ(response_trailer->maxHeadersCount(), 100);
   EXPECT_EQ(response_trailer->maxHeadersKb(), 60);
+}
+
+TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCode) {
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::OverloadManager),
+            quic::QUIC_STREAM_EXCESSIVE_LOAD);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::LocalRefusedStreamReset),
+            quic::QUIC_REFUSED_STREAM);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::LocalConnectionFailure),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::RemoteConnectionFailure),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ConnectionTimeout),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ConnectionTermination),
+            quic::QUIC_STREAM_CONNECTION_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ConnectError),
+            quic::QUIC_STREAM_CONNECT_ERROR);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::LocalReset),
+            quic::QUIC_STREAM_REQUEST_REJECTED);
+  EXPECT_EQ(envoyResetReasonToQuicRstError(Http::StreamResetReason::ProtocolError),
+            quic::QUIC_STREAM_GENERAL_PROTOCOL_ERROR);
+}
+
+TEST(EnvoyQuicUtilsTest, EnvoyResetReasonToQuicResetErrorCodeImpossibleCases) {
+  EXPECT_ENVOY_BUG(envoyResetReasonToQuicRstError(Http::StreamResetReason::Overflow),
+                   "Resource overflow ");
+  EXPECT_ENVOY_BUG(
+      envoyResetReasonToQuicRstError(Http::StreamResetReason::RemoteRefusedStreamReset),
+      "Remote reset ");
+  EXPECT_ENVOY_BUG(
+      envoyResetReasonToQuicRstError(Http::StreamResetReason::Http1PrematureUpstreamHalfClose),
+      "not applicable");
+}
+
+TEST(EnvoyQuicUtilsTest, QuicResetErrorToEnvoyResetReason) {
+  EXPECT_EQ(quicRstErrorToEnvoyLocalResetReason(quic::QUIC_STREAM_NO_ERROR),
+            Http::StreamResetReason::LocalReset);
+  EXPECT_EQ(quicRstErrorToEnvoyLocalResetReason(quic::QUIC_STREAM_CANCELLED),
+            Http::StreamResetReason::LocalReset);
+  EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECTION_ERROR),
+            Http::StreamResetReason::ConnectionTermination);
+  EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CONNECT_ERROR),
+            Http::StreamResetReason::ConnectError);
+  EXPECT_EQ(quicRstErrorToEnvoyRemoteResetReason(quic::QUIC_STREAM_CANCELLED),
+            Http::StreamResetReason::RemoteReset);
+}
+
+TEST(EnvoyQuicUtilsTest, CreateConnectionSocket) {
+  Network::Address::InstanceConstSharedPtr local_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
+  Network::Address::InstanceConstSharedPtr peer_addr =
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 54321, nullptr);
+  auto connection_socket = createConnectionSocket(peer_addr, local_addr, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr no_local_addr = nullptr;
+  connection_socket = createConnectionSocket(peer_addr, no_local_addr, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_EQ("127.0.0.1", no_local_addr->ip()->addressAsString());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(connection_socket->getSocketOption(IPPROTO_IP, IP_DONTFRAG, &value, &val_length)
+                           .return_value_ == 0,
+                   "Failed getsockopt IP_DONTFRAG");
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IP_MTU_DISCOVER");
+    EXPECT_EQ(value, IP_PMTUDISC_DO);
+#endif
+  }
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr local_addr_v6 =
+      std::make_shared<Network::Address::Ipv6Instance>("::1", 0, nullptr, /*v6only*/ true);
+  Network::Address::InstanceConstSharedPtr peer_addr_v6 =
+      std::make_shared<Network::Address::Ipv6Instance>("::1", 54321, nullptr, /*v6only*/ false);
+  connection_socket = createConnectionSocket(peer_addr_v6, local_addr_v6, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_TRUE(local_addr_v6->ip()->ipv6()->v6only());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_DONTFRAG, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IPV6_DONTFRAG");
+    ;
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IPV6_MTU_DISCOVER");
+    EXPECT_EQ(value, IPV6_PMTUDISC_DO);
+    // The v4 socket option is not applied to v6-only socket.
+    value = 0;
+    val_length = sizeof(value);
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IP_MTU_DISCOVER");
+    EXPECT_NE(value, IP_PMTUDISC_DO);
+#endif
+  }
+  connection_socket->close();
+
+  Network::Address::InstanceConstSharedPtr no_local_addr_v6 = nullptr;
+  connection_socket = createConnectionSocket(peer_addr_v6, no_local_addr_v6, nullptr);
+  EXPECT_TRUE(connection_socket->isOpen());
+  EXPECT_TRUE(connection_socket->ioHandle().wasConnected());
+  EXPECT_EQ("::1", no_local_addr_v6->ip()->addressAsString());
+  EXPECT_FALSE(no_local_addr_v6->ip()->ipv6()->v6only());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
+    int value = 0;
+    socklen_t val_length = sizeof(value);
+#ifdef ENVOY_IP_DONTFRAG
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_DONTFRAG, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IPV6_DONTFRAG");
+    EXPECT_EQ(value, 1);
+#else
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IPV6_MTU_DISCOVER");
+    EXPECT_EQ(value, IPV6_PMTUDISC_DO);
+    // The v4 socket option is also applied to dual stack socket.
+    value = 0;
+    val_length = sizeof(value);
+    RELEASE_ASSERT(
+        connection_socket->getSocketOption(IPPROTO_IP, IP_MTU_DISCOVER, &value, &val_length)
+                .return_value_ == 0,
+        "Failed getsockopt IP_MTU_DISCOVER");
+    EXPECT_EQ(value, IP_PMTUDISC_DO);
+#endif
+  }
+  connection_socket->close();
 }
 
 } // namespace Quic

@@ -16,7 +16,6 @@ envoy_cc_library(
     hdrs = [
         "conn_pool.h",
     ],
-    external_deps = ["abseil_optional"],
     deps = [
         "//envoy/event:deferred_deletable",
         "//envoy/event:dispatcher_interface",
@@ -33,6 +32,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

@@ -24,6 +24,14 @@ AsyncTcpClientImpl::AsyncTcpClientImpl(Event::Dispatcher& dispatcher,
       connect_timer_(dispatcher.createTimer([this]() { onConnectTimeout(); })),
       enable_half_close_(enable_half_close) {}
 
+AsyncTcpClientImpl::~AsyncTcpClientImpl() {
+  if (connection_) {
+    connection_->removeConnectionCallbacks(*this);
+  }
+
+  closeImpl(Network::ConnectionCloseType::NoFlush);
+}
+
 bool AsyncTcpClientImpl::connect() {
   if (connection_) {
     return false;
@@ -68,8 +76,9 @@ void AsyncTcpClientImpl::onConnectTimeout() {
   close(Network::ConnectionCloseType::NoFlush);
 }
 
-void AsyncTcpClientImpl::close(Network::ConnectionCloseType type) {
-  if (connection_) {
+void AsyncTcpClientImpl::closeImpl(Network::ConnectionCloseType type) {
+  if (connection_ && !closing_) {
+    closing_ = true;
     connection_->close(type);
   }
 }
@@ -127,6 +136,7 @@ void AsyncTcpClientImpl::onEvent(Network::ConnectionEvent event) {
       detected_close_ = connection_->detectedCloseType();
     }
 
+    closing_ = false;
     dispatcher_.deferredDelete(std::move(connection_));
     if (callbacks_) {
       callbacks_->onEvent(event);

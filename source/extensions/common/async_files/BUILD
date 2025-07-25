@@ -11,7 +11,6 @@ envoy_extension_package()
 envoy_cc_library(
     name = "async_files_base",
     srcs = [
-        "async_file_action.cc",
         "async_file_context_base.cc",
     ],
     hdrs = [
@@ -22,6 +21,7 @@ envoy_cc_library(
     ],
     deps = [
         ":status_after_file_error",
+        "//envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:utility_lib",
         "@com_google_absl//absl/base",
@@ -53,7 +53,6 @@ envoy_cc_library(
 envoy_cc_library(
     name = "async_files",
     srcs = [
-        "async_file_manager.cc",
         "async_file_manager_factory.cc",
     ],
     hdrs = [

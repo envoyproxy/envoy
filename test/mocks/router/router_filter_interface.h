@@ -54,7 +54,7 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   Stats::TestUtil::TestSymbolTable symbol_table_;
   Stats::StatNamePool pool_;
-  FilterConfig config_;
+  std::unique_ptr<FilterConfig> config_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_;
 };
 

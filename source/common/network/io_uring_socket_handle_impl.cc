@@ -135,12 +135,15 @@ Api::IoCallUint64Result IoUringSocketHandleImpl::sendmsg(const Buffer::RawSlice*
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmsg(Buffer::RawSlice*, const uint64_t,
-                                                         uint32_t, RecvMsgOutput&) {
+                                                         uint32_t,
+                                                         const IoHandle::UdpSaveCmsgConfig&,
+                                                         RecvMsgOutput&) {
   ENVOY_LOG(trace, "recvmsg, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
   return Network::IoSocketError::ioResultSocketInvalidAddress();
 }
 
 Api::IoCallUint64Result IoUringSocketHandleImpl::recvmmsg(RawSliceArrays&, uint32_t,
+                                                          const IoHandle::UdpSaveCmsgConfig&,
                                                           RecvMsgOutput&) {
   ENVOY_LOG(trace, "recvmmsg, fd = {}, type = {}", fd_, ioUringSocketTypeStr());
   return Network::IoSocketError::ioResultSocketInvalidAddress();

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
+
 #include "library/common/network/proxy_settings.h"
 
 namespace Envoy {
@@ -28,6 +30,14 @@ public:
   virtual ProxyResolutionResult
   resolveProxy(const std::string& target_url_string, std::vector<ProxySettings>& proxies,
                ProxySettingsResolvedCallback proxy_resolution_completed) PURE;
+
+  /**
+   * Sets the Event Dispatcher that a proxy resolver instance can use to post callbacks to.
+   * Typically, this would be the main Envoy thread's dispatcher (which is also the worker thread
+   * in Envoy Mobile).
+   * @param dispatcher The event dispatcher.
+   */
+  virtual void setDispatcher(Event::Dispatcher* dispatcher) PURE;
 };
 
 } // namespace Network

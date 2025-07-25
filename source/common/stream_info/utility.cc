@@ -86,7 +86,7 @@ ResponseFlag ResponseFlagUtils::registerCustomFlag(absl::string_view custom_flag
 
 const ResponseFlagUtils::ResponseFlagsVecType& ResponseFlagUtils::responseFlagsVec() {
   CONSTRUCT_ON_FIRST_USE(ResponseFlagsVecType, []() {
-    static_assert(CoreResponseFlag::LastFlag == 28,
+    static_assert(CoreResponseFlag::LastFlag == 29,
                   "A flag has been added. Add the new flag to CORE_RESPONSE_FLAGS.");
 
     responseFlagsVecInitialized() = true;
@@ -198,6 +198,14 @@ absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamTxByteSent
     return absl::nullopt;
   }
   return duration(timing.value().get().lastDownstreamTxByteSent(), stream_info_);
+}
+
+absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamHeaderRxByteReceived() {
+  OptRef<const DownstreamTiming> timing = stream_info_.downstreamTiming();
+  if (!timing) {
+    return absl::nullopt;
+  }
+  return duration(timing.value().get().lastDownstreamHeaderRxByteReceived(), stream_info_);
 }
 
 absl::optional<std::chrono::nanoseconds> TimingUtility::lastDownstreamRxByteReceived() {
