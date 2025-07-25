@@ -3,11 +3,6 @@
 Composite cluster
 =================
 
-.. attention::
-
-  The composite cluster type is currently under active development and should be considered experimental.
-  This cluster type provides flexible sub-cluster selection strategies with initial support for retry progression.
-
 The composite cluster type enables sophisticated routing and retry strategies across multiple upstream clusters.
 It provides a configurable framework for selecting among sub-clusters based on various strategies, with the
 initial implementation supporting retry-based progression.
@@ -50,13 +45,14 @@ Configuration
 -------------
 
 The composite cluster is configured using the
-:ref:`CompositeCluster <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>` message.
+:ref:`ClusterConfig <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>` message.
 
 The configuration requires:
 
-1. An operational ``mode`` (currently only ``RETRY`` is supported)
-2. A list of ``sub_clusters`` referencing existing cluster names
-3. Mode-specific configuration (e.g., ``retry_config`` for RETRY mode)
+1. A list of ``sub_clusters`` referencing existing cluster names
+2. Mode-specific configuration (e.g., ``retry_config`` for RETRY mode)
+
+The operational mode is determined by which configuration is provided (e.g., setting ``retry_config`` enables RETRY mode).
 
 Basic example
 ~~~~~~~~~~~~~
@@ -72,7 +68,6 @@ Basic example
         name: envoy.clusters.composite
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-          mode: RETRY
           sub_clusters:
           - name: primary_cluster
           - name: secondary_cluster
@@ -134,7 +129,6 @@ Configuration example
         name: envoy.clusters.composite
         typed_config:
           "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-          mode: RETRY
           name: "composite_cluster"
           sub_clusters:
           - name: us_east_cluster

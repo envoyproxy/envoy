@@ -2,6 +2,7 @@
 
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/composite/cluster.h"
+#include "source/extensions/clusters/composite/lb_context.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/http/conn_pool.h"
@@ -80,7 +81,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     - name: cluster_1
@@ -93,7 +93,7 @@ cluster_type:
   EXPECT_EQ(2, cluster_->subClusters()->size());
   EXPECT_EQ("cluster_0", (*cluster_->subClusters())[0]);
   EXPECT_EQ("cluster_1", (*cluster_->subClusters())[1]);
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY, cluster_->mode());
+  EXPECT_TRUE(cluster_->hasRetryConfig());
   EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL,
             cluster_->retryConfig().overflow_behavior());
   EXPECT_TRUE(cluster_->honorRouteRetryPolicy());
@@ -108,7 +108,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     - name: cluster_1
@@ -119,8 +118,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Test normal mapping (1-based retry attempts).
   EXPECT_FALSE(lb.mapRetryAttemptToClusterIndex(0).has_value()); // Invalid attempt 0
@@ -134,14 +132,13 @@ cluster_type:
 }
 
 // Test ROUND_ROBIN overflow behavior.
-TEST_F(CompositeClusterTest, RoundRobinOverflowBehavior) {
+TEST_F(CompositeClusterTest, RoundRobinOverflowOption) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     - name: cluster_1
@@ -153,8 +150,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Test normal mapping.
   EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value()); // First attempt -> cluster 0
@@ -170,14 +166,13 @@ cluster_type:
 }
 
 // Test FAIL overflow behavior.
-TEST_F(CompositeClusterTest, FailOverflowBehavior) {
+TEST_F(CompositeClusterTest, FailOverflowOption) {
   const std::string yaml = R"EOF(
 name: composite_cluster
 cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     - name: cluster_1
@@ -188,8 +183,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Test normal mapping.
   EXPECT_EQ(0, lb.mapRetryAttemptToClusterIndex(1).value()); // First attempt -> cluster 0
@@ -208,7 +202,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -228,7 +221,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -248,7 +240,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -269,7 +260,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
 )EOF";
@@ -286,7 +276,7 @@ cluster_type:
   auto cluster = std::make_unique<Cluster>(config, typed_config, factory_context, creation_status);
   EXPECT_FALSE(creation_status.ok());
   EXPECT_THAT(creation_status.message(),
-              testing::HasSubstr("retry_config is required when mode is RETRY"));
+              testing::HasSubstr("must specify a mode configuration (e.g., retry_config)"));
 }
 
 // Test error conditions - empty sub_clusters.
@@ -297,7 +287,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters: []
     retry_config:
       overflow_behavior: FAIL
@@ -370,7 +359,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     - name: cluster_1
@@ -381,8 +369,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Mock load balancer context with retry attempt information.
   NiceMock<Upstream::MockLoadBalancerContext> mock_context;
@@ -408,7 +395,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     - name: cluster_1
@@ -437,7 +423,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -447,8 +432,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Test out of bounds index.
   EXPECT_EQ(nullptr, lb.getClusterByIndex(5));
@@ -467,7 +451,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -477,8 +460,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Mock context returning null stream info.
   NiceMock<Upstream::MockLoadBalancerContext> mock_context;
@@ -495,7 +477,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -505,8 +486,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Set up mocks.
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -538,7 +518,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -548,8 +527,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Set up mocks.
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -577,7 +555,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -587,8 +564,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Set up mocks.
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -619,7 +595,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -629,8 +604,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   auto callbacks = lb.lifetimeCallbacks();
   EXPECT_TRUE(callbacks.has_value());
@@ -644,7 +618,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -654,8 +627,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Test onClusterAddOrUpdate - should be no-op.
   NiceMock<Upstream::MockThreadLocalCluster> mock_cluster;
@@ -676,7 +648,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -699,7 +670,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -725,7 +695,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -747,7 +716,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -757,8 +725,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Set up context with attempt that will map to invalid index.
   NiceMock<Upstream::MockLoadBalancerContext> context;
@@ -787,7 +754,6 @@ cluster_type:
   name: envoy.clusters.composite
   typed_config:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    mode: RETRY
     sub_clusters:
     - name: cluster_0
     retry_config:
@@ -797,8 +763,7 @@ cluster_type:
   initialize(yaml);
 
   CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
-                                  cluster_->mode(), cluster_->retryConfig(),
-                                  cluster_->honorRouteRetryPolicy());
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
 
   // Mock context with stream info that returns no attempt count.
   NiceMock<Upstream::MockLoadBalancerContext> mock_context;
@@ -807,6 +772,231 @@ cluster_type:
   ON_CALL(mock_stream_info, attemptCount()).WillByDefault(Return(absl::nullopt));
 
   EXPECT_EQ(1, lb.getRetryAttemptCount(&mock_context));
+}
+
+// Test CompositeLoadBalancerContext with null base context.
+TEST_F(CompositeClusterTest, CompositeLoadBalancerContextNullBase) {
+  CompositeLoadBalancerContext context(nullptr, 1);
+
+  // Test all methods with null base context return appropriate defaults.
+  EXPECT_EQ(absl::nullopt, context.computeHashKey());
+  EXPECT_EQ(nullptr, context.downstreamConnection());
+  EXPECT_EQ(nullptr, context.metadataMatchCriteria());
+  EXPECT_EQ(nullptr, context.downstreamHeaders());
+  EXPECT_EQ(nullptr, context.requestStreamInfo());
+  EXPECT_EQ(0, context.hostSelectionRetryCount());
+  EXPECT_EQ(nullptr, context.upstreamSocketOptions());
+  EXPECT_EQ(nullptr, context.upstreamTransportSocketOptions());
+  EXPECT_EQ(absl::nullopt, context.overrideHostToSelect());
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_FALSE(context.shouldSelectAnotherHost(*mock_host));
+  EXPECT_EQ(1, context.selectedClusterIndex());
+
+  // Test methods that accept callbacks with null base context (should not crash).
+  std::function<void(Http::ResponseHeaderMap&)> headers_modifier = [](Http::ResponseHeaderMap&) {};
+  context.setHeadersModifier(std::move(headers_modifier));
+
+  context.onAsyncHostSelection(mock_host, "test_details");
+}
+
+// Test CompositeLoadBalancerContext with non-null base context.
+TEST_F(CompositeClusterTest, CompositeLoadBalancerContextWithBase) {
+  auto mock_base_context = std::make_unique<NiceMock<Upstream::MockLoadBalancerContext>>();
+  auto* base_ptr = mock_base_context.get();
+
+  // Set up expectations for all methods.
+  EXPECT_CALL(*base_ptr, computeHashKey()).WillOnce(Return(12345));
+  EXPECT_CALL(*base_ptr, downstreamConnection()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*base_ptr, metadataMatchCriteria()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*base_ptr, downstreamHeaders()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*base_ptr, requestStreamInfo()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*base_ptr, hostSelectionRetryCount()).WillOnce(Return(3));
+  EXPECT_CALL(*base_ptr, upstreamSocketOptions()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*base_ptr, upstreamTransportSocketOptions()).WillOnce(Return(nullptr));
+  EXPECT_CALL(*base_ptr, overrideHostToSelect())
+      .WillOnce(Return(std::make_pair("test_host", true)));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  // Don't test shouldSelectAnotherHost here due to mock complexity
+
+  CompositeLoadBalancerContext context(base_ptr, 2);
+
+  // Test all methods delegate to base context.
+  EXPECT_EQ(12345, context.computeHashKey().value());
+  EXPECT_EQ(nullptr, context.downstreamConnection());
+  EXPECT_EQ(nullptr, context.metadataMatchCriteria());
+  EXPECT_EQ(nullptr, context.downstreamHeaders());
+  EXPECT_EQ(nullptr, context.requestStreamInfo());
+  EXPECT_EQ(3, context.hostSelectionRetryCount());
+  EXPECT_EQ(nullptr, context.upstreamSocketOptions());
+  EXPECT_EQ(nullptr, context.upstreamTransportSocketOptions());
+  auto override_host = context.overrideHostToSelect();
+  EXPECT_TRUE(override_host.has_value());
+  EXPECT_EQ("test_host", override_host->first);
+  EXPECT_TRUE(override_host->second);
+  EXPECT_EQ(2, context.selectedClusterIndex());
+
+  // Test callback methods delegate to base context.
+  std::function<void(Http::ResponseHeaderMap&)> headers_modifier = [](Http::ResponseHeaderMap&) {};
+  EXPECT_CALL(*base_ptr, setHeadersModifier(_));
+  context.setHeadersModifier(std::move(headers_modifier));
+}
+
+// Test peekAnotherHost with cluster not found (covers missing line 222).
+TEST_F(CompositeClusterTest, PeekAnotherHostClusterNotFound) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    sub_clusters:
+    - name: nonexistent_cluster
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+  EXPECT_NE(nullptr, cluster_);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
+
+  // Mock context with retry attempt that maps to valid index but nonexistent cluster.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(1));
+
+  // Should return nullptr when cluster is not found.
+  auto result = lb.peekAnotherHost(&context);
+  EXPECT_EQ(nullptr, result);
+}
+
+// Test selectExistingConnection with cluster not found (covers missing line 242).
+TEST_F(CompositeClusterTest, SelectExistingConnectionClusterNotFound) {
+  const std::string yaml = R"EOF(
+name: composite_cluster
+connect_timeout: 0.25s
+lb_policy: CLUSTER_PROVIDED
+cluster_type:
+  name: envoy.clusters.composite
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+    sub_clusters:
+    - name: nonexistent_cluster
+    retry_config:
+      overflow_behavior: FAIL
+)EOF";
+
+  initialize(yaml);
+  EXPECT_NE(nullptr, cluster_);
+
+  CompositeClusterLoadBalancer lb(*cluster_->info(), *cluster_manager_, cluster_->subClusters(),
+                                  cluster_->retryConfig(), cluster_->honorRouteRetryPolicy());
+
+  // Mock context with retry attempt that maps to valid index but nonexistent cluster.
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(context, requestStreamInfo()).WillRepeatedly(Return(&stream_info));
+  EXPECT_CALL(stream_info, attemptCount()).WillRepeatedly(Return(1));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  std::vector<uint8_t> hash_key = {1, 2, 3};
+
+  // Should return nullopt when cluster is not found.
+  auto result = lb.selectExistingConnection(&context, *mock_host, hash_key);
+  EXPECT_EQ(absl::nullopt, result);
+}
+
+// Test additional CompositeLoadBalancerContext methods with valid base context.
+TEST_F(CompositeClusterTest, CompositeLoadBalancerContextAdditionalMethods) {
+  NiceMock<Upstream::MockLoadBalancerContext> mock_base_context;
+  CompositeLoadBalancerContext context(&mock_base_context, 5);
+
+  // Test computeHashKey with null base context.
+  CompositeLoadBalancerContext null_context(nullptr, 3);
+  EXPECT_EQ(absl::nullopt, null_context.computeHashKey());
+  EXPECT_EQ(3, null_context.selectedClusterIndex());
+
+  // Test that methods work when base context returns values.
+  EXPECT_CALL(mock_base_context, computeHashKey()).WillOnce(Return(42));
+  EXPECT_EQ(42, context.computeHashKey().value());
+  EXPECT_EQ(5, context.selectedClusterIndex());
+}
+
+// Test additional coverage for CompositeLoadBalancerContext methods with both null and non-null
+// base.
+TEST_F(CompositeClusterTest, CompositeLoadBalancerContextComprehensiveCoverage) {
+  // Test with null base context to cover null branches.
+  CompositeLoadBalancerContext null_context(nullptr, 0);
+
+  EXPECT_EQ(nullptr, null_context.downstreamConnection());
+  EXPECT_EQ(nullptr, null_context.metadataMatchCriteria());
+  EXPECT_EQ(nullptr, null_context.downstreamHeaders());
+  EXPECT_EQ(nullptr, null_context.requestStreamInfo());
+  EXPECT_EQ(nullptr, null_context.upstreamSocketOptions());
+  EXPECT_EQ(nullptr, null_context.upstreamTransportSocketOptions());
+  EXPECT_EQ(absl::nullopt, null_context.overrideHostToSelect());
+  EXPECT_EQ(0, null_context.hostSelectionRetryCount());
+
+  // Test shouldSelectAnotherHost with null base context.
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+  EXPECT_FALSE(null_context.shouldSelectAnotherHost(*mock_host));
+
+  // Test setHeadersModifier with null base context (should not crash).
+  std::function<void(Http::ResponseHeaderMap&)> modifier = [](Http::ResponseHeaderMap&) {};
+  null_context.setHeadersModifier(std::move(modifier));
+
+  // Test onAsyncHostSelection with null base context (should not crash).
+  null_context.onAsyncHostSelection(mock_host, "test");
+
+  // Test with non-null base context to cover delegation branches.
+  NiceMock<Upstream::MockLoadBalancerContext> base_context;
+  CompositeLoadBalancerContext delegating_context(&base_context, 1);
+
+  // Test delegation for downstreamConnection.
+  EXPECT_CALL(base_context, downstreamConnection()).WillOnce(Return(nullptr));
+  EXPECT_EQ(nullptr, delegating_context.downstreamConnection());
+
+  // Test delegation for metadataMatchCriteria.
+  EXPECT_CALL(base_context, metadataMatchCriteria()).WillOnce(Return(nullptr));
+  EXPECT_EQ(nullptr, delegating_context.metadataMatchCriteria());
+
+  // Test delegation for downstreamHeaders.
+  EXPECT_CALL(base_context, downstreamHeaders()).WillOnce(Return(nullptr));
+  EXPECT_EQ(nullptr, delegating_context.downstreamHeaders());
+
+  // Test delegation for requestStreamInfo.
+  EXPECT_CALL(base_context, requestStreamInfo()).WillOnce(Return(nullptr));
+  EXPECT_EQ(nullptr, delegating_context.requestStreamInfo());
+
+  // Test delegation for upstreamSocketOptions.
+  EXPECT_CALL(base_context, upstreamSocketOptions()).WillOnce(Return(nullptr));
+  EXPECT_EQ(nullptr, delegating_context.upstreamSocketOptions());
+
+  // Test delegation for upstreamTransportSocketOptions.
+  EXPECT_CALL(base_context, upstreamTransportSocketOptions()).WillOnce(Return(nullptr));
+  EXPECT_EQ(nullptr, delegating_context.upstreamTransportSocketOptions());
+
+  // Test delegation for overrideHostToSelect.
+  EXPECT_CALL(base_context, overrideHostToSelect()).WillOnce(Return(absl::nullopt));
+  EXPECT_EQ(absl::nullopt, delegating_context.overrideHostToSelect());
+
+  // Test delegation for hostSelectionRetryCount.
+  EXPECT_CALL(base_context, hostSelectionRetryCount()).WillOnce(Return(5));
+  EXPECT_EQ(5, delegating_context.hostSelectionRetryCount());
+
+  // Test delegation for shouldSelectAnotherHost.
+  EXPECT_CALL(base_context, shouldSelectAnotherHost(_)).WillOnce(Return(true));
+  EXPECT_TRUE(delegating_context.shouldSelectAnotherHost(*mock_host));
+
+  // Test delegation for setHeadersModifier.
+  std::function<void(Http::ResponseHeaderMap&)> modifier2 = [](Http::ResponseHeaderMap&) {};
+  EXPECT_CALL(base_context, setHeadersModifier(_));
+  delegating_context.setHeadersModifier(std::move(modifier2));
 }
 
 } // namespace Composite

@@ -12,7 +12,7 @@ namespace {
 
 struct CompositeClusterTestParams {
   Network::Address::IpVersion version;
-  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::OverflowBehavior
+  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::OverflowOption
       overflow_option;
 };
 
@@ -71,8 +71,7 @@ private:
     cluster_type->set_name("envoy.clusters.composite");
     envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
 
-    // Set mode to RETRY.
-    composite_config.set_mode(envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY);
+    // Configure for RETRY mode by setting retry_config.
 
     // Add sub-clusters.
     auto* primary_entry = composite_config.add_sub_clusters();
@@ -170,7 +169,7 @@ public:
   }
 
 protected:
-  const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::OverflowBehavior
+  const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::OverflowOption
       overflow_option_;
 };
 
@@ -304,7 +303,7 @@ TEST_P(CompositeClusterIntegrationTest, FullRetryProgressionTertiarySucceeds) {
 }
 
 // Test overflow behavior: More retries than clusters.
-TEST_P(CompositeClusterIntegrationTest, RetryOverflowBehavior) {
+TEST_P(CompositeClusterIntegrationTest, RetryOverflowOption) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -440,8 +439,7 @@ private:
     cluster_type->set_name("envoy.clusters.composite");
     envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
 
-    // Set mode to RETRY.
-    composite_config.set_mode(envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY);
+    // Configure for RETRY mode by setting retry_config.
 
     // Reference a cluster that doesn't exist.
     auto* missing_entry = composite_config.add_sub_clusters();
@@ -515,8 +513,7 @@ public:
       cluster_type->set_name("envoy.clusters.composite");
       envoy::extensions::clusters::composite::v3::ClusterConfig composite_config;
 
-      // Set mode to RETRY.
-      composite_config.set_mode(envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY);
+      // Configure for RETRY mode by setting retry_config.
 
       // Only one sub-cluster.
       auto* single_entry = composite_config.add_sub_clusters();

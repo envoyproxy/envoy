@@ -43,9 +43,7 @@ public:
 
   // Access to configuration for load balancer.
   const std::vector<std::string>* subClusters() const { return sub_clusters_.get(); }
-  envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode() const {
-    return mode_;
-  }
+  bool hasRetryConfig() const { return has_retry_config_; }
   const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig&
   retryConfig() const {
     return retry_config_;
@@ -60,7 +58,7 @@ private:
 
   Upstream::ClusterFactoryContext& context_;
   std::unique_ptr<std::vector<std::string>> sub_clusters_;
-  envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode_;
+  bool has_retry_config_;
   envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
   std::string name_;
   bool honor_route_retry_policy_;
@@ -103,7 +101,6 @@ public:
   CompositeClusterLoadBalancer(
       const Upstream::ClusterInfo& cluster_info, Upstream::ClusterManager& cluster_manager,
       const std::vector<std::string>* sub_clusters,
-      envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode,
       const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig& retry_config,
       bool honor_route_retry_policy);
 
@@ -133,7 +130,6 @@ private:
   const Upstream::ClusterInfo& cluster_info_;
   Upstream::ClusterManager& cluster_manager_;
   const std::vector<std::string>* sub_clusters_;
-  envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode_;
   envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
   bool honor_route_retry_policy_;
   std::unique_ptr<CompositeConnectionLifetimeCallbacks> composite_callbacks_;
@@ -150,24 +146,20 @@ public:
   CompositeClusterLoadBalancerFactory(
       const Upstream::ClusterInfo& cluster_info, Upstream::ClusterManager& cluster_manager,
       const std::vector<std::string>* sub_clusters,
-      envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode,
       const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig& retry_config,
       bool honor_route_retry_policy)
       : cluster_info_(cluster_info), cluster_manager_(cluster_manager), sub_clusters_(sub_clusters),
-        mode_(mode), retry_config_(retry_config),
-        honor_route_retry_policy_(honor_route_retry_policy) {}
+        retry_config_(retry_config), honor_route_retry_policy_(honor_route_retry_policy) {}
 
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams /*params*/) override {
-    return std::make_unique<CompositeClusterLoadBalancer>(cluster_info_, cluster_manager_,
-                                                          sub_clusters_, mode_, retry_config_,
-                                                          honor_route_retry_policy_);
+    return std::make_unique<CompositeClusterLoadBalancer>(
+        cluster_info_, cluster_manager_, sub_clusters_, retry_config_, honor_route_retry_policy_);
   }
 
 private:
   const Upstream::ClusterInfo& cluster_info_;
   Upstream::ClusterManager& cluster_manager_;
   const std::vector<std::string>* sub_clusters_;
-  envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode_;
   envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
   bool honor_route_retry_policy_;
 };
@@ -178,8 +170,7 @@ struct CompositeThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalanc
       : factory_(std::make_shared<CompositeClusterLoadBalancerFactory>(
             *cluster.info(),
             const_cast<Cluster&>(cluster).context().serverFactoryContext().clusterManager(),
-            cluster.subClusters(), cluster.mode(), cluster.retryConfig(),
-            cluster.honorRouteRetryPolicy())) {}
+            cluster.subClusters(), cluster.retryConfig(), cluster.honorRouteRetryPolicy())) {}
 
   // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }

@@ -23,14 +23,13 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  Upstream::ClusterFactoryContext& context, absl::Status& creation_status)
     : ClusterImplBase(cluster, context, creation_status), context_(context) {
 
-  // Validate mode is supported.
-  mode_ = config.mode();
-  if (mode_ != envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY) {
-    creation_status = absl::InvalidArgumentError(fmt::format(
-        "composite cluster: unsupported mode: {}",
-        envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode_Name(mode_)));
+  // Determine mode from the oneof configuration provided.
+  if (!config.has_retry_config()) {
+    creation_status = absl::InvalidArgumentError(
+        "composite cluster: must specify a mode configuration (e.g., retry_config)");
     return;
   }
+  has_retry_config_ = true;
 
   // Extract cluster names from SubCluster objects.
   sub_clusters_ = std::make_unique<std::vector<std::string>>();
@@ -45,31 +44,20 @@ Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
     return;
   }
 
-  // Parse mode-specific configuration.
-  if (mode_ == envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY) {
-    if (!config.has_retry_config()) {
-      creation_status = absl::InvalidArgumentError(
-          "composite cluster: retry_config is required when mode is RETRY");
-      return;
-    }
-    retry_config_ = config.retry_config();
-  }
+  // Parse retry configuration.
+  retry_config_ = config.retry_config();
 
   // Set name. We fallback to cluster name if not specified.
   name_ = config.name().empty() ? cluster.name() : config.name();
 
   // Set honor_route_retry_policy (defaults to true if not specified).
-  // Only applicable for RETRY mode.
   honor_route_retry_policy_ = true;
-  if (mode_ == envoy::extensions::clusters::composite::v3::ClusterConfig::RETRY &&
-      config.retry_config().has_honor_route_retry_policy()) {
+  if (config.retry_config().has_honor_route_retry_policy()) {
     honor_route_retry_policy_ = config.retry_config().honor_route_retry_policy().value();
   }
 
-  ENVOY_LOG(debug, "composite cluster '{}' initialized: mode={}, sub_clusters={}, name='{}'",
-            cluster.name(),
-            envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode_Name(mode_),
-            sub_clusters_->size(), name_);
+  ENVOY_LOG(debug, "composite cluster '{}' initialized: mode=RETRY, sub_clusters={}, name='{}'",
+            cluster.name(), sub_clusters_->size(), name_);
 }
 
 void CompositeConnectionLifetimeCallbacks::onConnectionOpen(
@@ -107,12 +95,10 @@ void CompositeConnectionLifetimeCallbacks::clearCallbacks() { callbacks_.clear()
 CompositeClusterLoadBalancer::CompositeClusterLoadBalancer(
     const Upstream::ClusterInfo& cluster_info, Upstream::ClusterManager& cluster_manager,
     const std::vector<std::string>* sub_clusters,
-    envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode mode,
     const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig& retry_config,
     bool honor_route_retry_policy)
     : cluster_info_(cluster_info), cluster_manager_(cluster_manager), sub_clusters_(sub_clusters),
-      mode_(mode), retry_config_(retry_config),
-      honor_route_retry_policy_(honor_route_retry_policy) {
+      retry_config_(retry_config), honor_route_retry_policy_(honor_route_retry_policy) {
   UNREFERENCED_PARAMETER(cluster_info_);
 
   composite_callbacks_ = std::make_unique<CompositeConnectionLifetimeCallbacks>();
@@ -125,9 +111,8 @@ CompositeClusterLoadBalancer::CompositeClusterLoadBalancer(
   }
 
   ENVOY_LOG(debug,
-            "composite cluster load balancer initialized: mode={}, sub_clusters={}, "
+            "composite cluster load balancer initialized: mode=RETRY, sub_clusters={}, "
             "honor_route_retry_policy={}",
-            envoy::extensions::clusters::composite::v3::ClusterConfig::ClusterMode_Name(mode_),
             sub_clusters_->size(), honor_route_retry_policy_);
 }
 
