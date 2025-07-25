@@ -9,6 +9,7 @@
 #include "envoy/server/fatal_action_config.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/notification.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -846,6 +847,10 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 
+  ENVOY_NOTIFICATION("name", "stuff");
+  ENVOY_NOTIFICATION("name1", "stuff1");
+  ENVOY_NOTIFICATION("name3", "stuff3");
+  EXPECT_EQ(3L, TestUtility::findCounter(stats_store_, "server.envoy_notifications")->value());
 // The ENVOY_BUG stat works in release mode.
 #if defined(NDEBUG)
   // Test exponential back-off on a fixed line ENVOY_BUG.

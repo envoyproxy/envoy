@@ -661,3 +661,13 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "notification_test",
+    srcs = ["notification_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:notification_lib",
+        "//test/test_common:logging_lib",
+    ],
+)

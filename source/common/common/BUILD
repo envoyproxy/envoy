@@ -387,6 +387,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "notification_lib",
+    srcs = ["notification.cc"],
+    hdrs = ["notification.h"],
+    deps = [
+        ":assert_lib",
+        ":minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "phantom",
     hdrs = ["phantom.h"],
 )
