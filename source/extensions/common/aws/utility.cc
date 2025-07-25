@@ -30,7 +30,7 @@ std::map<std::string, std::string>
 Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
                              const std::vector<Matchers::StringMatcherPtr>& excluded_headers) {
   std::map<std::string, std::string> out;
-  std::map<std::string, std::vector<std::string>> header_values;
+  std::map<std::string, std::vector<std::string>, std::less<>> header_values;
 
   headers.iterate([&header_values,
                    &excluded_headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
@@ -49,19 +49,26 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
       return Http::HeaderMap::Iterate::Continue;
     }
 
-    std::string header_key(key);
-    std::string value(entry.value().getStringView());
+    const auto value_view = entry.value().getStringView();
+    auto& values_vec = header_values.try_emplace(std::string(key)).first->second;
 
-    // Split by comma and process each value
-    std::vector<std::string> comma_separated = absl::StrSplit(value, ',');
-    for (auto& val : comma_separated) {
-      // Remove leading, trailing, and deduplicate repeated ascii spaces
-      absl::RemoveExtraAsciiWhitespace(&val);
-      if (!val.empty()) {
-        header_values[header_key].push_back(val);
+    // If we have no comma (common case) don't split
+    if (value_view.find(',') == absl::string_view::npos) {
+      std::string trimmed_value(value_view);
+      absl::RemoveExtraAsciiWhitespace(&trimmed_value);
+      if (!trimmed_value.empty()) {
+        values_vec.emplace_back(std::move(trimmed_value));
+      }
+    } else {
+      // Has comma - perform split
+      std::vector<std::string> comma_separated = absl::StrSplit(value_view, ',');
+      for (auto& val : comma_separated) {
+        absl::RemoveExtraAsciiWhitespace(&val);
+        if (!val.empty()) {
+          values_vec.emplace_back(std::move(val));
+        }
       }
     }
-
     return Http::HeaderMap::Iterate::Continue;
   });
 
