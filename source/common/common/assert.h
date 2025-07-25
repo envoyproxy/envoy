@@ -126,32 +126,6 @@ bool shouldLogAndInvokeEnvoyBugForEnvoyBugMacroUseOnly(absl::string_view bug_nam
  */
 void resetEnvoyBugCountersForTest();
 
-/**
- * Sets an action to be invoked when an ENVOY_NOTIFICATION is encountered.
- *
- * This function is not thread-safe; concurrent calls to set the action are not allowed.
- *
- * The action may be invoked concurrently if two ENVOY_NOTIFICATION in different threads run at the
- * same time, so the action must be thread-safe.
- *
- * The action will be invoked in all build types (debug or release).
- *
- * @param action The action to take when an envoy bug fails.
- * @return A registration object. The registration is removed when the object is destructed.
- */
-ActionRegistrationPtr
-addEnvoyNotificationRecordAction(const std::function<void(absl::string_view)>& action);
-
-/**
- * Invokes the action set by addEnvoyNotificationRecordAction, or does nothing if
- * no action has been set.
- *
- * @param location Unique identifier for the ENVOY_NOTIFICATION.
- *
- * This should only be called by ENVOY_NOTIFICATION macros in this file.
- */
-void invokeEnvoyNotificationRecordActionForEnvoyNotificationMacroUseOnly(absl::string_view name);
-
 // CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
 // the logged failure, e.g., "EAGAIN" vs "11".
 #define _ASSERT_IMPL(CONDITION, CONDITION_STR, ACTION, DETAILS)                                    \
@@ -347,29 +321,6 @@ void invokeEnvoyNotificationRecordActionForEnvoyNotificationMacroUseOnly(absl::s
 // This is not encouraged, as it's too easy to panic using break; instead of return;
 // but this macro replaces a less clear crash using NOT_REACHED_GCOVR_EXCL_LINE.
 #define PANIC_DUE_TO_CORRUPT_ENUM PANIC("corrupted enum");
-
-// CONDITION_STR is needed to prevent macros in condition from being expected, which obfuscates
-// the logged failure, e.g., "EAGAIN" vs "11".
-#define _ENVOY_NOTIFICATION_IMPL(CONDITION, NAME, DETAILS)                                         \
-  do {                                                                                             \
-    if (!(CONDITION)) {                                                                            \
-      const std::string& details = (DETAILS);                                                      \
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::envoy_bug), debug,    \
-                          "envoy notification: {}.{}{}", NAME,                                     \
-                          details.empty() ? "" : " Details: ", details);                           \
-      Envoy::Assert::invokeEnvoyNotificationRecordActionForEnvoyNotificationMacroUseOnly((NAME));  \
-    }                                                                                              \
-  } while (false)
-
-/**
- * Invoke a notification of a specific condition. In contrast to ENVOY_BUG it does not ASSERT in
- * debug builds and as such has no impact on continuous integration or system tests. If a condition
- * is met it is logged at the debug verbosity and a stat is incremented. There is no exponential
- * backoff, so the notification will be invoked every time the condition is met. As such
- * notification handler must have low overhead if the condition is expected to be encountered
- * frequently. ENVOY_NOTIFICATION must be called with three arguments for verbose logging.
- */
-#define ENVOY_NOTIFICATION(...) PASS_ON(PASS_ON(_ENVOY_NOTIFICATION_IMPL)(__VA_ARGS__))
 
 } // namespace Assert
 } // namespace Envoy

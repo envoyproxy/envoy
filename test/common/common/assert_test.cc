@@ -192,41 +192,4 @@ TEST(SlowAssertTest, TestSlowAssertInFastAssertInReleaseMode) {
   EXPECT_EQ(expected_counted_failures, slow_assert_fail_count);
 }
 
-TEST(EnvoyNotification, CallbackInvoked) {
-  // Use 2 envoy notification action registrations to verify that action chaining is working
-  // correctly.
-  int envoy_notification_count = 0;
-  int envoy_notification_count2 = 0;
-  std::string name1;
-  std::string name2;
-  auto envoy_notification_action_registration =
-      Assert::addEnvoyNotificationRecordAction([&](absl::string_view name) {
-        name1 = name;
-        envoy_notification_count++;
-      });
-  auto envoy_notification_action_registration2 =
-      Assert::addEnvoyNotificationRecordAction([&](absl::string_view name) {
-        name2 = name;
-        envoy_notification_count2++;
-      });
-
-  EXPECT_LOG_CONTAINS("debug", "envoy notification: id1.",
-                      { ENVOY_NOTIFICATION(false, "id1", ""); });
-  EXPECT_EQ(envoy_notification_count, 1);
-  EXPECT_EQ(envoy_notification_count2, 1);
-  EXPECT_EQ(name1, "id1");
-  EXPECT_EQ(name2, "id1");
-  EXPECT_LOG_CONTAINS("debug", "envoy notification: .", { ENVOY_NOTIFICATION(false, "", ""); });
-  EXPECT_EQ(envoy_notification_count, 2);
-  EXPECT_EQ(envoy_notification_count2, 2);
-  EXPECT_EQ(name1, "");
-  EXPECT_EQ(name2, "");
-  EXPECT_LOG_CONTAINS("debug", "envoy notification: id2. Details: with some logs",
-                      { ENVOY_NOTIFICATION(false, "id2", "with some logs"); });
-  EXPECT_EQ(envoy_notification_count, 3);
-  EXPECT_EQ(envoy_notification_count2, 3);
-  EXPECT_EQ(name1, "id2");
-  EXPECT_EQ(name2, "id2");
-}
-
 } // namespace Envoy
