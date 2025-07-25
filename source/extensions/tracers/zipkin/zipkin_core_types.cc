@@ -232,6 +232,8 @@ Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::stri
 }
 
 SpanContext Span::spanContext() const {
+  // The inner_context is set to true because this SpanContext is context of Envoy created span
+  // rather than the one that extracted from the downstream request headers.
   return {trace_id_high_.value_or(0), trace_id_, id_, parent_id_.value_or(0), sampled_, true};
 }
 
