@@ -1467,8 +1467,9 @@ TEST_F(LuaVirtualHostWrapperTest, GetFilterMetadataBasic) {
   // Set up wrapper with the mock virtual host.
   const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
-        VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr, "lua-filter-config-name"),
-        true);
+      VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr,
+                                 "lua-filter-config-name"),
+      true);
 
   EXPECT_CALL(printer_, testPrint("foo"));
   EXPECT_CALL(printer_, testPrint("bar"));
@@ -1500,8 +1501,9 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataUnderFilterName) {
   // Set up wrapper with the mock virtual host.
   const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
-        VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr, "lua-filter-config-name"),
-        true);
+      VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr,
+                                 "lua-filter-config-name"),
+      true);
 
   EXPECT_CALL(printer_, testPrint("No metadata found"));
 
@@ -1522,8 +1524,9 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataAtAll) {
   // Set up wrapper with the mock virtual host.
   const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
-        VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr, "lua-filter-config-name"),
-        true);
+      VirtualHostWrapper::create(coroutine_->luaState(), virtual_host_ptr,
+                                 "lua-filter-config-name"),
+      true);
 
   EXPECT_CALL(printer_, testPrint("No metadata found"));
 
