@@ -315,11 +315,16 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   // Get host value from the request headers.
   const auto host_attributes =
       Http::Utility::parseAuthority(headers.Host()->value().getStringView());
-  std::string host_str(!host_attributes.is_ip_address_ ||
-                               !absl::StrContains(host_attributes.host_, ":")
-                           ? host_attributes.host_
-                           : absl::StrCat("[", host_attributes.host_, "]"));
-  absl::string_view host = host_str;
+  // For IPv6 numeric addresses, use a copy with square brackets added around the host.
+  // For any other address type just use the existing unmodified host string.
+  std::string host_str;
+  absl::string_view host;
+  if (host_attributes.is_ip_address_ && absl::StrContains(host_attributes.host_, ":")) {
+    host_str = absl::StrCat("[", host_attributes.host_, "]");
+    host = host_str;
+  } else {
+    host = host_attributes.host_;
+  }
   uint16_t port = host_attributes.port_.value_or(default_port);
 
   // Apply filter state overrides for host and port.
