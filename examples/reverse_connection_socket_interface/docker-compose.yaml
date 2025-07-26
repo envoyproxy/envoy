@@ -14,7 +14,7 @@ services:
     image: debug/envoy:latest
     volumes:
       - ./on-prem-envoy-custom-resolver.yaml:/etc/on-prem-envoy.yaml
-    command: envoy -c /etc/on-prem-envoy.yaml --concurrency 2 -l trace --drain-time-s 3
+    command: envoy -c /etc/on-prem-envoy.yaml --concurrency 1 -l trace --drain-time-s 3
     ports:
       # Admin interface
       - "8888:8888"

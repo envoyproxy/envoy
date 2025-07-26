@@ -1,0 +1,52 @@
+#0 building with "default" instance using docker driver
+
+#1 [xds-server internal] load .dockerignore
+#1 transferring context: 2B done
+#1 DONE 0.0s
+
+#2 [xds-server internal] load build definition from Dockerfile.xds
+#2 transferring dockerfile: 6.20kB done
+#2 DONE 0.0s
+
+#3 [xds-server internal] load metadata for docker.io/library/ubuntu:20.04
+#3 DONE 0.0s
+
+#4 [xds-server 1/6] FROM docker.io/library/ubuntu:20.04
+#4 DONE 0.0s
+
+#5 [xds-server 3/6] RUN apt-get update && apt-get install -y     python3     python3-pip     && rm -rf /var/lib/apt/lists/*
+#5 CACHED
+
+#6 [xds-server 4/6] RUN pip3 install requests pyyaml
+#6 CACHED
+
+#7 [xds-server 2/6] WORKDIR /app
+#7 CACHED
+
+#8 [xds-server 5/6] RUN echo '#!/usr/bin/env python3\nimport json\nimport time\nimport threading\nimport http.server\nimport socketserver\nimport logging\n\nlogging.basicConfig(level=logging.INFO)\nlogger = logging.getLogger(__name__)\n\nclass XDSServer:\n    def __init__(self):\n        self.listeners = {}\n        self.version = 1\n        self._lock = threading.Lock()\n        self.server = None\n    \n    def start(self, port):\n        class XDSHandler(http.server.BaseHTTPRequestHandler):\n            def do_POST(self):\n                if self.path == "/v3/discovery:listeners":\n                    content_length = int(self.headers["Content-Length"])\n                    post_data = self.rfile.read(content_length)\n                    response_data = self.server.xds_server.handle_lds_request(post_data)\n                    self.send_response(200)\n                    self.send_header("Content-type", "application/json")\n                    self.end_headers()\n                    self.wfile.write(response_data.encode())\n                elif self.path == "/add_listener":\n                    content_length = int(self.headers["Content-Length"])\n                    post_data = self.rfile.read(content_length)\n                    data = json.loads(post_data.decode())\n                    self.server.xds_server.add_listener(data["name"], data["config"])\n                    self.send_response(200)\n                    self.send_header("Content-type", "application/json")\n                    self.end_headers()\n                    self.wfile.write(json.dumps({"status": "success"}).encode())\n                elif self.path == "/remove_listener":\n                    content_length = int(self.headers["Content-Length"])\n                    post_data = self.rfile.read(content_length)\n                    data = json.loads(post_data.decode())\n                    success = self.server.xds_server.remove_listener(data["name"])\n                    if success:\n                        self.send_response(200)\n                        self.send_header("Content-type", "application/json")\n                        self.end_headers()\n                        self.wfile.write(json.dumps({"status": "success"}).encode())\n                    else:\n                        self.send_response(404)\n                        self.send_header("Content-type", "application/json")\n                        self.end_headers()\n                        self.wfile.write(json.dumps({"status": "not_found"}).encode())\n                elif self.path == "/state":\n                    state = self.server.xds_server.get_state()\n                    self.send_response(200)\n                    self.send_header("Content-type", "application/json")\n                    self.end_headers()\n                    self.wfile.write(json.dumps(state).encode())\n                else:\n                    self.send_response(404)\n                    self.end_headers()\n            \n            def log_message(self, format, *args):\n                pass\n        \n        class XDSServer(socketserver.TCPServer):\n            def __init__(self, server_address, RequestHandlerClass, xds_server):\n                self.xds_server = xds_server\n                super().__init__(server_address, RequestHandlerClass)\n        \n        self.server = XDSServer(("0.0.0.0", port), XDSHandler, self)\n        self.server_thread = threading.Thread(target=self.server.serve_forever)\n        self.server_thread.daemon = True\n        self.server_thread.start()\n        logger.info(f"xDS server started on port {port}")\n    \n    def handle_lds_request(self, request_data):\n        with self._lock:\n            response = {\n                "version_info": str(self.version),\n                "resources": [],\n                "type_url": "type.googleapis.com/envoy.config.listener.v3.Listener"\n            }\n            for listener_name, listener_config in self.listeners.items():\n                wrapped_config = {\n                    "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",\n                    **listener_config\n                }\n                response["resources"].append(wrapped_config)\n            return json.dumps(response)\n    \n    def add_listener(self, listener_name, listener_config):\n        with self._lock:\n            self.listeners[listener_name] = listener_config\n            self.version += 1\n            logger.info(f"Added listener {listener_name}, version {self.version}")\n    \n    def remove_listener(self, listener_name):\n        with self._lock:\n            if listener_name in self.listeners:\n                del self.listeners[listener_name]\n                self.version += 1\n                logger.info(f"Removed listener {listener_name}, version {self.version}")\n                return True\n            return False\n\n    def get_state(self):\n        with self._lock:\n            return {\n                "version": self.version,\n                "listeners": list(self.listeners.keys())\n            }\n\nif __name__ == "__main__":\n    xds_server = XDSServer()\n    xds_server.start(18000)\n    try:\n        while True:\n            time.sleep(1)\n    except KeyboardInterrupt:\n        print("Shutting down xDS server...")\n' > /app/xds_server.py
+#8 CACHED
+
+#9 [xds-server 6/6] RUN chmod +x /app/xds_server.py
+#9 CACHED
+
+#10 [xds-server] exporting to image
+#10 exporting layers done
+#10 writing image sha256:cc765ad92907541f91a22ed321919acbeafeb018ce196b355b62788d3344fb2f done
+#10 naming to docker.io/library/tmp0sqi5eqk-xds-server done
+#10 DONE 0.0s
+Attaching to cloud-envoy-1, on-prem-envoy-1, on-prem-service-1, xds-server-1
+on-prem-service-1  | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+on-prem-service-1  | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+on-prem-service-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+on-prem-service-1  | 10-listen-on-ipv6-by-default.sh: info: /etc/nginx/conf.d/default.conf is not a file or does not exist
+on-prem-service-1  | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+on-prem-service-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+on-prem-service-1  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+on-prem-service-1  | /docker-entrypoint.sh: Configuration complete; ready for start up
+cloud-envoy-1      | [2025-07-26T00:52:10.565Z] "GET /ready HTTP/1.1" 200 - 0 5 3 - "172.26.0.1" "python-requests/2.27.1" "-" "localhost:8889" "-"
+on-prem-envoy-1    | [2025-07-26T00:52:10.573Z] "GET /ready HTTP/1.1" 200 - 0 5 2 - "172.26.0.1" "python-requests/2.27.1" "-" "localhost:8888" "-"
+on-prem-service-1  | 172.26.0.1 - - [26/Jul/2025:00:52:17 +0000] "GET /on_prem_service HTTP/1.1" 200 156 "-" "python-requests/2.27.1" "-"
+cloud-envoy-1 exited with code 0
+cloud-envoy-1 exited with code 0
+cloud-envoy-1      | [2025-07-26T00:52:38.503Z] "GET /ready HTTP/1.1" 200 - 0 5 3 - "172.26.0.1" "python-requests/2.27.1" "-" "localhost:8889" "-"
+on-prem-envoy-1 exited with code 139

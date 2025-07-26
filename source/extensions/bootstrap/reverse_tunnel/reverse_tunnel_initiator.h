@@ -25,6 +25,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/bootstrap/reverse_tunnel/factory_base.h"
+#include "source/extensions/bootstrap/reverse_tunnel/grpc_reverse_tunnel_client.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -36,11 +37,115 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
+// Forward declaration for friend class
+class ReverseConnectionIOHandleTest;
+
 // Forward declarations.
-class RCConnectionWrapper;
 class ReverseTunnelInitiator;
 class ReverseTunnelInitiatorExtension;
 class GrpcReverseTunnelClient;
+class ReverseConnectionIOHandle;
+
+/**
+ * RCConnectionWrapper manages the lifecycle of a ClientConnectionPtr for reverse connections.
+ * It handles the handshake process (both gRPC and HTTP fallback) and manages connection
+ * callbacks and cleanup.
+ */
+class RCConnectionWrapper : public Network::ConnectionCallbacks,
+                            public Event::DeferredDeletable,
+                            public ReverseConnection::GrpcReverseTunnelCallbacks,
+                            Logger::Loggable<Logger::Id::main> {
+public:
+  /**
+   * Constructor for RCConnectionWrapper.
+   * @param parent reference to the parent ReverseConnectionIOHandle
+   * @param connection the client connection to wrap
+   * @param host the upstream host description
+   * @param cluster_name the name of the cluster
+   */
+  RCConnectionWrapper(ReverseConnectionIOHandle& parent, Network::ClientConnectionPtr connection,
+                      Upstream::HostDescriptionConstSharedPtr host,
+                      const std::string& cluster_name);
+
+  /**
+   * Destructor for RCConnectionWrapper.
+   * Performs defensive cleanup to prevent crashes during shutdown.
+   */
+  ~RCConnectionWrapper() override;
+
+  // Network::ConnectionCallbacks overrides
+  void onEvent(Network::ConnectionEvent event) override;
+  void onAboveWriteBufferHighWatermark() override {}
+  void onBelowWriteBufferLowWatermark() override {}
+
+  // ReverseConnection::GrpcReverseTunnelCallbacks overrides
+  void onHandshakeSuccess(
+      std::unique_ptr<envoy::service::reverse_tunnel::v3::EstablishTunnelResponse> response)
+      override;
+  void onHandshakeFailure(Grpc::Status::GrpcStatus status, const std::string& message) override;
+
+  /**
+   * Initiate the reverse connection handshake (gRPC or HTTP fallback).
+   * @param src_tenant_id the tenant identifier
+   * @param src_cluster_id the cluster identifier
+   * @param src_node_id the node identifier
+   * @return the local address as string
+   */
+  std::string connect(const std::string& src_tenant_id, const std::string& src_cluster_id,
+                      const std::string& src_node_id);
+
+  /**
+   * Handle connection failure and initiate graceful shutdown.
+   */
+  void onFailure();
+
+  /**
+   * Perform graceful shutdown of the connection.
+   */
+  void shutdown();
+
+  /**
+   * Get the underlying connection.
+   * @return pointer to the client connection
+   */
+  Network::ClientConnection* getConnection() { return connection_.get(); }
+
+  /**
+   * Get the host description.
+   * @return shared pointer to the host description
+   */
+  Upstream::HostDescriptionConstSharedPtr getHost() { return host_; }
+
+  /**
+   * Release the connection when handshake succeeds.
+   * @return the released connection
+   */
+  Network::ClientConnectionPtr releaseConnection() { return std::move(connection_); }
+
+private:
+  /**
+   * Simplified read filter for HTTP fallback during gRPC migration.
+   */
+  struct SimpleConnReadFilter : public Network::ReadFilterBaseImpl {
+    SimpleConnReadFilter(RCConnectionWrapper* parent) : parent_(parent) {}
+
+    Network::FilterStatus onData(Buffer::Instance& buffer, bool) override;
+
+    RCConnectionWrapper* parent_;
+  };
+
+  ReverseConnectionIOHandle& parent_;
+  Network::ClientConnectionPtr connection_;
+  Upstream::HostDescriptionConstSharedPtr host_;
+  const std::string cluster_name_;
+  std::unique_ptr<ReverseConnection::GrpcReverseTunnelClient> reverse_tunnel_client_;
+  
+  // Handshake data for HTTP fallback
+  std::string handshake_tenant_id_;
+  std::string handshake_cluster_id_;
+  std::string handshake_node_id_;
+  bool handshake_sent_{false};
+};
 
 namespace {
 // HTTP protocol constants.
@@ -55,27 +160,6 @@ static constexpr uint32_t kDefaultConnectionTimeoutMs = 10000;   // 10 seconds.
 } // namespace
 
 /**
- * All reverse connection downstream stats. @see stats_macros.h
- * These stats track the performance and health of outgoing reverse connections
- * from the initiator (on-premises) to the acceptor (cloud).
- */
-#define ALL_REVERSE_CONNECTION_DOWNSTREAM_STATS(COUNTER, GAUGE, HISTOGRAM)                         \
-  COUNTER(reverse_conn_connect_attempts)                                                           \
-  COUNTER(reverse_conn_connect_failures)                                                           \
-  COUNTER(reverse_conn_handshake_failures)                                                         \
-  COUNTER(reverse_conn_timeout_failures)                                                           \
-  COUNTER(reverse_conn_retries)                                                                    \
-  GAUGE(reverse_conn_connecting, Accumulate)                                                       \
-  GAUGE(reverse_conn_connected, Accumulate)                                                        \
-  GAUGE(reverse_conn_failed, Accumulate)                                                           \
-  GAUGE(reverse_conn_recovered, Accumulate)                                                        \
-  GAUGE(reverse_conn_backoff, Accumulate)                                                          \
-  GAUGE(reverse_conn_cannot_connect, Accumulate)                                                   \
-  HISTOGRAM(reverse_conn_establishment_time, Milliseconds)                                         \
-  HISTOGRAM(reverse_conn_handshake_time, Milliseconds)                                             \
-  HISTOGRAM(reverse_conn_retry_backoff_time, Milliseconds)
-
-/**
  * Connection state tracking for reverse connections.
  */
 enum class ReverseConnectionState {
@@ -86,16 +170,6 @@ enum class ReverseConnectionState {
   CannotConnect, // Connection cannot be initiated (early failure).
   Backoff        // Connection is in backoff state due to failures.
 };
-
-/**
- * Struct definition for all reverse connection downstream stats. @see stats_macros.h
- */
-struct ReverseConnectionDownstreamStats {
-  ALL_REVERSE_CONNECTION_DOWNSTREAM_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT,
-                                          GENERATE_HISTOGRAM_STRUCT)
-};
-
-using ReverseConnectionDownstreamStatsPtr = std::unique_ptr<ReverseConnectionDownstreamStats>;
 
 /**
  * Configuration for remote cluster connections.
@@ -147,6 +221,8 @@ struct ReverseConnectionSocketConfig {
  */
 class ReverseConnectionIOHandle : public Network::IoSocketHandleImpl,
                                   public Network::ConnectionCallbacks {
+
+  friend class ReverseConnectionIOHandleTest;
 public:
   /**
    * Constructor for ReverseConnectionIOHandle.
@@ -158,7 +234,7 @@ public:
    */
   ReverseConnectionIOHandle(os_fd_t fd, const ReverseConnectionSocketConfig& config,
                             Upstream::ClusterManager& cluster_manager,
-                            const ReverseTunnelInitiator& socket_interface, Stats::Scope& scope);
+                            ReverseTunnelInitiatorExtension* extension, Stats::Scope& scope);
 
   ~ReverseConnectionIOHandle() override;
 
@@ -246,6 +322,12 @@ public:
    */
   bool isTriggerReady() const;
 
+  /**
+   * Get the file descriptor for the pipe monitor used to wake up accept().
+   * @return the file descriptor for the pipe monitor
+   */
+  int getPipeMonitorFd() const;
+
   // Callbacks from RCConnectionWrapper.
   /**
    * Called when a reverse connection handshake completes.
@@ -279,28 +361,6 @@ public:
   void resetHostBackoff(const std::string& host_address);
 
   /**
-   * Initialize stats collection for reverse connections.
-   * @param scope the stats scope to use for metrics collection.
-   */
-  void initializeStats(Stats::Scope& scope);
-
-  /**
-   * Get or create stats for a specific cluster.
-   * @param cluster_name the name of the cluster to get stats for.
-   * @return pointer to the cluster stats.
-   */
-  ReverseConnectionDownstreamStats* getStatsByCluster(const std::string& cluster_name);
-
-  /**
-   * Get or create stats for a specific host within a cluster.
-   * @param host_address the address of the host to get stats for.
-   * @param cluster_name the name of the cluster the host belongs to.
-   * @return pointer to the host stats.
-   */
-  ReverseConnectionDownstreamStats* getStatsByHost(const std::string& host_address,
-                                                   const std::string& cluster_name);
-
-  /**
    * Update the connection state for a specific connection and update metrics.
    * @param host_address the address of the host.
    * @param cluster_name the name of the cluster.
@@ -309,6 +369,16 @@ public:
    */
   void updateConnectionState(const std::string& host_address, const std::string& cluster_name,
                              const std::string& connection_key, ReverseConnectionState new_state);
+
+  /**
+   * Update state-specific gauge using switch case logic (combined increment/decrement).
+   * @param host_address the address of the host
+   * @param cluster_name the name of the cluster  
+   * @param state the connection state to update
+   * @param increment whether to increment (true) or decrement (false) the gauge
+   */
+  void updateStateGauge(const std::string& host_address, const std::string& cluster_name,
+                        ReverseConnectionState state, bool increment);
 
   /**
    * Remove connection state tracking for a specific connection.
@@ -343,26 +413,13 @@ public:
   }
 
   /**
-   * Increment the gauge for a specific connection state.
-   * @param cluster_stats pointer to cluster-level stats
-   * @param host_stats pointer to host-level stats
-   * @param state the connection state to increment
+   * Get pointer to the downstream extension for stats updates.
+   * @return pointer to the extension, nullptr if not available
    */
-  void incrementStateGauge(ReverseConnectionDownstreamStats* cluster_stats,
-                           ReverseConnectionDownstreamStats* host_stats,
-                           ReverseConnectionState state);
-
-  /**
-   * Decrement the gauge for a specific connection state.
-   * @param cluster_stats pointer to cluster-level stats
-   * @param host_stats pointer to host-level stats
-   * @param state the connection state to decrement
-   */
-  void decrementStateGauge(ReverseConnectionDownstreamStats* cluster_stats,
-                           ReverseConnectionDownstreamStats* host_stats,
-                           ReverseConnectionState state);
+  ReverseTunnelInitiatorExtension* getDownstreamExtension() const;
 
 private:
+  
   /**
    * @return reference to the thread-local dispatcher
    */
@@ -466,7 +523,7 @@ private:
   // Core components
   const ReverseConnectionSocketConfig config_; // Configuration for reverse connections
   Upstream::ClusterManager& cluster_manager_;
-  const ReverseTunnelInitiator& socket_interface_;
+  ReverseTunnelInitiatorExtension* extension_;
 
   // Connection wrapper management
   std::vector<std::unique_ptr<RCConnectionWrapper>>
@@ -487,11 +544,6 @@ private:
   // Socket cache to prevent socket objects from going out of scope
   // Maps connection key to socket object.
   // Socket cache removed - sockets are now managed via RAII in DownstreamReverseConnectionIOHandle
-
-  // Stats tracking per cluster and host
-  absl::flat_hash_map<std::string, ReverseConnectionDownstreamStatsPtr> cluster_stats_map_;
-  absl::flat_hash_map<std::string, ReverseConnectionDownstreamStatsPtr> host_stats_map_;
-  Stats::ScopeSharedPtr reverse_conn_scope_; // Stats scope for reverse connections
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
@@ -538,6 +590,9 @@ private:
  */
 class ReverseTunnelInitiator : public Envoy::Network::SocketInterfaceBase,
                                public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
+  // Friend class for testing
+  friend class ReverseTunnelInitiatorTest;
+  
 public:
   ReverseTunnelInitiator(Server::Configuration::ServerFactoryContext& context);
 
@@ -590,18 +645,13 @@ public:
 
   // Socket interface functionality only - factory methods moved to ReverseTunnelInitiatorFactory
 
-  /**
-   * Get the number of established reverse connections to a specific target (cluster or node).
-   * @param target the cluster or node name to check connections for
-   * @return number of established connections to the target
-   */
-  size_t getConnectionCount(const std::string& target) const;
+
 
   /**
-   * Get a list of all clusters that have established reverse connections.
-   * @return vector of cluster names with active reverse connections
+   * Get the extension instance for accessing cross-thread aggregation capabilities.
+   * @return pointer to the extension, or nullptr if not available
    */
-  std::vector<std::string> getEstablishedConnections() const;
+  ReverseTunnelInitiatorExtension* getExtension() const { return extension_; }
 
   // BootstrapExtensionFactory implementation
   Server::BootstrapExtensionPtr createBootstrapExtension(
@@ -626,6 +676,9 @@ DECLARE_FACTORY(ReverseTunnelInitiator);
  */
 class ReverseTunnelInitiatorExtension : public Server::BootstrapExtension,
                                         public Logger::Loggable<Logger::Id::connection> {
+  // Friend class for testing
+  friend class ReverseTunnelInitiatorExtensionTest;
+  
 public:
   ReverseTunnelInitiatorExtension(
       Server::Configuration::ServerFactoryContext& context,
@@ -652,6 +705,63 @@ public:
    */
   const envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig& getGrpcConfig() const {
     return config_.grpc_service_config();
+  }
+
+  /**
+   * Update connection stats for reverse connections.
+   * @param node_id the node identifier for the connection
+   * @param cluster_id the cluster identifier for the connection  
+   * @param state_suffix the state suffix (e.g., "connecting", "connected", "failed")
+   * @param increment whether to increment (true) or decrement (false) the connection count
+   */
+  void updateConnectionStats(const std::string& node_id, const std::string& cluster_id,
+                             const std::string& state_suffix, bool increment);
+
+  /**
+   * Update per-worker connection stats for debugging purposes.
+   * Creates worker-specific stats "reverse_connections.{worker_name}.node.{node_id}.{state_suffix}".
+   * @param node_id the node identifier for the connection
+   * @param cluster_id the cluster identifier for the connection
+   * @param state_suffix the state suffix for the connection
+   * @param increment whether to increment (true) or decrement (false) the connection count
+   */
+  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
+                                      const std::string& state_suffix, bool increment);
+
+  /**
+   * Get per-worker stat map for the current dispatcher.
+   * @return map of stat names to values for the current worker thread
+   */
+  absl::flat_hash_map<std::string, uint64_t> getPerWorkerStatMap();
+
+  /**
+   * Get cross-worker stat map across all dispatchers.
+   * @return map of stat names to values across all worker threads
+   */
+  absl::flat_hash_map<std::string, uint64_t> getCrossWorkerStatMap();
+
+  /**
+   * Get connection stats synchronously with timeout.
+   * @param timeout_ms timeout for the operation
+   * @return pair of vectors containing connected nodes and accepted connections
+   */
+  std::pair<std::vector<std::string>, std::vector<std::string>> 
+  getConnectionStatsSync(std::chrono::milliseconds timeout_ms);
+
+  /**
+   * Get the stats scope for accessing stats.
+   * @return reference to the stats scope.
+   */
+  Stats::Scope& getStatsScope() const { return context_.scope(); }
+
+  /**
+   * Test-only method to set the thread local slot for testing purposes.
+   * This allows tests to inject a custom thread local registry without
+   * requiring friend class access.
+   * @param slot the thread local slot to set
+   */
+  void setTestOnlyTLSRegistry(std::unique_ptr<ThreadLocal::TypedSlot<DownstreamSocketThreadLocal>> slot) {
+    tls_slot_ = std::move(slot);
   }
 
 private:

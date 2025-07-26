@@ -60,20 +60,20 @@ IoSocketHandleImpl::~IoSocketHandleImpl() {
 }
 
 Api::IoCallUint64Result IoSocketHandleImpl::close() {
-  ENVOY_LOG_MISC(trace, "IoSocketHandleImpl::close() called, fd_={}, SOCKET_VALID={}", 
+  ENVOY_LOG_MISC(error, "IoSocketHandleImpl::close() called, fd_={}, SOCKET_VALID={}", 
             fd_, SOCKET_VALID(fd_));
   
   if (file_event_) {
-    ENVOY_LOG_MISC(trace, "IoSocketHandleImpl::close() resetting file_event_");
+    ENVOY_LOG_MISC(error, "IoSocketHandleImpl::close() resetting file_event_");
     file_event_.reset();
   }
 
   ASSERT(SOCKET_VALID(fd_));
-  ENVOY_LOG_MISC(trace, "IoSocketHandleImpl::close() calling system close(fd_={})", fd_);
+  ENVOY_LOG_MISC(error, "IoSocketHandleImpl::close() calling system close(fd_={})", fd_);
   const int rc = Api::OsSysCallsSingleton::get().close(fd_).return_value_;
-  ENVOY_LOG_MISC(trace, "IoSocketHandleImpl::close() system close returned rc={}", rc);
+  ENVOY_LOG_MISC(error, "IoSocketHandleImpl::close() system close returned rc={}", rc);
   SET_SOCKET_INVALID(fd_);
-  ENVOY_LOG_MISC(trace, "IoSocketHandleImpl::close() completed, fd_ set to invalid");
+  ENVOY_LOG_MISC(error, "IoSocketHandleImpl::close() completed, fd_ set to invalid");
   return {static_cast<unsigned long>(rc), Api::IoError::none()};
 }
 

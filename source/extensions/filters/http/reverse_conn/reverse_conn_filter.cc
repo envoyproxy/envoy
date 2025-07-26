@@ -152,8 +152,6 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
       },
       absl::nullopt, "");
 
-  // connection->setSocketReused(true);
-  // connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
   ENVOY_STREAM_LOG(info, "DEBUG: About to save connection with node_uuid='{}' cluster_uuid='{}'",
                    *decoder_callbacks_, node_uuid, cluster_uuid);
   saveDownstreamConnection(*connection, node_uuid, cluster_uuid);
@@ -276,21 +274,37 @@ ReverseConnFilter::handleInitiatorInfo(const std::string& remote_node,
                                        const std::string& remote_cluster) {
   ENVOY_LOG(debug, "Getting reverse connection info for initiator role");
 
-  // Get the downstream socket interface to check established connections
-  auto* downstream_interface = getDownstreamSocketInterface();
-  if (!downstream_interface) {
-    ENVOY_LOG(error, "Failed to get downstream socket interface for initiator role");
+  // Get the downstream socket interface extension to check established connections
+  auto* downstream_extension = getDownstreamSocketInterfaceExtension();
+  if (!downstream_extension) {
+    ENVOY_LOG(error, "Failed to get downstream socket interface extension for initiator role");
     std::string response = R"({"accepted":[],"connected":[]})";
-    ENVOY_LOG(info, "handleInitiatorInfo response (no interface): {}", response);
+    ENVOY_LOG(info, "handleInitiatorInfo response (no extension): {}", response);
     decoder_callbacks_->sendLocalReply(Http::Code::OK, response, nullptr, absl::nullopt, "");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   // For specific node or cluster query
   if (!remote_node.empty() || !remote_cluster.empty()) {
-    // Get connection count for specific remote node/cluster
-    size_t num_connections = downstream_interface->getConnectionCount(
-        remote_node.empty() ? remote_cluster : remote_node);
+    // Get connection count for specific remote node/cluster using stats
+    // For initiator, stats format includes state suffix: reverse_connections.nodes.<node>.connected
+    auto stats_map = downstream_extension->getCrossWorkerStatMap();
+    size_t num_connections = 0;
+    
+    if (!remote_node.empty()) {
+      std::string node_stat_name = fmt::format("reverse_connections.nodes.{}.connected", remote_node);
+      auto it = stats_map.find(node_stat_name);
+      if (it != stats_map.end()) {
+        num_connections = it->second;
+      }
+    } else {
+      std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}.connected", remote_cluster);
+      auto it = stats_map.find(cluster_stat_name);
+      if (it != stats_map.end()) {
+        num_connections = it->second;
+      }
+    }
+    
     std::string response = fmt::format("{{\"available_connections\":{}}}", num_connections);
     ENVOY_LOG(info, "handleInitiatorInfo response for {}: {}",
               remote_node.empty() ? remote_cluster : remote_node, response);
@@ -298,18 +312,27 @@ ReverseConnFilter::handleInitiatorInfo(const std::string& remote_node,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
-  // Get all established connections from downstream interface
-  std::list<std::string> connected_clusters;
-  auto established_connections = downstream_interface->getEstablishedConnections();
-  for (const auto& cluster : established_connections) {
-    connected_clusters.push_back(cluster);
-  }
+  ENVOY_LOG(debug, "ReverseConnFilter: Using downstream socket manager to get connection stats");
 
-  // For initiator role, "accepted" is always empty (we don't accept, we initiate)
-  // "connected" shows which clusters we have established connections to
-  std::string response = fmt::format("{{\"accepted\":[],\"connected\":{}}}",
-                                     Json::Factory::listAsJsonString(connected_clusters));
-  ENVOY_LOG(info, "handleInitiatorInfo response: {}", response);
+  // Use the production stats-based approach with Envoy's proven stats system
+  auto [connected_nodes, accepted_connections] =
+      downstream_extension->getConnectionStatsSync(std::chrono::milliseconds(1000));
+
+  // Convert vectors to lists for JSON serialization
+  std::list<std::string> accepted_connections_list(accepted_connections.begin(),
+                                                   accepted_connections.end());
+  std::list<std::string> connected_nodes_list(connected_nodes.begin(), connected_nodes.end());
+
+  ENVOY_LOG(debug,
+            "Stats aggregation completed: {} connected nodes, {} accepted connections",
+            connected_nodes.size(), accepted_connections.size());
+
+  // Create production-ready JSON response for multi-tenant environment
+  std::string response = fmt::format("{{\"accepted\":{},\"connected\":{}}}",
+                                     Json::Factory::listAsJsonString(accepted_connections_list),
+                                     Json::Factory::listAsJsonString(connected_nodes_list));
+
+  ENVOY_LOG(info, "handleInitiatorInfo production stats-based response: {}", response);
   decoder_callbacks_->sendLocalReply(Http::Code::OK, response, nullptr, absl::nullopt, "");
   return Http::FilterHeadersStatus::StopIteration;
 }
@@ -519,7 +542,7 @@ Http::FilterDataStatus ReverseConnFilter::processGrpcRequest() {
 
       ENVOY_STREAM_LOG(info, "Saving downstream connection for gRPC request", *decoder_callbacks_);
 
-      // connection->setSocketReused(true);
+      connection->setSocketReused(true);
       ENVOY_STREAM_LOG(info, "DEBUG: About to save connection with node_uuid='{}' cluster_uuid='{}'",
                    *decoder_callbacks_, initiator.node_id(), initiator.cluster_id());
       saveDownstreamConnection(*connection, initiator.node_id(), initiator.cluster_id());

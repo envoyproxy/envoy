@@ -210,6 +210,26 @@ private:
     return upstream_socket_interface->getExtension();
   }
 
+  // Get the downstream socket interface extension for production cross-thread aggregation
+  ReverseConnection::ReverseTunnelInitiatorExtension* getDownstreamSocketInterfaceExtension() {
+    auto* downstream_interface = Network::socketInterface(
+        "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface");
+    if (!downstream_interface) {
+      ENVOY_LOG(debug, "Downstream reverse socket interface not found");
+      return nullptr;
+    }
+
+    auto* downstream_socket_interface =
+        dynamic_cast<const ReverseConnection::ReverseTunnelInitiator*>(downstream_interface);
+    if (!downstream_socket_interface) {
+      ENVOY_LOG(error, "Failed to cast to ReverseTunnelInitiator");
+      return nullptr;
+    }
+
+    // Get the extension which provides cross-thread aggregation capabilities
+    return downstream_socket_interface->getExtension();
+  }
+
   // Determine the role of this envoy instance based on available socket interfaces
   std::string determineRole() {
     auto* upstream_manager = getUpstreamSocketManager();

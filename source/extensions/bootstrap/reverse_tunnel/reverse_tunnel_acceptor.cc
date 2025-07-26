@@ -27,34 +27,30 @@ UpstreamReverseConnectionIOHandle::UpstreamReverseConnectionIOHandle(
     : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), cluster_name_(cluster_name),
       owned_socket_(std::move(socket)) {
 
-  ENVOY_LOG(trace, "Created UpstreamReverseConnectionIOHandle for cluster: {} with FD: {}",
-            cluster_name_, fd_);
+  ENVOY_LOG(trace, "reverse_tunnel: created IO handle for cluster: {}, fd: {}", cluster_name_, fd_);
 }
 
 UpstreamReverseConnectionIOHandle::~UpstreamReverseConnectionIOHandle() {
-  ENVOY_LOG(trace, "Destroying UpstreamReverseConnectionIOHandle for cluster: {} with FD: {}",
-            cluster_name_, fd_);
-  // The owned_socket_ will be automatically destroyed via RAII
+  ENVOY_LOG(trace, "reverse_tunnel: destroying IO handle for cluster: {}, fd: {}", cluster_name_,
+            fd_);
+  // The owned_socket_ will be automatically destroyed via RAII.
 }
 
 Api::SysCallIntResult UpstreamReverseConnectionIOHandle::connect(
     Envoy::Network::Address::InstanceConstSharedPtr address) {
-  ENVOY_LOG(trace,
-            "UpstreamReverseConnectionIOHandle::connect() to {} - connection already established "
-            "through reverse tunnel",
+  ENVOY_LOG(trace, "reverse_tunnel: connect() to {} - connection already established",
             address->asString());
 
-  // For reverse connections, the connection is already established, therefore
-  // connect() is a no-op
+  // For reverse connections, the connection is already established.
   return Api::SysCallIntResult{0, 0};
 }
 
 Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
-  ENVOY_LOG(debug, "UpstreamReverseConnectionIOHandle::close() called for FD: {}", fd_);
+  ENVOY_LOG(debug, "reverse_tunnel: close() called for fd: {}", fd_);
 
   // Reset the owned socket to properly close the connection
   if (owned_socket_) {
-    ENVOY_LOG(debug, "Releasing owned socket for cluster: {}", cluster_name_);
+    ENVOY_LOG(debug, "reverse_tunnel: releasing socket for cluster: {}", cluster_name_);
     owned_socket_.reset();
   }
 
@@ -65,7 +61,7 @@ Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
 // ReverseTunnelAcceptor implementation
 ReverseTunnelAcceptor::ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context)
     : extension_(nullptr), context_(&context) {
-  ENVOY_LOG(debug, "Created ReverseTunnelAcceptor.");
+  ENVOY_LOG(debug, "reverse_tunnel: created acceptor");
 }
 
 Envoy::Network::IoHandlePtr
@@ -80,11 +76,9 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
   (void)socket_v6only;
   (void)options;
 
-  ENVOY_LOG(warn, "ReverseTunnelAcceptor::socket() called without address - reverse "
-                  "connections require specific addresses. Returning nullptr.");
+  ENVOY_LOG(warn, "reverse_tunnel: socket() called without address - returning nullptr");
 
-  // Reverse connection sockets should always have an address (cluster ID)
-  // This function should never be called for reverse connections
+  // Reverse connection sockets should always have an address.
   return nullptr;
 }
 
@@ -92,42 +86,40 @@ Envoy::Network::IoHandlePtr
 ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
                               const Envoy::Network::Address::InstanceConstSharedPtr addr,
                               const Envoy::Network::SocketCreationOptions& options) const {
-  ENVOY_LOG(debug,
-            "ReverseTunnelAcceptor::socket() called with address: {}. Finding socket for "
-            "node: {}",
-            addr->asString(), addr->logicalName());
+  ENVOY_LOG(debug, "reverse_tunnel: socket() called for address: {}, node: {}", addr->asString(),
+            addr->logicalName());
 
   // For upstream reverse connections, we need to get the thread-local socket manager
   // and check if there are any cached connections available
   auto* tls_registry = getLocalRegistry();
   if (tls_registry && tls_registry->socketManager()) {
+    ENVOY_LOG(trace, "reverse_tunnel: running on dispatcher: {}",
+              tls_registry->dispatcher().name());
     auto* socket_manager = tls_registry->socketManager();
 
-    // The address's logical name should already be the node ID
+    // The address's logical name is the node ID.
     std::string node_id = addr->logicalName();
-    ENVOY_LOG(debug, "ReverseTunnelAcceptor: Using node_id from logicalName: {}", node_id);
+    ENVOY_LOG(debug, "reverse_tunnel: using node_id: {}", node_id);
 
-    // Try to get a cached socket for the specific node
+    // Try to get a cached socket for the node.
     auto socket = socket_manager->getConnectionSocket(node_id);
     if (socket) {
-      ENVOY_LOG(info, "Reusing cached reverse connection socket for node: {}", node_id);
-      // Create IOHandle that properly owns the socket using RAII
+      ENVOY_LOG(info, "reverse_tunnel: reusing cached socket for node: {}", node_id);
+      // Create IOHandle that owns the socket using RAII.
       auto io_handle =
           std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), node_id);
       return io_handle;
     }
   }
 
-  // This is unexpected. This indicates that no sockets are available for the node.
-  // Fallback to standard socket interface.
-  ENVOY_LOG(debug, "No available reverse connection, falling back to standard socket");
+  // No sockets available, fallback to standard socket interface.
+  ENVOY_LOG(debug, "reverse_tunnel: no available connection, falling back to standard socket");
   return Network::socketInterface(
              "envoy.extensions.network.socket_interface.default_socket_interface")
       ->socket(socket_type, addr, options);
 }
 
 bool ReverseTunnelAcceptor::ipFamilySupported(int domain) {
-  // Support standard IP families.
   return domain == AF_INET || domain == AF_INET6;
 }
 
@@ -143,16 +135,15 @@ UpstreamSocketThreadLocal* ReverseTunnelAcceptor::getLocalRegistry() const {
 Server::BootstrapExtensionPtr ReverseTunnelAcceptor::createBootstrapExtension(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   ENVOY_LOG(debug, "ReverseTunnelAcceptor::createBootstrapExtension()");
-  // Cast the config to the proper type
+  // Cast the config to the proper type.
   const auto& message = MessageUtil::downcastAndValidate<
       const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
           UpstreamReverseConnectionSocketInterface&>(config, context.messageValidationVisitor());
 
-  // Set the context for this socket interface instance
+  // Set the context for this socket interface instance.
   context_ = &context;
 
-  // Return a SocketInterfaceExtension that wraps this socket interface
-  // The onServerInitialized() will be called automatically by the BootstrapExtension lifecycle
+  // Return a SocketInterfaceExtension that wraps this socket interface.
   return std::make_unique<ReverseTunnelAcceptorExtension>(*this, context, message);
 }
 
@@ -166,15 +157,15 @@ void ReverseTunnelAcceptorExtension::onServerInitialized() {
   ENVOY_LOG(debug,
             "ReverseTunnelAcceptorExtension::onServerInitialized - creating thread local slot");
 
-  // Set the extension reference in the socket interface
+  // Set the extension reference in the socket interface.
   if (socket_interface_) {
     socket_interface_->extension_ = this;
   }
 
-  // Create thread local slot to store dispatcher and socket manager for each worker thread
+  // Create thread local slot for dispatcher and socket manager.
   tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(context_.threadLocal());
 
-  // Set up the thread local dispatcher and socket manager for each worker thread
+  // Set up the thread local dispatcher and socket manager.
   tls_slot_->set([this](Event::Dispatcher& dispatcher) {
     return std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
   });
@@ -208,18 +199,18 @@ ReverseTunnelAcceptorExtension::getConnectionStatsSync(std::chrono::milliseconds
   // Process the stats to extract connection information
   for (const auto& [stat_name, count] : connection_stats) {
     if (count > 0) {
-      // Parse stat name to extract node/cluster information
+      // Parse stat name to extract node/cluster information.
       // Format: "<scope>.reverse_connections.nodes.<node_id>" or
-      // "<scope>.reverse_connections.clusters.<cluster_id>"
+      // "<scope>.reverse_connections.clusters.<cluster_id>".
       if (stat_name.find("reverse_connections.nodes.") != std::string::npos) {
-        // Find the position after "reverse_connections.nodes."
+        // Find the position after "reverse_connections.nodes.".
         size_t pos = stat_name.find("reverse_connections.nodes.");
         if (pos != std::string::npos) {
           std::string node_id = stat_name.substr(pos + strlen("reverse_connections.nodes."));
           connected_nodes.push_back(node_id);
         }
       } else if (stat_name.find("reverse_connections.clusters.") != std::string::npos) {
-        // Find the position after "reverse_connections.clusters."
+        // Find the position after "reverse_connections.clusters.".
         size_t pos = stat_name.find("reverse_connections.clusters.");
         if (pos != std::string::npos) {
           std::string cluster_id = stat_name.substr(pos + strlen("reverse_connections.clusters."));
@@ -276,36 +267,43 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
   // Create/update node connection stat
   if (!node_id.empty()) {
     std::string node_stat_name = fmt::format("reverse_connections.nodes.{}", node_id);
-    auto& node_gauge =
-        stats_store.gaugeFromString(node_stat_name, Stats::Gauge::ImportMode::Accumulate);
+    Stats::StatNameManagedStorage node_stat_name_storage(node_stat_name, stats_store.symbolTable());
+    auto& node_gauge = stats_store.gaugeFromStatName(node_stat_name_storage.statName(),
+                                                     Stats::Gauge::ImportMode::Accumulate);
     if (increment) {
       node_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented node stat {} to {}",
                 node_stat_name, node_gauge.value());
     } else {
-      node_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented node stat {} to {}",
-                node_stat_name, node_gauge.value());
+      if (node_gauge.value() > 0) {
+        node_gauge.dec();
+        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented node stat {} to {}",
+                  node_stat_name, node_gauge.value());
+      }
     }
   }
 
-  // Create/update cluster connection stat
+  // Create/update cluster connection stat.
   if (!cluster_id.empty()) {
     std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}", cluster_id);
-    auto& cluster_gauge =
-        stats_store.gaugeFromString(cluster_stat_name, Stats::Gauge::ImportMode::Accumulate);
+    Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
+                                                            stats_store.symbolTable());
+    auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
+                                                        Stats::Gauge::ImportMode::Accumulate);
     if (increment) {
       cluster_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented cluster stat {} to {}",
                 cluster_stat_name, cluster_gauge.value());
     } else {
-      cluster_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented cluster stat {} to {}",
-                cluster_stat_name, cluster_gauge.value());
+      if (cluster_gauge.value() > 0) {
+        cluster_gauge.dec();
+        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented cluster stat {} to {}",
+                  cluster_stat_name, cluster_gauge.value());
+      }
     }
   }
 
-  // Also update per-worker stats for debugging
+  // Also update per-worker stats for debugging.
   updatePerWorkerConnectionStats(node_id, cluster_id, increment);
 }
 
@@ -314,28 +312,42 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
                                                                     bool increment) {
   auto& stats_store = context_.scope();
 
-  // Get dispatcher name from the thread local dispatcher
-  std::string dispatcher_name = "main_thread"; // Default for main thread
+  // Get dispatcher name from the thread local dispatcher.
+  std::string dispatcher_name;
   auto* local_registry = getLocalRegistry();
-  if (local_registry) {
-    // Dispatcher name is of the form "worker_x" where x is the worker index
-    dispatcher_name = local_registry->dispatcher().name();
+  if (local_registry == nullptr) {
+    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension: No local registry found");
+    return;
   }
+
+  // Dispatcher name is of the form "worker_x" where x is the worker index
+  dispatcher_name = local_registry->dispatcher().name();
+  ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: Updating stats for worker {}", dispatcher_name);
 
   // Create/update per-worker node connection stat
   if (!node_id.empty()) {
     std::string worker_node_stat_name =
         fmt::format("reverse_connections.{}.node.{}", dispatcher_name, node_id);
-    auto& worker_node_gauge =
-        stats_store.gaugeFromString(worker_node_stat_name, Stats::Gauge::ImportMode::NeverImport);
+    Stats::StatNameManagedStorage worker_node_stat_name_storage(worker_node_stat_name,
+                                                                stats_store.symbolTable());
+    auto& worker_node_gauge = stats_store.gaugeFromStatName(
+        worker_node_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
     if (increment) {
       worker_node_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented worker node stat {} to {}",
                 worker_node_stat_name, worker_node_gauge.value());
     } else {
-      worker_node_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker node stat {} to {}",
-                worker_node_stat_name, worker_node_gauge.value());
+      // Guardrail: only decrement if the gauge value is greater than 0
+      if (worker_node_gauge.value() > 0) {
+        worker_node_gauge.dec();
+        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker node stat {} to {}",
+                  worker_node_stat_name, worker_node_gauge.value());
+      } else {
+        ENVOY_LOG(trace,
+                  "ReverseTunnelAcceptorExtension: skipping decrement for worker node stat {} "
+                  "(already at 0)",
+                  worker_node_stat_name);
+      }
     }
   }
 
@@ -343,16 +355,26 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
   if (!cluster_id.empty()) {
     std::string worker_cluster_stat_name =
         fmt::format("reverse_connections.{}.cluster.{}", dispatcher_name, cluster_id);
-    auto& worker_cluster_gauge = stats_store.gaugeFromString(worker_cluster_stat_name,
-                                                             Stats::Gauge::ImportMode::NeverImport);
+    Stats::StatNameManagedStorage worker_cluster_stat_name_storage(worker_cluster_stat_name,
+                                                                   stats_store.symbolTable());
+    auto& worker_cluster_gauge = stats_store.gaugeFromStatName(
+        worker_cluster_stat_name_storage.statName(), Stats::Gauge::ImportMode::NeverImport);
     if (increment) {
       worker_cluster_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented worker cluster stat {} to {}",
                 worker_cluster_stat_name, worker_cluster_gauge.value());
     } else {
-      worker_cluster_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker cluster stat {} to {}",
-                worker_cluster_stat_name, worker_cluster_gauge.value());
+      // Guardrail: only decrement if the gauge value is greater than 0
+      if (worker_cluster_gauge.value() > 0) {
+        worker_cluster_gauge.dec();
+        ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented worker cluster stat {} to {}",
+                  worker_cluster_stat_name, worker_cluster_gauge.value());
+      } else {
+        ENVOY_LOG(trace,
+                  "ReverseTunnelAcceptorExtension: skipping decrement for worker cluster stat {} "
+                  "(already at 0)",
+                  worker_cluster_stat_name);
+      }
     }
   }
 }
@@ -361,15 +383,15 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getPe
   absl::flat_hash_map<std::string, uint64_t> stats_map;
   auto& stats_store = context_.scope();
 
-  // Get the current dispatcher name
-  std::string dispatcher_name = "main_thread"; // Default for main thread
+  // Get the current dispatcher name.
+  std::string dispatcher_name = "main_thread"; // Default for main thread.
   auto* local_registry = getLocalRegistry();
   if (local_registry) {
-    // Dispatcher name is of the form "worker_x" where x is the worker index
+    // Dispatcher name is of the form "worker_x" where x is the worker index.
     dispatcher_name = local_registry->dispatcher().name();
   }
 
-  // Iterate through all gauges and filter for the current dispatcher
+  // Iterate through all gauges and filter for the current dispatcher.
   Stats::IterateFn<Stats::Gauge> gauge_callback =
       [&stats_map, &dispatcher_name](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
@@ -397,7 +419,7 @@ UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
                                              ReverseTunnelAcceptorExtension* extension)
     : dispatcher_(dispatcher), random_generator_(std::make_unique<Random::RandomGeneratorImpl>()),
       extension_(extension) {
-  ENVOY_LOG(debug, "UpstreamSocketManager: creating UpstreamSocketManager with stats integration");
+  ENVOY_LOG(debug, "reverse_tunnel: creating socket manager with stats integration");
   ping_timer_ = dispatcher_.createTimer([this]() { pingConnections(); });
 }
 
@@ -406,15 +428,13 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
                                                 Network::ConnectionSocketPtr socket,
                                                 const std::chrono::seconds& ping_interval,
                                                 bool rebalanced) {
-  ENVOY_LOG(debug,
-            "UpstreamSocketManager: addConnectionSocket called for node_id='{}' cluster_id='{}'",
-            node_id, cluster_id);
+  ENVOY_LOG(debug, "reverse_tunnel: adding connection for node: {}, cluster: {}", node_id,
+            cluster_id);
 
-  // Both node_id and cluster_id are mandatory for consistent state management and stats tracking
+  // Both node_id and cluster_id are mandatory for consistent state management and stats tracking.
   if (node_id.empty() || cluster_id.empty()) {
     ENVOY_LOG(error,
-              "UpstreamSocketManager: addConnectionSocket called with empty node_id='{}' or "
-              "cluster_id='{}'. Both are mandatory.",
+              "reverse_tunnel: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'",
               node_id, cluster_id);
     return;
   }
@@ -423,14 +443,10 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   const int fd = socket->ioHandle().fdDoNotUse();
   const std::string& connectionKey = socket->connectionInfoProvider().localAddress()->asString();
 
-  ENVOY_LOG(debug, "UpstreamSocketManager: Adding connection socket for node: {} and cluster: {}",
-            node_id, cluster_id);
+  ENVOY_LOG(debug, "reverse_tunnel: adding socket for node: {}, cluster: {}", node_id, cluster_id);
 
-  // Store node -> cluster mapping
-  ENVOY_LOG(trace,
-            "UpstreamSocketManager: adding node: {} cluster: {} to node_to_cluster_map_ and "
-            "cluster_to_node_map_",
-            node_id, cluster_id);
+  // Store node -> cluster mapping.
+  ENVOY_LOG(trace, "reverse_tunnel: adding mapping node: {} -> cluster: {}", node_id, cluster_id);
   if (node_to_cluster_map_.find(node_id) == node_to_cluster_map_.end()) {
     node_to_cluster_map_[node_id] = cluster_id;
     cluster_to_node_map_[cluster_id].push_back(node_id);
@@ -450,7 +466,7 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   accepted_reverse_connections_[node_id].push_back(std::move(socket));
   Network::ConnectionSocketPtr& socket_ref = accepted_reverse_connections_[node_id].back();
 
-  ENVOY_LOG(debug, "UpstreamSocketManager: mapping fd {} to node '{}'", fd, node_id);
+  ENVOY_LOG(debug, "reverse_tunnel: mapping fd {} to node: {}", fd, node_id);
   fd_to_node_map_[fd] = node_id;
 
   // Update stats registry
@@ -497,7 +513,7 @@ UpstreamSocketManager::getConnectionSocket(const std::string& node_id) {
   ENVOY_LOG(debug, "UpstreamSocketManager: Looking for socket with node: {} cluster: {}", node_id,
             cluster_id);
 
-  // Find first available socket for the node
+  // Find first available socket for the node.
   auto node_sockets_it = accepted_reverse_connections_.find(node_id);
   if (node_sockets_it == accepted_reverse_connections_.end() || node_sockets_it->second.empty()) {
     ENVOY_LOG(debug, "UpstreamSocketManager: No available sockets for node: {}", node_id);
@@ -535,11 +551,13 @@ std::string UpstreamSocketManager::getNodeID(const std::string& key) {
   // First check if the key exists as a cluster ID by checking global stats
   // This ensures we check across all threads, not just the current thread
   if (auto extension = getUpstreamExtension()) {
-    // Check if any thread has sockets for this cluster by looking at global stats
+    // Check if any thread has sockets for this cluster by looking at global stats.
     std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}", key);
     auto& stats_store = extension->getStatsScope();
-    auto& cluster_gauge =
-        stats_store.gaugeFromString(cluster_stat_name, Stats::Gauge::ImportMode::Accumulate);
+    Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
+                                                            stats_store.symbolTable());
+    auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
+                                                        Stats::Gauge::ImportMode::Accumulate);
 
     if (cluster_gauge.value() > 0) {
       // Key is a cluster ID with active connections, find a node from this cluster
@@ -565,7 +583,7 @@ std::string UpstreamSocketManager::getNodeID(const std::string& key) {
 }
 
 void UpstreamSocketManager::markSocketDead(const int fd) {
-  ENVOY_LOG(debug, "UpstreamSocketManager: markSocketDead called for fd {}", fd);
+  ENVOY_LOG(trace, "UpstreamSocketManager: markSocketDead called for fd {}", fd);
 
   auto node_it = fd_to_node_map_.find(fd);
   if (node_it == fd_to_node_map_.end()) {
@@ -728,13 +746,20 @@ void UpstreamSocketManager::pingConnections(const std::string& node_id) {
   ENVOY_LOG(debug, "UpstreamSocketManager: Pinging connections for node: {}", node_id);
   auto& sockets = accepted_reverse_connections_[node_id];
   ENVOY_LOG(debug, "UpstreamSocketManager: node:{} Number of sockets:{}", node_id, sockets.size());
-  for (auto itr = sockets.begin(); itr != sockets.end(); itr++) {
+
+  auto itr = sockets.begin();
+  while (itr != sockets.end()) {
     int fd = itr->get()->ioHandle().fdDoNotUse();
     auto buffer = ::Envoy::Extensions::Bootstrap::ReverseConnection::ReverseConnectionUtility::
         createPingResponse();
 
     auto ping_response_timeout = ping_interval_ / 2;
     fd_to_timer_map_[fd]->enableTimer(ping_response_timeout);
+
+    // Use a flag to signal whether the socket needs to be marked dead. If the socket is marked dead
+    // in markSocketDead(), it is erased from the list, and the iterator becomes invalid. We need to
+    // break out of the loop to avoid a use after free error.
+    bool socket_dead = false;
     while (buffer->length() > 0) {
       Api::IoCallUint64Result result = itr->get()->ioHandle().write(*buffer);
       ENVOY_LOG(trace,
@@ -747,14 +772,25 @@ void UpstreamSocketManager::pingConnections(const std::string& node_id) {
           ENVOY_LOG(error, "UpstreamSocketManager: node:{} FD:{}: failed to send ping", node_id,
                     fd);
           markSocketDead(fd);
+          socket_dead = true;
           break;
         }
       }
     }
 
     if (buffer->length() > 0) {
+      // Move to next socket if current one couldn't be fully written
+      ++itr;
       continue;
     }
+
+    if (socket_dead) {
+      // Socket was marked dead, iterator is now invalid, break out of the loop
+      break;
+    }
+
+    // Move to next socket
+    ++itr;
   }
 }
 
@@ -772,13 +808,13 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   // Clean up all active file events and timers first
   for (auto& [fd, event] : fd_to_event_map_) {
     ENVOY_LOG(debug, "UpstreamSocketManager: cleaning up file event for FD: {}", fd);
-    event.reset(); // This will cancel the file event
+    event.reset(); // This will cancel the file event.
   }
   fd_to_event_map_.clear();
 
   for (auto& [fd, timer] : fd_to_timer_map_) {
     ENVOY_LOG(debug, "UpstreamSocketManager: cleaning up timer for FD: {}", fd);
-    timer.reset(); // This will cancel the timer
+    timer.reset(); // This will cancel the timer.
   }
   fd_to_timer_map_.clear();
 
@@ -789,7 +825,7 @@ UpstreamSocketManager::~UpstreamSocketManager() {
   }
 
   for (int fd : fds_to_cleanup) {
-    ENVOY_LOG(debug, "UpstreamSocketManager: marking socket dead in destructor for FD: {}", fd);
+    ENVOY_LOG(trace, "UpstreamSocketManager: marking socket dead in destructor for FD: {}", fd);
     markSocketDead(fd); // false = not used, just cleanup
   }
 

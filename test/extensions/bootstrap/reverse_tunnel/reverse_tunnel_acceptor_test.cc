@@ -32,27 +32,27 @@ namespace ReverseConnection {
 class ReverseTunnelAcceptorExtensionTest : public testing::Test {
 protected:
   ReverseTunnelAcceptorExtensionTest() {
-    // Set up the stats scope
+    // Set up the stats scope.
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
 
-    // Set up the mock context
+    // Set up the mock context.
     EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
 
-    // Create the config
+    // Create the config.
     config_.set_stat_prefix("test_prefix");
 
-    // Create the socket interface
+    // Create the socket interface.
     socket_interface_ = std::make_unique<ReverseTunnelAcceptor>(context_);
 
-    // Create the extension
+    // Create the extension.
     extension_ =
         std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
   }
 
-  // Helper function to set up thread local slot for tests
+  // Helper function to set up thread local slot for tests.
   void setupThreadLocalSlot() {
-    // Create a thread local registry
+    // Create a thread local registry.
     thread_local_registry_ =
         std::make_shared<UpstreamSocketThreadLocal>(dispatcher_, extension_.get());
 
@@ -155,12 +155,22 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetLocalRegistryAfterInitialization) 
   auto* registry = extension_->getLocalRegistry();
   EXPECT_NE(registry, nullptr);
 
-  // Verify we can access the socket manager from the registry
+  // Verify we can access the socket manager from the registry (non-const version)
   auto* socket_manager = registry->socketManager();
   EXPECT_NE(socket_manager, nullptr);
 
   // Verify the socket manager has the correct extension reference
   EXPECT_EQ(socket_manager->getUpstreamExtension(), extension_.get());
+
+  // Test const socketManager()
+  const auto* const_registry = extension_->getLocalRegistry();
+  EXPECT_NE(const_registry, nullptr);
+
+  const auto* const_socket_manager = const_registry->socketManager();
+  EXPECT_NE(const_socket_manager, nullptr);
+
+  // Verify the const socket manager has the correct extension reference
+  EXPECT_EQ(const_socket_manager->getUpstreamExtension(), extension_.get());
 }
 
 // Test stats aggregation for one thread only (test thread)
@@ -187,6 +197,34 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   for (const auto& [stat_name, value] : stat_map) {
     EXPECT_TRUE(stat_name.find("worker_0") != std::string::npos);
   }
+
+  // Test StatNameManagedStorage behavior: verify that calling updateConnectionStats
+  // creates the same gauges and increments them correctly
+  extension_->updateConnectionStats("node1", "cluster1", true);
+  extension_->updateConnectionStats("node1", "cluster1", true);
+
+  // Get stats again to verify the same gauges were incremented
+  stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify the gauge values were incremented correctly
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node1"], 3);       // 1 + 2
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"], 3); // 1 + 2
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node2"], 2);       // unchanged
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 2); // unchanged
+
+  // Test decrement operations to cover the decrement code paths
+  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false); // Decrement node1
+  extension_->updatePerWorkerConnectionStats("node2", "cluster2", false); // Decrement node2 once
+  extension_->updatePerWorkerConnectionStats("node2", "cluster2", false); // Decrement node2 again
+
+  // Get stats again to verify the decrements worked correctly
+  stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify the gauge values were decremented correctly
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node1"], 2);       // 3 - 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"], 2); // 3 - 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node2"], 0);       // 2 - 2
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 0); // 2 - 2
 }
 
 // Test cross-thread stat map functions using multiple dispatchers
@@ -231,6 +269,70 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster2"], 1);
   // cluster3: incremented 1 time from worker_1
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster3"], 1);
+
+  // Test StatNameManagedStorage behavior: verify that calling updateConnectionStats again
+  // with the same names increments the existing gauges (not creates new ones)
+  extension_->updateConnectionStats("node1", "cluster1", true);  // Increment again
+  extension_->updateConnectionStats("node2", "cluster2", false); // Decrement
+
+  // Get stats again to verify the same gauges were updated
+  stat_map = extension_->getCrossWorkerStatMap();
+
+  // Verify the gauge values were updated correctly (StatNameManagedStorage ensures same gauge)
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node1"], 4);       // 3 + 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster1"], 4); // 3 + 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node2"], 0);       // 1 - 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster2"], 0); // 1 - 1
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node3"], 1);       // unchanged
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster3"], 1); // unchanged
+
+  // Test per-worker decrement operations to cover the per-worker decrement code paths
+  // First, test decrements from worker_0 context
+  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false); // Decrement from worker_0
+
+  // Get per-worker stats to verify decrements worked correctly for worker_0
+  auto per_worker_stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify worker_0 stats were decremented correctly
+  EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.node.node1"], 3); // 4 - 1
+  EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.cluster.cluster1"],
+            3); // 4 - 1
+
+  // Decrement cluster2 which is already at 0 from cross-worker stats
+  extension_->updateConnectionStats("node2", "cluster2", false);
+
+  // Get cross-worker stats to verify the guardrail worked
+  auto cross_worker_stat_map = extension_->getCrossWorkerStatMap();
+
+  // Verify that cluster2 remains at 0 (guardrail prevented underflow)
+  EXPECT_EQ(cross_worker_stat_map["test_scope.reverse_connections.clusters.cluster2"], 0);
+
+  per_worker_stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify that node2/cluster2 remain at 0 (not wrapped around to UINT64_MAX)
+  EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.node.node2"], 0);
+  EXPECT_EQ(per_worker_stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 0);
+
+  // Now test decrements from worker_1 context
+  thread_local_registry_ = another_thread_local_registry_;
+
+  // Decrement some stats from worker_1
+  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false); // Decrement from worker_1
+  extension_->updatePerWorkerConnectionStats("node3", "cluster3", false); // Decrement node3 to 0
+
+  // Get per-worker stats from worker_1 context
+  auto worker1_stat_map = extension_->getPerWorkerStatMap();
+
+  // Verify worker_1 stats were decremented correctly
+  EXPECT_EQ(worker1_stat_map["test_scope.reverse_connections.worker_1.node.node1"], 0); // 1 - 1
+  EXPECT_EQ(worker1_stat_map["test_scope.reverse_connections.worker_1.cluster.cluster1"],
+            0);                                                                         // 1 - 1
+  EXPECT_EQ(worker1_stat_map["test_scope.reverse_connections.worker_1.node.node3"], 0); // 1 - 1
+  EXPECT_EQ(worker1_stat_map["test_scope.reverse_connections.worker_1.cluster.cluster3"],
+            0); // 1 - 1
+
+  // Restore original registry
+  thread_local_registry_ = original_registry;
 }
 
 // Test getConnectionStatsSync using multiple dispatchers
@@ -285,6 +387,31 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetConnectionStatsSyncMultiThread) {
   // cluster3: should be present (incremented 1 time)
   EXPECT_TRUE(std::find(accepted_connections.begin(), accepted_connections.end(), "cluster3") !=
               accepted_connections.end());
+
+  // Test StatNameManagedStorage behavior: verify that calling updateConnectionStats again
+  // with the same names updates the existing gauges and the sync result reflects this
+  extension_->updateConnectionStats("node1", "cluster1", true);  // Increment again
+  extension_->updateConnectionStats("node2", "cluster2", false); // Decrement to 0
+
+  // Get connection stats again to verify the updated values
+  result = extension_->getConnectionStatsSync();
+  auto& [updated_connected_nodes, updated_accepted_connections] = result;
+
+  // Verify that node2 is no longer present (gauge value is 0)
+  EXPECT_TRUE(std::find(updated_connected_nodes.begin(), updated_connected_nodes.end(), "node2") ==
+              updated_connected_nodes.end());
+  EXPECT_TRUE(std::find(updated_accepted_connections.begin(), updated_accepted_connections.end(),
+                        "cluster2") == updated_accepted_connections.end());
+
+  // Verify that node1 and node3 are still present
+  EXPECT_TRUE(std::find(updated_connected_nodes.begin(), updated_connected_nodes.end(), "node1") !=
+              updated_connected_nodes.end());
+  EXPECT_TRUE(std::find(updated_connected_nodes.begin(), updated_connected_nodes.end(), "node3") !=
+              updated_connected_nodes.end());
+  EXPECT_TRUE(std::find(updated_accepted_connections.begin(), updated_accepted_connections.end(),
+                        "cluster1") != updated_accepted_connections.end());
+  EXPECT_TRUE(std::find(updated_accepted_connections.begin(), updated_accepted_connections.end(),
+                        "cluster3") != updated_accepted_connections.end());
 }
 
 // Test getConnectionStatsSync with timeouts
@@ -334,6 +461,7 @@ protected:
 
   void TearDown() override {
     socket_manager_.reset();
+
     extension_.reset();
     socket_interface_.reset();
   }
@@ -358,35 +486,51 @@ protected:
     return socket_manager_->fd_to_timer_map_.find(fd) != socket_manager_->fd_to_timer_map_.end();
   }
 
-  size_t verifyAcceptedReverseConnectionsMap(const std::string& node) {
-    auto it = socket_manager_->accepted_reverse_connections_.find(node);
-    return (it != socket_manager_->accepted_reverse_connections_.end()) ? it->second.size() : 0;
+  size_t getFDToEventMapSize() { return socket_manager_->fd_to_event_map_.size(); }
+
+  size_t getFDToTimerMapSize() { return socket_manager_->fd_to_timer_map_.size(); }
+
+  size_t verifyAcceptedReverseConnectionsMap(const std::string& node_id) {
+    auto it = socket_manager_->accepted_reverse_connections_.find(node_id);
+    if (it == socket_manager_->accepted_reverse_connections_.end()) {
+      return 0;
+    }
+    return it->second.size();
   }
 
-  std::string getNodeToClusterMapping(const std::string& node) {
-    auto it = socket_manager_->node_to_cluster_map_.find(node);
-    return (it != socket_manager_->node_to_cluster_map_.end()) ? it->second : "";
+  std::string getNodeToClusterMapping(const std::string& node_id) {
+    auto it = socket_manager_->node_to_cluster_map_.find(node_id);
+    if (it == socket_manager_->node_to_cluster_map_.end()) {
+      return "";
+    }
+    return it->second;
   }
 
-  std::vector<std::string> getClusterToNodeMapping(const std::string& cluster) {
-    auto it = socket_manager_->cluster_to_node_map_.find(cluster);
-    return (it != socket_manager_->cluster_to_node_map_.end()) ? it->second
-                                                               : std::vector<std::string>{};
+  std::vector<std::string> getClusterToNodeMapping(const std::string& cluster_id) {
+    auto it = socket_manager_->cluster_to_node_map_.find(cluster_id);
+    if (it == socket_manager_->cluster_to_node_map_.end()) {
+      return {};
+    }
+    return it->second;
   }
-
-  size_t getAcceptedReverseConnectionsSize() {
-    return socket_manager_->accepted_reverse_connections_.size();
-  }
-
-  size_t getFDToNodeMapSize() { return socket_manager_->fd_to_node_map_.size(); }
 
   size_t getNodeToClusterMapSize() { return socket_manager_->node_to_cluster_map_.size(); }
 
   size_t getClusterToNodeMapSize() { return socket_manager_->cluster_to_node_map_.size(); }
 
-  size_t getFDToEventMapSize() { return socket_manager_->fd_to_event_map_.size(); }
+  size_t getAcceptedReverseConnectionsSize() {
+    return socket_manager_->accepted_reverse_connections_.size();
+  }
 
-  size_t getFDToTimerMapSize() { return socket_manager_->fd_to_timer_map_.size(); }
+  // Helper methods for the new test cases
+  void addNodeToClusterMapping(const std::string& node_id, const std::string& cluster_id) {
+    socket_manager_->node_to_cluster_map_[node_id] = cluster_id;
+    socket_manager_->cluster_to_node_map_[cluster_id].push_back(node_id);
+  }
+
+  void addFDToNodeMapping(int fd, const std::string& node_id) {
+    socket_manager_->fd_to_node_map_[fd] = node_id;
+  }
 
   // Helper to create a mock socket with proper address setup
   Network::ConnectionSocketPtr createMockSocket(int fd = 123,
@@ -1042,7 +1186,8 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
   auto* mock_io_handle2 =
       dynamic_cast<NiceMock<Network::MockIoHandle>*>(&sockets.back()->ioHandle());
 
-  // Send failed ping on mock_io_handle1 and successful one on mock_io_handle2
+  // First call: Send failed ping on mock_io_handle1
+  // When the first socket fails, the loop breaks and doesn't process the second socket
   EXPECT_CALL(*mock_io_handle1, write(_))
       .Times(1) // Called once
       .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
@@ -1050,14 +1195,7 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
         buffer.drain(buffer.length());
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(ECONNRESET)};
       }));
-  EXPECT_CALL(*mock_io_handle2, write(_))
-      .Times(1) // Called once
-      .WillRepeatedly(Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
-        // Drain the buffer to simulate successful write
-        buffer.drain(buffer.length());
-        return Api::IoCallUint64Result{
-            0, Network::IoSocketError::getIoSocketEagainError()}; // Second socket succeeds
-      }));
+  // Second socket should NOT be called in the first pingConnections call
 
   // Manually call pingConnections to test the functionality
   socket_manager_->pingConnections(node_id);
@@ -1078,8 +1216,7 @@ TEST_F(TestUpstreamSocketManager, PingConnectionsWriteFailure) {
         return Api::IoCallUint64Result{0, Network::IoSocketError::create(EPIPE)};
       }));
 
-  // Manually call pingConnections again. This should ping once socket2, fail and trigger node
-  // cleanup
+  // Manually call pingConnections again. This should ping socket2, fail and trigger node cleanup
   socket_manager_->pingConnections(node_id);
 
   // Verify complete cleanup occurred (both sockets removed due to node cleanup)
@@ -1234,10 +1371,13 @@ protected:
   }
 
   void TearDown() override {
+    // Destroy socket manager first so it can still access thread local slot during cleanup
+    socket_manager_.reset();
+
+    // Then destroy thread local components
     tls_slot_.reset();
     thread_local_registry_.reset();
 
-    socket_manager_.reset();
     extension_.reset();
     socket_interface_.reset();
   }
@@ -1410,7 +1550,7 @@ TEST_F(TestReverseTunnelAcceptor, SocketWithAddressAndThreadLocalNoCachedSockets
   const std::string node_id = "test-node";
   auto address = createAddressWithLogicalName(node_id);
 
-  // Call socket() before calling addConnectionSocket() so that no sockets are cacheds
+  // Call socket() before calling addConnectionSocket() so that no sockets are cached
   Network::SocketCreationOptions options;
   auto io_handle = socket_interface_->socket(Network::Socket::Type::Stream, address, options);
   EXPECT_NE(io_handle, nullptr); // Should fall back to default socket interface
@@ -1516,32 +1656,6 @@ TEST_F(TestUpstreamReverseConnectionIOHandle, GetSocketReturnsConstReference) {
   EXPECT_NE(&socket, nullptr);
 }
 
-// Configuration validation tests
-class ConfigValidationTest : public testing::Test {
-protected:
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
-      UpstreamReverseConnectionSocketInterface config_;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-};
-
-TEST_F(ConfigValidationTest, ValidConfiguration) {
-  // Test that valid configuration gets accepted
-  config_.set_stat_prefix("reverse_tunnel");
-
-  ReverseTunnelAcceptor acceptor(context_);
-
-  // Should not throw when creating bootstrap extension
-  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
-}
-
-TEST_F(ConfigValidationTest, EmptyStatPrefix) {
-  // Test that empty stat_prefix still works with default
-  ReverseTunnelAcceptor acceptor(context_);
-
-  // Should not throw and should use default prefix
-  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
-}
-
 TEST_F(ReverseTunnelAcceptorExtensionTest, IpFamilySupportIPv4) {
   // Test that IPv4 is supported
   EXPECT_TRUE(socket_interface_->ipFamilySupported(AF_INET));
@@ -1584,13 +1698,72 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, FactoryName) {
             "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
 }
 
+class UpstreamReverseConnectionIOHandleTest : public testing::Test {
+protected:
+  void SetUp() override {
+    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+    EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
+    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+
+    socket->io_handle_ = std::move(mock_io_handle);
+
+    handle_ =
+        std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), "test-cluster");
+  }
+
+  std::unique_ptr<UpstreamReverseConnectionIOHandle> handle_;
+};
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
+  // Test that connect() returns success immediately for reverse connections
+  auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
+
+  auto result = handle_->connect(address);
+
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(result.errno_, 0);
+}
+
+TEST_F(UpstreamReverseConnectionIOHandleTest, GetSocketReturnsValidReference) {
+  // Test that getSocket() returns a valid reference
+  const auto& socket = handle_->getSocket();
+  EXPECT_NE(&socket, nullptr);
+}
+
+// Configuration validation tests
+class ConfigValidationTest : public testing::Test {
+protected:
+  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface config_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+};
+
+TEST_F(ConfigValidationTest, ValidConfiguration) {
+  // Test that valid configuration gets accepted
+  config_.set_stat_prefix("reverse_tunnel");
+
+  ReverseTunnelAcceptor acceptor(context_);
+
+  // Should not throw when creating bootstrap extension
+  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
+}
+
+TEST_F(ConfigValidationTest, EmptyStatPrefix) {
+  // Test that empty stat_prefix still works with default
+  ReverseTunnelAcceptor acceptor(context_);
+
+  // Should not throw and should use default prefix
+  EXPECT_NO_THROW(acceptor.createBootstrapExtension(config_, context_));
+}
+
 TEST_F(TestUpstreamSocketManager, GetConnectionSocketNoSocketsButValidMapping) {
   const std::string node_id = "test-node";
   const std::string cluster_id = "test-cluster";
 
   // Manually add mapping without adding any actual sockets
-  socket_manager_->node_to_cluster_map_[node_id] = cluster_id;
-  socket_manager_->cluster_to_node_map_[cluster_id].push_back(node_id);
+  addNodeToClusterMapping(node_id, cluster_id);
 
   // Try to get a socket - should hit the "No available sockets" log and return nullptr
   auto socket = socket_manager_->getConnectionSocket(node_id);
@@ -1612,7 +1785,7 @@ TEST_F(TestUpstreamSocketManager, MarkSocketDeadInvalidSocketNotInPool) {
   EXPECT_NE(retrieved_socket, nullptr);
 
   // Manually add the fd back to fd_to_node_map to simulate the edge case
-  socket_manager_->fd_to_node_map_[123] = node_id;
+  addFDToNodeMapping(123, node_id);
 
   // Now mark socket dead - it should find the node but not find the socket in the pool
   // This will trigger the "Marking an invalid socket dead" error log

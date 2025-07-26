@@ -33,14 +33,15 @@ class ReverseTunnelAcceptorExtension;
 class UpstreamSocketManager;
 
 /**
- * Custom IoHandle for upstream reverse connections that properly owns a ConnectionSocket.
- * This class uses RAII principles to manage socket lifetime.
+ * Custom IoHandle for upstream reverse connections that manages ConnectionSocket lifetime.
+ * This class implements RAII principles to ensure proper socket cleanup and provides
+ * reverse connection semantics where the connection is already established.
  */
 class UpstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
 public:
   /**
-   * Constructor for UpstreamReverseConnectionIOHandle.
-   * Takes ownership of the socket and manages its lifetime properly.
+   * Constructs an UpstreamReverseConnectionIOHandle that takes ownership of a socket.
+   *
    * @param socket the reverse connection socket to own and manage.
    * @param cluster_name the name of the cluster this connection belongs to.
    */
@@ -53,21 +54,24 @@ public:
   /**
    * Override of connect method for reverse connections.
    * For reverse connections, the connection is already established so this method
-   * is a no-op.
+   * is a no-op and always returns success.
+   *
    * @param address the target address (unused for reverse connections).
-   * @return SysCallIntResult with success status.
+   * @return SysCallIntResult with success status (0, 0).
    */
   Api::SysCallIntResult connect(Network::Address::InstanceConstSharedPtr address) override;
 
   /**
    * Override of close method for reverse connections.
    * Cleans up the owned socket and calls the parent close method.
+   *
    * @return IoCallUint64Result indicating the result of the close operation.
    */
   Api::IoCallUint64Result close() override;
 
   /**
-   * Get the owned socket. This should only be used for read-only operations.
+   * Get the owned socket for read-only operations.
+   *
    * @return const reference to the owned socket.
    */
   const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
@@ -81,12 +85,10 @@ private:
 
 /**
  * Thread local storage for ReverseTunnelAcceptor.
- * Stores the thread-local dispatcher and socket manager for each worker thread.
  */
 class UpstreamSocketThreadLocal : public ThreadLocal::ThreadLocalObject {
 public:
   /**
-   * Constructor for UpstreamSocketThreadLocal.
    * Creates a new socket manager instance for the given dispatcher.
    * @param dispatcher the thread-local dispatcher.
    * @param extension the upstream extension for stats integration.
@@ -108,22 +110,22 @@ public:
   const UpstreamSocketManager* socketManager() const { return socket_manager_.get(); }
 
 private:
-  // The thread-local dispatcher.
+  // Thread-local dispatcher.
   Event::Dispatcher& dispatcher_;
-  // The thread-local socket manager.
+  // Thread-local socket manager.
   std::unique_ptr<UpstreamSocketManager> socket_manager_;
 };
 
 /**
  * Socket interface that creates upstream reverse connection sockets.
- * This class implements the SocketInterface interface to provide reverse connection
- * functionality for upstream connections. It manages cached reverse TCP connections
- * and provides them when requested by an incoming request.
+ * Manages cached reverse TCP connections and provides them when requested.
  */
 class ReverseTunnelAcceptor : public Envoy::Network::SocketInterfaceBase,
                               public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
   /**
+   * Constructs a ReverseTunnelAcceptor with the given server factory context.
+   *
    * @param context the server factory context for this socket interface.
    */
   ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context);
@@ -132,7 +134,7 @@ public:
 
   // SocketInterface overrides
   /**
-   * Create a socket without a specific address (not applicable reverse connections).
+   * Create a socket without a specific address (no-op for reverse connections).
    * @param socket_type the type of socket to create.
    * @param addr_type the address type.
    * @param version the IP version.
@@ -146,7 +148,7 @@ public:
          const Envoy::Network::SocketCreationOptions& options) const override;
 
   /**
-   * Create a socket with a specific address for reverse connections.
+   * Create a socket with a specific address.
    * @param socket_type the type of socket to create.
    * @param addr the address to bind to.
    * @param options socket creation options.
@@ -184,14 +186,14 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   /**
-   * @return string containing the interface name.
+   * @return the interface name.
    */
   std::string name() const override {
     return "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface";
   }
 
   /**
-   * @return pointer to the extension for accessing cross-thread aggregation functionality.
+   * @return pointer to the extension for cross-thread aggregation.
    */
   ReverseTunnelAcceptorExtension* getExtension() const { return extension_; }
 
@@ -203,8 +205,6 @@ private:
 
 /**
  * Socket interface extension for upstream reverse connections.
- * This class extends SocketInterfaceExtension and initializes the upstream reverse socket
- * interface.
  */
 class ReverseTunnelAcceptorExtension
     : public Envoy::Network::SocketInterfaceExtension,
@@ -235,13 +235,11 @@ public:
 
   /**
    * Called when the server is initialized.
-   * Sets up thread-local storage for the socket interface.
    */
   void onServerInitialized() override;
 
   /**
    * Called when a worker thread is initialized.
-   * no-op for this extension.
    */
   void onWorkerThreadInitialized() override {}
 
@@ -257,7 +255,7 @@ public:
 
   /**
    * Synchronous version for admin API endpoints that require immediate response on reverse
-   * connection stats. Uses blocking aggregation with timeout for production reliability.
+   * connection stats.
    * @param timeout_ms maximum time to wait for aggregation completion
    * @return pair of <connected_nodes, accepted_connections> or empty if timeout
    */
@@ -266,34 +264,31 @@ public:
 
   /**
    * Get cross-worker aggregated reverse connection stats.
-   * @return map of node/cluster -> connection count across all worker threads
+   * @return map of node/cluster -> connection count across all worker threads.
    */
   absl::flat_hash_map<std::string, uint64_t> getCrossWorkerStatMap();
 
   /**
    * Update the cross-thread aggregated stats for the connection.
-   * @param node_id the node identifier for the connection
-   * @param cluster_id the cluster identifier for the connection
-   * @param increment whether to increment (true) or decrement (false) the connection count
+   * @param node_id the node identifier for the connection.
+   * @param cluster_id the cluster identifier for the connection.
+   * @param increment whether to increment (true) or decrement (false) the connection count.
    */
   void updateConnectionStats(const std::string& node_id, const std::string& cluster_id,
                              bool increment);
 
   /**
-   * Update per-worker connection stats for debugging purposes.
-   * Creates worker-specific stats "reverse_connections.{worker_name}.node.{node_id}".
-   * @param node_id the node identifier for the connection
-   * @param cluster_id the cluster identifier for the connection
-   * @param increment whether to increment (true) or decrement (false) the connection count
+   * Update per-worker connection stats for debugging.
+   * @param node_id the node identifier for the connection.
+   * @param cluster_id the cluster identifier for the connection.
+   * @param increment whether to increment (true) or decrement (false) the connection count.
    */
   void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
                                       bool increment);
 
   /**
-   * Get per-worker connection stats for debugging purposes.
-   * Returns stats like "reverse_connections.{worker_name}.node.{node_id}" for the current thread
-   * only.
-   * @return map of node/cluster -> connection count for the current worker thread
+   * Get per-worker connection stats for debugging.
+   * @return map of node/cluster -> connection count for the current worker thread.
    */
   absl::flat_hash_map<std::string, uint64_t> getPerWorkerStatMap();
 
@@ -304,10 +299,8 @@ public:
   Stats::Scope& getStatsScope() const { return context_.scope(); }
 
   /**
-   * Test-only method to set the thread local slot for testing purposes.
-   * This allows tests to inject a custom thread local registry without
-   * requiring friend class access.
-   * @param slot the thread local slot to set
+   * Test-only method to set the thread local slot.
+   * @param slot the thread local slot to set.
    */
   void
   setTestOnlyTLSRegistry(std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> slot) {
@@ -324,7 +317,6 @@ private:
 
 /**
  * Thread-local socket manager for upstream reverse connections.
- * Manages cached reverse connection sockets per cluster.
  */
 class UpstreamSocketManager : public ThreadLocal::ThreadLocalObject,
                               public Logger::Loggable<Logger::Id::filter> {
@@ -339,51 +331,56 @@ public:
 
   // RPING message now handled by ReverseConnectionUtility
 
-  /** Add the accepted connection and remote cluster mapping to UpstreamSocketManager maps.
+  /**
+   * Add accepted connection to socket manager.
    * @param node_id node_id of initiating node.
-   * @param cluster_id cluster_id of receiving(acceptor) cluster.
+   * @param cluster_id cluster_id of receiving cluster.
    * @param socket the socket to be added.
-   * @param ping_interval the interval at which ping keepalives are sent on accepted reverse conns.
-   * @param rebalanced is true if we are adding to the socket after rebalancing to pick the most
-   * appropriate thread.
+   * @param ping_interval the interval at which ping keepalives are sent.
+   * @param rebalanced true if adding socket after rebalancing.
    */
   void addConnectionSocket(const std::string& node_id, const std::string& cluster_id,
                            Network::ConnectionSocketPtr socket,
                            const std::chrono::seconds& ping_interval, bool rebalanced);
 
-  /** Called by the responder envoy when a request is received, that could be sent through a reverse
-   * connection. This returns an accepted connection socket, if present.
+  /**
+   * Get an available reverse connection socket.
    * @param node_id the node ID to get a socket for.
    * @return the connection socket, or nullptr if none available.
    */
   Network::ConnectionSocketPtr getConnectionSocket(const std::string& node_id);
 
-  /** Mark the connection socket dead and remove it from internal maps.
+  /**
+   * Mark connection socket dead and remove from internal maps.
    * @param fd the FD for the socket to be marked dead.
    */
   void markSocketDead(const int fd);
 
-  /** Ping all active reverse connections to check their health and maintain keepalive.
-   * Sends ping messages to all accepted reverse connections and sets up response timeouts.
+  /**
+   * Ping all active reverse connections for health checks.
    */
   void pingConnections();
 
-  /** Ping reverse connections for a specific node to check their health.
+  /**
+   * Ping reverse connections for a specific node.
    * @param node_id the node ID whose connections should be pinged.
    */
   void pingConnections(const std::string& node_id);
 
-  /** Try to enable the ping timer if it's not already enabled.
+  /**
+   * Enable the ping timer if not already enabled.
    * @param ping_interval the interval at which ping keepalives should be sent.
    */
   void tryEnablePingTimer(const std::chrono::seconds& ping_interval);
 
-  /** Clean up stale node entries when no active sockets remain for a node.
+  /**
+   * Clean up stale node entries when no active sockets remain.
    * @param node_id the node ID to clean up.
    */
   void cleanStaleNodeEntry(const std::string& node_id);
 
-  /** Handle ping response from a reverse connection.
+  /**
+   * Handle ping response from a reverse connection.
    * @param io_handle the IO handle for the socket that sent the ping response.
    */
   void onPingResponse(Network::IoHandle& io_handle);
@@ -394,41 +391,38 @@ public:
    */
   ReverseTunnelAcceptorExtension* getUpstreamExtension() const { return extension_; }
   /**
-   * Automatically discern whether the key is a node ID or a cluster ID. The key is a
-   * cluster ID if any worker has a reverse connection for that cluster, in which case
-   * return a node belonging to that cluster. Otherwise, it is a node ID, in which case
-   * return the node ID as-is.
+   * Automatically discern whether the key is a node ID or cluster ID.
    * @param key the key to get the node ID for.
-   * @return the node ID or cluster ID.
+   * @return the node ID.
    */
   std::string getNodeID(const std::string& key);
 
 private:
-  // Pointer to the thread local Dispatcher instance.
+  // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
   Random::RandomGeneratorPtr random_generator_;
 
-  // Map of node IDs to connection sockets, stored on the accepting(remote) envoy.
+  // Map of node IDs to connection sockets.
   absl::flat_hash_map<std::string, std::list<Network::ConnectionSocketPtr>>
       accepted_reverse_connections_;
 
-  // Map from file descriptor to node ID
+  // Map from file descriptor to node ID.
   absl::flat_hash_map<int, std::string> fd_to_node_map_;
 
-  // Map of node ID to the corresponding cluster it belongs to.
+  // Map of node ID to cluster.
   absl::flat_hash_map<std::string, std::string> node_to_cluster_map_;
 
-  // Map of cluster IDs to list of node IDs
+  // Map of cluster IDs to node IDs.
   absl::flat_hash_map<std::string, std::vector<std::string>> cluster_to_node_map_;
 
-  // File events and timers for ping functionality
+  // File events and timers for ping functionality.
   absl::flat_hash_map<int, Event::FileEventPtr> fd_to_event_map_;
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_timer_map_;
 
   Event::TimerPtr ping_timer_;
   std::chrono::seconds ping_interval_{0};
 
-  // Pointer to the upstream extension for stats integration
+  // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;
 };
 

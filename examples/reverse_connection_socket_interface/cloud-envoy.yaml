@@ -32,7 +32,7 @@ static_resources:
                   - name: envoy.filters.http.reverse_conn
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
-                      ping_interval: 30
+                      ping_interval: 2
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
