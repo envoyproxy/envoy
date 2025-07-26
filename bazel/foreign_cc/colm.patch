@@ -1,0 +1,22 @@
+diff --git a/autogen.sh b/autogen.sh
+index 4d0c2d34..aaad090b 100755
+--- a/autogen.sh
++++ b/autogen.sh
+@@ -4,10 +4,10 @@ set -x
+ 
+ case `uname` in
+ 	Darwin)
+-		glibtoolize --quiet --copy --force
++		${LIBTOOLIZE:-glibtoolize} --quiet --copy --force
+ 		;;
+ 	*)
+-		libtoolize --quiet --copy --force
++		${LIBTOOLIZE:-libtoolize} --quiet --copy --force
+ 	;;
+ esac
+ 
+@@ -15,4 +15,3 @@ aclocal
+ autoheader
+ automake --foreign --add-missing
+ autoconf
+-

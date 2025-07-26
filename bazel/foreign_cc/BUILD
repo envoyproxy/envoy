@@ -106,7 +106,7 @@ make(
 configure_make(
     name = "librdkafka_build",
     configure_in_place = True,
-    configure_options = ["--disable-ssl --disable-gssapi --disable-zstd --disable-curl && cp Makefile.config src/.. && cp config.h src/.."],
+    configure_options = ["--disable-ssl --disable-gssapi --disable-zstd --disable-curl --disable-c11threads && cp Makefile.config src/.. && cp config.h src/.."],
     lib_source = "@confluentinc_librdkafka//:all",
     out_static_libs = [
         "librdkafka.a",
@@ -152,6 +152,10 @@ configure_make(
 configure_make(
     name = "colm",
     autogen = True,
+    build_data = select({
+        "@platforms//cpu:x86_64": ["@libtool_x86_64//:all"],
+        "@platforms//cpu:aarch64": ["@libtool_aarch64//:all"],
+    }),
     configure_in_place = True,
     configure_options = [
         "AUTOMAKE=automake",
@@ -163,10 +167,16 @@ configure_make(
     # using -l:libstdc++.a.
     env = {
         "CXXFLAGS": "--static -lstdc++ -Wno-unused-command-line-argument",
+        "LIBTOOLIZE": "$$EXT_BUILD_ROOT/external/libtool_x86_64/bin/libtoolize",
+        "LIBTOOL": "$$EXT_BUILD_ROOT/external/libtool_x86_64/bin/libtool",
+        "ACLOCAL_PATH": "$$EXT_BUILD_ROOT/external/libtool_x86_64/share/aclocal",
+        "pkgauxdir": "$$EXT_BUILD_ROOT/external/libtool_x86_64/share/libtool/build-aux",
+        "pkgdatadir": "$$EXT_BUILD_ROOT/external/libtool_x86_64/share/libtool",
     },
     lib_source = "@net_colm_open_source_colm//:all",
     out_binaries = ["colm"],
     tags = ["skip_on_windows"],
+    # toolchains = ["@envoy_toolshed//toolchains/libtool:current_libtool_toolchain"],
 )
 
 configure_make(

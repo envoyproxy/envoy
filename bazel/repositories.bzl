@@ -120,6 +120,8 @@ def envoy_dependencies(skip_targets = []):
     if "envoy_build_config" not in native.existing_rules().keys():
         default_envoy_build_config(name = "envoy_build_config")
 
+    _org_chromium_sysroot_linux_x64()
+
     # Setup Bazel shell rules
     external_http_archive(name = "rules_shell")
 
@@ -237,6 +239,10 @@ def envoy_dependencies(skip_targets = []):
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
+    _toolchains_llvm()
+    _org_chromium_sysroot_linux_x64()
+    _org_chromium_sysroot_linux_arm64()
+
     _cc_deps()
     _go_deps(skip_targets)
     _rust_deps()
@@ -314,6 +320,8 @@ def _com_github_axboe_liburing():
     external_http_archive(
         name = "com_github_axboe_liburing",
         build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:liburing_debug.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_bazel_buildtools():
@@ -401,12 +409,16 @@ def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
         build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:qatlib.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_intel_qatzip():
     external_http_archive(
         name = "com_github_intel_qatzip",
         build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:qatzip.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_qat_zstd():
@@ -438,6 +450,9 @@ def _net_colm_open_source_colm():
     external_http_archive(
         name = "net_colm_open_source_colm",
         build_file_content = BUILD_ALL_CONTENT,
+        patch_args = ["-p1"],
+        # https://github.com/adrian-thurston/colm/pull/165
+        patches = ["@envoy//bazel/foreign_cc:colm.patch"],
     )
 
 def _net_colm_open_source_ragel():
@@ -715,6 +730,7 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
+            "@envoy//bazel:v8_python.patch",
             "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
@@ -917,6 +933,35 @@ def _com_github_wamr():
     native.bind(
         name = "wamr",
         actual = "@envoy//bazel/foreign_cc:wamr",
+    )
+
+def _toolchains_llvm():
+    external_http_archive(
+        name = "toolchains_llvm",
+    )
+
+def _org_chromium_sysroot_linux_x64():
+    external_http_archive(
+        name = "org_chromium_sysroot_linux_x64",
+        build_file_content = """
+filegroup(
+    name = "sysroot",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+""",
+    )
+
+def _org_chromium_sysroot_linux_arm64():
+    external_http_archive(
+        name = "org_chromium_sysroot_linux_arm64",
+        build_file_content = """
+filegroup(
+    name = "sysroot",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+""",
     )
 
 def _com_github_wasmtime():

@@ -1,12 +1,12 @@
 agent-ubuntu: ubuntu-24.04
 build-image:
   # Authoritative configuration for build image/s
-  repo: envoyproxy/envoy-build-ubuntu
-  sha: b10346fe2eee41733dbab0e02322c47a538bf3938d093a5daebad9699860b814
-  mobile-sha: 1a4da70e73be0de3ae2f3342aaf9a58b7b426ae9e6007f51fec36f57be7315db
+  repo: envoyproxy/envoy-build
+  sha: 041bf5a90d549aecbf6580d60064aeaa50a6d67483f4676d2f49d4f37d03a914
+  mobile-sha: e968c48d215eedda6d624b3aa3aa46d3b14c52a9d74346e4be85cb5cd255edee
   # this is authoritative, but is not currently used in github ci
-  gcr-sha: 95d7afdea0f0f8881e88fa5e581db4f50907d0745ac8d90e00357ac1a316abe5
-  tag: f4a881a1205e8e6db1a57162faf3df7aed88eae8
+  gcr-sha: cd3e44f040477c1cc27b0b464614a477b98c8210b6624cfeb926a5d69e4cc6f6
+  tag: a3be5281b88359ab536d052218a30a951c97d751
 
 config:
   envoy:
@@ -381,7 +381,7 @@ tables:
     title: Build image
     table-title: Container image/s (as used in this CI run)
     filter: |
-      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
       | .request["build-image"]
       | del(.changed)
       | with_entries(
@@ -393,7 +393,7 @@ tables:
     title: Build image (current)
     table-title: Current or previous container image
     filter: |
-      "https://hub.docker.com/r/envoyproxy/envoy-build-ubuntu/tags?page=1&name=" as $dockerLink
+      "https://hub.docker.com/r/envoyproxy/envoy-build/tags?page=1&name=" as $dockerLink
       | if .request["build-image"].changed then
           .request["build-image-current"]
           | with_entries(

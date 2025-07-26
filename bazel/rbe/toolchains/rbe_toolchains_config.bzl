@@ -4,10 +4,10 @@ load("@bazel_toolchains//rules/exec_properties:exec_properties.bzl", "create_rbe
 load("//bazel/rbe/toolchains:configs/linux/versions.bzl", _generated_toolchain_config_suite_autogen_spec_linux = "TOOLCHAIN_CONFIG_AUTOGEN_SPEC")
 
 _ENVOY_BUILD_IMAGE_REGISTRY = "gcr.io"
-_ENVOY_BUILD_IMAGE_TAG = "2144d692c47e4fc5f4d4e2dab27f08a084c5b346"
+_ENVOY_BUILD_IMAGE_TAG = "1b4d7012649453ba9a16c0b9e18ff8ad843b2db8"
 
 _ENVOY_BUILD_IMAGE_REPOSITORY_LINUX = "envoy-ci/envoy-build"
-_ENVOY_BUILD_IMAGE_DIGEST_LINUX = "sha256:375bf44de0d891f881fd38d7732db411f1f34ec6200eac2f1c9fedf4ad0e474d"
+_ENVOY_BUILD_IMAGE_DIGEST_LINUX = "sha256:cd3e44f040477c1cc27b0b464614a477b98c8210b6624cfeb926a5d69e4cc6f6"
 _CONFIGS_OUTPUT_BASE_LINUX = "toolchains/configs/linux"
 
 _CLANG_ENV = {
