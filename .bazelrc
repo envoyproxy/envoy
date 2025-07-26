@@ -518,7 +518,7 @@ build:rbe-engflow --remote_executor=grpcs://envoy.cluster.engflow.com
 build:rbe-engflow --bes_backend=grpcs://envoy.cluster.engflow.com/
 build:rbe-engflow --bes_results_url=https://envoy.cluster.engflow.com/invocation/
 build:rbe-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
-build:rbe-engflow --grpc_keepalive_time=60s
+build:rbe-engflow --grpc_keepalive_time=120s
 build:rbe-engflow --grpc_keepalive_timeout=30s
 build:rbe-engflow --remote_timeout=3600s
 build:rbe-engflow --bes_timeout=3600s
@@ -532,7 +532,7 @@ common:common-envoy-engflow --grpc_keepalive_time=60s
 common:common-envoy-engflow --grpc_keepalive_timeout=30s
 
 common:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
-common:cache-envoy-engflow --remote_timeout=3600s
+common:cache-envoy-engflow --remote_timeout=7200s
 # common:cache-envoy-engflow --remote_instance_name=llvm-18
 common:bes-envoy-engflow --bes_backend=grpcs://mordenite.cluster.engflow.com/
 common:bes-envoy-engflow --bes_results_url=https://mordenite.cluster.engflow.com/invocation/
@@ -544,6 +544,9 @@ common:rbe-envoy-engflow --remote_default_exec_properties=container-image=docker
 # gcr.io/envoy-ci/envoy-build@sha256:cd3e44f040477c1cc27b0b464614a477b98c8210b6624cfeb926a5d69e4cc6f6
 common:rbe-envoy-engflow --jobs=200
 common:rbe-envoy-engflow --define=engflow_rbe=true
+
+build:rbe-envoy-engflow --copt=-gsplit-dwarf
+build:rbe-envoy-engflow --linkopt=-Wl,-S
 
 common:remote-envoy-engflow --config=common-envoy-engflow
 common:remote-envoy-engflow --config=cache-envoy-engflow
