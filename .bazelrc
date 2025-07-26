@@ -75,8 +75,9 @@ build:linux --copt=-fdebug-types-section
 build:linux --copt=-fPIC
 build:linux --cxxopt=-fsized-deallocation --host_cxxopt=-fsized-deallocation
 build:linux --conlyopt=-fexceptions
-build:linux --fission=dbg,opt
-build:linux --features=per_object_debug_info
+# build:linux --fission=dbg,opt
+build:linux --fission=dbg
+# build:linux --features=per_object_debug_info
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 
@@ -559,6 +560,7 @@ build:opt --copt=-ffunction-sections
 build:opt --copt=-fdata-sections
 build:opt --linkopt=-Wl,--gc-sections
 
+build:dbg --features=per_object_debug_info
 build:dbg --copt=-g
 build:dbg --copt=-gsplit-dwarf
 
