@@ -1251,12 +1251,12 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Unicode routines (UTF8, UTF16, UTF32) and Base64: billions of characters per second using SSE2, AVX2, NEON, AVX-512, RISC-V Vector Extension, LoongArch64, POWER. Part of Node.js, WebKit/Safari, Ladybird, Chromium, Cloudflare Workers and Bun.",
         project_url = "https://github.com/simdutf/simdutf",
         # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "7.3.0",
-        sha256 = "512374f8291d3daf102ccd0ad223b1a8318358f7c1295efd4d9a3abbb8e4b6ff",
+        version = "7.3.3",
+        sha256 = "ebe033a48a3ea4a46205710f3dfdc98587dae3f9937d00d509773798b8243e60",
         urls = ["https://github.com/simdutf/simdutf/releases/download/v{version}/singleheader.zip"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2025-05-28",
+        release_date = "2025-07-13",
         cpe = "N/A",
     ),
     intel_ittapi = dict(
