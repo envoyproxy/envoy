@@ -27,9 +27,13 @@ public:
   virtual bool spawnUpstreamSpan() const PURE;
 
   /**
-   * @return custom tags to be attached to the active span.
+   * @return modify the span. For example, set custom tags from configuration or
+   * make other modifications.
+   * This method MUST be called at most ONLY once per span before the span is
+   * finished.
+   * @param span the span to modify.
    */
-  virtual void setCustomTags(Span& span) const PURE;
+  virtual void modifySpan(Span& span) const PURE;
 
   /**
    * @return true if spans should be annotated with more detailed information.

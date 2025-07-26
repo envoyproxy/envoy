@@ -115,7 +115,7 @@ protected:
       }
     }
 
-    EXPECT_CALL(config, setCustomTags(_)).WillOnce(Invoke([this](Span& span) {
+    EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
       const CustomTagContext ctx{trace_context, stream_info};
       for (const auto& [_, custom_tag] : custom_tags) {
         custom_tag->applySpan(span, ctx);
@@ -252,7 +252,7 @@ TEST(EgressConfigImplTest, EgressConfigImplTest) {
   EXPECT_EQ(false, config_impl.verbose());
   EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config_impl.maxPathTagLength());
   NiceMock<MockSpan> span;
-  config_impl.setCustomTags(span);
+  config_impl.modifySpan(span);
 }
 
 TEST(NullTracerTest, BasicFunctionality) {

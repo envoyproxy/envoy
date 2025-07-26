@@ -2016,7 +2016,7 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_tracing_config_->operation_name_;
 }
 
-void ConnectionManagerImpl::ActiveStream::setCustomTags(Tracing::Span& span) const {
+void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const {
   ASSERT(connection_manager_tracing_config_.has_value());
 
   const Tracing::HttpTraceContext trace_context(*request_headers_);

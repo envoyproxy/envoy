@@ -67,7 +67,7 @@ protected:
       }
     }
 
-    EXPECT_CALL(config, setCustomTags(_)).WillOnce(Invoke([this](Span& span) {
+    EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
       HttpTraceContext trace_context{request_headers_};
       const CustomTagContext ctx{trace_context, stream_info};
       for (const auto& [_, custom_tag] : custom_tags_) {

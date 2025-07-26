@@ -50,7 +50,7 @@ class EgressConfigImpl : public Config {
 public:
   // Tracing::Config
   Tracing::OperationName operationName() const override { return Tracing::OperationName::Egress; }
-  void setCustomTags(Tracing::Span&) const override {}
+  void modifySpan(Tracing::Span&) const override {}
   bool verbose() const override { return false; }
   uint32_t maxPathTagLength() const override { return Tracing::DefaultMaxPathTagLength; }
   // This EgressConfigImpl is only used for async client tracing. Return false here is OK.

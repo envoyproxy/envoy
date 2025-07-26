@@ -256,7 +256,7 @@ void HttpTracerUtility::setCommonTags(Span& span, const StreamInfo::StreamInfo& 
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
 
-  tracing_config.setCustomTags(span);
+  tracing_config.modifySpan(span);
 }
 
 } // namespace Tracing
