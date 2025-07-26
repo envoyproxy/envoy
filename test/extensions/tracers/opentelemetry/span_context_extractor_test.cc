@@ -30,7 +30,7 @@ TEST(SpanContextExtractorTest, ExtractSpanContext) {
 
   EXPECT_OK(span_context);
   EXPECT_EQ(span_context->traceId(), trace_id);
-  EXPECT_EQ(span_context->parentId(), parent_id);
+  EXPECT_EQ(span_context->spanId(), parent_id);
   EXPECT_EQ(span_context->version(), version);
   EXPECT_TRUE(span_context->sampled());
 }
@@ -45,7 +45,7 @@ TEST(SpanContextExtractorTest, ExtractSpanContextNotSampled) {
 
   EXPECT_OK(span_context);
   EXPECT_EQ(span_context->traceId(), trace_id);
-  EXPECT_EQ(span_context->parentId(), parent_id);
+  EXPECT_EQ(span_context->spanId(), parent_id);
   EXPECT_EQ(span_context->version(), version);
   EXPECT_FALSE(span_context->sampled());
 }

@@ -49,7 +49,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  std::vector<MatcherConstSharedPtr> matchers_;
+  std::vector<MatcherConstPtr> matchers_;
 };
 
 /**
@@ -75,7 +75,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  std::vector<MatcherConstSharedPtr> matchers_;
+  std::vector<MatcherConstPtr> matchers_;
 };
 
 class NotMatcher : public Matcher {
@@ -92,7 +92,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  MatcherConstSharedPtr matcher_;
+  MatcherConstPtr matcher_;
 };
 
 /**

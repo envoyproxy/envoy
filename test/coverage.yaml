@@ -11,6 +11,8 @@ directories:
   source/common/crypto: 95.5
   source/common/event: 98.3  # Emulated edge events guards don't report LCOV
   source/common/filesystem/posix: 96.4  # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
+  source/common/http: 96.5
+  source/common/http/http1: 93.4  # To be removed when http_inspector_use_balsa_parser is retired.
   source/common/http/http2: 96.6
   source/common/json: 95.2
   source/common/matcher: 95.0

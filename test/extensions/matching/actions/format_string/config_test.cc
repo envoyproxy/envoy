@@ -23,10 +23,8 @@ TEST(ConfigTest, TestConfig) {
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
   ActionFactory factory;
-  auto action_cb = factory.createActionFactoryCb(config, factory_context,
-                                                 ProtobufMessage::getStrictValidationVisitor());
-  ASSERT_NE(nullptr, action_cb);
-  auto action = action_cb();
+  auto action =
+      factory.createAction(config, factory_context, ProtobufMessage::getStrictValidationVisitor());
   ASSERT_NE(nullptr, action);
   const auto& typed_action = action->getTyped<Server::Configuration::FilterChainBaseAction>();
 
