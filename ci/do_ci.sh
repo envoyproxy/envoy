@@ -764,6 +764,12 @@ case $CI_TARGET in
         echo "  release options:  ${BAZEL_RELEASE_OPTIONS[*]}"
         echo "  binary dir:  ${ENVOY_BINARY_DIR}"
 
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_outputs=toplevel \
+              -c opt //source/exe:envoy-static
+        exit 0
+
         # Build release binaries
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_RELEASE_OPTIONS[@]}" \
