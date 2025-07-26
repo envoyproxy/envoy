@@ -187,11 +187,8 @@ public:
                 ProtobufMessage::ValidationVisitor& validation_visitor,
                 Server::Configuration::CommonFactoryContext& context)
       : permissions_(policy.permissions(), validation_visitor, context),
-        principals_(policy.principals(), context), condition_(policy.condition()) {
-    if (policy.has_condition()) {
-      expr_ = Expr::createExpression(*builder, condition_);
-    }
-  }
+        principals_(policy.principals(), context),
+        expr_wrapper_(ExprWrapper::maybeCreate(policy, builder)) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -199,8 +196,32 @@ public:
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
-  const google::api::expr::v1alpha1::Expr condition_;
-  Expr::ExpressionPtr expr_;
+
+  // A wrapper that encapsulates the CEL expression and its condition.
+  class ExprWrapper {
+  public:
+    static std::unique_ptr<ExprWrapper> maybeCreate(const envoy::config::rbac::v3::Policy& policy,
+                                                    Expr::Builder* builder) {
+      if (!policy.has_condition()) {
+        return nullptr;
+      }
+      return std::unique_ptr<ExprWrapper>(new ExprWrapper(policy.condition(), builder));
+    }
+
+    bool matches(const Envoy::Http::RequestHeaderMap& headers,
+                 const StreamInfo::StreamInfo& info) const {
+      return Expr::matches(*expr_, info, headers);
+    }
+
+  private:
+    ExprWrapper(const google::api::expr::v1alpha1::Expr& condition, Expr::Builder* builder)
+        : condition_(condition), expr_(Expr::createExpression(*builder, condition_)) {}
+
+    const google::api::expr::v1alpha1::Expr condition_;
+    Expr::ExpressionPtr expr_;
+  };
+
+  std::unique_ptr<ExprWrapper> expr_wrapper_;
 };
 
 class MetadataMatcher : public Matcher {
