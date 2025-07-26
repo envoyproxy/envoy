@@ -5,7 +5,7 @@ ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
 FROM scratch AS binary
-COPY ci/docker-entrypoint.sh /
+COPY distribution/docker/docker-entrypoint.sh /
 ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 # See https://github.com/docker/buildx/issues/510 for why this _must_ be this way
 ARG TARGETPLATFORM
