@@ -64,16 +64,16 @@ _test () {
 
     if [[ "$DOCKER_CI_TEST_COMMIT" ]]; then
         echo "COMMIT(${name}): > ${testdata}"
-        echo "  ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
-        ./ci/docker_ci.sh | grep -E "^>" > "$testdata"
+        echo "  ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./distribution/docker/docker_ci.sh | grep -E \"^>\""
+        ./distribution/docker/docker_ci.sh | grep -E "^>" > "$testdata"
         return
     fi
 
     echo "TEST(${name}): <> ${testdata}"
-    echo "  ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./ci/docker_ci.sh | grep -E \"^>\""
+    echo "  ENVOY_VERSION=${version} ENVOY_DOCKER_IMAGE_DIRECTORY=/non/existent/test/path CI_BRANCH=${branch} DOCKER_CI_DRYRUN=1 ./distribution/docker/docker_ci.sh | grep -E \"^>\""
     generated="$(mktemp)"
 
-    ./ci/docker_ci.sh | grep -E "^>" > "$generated"
+    ./distribution/docker/docker_ci.sh | grep -E "^>" > "$generated"
 
     cmp --silent "$testdata" "$generated" || {
         echo "files are different" >&2
