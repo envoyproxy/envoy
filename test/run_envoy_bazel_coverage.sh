@@ -113,7 +113,7 @@ else
     cp bazel-out/_coverage/_coverage_report.dat "${COVERAGE_DATA}"
 fi
 
-COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}/html" "${COVERAGE_DATA}" | tee /dev/stderr | grep lines... | cut -d ' ' -f 4)"
+COVERAGE_VALUE="$(genhtml --prefix "${PWD}" --output "${COVERAGE_DIR}/html" "${COVERAGE_DATA}" | tee >(cat >&2) | grep lines... | cut -d ' ' -f 4)"
 COVERAGE_VALUE=${COVERAGE_VALUE%?}
 
 echo "Compressing coveraged data"
