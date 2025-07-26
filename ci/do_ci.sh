@@ -596,7 +596,7 @@ case $CI_TARGET in
             # then load to Docker (ie local build)
             export DOCKER_LOAD_IMAGES=1
         fi
-        "${ENVOY_SRCDIR}/ci/docker_ci.sh"
+        "${ENVOY_SRCDIR}/distribution/docker/docker_ci.sh"
         ;;
 
     dockerhub-publish)
