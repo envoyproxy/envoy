@@ -20,19 +20,7 @@ CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
                            const cel::expr::Expr& input_expr, absl::optional<size_t>& max_length)
     : local_info_(local_info), expr_builder_(expr_builder), parsed_expr_(input_expr),
       max_length_(max_length) {
-  // Create source info for the new API
-  cel::expr::SourceInfo source_info;
-
-  // Create warnings vector for the new API
-  std::vector<absl::Status> warnings;
-
-  auto cel_expression_status =
-      expr_builder_->builder().CreateExpression(&parsed_expr_, &source_info, &warnings);
-  if (!cel_expression_status.ok()) {
-    throw EnvoyException("Failed to compile CEL expression: " +
-                         cel_expression_status.status().ToString());
-  }
-  compiled_expr_ = std::move(cel_expression_status.value());
+  compiled_expr_ = Expr::createExpression(expr_builder_->builder(), parsed_expr_);
 }
 
 absl::optional<std::string>

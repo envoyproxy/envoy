@@ -33,12 +33,12 @@ CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
       throw EnvoyException("Failed to serialize legacy expression");
     }
 
-    cel::expr::Expr new_expr;
-    if (!new_expr.ParseFromString(serialized_expr)) {
+    converted_expr_ = cel::expr::Expr();
+    if (!converted_expr_->ParseFromString(serialized_expr)) {
       throw EnvoyException("Failed to convert legacy expression to new format");
     }
 
-    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), new_expr);
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), *converted_expr_);
     return;
   }
   case CelExpression::ExprSpecifierCase::kCheckedExpr: {
@@ -51,12 +51,12 @@ CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
       throw EnvoyException("Failed to serialize legacy expression");
     }
 
-    cel::expr::Expr new_expr;
-    if (!new_expr.ParseFromString(serialized_expr)) {
+    converted_expr_ = cel::expr::Expr();
+    if (!converted_expr_->ParseFromString(serialized_expr)) {
       throw EnvoyException("Failed to convert legacy expression to new format");
     }
 
-    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), new_expr);
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), *converted_expr_);
     return;
   }
   case CelExpression::ExprSpecifierCase::EXPR_SPECIFIER_NOT_SET:

@@ -489,7 +489,7 @@ TEST_F(CelMatcherTest, FormatConversionV1AlphaToDevCel) {
   const auto result = matcher_tree->match(data_);
   // The match was complete, match found since user is "staging"
   EXPECT_TRUE(result.isMatch());
-  EXPECT_NE(result.actionFactory(), nullptr);
+  EXPECT_NE(result.action(), nullptr);
 }
 
 // Test that we can parse and evaluate expressions in dev.cel format
@@ -505,7 +505,7 @@ TEST_F(CelMatcherTest, DevCelExpressionFormat) {
   const auto result = matcher_tree->match(data_);
   // The match was complete, match found
   EXPECT_TRUE(result.isMatch());
-  EXPECT_NE(result.actionFactory(), nullptr);
+  EXPECT_NE(result.action(), nullptr);
 }
 
 // Test with different types of expressions and formats
@@ -520,7 +520,7 @@ TEST_F(CelMatcherTest, MixedFormatExpressions) {
 
   const auto result1 = matcher_tree1->match(data_);
   EXPECT_TRUE(result1.isMatch());
-  EXPECT_NE(result1.actionFactory(), nullptr);
+  EXPECT_NE(result1.action(), nullptr);
 }
 
 } // namespace CelMatcher

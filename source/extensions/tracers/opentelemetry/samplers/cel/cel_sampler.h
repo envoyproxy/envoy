@@ -33,11 +33,13 @@ public:
                               OTelSpanKind spankind,
                               OptRef<const Tracing::TraceContext> trace_context,
                               const std::vector<SpanContext>& links) override;
-  std::string getDescription() const override;
+
+  std::string getDescription() const override { return "CELSampler"; }
 
 private:
   const ::Envoy::LocalInfo::LocalInfo& local_info_;
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
+  const cel::expr::Expr parsed_expr_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
 };
 

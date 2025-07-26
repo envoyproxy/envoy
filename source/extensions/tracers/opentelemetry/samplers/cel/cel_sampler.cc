@@ -14,8 +14,8 @@ namespace OpenTelemetry {
 
 CELSampler::CELSampler(const ::Envoy::LocalInfo::LocalInfo& local_info,
                        Expr::BuilderInstanceSharedPtr builder, const cel::expr::Expr& expr)
-    : local_info_(local_info), builder_(builder) {
-  compiled_expr_ = Expr::createExpression(builder_->builder(), expr);
+    : local_info_(local_info), builder_(builder), parsed_expr_(expr) {
+  compiled_expr_ = Expr::createExpression(builder_->builder(), parsed_expr_);
 }
 
 SamplingResult CELSampler::shouldSample(const StreamInfo::StreamInfo& stream_info,
@@ -52,8 +52,6 @@ SamplingResult CELSampler::shouldSample(const StreamInfo::StreamInfo& stream_inf
   }
   return result;
 }
-
-std::string CELSampler::getDescription() const { return "CELSampler"; }
 
 } // namespace OpenTelemetry
 } // namespace Tracers
