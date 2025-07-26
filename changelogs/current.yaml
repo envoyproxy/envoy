@@ -46,6 +46,9 @@ new_features:
     This allows Lua scripts to retrieve string, boolean, and numeric values stored by various filters for use in routing decisions,
     header modifications, and other processing logic. See :ref:`Filter State API <config_http_filters_lua_stream_info_filter_state_wrapper>`
     for more details.
+- area: socket
+  change: |
+    Added ``network_namespace_filepath`` to ``SocketAddress``.
 - area: ratelimit
   change: |
     Add the :ref:`rate_limits

@@ -220,8 +220,8 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   }
   StatusOr<sockaddr_in> sa4 = parseV4Address(ip_str, port64);
   if (sa4.ok()) {
-    return instanceOrNull(
-        Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(&sa4.value()));
+    return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
+        &sa4.value(), nullptr, network_namespace));
   }
   return nullptr;
 }
