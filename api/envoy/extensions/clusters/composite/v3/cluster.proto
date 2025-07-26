@@ -54,11 +54,17 @@ message ClusterConfig {
 
     // Defines how to select the next cluster for retry attempts.
     enum ClusterSelectionMethod {
-      // Default selection.
+      // Sequential cluster selection based on retry attempts.
       //
-      // Envoy progress through clusters in the order they are defined.
-      // First retry uses second cluster, second retry uses third
-      // cluster, etc.
+      // The initial request is sent to the first cluster in the list.
+      // If that request fails and triggers a retry (based on retry policy),
+      // the first retry attempt uses the second cluster, the second retry
+      // attempt uses the third cluster, and so on.
+      //
+      // This progression is based on retry state. Each cluster is used
+      // independently. If the first cluster has healthy endpoints, it will
+      // still be used for the initial request. The second cluster is only
+      // selected when a retry is triggered.
       DEFAULT = 0;
     }
 
@@ -87,7 +93,7 @@ message ClusterConfig {
   repeated SubCluster sub_clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 
   // Mode-specific configuration. The operational mode is determined by which
-  // configuration is provided (e.g., ``retry_config`` for RETRY mode).
+  // configuration is provided (e.g., ``retry_config`` for ``RETRY`` mode).
   oneof mode_config {
     // Configuration specific to ``RETRY`` mode.
     // Required when mode is ``RETRY``.
