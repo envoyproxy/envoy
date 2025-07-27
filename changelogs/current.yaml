@@ -64,5 +64,11 @@ new_features:
 - area: dns_filter, redis_proxy and prefix_matcher_map
   change: |
     Switch to using Radix Tree instead of Trie for performance improvements.
+- area: cluster
+  change: |
+    Added ``CompositeCluster`` extension that provides flexible sub-cluster selection strategies. This cluster type
+    supports configurable selection strategies (currently ``SEQUENTIAL``), multiple overflow handling options (``FAIL``,
+    ``USE_LAST_CLUSTER``, ``ROUND_ROBIN``), and extensible cluster configuration for future enhancements. See
+    :ref:`composite cluster docs <arch_overview_composite_cluster>` for more details.
 
 deprecated:
