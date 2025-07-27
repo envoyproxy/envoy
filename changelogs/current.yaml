@@ -64,5 +64,11 @@ new_features:
 - area: dns_filter, redis_proxy and prefix_matcher_map
   change: |
     Switch to using Radix Tree instead of Trie for performance improvements.
+- area: header_to_metadata
+  change: |
+    Added optional statistics collection for the Header-To-Metadata filter. When the :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.stat_prefix>` field is configured,
+    the filter emits detailed counters for rule processing, metadata operations, etc. See
+    :ref:`Header-To-Metadata filter statistics <config_http_filters_header_to_metadata>` for details.
 
 deprecated:
