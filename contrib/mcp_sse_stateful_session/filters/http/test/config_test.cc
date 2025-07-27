@@ -46,7 +46,8 @@ mcp_sse_stateful_session: {}
 
 TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   testing::NiceMock<Envoy::Http::MockSessionStateFactoryConfig> config_factory;
-  Registry::InjectFactory<Http::McpSseSessionState::McpSseSessionStateFactoryConfig> registration(config_factory);
+  Registry::InjectFactory<Http::McpSseSessionState::McpSseSessionStateFactoryConfig> registration(
+      config_factory);
 
   ProtoConfig proto_config;
   PerRouteProtoConfig proto_route_config;
@@ -80,13 +81,13 @@ TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
                   .createRouteSpecificFilterConfig(disabled_config, server_context,
                                                    context.messageValidationVisitor())
                   .ok());
-  EXPECT_THROW_WITH_MESSAGE(
-      factory
-          .createRouteSpecificFilterConfig(not_exist_config, server_context,
-                                           context.messageValidationVisitor())
-          .value(),
-      EnvoyException,
-      "Didn't find a registered implementation for name: 'envoy.http.mcp_sse_stateful_session.not_exist'");
+  EXPECT_THROW_WITH_MESSAGE(factory
+                                .createRouteSpecificFilterConfig(not_exist_config, server_context,
+                                                                 context.messageValidationVisitor())
+                                .value(),
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: "
+                            "'envoy.http.mcp_sse_stateful_session.not_exist'");
 
   EXPECT_NO_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context)
                       .status()

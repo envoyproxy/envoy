@@ -13,8 +13,8 @@ envoy_cc_test(
     srcs = ["envelope_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/http:utility_lib",
         "//contrib/mcp_sse_stateful_session/http/source:envelope_lib",
+        "//source/common/http:utility_lib",
         "//test/mocks/upstream:host_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -25,8 +25,8 @@ envoy_cc_test(
     srcs = ["config_test.cc"],
     rbe_pool = "6gig",
     deps = [
-        "//envoy/registry",
         "//contrib/mcp_sse_stateful_session/http/source:config",
+        "//envoy/registry",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
     ],

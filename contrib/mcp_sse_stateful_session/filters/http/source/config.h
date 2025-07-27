@@ -13,9 +13,11 @@ namespace McpSseStatefulSession {
 /**
  * Config registration for the stateful session filter. @see NamedHttpFilterConfigFactory.
  */
-class McpSseStatefulSessionFactoryConfig : public Common::FactoryBase<ProtoConfig, PerRouteProtoConfig> {
+class McpSseStatefulSessionFactoryConfig
+    : public Common::FactoryBase<ProtoConfig, PerRouteProtoConfig> {
 public:
-  McpSseStatefulSessionFactoryConfig() : FactoryBase("envoy.filters.http.mcp_sse_stateful_session") {}
+  McpSseStatefulSessionFactoryConfig()
+      : FactoryBase("envoy.filters.http.mcp_sse_stateful_session") {}
 
 private:
   Envoy::Http::FilterFactoryCb

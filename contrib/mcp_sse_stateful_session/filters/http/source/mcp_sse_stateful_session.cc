@@ -16,24 +16,24 @@ namespace {
 
 class EmptySessionStateFactory : public Http::McpSseSessionState::McpSseSessionStateFactory {
 public:
-  Http::McpSseSessionState::McpSseSessionStatePtr create(Envoy::Http::RequestHeaderMap&) const override {
+  Http::McpSseSessionState::McpSseSessionStatePtr
+  create(Envoy::Http::RequestHeaderMap&) const override {
     return nullptr;
   }
 };
 
 } // namespace
 
-McpSseStatefulSessionConfig::McpSseStatefulSessionConfig(const ProtoConfig& config,
-                                             Server::Configuration::GenericFactoryContext& context)
+McpSseStatefulSessionConfig::McpSseStatefulSessionConfig(
+    const ProtoConfig& config, Server::Configuration::GenericFactoryContext& context)
     : strict_(config.strict()) {
   if (!config.has_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
     return;
   }
 
-  auto& factory =
-      Envoy::Config::Utility::getAndCheckFactoryByName<Http::McpSseSessionState::McpSseSessionStateFactoryConfig>(
-          config.session_state().name());
+  auto& factory = Envoy::Config::Utility::getAndCheckFactoryByName<
+      Http::McpSseSessionState::McpSseSessionStateFactoryConfig>(config.session_state().name());
 
   auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.session_state().typed_config(), context.messageValidationVisitor(), factory);
@@ -47,13 +47,16 @@ PerRouteMcpSseStatefulSession::PerRouteMcpSseStatefulSession(
     disabled_ = true;
     return;
   }
-  config_ = std::make_shared<McpSseStatefulSessionConfig>(config.mcp_sse_stateful_session(), context);
+  config_ =
+      std::make_shared<McpSseStatefulSessionConfig>(config.mcp_sse_stateful_session(), context);
 }
 
-Envoy::Http::FilterHeadersStatus McpSseStatefulSession::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
+Envoy::Http::FilterHeadersStatus
+McpSseStatefulSession::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
   const McpSseStatefulSessionConfig* config = config_.get();
-  auto route_config = Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteMcpSseStatefulSession>(
-      decoder_callbacks_);
+  auto route_config =
+      Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteMcpSseStatefulSession>(
+          decoder_callbacks_);
 
   if (route_config != nullptr) {
     if (route_config->disabled()) {
@@ -73,7 +76,8 @@ Envoy::Http::FilterHeadersStatus McpSseStatefulSession::decodeHeaders(Envoy::Htt
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
-Envoy::Http::FilterHeadersStatus McpSseStatefulSession::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, bool) {
+Envoy::Http::FilterHeadersStatus
+McpSseStatefulSession::encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, bool) {
   if (session_state_ == nullptr) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
@@ -89,7 +93,8 @@ Envoy::Http::FilterHeadersStatus McpSseStatefulSession::encodeHeaders(Envoy::Htt
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
 
-Envoy::Http::FilterDataStatus McpSseStatefulSession::encodeData(Buffer::Instance& data, bool end_stream) {
+Envoy::Http::FilterDataStatus McpSseStatefulSession::encodeData(Buffer::Instance& data,
+                                                                bool end_stream) {
   if (session_state_ == nullptr) {
     return Envoy::Http::FilterDataStatus::Continue;
   }

@@ -22,16 +22,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace McpSseStatefulSession {
 
-using ProtoConfig = envoy::extensions::filters::http::mcp_sse_stateful_session::v3alpha::McpSseStatefulSession;
-using PerRouteProtoConfig =
-    envoy::extensions::filters::http::mcp_sse_stateful_session::v3alpha::McpSseStatefulSessionPerRoute;
+using ProtoConfig =
+    envoy::extensions::filters::http::mcp_sse_stateful_session::v3alpha::McpSseStatefulSession;
+using PerRouteProtoConfig = envoy::extensions::filters::http::mcp_sse_stateful_session::v3alpha::
+    McpSseStatefulSessionPerRoute;
 
 class McpSseStatefulSessionConfig {
 public:
   McpSseStatefulSessionConfig(const ProtoConfig& config,
-                        Server::Configuration::GenericFactoryContext& context);
+                              Server::Configuration::GenericFactoryContext& context);
 
-  Http::McpSseSessionState::McpSseSessionStatePtr createSessionState(Envoy::Http::RequestHeaderMap& headers) const {
+  Http::McpSseSessionState::McpSseSessionStatePtr
+  createSessionState(Envoy::Http::RequestHeaderMap& headers) const {
     ASSERT(factory_ != nullptr);
     return factory_->create(headers);
   }
@@ -47,7 +49,7 @@ using McpSseStatefulSessionConfigSharedPtr = std::shared_ptr<McpSseStatefulSessi
 class PerRouteMcpSseStatefulSession : public Router::RouteSpecificFilterConfig {
 public:
   PerRouteMcpSseStatefulSession(const PerRouteProtoConfig& config,
-                          Server::Configuration::GenericFactoryContext& context);
+                                Server::Configuration::GenericFactoryContext& context);
 
   bool disabled() const { return disabled_; }
   McpSseStatefulSessionConfig* statefuleSessionConfig() const { return config_.get(); }
@@ -59,22 +61,24 @@ private:
 using PerRouteMcpSseStatefulSessionConfigSharedPtr = std::shared_ptr<PerRouteMcpSseStatefulSession>;
 
 class McpSseStatefulSession : public Envoy::Http::PassThroughFilter,
-                        public Logger::Loggable<Logger::Id::filter> {
+                              public Logger::Loggable<Logger::Id::filter> {
 public:
   McpSseStatefulSession(McpSseStatefulSessionConfigSharedPtr config) : config_(std::move(config)) {}
 
   // Http::StreamDecoderFilter
-  Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) override;
+  Envoy::Http::FilterHeadersStatus decodeHeaders(Envoy::Http::RequestHeaderMap& headers,
+                                                 bool) override;
 
   // Http::StreamEncoderFilter
-  Envoy::Http::FilterHeadersStatus encodeHeaders(Envoy::Http::ResponseHeaderMap& headers, bool) override;
+  Envoy::Http::FilterHeadersStatus encodeHeaders(Envoy::Http::ResponseHeaderMap& headers,
+                                                 bool) override;
 
   Envoy::Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
 
   Http::McpSseSessionState::McpSseSessionStatePtr& sessionStateForTest() { return session_state_; }
 
 private:
-Http::McpSseSessionState::McpSseSessionStatePtr session_state_;
+  Http::McpSseSessionState::McpSseSessionStatePtr session_state_;
   McpSseStatefulSessionConfigSharedPtr config_;
 };
 

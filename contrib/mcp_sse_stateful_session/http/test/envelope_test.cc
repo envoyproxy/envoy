@@ -192,7 +192,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestSse) {
 
     // Case 4: Session value with valid separator and encoded host
     const std::string host = "1.2.3.4:80";
-    const std::string encoded_host = Envoy::Base64Url::encode(host.data(), host.size()); 
+    const std::string encoded_host = Envoy::Base64Url::encode(host.data(), host.size());
     const std::string session_value = raw_session_id + SEPARATOR + encoded_host;
 
     Envoy::Http::TestRequestHeaderMapImpl request_headers4{

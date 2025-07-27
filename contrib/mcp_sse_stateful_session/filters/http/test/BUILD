@@ -14,10 +14,10 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//contrib/mcp_sse_stateful_session/filters/http/source:config",
+        "//contrib/mcp_sse_stateful_session/filters/http/test/mocks:mcp_sse_stateful_session_mock",
         "//source/server:generic_factory_context_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
-        "//contrib/mcp_sse_stateful_session/filters/http/test/mocks:mcp_sse_stateful_session_mock",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
@@ -32,11 +32,11 @@ envoy_cc_test(
     ],
     rbe_pool = "6gig",
     deps = [
-        "//source/common/protobuf",
         "//contrib/mcp_sse_stateful_session/filters/http/source:config",
         "//contrib/mcp_sse_stateful_session/http/source:config",
+        "//source/common/protobuf",
         "//test/integration:http_integration_lib",
-        "//test/test_common:utility_lib",
+        "//test/test_common:utility_lib",        
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )

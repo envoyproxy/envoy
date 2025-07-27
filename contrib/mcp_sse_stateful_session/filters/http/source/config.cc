@@ -17,7 +17,8 @@ Envoy::Http::FilterFactoryCb McpSseStatefulSessionFactoryConfig::createFilterFac
 
   auto filter_config(std::make_shared<McpSseStatefulSessionConfig>(proto_config, context));
   return [filter_config](Envoy::Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(Envoy::Http::StreamFilterSharedPtr{new McpSseStatefulSession(filter_config)});
+    callbacks.addStreamFilter(
+        Envoy::Http::StreamFilterSharedPtr{new McpSseStatefulSession(filter_config)});
   };
 }
 
@@ -30,7 +31,8 @@ McpSseStatefulSessionFactoryConfig::createRouteSpecificFilterConfigTyped(
   return std::make_shared<PerRouteMcpSseStatefulSession>(proto_config, generic_context);
 }
 
-REGISTER_FACTORY(McpSseStatefulSessionFactoryConfig, Server::Configuration::NamedHttpFilterConfigFactory);
+REGISTER_FACTORY(McpSseStatefulSessionFactoryConfig,
+                 Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace McpSseStatefulSession
 } // namespace HttpFilters

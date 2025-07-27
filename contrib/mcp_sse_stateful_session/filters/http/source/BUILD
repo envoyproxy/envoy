@@ -14,6 +14,7 @@ envoy_cc_library(
     srcs = ["mcp_sse_stateful_session.cc"],
     hdrs = ["mcp_sse_stateful_session.h"],
     deps = [
+        "//contrib/mcp_sse_stateful_session/http/source:mcp_sse_stateful_session_interface",
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/upstream:load_balancer_interface",
@@ -25,7 +26,6 @@ envoy_cc_library(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/server:generic_factory_context_lib",
-        "//contrib/mcp_sse_stateful_session/http/source:mcp_sse_stateful_session_interface",
         "@envoy_api//contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha:pkg_cc_proto",
     ],
 )
@@ -35,12 +35,12 @@ envoy_cc_contrib_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        "//contrib/mcp_sse_stateful_session/filters/http/source:mcp_sse_stateful_session_lib",
+        "//contrib/mcp_sse_stateful_session/http/source:mcp_sse_stateful_session_interface",
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "//contrib/mcp_sse_stateful_session/filters/http/source:mcp_sse_stateful_session_lib",
         "//source/server:generic_factory_context_lib",
-        "//contrib/mcp_sse_stateful_session/http/source:mcp_sse_stateful_session_interface",
         "@envoy_api//contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha:pkg_cc_proto",
     ],
 )

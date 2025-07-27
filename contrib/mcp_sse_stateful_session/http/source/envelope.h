@@ -22,7 +22,7 @@ using EnvelopeSessionStateProto =
     envoy::extensions::http::mcp_sse_stateful_session::envelope::v3alpha::EnvelopeSessionState;
 
 class EnvelopeSessionStateFactory : public McpSseSessionStateFactory,
-                                      public Logger::Loggable<Logger::Id::http> {
+                                    public Logger::Loggable<Logger::Id::http> {
   friend class SessionStateImpl;
 
 public:
