@@ -11,7 +11,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/http/async_client.h"
-#include "envoy/grpc/async_client.h"
 #include "envoy/tracing/tracer.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -24,7 +23,6 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_address.h"
-#include "source/extensions/bootstrap/reverse_tunnel/grpc_reverse_tunnel_client.h"
 
 #include "google/protobuf/empty.pb.h"
 
@@ -102,100 +100,18 @@ RCConnectionWrapper::RCConnectionWrapper(ReverseConnectionIOHandle& parent, Netw
                                         const std::string& cluster_name)
     : parent_(parent), connection_(std::move(connection)), host_(std::move(host)),
       cluster_name_(cluster_name) {
-
-  reverse_tunnel_client_ = nullptr;
-  const auto* grpc_config = parent.getGrpcConfig();
-  if (grpc_config != nullptr) {
-    ENVOY_LOG(debug, "RCConnectionWrapper: gRPC config available, creating gRPC client");
-    reverse_tunnel_client_ = std::make_unique<ReverseConnection::GrpcReverseTunnelClient>(
-        parent.getClusterManager(), cluster_name_, *grpc_config, *this);
-  } else {
-    ENVOY_LOG(debug, "RCConnectionWrapper: gRPC config not available, using HTTP fallback");
-  }
+  ENVOY_LOG(debug, "RCConnectionWrapper: Using HTTP handshake for reverse connections");
 }
 
 // RCConnectionWrapper destructor implementation
 RCConnectionWrapper::~RCConnectionWrapper() {
-  ENVOY_LOG(debug, "DEFENSIVE CLEANUP: Starting safe RCConnectionWrapper destruction");
-  
-  // Use atomic flag to prevent recursive destruction
-  static thread_local std::atomic<bool> destruction_in_progress{false};
-  bool expected = false;
-  if (!destruction_in_progress.compare_exchange_strong(expected, true)) {
-    ENVOY_LOG(debug, "DEFENSIVE CLEANUP: Wrapper destruction already in progress, skipping");
-    return;
-  }
-  
-  // RAII guard to ensure flag is reset
-  struct DestructionGuard {
-    std::atomic<bool>& flag;
-    DestructionGuard(std::atomic<bool>& f) : flag(f) {}
-    ~DestructionGuard() { flag = false; }
-  } guard(destruction_in_progress);
-  
-  try {
-    // STEP 1: Cancel gRPC client first to prevent callback access
-    if (reverse_tunnel_client_) {
-      try {
-        reverse_tunnel_client_->cancel();
-        reverse_tunnel_client_.reset();
-        ENVOY_LOG(debug, "DEFENSIVE CLEANUP: gRPC client safely canceled");
-      } catch (const std::exception& e) {
-        ENVOY_LOG(debug, "DEFENSIVE CLEANUP: gRPC client cleanup exception: {}", e.what());
-      } catch (...) {
-        ENVOY_LOG(debug, "DEFENSIVE CLEANUP: Unknown gRPC client cleanup exception");
-      }
-    }
-
-    // STEP 2: Safely remove connection callbacks
-    if (connection_) {
-      try {
-        // Check if connection is still valid before accessing
-        auto state = connection_->state();
-        
-        // Only remove callbacks if connection is in valid state
-        if (state != Network::Connection::State::Closed) {
-          connection_->removeConnectionCallbacks(*this);
-          ENVOY_LOG(debug, "DEFENSIVE CLEANUP: Connection callbacks safely removed");
-        }
-        
-        // Don't call close() here - let Envoy's cleanup handle it
-        // This prevents double-close and access after free issues
-        connection_.reset();
-        
-      } catch (const std::exception& e) {
-        ENVOY_LOG(debug, "DEFENSIVE CLEANUP: Connection cleanup exception: {}", e.what());
-        // Still try to reset the connection pointer to prevent further access
-        try {
-          connection_.reset();
-        } catch (...) {
-          ENVOY_LOG(debug, "DEFENSIVE CLEANUP: Connection reset failed");
-        }
-      } catch (...) {
-        ENVOY_LOG(debug, "DEFENSIVE CLEANUP: Unknown connection cleanup exception");
-        try {
-          connection_.reset();
-        } catch (...) {
-          ENVOY_LOG(debug, "DEFENSIVE CLEANUP: Connection reset failed");
-        }
-      }
-    }
-    
-    ENVOY_LOG(debug, "DEFENSIVE CLEANUP: RCConnectionWrapper destruction completed safely");
-    
-  } catch (const std::exception& e) {
-    ENVOY_LOG(error, "DEFENSIVE CLEANUP: Top-level wrapper destruction exception: {}", e.what());
-  } catch (...) {
-    ENVOY_LOG(error, "DEFENSIVE CLEANUP: Unknown top-level wrapper destruction exception");
-  }
+  ENVOY_LOG(debug, "RCConnectionWrapper destructor called");
+  shutdown();
 }
 
 // RCConnectionWrapper method implementations
 void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::Connected && !handshake_sent_ && 
-      !handshake_tenant_id_.empty() && reverse_tunnel_client_ == nullptr) {
-    ENVOY_LOG(error, "RCConnectionWrapper: onEvent() called but handshake_sent_ is false");
-  } else if (event == Network::ConnectionEvent::RemoteClose) {
+  if (event == Network::ConnectionEvent::RemoteClose) {
     if (!connection_) {
       ENVOY_LOG(debug, "RCConnectionWrapper: connection is null, skipping event handling");
       return;
@@ -209,7 +125,7 @@ void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
     ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, found connection {} remote closed",
               connectionId, connectionKey);
 
-    // Don't call onFailure() here as it may cause cleanup during event processing
+    // Don't call shutdown() here as it may cause cleanup during event processing
     // Instead, just notify parent of closure
     parent_.onConnectionDone("Connection closed", this, true);
   }
@@ -245,29 +161,17 @@ Network::FilterStatus RCConnectionWrapper::SimpleConnReadFilter::onData(Buffer::
           // Check if the status is ACCEPTED
           if (ret.status() == envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeRet::ACCEPTED) {
             ENVOY_LOG(debug, "Reverse connection accepted by cloud side");
-            parent_->onHandshakeSuccess(nullptr);
+            parent_->onHandshakeSuccess();
             return Network::FilterStatus::StopIteration;
           } else {
             ENVOY_LOG(error, "Reverse connection rejected: {}", ret.status_message());
-            parent_->onHandshakeFailure(Grpc::Status::WellKnownGrpcStatus::PermissionDenied,
-                                      ret.status_message());
+            parent_->onHandshakeFailure(ret.status_message());
             return Network::FilterStatus::StopIteration;
           }
         } else {
-          ENVOY_LOG(debug, "Could not parse protobuf response, checking for text success indicators");
-          
-          // Fallback: look for success indicators in the response body
-          if (response_body.find("reverse connection accepted") != std::string::npos ||
-              response_body.find("ACCEPTED") != std::string::npos) {
-            ENVOY_LOG(debug, "Found success indicator in response body");
-            parent_->onHandshakeSuccess(nullptr);
-            return Network::FilterStatus::StopIteration;
-          } else {
-            ENVOY_LOG(error, "No success indicator found in response body");
-            parent_->onHandshakeFailure(Grpc::Status::WellKnownGrpcStatus::Internal,
-                                      "Unrecognized response format");
-            return Network::FilterStatus::StopIteration;
-          }
+          ENVOY_LOG(error, "Could not parse protobuf response - invalid response format");
+          parent_->onHandshakeFailure("Invalid response format - expected ReverseConnHandshakeRet protobuf");
+          return Network::FilterStatus::StopIteration;
         }
       } else {
         ENVOY_LOG(debug, "Response body is empty, waiting for more data");
@@ -280,8 +184,7 @@ Network::FilterStatus RCConnectionWrapper::SimpleConnReadFilter::onData(Buffer::
   } else if (data.find("HTTP/1.1 ") != std::string::npos || data.find("HTTP/2 ") != std::string::npos) {
     // Found HTTP response but not 200 OK - this is an error
     ENVOY_LOG(error, "Received non-200 HTTP response: {}", data.substr(0, 100));
-    parent_->onHandshakeFailure(Grpc::Status::WellKnownGrpcStatus::Internal,
-                               "HTTP handshake failed with non-200 response");
+    parent_->onHandshakeFailure("HTTP handshake failed with non-200 response");
     return Network::FilterStatus::StopIteration;
   } else {
     ENVOY_LOG(debug, "Waiting for HTTP response, received {} bytes", data.length());
@@ -298,141 +201,108 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   connection_->addConnectionCallbacks(*this);
   connection_->connect();
 
-  if (reverse_tunnel_client_) {
-    // Use gRPC handshake
+  // Use HTTP handshake
+  ENVOY_LOG(debug,
+            "RCConnectionWrapper: connection: {}, sending reverse connection creation "
+            "request through HTTP",
+            connection_->id());
+
+  // Add read filter to handle HTTP response
+  connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
+
+  // Use HTTP handshake logic
+  envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeArg arg;
+  arg.set_tenant_uuid(src_tenant_id);
+  arg.set_cluster_uuid(src_cluster_id);
+  arg.set_node_uuid(src_node_id);
+  ENVOY_LOG(debug,
+            "RCConnectionWrapper: Creating protobuf with tenant='{}', cluster='{}', node='{}'",
+            src_tenant_id, src_cluster_id, src_node_id);
+  std::string body = arg.SerializeAsString();
+  ENVOY_LOG(debug, "RCConnectionWrapper: Serialized protobuf body length: {}, debug: '{}'",
+            body.length(), arg.DebugString());
+  std::string host_value;
+  const auto& remote_address = connection_->connectionInfoProvider().remoteAddress();
+  if (remote_address->type() == Network::Address::Type::EnvoyInternal) {
+    const auto& internal_address =
+        std::dynamic_pointer_cast<const Network::Address::EnvoyInternalInstance>(remote_address);
     ENVOY_LOG(debug,
-              "RCConnectionWrapper: connection: {}, sending reverse connection creation "
-              "request through gRPC to cluster: {}",
-              connection_->id(), cluster_name_);
-
-    ENVOY_LOG(debug,
-              "RCConnectionWrapper: Creating gRPC EstablishTunnel request with tenant='{}', "
-              "cluster='{}', node='{}'",
-              src_tenant_id, src_cluster_id, src_node_id);
-
-    // Create a dummy span for tracing
-    auto span = std::make_unique<Tracing::NullSpan>();
-
-    connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
-
-    // Initiate the gRPC handshake using the actual interface
-    bool success = reverse_tunnel_client_->initiateHandshake(
-        src_tenant_id, src_cluster_id, src_node_id, absl::nullopt, *span);
-
-    if (!success) {
-      ENVOY_LOG(error, "RCConnectionWrapper: Failed to initiate gRPC handshake");
-      onFailure();
-      return "";
-    }
-
-    ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, initiated gRPC EstablishTunnel request",
-              connection_->id());
+              "RCConnectionWrapper: connection: {}, remote address is internal "
+              "listener {}, using endpoint ID in host header",
+              connection_->id(), internal_address->envoyInternalAddress()->addressId());
+    host_value = internal_address->envoyInternalAddress()->endpointId();
   } else {
-    // Fall back to HTTP handshake for now during transition
+    host_value = remote_address->asString();
     ENVOY_LOG(debug,
-              "RCConnectionWrapper: connection: {}, sending reverse connection creation "
-              "request through HTTP (fallback)",
+              "RCConnectionWrapper: connection: {}, remote address is external, "
+              "using address as host header",
               connection_->id());
-
-    // Add read filter to handle HTTP response
-    connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
-
-    // Use existing HTTP handshake logic
-    envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeArg arg;
-    arg.set_tenant_uuid(src_tenant_id);
-    arg.set_cluster_uuid(src_cluster_id);
-    arg.set_node_uuid(src_node_id);
-    ENVOY_LOG(debug,
-              "RCConnectionWrapper: Creating protobuf with tenant='{}', cluster='{}', node='{}'",
-              src_tenant_id, src_cluster_id, src_node_id);
-    std::string body = arg.SerializeAsString();
-    ENVOY_LOG(debug, "RCConnectionWrapper: Serialized protobuf body length: {}, debug: '{}'",
-              body.length(), arg.DebugString());
-    std::string host_value;
-    const auto& remote_address = connection_->connectionInfoProvider().remoteAddress();
-    if (remote_address->type() == Network::Address::Type::EnvoyInternal) {
-      const auto& internal_address =
-          std::dynamic_pointer_cast<const Network::Address::EnvoyInternalInstance>(remote_address);
-      ENVOY_LOG(debug,
-                "RCConnectionWrapper: connection: {}, remote address is internal "
-                "listener {}, using endpoint ID in host header",
-                connection_->id(), internal_address->envoyInternalAddress()->addressId());
-      host_value = internal_address->envoyInternalAddress()->endpointId();
-    } else {
-      host_value = remote_address->asString();
-      ENVOY_LOG(debug,
-                "RCConnectionWrapper: connection: {}, remote address is external, "
-                "using address as host header",
-                connection_->id());
-    }
-    // Build HTTP request with protobuf body.
-    Buffer::OwnedImpl reverse_connection_request(
-        fmt::format("POST /reverse_connections/request HTTP/1.1\r\n"
-                    "Host: {}\r\n"
-                    "Accept: */*\r\n"
-                    "Content-length: {}\r\n"
-                    "\r\n{}",
-                    host_value, body.length(), body));
-    ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, writing request to connection: {}",
-              connection_->id(), reverse_connection_request.toString());
-    // Send reverse connection request over TCP connection.
-    connection_->write(reverse_connection_request, false);
   }
+  // Build HTTP request with protobuf body.
+  Buffer::OwnedImpl reverse_connection_request(
+      fmt::format("POST /reverse_connections/request HTTP/1.1\r\n"
+                  "Host: {}\r\n"
+                  "Accept: */*\r\n"
+                  "Content-length: {}\r\n"
+                  "\r\n{}",
+                  host_value, body.length(), body));
+  ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, writing request to connection: {}",
+            connection_->id(), reverse_connection_request.toString());
+  // Send reverse connection request over TCP connection.
+  connection_->write(reverse_connection_request, false);
 
   return connection_->connectionInfoProvider().localAddress()->asString();
 }
 
-void RCConnectionWrapper::onHandshakeSuccess(
-    std::unique_ptr<envoy::service::reverse_tunnel::v3::EstablishTunnelResponse> response) {
+void RCConnectionWrapper::onHandshakeSuccess() {
   std::string message = "reverse connection accepted";
-  if (response) {
-    message = response->status_message();
-  }
   ENVOY_LOG(debug, "handshake succeeded: {}", message);
   parent_.onConnectionDone(message, this, false);
 }
 
-void RCConnectionWrapper::onHandshakeFailure(Grpc::Status::GrpcStatus status,
-                                             const std::string& message) {
-  ENVOY_LOG(error, "handshake failed with status {}: {}", static_cast<int>(status), message);
+void RCConnectionWrapper::onHandshakeFailure(const std::string& message) {
+  ENVOY_LOG(error, "handshake failed: {}", message);
   parent_.onConnectionDone(message, this, false);
-}
-
-void RCConnectionWrapper::onFailure() {
-  ENVOY_LOG(debug,
-            "RCConnectionWrapper::onFailure - initiating graceful shutdown due to failure");
-  shutdown();
 }
 
 void RCConnectionWrapper::shutdown() {
   if (!connection_) {
-    ENVOY_LOG(debug, "Connection already null.");
+    ENVOY_LOG(error, "RCConnectionWrapper: Connection already null, nothing to shutdown");
     return;
   }
 
-  ENVOY_LOG(debug, "Connection ID: {}, state: {}.", connection_->id(),
-            static_cast<int>(connection_->state()));
+  ENVOY_LOG(error, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}", 
+            connection_->id(), static_cast<int>(connection_->state()));
 
-  // Cancel any ongoing gRPC handshake
-  if (reverse_tunnel_client_) {
-    reverse_tunnel_client_->cancel();
+  // Remove connection callbacks first to prevent recursive calls during shutdown
+  try {
+    auto state = connection_->state();
+    if (state != Network::Connection::State::Closed) {
+      connection_->removeConnectionCallbacks(*this);
+      ENVOY_LOG(error, "Connection callbacks removed");
+    }
+  } catch (const std::exception& e) {
+    ENVOY_LOG(error, "Exception removing connection callbacks: {}", e.what());
   }
 
-  // Remove callbacks first to prevent recursive calls during shutdown
-  connection_->removeConnectionCallbacks(*this);
-
-  if (connection_->state() == Network::Connection::State::Open) {
-    ENVOY_LOG(debug, "Closing open connection gracefully.");
-    connection_->close(Network::ConnectionCloseType::FlushWrite);
-  } else if (connection_->state() == Network::Connection::State::Closing) {
-    ENVOY_LOG(debug, "Connection already closing, waiting.");
-  } else {
-    ENVOY_LOG(debug, "Connection already closed.");
+  // Close the connection if it's still open
+  try {
+    auto state = connection_->state();
+    if (state == Network::Connection::State::Open) {
+      ENVOY_LOG(error, "Closing open connection gracefully");
+      connection_->close(Network::ConnectionCloseType::FlushWrite);
+    } else if (state == Network::Connection::State::Closing) {
+      ENVOY_LOG(error, "Connection already closing");
+    } else {
+      ENVOY_LOG(error, "Connection already closed");
+    }
+  } catch (const std::exception& e) {
+    ENVOY_LOG(error, "Exception closing connection: {}", e.what());
   }
 
   // Clear the connection pointer to prevent further access
   connection_.reset();
-  ENVOY_LOG(debug, "Completed graceful shutdown.");
+  ENVOY_LOG(error, "RCConnectionWrapper: Shutdown completed");
 }
 
 ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
@@ -1705,11 +1575,6 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
     // Add the remote cluster configuration
     RemoteClusterConnectionConfig cluster_config(config.remote_cluster, config.connection_count);
     socket_config.remote_clusters.push_back(cluster_config);
-
-    // Get gRPC config from extension if available
-    if (extension_ && extension_->hasGrpcConfig()) {
-      socket_config.grpc_service_config = extension_->getGrpcConfig();
-    }
 
     // Thread-safe: Pass config directly to helper method
     return createReverseConnectionSocket(

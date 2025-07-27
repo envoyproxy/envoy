@@ -25,7 +25,6 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/extensions/bootstrap/reverse_tunnel/factory_base.h"
-#include "source/extensions/bootstrap/reverse_tunnel/grpc_reverse_tunnel_client.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -37,13 +36,9 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-// Forward declaration for friend class
-class ReverseConnectionIOHandleTest;
-
 // Forward declarations.
 class ReverseTunnelInitiator;
 class ReverseTunnelInitiatorExtension;
-class GrpcReverseTunnelClient;
 class ReverseConnectionIOHandle;
 
 /**
@@ -53,8 +48,8 @@ class ReverseConnectionIOHandle;
  */
 class RCConnectionWrapper : public Network::ConnectionCallbacks,
                             public Event::DeferredDeletable,
-                            public ReverseConnection::GrpcReverseTunnelCallbacks,
-                            Logger::Loggable<Logger::Id::main> {
+                            public Logger::Loggable<Logger::Id::main> {
+  friend class SimpleConnReadFilterTest;
 public:
   /**
    * Constructor for RCConnectionWrapper.
@@ -78,14 +73,8 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
-  // ReverseConnection::GrpcReverseTunnelCallbacks overrides
-  void onHandshakeSuccess(
-      std::unique_ptr<envoy::service::reverse_tunnel::v3::EstablishTunnelResponse> response)
-      override;
-  void onHandshakeFailure(Grpc::Status::GrpcStatus status, const std::string& message) override;
-
   /**
-   * Initiate the reverse connection handshake (gRPC or HTTP fallback).
+   * Initiate the reverse connection handshake (HTTP only).
    * @param src_tenant_id the tenant identifier
    * @param src_cluster_id the cluster identifier
    * @param src_node_id the node identifier
@@ -95,9 +84,15 @@ public:
                       const std::string& src_node_id);
 
   /**
-   * Handle connection failure and initiate graceful shutdown.
+   * Handle successful handshake completion.
    */
-  void onFailure();
+  void onHandshakeSuccess();
+
+  /**
+   * Handle handshake failure.
+   * @param message error message
+   */
+  void onHandshakeFailure(const std::string& message);
 
   /**
    * Perform graceful shutdown of the connection.
@@ -138,13 +133,6 @@ private:
   Network::ClientConnectionPtr connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
   const std::string cluster_name_;
-  std::unique_ptr<ReverseConnection::GrpcReverseTunnelClient> reverse_tunnel_client_;
-  
-  // Handshake data for HTTP fallback
-  std::string handshake_tenant_id_;
-  std::string handshake_cluster_id_;
-  std::string handshake_node_id_;
-  bool handshake_sent_{false};
 };
 
 namespace {
@@ -204,15 +192,11 @@ struct ReverseConnectionSocketConfig {
   uint32_t connection_timeout_ms;    // Connection timeout in milliseconds.
   bool enable_metrics;               // Whether to enable metrics collection.
   bool enable_circuit_breaker;       // Whether to enable circuit breaker functionality.
-  
-  // gRPC service configuration for reverse tunnel handshake
-  absl::optional<envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig> grpc_service_config;
-  bool enable_legacy_http_handshake; // Whether to enable legacy HTTP handshake
 
   ReverseConnectionSocketConfig()
       : health_check_interval_ms(kDefaultHealthCheckIntervalMs),
         connection_timeout_ms(kDefaultConnectionTimeoutMs), enable_metrics(true),
-        enable_circuit_breaker(true), enable_legacy_http_handshake(true) {}
+        enable_circuit_breaker(true) {}
 };
 
 /**
@@ -223,6 +207,7 @@ class ReverseConnectionIOHandle : public Network::IoSocketHandleImpl,
                                   public Network::ConnectionCallbacks {
 
   friend class ReverseConnectionIOHandleTest;
+  friend class RCConnectionWrapperTest;
 public:
   /**
    * Constructor for ReverseConnectionIOHandle.
@@ -402,17 +387,6 @@ public:
   Upstream::ClusterManager& getClusterManager() { return cluster_manager_; }
 
   /**
-   * Get pointer to the gRPC service configuration if available.
-   * @return pointer to the gRPC config, nullptr if not available
-   */
-  const envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig* getGrpcConfig() const {
-    if (!config_.grpc_service_config.has_value()) {
-      return nullptr;
-    }
-    return &config_.grpc_service_config.value();
-  }
-
-  /**
    * Get pointer to the downstream extension for stats updates.
    * @return pointer to the extension, nullptr if not available
    */
@@ -547,9 +521,6 @@ private:
 
   // Single retry timer for all clusters
   Event::TimerPtr rev_conn_retry_timer_;
-
-  // gRPC reverse tunnel client for handshake operations
-  std::unique_ptr<GrpcReverseTunnelClient> reverse_tunnel_client_;
 
   bool is_reverse_conn_started_{false}; // Whether reverse connections have been started on worker thread
   Event::Dispatcher* worker_dispatcher_{nullptr}; // Dispatcher for the worker thread
@@ -692,20 +663,6 @@ public:
    * @return pointer to the thread-local registry, or nullptr if not available.
    */
   DownstreamSocketThreadLocal* getLocalRegistry() const;
-
-  /**
-   * @return true if gRPC service config is available in the configuration
-   */
-  bool hasGrpcConfig() const {
-    return config_.has_grpc_service_config();
-  }
-
-  /**
-   * @return reference to the gRPC service config
-   */
-  const envoy::service::reverse_tunnel::v3::ReverseTunnelGrpcConfig& getGrpcConfig() const {
-    return config_.grpc_service_config();
-  }
 
   /**
    * Update connection stats for reverse connections.
