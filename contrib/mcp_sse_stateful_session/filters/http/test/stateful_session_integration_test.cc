@@ -2,6 +2,7 @@
 #include <cstdint>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/http/mcp_sse_stateful_session.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/http/utility.h"
@@ -9,7 +10,6 @@
 
 #include "test/integration/http_integration.h"
 
-#include "envoy/http/mcp_sse_stateful_session.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

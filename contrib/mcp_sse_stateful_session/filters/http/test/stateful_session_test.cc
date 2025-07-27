@@ -8,7 +8,6 @@
 #include "test/test_common/utility.h"
 
 #include "contrib/mcp_sse_stateful_session/filters/http/source/mcp_sse_stateful_session.h"
-
 #include "contrib/mcp_sse_stateful_session/filters/http/test/mocks/mcp_sse_stateful_session.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

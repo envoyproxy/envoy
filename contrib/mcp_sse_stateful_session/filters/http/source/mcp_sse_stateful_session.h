@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/http/mcp_sse_stateful_session.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -16,7 +17,6 @@
 #include "absl/strings/string_view.h"
 #include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.h"
 #include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.validate.h"
-#include "envoy/http/mcp_sse_stateful_session.h"
 
 namespace Envoy {
 namespace Extensions {

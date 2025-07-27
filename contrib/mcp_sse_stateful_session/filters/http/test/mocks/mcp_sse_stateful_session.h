@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/mcp_sse_stateful_session.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

@@ -1,10 +1,10 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
+#include "envoy/http/mcp_sse_stateful_session.h"
 #include "envoy/server/factory_context.h"
 
 #include "contrib/mcp_sse_stateful_session/http/source/envelope.h"
-#include "envoy/http/mcp_sse_stateful_session.h"
 
 namespace Envoy {
 namespace Extensions {

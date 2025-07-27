@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/http/filter.h"
+#include "envoy/http/mcp_sse_stateful_session.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
@@ -10,7 +11,6 @@
 #include "source/common/http/utility.h"
 
 #include "contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha/envelope.pb.h"
-#include "envoy/http/mcp_sse_stateful_session.h"
 
 namespace Envoy {
 namespace Extensions {
