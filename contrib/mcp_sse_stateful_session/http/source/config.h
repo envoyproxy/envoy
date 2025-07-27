@@ -2,32 +2,31 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/server/factory_context.h"
-
-#include "contrib/mcp_sse_stateful_session/filters/http/source/mcp_sse.h"
+#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
+#include "contrib/mcp_sse_stateful_session/http/source/envelope.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace StatefulSession {
-namespace McpSse {
+namespace McpSseSessionState {
+namespace Envelope {
 
-class Config : public Envoy::Config::TypedFactory {
+class EnvelopeSessionStateFactoryConfig : public McpSseSessionStateFactoryConfig {
 public:
   McpSseSessionStateFactorySharedPtr
   createSessionStateFactory(const Protobuf::Message& config,
-                            Server::Configuration::GenericFactoryContext& context);
+                            Server::Configuration::GenericFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::http::stateful_session::mcp_sse::v3::McpSseSessionState>();
+        envoy::extensions::http::mcp_sse_stateful_session::envelope::v3alpha::EnvelopeSessionState>();
   }
 
-  std::string name() const override { return "envoy.http.stateful_session.mcp_sse"; }
-  std::string category() const override { return "envoy.http.stateful_session"; }
+  std::string name() const override { return "envoy.http.mcp_sse_stateful_session.envelope"; }
 };
 
-} // namespace McpSse
-} // namespace StatefulSession
+} // namespace Envelope
+} // namespace McpSseSessionState
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

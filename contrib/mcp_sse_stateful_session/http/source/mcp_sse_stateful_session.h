@@ -5,12 +5,12 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace StatefulSession {
-namespace McpSse {
+namespace McpSseSessionState {
 
 /**
  * Independent interface for session state that supports data processing.
@@ -68,8 +68,31 @@ public:
 
 using McpSseSessionStateFactorySharedPtr = std::shared_ptr<McpSseSessionStateFactory>;
 
-} // namespace McpSse
-} // namespace StatefulSession
+/*
+ * Extension configuration for session state factory.
+ */
+class McpSseSessionStateFactoryConfig : public Envoy::Config::TypedFactory {
+public:
+  ~McpSseSessionStateFactoryConfig() override = default;
+
+  /**
+   * Creates a particular session state factory implementation.
+   *
+   * @param config supplies the configuration for the session state factory extension.
+   * @param context supplies the factory context. Please don't store the reference to
+   * the context as it is only valid during the call.
+   * @return SessionStateFactorySharedPtr the session state factory.
+   */
+  virtual McpSseSessionStateFactorySharedPtr
+  createSessionStateFactory(const Protobuf::Message& config,
+                            Server::Configuration::GenericFactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.http.mcp_sse_stateful_session"; }
+};
+
+using McpSseSessionStateFactoryConfigPtr = std::unique_ptr<McpSseSessionStateFactoryConfig>;
+
+} // namespace McpSseSessionState
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

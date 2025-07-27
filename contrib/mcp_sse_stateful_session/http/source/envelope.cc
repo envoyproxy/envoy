@@ -1,25 +1,25 @@
-#include "contrib/mcp_sse_stateful_session/filters/http/source/mcp_sse.h"
+#include "contrib/mcp_sse_stateful_session/http/source/envelope.h"
 
 #include "absl/container/inlined_vector.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace StatefulSession {
-namespace McpSse {
+namespace McpSseSessionState {
+namespace Envelope {
 
 constexpr absl::string_view CRLFCRLF = "\r\n\r\n";
 constexpr absl::string_view CRCR = "\r\r";
 constexpr absl::string_view LFLF = "\n\n";
 
-void McpSseSessionStateFactoryImpl::SessionStateImpl::onUpdateHeader(
+void EnvelopeSessionStateFactory::SessionStateImpl::onUpdateHeader(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
   // Store response headers for SSE detection
   response_headers_ = &headers;
   UNREFERENCED_PARAMETER(host_address);
 }
 
-Envoy::Http::FilterDataStatus McpSseSessionStateFactoryImpl::SessionStateImpl::onUpdateData(
+Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onUpdateData(
     absl::string_view host_address, Buffer::Instance& data, bool end_stream) {
   // Skip if not SSE response
   if (!isSSEResponse()) {
@@ -75,7 +75,7 @@ Envoy::Http::FilterDataStatus McpSseSessionStateFactoryImpl::SessionStateImpl::o
     size_t param_pos = chunk_buffer_str.find(param_name + "=");
     if (param_pos != std::string::npos) {
       size_t value_start = param_pos + param_name.length() + 1;
-      size_t value_end = chunk_buffer_str.find("&", value_start);
+      size_t value_end = chunk_buffer_str.find('&', value_start);
       if (value_end == std::string::npos) {
         value_end = chunk_buffer_str.length();
       }
@@ -110,11 +110,11 @@ Envoy::Http::FilterDataStatus McpSseSessionStateFactoryImpl::SessionStateImpl::o
                            : Envoy::Http::FilterDataStatus::StopIterationAndBuffer;
 }
 
-McpSseSessionStateFactoryImpl::McpSseSessionStateFactoryImpl(const McpSseSessionStateProto& config)
+EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)
     : param_name_(config.param_name()) {}
 
 absl::optional<std::string>
-McpSseSessionStateFactoryImpl::parseAddress(Envoy::Http::RequestHeaderMap& headers) const {
+EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers) const {
   const auto* path = headers.Path();
   if (!path) {
     return absl::nullopt;
@@ -172,8 +172,8 @@ McpSseSessionStateFactoryImpl::parseAddress(Envoy::Http::RequestHeaderMap& heade
   return host_address;
 }
 
-} // namespace McpSse
-} // namespace StatefulSession
+} // namespace Envelope
+} // namespace McpSseSessionState
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

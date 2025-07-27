@@ -14,6 +14,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
+    "envoy.filters.http.stateful_session":                      "//contrib/mcp_sse_stateful_session/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
 
     #
@@ -94,4 +95,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
+
+    #
+    # mcp sse stateful session
+    #
+
+    "envoy.http.stateful_session.mcp_sse":                      "//contrib/mcp_sse_stateful_session/http/source:config",
 }
