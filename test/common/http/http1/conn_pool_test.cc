@@ -1231,10 +1231,7 @@ TEST_F(Http1ConnPoolImplTest, RequestTrackingMetric) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-/**
- * Test request tracking with connection that handles multiple individual requests.
- * Verifies that each separate request is tracked correctly.
- */
+// Verifies that the upstream_rq_per_cx histogram is emitted correctly for multiple connections.
 TEST_F(Http1ConnPoolImplTest, RequestTrackingMultipleConnections) {
   // Set up expectations for histograms from first connection
   EXPECT_CALL(cluster_->stats_store_,
