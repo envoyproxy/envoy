@@ -281,6 +281,42 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
 
+// Test that HTTP/3 ActiveClient inherits request_count_ from base class
+TEST_F(Http3ConnPoolImplTest, RequestCountTracking) {
+  initialize();
+
+  MockResponseDecoder decoder;
+  ConnPoolCallbacks callbacks;
+  EXPECT_CALL(*socket_option_, setOption(_, _)).Times(2u);
+  auto* async_connect_callback = new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
+  ConnectionPool::Cancellable* cancellable = pool_->newStream(decoder, callbacks,
+                                                              {/*can_send_early_data_=*/false,
+                                                               /*can_use_http3_=*/true});
+  EXPECT_NE(nullptr, cancellable);
+  
+  // Get the connecting clients and test request_count_ access
+  std::list<Envoy::ConnectionPool::ActiveClientPtr>& clients =
+      Http3ConnPoolImplPeer::connectingClients(*pool_);
+  EXPECT_EQ(1u, clients.size());
+  
+  // Cast to HTTP3 ActiveClient to access inherited request_count_ field
+  auto* http3_client = static_cast<Http3::ActiveClient*>(clients.front().get());
+  
+  // Verify initial request count is 0 (inherited from Envoy::Http::ActiveClient)
+  EXPECT_EQ(0, http3_client->request_count_);
+  
+  // Manually increment request count to verify the field is accessible
+  http3_client->request_count_++;
+  EXPECT_EQ(1, http3_client->request_count_);
+  
+  http3_client->request_count_++;
+  EXPECT_EQ(2, http3_client->request_count_);
+  
+  // Clean up following the same pattern as NewAndCancelStreamBeforeConnect
+  EXPECT_CALL(*async_connect_callback, cancel());
+  cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+}
+
 } // namespace Http3
 } // namespace Http
 } // namespace Envoy
