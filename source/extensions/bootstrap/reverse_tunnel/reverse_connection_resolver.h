@@ -24,6 +24,9 @@ public:
 
   std::string name() const override { return "envoy.resolvers.reverse_connection"; }
 
+  // Friend class for testing
+  friend class ReverseConnectionResolverTest;
+
 private:
   /**
    * Extracts reverse connection config from socket address metadata.

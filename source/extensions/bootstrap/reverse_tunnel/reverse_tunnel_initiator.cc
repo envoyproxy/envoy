@@ -60,6 +60,13 @@ public:
     ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: closing handle for FD: {} with connection key: {}", 
               fd_, connection_key_);
     
+    // Prevent double-closing by checking if already closed
+    if (fd_ < 0) {
+      ENVOY_LOG(debug, "DownstreamReverseConnectionIOHandle: handle already closed for connection key: {}", 
+                connection_key_);
+      return Api::ioCallUint64ResultNoError();
+    }
+    
     // Notify parent that this downstream connection has been closed
     // This will trigger re-initiation of the reverse connection if needed
     if (parent_) {

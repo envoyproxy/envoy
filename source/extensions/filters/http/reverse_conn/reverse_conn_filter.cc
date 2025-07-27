@@ -154,6 +154,12 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
                    *decoder_callbacks_, node_uuid, cluster_uuid);
   saveDownstreamConnection(*connection, node_uuid, cluster_uuid);
   connection->setSocketReused(true);
+  
+  // Reset file events on the connection socket
+  if (connection->getSocket()) {
+    connection->getSocket()->ioHandle().resetFileEvents();
+  }
+  
   connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
   decoder_callbacks_->setReverseConnForceLocalReply(false);
   return Http::FilterDataStatus::StopIterationNoBuffer;
@@ -181,14 +187,6 @@ Http::FilterHeadersStatus ReverseConnFilter::getReverseConnectionInfo() {
   if (is_responder) {
     return handleResponderInfo(remote_node, remote_cluster);
   } else if (is_initiator) {
-    auto* downstream_interface = getDownstreamSocketInterface();
-    if (!downstream_interface) {
-      ENVOY_LOG(error, "Failed to get downstream socket interface for initiator role");
-      decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
-                                         "Failed to get downstream socket interface", nullptr,
-                                         absl::nullopt, "");
-      return Http::FilterHeadersStatus::StopIteration;
-    }
     return handleInitiatorInfo(remote_node, remote_cluster);
   } else {
     ENVOY_LOG(error, "Unknown role: {}", role);
@@ -271,6 +269,16 @@ Http::FilterHeadersStatus
 ReverseConnFilter::handleInitiatorInfo(const std::string& remote_node,
                                        const std::string& remote_cluster) {
   ENVOY_LOG(debug, "Getting reverse connection info for initiator role");
+
+  // Check if downstream socket interface is available
+  auto* downstream_interface = getDownstreamSocketInterface();
+  if (!downstream_interface) {
+    ENVOY_LOG(error, "Failed to get downstream socket interface for initiator role");
+    decoder_callbacks_->sendLocalReply(Http::Code::InternalServerError,
+                                       "Failed to get downstream socket interface", nullptr,
+                                       absl::nullopt, "");
+    return Http::FilterHeadersStatus::StopIteration;
+  }
 
   // Get the downstream socket interface extension to check established connections
   auto* downstream_extension = getDownstreamSocketInterfaceExtension();

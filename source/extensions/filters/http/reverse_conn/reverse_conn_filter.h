@@ -42,11 +42,22 @@ class ReverseConnFilterConfig {
 public:
   ReverseConnFilterConfig(
       const envoy::extensions::filters::http::reverse_conn::v3::ReverseConn& config)
-      : ping_interval_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_interval, 2)) {}
+      : ping_interval_(getValidPingInterval(config)) {}
 
   std::chrono::seconds pingInterval() const { return ping_interval_; }
 
 private:
+  static std::chrono::seconds getValidPingInterval(
+      const envoy::extensions::filters::http::reverse_conn::v3::ReverseConn& config) {
+    if (config.has_ping_interval()) {
+      uint32_t value = config.ping_interval().value();
+      // If ping_interval is explicitly set to 0, use default value
+      return value > 0 ? std::chrono::seconds(value) : std::chrono::seconds(2);
+    }
+    // If ping_interval is not set, use default value
+    return std::chrono::seconds(2);
+  }
+
   const std::chrono::seconds ping_interval_;
 };
 
@@ -59,6 +70,7 @@ static const char DOUBLE_CRLF[] = "\r\n\r\n";
  * This filter handles HTTP requests for reverse tunnel handshakes.
  */
 class ReverseConnFilter : Logger::Loggable<Logger::Id::filter>, public Http::StreamDecoderFilter {
+  friend class ReverseConnFilterTest;
 public:
   ReverseConnFilter(ReverseConnFilterConfigSharedPtr config);
   ~ReverseConnFilter();

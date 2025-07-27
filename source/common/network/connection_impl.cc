@@ -403,6 +403,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
     ENVOY_CONN_LOG(trace, "closeSocket: socket_->close() completed", *this);
   } else {
     ENVOY_CONN_LOG(trace, "closeSocket: skipping socket close due to reuse_socket_=true", *this);
+    return;
   }
 
   // Call the base class directly as close() is called in the destructor.
