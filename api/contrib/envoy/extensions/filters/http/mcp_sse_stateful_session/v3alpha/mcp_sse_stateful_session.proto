@@ -13,8 +13,8 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha;mcp_sse_stateful_sessionv3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Stateful session filter]
-// Stateful session :ref:`configuration overview <config_http_filters_mcp_sse_stateful_session>`.
+// [#protodoc-title: Model Context Protocol(MCP) server-side events(SSE) Stateful session filter]
+// MCP SSE Stateful session :ref:`configuration overview <config_http_filters_mcp_sse_stateful_session>`.
 // [#extension: envoy.filters.http.mcp_sse_stateful_session]
 
 message McpSseStatefulSession {
