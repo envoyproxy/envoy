@@ -1276,9 +1276,7 @@ TEST_F(Http1ConnPoolImplTest, RequestTrackingMultipleConnections) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-/**
- * Test request tracking with single request per connection.
- */
+// Test request tracking with single request per connection.
 TEST_F(Http1ConnPoolImplTest, RequestTrackingSingleRequest) {
   // Set up expectations for all histograms that will be emitted on connection close
   EXPECT_CALL(cluster_->stats_store_,
