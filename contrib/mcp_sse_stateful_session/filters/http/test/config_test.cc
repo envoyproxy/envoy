@@ -1,11 +1,10 @@
-#include "contrib/mcp_sse_stateful_session/filters/http/source/config.h"
-
-#include "contrib/mcp_sse_stateful_session/filters/http/test/mocks/mcp_sse_stateful_session.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/mcp_sse_stateful_session/filters/http/source/config.h"
+#include "contrib/mcp_sse_stateful_session/filters/http/test/mocks/mcp_sse_stateful_session.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;

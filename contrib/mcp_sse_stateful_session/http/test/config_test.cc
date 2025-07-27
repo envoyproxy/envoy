@@ -1,8 +1,7 @@
-#include "contrib/mcp_sse_stateful_session/http/source/config.h"
-
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
 
+#include "contrib/mcp_sse_stateful_session/http/source/config.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

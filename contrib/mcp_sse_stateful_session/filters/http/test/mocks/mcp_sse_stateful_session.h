@@ -1,7 +1,6 @@
 #pragma once
 
 #include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -17,15 +16,18 @@ public:
               (absl::string_view host_address, Buffer::Instance& data, bool end_stream));
 };
 
-class MockSessionStateFactory : public Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStateFactory {
+class MockSessionStateFactory
+    : public Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStateFactory {
 public:
   MockSessionStateFactory();
 
-  MOCK_METHOD(Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStatePtr, create, (Envoy::Http::RequestHeaderMap & headers), (const));
+  MOCK_METHOD(Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStatePtr, create,
+              (Envoy::Http::RequestHeaderMap & headers), (const));
   MOCK_METHOD(bool, isStrict, (), (const));
 };
 
-class MockSessionStateFactoryConfig : public Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStateFactoryConfig {
+class MockSessionStateFactoryConfig
+    : public Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStateFactoryConfig {
 public:
   MockSessionStateFactoryConfig();
 

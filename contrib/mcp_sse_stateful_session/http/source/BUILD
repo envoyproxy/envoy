@@ -44,11 +44,9 @@ envoy_cc_contrib_extension(
     name = "mcp_sse_stateful_session_interface",
     hdrs = ["mcp_sse_stateful_session.h"],
     deps = [
-        "//source/common/buffer:buffer_lib",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
         "//envoy/upstream:upstream_interface",
+        "//source/common/buffer:buffer_lib",
     ],
 )
-
-

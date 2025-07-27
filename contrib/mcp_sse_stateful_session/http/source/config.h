@@ -2,8 +2,9 @@
 
 #include "envoy/config/typed_config.h"
 #include "envoy/server/factory_context.h"
-#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
+
 #include "contrib/mcp_sse_stateful_session/http/source/envelope.h"
+#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
 
 namespace Envoy {
 namespace Extensions {

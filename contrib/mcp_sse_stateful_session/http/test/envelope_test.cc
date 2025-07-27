@@ -1,7 +1,6 @@
-#include "contrib/mcp_sse_stateful_session/http/source/envelope.h"
-
 #include "test/test_common/utility.h"
 
+#include "contrib/mcp_sse_stateful_session/http/source/envelope.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

@@ -1,10 +1,13 @@
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_contrib_package",
     "envoy_package",
 )
 
 licenses(["notice"])  # Apache 2
+
+envoy_contrib_package()
 
 envoy_package()
 
@@ -36,7 +39,7 @@ envoy_cc_test(
         "//contrib/mcp_sse_stateful_session/http/source:config",
         "//source/common/protobuf",
         "//test/integration:http_integration_lib",
-        "//test/test_common:utility_lib",        
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
     ],
 )

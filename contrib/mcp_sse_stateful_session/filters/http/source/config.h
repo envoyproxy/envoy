@@ -1,8 +1,8 @@
 #pragma once
 
-#include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.h"
-
 #include "source/extensions/filters/http/common/factory_base.h"
+
+#include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.h"
 #include "contrib/mcp_sse_stateful_session/filters/http/source/mcp_sse_stateful_session.h"
 
 namespace Envoy {

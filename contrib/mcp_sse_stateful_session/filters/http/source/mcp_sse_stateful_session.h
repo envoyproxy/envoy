@@ -6,16 +6,17 @@
 #include <string>
 #include <vector>
 
-#include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.h"
-#include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.validate.h"
-#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
 #include "envoy/upstream/load_balancer.h"
-#include "source/server/generic_factory_context.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/server/generic_factory_context.h"
 
 #include "absl/strings/string_view.h"
+#include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.h"
+#include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.validate.h"
+#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
 
 namespace Envoy {
 namespace Extensions {
