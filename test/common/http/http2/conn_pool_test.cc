@@ -1988,11 +1988,7 @@ TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectMaxRequests) {
   EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
 }
 
-/**
- * Test request tracking for HTTP/2 with multiple concurrent streams on a single connection.
- * This test verifies that the upstream_rq_per_cx histogram correctly tracks multiple
- * concurrent HTTP/2 streams on the same connection.
- */
+// Verifies the upstream_rq_per_cx histogram correctly tracks multiple concurrent HTTP/2 streams on the same connection.
 TEST_F(Http2ConnPoolImplTest, RequestTrackingMultipleStreams) {
   // Allow multiple concurrent streams on a single connection
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(5);
