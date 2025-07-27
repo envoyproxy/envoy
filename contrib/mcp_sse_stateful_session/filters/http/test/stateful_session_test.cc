@@ -8,6 +8,7 @@
 #include "test/test_common/utility.h"
 
 #include "contrib/mcp_sse_stateful_session/filters/http/source/mcp_sse_stateful_session.h"
+
 #include "contrib/mcp_sse_stateful_session/filters/http/test/mocks/mcp_sse_stateful_session.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -25,9 +26,8 @@ class StatefulSessionTest : public testing::Test {
 public:
   void initialize(absl::string_view config, absl::string_view route_config = "") {
     Envoy::Http::MockSessionStateFactoryConfig config_factory;
-    Registry::InjectFactory<
-        Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStateFactoryConfig>
-        registration(config_factory);
+    Registry::InjectFactory<Envoy::Http::McpSseSessionStateFactoryConfig> registration(
+        config_factory);
 
     factory_ = std::make_shared<NiceMock<Envoy::Http::MockSessionStateFactory>>();
     EXPECT_CALL(config_factory, createSessionStateFactory(_, _)).WillOnce(Return(factory_));

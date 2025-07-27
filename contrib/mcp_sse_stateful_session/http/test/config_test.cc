@@ -12,8 +12,9 @@ namespace Envelope {
 namespace {
 
 TEST(EnvelopeSessionStateFactoryConfigTest, BasicSse) {
-  auto* factory = Registry::FactoryRegistry<McpSseSessionStateFactoryConfig>::getFactory(
-      "envoy.http.mcp_sse_stateful_session.envelope");
+  auto* factory =
+      Registry::FactoryRegistry<Envoy::Http::McpSseSessionStateFactoryConfig>::getFactory(
+          "envoy.http.mcp_sse_stateful_session.envelope");
   ASSERT_NE(factory, nullptr);
 
   EnvelopeSessionStateProto proto_config;

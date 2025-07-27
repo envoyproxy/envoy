@@ -143,9 +143,14 @@ envoy.filters.http.mcp_sse_stateful_session:
   categories:
   - envoy.filters.http
   security_posture: requires_trusted_downstream_and_upstream
-  status: alpha
+  status: stable
+  type_urls:
+  - envoy.extensions.filters.http.mcp_sse_stateful_session.v3.StatefulSession
+  - envoy.extensions.filters.http.mcp_sse_stateful_session.v3.StatefulSessionPerRoute
 envoy.http.mcp_sse_stateful_session.envelope:
   categories:
-  - envoy.http
-  security_posture: requires_trusted_downstream_and_upstream
+  - envoy.http.mcp_sse_stateful_session
+  security_posture: unknown
   status: alpha
+  type_urls:
+  - envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState

@@ -14,8 +14,8 @@ envoy_cc_library(
     srcs = ["mcp_sse_stateful_session.cc"],
     hdrs = ["mcp_sse_stateful_session.h"],
     deps = [
-        "//contrib/mcp_sse_stateful_session/http/source:mcp_sse_stateful_session_interface",
         "//envoy/http:filter_interface",
+        "//envoy/http:mcp_sse_stateful_session_interface",
         "//envoy/server:filter_config_interface",
         "//envoy/upstream:load_balancer_interface",
         "//source/common/config:utility_lib",
@@ -36,7 +36,7 @@ envoy_cc_contrib_extension(
     hdrs = ["config.h"],
     deps = [
         "//contrib/mcp_sse_stateful_session/filters/http/source:mcp_sse_stateful_session_lib",
-        "//contrib/mcp_sse_stateful_session/http/source:mcp_sse_stateful_session_interface",
+        "//envoy/http:mcp_sse_stateful_session_interface",
         "//envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:factory_base_lib",

@@ -1,13 +1,13 @@
 #pragma once
 
-#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
+#include "envoy/http/mcp_sse_stateful_session.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Http {
 
-class MockSessionState : public Envoy::Extensions::Http::McpSseSessionState::McpSseSessionState {
+class MockSessionState : public Envoy::Http::McpSseSessionState {
 public:
   MOCK_METHOD(absl::optional<absl::string_view>, upstreamAddress, (), (const));
   MOCK_METHOD(void, onUpdateHeader,
@@ -16,18 +16,16 @@ public:
               (absl::string_view host_address, Buffer::Instance& data, bool end_stream));
 };
 
-class MockSessionStateFactory
-    : public Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStateFactory {
+class MockSessionStateFactory : public Envoy::Http::McpSseSessionStateFactory {
 public:
   MockSessionStateFactory();
 
-  MOCK_METHOD(Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStatePtr, create,
-              (Envoy::Http::RequestHeaderMap & headers), (const));
+  MOCK_METHOD(Envoy::Http::McpSseSessionStatePtr, create, (Envoy::Http::RequestHeaderMap & headers),
+              (const));
   MOCK_METHOD(bool, isStrict, (), (const));
 };
 
-class MockSessionStateFactoryConfig
-    : public Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStateFactoryConfig {
+class MockSessionStateFactoryConfig : public Envoy::Http::McpSseSessionStateFactoryConfig {
 public:
   MockSessionStateFactoryConfig();
 
@@ -35,8 +33,7 @@ public:
     return std::make_unique<ProtobufWkt::Struct>();
   }
 
-  MOCK_METHOD(Envoy::Extensions::Http::McpSseSessionState::McpSseSessionStateFactorySharedPtr,
-              createSessionStateFactory,
+  MOCK_METHOD(Envoy::Http::McpSseSessionStateFactorySharedPtr, createSessionStateFactory,
               (const Protobuf::Message&, Server::Configuration::GenericFactoryContext&));
 
   std::string name() const override { return "envoy.http.mcp_sse_stateful_session.mock"; }

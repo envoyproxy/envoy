@@ -8,9 +8,7 @@
 #include "envoy/server/factory_context.h"
 
 namespace Envoy {
-namespace Extensions {
 namespace Http {
-namespace McpSseSessionState {
 
 /**
  * Independent interface for session state that supports data processing.
@@ -92,7 +90,5 @@ public:
 
 using McpSseSessionStateFactoryConfigPtr = std::unique_ptr<McpSseSessionStateFactoryConfig>;
 
-} // namespace McpSseSessionState
 } // namespace Http
-} // namespace Extensions
 } // namespace Envoy

@@ -9,7 +9,7 @@
 
 #include "test/integration/http_integration.h"
 
-#include "contrib/mcp_sse_stateful_session/filters/http/source/mcp_sse_stateful_session.h"
+#include "envoy/http/mcp_sse_stateful_session.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {

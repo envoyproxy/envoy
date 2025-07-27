@@ -267,3 +267,14 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
     ],
 )
+
+envoy_cc_library(
+    name = "mcp_sse_stateful_session_interface",
+    hdrs = ["mcp_sse_stateful_session.h"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//envoy/upstream:upstream_interface",
+        "//source/common/buffer:buffer_lib",
+    ],
+)

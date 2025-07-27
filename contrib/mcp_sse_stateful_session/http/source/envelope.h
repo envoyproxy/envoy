@@ -10,7 +10,7 @@
 #include "source/common/http/utility.h"
 
 #include "contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha/envelope.pb.h"
-#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
+#include "envoy/http/mcp_sse_stateful_session.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,12 +21,12 @@ namespace Envelope {
 using EnvelopeSessionStateProto =
     envoy::extensions::http::mcp_sse_stateful_session::envelope::v3alpha::EnvelopeSessionState;
 
-class EnvelopeSessionStateFactory : public McpSseSessionStateFactory,
+class EnvelopeSessionStateFactory : public Envoy::Http::McpSseSessionStateFactory,
                                     public Logger::Loggable<Logger::Id::http> {
   friend class SessionStateImpl;
 
 public:
-  class SessionStateImpl : public McpSseSessionState {
+  class SessionStateImpl : public Envoy::Http::McpSseSessionState {
   public:
     SessionStateImpl(absl::optional<std::string> address,
                      const EnvelopeSessionStateFactory& factory)
@@ -51,7 +51,7 @@ public:
 
   EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config);
 
-  McpSseSessionStatePtr create(Envoy::Http::RequestHeaderMap& headers) const override {
+  Envoy::Http::McpSseSessionStatePtr create(Envoy::Http::RequestHeaderMap& headers) const override {
     absl::optional<std::string> address = parseAddress(headers);
     return std::make_unique<SessionStateImpl>(address, *this);
   }

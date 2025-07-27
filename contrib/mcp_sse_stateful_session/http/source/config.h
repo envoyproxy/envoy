@@ -4,7 +4,7 @@
 #include "envoy/server/factory_context.h"
 
 #include "contrib/mcp_sse_stateful_session/http/source/envelope.h"
-#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
+#include "envoy/http/mcp_sse_stateful_session.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,9 +12,9 @@ namespace Http {
 namespace McpSseSessionState {
 namespace Envelope {
 
-class EnvelopeSessionStateFactoryConfig : public McpSseSessionStateFactoryConfig {
+class EnvelopeSessionStateFactoryConfig : public Envoy::Http::McpSseSessionStateFactoryConfig {
 public:
-  McpSseSessionStateFactorySharedPtr
+  Envoy::Http::McpSseSessionStateFactorySharedPtr
   createSessionStateFactory(const Protobuf::Message& config,
                             Server::Configuration::GenericFactoryContext& context) override;
 

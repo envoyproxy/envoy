@@ -16,7 +16,7 @@
 #include "absl/strings/string_view.h"
 #include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.h"
 #include "contrib/envoy/extensions/filters/http/mcp_sse_stateful_session/v3alpha/mcp_sse_stateful_session.pb.validate.h"
-#include "contrib/mcp_sse_stateful_session/http/source/mcp_sse_stateful_session.h"
+#include "envoy/http/mcp_sse_stateful_session.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -33,7 +33,7 @@ public:
   McpSseStatefulSessionConfig(const ProtoConfig& config,
                               Server::Configuration::GenericFactoryContext& context);
 
-  Http::McpSseSessionState::McpSseSessionStatePtr
+  Envoy::Http::McpSseSessionStatePtr
   createSessionState(Envoy::Http::RequestHeaderMap& headers) const {
     ASSERT(factory_ != nullptr);
     return factory_->create(headers);
@@ -42,7 +42,7 @@ public:
   bool isStrict() const { return strict_; }
 
 private:
-  Http::McpSseSessionState::McpSseSessionStateFactorySharedPtr factory_;
+  Envoy::Http::McpSseSessionStateFactorySharedPtr factory_;
   bool strict_{false};
 };
 using McpSseStatefulSessionConfigSharedPtr = std::shared_ptr<McpSseStatefulSessionConfig>;
@@ -76,10 +76,10 @@ public:
 
   Envoy::Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
 
-  Http::McpSseSessionState::McpSseSessionStatePtr& sessionStateForTest() { return session_state_; }
+  Envoy::Http::McpSseSessionStatePtr& sessionStateForTest() { return session_state_; }
 
 private:
-  Http::McpSseSessionState::McpSseSessionStatePtr session_state_;
+  Envoy::Http::McpSseSessionStatePtr session_state_;
   McpSseStatefulSessionConfigSharedPtr config_;
 };
 
