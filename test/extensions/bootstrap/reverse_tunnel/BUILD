@@ -61,3 +61,27 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "reverse_connection_address_test",
+    size = "medium",
+    srcs = ["reverse_connection_address_test.cc"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/extensions/bootstrap/reverse_tunnel:reverse_connection_address_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "reverse_connection_resolver_test",
+    size = "medium",
+    srcs = ["reverse_connection_resolver_test.cc"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/extensions/bootstrap/reverse_tunnel:reverse_connection_resolver_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:test_runtime_lib",
+    ],
+)

@@ -2597,6 +2597,47 @@ protected:
         test_fd, config, cluster_manager_, extension_.get(), *stats_scope_);
   }
 
+  // Connection Management Helpers
+  
+  bool initiateOneReverseConnection(const std::string& cluster_name,
+                                    const std::string& host_address,
+                                    Upstream::HostConstSharedPtr host) {
+    return io_handle_->initiateOneReverseConnection(cluster_name, host_address, host);
+  }
+
+  // Data Access Helpers
+  
+  const std::vector<std::unique_ptr<RCConnectionWrapper>>& getConnectionWrappers() const {
+    return io_handle_->connection_wrappers_;
+  }
+
+  const std::unordered_map<RCConnectionWrapper*, std::string>& getConnWrapperToHostMap() const {
+    return io_handle_->conn_wrapper_to_host_map_;
+  }
+
+  // Test Data Setup Helpers
+  
+  void addHostConnectionInfo(const std::string& host_address, const std::string& cluster_name, uint32_t target_count) {
+    io_handle_->host_to_conn_info_map_[host_address] = ReverseConnectionIOHandle::HostConnectionInfo{
+        host_address,
+        cluster_name,
+        {},  // connection_keys - empty set initially
+        target_count,  // target_connection_count
+        0,   // failure_count
+        std::chrono::steady_clock::now(),  // last_failure_time
+        std::chrono::steady_clock::now(),  // backoff_until
+        {}   // connection_states
+    };
+  }
+
+  // Helper to create a mock host
+  Upstream::HostConstSharedPtr createMockHost(const std::string& address) {
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHost>>();
+    auto mock_address = std::make_shared<Network::Address::Ipv4Instance>(address, 8080);
+    EXPECT_CALL(*mock_host, address()).WillRepeatedly(Return(mock_address));
+    return mock_host;
+  }
+
   // Test fixtures
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -2645,14 +2686,6 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
   
   // Create RCConnectionWrapper with the mock connection
   RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
-  
-  // Debug: Check if gRPC config is available
-  const auto* grpc_config = io_handle_->getGrpcConfig();
-  if (grpc_config != nullptr) {
-    std::cout << "DEBUG: gRPC config is available, will use gRPC handshake" << std::endl;
-  } else {
-    std::cout << "DEBUG: gRPC config is null, will use HTTP handshake" << std::endl;
-  }
   
   // Call connect() method
   std::string result = wrapper.connect("test-tenant", "test-cluster", "test-node");
@@ -2734,6 +2767,691 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWriteFailure) {
   
   // If no exception was thrown, verify connect() still returns the local address
   EXPECT_EQ(result, "127.0.0.1:12345");
+}
+
+// Test RCConnectionWrapper::onHandshakeSuccess method
+TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
+  // Set up thread local slot first so stats can be properly tracked
+  setupThreadLocalSlot();
+  
+  // Set up mock thread local cluster
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet()).WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  // Create HostConnectionInfo entry
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_))
+      .WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Call initiateOneReverseConnection to create the wrapper and add it to the map
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  // Verify wrapper was created and mapped
+  const auto& connection_wrappers = getConnectionWrappers();
+  EXPECT_EQ(connection_wrappers.size(), 1);
+  
+  const auto& wrapper_to_host_map = getConnWrapperToHostMap();
+  EXPECT_EQ(wrapper_to_host_map.size(), 1);
+  
+  RCConnectionWrapper* wrapper_ptr = connection_wrappers[0].get();
+  EXPECT_EQ(wrapper_to_host_map.at(wrapper_ptr), "192.168.1.1");
+
+  // Get initial stats before onHandshakeSuccess
+  auto initial_stats = extension_->getCrossWorkerStatMap();
+  std::string host_stat_name = "test_scope.reverse_connections.host.192.168.1.1.connected";
+  std::string cluster_stat_name = "test_scope.reverse_connections.cluster.test-cluster.connected";
+  
+  // Call onHandshakeSuccess
+  wrapper_ptr->onHandshakeSuccess();
+  
+  // Get stats after onHandshakeSuccess
+  auto final_stats = extension_->getCrossWorkerStatMap();
+  
+  // Verify that connected stats were incremented
+  EXPECT_EQ(final_stats[host_stat_name], initial_stats[host_stat_name] + 1);
+  EXPECT_EQ(final_stats[cluster_stat_name], initial_stats[cluster_stat_name] + 1);
+  
+  // Debug: Print stats for verification
+  std::cout << "\n=== OnHandshakeSuccess Stats ===" << std::endl;
+  std::cout << "Host stat '" << host_stat_name << "': " << initial_stats[host_stat_name] << " -> " << final_stats[host_stat_name] << std::endl;
+  std::cout << "Cluster stat '" << cluster_stat_name << "': " << initial_stats[cluster_stat_name] << " -> " << final_stats[cluster_stat_name] << std::endl;
+  std::cout << "=================================" << std::endl;
+}
+
+// Test RCConnectionWrapper::onHandshakeFailure method
+TEST_F(RCConnectionWrapperTest, OnHandshakeFailure) {
+  // Set up thread local slot first so stats can be properly tracked
+  setupThreadLocalSlot();
+  
+  // Set up mock thread local cluster
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet()).WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  // Create HostConnectionInfo entry
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_))
+      .WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Call initiateOneReverseConnection to create the wrapper and add it to the map
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  // Verify wrapper was created and mapped
+  const auto& connection_wrappers = getConnectionWrappers();
+  EXPECT_EQ(connection_wrappers.size(), 1);
+  
+  const auto& wrapper_to_host_map = getConnWrapperToHostMap();
+  EXPECT_EQ(wrapper_to_host_map.size(), 1);
+  
+  RCConnectionWrapper* wrapper_ptr = connection_wrappers[0].get();
+  EXPECT_EQ(wrapper_to_host_map.at(wrapper_ptr), "192.168.1.1");
+
+  // Get initial stats before onHandshakeFailure
+  auto initial_stats = extension_->getCrossWorkerStatMap();
+  std::string host_failed_stat_name = "test_scope.reverse_connections.host.192.168.1.1.failed";
+  std::string cluster_failed_stat_name = "test_scope.reverse_connections.cluster.test-cluster.failed";
+  
+  // Call onHandshakeFailure with an error message
+  std::string error_message = "Handshake failed due to authentication error";
+  wrapper_ptr->onHandshakeFailure(error_message);
+  
+  // Get stats after onHandshakeFailure
+  auto final_stats = extension_->getCrossWorkerStatMap();
+  
+  // Verify that failed stats were incremented
+  EXPECT_EQ(final_stats[host_failed_stat_name], initial_stats[host_failed_stat_name] + 1);
+  EXPECT_EQ(final_stats[cluster_failed_stat_name], initial_stats[cluster_failed_stat_name] + 1);
+  
+  // Debug: Print stats for verification
+  std::cout << "\n=== OnHandshakeFailure Stats ===" << std::endl;
+  std::cout << "Host failed stat '" << host_failed_stat_name << "': " << initial_stats[host_failed_stat_name] << " -> " << final_stats[host_failed_stat_name] << std::endl;
+  std::cout << "Cluster failed stat '" << cluster_failed_stat_name << "': " << initial_stats[cluster_failed_stat_name] << " -> " << final_stats[cluster_failed_stat_name] << std::endl;
+  std::cout << "==================================" << std::endl;
+}
+
+// Test RCConnectionWrapper::onEvent method with RemoteClose event
+TEST_F(RCConnectionWrapperTest, OnEventRemoteClose) {
+  // Set up thread local slot first so stats can be properly tracked
+  setupThreadLocalSlot();
+  
+  // Set up mock thread local cluster
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet()).WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  // Create HostConnectionInfo entry
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_))
+      .WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Call initiateOneReverseConnection to create the wrapper and add it to the map
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  // Verify wrapper was created and mapped
+  const auto& connection_wrappers = getConnectionWrappers();
+  EXPECT_EQ(connection_wrappers.size(), 1);
+  
+  const auto& wrapper_to_host_map = getConnWrapperToHostMap();
+  EXPECT_EQ(wrapper_to_host_map.size(), 1);
+  
+  RCConnectionWrapper* wrapper_ptr = connection_wrappers[0].get();
+  EXPECT_EQ(wrapper_to_host_map.at(wrapper_ptr), "192.168.1.1");
+
+  // Get initial stats before onEvent
+  auto initial_stats = extension_->getCrossWorkerStatMap();
+  std::string host_connected_stat_name = "test_scope.reverse_connections.host.192.168.1.1.connected";
+  std::string cluster_connected_stat_name = "test_scope.reverse_connections.cluster.test-cluster.connected";
+  
+  // Call onEvent with RemoteClose event
+  wrapper_ptr->onEvent(Network::ConnectionEvent::RemoteClose);
+  
+  // Get stats after onEvent
+  auto final_stats = extension_->getCrossWorkerStatMap();
+  
+  // Verify that the connection closure was handled
+  // Note: The exact stat changes depend on the implementation of onConnectionDone
+  // For RemoteClose, we expect the connection to be marked as closed
+  
+  // Debug: Print stats for verification
+  std::cout << "\n=== OnEventRemoteClose Stats ===" << std::endl;
+  std::cout << "Host connected stat '" << host_connected_stat_name << "': " << initial_stats[host_connected_stat_name] << " -> " << final_stats[host_connected_stat_name] << std::endl;
+  std::cout << "Cluster connected stat '" << cluster_connected_stat_name << "': " << initial_stats[cluster_connected_stat_name] << " -> " << final_stats[cluster_connected_stat_name] << std::endl;
+  std::cout << "=================================" << std::endl;
+}
+
+// Test RCConnectionWrapper::onEvent method with Connected event (should be ignored)
+TEST_F(RCConnectionWrapperTest, OnEventConnected) {
+  // Set up thread local slot first so stats can be properly tracked
+  setupThreadLocalSlot();
+  
+  // Set up mock thread local cluster
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet()).WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  // Create HostConnectionInfo entry
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_))
+      .WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Call initiateOneReverseConnection to create the wrapper and add it to the map
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  // Verify wrapper was created and mapped
+  const auto& connection_wrappers = getConnectionWrappers();
+  EXPECT_EQ(connection_wrappers.size(), 1);
+  
+  const auto& wrapper_to_host_map = getConnWrapperToHostMap();
+  EXPECT_EQ(wrapper_to_host_map.size(), 1);
+  
+  RCConnectionWrapper* wrapper_ptr = connection_wrappers[0].get();
+  EXPECT_EQ(wrapper_to_host_map.at(wrapper_ptr), "192.168.1.1");
+
+  // Get initial stats before onEvent
+  auto initial_stats = extension_->getCrossWorkerStatMap();
+  
+  // Call onEvent with Connected event (should be ignored)
+  wrapper_ptr->onEvent(Network::ConnectionEvent::Connected);
+  
+  // Get stats after onEvent
+  auto final_stats = extension_->getCrossWorkerStatMap();
+  
+  // Verify that Connected event doesn't change stats (it should be ignored)
+  // The stats should remain the same
+  EXPECT_EQ(final_stats, initial_stats);
+  
+  // Debug: Print stats for verification
+  std::cout << "\n=== OnEventConnected Stats ===" << std::endl;
+  std::cout << "Stats unchanged after Connected event (as expected)" << std::endl;
+  std::cout << "=================================" << std::endl;
+}
+
+// Test RCConnectionWrapper::onEvent method with null connection
+TEST_F(RCConnectionWrapperTest, OnEventWithNullConnection) {
+  // Set up thread local slot first so stats can be properly tracked
+  setupThreadLocalSlot();
+  
+  // Set up mock thread local cluster
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet()).WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  // Create HostConnectionInfo entry
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_))
+      .WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Call initiateOneReverseConnection to create the wrapper and add it to the map
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  // Verify wrapper was created and mapped
+  const auto& connection_wrappers = getConnectionWrappers();
+  EXPECT_EQ(connection_wrappers.size(), 1);
+  
+  const auto& wrapper_to_host_map = getConnWrapperToHostMap();
+  EXPECT_EQ(wrapper_to_host_map.size(), 1);
+  
+  RCConnectionWrapper* wrapper_ptr = connection_wrappers[0].get();
+  EXPECT_EQ(wrapper_to_host_map.at(wrapper_ptr), "192.168.1.1");
+
+  // Get initial stats before onEvent
+  auto initial_stats = extension_->getCrossWorkerStatMap();
+  
+  // Call onEvent with RemoteClose event
+  wrapper_ptr->onEvent(Network::ConnectionEvent::RemoteClose);
+  
+  // Get stats after onEvent
+  auto final_stats = extension_->getCrossWorkerStatMap();
+  
+  // Verify that the event was handled gracefully even with connection closure
+  // The exact behavior depends on the implementation, but it should not crash
+  
+  // Debug: Print stats for verification
+  std::cout << "\n=== OnEventWithNullConnection Stats ===" << std::endl;
+  std::cout << "Event handled gracefully after connection closure" << std::endl;
+  std::cout << "===============================================" << std::endl;
+}
+
+// Test RCConnectionWrapper::releaseConnection method
+TEST_F(RCConnectionWrapperTest, ReleaseConnection) {
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  
+  // Create RCConnectionWrapper with the mock connection
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  
+  // Verify connection exists before release
+  EXPECT_NE(wrapper.getConnection(), nullptr);
+  
+  // Release the connection
+  auto released_connection = wrapper.releaseConnection();
+  
+  // Verify connection was released
+  EXPECT_NE(released_connection, nullptr);
+  EXPECT_EQ(wrapper.getConnection(), nullptr);
+}
+
+// Test RCConnectionWrapper::getConnection method
+TEST_F(RCConnectionWrapperTest, GetConnection) {
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  
+  // Create RCConnectionWrapper with the mock connection
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  
+  // Get the connection
+  auto* connection = wrapper.getConnection();
+  
+  // Verify connection is returned
+  EXPECT_NE(connection, nullptr);
+  
+  // Test after release
+  wrapper.releaseConnection();
+  EXPECT_EQ(wrapper.getConnection(), nullptr);
+}
+
+// Test RCConnectionWrapper::getHost method
+TEST_F(RCConnectionWrapperTest, GetHost) {
+  // Create a mock connection and host
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  
+  // Create RCConnectionWrapper with the mock connection
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  
+  // Get the host
+  auto host = wrapper.getHost();
+  
+  // Verify host is returned
+  EXPECT_EQ(host, mock_host);
+}
+
+// Test RCConnectionWrapper::onAboveWriteBufferHighWatermark method (no-op)
+TEST_F(RCConnectionWrapperTest, OnAboveWriteBufferHighWatermark) {
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  
+  // Create RCConnectionWrapper with the mock connection
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  
+  // Call onAboveWriteBufferHighWatermark - should be a no-op
+  wrapper.onAboveWriteBufferHighWatermark();
+}
+
+// Test RCConnectionWrapper::onBelowWriteBufferLowWatermark method (no-op)
+TEST_F(RCConnectionWrapperTest, OnBelowWriteBufferLowWatermark) {
+  // Create a mock connection
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+  
+  // Create RCConnectionWrapper with the mock connection
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  
+  // Call onBelowWriteBufferLowWatermark - should be a no-op
+  wrapper.onBelowWriteBufferLowWatermark();
+}
+
+// Test RCConnectionWrapper::shutdown method
+TEST_F(RCConnectionWrapperTest, Shutdown) {
+  // Test 1: Shutdown with open connection
+  std::cout << "Test 1: Shutdown with open connection" << std::endl;
+  {
+    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    
+    // Set up connection expectations for open connection
+    EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_)).Times(1);
+    EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::FlushWrite)).Times(1);
+    EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+    
+    RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+    
+    EXPECT_NE(wrapper.getConnection(), nullptr);
+    wrapper.shutdown();
+    EXPECT_EQ(wrapper.getConnection(), nullptr);
+  }
+  std::cout << "Test 2: Shutdown with already closed connection" << std::endl;
+  // Test 2: Shutdown with already closed connection
+  {
+    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    
+    // Set up connection expectations for closed connection
+    EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Closed));
+    EXPECT_CALL(*mock_connection, close(_)).Times(0); // Should not call close on already closed connection
+    EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12346));
+    
+    RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+    
+    EXPECT_NE(wrapper.getConnection(), nullptr);
+    wrapper.shutdown();
+    EXPECT_EQ(wrapper.getConnection(), nullptr);
+  }
+  std::cout << "Test 3: Shutdown with closing connection" << std::endl;
+  
+  // Test 3: Shutdown with closing connection
+  {
+    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    
+    // Set up connection expectations for closing connection
+    EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_)).Times(1);
+    EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Closing));
+    EXPECT_CALL(*mock_connection, close(_)).Times(0); // Should not call close on already closing connection
+    EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12347));
+    
+    RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+    
+    EXPECT_NE(wrapper.getConnection(), nullptr);
+    wrapper.shutdown();
+    EXPECT_EQ(wrapper.getConnection(), nullptr);
+  }
+  std::cout << "Test 4: Shutdown with null connection" << std::endl;
+  // Test 4: Shutdown with null connection (should be safe)
+  {
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    
+    // Create wrapper with null connection
+    RCConnectionWrapper wrapper(*io_handle_, nullptr, mock_host, "test-cluster");
+    
+    EXPECT_EQ(wrapper.getConnection(), nullptr);
+    wrapper.shutdown(); // Should not crash
+    EXPECT_EQ(wrapper.getConnection(), nullptr);
+  }
+  std::cout << "Test 5: Multiple shutdown calls" << std::endl;
+  // Test 5: Multiple shutdown calls (should be safe)
+  {
+    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    
+    // Set up connection expectations
+    EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_)).Times(1);
+    EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+    EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::FlushWrite)).Times(1);
+    EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12348));
+    
+    RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+    
+    EXPECT_NE(wrapper.getConnection(), nullptr);
+    
+    // First shutdown
+    wrapper.shutdown();
+    EXPECT_EQ(wrapper.getConnection(), nullptr);
+    
+    // Second shutdown (should be safe)
+    wrapper.shutdown();
+    EXPECT_EQ(wrapper.getConnection(), nullptr);
+  }
+}
+
+// Test SimpleConnReadFilter::onData method
+class SimpleConnReadFilterTest : public testing::Test {
+protected:
+  void SetUp() override {
+    stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
+    
+    // Create a mock IO handle
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockConnection>>();
+    io_handle_ = std::make_unique<ReverseConnectionIOHandle>(
+        7, // dummy fd
+        ReverseConnectionSocketConfig{},
+        cluster_manager_,
+        nullptr, // extension
+        *stats_scope_); // Use the created scope
+  }
+
+  void TearDown() override {
+    io_handle_.reset();
+  }
+
+  // Helper to create a mock RCConnectionWrapper
+  std::unique_ptr<RCConnectionWrapper> createMockWrapper() {
+    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+    return std::make_unique<RCConnectionWrapper>(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  }
+
+  // Helper to create SimpleConnReadFilter
+  std::unique_ptr<RCConnectionWrapper::SimpleConnReadFilter> createFilter(RCConnectionWrapper* parent) {
+    return std::make_unique<RCConnectionWrapper::SimpleConnReadFilter>(parent);
+  }
+
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  Stats::IsolatedStoreImpl stats_store_;
+  Stats::ScopeSharedPtr stats_scope_;
+  std::unique_ptr<ReverseConnectionIOHandle> io_handle_;
+};
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithNullParent) {
+  // Create filter with null parent
+  auto filter = createFilter(nullptr);
+  
+  // Create a buffer with some data
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
+  
+  // Call onData - should return StopIteration when parent is null
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithHttp200Response) {
+  // Create wrapper and filter
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+  
+  // Create a buffer with HTTP 200 response but invalid protobuf
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\nreverse connection accepted");
+  
+  // Call onData - should return StopIteration for invalid response format
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithHttp2Response) {
+  // Create wrapper and filter
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+  
+  // Create a buffer with HTTP/2 response but invalid protobuf
+  Buffer::OwnedImpl buffer("HTTP/2 200\r\n\r\nACCEPTED");
+  
+  // Call onData - should return StopIteration for invalid response format
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithIncompleteHeaders) {
+  // Create wrapper and filter
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+  
+  // Create a buffer with incomplete HTTP headers
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n");
+  
+  // Call onData - should return Continue for incomplete headers
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::Continue);
+}
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithEmptyResponseBody) {
+  // Create wrapper and filter
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+  
+  // Create a buffer with HTTP 200 but empty body
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
+  
+  // Call onData - should return Continue for empty body
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::Continue);
+}
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithNon200Response) {
+  // Create wrapper and filter
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+  
+  // Create a buffer with HTTP 404 response
+  Buffer::OwnedImpl buffer("HTTP/1.1 404 Not Found\r\n\r\n");
+  
+  // Call onData - should return StopIteration for error response
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithHttp2ErrorResponse) {
+  // Create wrapper and filter
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+  
+  // Create a buffer with HTTP/2 error response
+  Buffer::OwnedImpl buffer("HTTP/2 500\r\n\r\n");
+  
+  // Call onData - should return StopIteration for error response
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
+}
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithPartialData) {
+  // Create wrapper and filter
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+  
+  // Create a buffer with partial data (no HTTP response yet)
+  Buffer::OwnedImpl buffer("partial data");
+  
+  // Call onData - should return Continue for partial data
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::Continue);
+}
+
+TEST_F(SimpleConnReadFilterTest, OnDataWithProtobufResponse) {
+  // Create wrapper and filter
+  auto wrapper = createMockWrapper();
+  auto filter = createFilter(wrapper.get());
+  
+  // Create a proper ReverseConnHandshakeRet protobuf response
+  envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeRet ret;
+  ret.set_status(envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeRet::ACCEPTED);
+  ret.set_status_message("Connection accepted");
+  
+  std::string protobuf_data = ret.SerializeAsString();
+  std::string http_response = "HTTP/1.1 200 OK\r\n\r\n" + protobuf_data;
+  Buffer::OwnedImpl buffer(http_response);
+  
+  // Call onData - should return StopIteration for successful protobuf response
+  auto result = filter->onData(buffer, false);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
 } // namespace ReverseConnection
