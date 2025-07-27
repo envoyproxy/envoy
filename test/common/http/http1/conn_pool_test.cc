@@ -1193,10 +1193,7 @@ TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-/**
- * Test that request tracking works correctly for HTTP/1.1 connections.
- * Verifies that the upstream_rq_per_cx histogram is emitted correctly.
- */
+// Verifies that the upstream_rq_per_cx histogram is emitted correctly.
 TEST_F(Http1ConnPoolImplTest, RequestTrackingMetric) {
   // Set up expectations for all histograms that will be emitted on connection close
   EXPECT_CALL(cluster_->stats_store_,
