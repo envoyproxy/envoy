@@ -151,14 +151,9 @@ public:
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
   uint64_t id() const override { return codec_client_->id(); }
 
-  // Request tracking methods
-  virtual void trackRequest();
-
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
-
-protected:
   // Request tracking for HTTP protocols
   uint32_t request_count_{0};
 };
