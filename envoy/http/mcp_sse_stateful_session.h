@@ -45,6 +45,9 @@ public:
    */
   virtual Envoy::Http::FilterDataStatus onUpdateData(absl::string_view host_address,
                                                      Buffer::Instance& data, bool end_stream) PURE;
+
+  virtual bool sessionIdFound() const PURE;
+  virtual void resetSessionIdFound() PURE; // only for testing
 };
 
 using McpSseSessionStatePtr = std::unique_ptr<McpSseSessionState>;

@@ -15,6 +15,8 @@ public:
               (absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers));
   MOCK_METHOD(Envoy::Http::FilterDataStatus, onUpdateData,
               (absl::string_view host_address, Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(bool, sessionIdFound, (), (const));
+  MOCK_METHOD(void, resetSessionIdFound, ());
 };
 
 class MockSessionStateFactory : public Envoy::Http::McpSseSessionStateFactory {

@@ -107,6 +107,14 @@ static const std::string DISABLE_STATEFUL_SESSION =
 disabled: true
 )EOF";
 
+static const std::string EMPTY_STATEFUL_SESSION =
+    R"EOF(
+name: envoy.filters.http.mcp_sse_stateful_session
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_sse_stateful_session.v3alpha.McpSseStatefulSession
+  strict: false
+)EOF";
+
 static const std::string OVERRIDE_STATEFUL_SESSION =
     R"EOF(
 "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_sse_stateful_session.v3alpha.McpSseStatefulSessionPerRoute
@@ -116,6 +124,7 @@ mcp_sse_stateful_session:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
       param_name: sessionId
+  strict: true
 )EOF";
 
 // Tests upstream SSE response injection in Envelope + Strict mode.
@@ -330,6 +339,162 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
     const std::string expected_sse_data = "data: https://example.com/test?sessionId=abcdefg\n\n";
 
     EXPECT_EQ(expected_sse_data, sse_response->body());
+
+    cleanupUpstreamAndDownstream();
+  }
+}
+
+//Empty stateful session should be overridden by per route config.
+TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverrideByRoute) {
+  initializeFilterAndRoute(EMPTY_STATEFUL_SESSION, OVERRIDE_STATEFUL_SESSION);
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    // Construct SSE request
+    Envoy::Http::TestRequestHeaderMapImpl sse_request_headers{
+        {":method", "GET"},
+        {":path", "/sse"},
+        {":scheme", "http"},
+        {":authority", "stateful.session.com"}};
+
+    auto sse_response = codec_client_->makeRequestWithBody(sse_request_headers, 0);
+
+    // Wait for upstream request
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    ASSERT(upstream_index.has_value());
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(upstream_index.value(), endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+    const std::string encoded_host =
+        Envoy::Base64Url::encode(address_string.data(), address_string.size());
+
+    // Set content type to text/event-stream (required for SSE)
+    default_response_headers_.addCopy(Envoy::Http::LowerCaseString("content-type"),
+                                      "text/event-stream");
+    upstream_request_->encodeHeaders(default_response_headers_, false); // stream not closed yet
+
+    // Build and send initial SSE event data
+    const std::string original_session_id = "abcdefg";
+    const std::string sse_data =
+        fmt::format("data: https://example.com/test?sessionId={}\n\n", original_session_id);
+    upstream_request_->encodeData(sse_data, true);
+    ASSERT_TRUE(sse_response->waitForEndStream());
+
+    EXPECT_TRUE(upstream_request_->complete());
+    EXPECT_TRUE(sse_response->complete());
+
+    // Build expected response with host address
+    const std::string expected_sse_data =
+        "data: https://example.com/test?sessionId=abcdefg." + encoded_host + "\n\n";
+
+    EXPECT_EQ(expected_sse_data, sse_response->body());
+
+    cleanupUpstreamAndDownstream();
+  }
+
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(1, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+
+    // Encode upstream address using Base64Url
+    const std::string encoded_host =
+        Envoy::Base64Url::encode(address_string.data(), address_string.size());
+    const std::string session_param = "abcdefg." + encoded_host;
+
+    // Construct SSE request with encoded session parameter
+    Envoy::Http::TestRequestHeaderMapImpl sse_request_headers{
+        {":method", "GET"},
+        {":path", fmt::format("/sse?sessionId={}", session_param)},
+        {":scheme", "http"},
+        {":authority", "stateful.session.com"}};
+
+    auto sse_response = codec_client_->makeRequestWithBody(sse_request_headers, 0);
+
+    // Wait for upstream request
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    ASSERT_TRUE(upstream_index.has_value());
+
+    // Expect that the selected upstream is index 1
+    EXPECT_EQ(upstream_index.value(), 1);
+
+    // Send response headers and complete stream
+    default_response_headers_.addCopy(Envoy::Http::LowerCaseString("content-type"),
+                                      "text/event-stream");
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+    upstream_request_->encodeData("data: hello\n\n", true);
+
+    ASSERT_TRUE(sse_response->waitForEndStream());
+
+    cleanupUpstreamAndDownstream();
+  }
+  // Upstream endpoint encoded in stateful session SSE points to the second server address.
+  // This should return the second server address.
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    envoy::config::endpoint::v3::LbEndpoint endpoint;
+    setUpstreamAddress(2, endpoint);
+    const std::string address_string =
+        fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+
+    // Encode upstream address using Base64Url
+    const std::string encoded_host =
+        Envoy::Base64Url::encode(address_string.data(), address_string.size());
+    const std::string session_param = "abcdefg." + encoded_host;
+
+    // Construct SSE request with encoded session parameter
+    Envoy::Http::TestRequestHeaderMapImpl sse_request_headers{
+        {":method", "GET"},
+        {":path", fmt::format("/sse?sessionId={}", session_param)},
+        {":scheme", "http"},
+        {":authority", "stateful.session.com"}};
+
+    auto sse_response = codec_client_->makeRequestWithBody(sse_request_headers, 0);
+
+    // Wait for upstream request
+    auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+    ASSERT_TRUE(upstream_index.has_value());
+
+    // Expect that the selected upstream is index 1
+    EXPECT_EQ(upstream_index.value(), 2);
+
+    // Send response headers and complete stream
+    default_response_headers_.addCopy(Envoy::Http::LowerCaseString("content-type"),
+                                      "text/event-stream");
+    upstream_request_->encodeHeaders(default_response_headers_, false);
+    upstream_request_->encodeData("data: hello\n\n", true);
+
+    ASSERT_TRUE(sse_response->waitForEndStream());
+
+    cleanupUpstreamAndDownstream();
+  }
+  // Upstream endpoint encoded in stateful session SSE points to unknown server address.
+  // This should return 503.
+  {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    // This decodes to "127.0.0.9:50000"
+    const std::string host = "127.0.0.9:50000";
+    const std::string encoded_host = Envoy::Base64Url::encode(host.data(), host.size());
+    const std::string session_param = "abcdefg." + encoded_host;
+
+    Envoy::Http::TestRequestHeaderMapImpl sse_request_headers{
+        {":method", "GET"},
+        {":path", fmt::format("/sse?sessionId={}", session_param)},
+        {":scheme", "http"},
+        {":authority", "stateful.session.com"}};
+
+    auto sse_response = codec_client_->makeRequestWithBody(sse_request_headers, 0);
+
+    // Should return 503 because the host is unknown
+    ASSERT_TRUE(sse_response->waitForEndStream());
+    EXPECT_EQ("503", sse_response->headers().getStatusValue());
 
     cleanupUpstreamAndDownstream();
   }

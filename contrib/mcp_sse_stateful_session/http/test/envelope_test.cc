@@ -44,9 +44,8 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
 
     // Call onUpdateData (this will move data to pending_chunk_)
     EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, false),
-              Envoy::Http::FilterDataStatus::StopIterationAndBuffer);
-
-    data_buffer.drain(data_buffer.length()); // Clear buffer for next test
+              Envoy::Http::FilterDataStatus::Continue);
+    EXPECT_EQ(data_buffer.length(), 0); // data_buffer should be drained
   }
 
   // Case 2: Non-SSE response (Content-Type: text/plain)
@@ -68,6 +67,9 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
     // Should NOT be modified
     EXPECT_NE(result_data.find("sessionId=abcdefg"), std::string::npos);
     EXPECT_EQ(result_data.find(encoded_host), std::string::npos);
+    data_buffer.drain(data_buffer.length());
+    EXPECT_FALSE(session_state->sessionIdFound());
+    session_state->resetSessionIdFound();
   }
 
   // Case 3: Valid SSE response with LFLF \n\n
@@ -83,7 +85,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
               Envoy::Http::FilterDataStatus::Continue);
 
     const std::string expected_url =
-        absl::StrCat("http://example.com?sessionId=abcdefg.", encoded_host);
+        absl::StrCat("http://example.com?sessionId=", raw_session_id, ".", encoded_host);
 
     const std::string result_data(
         static_cast<const char*>(data_buffer.linearize(data_buffer.length())),
@@ -91,6 +93,8 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
 
     EXPECT_NE(result_data.find(expected_url), std::string::npos);
     data_buffer.drain(data_buffer.length());
+    EXPECT_TRUE(session_state->sessionIdFound());
+    session_state->resetSessionIdFound();
   }
 
   // Case 4: Valid SSE response with CRCR \r\r
@@ -106,7 +110,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
               Envoy::Http::FilterDataStatus::Continue);
 
     const std::string expected_url =
-        absl::StrCat("http://example.com?sessionId=abcdefg.", encoded_host);
+        absl::StrCat("http://example.com?sessionId=", raw_session_id, ".", encoded_host);
 
     const std::string result_data(
         static_cast<const char*>(data_buffer.linearize(data_buffer.length())),
@@ -114,6 +118,8 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
 
     EXPECT_NE(result_data.find(expected_url), std::string::npos);
     data_buffer.drain(data_buffer.length());
+    EXPECT_TRUE(session_state->sessionIdFound());
+    session_state->resetSessionIdFound();
   }
 
   // Case 5: Valid SSE response with CRLFCRLF \r\n\r\n
@@ -129,7 +135,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
               Envoy::Http::FilterDataStatus::Continue);
 
     const std::string expected_url =
-        absl::StrCat("http://example.com?sessionId=abcdefg.", encoded_host);
+        absl::StrCat("http://example.com?sessionId=", raw_session_id, ".", encoded_host);
 
     const std::string result_data(
         static_cast<const char*>(data_buffer.linearize(data_buffer.length())),
@@ -137,6 +143,8 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
 
     EXPECT_NE(result_data.find(expected_url), std::string::npos);
     data_buffer.drain(data_buffer.length());
+    EXPECT_TRUE(session_state->sessionIdFound());
+    session_state->resetSessionIdFound();
   }
 
   // Case 6: sessionId contains SEPARATOR ('.') in the middle (e.g. "abc.def.ghi")
@@ -153,8 +161,8 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
     EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, false),
               Envoy::Http::FilterDataStatus::Continue);
 
-    const std::string expected_url =
-        absl::StrCat("http://example.com?sessionId=abc.def.ghi.", encoded_host);
+    const std::string expected_url = absl::StrCat(
+        "http://example.com?sessionId=", raw_session_id_with_separator, ".", encoded_host);
 
     const std::string result_data(
         static_cast<const char*>(data_buffer.linearize(data_buffer.length())),
@@ -162,6 +170,28 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
 
     EXPECT_NE(result_data.find(expected_url), std::string::npos);
     data_buffer.drain(data_buffer.length());
+    EXPECT_TRUE(session_state->sessionIdFound());
+    session_state->resetSessionIdFound();
+  }
+
+  // Case 7: after sessionId is found, no more data should be processed
+  {
+    Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                                   {"content-type", "text/event-stream"}};
+
+    session_state->onUpdateHeader(host_address, headers);
+    data_buffer.add(absl::StrCat("data: http://example.com?sessionId=", raw_session_id, LFLF));
+    EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, false),
+              Envoy::Http::FilterDataStatus::Continue);
+    EXPECT_TRUE(session_state->sessionIdFound());
+    data_buffer.drain(data_buffer.length());
+
+    // Add more data
+    data_buffer.add(absl::StrCat("data: abcdefg")); // no LFLF at the end, incomplete chunk
+    EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, false),
+              Envoy::Http::FilterDataStatus::Continue);
+
+    EXPECT_NE(data_buffer.length(), 0);
   }
 }
 TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestSse) {
@@ -209,6 +239,73 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestSse) {
     EXPECT_EQ(session_state5->upstreamAddress().value(), "1.2.3.4:80");
     EXPECT_EQ(request_headers5.getPathValue(), "/path?sessionId=abcdefg&otherParam=highklm");
   }
+}
+
+TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestMaxPendingChunkSize) {
+  EnvelopeSessionStateProto config;
+  config.set_param_name("sessionId");
+  EnvelopeSessionStateFactory factory(config);
+  Envoy::Http::TestRequestHeaderMapImpl request_headers;
+  auto session_state = factory.create(request_headers);
+
+  const std::string host_address = "1.2.3.4:80";
+
+  Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                                   {"content-type", "text/event-stream"}};
+
+  session_state->onUpdateHeader(host_address, headers);
+
+  // Base64Url encoded host address
+  const std::string encoded_host =
+      Envoy::Base64Url::encode(host_address.data(), host_address.size());
+
+  Buffer::OwnedImpl data_buffer;
+
+  // Generate data larger than 4KB and add it to data_buffer
+  std::string large_data(5 * 1024, 'x'); 
+  data_buffer.add(large_data);
+
+  // Call onUpdateData (this will move data to pending_chunk_)
+  EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, false),
+            Envoy::Http::FilterDataStatus::Continue);
+
+  // Check if the session ID is found
+  EXPECT_TRUE(session_state->sessionIdFound());
+
+  data_buffer.drain(data_buffer.length());
+}
+
+TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestEndStream) {
+  EnvelopeSessionStateProto config;
+  config.set_param_name("sessionId");
+  EnvelopeSessionStateFactory factory(config);
+  Envoy::Http::TestRequestHeaderMapImpl request_headers;
+  auto session_state = factory.create(request_headers);
+
+  const std::string host_address = "1.2.3.4:80";
+
+  Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                                   {"content-type", "text/event-stream"}};
+
+  session_state->onUpdateHeader(host_address, headers);
+
+  // Base64Url encoded host address
+  const std::string encoded_host =
+      Envoy::Base64Url::encode(host_address.data(), host_address.size());
+
+  Buffer::OwnedImpl data_buffer;
+
+  // data contain no end of line at the end, incomplete chunk
+  data_buffer.add("data: abcdefg");
+
+  // Call onUpdateData 
+  EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, true),
+            Envoy::Http::FilterDataStatus::Continue);
+
+  // data_buffer should not be drained, because it's end of stream
+  EXPECT_NE(data_buffer.length(), 0);
+
+  data_buffer.drain(data_buffer.length());
 }
 
 } // namespace

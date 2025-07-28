@@ -11,6 +11,7 @@ namespace Envelope {
 constexpr absl::string_view CRLFCRLF = "\r\n\r\n";
 constexpr absl::string_view CRCR = "\r\r";
 constexpr absl::string_view LFLF = "\n\n";
+constexpr uint64_t MAX_PENDING_CHUNK_SIZE = 4 * 1024; // 4KB
 
 void EnvelopeSessionStateFactory::SessionStateImpl::onUpdateHeader(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
@@ -26,8 +27,26 @@ Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onU
     return Envoy::Http::FilterDataStatus::Continue;
   }
 
+  // Skip if session ID is already found
+  if (session_id_found_) {
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+
+  // check the pending chunk size
+  // in case of wrong configuration on this filter
+  if (pending_chunk_.length() + data.length() > MAX_PENDING_CHUNK_SIZE) {
+    ENVOY_LOG(error, "Pending chunk size exceeds max pending chunk size: {}",
+              pending_chunk_.length() + data.length());
+    pending_chunk_.add(data);
+    data.drain(data.length());
+    data.move(pending_chunk_);
+    session_id_found_ = true; // skip the rest of the data
+    return Envoy::Http::FilterDataStatus::Continue;
+  }
+
   // Append new data to pending buffer
   pending_chunk_.add(data);
+
   data.drain(data.length());
 
   while (pending_chunk_.length() > 0) {
@@ -93,6 +112,7 @@ Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onU
           chunk_buffer_str.substr(value_end));
 
       data.add(modified_url);
+      session_id_found_ = true;
     } else {
       // If parameter not found, keep chunk unchanged
       data.add(chunk_buffer);
@@ -104,10 +124,8 @@ Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onU
   if (end_stream) {
     data.add(pending_chunk_);
     pending_chunk_.drain(pending_chunk_.length());
-    return Envoy::Http::FilterDataStatus::Continue;
   }
-  return data.length() > 0 ? Envoy::Http::FilterDataStatus::Continue
-                           : Envoy::Http::FilterDataStatus::StopIterationAndBuffer;
+  return Envoy::Http::FilterDataStatus::Continue;
 }
 
 EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)

@@ -37,6 +37,8 @@ public:
                         Envoy::Http::ResponseHeaderMap& headers) override;
     Envoy::Http::FilterDataStatus onUpdateData(absl::string_view host_address,
                                                Buffer::Instance& data, bool end_stream) override;
+    bool sessionIdFound() const override { return session_id_found_; }
+    void resetSessionIdFound() override { session_id_found_ = false; } // only for testing
 
   private:
     bool isSSEResponse() const {
@@ -47,6 +49,7 @@ public:
     const EnvelopeSessionStateFactory& factory_;
     Envoy::Http::ResponseHeaderMap* response_headers_{nullptr};
     Buffer::OwnedImpl pending_chunk_;
+    bool session_id_found_{false};
   };
 
   EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config);
