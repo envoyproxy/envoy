@@ -5273,8 +5273,8 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
   ASSERT_EQ(timings.size(), 6);
   if (fake_upstreams_[0]->httpType() != Http::CodecType::HTTP1 &&
       downstreamProtocol() != Http::CodecType::HTTP1) {
-    // All duration values except for ROUNDTIP_DURATION should be present (no '-' in the access log)
-    // when neither upstream nor downstream is H/1
+    // All duration values except for ROUNDTRIP_DURATION should be present (no '-' in the access
+    // log) when neither upstream nor downstream is H/1
     EXPECT_GT(/* DURATION */ std::stoi(timings.at(0)), 0);
     if (downstreamProtocol() == Http::CodecType::HTTP3) {
       // Only H/3 populate this metric.
