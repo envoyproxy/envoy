@@ -3,5 +3,3 @@
 
 MCP SSE Stateful Session Filter
 ===============================
-
-:ref:`envoy.http.mcp_sse_stateful_session.envelope <extension_envoy.http.mcp_sse_stateful_session.envelope>`
