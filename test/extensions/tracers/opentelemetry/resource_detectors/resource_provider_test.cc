@@ -101,30 +101,6 @@ TEST_F(ResourceProviderTest, NoResourceDetectorsConfigured) {
   }
 }
 
-// Verifies a resource with the default service name is returned when no detectors + static service
-// name are configured
-TEST_F(ResourceProviderTest, ServiceNameNotProvided) {
-  const std::string yaml_string = R"EOF(
-    grpc_service:
-      envoy_grpc:
-        cluster_name: fake-cluster
-      timeout: 0.250s
-    )EOF";
-  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
-  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
-
-  ResourceProviderImpl resource_provider;
-  Resource resource = resource_provider.getResource(opentelemetry_config.resource_detectors(),
-                                                    server_factory_context_);
-
-  EXPECT_EQ(resource.schema_url_, "");
-
-  // service.name receives the unknown value when not configured
-  EXPECT_EQ(4, resource.attributes_.size());
-  auto service_name = resource.attributes_.find("service.name");
-  EXPECT_EQ("unknown_service:envoy", service_name->second);
-}
-
 // Verifies it is possible to configure multiple resource detectors
 TEST_F(ResourceProviderTest, MultipleResourceDetectorsConfigured) {
   auto detector_a = std::make_unique<NiceMock<SampleDetector>>();
