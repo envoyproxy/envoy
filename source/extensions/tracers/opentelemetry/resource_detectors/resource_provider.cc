@@ -14,7 +14,7 @@ namespace OpenTelemetry {
 namespace {
 bool isEmptyResource(const Resource& resource) { return resource.attributes_.empty(); }
 
-Resource createInitialResource(const std::string& service_name) {
+Resource createInitialResource(absl::string_view service_name) {
   Resource resource{};
 
   // Creates initial resource with the static service.name and telemetry.sdk.* attributes.
@@ -88,14 +88,14 @@ void mergeResource(Resource& old_resource, const Resource& updating_resource) {
 } // namespace
 
 Resource ResourceProviderImpl::getResource(
-    const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-    Server::Configuration::TracerFactoryContext& context) const {
+    absl::string_view service_name,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+        resource_detectors,
+    Envoy::Server::Configuration::ServerFactoryContext& context) const {
 
-  Resource resource = createInitialResource(opentelemetry_config.service_name());
+  Resource resource = createInitialResource(service_name);
 
-  const auto& detectors_configs = opentelemetry_config.resource_detectors();
-
-  for (const auto& detector_config : detectors_configs) {
+  for (const auto& detector_config : resource_detectors) {
     ResourceDetectorPtr detector;
     auto* factory = Envoy::Config::Utility::getFactory<ResourceDetectorFactory>(detector_config);
 

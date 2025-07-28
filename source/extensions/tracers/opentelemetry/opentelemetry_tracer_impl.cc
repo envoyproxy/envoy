@@ -75,7 +75,9 @@ Driver::Driver(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetr
           POOL_COUNTER_PREFIX(context.serverFactoryContext().scope(), "tracing.opentelemetry"))} {
   auto& factory_context = context.serverFactoryContext();
 
-  Resource resource = resource_provider.getResource(opentelemetry_config, context);
+  Resource resource = resource_provider.getResource(opentelemetry_config.service_name(),
+                                                    opentelemetry_config.resource_detectors(),
+                                                    context.serverFactoryContext());
   ResourceConstSharedPtr resource_ptr = std::make_shared<Resource>(std::move(resource));
 
   if (opentelemetry_config.has_grpc_service() && opentelemetry_config.has_http_service()) {

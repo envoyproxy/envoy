@@ -12,6 +12,7 @@
 #include "envoy/stats/stats.h"
 
 #include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
 
 #include "opentelemetry/proto/collector/metrics/v1/metrics_service.pb.h"
 #include "opentelemetry/proto/common/v1/common.pb.h"
@@ -35,7 +36,7 @@ using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig
 
 class OtlpOptions {
 public:
-  OtlpOptions(const SinkConfig& sink_config);
+  OtlpOptions(const SinkConfig& sink_config, const Tracers::OpenTelemetry::Resource& resource);
 
   bool reportCountersAsDeltas() { return report_counters_as_deltas_; }
   bool reportHistogramsAsDeltas() { return report_histograms_as_deltas_; }
@@ -43,7 +44,7 @@ public:
   bool useTagExtractedName() { return use_tag_extracted_name_; }
   const std::string& statPrefix() { return stat_prefix_; }
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
-  resource_attributes() {
+  resource_attributes() const {
     return resource_attributes_;
   }
 

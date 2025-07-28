@@ -45,14 +45,12 @@ public:
     sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
     sink_config.mutable_emit_tags_as_attributes()->set_value(emit_tags_as_attributes);
     sink_config.mutable_use_tag_extracted_name()->set_value(use_tag_extracted_name);
-    for (const auto& [key, value] : resource_attributes) {
-      auto* attribute = sink_config.add_resource_attributes();
-      attribute->set_key(key);
-      attribute->set_value(value);
-    }
     sink_config.set_prefix(stat_prefix);
-
-    return std::make_shared<OtlpOptions>(sink_config);
+    Tracers::OpenTelemetry::Resource resource;
+    for (const auto& [key, value] : resource_attributes) {
+      resource.attributes_[key] = value;
+    }
+    return std::make_shared<OtlpOptions>(sink_config, resource);
   }
 
   std::string getTagExtractedName(const std::string name) { return name + "-tagged"; }

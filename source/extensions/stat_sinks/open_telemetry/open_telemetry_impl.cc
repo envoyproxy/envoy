@@ -7,7 +7,8 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
-OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
+OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
+                         const Tracers::OpenTelemetry::Resource& resource)
     : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
       report_histograms_as_deltas_(sink_config.report_histograms_as_deltas()),
       emit_tags_as_attributes_(
@@ -15,10 +16,10 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
       use_tag_extracted_name_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
       stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : "") {
-  for (const auto& attr : sink_config.resource_attributes()) {
+  for (const auto& attr : resource.attributes_) {
     auto* attribute = resource_attributes_.Add();
-    attribute->set_key(attr.key());
-    attribute->mutable_value()->set_string_value(attr.value());
+    attribute->set_key(attr.first);
+    attribute->mutable_value()->set_string_value(attr.second);
   }
 }
 

@@ -67,7 +67,7 @@ public:
    */
   virtual ResourceDetectorPtr
   createResourceDetector(const Protobuf::Message& message,
-                         Server::Configuration::TracerFactoryContext& context) PURE;
+                         Server::Configuration::ServerFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.tracers.opentelemetry.resource_detectors"; }
 };
