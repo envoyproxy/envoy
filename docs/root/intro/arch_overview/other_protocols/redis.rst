@@ -257,6 +257,7 @@ For details on each command's usage see the official
   INCRBY, String
   INCRBYFLOAT, String
   INFO, Server
+  ROLE, Server
   MGET, String
   MSET, String
   PSETEX, String

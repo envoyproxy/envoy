@@ -1,11 +1,11 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=22.04
-ARG BUILD_SHA=3c61d3759c2639d4b836d32a2d3c83fa0214e36f195a3421018dbaaf79cbe37f
+ARG BUILD_SHA=1ec65b2719518e27d4d25f104d93f9fac60dc437f81452302406825c46fcc9cb
 ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
 FROM scratch AS binary
-COPY ci/docker-entrypoint.sh /
+COPY distribution/docker/docker-entrypoint.sh /
 ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 # See https://github.com/docker/buildx/issues/510 for why this _must_ be this way
 ARG TARGETPLATFORM
@@ -59,7 +59,7 @@ COPY --chown=0:0 --chmod=755 \
 
 
 # STAGE: envoy-distroless
-FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:d1fc914c43cea489c26c896721344a49a1761b9bb678bcba1758772d22913302 AS envoy-distroless
+FROM gcr.io/distroless/base-nossl-debian12:nonroot@sha256:fa7b50f111719aaf5f7435383b6d05f12277f3ce9514bc0a62759374a04d6bae AS envoy-distroless
 EXPOSE 10000
 ENTRYPOINT ["/usr/local/bin/envoy"]
 CMD ["-c", "/etc/envoy/envoy.yaml"]

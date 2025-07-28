@@ -302,7 +302,7 @@ createMatchingTree(const std::string& name, const std::string& value) {
       std::make_unique<InputType>(name), absl::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
-                            []() { return std::make_unique<ActionType>(); }, nullptr, false});
+                            std::make_shared<ActionType>(), nullptr, false});
 
   return tree;
 }
@@ -315,7 +315,7 @@ Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> createRequestAndRespo
   tree->addChild(
       "match",
       Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
-          []() { return std::make_unique<SkipAction>(); },
+          std::make_shared<SkipAction>(),
           createMatchingTree<Envoy::Http::Matching::HttpRequestHeadersDataInput, SkipAction>(
               "match-header", "match"),
           false});
@@ -369,13 +369,11 @@ template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
 createMatchTreeWithOnNoMatch(const std::string& name, const std::string& value) {
   auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
-      std::make_unique<InputType>(name),
-      Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
-          []() { return std::make_unique<ActionType>(); }, nullptr, false});
+      std::make_unique<InputType>(name), Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
+                                             std::make_shared<ActionType>(), nullptr, false});
 
   // No action is set on match. i.e., nullptr action factory cb.
-  tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{[]() { return nullptr; },
-                                                                        nullptr, false});
+  tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{nullptr, nullptr, false});
   return tree;
 }
 

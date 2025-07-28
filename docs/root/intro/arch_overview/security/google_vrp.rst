@@ -55,9 +55,13 @@ attack surface for the initial stages of this program. We exclude any threat fro
 
 * Untrusted control planes.
 * Runtime services such as access logging, external authorization, etc.
-* Untrusted upstreams.
 * DoS attacks except as stipulated below.
-* Any filters apart from the HTTP connection manager network filter and HTTP router filter.
+* Any extensions in the ``contrib`` directory.
+* Any extensions that do not have ``stable`` status.
+* Any extensions that do not have security_posture ``robust_to_untrusted_downstream`` or ``robust_to_untrusted_downstream_and_upstream``
+  in the most recent `manifest <https://github.com/envoyproxy/envoy/blob/HEAD/source/extensions/extensions_metadata.yaml>`_.
+* Extensions with the ``robust_to_untrusted_downstream`` security posture do not qualify for vulnerabilties that require
+  untrusted upstream.
 * Admin console; this is disabled in the execution environment.
 
 We also explicitly exclude any local attacks (e.g. via local processes, shells, etc.) against

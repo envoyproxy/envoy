@@ -33,7 +33,6 @@
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_allow_alt_svc_for_ips);
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
-RUNTIME_GUARD(envoy_reloadable_features_avoid_dfp_cluster_removal_on_cds_update);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_fail_on_empty_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
@@ -42,7 +41,6 @@ RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
 RUNTIME_GUARD(envoy_reloadable_features_enable_include_histograms);
 RUNTIME_GUARD(envoy_reloadable_features_enable_new_query_param_present_match_behavior);
 RUNTIME_GUARD(envoy_reloadable_features_enable_udp_proxy_outlier_detection);
-RUNTIME_GUARD(envoy_reloadable_features_explicit_internal_address_config);
 RUNTIME_GUARD(envoy_reloadable_features_ext_proc_fail_close_spurious_resp);
 RUNTIME_GUARD(envoy_reloadable_features_filter_chain_aborted_can_not_continue);
 RUNTIME_GUARD(envoy_reloadable_features_gcp_authn_use_fixed_url);
@@ -51,8 +49,6 @@ RUNTIME_GUARD(envoy_reloadable_features_grpc_side_stream_flow_control);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_allow_cr_or_lf_at_request_start);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_delay_reset);
 RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_extension);
-// Ignore the automated "remove this flag" issue: we should keep this for 1 year.
-RUNTIME_GUARD(envoy_reloadable_features_http1_use_balsa_parser);
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
@@ -70,7 +66,6 @@ RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_normalize_rds_provider_config);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
-RUNTIME_GUARD(envoy_reloadable_features_oauth2_use_refresh_token);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_prefer_ipv6_dns_on_macos);
@@ -89,7 +84,6 @@ RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_with_rq_issued);
 RUNTIME_GUARD(envoy_reloadable_features_report_stream_reset_error_code);
 RUNTIME_GUARD(envoy_reloadable_features_router_filter_resetall_on_local_reply);
-RUNTIME_GUARD(envoy_reloadable_features_shadow_policy_inherit_trace_sampling);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_ext_proc_on_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_streaming_shadow);
@@ -162,6 +156,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_srtt);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_log_ip_families_on_network_error);
 // TODO(botengyao): flip to true after canarying the feature internally without problems.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_connection_close_through_filter_manager);
+// TODO(adisuissa): flip to true after all xDS types use the new subscription
+// method, and this is tested extensively.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_xdstp_based_config_singleton_subscriptions);
 
 // A flag to set the maximum TLS version for google_grpc client to TLS1.2, when needed for
 // compliance restrictions.
