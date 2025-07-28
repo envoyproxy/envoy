@@ -251,7 +251,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestMaxPendingChunkSiz
   const std::string host_address = "1.2.3.4:80";
 
   Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"},
-                                                   {"content-type", "text/event-stream"}};
+                                                 {"content-type", "text/event-stream"}};
 
   session_state->onUpdateHeader(host_address, headers);
 
@@ -262,7 +262,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestMaxPendingChunkSiz
   Buffer::OwnedImpl data_buffer;
 
   // Generate data larger than 4KB and add it to data_buffer
-  std::string large_data(5 * 1024, 'x'); 
+  std::string large_data(5 * 1024, 'x');
   data_buffer.add(large_data);
 
   // Call onUpdateData (this will move data to pending_chunk_)
@@ -285,7 +285,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestEndStream) {
   const std::string host_address = "1.2.3.4:80";
 
   Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"},
-                                                   {"content-type", "text/event-stream"}};
+                                                 {"content-type", "text/event-stream"}};
 
   session_state->onUpdateHeader(host_address, headers);
 
@@ -298,7 +298,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestEndStream) {
   // data contain no end of line at the end, incomplete chunk
   data_buffer.add("data: abcdefg");
 
-  // Call onUpdateData 
+  // Call onUpdateData
   EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, true),
             Envoy::Http::FilterDataStatus::Continue);
 

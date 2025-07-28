@@ -344,7 +344,7 @@ TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {
   }
 }
 
-//Empty stateful session should be overridden by per route config.
+// Empty stateful session should be overridden by per route config.
 TEST_F(StatefulSessionIntegrationTest, StatefulSessionOverrideByRoute) {
   initializeFilterAndRoute(EMPTY_STATEFUL_SESSION, OVERRIDE_STATEFUL_SESSION);
   {
