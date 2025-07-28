@@ -2026,9 +2026,6 @@ TEST_F(Http2ConnPoolImplTest, RequestTrackingMultipleStreams) {
   dispatcher_.clearDeferredDeleteList();
 }
 
-/**
- * Test request tracking for HTTP/2 with 5 concurrent streams to verify the counting.
- */
 // Verify request tracking for HTTP/2 with 5 concurrent streams.
 TEST_F(Http2ConnPoolImplTest, RequestTrackingFiveStreams) {
   // Allow multiple concurrent streams on a single connection
