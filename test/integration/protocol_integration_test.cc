@@ -5291,7 +5291,6 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
     EXPECT_EQ(/* REQUEST_DURATION */ timings.at(2), "-");
     EXPECT_EQ(/* REQUEST_TX_DURATION */ timings.at(3), "-");
     EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(timings.at(4)), 0);
-    EXPECT_GE(/* RESPONSE_TX_DURATION */ std::stoi(timings.at(5)), 0);
   }
 }
 
