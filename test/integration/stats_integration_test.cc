@@ -400,6 +400,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
   // 2021/08/18  13176    40577       40700   Support slow start mode
   // 2022/03/14                       42000   Fix test flakes
   // 2022/10/27                       44000   Update tcmalloc
+  // 2025/07/28  40266    44299       44500   Add request_count_ field to ActiveClient
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -420,7 +421,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSize) {
     // https://github.com/envoyproxy/envoy/issues/12209
     // EXPECT_MEMORY_EQ(m_per_cluster, 37061);
   }
-  EXPECT_MEMORY_LE(m_per_cluster, 44000); // Round up to allow platform variations.
+  EXPECT_MEMORY_LE(m_per_cluster, 44500); // Round up to allow platform variations.
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
