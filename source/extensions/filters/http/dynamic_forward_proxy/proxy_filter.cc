@@ -305,8 +305,8 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
   const bool is_proxying = isProxying();
   if (headers.Host()->value().getStringView().empty()) {
     decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                        ResponseStrings::get().EmptyHostHeader, nullptr,
-                                        absl::nullopt, RcDetails::get().EmptyHostHeader);
+                                       ResponseStrings::get().EmptyHostHeader, nullptr,
+                                       absl::nullopt, RcDetails::get().EmptyHostHeader);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
