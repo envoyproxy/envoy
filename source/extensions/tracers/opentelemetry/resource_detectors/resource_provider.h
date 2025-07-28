@@ -36,20 +36,20 @@ public:
    * @return Resource const The merged resource.
    */
   virtual Resource
-  getResource(absl::string_view service_name,
-              const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+  getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
                   resource_detectors,
-              Server::Configuration::ServerFactoryContext& context) const PURE;
+              Server::Configuration::ServerFactoryContext& context,
+              absl::string_view service_name = kDefaultServiceName) const PURE;
 };
 using ResourceProviderPtr = std::shared_ptr<ResourceProvider>;
 
 class ResourceProviderImpl : public ResourceProvider {
 public:
   Resource
-  getResource(absl::string_view service_name,
-              const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+  getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
                   resource_detectors,
-              Server::Configuration::ServerFactoryContext& context) const override;
+              Server::Configuration::ServerFactoryContext& context,
+              absl::string_view service_name = kDefaultServiceName) const override;
 };
 
 } // namespace OpenTelemetry

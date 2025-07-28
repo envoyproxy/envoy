@@ -15,7 +15,7 @@ namespace OpenTelemetry {
 /**
  * @brief A string key-value map that stores the resource attributes.
  */
-using ResourceAttributes = std::map<std::string, std::string>;
+using ResourceAttributes = absl::flat_hash_map<std::string, std::string>;
 
 /**
  * @brief A Resource represents the entity producing telemetry as Attributes.

@@ -18,19 +18,14 @@ Resource createInitialResource(absl::string_view service_name) {
   Resource resource{};
 
   // Creates initial resource with the static service.name and telemetry.sdk.* attributes.
-  resource.attributes_[std::string(kServiceNameKey.data(), kServiceNameKey.size())] =
-      service_name.empty() ? std::string{kDefaultServiceName} : service_name;
+  if (!service_name.empty()) {
+    resource.attributes_[kServiceNameKey] = service_name;
+  }
+  resource.attributes_[kTelemetrySdkLanguageKey] = kDefaultTelemetrySdkLanguage;
 
-  resource
-      .attributes_[std::string(kTelemetrySdkLanguageKey.data(), kTelemetrySdkLanguageKey.size())] =
-      kDefaultTelemetrySdkLanguage;
+  resource.attributes_[kTelemetrySdkNameKey] = kDefaultTelemetrySdkName;
 
-  resource.attributes_[std::string(kTelemetrySdkNameKey.data(), kTelemetrySdkNameKey.size())] =
-      kDefaultTelemetrySdkName;
-
-  resource
-      .attributes_[std::string(kTelemetrySdkVersionKey.data(), kTelemetrySdkVersionKey.size())] =
-      Envoy::VersionInfo::version();
+  resource.attributes_[kTelemetrySdkVersionKey] = Envoy::VersionInfo::version();
 
   return resource;
 }
@@ -88,10 +83,10 @@ void mergeResource(Resource& old_resource, const Resource& updating_resource) {
 } // namespace
 
 Resource ResourceProviderImpl::getResource(
-    absl::string_view service_name,
     const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
         resource_detectors,
-    Envoy::Server::Configuration::ServerFactoryContext& context) const {
+    Envoy::Server::Configuration::ServerFactoryContext& context,
+    absl::string_view service_name) const {
 
   Resource resource = createInitialResource(service_name);
 

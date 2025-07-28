@@ -32,10 +32,10 @@ using testing::ReturnRef;
 class MockResourceProvider : public ResourceProvider {
 public:
   MOCK_METHOD(Resource, getResource,
-              (absl::string_view service_name,
-               const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+              (const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
                    resource_detectors,
-               Server::Configuration::ServerFactoryContext& context),
+               Server::Configuration::ServerFactoryContext& context,
+               absl::string_view service_name),
               (const));
 };
 
