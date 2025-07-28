@@ -23,6 +23,9 @@ removed_config_or_runtime:
 - area: http_connection_manager
   change: |
     Removed runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` and legacy code paths.
+- area: dfp
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` and legacy code paths.
 
 new_features:
 - area: health_check
