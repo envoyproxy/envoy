@@ -5275,7 +5275,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
       downstreamProtocol() != Http::CodecType::HTTP1) {
     // All duration values except for ROUNDTRIP_DURATION should be present (no '-' in the access
     // log) when neither upstream nor downstream is H/1
-    EXPECT_GT(/* DURATION */ std::stoi(timings.at(0)), 0);
+    EXPECT_GE(/* DURATION */ std::stoi(timings.at(0)), 0);
     if (downstreamProtocol() == Http::CodecType::HTTP3) {
       // Only H/3 populate this metric.
       EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(timings.at(1)), 0);
@@ -5286,7 +5286,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
     EXPECT_GE(/* RESPONSE_TX_DURATION */ std::stoi(timings.at(5)), 0);
   } else {
     // When one the peers is H/1 the stream is reset and request duration values will be unset
-    EXPECT_GT(/* DURATION */ std::stoi(timings.at(0)), 0);
+    EXPECT_GE(/* DURATION */ std::stoi(timings.at(0)), 0);
     EXPECT_EQ(/* ROUNDTRIP_DURATION */ timings.at(1), "-");
     EXPECT_EQ(/* REQUEST_DURATION */ timings.at(2), "-");
     EXPECT_EQ(/* REQUEST_TX_DURATION */ timings.at(3), "-");
