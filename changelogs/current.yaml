@@ -23,6 +23,9 @@ removed_config_or_runtime:
 - area: http_connection_manager
   change: |
     Removed runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` and legacy code paths.
+- area: dfp
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` and legacy code paths.
 
 new_features:
 - area: health_check
@@ -64,5 +67,13 @@ new_features:
 - area: dns_filter, redis_proxy and prefix_matcher_map
   change: |
     Switch to using Radix Tree instead of Trie for performance improvements.
+- area: load_reporting
+  change: |
+    Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
+    endpoint statistics and metrics, but only for endpoints with updated stats, optimizing report size and efficiency.
+- area: otlp_stat_sink
+  change: |
+    Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
+    :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
 
 deprecated:
