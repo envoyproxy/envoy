@@ -442,14 +442,14 @@ TEST_P(XdsTpConfigsIntegrationTest, TwoClustersWithEdsOnlyConfigAuthority1) {
 
     // Authority1 should receive the EDS request containing the 2 resources.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().ClusterLoadAssignment, "",
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "",
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
          "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
          "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
         {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
     sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-        Config::TypeUrl::get().ClusterLoadAssignment,
+        Config::TestTypeUrl::get().ClusterLoadAssignment,
         {buildClusterLoadAssignment(
              "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
              "cluster1"),
@@ -466,7 +466,7 @@ TEST_P(XdsTpConfigsIntegrationTest, TwoClustersWithEdsOnlyConfigAuthority1) {
 
     // Expect an EDS ACK.
     EXPECT_TRUE(compareDiscoveryRequest(
-        Config::TypeUrl::get().ClusterLoadAssignment, "1",
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
         {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
          "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
         {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
