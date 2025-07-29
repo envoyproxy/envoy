@@ -1,0 +1,88 @@
+virtual_hosts:
+- name: default
+  domains:
+  - 'edge.example.net'
+  routes:
+  # Route with different dynamic metadata value - more specific path
+  - route:
+      cluster: cluster3
+    match:
+      path: /example
+      dynamic_metadata:
+      - filter: example.meta
+        path:
+        - key: foo
+        value:
+          string_match:
+            exact: baz
+  # More specific route with dynamic metadata - should match first for foo=bar
+  - route:
+      cluster: cluster2
+    match:
+      path: /example
+      dynamic_metadata:
+      - filter: example.meta
+        path:
+        - key: foo
+        value:
+          string_match:
+            exact: bar
+  # Route with nested metadata structure
+  - route:
+      cluster: cluster4
+    match:
+      path: /nested
+      dynamic_metadata:
+      - filter: nested.meta
+        path:
+        - key: level1
+        - key: level2
+        value:
+          string_match:
+            exact: value
+  # Route with inverted dynamic metadata matcher - more specific path
+  - route:
+      cluster: cluster5
+    match:
+      path: /inverted
+      dynamic_metadata:
+      - filter: example.meta
+        path:
+        - key: foo
+        value:
+          string_match:
+            exact: bar
+        invert: true
+  # Fallback route for /inverted path
+  - route:
+      cluster: cluster1
+    match:
+      path: /inverted
+  # Route with multiple dynamic metadata matchers - more specific path
+  - route:
+      cluster: cluster6
+    match:
+      path: /multiple
+      dynamic_metadata:
+      - filter: example.meta
+        path:
+        - key: foo
+        value:
+          string_match:
+            exact: bar
+      - filter: other.meta
+        path:
+        - key: status
+        value:
+          string_match:
+            exact: active
+  # Fallback route for /multiple path
+  - route:
+      cluster: cluster1
+    match:
+      path: /multiple
+  # Fallback route without dynamic metadata - should be last
+  - route:
+      cluster: cluster1
+    match:
+      path: /example

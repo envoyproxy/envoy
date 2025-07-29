@@ -190,13 +190,7 @@ public:
  */
 class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
 public:
-  bool isInternalAddress(const Network::Address::Instance& address) const override {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.explicit_internal_address_config")) {
-      return false;
-    }
-    return Network::Utility::isInternalAddress(address);
-  }
+  bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
 };
 
 /**
