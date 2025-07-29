@@ -118,7 +118,7 @@ Factory::createFilterFactoryFromProtoTyped(const ProxyConfig& proto_config,
     if (proto_config.tracing().has_provider()) {
       tracer = tracer_manager->getOrCreateTracer(&proto_config.tracing().provider());
     }
-    tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
+    tracing_config = std::make_unique<Tracing::ConnectionManagerTracingConfig>(
         context.listenerInfo().direction(), proto_config.tracing());
   }
 
