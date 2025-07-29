@@ -30,6 +30,9 @@ PerSocketTapperImpl::PerSocketTapperImpl(
     sink_handle_->submitTrace(std::move(trace));
     pegSubmitCounter(true);
   }
+  if (config_->minStreamedSentBytes()) {
+    streamed_buffer_aged_duration_ = DefaultBufferedAgedDuration;
+  }
 }
 
 void PerSocketTapperImpl::fillConnectionInfo(envoy::data::tap::v3::Connection& connection) {
@@ -55,9 +58,7 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
       initStreamingEvent(event);
       event.mutable_closed();
       // submit directly and don't check current_streamed_rx_tx_bytes_ any more
-      sink_handle_->submitTrace(std::move(streamed_trace_));
-      buffered_trace_.reset();
-      current_streamed_rx_tx_bytes_ = 0;
+      submitStreamedDataPerConfiguredSize();
     } else {
       TapCommon::TraceWrapperPtr trace = makeTraceSegment();
       auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
@@ -106,31 +107,104 @@ bool PerSocketTapperImpl::shouldSendStreamedMsgByConfiguredSize() const {
   return config_->minStreamedSentBytes() > 0;
 }
 
-void PerSocketTapperImpl::handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
-                                                                    const uint32_t total_bytes,
-                                                                    const bool is_read,
-                                                                    const bool is_end_stream) {
+void PerSocketTapperImpl::submitStreamedDataPerConfiguredSize() {
+  sink_handle_->submitTrace(std::move(streamed_trace_));
+  streamed_trace_.reset();
+  current_streamed_rx_tx_bytes_ = 0;
+}
+
+void PerSocketTapperImpl::setStreamedDataPerConfiguredSize(const Buffer::Instance& data,
+                                                           const uint32_t buffer_offset,
+                                                           const uint32_t total_bytes,
+                                                           const bool is_read,
+                                                           const bool is_end_stream) {
+
   makeStreamedTraceIfNeeded();
   auto& event =
       *streamed_trace_->mutable_socket_streamed_trace_segment()->mutable_events()->add_events();
   initStreamingEvent(event);
-  uint32_t buffer_start_offset = 0;
   if (is_read) {
-    buffer_start_offset = data.length() - total_bytes;
     TapCommon::Utility::addBufferToProtoBytes(*event.mutable_read()->mutable_data(), total_bytes,
-                                              data, buffer_start_offset, total_bytes);
+                                              data, buffer_offset, total_bytes);
     current_streamed_rx_tx_bytes_ += event.read().data().as_bytes().size();
   } else {
-    event.mutable_write()->set_end_stream(is_end_stream);
     TapCommon::Utility::addBufferToProtoBytes(*event.mutable_write()->mutable_data(), total_bytes,
-                                              data, buffer_start_offset, total_bytes);
+                                              data, buffer_offset, total_bytes);
+    event.mutable_write()->set_end_stream(is_end_stream);
     current_streamed_rx_tx_bytes_ += event.write().data().as_bytes().size();
   }
+}
 
-  if (current_streamed_rx_tx_bytes_ >= config_->minStreamedSentBytes()) {
-    sink_handle_->submitTrace(std::move(streamed_trace_));
-    streamed_trace_.reset();
-    current_streamed_rx_tx_bytes_ = 0;
+bool PerSocketTapperImpl::shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration() const {
+  if (streamed_trace_ == nullptr) {
+    return false;
+  }
+  const envoy::data::tap::v3::SocketEvents& streamed_events =
+      streamed_trace_->socket_streamed_trace_segment().events();
+  auto& repeated_streamed_events = streamed_events.events();
+  if (repeated_streamed_events.size() < 2) {
+    // Only one event.
+    return false;
+  }
+
+  const ProtobufWkt::Timestamp& first_event_ts = repeated_streamed_events[0].timestamp();
+  const ProtobufWkt::Timestamp& last_event_ts =
+      repeated_streamed_events[repeated_streamed_events.size() - 1].timestamp();
+  return (last_event_ts.seconds() - first_event_ts.seconds()) >=
+         static_cast<int64_t>(getStreamedBufferAgedDuration());
+}
+
+void PerSocketTapperImpl::handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
+                                                                    const uint32_t total_bytes,
+                                                                    const bool is_read,
+                                                                    const bool is_end_stream) {
+  // Submit firstly and make the data size is closed to configured size.
+  if ((streamed_trace_ != nullptr) &&
+      (current_streamed_rx_tx_bytes_ + total_bytes) >= config_->minStreamedSentBytes()) {
+    submitStreamedDataPerConfiguredSize();
+    pegSubmitCounter(true);
+  }
+
+  // Set the initial offset for data copying.
+  uint32_t copy_start_offset = 0;
+  if (is_read) {
+    copy_start_offset = data.length() - total_bytes;
+  }
+  if (total_bytes < config_->minStreamedSentBytes()) {
+    // Only store the data in new event.
+    setStreamedDataPerConfiguredSize(data, copy_start_offset, total_bytes, is_read, is_end_stream);
+  } else {
+    // The data size is equal or bigger than configured size.
+    // Make the submitted data size is closed to configured size and split the data if needed.
+    uint32_t per_split_bytes = config_->minStreamedSentBytes();
+    uint32_t remaining_bytes = 0;
+    uint32_t split_cnt = 0;
+    while (true) {
+      split_cnt++;
+      setStreamedDataPerConfiguredSize(data, copy_start_offset, per_split_bytes, is_read,
+                                       is_end_stream);
+      submitStreamedDataPerConfiguredSize();
+      pegSubmitCounter(true);
+
+      remaining_bytes = total_bytes - split_cnt * per_split_bytes;
+      if (remaining_bytes == 0) {
+        // By coincidence, the data size evenly divides by the configured size.
+        break;
+      }
+
+      copy_start_offset += per_split_bytes;
+      if (remaining_bytes < per_split_bytes) {
+        // Few data left, store it and submit later.
+        setStreamedDataPerConfiguredSize(data, copy_start_offset, remaining_bytes, is_read,
+                                         is_end_stream);
+        break;
+      }
+    }
+  }
+
+  // Submit the data if it is meet streamed buffer aged duration threshold.
+  if (shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration()) {
+    submitStreamedDataPerConfiguredSize();
     pegSubmitCounter(true);
   }
 }

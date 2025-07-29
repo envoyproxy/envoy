@@ -49,6 +49,9 @@ new_features:
 - area: socket
   change: |
     Added ``network_namespace_filepath`` to ``SocketAddress``.
+- area: tap
+  change: |
+    Submit captured transport streamed strace data as smoothly as possible with the configured chunk size.
 - area: ratelimit
   change: |
     Add the :ref:`rate_limits
