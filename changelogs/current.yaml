@@ -69,40 +69,11 @@ new_features:
     Switch to using Radix Tree instead of Trie for performance improvements.
 - area: load_reporting
   change: |
-    Added support for :ref:`ServerNameMatcher <envoy_v3_api_msg_.xds.type.matcher.v3.ServerNameMatcher>` trie-based matching.
-- area: stateful_session
-  change: |
-    Added support for cookie attributes to stateful session cookie.
-- area: http3
-  change: |
-    Added :ref:`disable_connection_flow_control_for_streams
-    <envoy_v3_api_field_config.core.v3.Http3ProtocolOptions.disable_connection_flow_control_for_streams>`, an experimental
-    option for disabling connection level flow control for streams. This is useful in situations where the streams share the same
-    connection but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
-- area: dfp
-  change: |
-    Added :ref:`allow_dynamic_host_from_filter_state
-    <envoy_v3_api_field_extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig.allow_dynamic_host_from_filter_state>`
-    flag to HTTP Dynamic Forward Proxy filter. When enabled, the filter will check for ``envoy.upstream.dynamic_host`` and
-    ``envoy.upstream.dynamic_port`` filter state values before using the HTTP Host header, providing consistency with SNI
-    and UDP DFP filters. When disabled (default), maintains backward compatibility by using the HTTP Host header directly.
-- area: alts
-  change: |
-    Added environment variable-protected gRPC keepalive params to the ALTS handshaker client.
-- area: wasm
-  change: |
-    Added support for returning ``StopIteration`` from plugin ``onRequestHeader`` and ``onResponseHeader`` callbacks. See
-    :ref:`allow_on_headers_stop_iteration <envoy_v3_api_field_extensions.wasm.v3.PluginConfig.allow_on_headers_stop_iteration>`
-    for more details. By default, current behavior is maintained.
-- area: aws
-  change: |
-    Added ``assume_role_credential_provider`` to add support for role chaining in AWS filters. This allows envoy to
-    assume an additional role before SigV4 signing occurs.
-- area: otlp_stat_sink
-  change: |
-    added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
-    :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
     Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
     endpoint statistics and metrics, but only for endpoints with updated stats, optimizing report size and efficiency.
+- area: otlp_stat_sink
+  change: |
+    Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
+    :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
 
 deprecated:
