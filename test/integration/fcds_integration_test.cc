@@ -489,6 +489,34 @@ TEST_P(FcdsIntegrationTest, LdsUpdateCreatesNewFcdsSubscription) {
   sendDataVerifyResponse(l0_port_, direct_response_2, ip_2_);
 }
 
+TEST_P(FcdsIntegrationTest, LdsUpdateCreatesWithNoFcdsRemovesSubscription) {
+  initialize();
+
+  ASSERT_TRUE(expectLdsSubscription());
+  auto listener = listenerConfig(l0_name_, l0_name_, {}, {}, {});
+  sendLdsResponse(listener, listeners_v1_);
+
+  EXPECT_TRUE(expectFcdsSubscription(xdstpResource(l0_name_, "*")));
+
+  auto direct_response = "listener_0_filter_chain_0_direct_response";
+  auto filter_chain = filterChainConfig(l0_name_, fc0_name_, filter_name_, direct_response, ip_2_);
+
+  sendFcdsResponse(filter_chains_v1_, filter_chain);
+  expectListenersModified(1);
+  expectFilterChainUpdateStats(l0_name_, 1, 1);
+  expectListenersUpdateStats(1, 1, 1);
+  expectConfigDump(listeners_v1_, filter_chains_v1_, listener);
+
+  sendDataVerifyResponse(l0_port_, direct_response, ip_2_);
+
+  auto listener_2 = listenerConfig(l0_name_, {}, "default_response", {}, {});
+  sendLdsResponse(listener_2, listeners_v2_);
+  expectLdsAck();
+  expectFcdsAck();
+  expectListenersModified(2);
+  EXPECT_TRUE(expectFcdsUnsubscribe(xdstpResource(l0_name_, "*")));
+}
+
 TEST_P(FcdsIntegrationTest, AdditionalListenerDoesNotImpactExistingListenerWithFcds) {
   initialize();
 

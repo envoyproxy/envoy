@@ -72,7 +72,7 @@ public:
   };
 
   envoy::config::listener::v3::Listener
-  listenerConfig(const std::string& name, const std::string& fcds_collection_name,
+  listenerConfig(const std::string& name, absl::optional<std::string> fcds_collection_name,
                  absl::optional<std::string> default_response,
                  absl::optional<FilterChainConfig> filter_chain_config,
                  absl::optional<std::vector<std::tuple<std::string, std::string>>> matcher_rules) {
@@ -142,14 +142,17 @@ public:
                                  config.name_, match, config.filter_name_, filter_config);
     }
 
-    std::string fcds_config = fmt::format(R"EOF(
+    std::string fcds_config;
+    if (fcds_collection_name.has_value()) {
+      fcds_config = fmt::format(R"EOF(
       fcds_config:
         resources_locator: xdstp://test/envoy.config.listener.v3.FilterChain/{0}/*
         config_source:
           resource_api_version: V3
           ads: {{}}
     )EOF",
-                                          fcds_collection_name);
+                                fcds_collection_name.value());
+    }
 
     std::string default_filter_chain;
     if (default_response.has_value()) {

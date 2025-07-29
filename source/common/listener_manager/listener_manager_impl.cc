@@ -696,6 +696,8 @@ absl::StatusOr<bool> ListenerManagerImpl::addOrUpdateListenerInternal(
     new_listener = std::move(*listener_or_error);
     if (config.has_fcds_config()) {
       fcds_subscription = new_listener->createFcdsSubscription(config.fcds_config());
+    } else {
+      fcds_subscription_manager_.removeSubscription(name);
     }
 
     new_listener->maybeAddListenerInitTarget();
