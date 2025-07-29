@@ -7,6 +7,17 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
+Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
+generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes;
+  for (const auto& attr : resource.attributes_) {
+    auto* attribute = resource_attributes.Add();
+    attribute->set_key(attr.first);
+    attribute->mutable_value()->set_string_value(attr.second);
+  }
+  return resource_attributes;
+}
+
 OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
                          const Tracers::OpenTelemetry::Resource& resource)
     : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
@@ -15,13 +26,8 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
       use_tag_extracted_name_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
-      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : "") {
-  for (const auto& attr : resource.attributes_) {
-    auto* attribute = resource_attributes_.Add();
-    attribute->set_key(attr.first);
-    attribute->mutable_value()->set_string_value(attr.second);
-  }
-}
+      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
+      resource_attributes_(generateResourceAttributes(resource)) {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
@@ -32,6 +38,16 @@ OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
 void OpenTelemetryGrpcMetricsExporterImpl::send(MetricsExportRequestPtr&& export_request) {
   client_->send(service_method_, *export_request, *this, Tracing::NullSpan::instance(),
                 Http::AsyncClient::RequestOptions());
+}
+
+void OtlpOptions::populateResourceAttributes(
+    const Tracers::OpenTelemetry::Resource& resource,
+    Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& target) const {
+  for (const auto& attr : resource.attributes_) {
+    auto* attribute = target.Add();
+    attribute->set_key(attr.first);
+    attribute->mutable_value()->set_string_value(attr.second);
+  }
 }
 
 void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
