@@ -77,11 +77,10 @@ metadata:
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
   SetMetadataConfig factory;
 
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context);
-  Http::MockFilterChainFactoryCallbacks filter_callbacks;
-  EXPECT_CALL(filter_callbacks, addStreamDecoderFilter(_));
-  cb(filter_callbacks);
+  // The set_metadata filter doesn't support server context creation, so it should throw.
+  EXPECT_THROW_WITH_MESSAGE(
+      factory.createFilterFactoryFromProtoWithServerContext(proto_config, "stats", context),
+      EnvoyException, "Creating filter factory from server factory context is not supported");
 }
 
 } // namespace SetMetadataFilter

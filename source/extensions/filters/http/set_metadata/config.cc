@@ -8,29 +8,19 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/http/set_metadata/set_metadata_filter.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace SetMetadataFilter {
 
-Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> SetMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
-  ConfigSharedPtr filter_config(
-      std::make_shared<Config>(proto_config, context.scope(), stats_prefix));
-
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(
-        Http::StreamDecoderFilterSharedPtr{new SetMetadataFilter(filter_config)});
-  };
-}
-
-Http::FilterFactoryCb SetMetadataConfig::createFilterFactoryFromProtoWithServerContextTyped(
-    const envoy::extensions::filters::http::set_metadata::v3::Config& proto_config,
-    const std::string& stats_prefix, Server::Configuration::ServerFactoryContext& server_context) {
-  ConfigSharedPtr filter_config(
-      std::make_shared<Config>(proto_config, server_context.scope(), stats_prefix));
+  auto config_or_error = Config::create(proto_config, context.scope(), stats_prefix, context);
+  RETURN_IF_NOT_OK_REF(config_or_error.status());
+  ConfigSharedPtr filter_config = config_or_error.value();
 
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(
