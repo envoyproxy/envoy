@@ -1436,9 +1436,9 @@ public:
   )EOF"};
 };
 
-// Test that VirtualHostWrapper returns metadata for the specified filter name.
+// Test that VirtualHostWrapper returns metadata under the current filter configured name.
 // This verifies that when virtual host has filter metadata configured under the current filter
-// name, the wrapper successfully retrieves and returns the metadata values from nested structures.
+// configured name, the wrapper can successfully retrieves and returns it.
 TEST_F(LuaVirtualHostWrapperTest, GetFilterMetadataBasic) {
   const std::string SCRIPT{R"EOF(
     function callMe(object)
@@ -1482,8 +1482,8 @@ TEST_F(LuaVirtualHostWrapperTest, GetFilterMetadataBasic) {
   wrapper.reset();
 }
 
-// Test that VirtualHostWrapper returns empty metadata when no metadata exists
-// under the current filter name.
+// Test that VirtualHostWrapper returns an empty metadata object when no metadata exists
+// under the current filter configured name.
 TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataUnderFilterName) {
   const std::string METADATA{R"EOF(
     filter_metadata:
@@ -1518,9 +1518,9 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataUnderFilterName) {
   wrapper.reset();
 }
 
-// Test that VirtualHostWrapper returns empty metadata when no metadata is configured on the
-// virtual host. This verifies that the wrapper correctly handles cases where the virtual host has
-// no filter_metadata section, returning empty metadata without crashing.
+// Test that VirtualHostWrapper returns an empty metadata object when no metadata is configured on
+// the virtual host. This verifies that the wrapper correctly handles cases where the virtual host
+// has no filter_metadata section, returning an empty metadata object without crashing.
 TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataAtAll) {
   InSequence s;
   setup(NO_METADATA_FOUND_SCRIPT);
@@ -1544,9 +1544,9 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataAtAll) {
   wrapper.reset();
 }
 
-// Test that VirtualHostWrapper returns empty metadata when no virtual host matches the request
-// authority. This verifies that the wrapper correctly handles cases where the stream info does not
-// have a virtual host, returning empty metadata without crashing.
+// Test that VirtualHostWrapper returns an empty metadata object when no virtual host matches the
+// request authority. This verifies that the wrapper correctly handles cases where the stream info
+// does not have a virtual host, returning an empty metadata object without crashing.
 TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoVirtualHost) {
   InSequence s;
   setup(NO_METADATA_FOUND_SCRIPT);

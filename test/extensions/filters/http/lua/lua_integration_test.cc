@@ -2124,8 +2124,8 @@ typed_config:
   cleanup();
 }
 
-// Test that handle:virtualHost() returns valid object when virtual host matches
-// but no route matches.
+// Test that handle:virtualHost():metadata() returns valid metadata when virtual host matches
+// but route doesn't, ensuring metadata access works correctly.
 TEST_P(LuaIntegrationTest, VirtualHostValidWhenNoRouteMatch) {
   if (!testing_downstream_filter_) {
     GTEST_SKIP() << "This is a local reply test that does not go upstream";
