@@ -886,6 +886,7 @@ namespace Tracing {
 
 class TestTraceContextImpl : public Tracing::TraceContext {
 public:
+  TestTraceContextImpl() = default;
   TestTraceContextImpl(const std::initializer_list<std::pair<std::string, std::string>>& values) {
     for (const auto& value : values) {
       context_map_[value.first] = value.second;

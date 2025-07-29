@@ -1588,13 +1588,15 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Ingress, conn_tracing_tags, percent1,
                                      percent2, percent1, false, 256});
-  NiceMock<Router::MockRouteTracing> route_tracing;
-  ON_CALL(route_tracing, getClientSampling()).WillByDefault(ReturnRef(percent1));
-  ON_CALL(route_tracing, getRandomSampling()).WillByDefault(ReturnRef(percent2));
-  ON_CALL(route_tracing, getOverallSampling()).WillByDefault(ReturnRef(percent1));
-  ON_CALL(route_tracing, getCustomTags()).WillByDefault(ReturnRef(route_tracing_tags));
+  NiceMock<Router::MockRouteTracing>& route_tracing =
+      route_config_provider_.route_config_->route_->route_tracing_;
+  route_tracing.client_sampling_ = percent1;
+  route_tracing.random_sampling_ = percent2;
+  route_tracing.overall_sampling_ = percent1;
+  route_tracing.custom_tags_ = route_tracing_tags;
+
   ON_CALL(*route_config_provider_.route_config_->route_, tracingConfig())
-      .WillByDefault(Return(&route_tracing));
+      .WillByDefault(Return(&route_config_provider_.route_config_->route_->route_tracing_));
 
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());

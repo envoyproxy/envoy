@@ -144,7 +144,12 @@ MockDecorator::MockDecorator() {
 }
 MockDecorator::~MockDecorator() = default;
 
-MockRouteTracing::MockRouteTracing() = default;
+MockRouteTracing::MockRouteTracing() {
+  ON_CALL(*this, getCustomTags()).WillByDefault(ReturnRef(custom_tags_));
+  ON_CALL(*this, getClientSampling()).WillByDefault(ReturnRef(client_sampling_));
+  ON_CALL(*this, getRandomSampling()).WillByDefault(ReturnRef(random_sampling_));
+  ON_CALL(*this, getOverallSampling()).WillByDefault(ReturnRef(overall_sampling_));
+}
 MockRouteTracing::~MockRouteTracing() = default;
 
 MockRoute::MockRoute() {
