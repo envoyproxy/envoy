@@ -71,5 +71,9 @@ new_features:
   change: |
     Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
     endpoint statistics and metrics, but only for endpoints with updated stats, optimizing report size and efficiency.
+- area: overload management
+  change: |
+        Added load shed point ``envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch`` that
+            closes connections before creating codec if Envoy is under pressure, typically memory.
 
 deprecated:
