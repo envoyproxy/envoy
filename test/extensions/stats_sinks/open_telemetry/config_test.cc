@@ -47,7 +47,7 @@ TEST(OpenTelemetryConfigTest, OpenTelemetrySinkType) {
 TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
   {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
-    OtlpOptions options(sink_config);
+    OtlpOptions options(sink_config, Tracers::OpenTelemetry::Resource());
 
     // Default options
     EXPECT_FALSE(options.reportCountersAsDeltas());
@@ -55,6 +55,7 @@ TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
     EXPECT_TRUE(options.emitTagsAsAttributes());
     EXPECT_TRUE(options.useTagExtractedName());
     EXPECT_EQ("", options.statPrefix());
+    EXPECT_TRUE(options.resource_attributes().empty());
   }
 
   {
@@ -63,12 +64,17 @@ TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
     sink_config.mutable_use_tag_extracted_name()->set_value(false);
     sink_config.set_prefix("prefix");
 
-    OtlpOptions options(sink_config);
+    Tracers::OpenTelemetry::Resource resource;
+    resource.attributes_["key"] = "value";
+    OtlpOptions options(sink_config, resource);
     EXPECT_FALSE(options.reportCountersAsDeltas());
     EXPECT_FALSE(options.reportHistogramsAsDeltas());
     EXPECT_FALSE(options.emitTagsAsAttributes());
     EXPECT_FALSE(options.useTagExtractedName());
     EXPECT_EQ("prefix.", options.statPrefix());
+    ASSERT_EQ(1, options.resource_attributes().size());
+    EXPECT_EQ("key", options.resource_attributes()[0].key());
+    EXPECT_EQ("value", options.resource_attributes()[0].value().string_value());
   }
 }
 

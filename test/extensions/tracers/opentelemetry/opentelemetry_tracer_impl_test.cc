@@ -32,8 +32,10 @@ using testing::ReturnRef;
 class MockResourceProvider : public ResourceProvider {
 public:
   MOCK_METHOD(Resource, getResource,
-              (const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-               Server::Configuration::TracerFactoryContext& context),
+              (const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+                   resource_detectors,
+               Server::Configuration::ServerFactoryContext& context,
+               absl::string_view service_name),
               (const));
 };
 
@@ -57,7 +59,7 @@ public:
     resource.attributes_.insert(std::pair<std::string, std::string>("key1", "val1"));
 
     auto mock_resource_provider = NiceMock<MockResourceProvider>();
-    EXPECT_CALL(mock_resource_provider, getResource(_, _)).WillRepeatedly(Return(resource));
+    EXPECT_CALL(mock_resource_provider, getResource(_, _, _)).WillRepeatedly(Return(resource));
 
     driver_ = std::make_unique<Driver>(opentelemetry_config, context_, mock_resource_provider);
   }
