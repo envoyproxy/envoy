@@ -150,7 +150,7 @@ public:
     ASSERT_TRUE(match_result.ok());
     // Retrieve the matched action.
     const RateLimitOnMatchAction* match_action =
-        dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
+        dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
 
     RateLimitQuotaValidationVisitor visitor = {};
     // Generate the bucket ids.
@@ -277,7 +277,7 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   ASSERT_TRUE(match_result.ok());
   // Retrieve the matched action.
   const RateLimitOnMatchAction* match_action =
-      dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
+      dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
 
   RateLimitQuotaValidationVisitor visitor = {};
   // Generate the bucket ids.

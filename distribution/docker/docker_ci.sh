@@ -147,7 +147,7 @@ build_args() {
 
     target="${build_type/-debug/}"
     target="${target/-contrib/}"
-    printf ' -f ci/Dockerfile-envoy --target %s' "envoy${target}"
+    printf ' -f distribution/docker/Dockerfile-envoy --target %s' "envoy${target}"
 
     if [[ "${build_type}" == *-contrib* ]]; then
         printf ' --build-arg ENVOY_BINARY=envoy-contrib'
