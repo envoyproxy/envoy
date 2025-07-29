@@ -47,6 +47,9 @@ class EnvoyQuicNetworkObserverRegistry;
 } // namespace Quic
 
 namespace Config {
+// TODO(adisuissa): This forward declaration is needed because OD-CDS code is
+// part of the Envoy::Upstream namespace but should be eventually moved to the
+// Envoy::Config namespace (next to the XdsManager).
 class XdsManager;
 } // namespace Config
 
