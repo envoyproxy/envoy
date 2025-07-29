@@ -5191,8 +5191,7 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
       "envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream", "true");
 
   useAccessLog("%DURATION% %ROUNDTRIP_DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% "
-               "%RESPONSE_DURATION% "
-               "%RESPONSE_TX_DURATION%");
+               "%RESPONSE_DURATION% %RESPONSE_TX_DURATION%");
   constexpr uint32_t kStreamWindowSize = 64 * 1024;
   // Set buffer limit large enough to accommodate H/2 stream window, so we can cause downstream
   // codec to buffer data without pushing back on upstream.

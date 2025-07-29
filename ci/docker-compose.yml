@@ -1,0 +1,112 @@
+x-envoy-build-base: &envoy-build-base
+  image: >-
+    ${ENVOY_BUILD_IMAGE:-envoyproxy/envoy-build-ubuntu:f4a881a1205e8e6db1a57162faf3df7aed88eae8@sha256:b10346fe2eee41733dbab0e02322c47a538bf3938d093a5daebad9699860b814}
+  user: root:root
+  working_dir: ${ENVOY_DOCKER_SOURCE_DIR:-/source}
+  stdin_open: true
+  tty: true
+  platform: ${ENVOY_DOCKER_PLATFORM:-}
+  environment:
+  # Core build environment
+  - BUILD_DIR=/build
+  - ENVOY_DOCKER_SOURCE_DIR=${ENVOY_DOCKER_SOURCE_DIR:-/source}
+  - ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}"
+
+  # Proxy settings
+  - HTTP_PROXY
+  - HTTPS_PROXY
+  - NO_PROXY
+  - GOPROXY
+
+  # Bazel configuration
+  - BAZEL_STARTUP_OPTIONS
+  - BAZEL_BUILD_EXTRA_OPTIONS
+  - BAZEL_EXTRA_TEST_OPTIONS
+  - BAZEL_REMOTE_CACHE
+  - BAZEL_STARTUP_EXTRA_OPTIONS
+  - BAZEL_REMOTE_INSTANCE
+  - BAZELISK_BASE_URL
+
+  # CI/CD variables
+  - CI_BRANCH
+  - CI_SHA1
+  - CI_TARGET_BRANCH
+  - BUILD_REASON
+  - GITHUB_REF_NAME
+  - GITHUB_REF_TYPE
+  - GITHUB_TOKEN
+  - GITHUB_APP_ID
+  - GITHUB_INSTALL_ID
+
+  # Build configuration
+  - NUM_CPUS
+  - ENVOY_BRANCH
+  - ENVOY_RBE
+  - ENVOY_BUILD_IMAGE
+  - ENVOY_SRCDIR
+  - ENVOY_BUILD_TARGET
+  - ENVOY_BUILD_DEBUG_INFORMATION
+  - ENVOY_BUILD_FILTER_EXAMPLE
+  - ENVOY_COMMIT
+  - ENVOY_HEAD_REF
+  - ENVOY_REPO
+  - ENVOY_BUILD_ARCH
+  - ENVOY_GEN_COMPDB_OPTIONS
+
+  # Publishing and artifacts
+  - DOCKERHUB_USERNAME
+  - DOCKERHUB_PASSWORD
+  - ENVOY_DOCKER_SAVE_IMAGE
+  - ENVOY_PUBLISH_DRY_RUN
+  - ENVOY_TARBALL_DIR
+  - GCS_ARTIFACT_BUCKET
+  - GCS_REDIRECT_PATH
+  - GCP_SERVICE_ACCOUNT_KEY
+  - GCP_SERVICE_ACCOUNT_KEY_PATH
+
+  - MOBILE_DOCS_CHECKOUT_DIR
+  - SYSTEM_STAGEDISPLAYNAME
+  - SYSTEM_JOBDISPLAYNAME
+  - SSH_AUTH_SOCK
+
+  entrypoint:
+  - "/bin/bash"
+  - "-c"
+  - |
+    groupadd --gid ${DOCKER_GID:-${USER_GID:-$(id -g)}} -f envoygroup
+    useradd -o \
+        --uid ${USER_UID:-$(id -u)} \
+        --gid ${DOCKER_GID:-${USER_GID:-$(id -g)}} \
+        --no-create-home \
+        -s /bin/bash \
+        --home-dir /build envoybuild
+    usermod -a -G pcap envoybuild
+    chown envoybuild:envoygroup /build
+    chown envoybuild /proc/self/fd/2 2>/dev/null || true
+    [[ -e /entrypoint-extra.sh ]] && /entrypoint-extra.sh
+    sudo -EHs -u envoybuild bash -c 'cd ${ENVOY_DOCKER_SOURCE_DIR:-/source} && exec ${DOCKER_COMMAND:-bash}'
+
+services:
+  envoy-build:
+    <<: *envoy-build-base
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
+    - ${SOURCE_DIR:-..}:/source
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
+
+  envoy-build-gpg:
+    <<: *envoy-build-base
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
+    - ${SOURCE_DIR:-..}:/source
+    - ${ENVOY_GPG_DIR-${HOME}/.gnupg}:/build/.gnupg
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
+
+  envoy-build-dind:
+    privileged: true
+    <<: *envoy-build-base
+    volumes:
+    - ${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}:/build
+    - ${SOURCE_DIR:-..}:/source
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ${SHARED_TMP_DIR:-/tmp/bazel-shared}:${SHARED_TMP_DIR:-/tmp/bazel-shared}
