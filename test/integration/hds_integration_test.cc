@@ -1317,12 +1317,11 @@ TEST_P(HdsIntegrationTest, RemoveClusterDuringHealthCheck) {
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
-  // Endpoint responds to the health check
-  host_stream_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
-  host_stream_->encodeData(1024, true);
+  // As the HDS cluster is destroyed, existing connections should be closed.
+  EXPECT_TRUE(host_fake_connection_->waitForDisconnect());
 
   // Receive updates until the one we expect arrives
-  waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
+  waitForEndpointHealthResponse(envoy::config::core::v3::UNHEALTHY);
 
   // Clean up connections
   cleanupHostConnections();
