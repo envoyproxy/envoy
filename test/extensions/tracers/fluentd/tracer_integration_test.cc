@@ -13,8 +13,6 @@
 #include "gtest/gtest.h"
 #include "msgpack.hpp"
 
-using testing::AssertionResult;
-
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
