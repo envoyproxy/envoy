@@ -687,8 +687,10 @@ The default resolution is millisecond if ``resolution`` is not set.
 
   local virtual_host = handle:virtualHost()
 
-Returns the virtual host object that matched the current request. Returns ``nil`` if no virtual host
-matches the current request.
+Returns a virtual host object that provides access to the virtual host configuration. This method always returns
+a valid object, even when the request does not match any configured virtual host. However, if no virtual host
+matches, calling methods on the returned object will return ``nil`` or, in the case of the ``metadata()`` method,
+an empty metadata object.
 
 Returns a :ref:`virtual host object <config_http_filters_lua_virtual_host_wrapper>`.
 

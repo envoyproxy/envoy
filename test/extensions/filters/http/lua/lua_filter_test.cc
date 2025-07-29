@@ -122,12 +122,10 @@ public:
     auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
     stream_info_.virtual_host_ = virtual_host;
 
-    ON_CALL(*virtual_host, metadata()).WillByDefault(testing::ReturnRef(virtual_host_metadata_));
+    ON_CALL(*virtual_host, metadata()).WillByDefault(ReturnRef(virtual_host_metadata_));
 
-    ON_CALL(decoder_callbacks_.stream_info_, virtualHost())
-        .WillByDefault(testing::ReturnRef(virtual_host));
-    ON_CALL(encoder_callbacks_.stream_info_, virtualHost())
-        .WillByDefault(testing::ReturnRef(virtual_host));
+    ON_CALL(decoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
+    ON_CALL(encoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
 
     EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
     EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
@@ -4021,18 +4019,24 @@ TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoLuaMetadata) {
   });
 }
 
-// Test that handle:virtualHost() returns nil when no virtual host matches the request authority.
+// Test that handle:virtualHost() returns a valid virtual host wrapper object that can be
+// safely accessed when no virtual host matches the request authority.
+// This verifies that calling metadata() returns an empty metadata object.
 TEST_F(LuaHttpFilterTest, GetVirtualHostFromHandleNoVirtualHost) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      if request_handle:virtualHost() == nil then
-        request_handle:logTrace("request-ok")
+      local virtual_host = request_handle:virtualHost()
+      for _, _ in pairs(virtual_host:metadata()) do
+        return
       end
+      request_handle:logTrace("No metadata found during request handling")
     end
     function envoy_on_response(response_handle)
-      if response_handle:virtualHost() == nil then
-        response_handle:logTrace("response-ok")
+      local virtual_host = response_handle:virtualHost()
+      for _, _ in pairs(virtual_host:metadata()) do
+        return
       end
+      response_handle:logTrace("No metadata found during response handling")
     end
   )EOF"};
 
@@ -4041,13 +4045,13 @@ TEST_F(LuaHttpFilterTest, GetVirtualHostFromHandleNoVirtualHost) {
 
   // Request path
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
-  EXPECT_LOG_CONTAINS("trace", "request-ok", {
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during request handling", {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   });
 
   // Response path
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_LOG_CONTAINS("trace", "response-ok", {
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during response handling", {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   });
 

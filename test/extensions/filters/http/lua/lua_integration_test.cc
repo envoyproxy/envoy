@@ -2200,8 +2200,10 @@ virtual_hosts:
   cleanup();
 }
 
-// Test that handle:virtualHost() returns nil when virtual host does not match.
-TEST_P(LuaIntegrationTest, VirtualHostNilWhenNoVirtualHostMatch) {
+// Test that handle:virtualHost() returns a valid object when no virtual host matches the request
+// authority. This verifies that metadata() returns an empty metadata object that can be safely
+// iterated.
+TEST_P(LuaIntegrationTest, VirtualHostValidWhenNoVirtualHostMatch) {
   if (!testing_downstream_filter_) {
     GTEST_SKIP() << "This is a local reply test that does not go upstream";
   }
@@ -2215,16 +2217,19 @@ typed_config:
     inline_string: |
       function envoy_on_request(request_handle)
         local virtual_host = request_handle:virtualHost()
-        if not virtual_host then
-          request_handle:logTrace("request-ok")
+        for _, _ in pairs(virtual_host:metadata()) do
+          return
         end
+        request_handle:logTrace("No metadata found during request handling")
       end
       function envoy_on_response(response_handle)
         local virtual_host = response_handle:virtualHost()
-        if not virtual_host then
-          response_handle:logTrace("response-ok")
+        for _, _ in pairs(virtual_host:metadata()) do
+          return
         end
+        response_handle:logTrace("No metadata found during response handling")
       end
+
 )EOF";
 
   initializeFilter(FILTER_AND_CODE, "foo.lyft.com");
@@ -2238,8 +2243,8 @@ typed_config:
 
   IntegrationStreamDecoderPtr response;
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
-                                 {"trace", "request-ok"},
-                                 {"trace", "response-ok"},
+                                 {"trace", "No metadata found during request handling"},
+                                 {"trace", "No metadata found during response handling"},
                              }),
                              {
                                auto encoder_decoder = codec_client_->startRequest(request_headers);
