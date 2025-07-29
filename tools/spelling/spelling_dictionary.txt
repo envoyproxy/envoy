@@ -1435,6 +1435,7 @@ timestamps
 timeval
 tmp
 tmpfile
+tmpl
 tokenize
 tokenized
 tokenizes
