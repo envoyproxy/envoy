@@ -40,16 +40,6 @@ void OpenTelemetryGrpcMetricsExporterImpl::send(MetricsExportRequestPtr&& export
                 Http::AsyncClient::RequestOptions());
 }
 
-void OtlpOptions::populateResourceAttributes(
-    const Tracers::OpenTelemetry::Resource& resource,
-    Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& target) const {
-  for (const auto& attr : resource.attributes_) {
-    auto* attribute = target.Add();
-    attribute->set_key(attr.first);
-    attribute->mutable_value()->set_string_value(attr.second);
-  }
-}
-
 void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
     Grpc::ResponsePtr<MetricsExportResponse>&& export_response, Tracing::Span&) {
   if (export_response->has_partial_success()) {
