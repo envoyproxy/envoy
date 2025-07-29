@@ -204,12 +204,11 @@ public:
       auto& handler = expr_context.getExpression(token);
 
       const auto& parsed_expr = parse_status.value();
-      const cel::expr::Expr& cel_expr = parsed_expr.expr();
-      const cel::expr::SourceInfo& cel_source_info = parsed_expr.source_info();
+      handler.parsed_expr_ = parsed_expr;
 
       std::vector<absl::Status> warnings;
-      auto cel_expression_status =
-          expr_context.builder()->CreateExpression(&cel_expr, &cel_source_info, &warnings);
+      auto cel_expression_status = expr_context.builder()->CreateExpression(
+          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info(), &warnings);
 
       if (!cel_expression_status.ok()) {
         ENVOY_LOG(info, "expr_create compile error: {}", cel_expression_status.status().message());
@@ -218,7 +217,6 @@ public:
       }
 
       handler.compiled_expr_ = std::move(cel_expression_status.value());
-      handler.parsed_expr_ = parsed_expr;
 
       auto result = reinterpret_cast<uint32_t*>(alloc_result(sizeof(uint32_t)));
       *result = token;
