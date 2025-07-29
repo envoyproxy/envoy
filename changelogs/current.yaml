@@ -134,6 +134,11 @@ bug_fixes:
   change: |
     Fixed a bug where the config validation server will crash when the configuration contains
     ``%CEL%`` or ``%METADATA%`` substitution formatter.
+- area: http3
+  change: |
+    Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
+    reverted by setting the runtime guard
+    ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
 - area: tls
   change: |
     Fixed an issue with incorrectly cached connection properties on TLS connections.
