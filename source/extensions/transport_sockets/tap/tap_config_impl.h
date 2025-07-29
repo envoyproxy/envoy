@@ -24,6 +24,10 @@ public:
   void closeSocket(Network::ConnectionEvent event) override;
   void onRead(const Buffer::Instance& data, uint32_t bytes_read) override;
   void onWrite(const Buffer::Instance& data, uint32_t bytes_written, bool end_stream) override;
+  void setStreamedBufferAgedDuration(uint32_t duration) {
+    streamed_buffer_aged_duration_ = duration;
+  }
+  uint32_t getStreamedBufferAgedDuration() const { return streamed_buffer_aged_duration_; }
 
 private:
   void initEvent(envoy::data::tap::v3::SocketEvent&);
@@ -48,6 +52,11 @@ private:
   }
   void pegSubmitCounter(const bool is_streaming);
   bool shouldSendStreamedMsgByConfiguredSize() const;
+  bool shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration() const;
+  void submitStreamedDataPerConfiguredSize();
+  void setStreamedDataPerConfiguredSize(const Buffer::Instance& data, const uint32_t buffer_offset,
+                                        const uint32_t total_bytes, const bool is_read,
+                                        const bool is_end_stream);
   void handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
                                                  const uint32_t total_bytes, const bool is_read,
                                                  const bool is_end_stream);
@@ -55,6 +64,10 @@ private:
   // (This means that per transport socket buffer trace, the minimum amount
   // which triggering to send the tapped messages size is 9 bytes).
   static constexpr uint32_t DefaultMinBufferedBytes = 9;
+  // It isn't easy to meet data submit threshold when the configured byte size is too large
+  // and the tapped data volume is low, therefore, set below buffer aged duration (seconds)
+  // to make sure that the tapped data is submitted in time.
+  static constexpr uint32_t DefaultBufferedAgedDuration = 15;
   SocketTapConfigSharedPtr config_;
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr sink_handle_;
   const Network::Connection& connection_;
@@ -65,6 +78,7 @@ private:
   uint32_t tx_bytes_buffered_{};
   const bool should_output_conn_info_per_event_{false};
   uint32_t current_streamed_rx_tx_bytes_{0};
+  uint32_t streamed_buffer_aged_duration_{0};
   Extensions::Common::Tap::TraceWrapperPtr streamed_trace_{nullptr};
   const TransportTapStats stats_;
 };
