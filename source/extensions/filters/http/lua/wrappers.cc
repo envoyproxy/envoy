@@ -446,7 +446,12 @@ int FilterStateWrapper::luaGet(lua_State* state) {
 }
 
 const ProtobufWkt::Struct& VirtualHostWrapper::getMetadata() const {
-  const auto& metadata = virtual_host_->metadata();
+  const auto& virtual_host = stream_info_.virtualHost();
+  if (virtual_host == nullptr) {
+    return ProtobufWkt::Struct::default_instance();
+  }
+
+  const auto& metadata = virtual_host->metadata();
   auto filter_it = metadata.filter_metadata().find(filter_config_name_);
 
   if (filter_it != metadata.filter_metadata().end()) {

@@ -131,11 +131,6 @@ public:
   virtual const ProtobufWkt::Struct& filterContext() const PURE;
 
   /**
-   * @return const Router::VirtualHostConstSharedPtr& the virtual host that owns the route.
-   */
-  virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
-
-  /**
    * @return absl::string_view the value of filter config name.
    */
   virtual const absl::string_view filterConfigName() const PURE;
@@ -583,9 +578,6 @@ private:
       }
     }
     const ProtobufWkt::Struct& filterContext() const override { return parent_.filterContext(); }
-    const Router::VirtualHostConstSharedPtr& virtualHost() const override {
-      return callbacks_->streamInfo().virtualHost();
-    }
     const absl::string_view filterConfigName() const override {
       return callbacks_->filterConfigName();
     }
@@ -618,9 +610,6 @@ private:
     }
     void clearRouteCache() override {}
     const ProtobufWkt::Struct& filterContext() const override { return parent_.filterContext(); }
-    const Router::VirtualHostConstSharedPtr& virtualHost() const override {
-      return callbacks_->streamInfo().virtualHost();
-    }
     const absl::string_view filterConfigName() const override {
       return callbacks_->filterConfigName();
     }

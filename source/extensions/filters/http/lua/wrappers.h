@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/http/header_map.h"
-#include "envoy/router/router.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/crypto/utility.h"
@@ -457,9 +456,9 @@ public:
 
 class VirtualHostWrapper : public Filters::Common::Lua::BaseLuaObject<VirtualHostWrapper> {
 public:
-  VirtualHostWrapper(const Router::VirtualHostConstSharedPtr& virtual_host,
+  VirtualHostWrapper(const StreamInfo::StreamInfo& stream_info,
                      const absl::string_view filter_config_name)
-      : virtual_host_{virtual_host}, filter_config_name_{filter_config_name} {}
+      : stream_info_{stream_info}, filter_config_name_{filter_config_name} {}
 
   static ExportedFunctions exportedFunctions() { return {{"metadata", static_luaMetadata}}; }
 
@@ -474,7 +473,7 @@ private:
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override { metadata_wrapper_.reset(); }
 
-  const Router::VirtualHostConstSharedPtr& virtual_host_;
+  const StreamInfo::StreamInfo& stream_info_;
   const absl::string_view filter_config_name_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
 };

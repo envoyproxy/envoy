@@ -633,11 +633,10 @@ int StreamHandleWrapper::luaVirtualHost(lua_State* state) {
   ASSERT(state_ == State::Running);
   if (virtual_host_wrapper_.get() != nullptr) {
     virtual_host_wrapper_.pushStack();
-  } else if (const auto& virtual_host = callbacks_.virtualHost(); virtual_host != nullptr) {
-    virtual_host_wrapper_.reset(
-        VirtualHostWrapper::create(state, virtual_host, callbacks_.filterConfigName()), true);
   } else {
-    lua_pushnil(state);
+    virtual_host_wrapper_.reset(
+        VirtualHostWrapper::create(state, callbacks_.streamInfo(), callbacks_.filterConfigName()),
+        true);
   }
   return 1;
 }
