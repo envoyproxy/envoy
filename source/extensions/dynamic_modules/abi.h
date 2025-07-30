@@ -420,6 +420,7 @@ typedef enum {
  * source/common/common/base_logger.h.
  */
 typedef enum {
+  envoy_dynamic_module_type_log_level_Trace,
   envoy_dynamic_module_type_log_level_Debug,
   envoy_dynamic_module_type_log_level_Info,
   envoy_dynamic_module_type_log_level_Warn,

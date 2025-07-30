@@ -1060,6 +1060,14 @@ TEST(ABIImpl, HttpCallout) {
             envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
 }
 
+TEST(ABIImpl, LogEnabled) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::critical);
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Debug));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Critical));
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions

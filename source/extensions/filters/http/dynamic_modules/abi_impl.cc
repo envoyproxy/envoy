@@ -1081,7 +1081,7 @@ void envoy_dynamic_module_callback_http_filter_continue_encoding(
 }
 
 bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level) {
-  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level() >=
+  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level() <=
          static_cast<spdlog::level::level_enum>(level);
 }
 

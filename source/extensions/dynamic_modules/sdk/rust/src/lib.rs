@@ -88,6 +88,19 @@ macro_rules! declare_init_functions {
   };
 }
 
+/// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// # Arguments
+/// * `message` - The message to log. Can be a string literal, formatted string, or any type that
+///   implements `Display`.
+#[macro_export]
+macro_rules! envoy_log_trace {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Trace, $($arg)*)
+    };
+}
+
 /// Log a debug message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
