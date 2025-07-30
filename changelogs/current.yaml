@@ -33,10 +33,10 @@ new_features:
     Added support for request payloads in HTTP health checks. The ``send`` field in ``HttpHealthCheck`` can now be
     used to specify a request body to be sent during health checking. This feature supports both hex-encoded text
     and binary payloads, similar to TCP health checks. The payload can only be used with HTTP methods that support
-    request bodies (POST, PUT, PATCH, OPTIONS). Methods that must not have request bodies (GET, HEAD, DELETE, TRACE)
-    are validated and will throw an error if combined with payloads. The implementation is optimized to process the
-    payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
-    <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
+    request bodies (``POST``, ``PUT``, ``PATCH``, ``OPTIONS``). Methods that must not have request bodies
+    (``GET``, ``HEAD``, ``DELETE``, ``TRACE``) are validated and will throw an error if combined with payloads.
+    The implementation is optimized to process the payload once during configuration and reuse it for all health
+    check requests. See :ref:`HttpHealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
 - area: router_check_tool
   change: |
     Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
@@ -51,7 +51,9 @@ new_features:
     for more details.
 - area: socket
   change: |
-    Added ``network_namespace_filepath`` to ``SocketAddress``.
+    Added :ref:``network_namespace_filepath <envoy_v3_api_msg_config.core.v3.SocketAddress.network_namespace_filepath>`` to
+    :ref:`SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`. This field allows specifying a Linux network namespace filepath
+    for socket creation, enabling network isolation in containerized environments.
 - area: ratelimit
   change: |
     Add the :ref:`rate_limits
@@ -63,9 +65,17 @@ new_features:
     will take precedence over this field.
 - area: observability
   change: |
-    Added ENVOY_NOTIFICATION macro to track specific conditions in produiction environments.
+    Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in produiction environments.
 - area: dns_filter, redis_proxy and prefix_matcher_map
   change: |
     Switch to using Radix Tree instead of Trie for performance improvements.
+- area: load_reporting
+  change: |
+    Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
+    endpoint statistics and metrics, but only for endpoints with updated stats, optimizing report size and efficiency.
+- area: otlp_stat_sink
+  change: |
+    Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
+    :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
 
 deprecated:
