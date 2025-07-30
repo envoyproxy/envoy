@@ -263,3 +263,41 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "bidirectional_grpc_stream_lib",
+    srcs = [],
+    hdrs = ["bidirectional_grpc_stream.h"],
+    deps = [
+        ":grpc_stream_lib",
+        "//source/common/grpc:typed_async_client_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "bidirectional_grpc_mux_lib",
+    srcs = ["bidirectional_grpc_mux.cc"],
+    hdrs = ["bidirectional_grpc_mux.h"],
+    deps = [
+        ":bidirectional_grpc_stream_lib",
+        ":new_grpc_mux_impl_lib",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "listener_status_provider_lib",
+    srcs = ["//source/server:listener_status_provider.cc"],
+    hdrs = ["//source/server:listener_status_provider.h"],
+    deps = [
+        ":bidirectional_grpc_mux_lib",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/server/listener_manager",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/synchronization",
+    ],
+)

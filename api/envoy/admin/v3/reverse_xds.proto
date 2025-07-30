@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package envoy.admin.v3;
+
+import "google/protobuf/timestamp.proto";
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.admin.v3";
+option java_outer_classname = "ReverseXdsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/admin/v3;adminv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Reverse xDS resource types]
+
+// Resource types that can be provided by Envoy clients to management servers
+// via reverse xDS (bidirectional xDS).
+
+// Listener readiness status resource for reverse xDS.
+// This provides information about whether listeners have successfully
+// bound to their ports and are ready to accept traffic.
+message ListenerReadinessStatus {
+  // The name of the listener.
+  string listener_name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Whether the listener is ready and accepting traffic.
+  bool ready = 2;
+
+  // The address the listener is bound to, if ready.
+  string bound_address = 3;
+
+  // Error message if the listener failed to become ready.
+  string error_message = 4;
+
+  // Current state of the listener.
+  enum State {
+    // Listener configuration received but not yet bound.
+    PENDING = 0;
+    
+    // Listener successfully bound and accepting traffic.
+    READY = 1;
+    
+    // Listener failed to bind or become ready.
+    FAILED = 2;
+    
+    // Listener is draining connections.
+    DRAINING = 3;
+  }
+  State state = 5;
+
+  // Timestamp when the status was last updated.
+  google.protobuf.Timestamp last_updated = 6;
+}
+
+// Cluster health status resource for reverse xDS.
+// This provides information about cluster health and endpoint status.
+message ClusterHealthStatus {
+  // The name of the cluster.
+  string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Overall health status of the cluster.
+  enum HealthState {
+    // Health state is unknown.
+    UNKNOWN = 0;
+    
+    // Cluster is healthy with available endpoints.
+    HEALTHY = 1;
+    
+    // Cluster is degraded but some endpoints are available.
+    DEGRADED = 2;
+    
+    // Cluster is unhealthy with no available endpoints.
+    UNHEALTHY = 3;
+  }
+  HealthState health_state = 2;
+
+  // Number of healthy endpoints.
+  uint32 healthy_endpoints = 3;
+
+  // Total number of endpoints.
+  uint32 total_endpoints = 4;
+
+  // Circuit breaker status.
+  message CircuitBreakerStatus {
+    // Whether the circuit breaker is open.
+    bool open = 1;
+    
+    // Number of pending requests.
+    uint32 pending_requests = 2;
+    
+    // Number of pending retries.
+    uint32 pending_retries = 3;
+  }
+  CircuitBreakerStatus circuit_breaker = 5;
+
+  // Timestamp when the status was last updated.
+  google.protobuf.Timestamp last_updated = 6;
+}
+
+// Configuration snapshot resource for reverse xDS.
+// This provides a snapshot of the client's current configuration.
+message ConfigurationSnapshot {
+  // Node information for the client.
+  string node_id = 1;
+  
+  // Cluster name for the client.
+  string cluster = 2;
+
+  // Number of active listeners.
+  uint32 active_listeners = 3;
+
+  // Number of active clusters.
+  uint32 active_clusters = 4;
+
+  // Bootstrap configuration version.
+  string bootstrap_version = 5;
+
+  // Last configuration update timestamp.
+  google.protobuf.Timestamp last_config_update = 6;
+
+  // Uptime of the client.
+  google.protobuf.Timestamp start_time = 7;
+} 
