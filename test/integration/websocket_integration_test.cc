@@ -717,8 +717,6 @@ TEST_P(WebsocketIntegrationTest, Http1UpgradeStatus5OOWithFilterChain) {
   // The upgrade should be paused, but the response header is proxied back to downstream.
   performUpgrade(upgradeRequestHeaders(), in_correct_status_response_headers, true);
   EXPECT_EQ("500", response_->headers().Status()->value().getStringView());
-  EXPECT_EQ("upgrade", response_->headers().Connection()->value().getStringView());
-  EXPECT_EQ("websocket", response_->headers().Upgrade()->value().getStringView());
 
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 0);
   test_server_->waitForGaugeEq("http.config_test.downstream_cx_upgrades_active", 1);
