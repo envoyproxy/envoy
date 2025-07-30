@@ -1,4 +1,4 @@
-name: Envoy/macOS
+name: Mobile/Docs
 
 permissions:
   contents: read
@@ -36,70 +36,71 @@ jobs:
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
     uses: ./.github/workflows/_load.yml
     with:
-      check-name: macos
+      check-name: mobile-docs
 
-  macos:
+  docs:
+    secrets:
+      ssh-key-extra: ${{ needs.load.outputs.trusted  && secrets.ENVOY_MOBILE_WEBSITE_DEPLOY_KEY || '' }}
     permissions:
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.build-macos }}
-    needs:
-    - load
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-docs }}
+    needs: load
     uses: ./.github/workflows/_run.yml
-    name: CI ${{ matrix.name || matrix.target }}
     with:
-      command:
-      container-command:
-      docker-ipv6: false
+      args: >-
+        --
+      command: ./docs/build.sh
       request: ${{ needs.load.outputs.request }}
-      # TODO: Remove these hardcoded branches when no longer supported
-      runs-on: >-
-        ${{ (contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.31')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.32')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.33')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.34'))
-            && 'macos-14-xlarge'
-            || 'macos-15-xlarge' }}
-      source: ${{ matrix.source }}
-      steps-post:
-      steps-pre: ${{ matrix.steps-pre }}
-      target: ${{ matrix.target }}
-      target-name: ${{ matrix.target-name }}
-      timeout-minutes: 180
+      target: mobile-docs
+      cache-build-image: ${{ needs.load.outputs.build-image && fromJSON(needs.load.outputs.build-image).build-image || '' }}
+      checkout-extra: |
+        repository: envoy-mobile/envoy-mobile.github.io
+        path: mobile-docs
+        fetch-depth: 0
+        branch: master
+      docker-ipv6: false
+      source: |
+        echo "ENVOY_DOCKER_SOURCE_DIR=/source/mobile" >> $GITHUB_ENV
+        # Path relative to ./mobile directory
+        echo "MOBILE_DOCS_CHECKOUT_DIR=../mobile-docs" >> $GITHUB_ENV
+      steps-post: |
+        - name: Publish docs
+          shell: bash
+          run: |
+            ./ci/run_envoy_docker.sh docs/publish.sh
+        # This step needs to be done outside the container to access ssh creds
+        - name: Push changes
+          # && github.repository == 'envoyproxy/envoy'
+          if: ${{ needs.load.outputs.trusted }}
+          shell: bash
+          run: |
+            git -C mobile-docs status
+            exit 0
+            git -C mobile-docs push origin master
+      timeout-minutes: 20
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - target: ci/mac_ci_steps.sh
-          name: macOS
-          target-name: mac_ci_steps
-          source: |
-            source ./ci/mac_ci_setup.sh
-            _BAZEL_BUILD_EXTRA_OPTIONS=(
-              --remote_download_toplevel
-              --flaky_test_attempts=2
-              --config=remote-cache-envoy-engflow
-              --config=ci)
-            export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
+      upload-name: docs
+      upload-path: mobile/generated/docs
 
   request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
     permissions:
       actions: read
       contents: read
       pull-requests: read
-    secrets:
-      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
-      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
     if: |
       always()
       && github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
-      && fromJSON(needs.load.outputs.request).run.build-macos
+      && needs.load.outputs.request
+      && fromJSON(needs.load.outputs.request).run.mobile-docs
     needs:
     - load
-    - macos
+    - docs
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

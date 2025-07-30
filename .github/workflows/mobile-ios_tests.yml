@@ -1,4 +1,4 @@
-name: Envoy/macOS
+name: Mobile/iOS tests
 
 permissions:
   contents: read
@@ -36,70 +36,69 @@ jobs:
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
     uses: ./.github/workflows/_load.yml
     with:
-      check-name: macos
+      check-name: mobile-ios-tests
 
-  macos:
+  tests:
     permissions:
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.build-macos }}
-    needs:
-    - load
     uses: ./.github/workflows/_run.yml
-    name: CI ${{ matrix.name || matrix.target }}
+    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-ios-tests }}
+    needs: load
+    name: ios-tests
     with:
-      command:
+      args: ${{ matrix.args }}
+      command: ./bazelw
       container-command:
       docker-ipv6: false
       request: ${{ needs.load.outputs.request }}
-      # TODO: Remove these hardcoded branches when no longer supported
-      runs-on: >-
-        ${{ (contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.31')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.32')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.33')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.34'))
-            && 'macos-14-xlarge'
-            || 'macos-15-xlarge' }}
-      source: ${{ matrix.source }}
-      steps-post:
-      steps-pre: ${{ matrix.steps-pre }}
+      # revert this to non-large once updated
+      runs-on: macos-15
+      source: |
+        source ./ci/mac_ci_setup.sh
+      steps-post: ${{ matrix.steps-post }}
       target: ${{ matrix.target }}
-      target-name: ${{ matrix.target-name }}
-      timeout-minutes: 180
+      timeout-minutes: ${{ matrix.timeout-minutes }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+      working-directory: mobile
     strategy:
       fail-fast: false
       matrix:
         include:
-        - target: ci/mac_ci_steps.sh
-          name: macOS
-          target-name: mac_ci_steps
-          source: |
-            source ./ci/mac_ci_setup.sh
-            _BAZEL_BUILD_EXTRA_OPTIONS=(
-              --remote_download_toplevel
-              --flaky_test_attempts=2
-              --config=remote-cache-envoy-engflow
-              --config=ci)
-            export BAZEL_BUILD_EXTRA_OPTIONS=${_BAZEL_BUILD_EXTRA_OPTIONS[*]}
+        - name: Run swift library tests
+          args: >-
+            test
+            --config=mobile-remote-ci-macos-ios-swift
+            //test/swift/...
+          target: swift-tests
+          timeout-minutes: 120
+        - name: Run Objective-C library tests
+          args: >-
+            test
+            --config=mobile-remote-ci-macos-ios-obj-c
+            //test/objective-c/...
+            //test/cc/unit:envoy_config_test
+          target: c-and-objc-tests
+          timeout-minutes: 120
 
   request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
     permissions:
       actions: read
       contents: read
       pull-requests: read
-    secrets:
-      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
-      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
     if: |
       always()
       && github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
-      && fromJSON(needs.load.outputs.request).run.build-macos
+      && needs.load.outputs.request
+      && fromJSON(needs.load.outputs.request).run.mobile-ios-tests
     needs:
     - load
-    - macos
+    - tests
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

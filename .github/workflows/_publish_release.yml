@@ -47,7 +47,7 @@ jobs:
       gcs-cache-key: ${{ secrets.gcs-cache-key }}
       gpg-key: ${{ secrets.gpg-key }}
       gpg-key-password: ${{ secrets.gpg-key-password }}
-    if: ${{ github.repository == 'envoyproxy/envoy-ci-staging' }}
+    if: ${{ vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy' }}
     name: Sign packages
     uses: ./.github/workflows/_run.yml
     with:
@@ -145,12 +145,12 @@ jobs:
     needs:
     - release
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.23
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.24
       id: appauth
       with:
         app_id: ${{ secrets.ENVOY_CI_SYNC_APP_ID }}
         key: ${{ secrets.ENVOY_CI_SYNC_APP_KEY }}
-    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.23
+    - uses: envoyproxy/toolshed/gh-actions/dispatch@actions-v0.3.24
       with:
         ref: main
         repository: ${{ fromJSON(inputs.request).request.version.dev && 'envoyproxy/envoy-website' || 'envoyproxy/archive' }}
