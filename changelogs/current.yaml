@@ -75,5 +75,9 @@ new_features:
   change: |
         Added load shed point ``envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch`` that
             closes connections before creating codec if Envoy is under pressure, typically memory.
+- area: otlp_stat_sink
+  change: |
+    Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
+    :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
 
 deprecated:
