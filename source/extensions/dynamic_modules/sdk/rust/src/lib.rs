@@ -91,9 +91,8 @@ macro_rules! declare_init_functions {
 /// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
-/// # Arguments
-/// * `message` - The message to log. Can be a string literal, formatted string, or any type that
-///   implements `Display`.
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
 #[macro_export]
 macro_rules! envoy_log_trace {
     ($($arg:tt)*) => {
@@ -104,9 +103,8 @@ macro_rules! envoy_log_trace {
 /// Log a debug message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
-/// # Arguments
-/// * `message` - The message to log. Can be a string literal, formatted string, or any type that
-///   implements `Display`.
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
 #[macro_export]
 macro_rules! envoy_log_debug {
     ($($arg:tt)*) => {
@@ -117,9 +115,8 @@ macro_rules! envoy_log_debug {
 /// Log an info message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
-/// # Arguments
-/// * `message` - The message to log. Can be a string literal, formatted string, or any type that
-///   implements `Display`.
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
 #[macro_export]
 macro_rules! envoy_log_info {
     ($($arg:tt)*) => {
@@ -130,9 +127,8 @@ macro_rules! envoy_log_info {
 /// Log a warning message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
-/// # Arguments
-/// * `message` - The message to log. Can be a string literal, formatted string, or any type that
-///   implements `Display`.
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
 #[macro_export]
 macro_rules! envoy_log_warn {
     ($($arg:tt)*) => {
@@ -143,9 +139,8 @@ macro_rules! envoy_log_warn {
 /// Log an error message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
-/// # Arguments
-/// * `message` - The message to log. Can be a string literal, formatted string, or any type that
-///   implements `Display`.
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
 #[macro_export]
 macro_rules! envoy_log_error {
     ($($arg:tt)*) => {
@@ -156,9 +151,8 @@ macro_rules! envoy_log_error {
 /// Log a critical message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
 /// allocated if the log level is not enabled on the Envoy side.
 ///
-/// # Arguments
-/// * `message` - The message to log. Can be a string literal, formatted string, or any type that
-///   implements `Display`.
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
 #[macro_export]
 macro_rules! envoy_log_critical {
     ($($arg:tt)*) => {
@@ -168,10 +162,6 @@ macro_rules! envoy_log_critical {
 
 /// Internal logging macro that handles the actual call to the Envoy logging callback
 /// used by envoy_log_* macros.
-///
-/// # Arguments
-/// * `level` - The log level (from the ABI enum)
-/// * `message` - The message to log (supports format! syntax)
 #[macro_export]
 macro_rules! envoy_log {
   ($level:expr, $($arg:tt)*) => {

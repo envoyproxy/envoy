@@ -6,11 +6,11 @@ use std::sync::atomic::AtomicBool; // This is used for testing the drop, not for
 fn test_loggers() {
   // Test that the loggers are defined and can be used during the unit tests, i.e., not trying to
   // find the symbol implemented by Envoy.
-  envoy_log_trace!("Trace message");
-  envoy_log_debug!("Debug message");
-  envoy_log_info!("Info message");
-  envoy_log_warn!("Warning message");
-  envoy_log_error!("Error message");
+  envoy_log_trace!("message with an argument: {}", "argument");
+  envoy_log_debug!("message with an argument: {}", "argument");
+  envoy_log_info!("message with an argument: {}", "argument");
+  envoy_log_warn!("message with an argument: {}", "argument");
+  envoy_log_error!("message with an argument: {}", "argument");
 }
 
 #[test]
