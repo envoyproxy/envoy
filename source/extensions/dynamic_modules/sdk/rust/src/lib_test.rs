@@ -3,6 +3,16 @@ use crate::*;
 use std::sync::atomic::AtomicBool; // This is used for testing the drop, not for the actual concurrency.
 
 #[test]
+fn test_loggers() {
+  // Test that the loggers are defined and can be used during the unit tests, i.e., not trying to
+  // find the symbol implemented by Envoy.
+  envoy_log_debug!("Debug message");
+  envoy_log_info!("Info message");
+  envoy_log_warn!("Warning message");
+  envoy_log_error!("Error message");
+}
+
+#[test]
 fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   struct TestHttpFilterConfig;
   impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
