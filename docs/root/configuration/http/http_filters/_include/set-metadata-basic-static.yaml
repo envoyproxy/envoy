@@ -35,8 +35,8 @@ static_resources:
                   version: "v1.2.3"
                   environment: "production"
                   features:
-                    - "feature_a"
-                    - "feature_b"
+                  - "feature_a"
+                  - "feature_b"
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
