@@ -387,6 +387,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "notification_lib",
+    srcs = ["notification.cc"],
+    hdrs = ["notification.h"],
+    deps = [
+        ":assert_lib",
+        ":minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "phantom",
     hdrs = ["phantom.h"],
 )
@@ -488,7 +498,9 @@ envoy_cc_library(
     hdrs = ["radix_tree.h"],
     deps = [
         ":assert_lib",
+        "//envoy/common:optref_lib",
         "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
     ],
 )

@@ -12,7 +12,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 ResourceDetectorPtr StaticConfigResourceDetectorFactory::createResourceDetector(
-    const Protobuf::Message& message, Server::Configuration::TracerFactoryContext& context) {
+    const Protobuf::Message& message, Server::Configuration::ServerFactoryContext& context) {
 
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
       dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);

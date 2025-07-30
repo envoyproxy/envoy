@@ -77,6 +77,7 @@ const static bool should_log = true;
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
   FUNCTION(multi_connection)                                                                       \
+  FUNCTION(notification)                                                                           \
   FUNCTION(oauth2)                                                                                 \
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \

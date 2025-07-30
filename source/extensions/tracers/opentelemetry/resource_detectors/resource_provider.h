@@ -36,14 +36,20 @@ public:
    * @return Resource const The merged resource.
    */
   virtual Resource
-  getResource(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-              Server::Configuration::TracerFactoryContext& context) const PURE;
+  getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+                  resource_detectors,
+              Server::Configuration::ServerFactoryContext& context,
+              absl::string_view service_name) const PURE;
 };
+using ResourceProviderPtr = std::shared_ptr<ResourceProvider>;
 
 class ResourceProviderImpl : public ResourceProvider {
 public:
-  Resource getResource(const envoy::config::trace::v3::OpenTelemetryConfig& opentelemetry_config,
-                       Server::Configuration::TracerFactoryContext& context) const override;
+  Resource
+  getResource(const Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>&
+                  resource_detectors,
+              Server::Configuration::ServerFactoryContext& context,
+              absl::string_view service_name) const override;
 };
 
 } // namespace OpenTelemetry
