@@ -1106,7 +1106,7 @@ void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level
     ENVOY_LOG_TO_LOGGER(logger, critical, message_view);
     break;
   default:
-    ENVOY_LOG_TO_LOGGER(logger, error,
+    ENVOY_LOG_TO_LOGGER(logger, critical,
                         fmt::format("Unsupported log level: {}", static_cast<int64_t>(level)));
     break;
   }
