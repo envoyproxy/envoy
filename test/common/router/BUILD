@@ -82,6 +82,19 @@ envoy_cc_benchmark_binary(
     ],
 )
 
+envoy_cc_benchmark_binary(
+    name = "radix_tree_route_matching_speed_test",
+    srcs = ["radix_tree_route_matching_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:radix_tree_lib",
+        "//source/common/router:config_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
+
 envoy_proto_library(
     name = "header_parser_fuzz_proto",
     srcs = ["header_parser_fuzz.proto"],

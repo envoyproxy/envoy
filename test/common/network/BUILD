@@ -64,6 +64,34 @@ envoy_benchmark_test(
     benchmark_binary = "address_impl_speed_test",
 )
 
+envoy_cc_benchmark_binary(
+    name = "radix_tree_ip_list_speed_test",
+    srcs = ["radix_tree_ip_list_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:cidr_range_lib",
+        "//source/common/network:radix_tree_ip_list_lib",
+        "//source/common/network:utility_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "radix_tree_ip_list_speed_test_benchmark_test",
+    benchmark_binary = "radix_tree_ip_list_speed_test",
+)
+
+envoy_cc_test(
+    name = "radix_tree_ip_list_test",
+    srcs = ["radix_tree_ip_list_test.cc"],
+    deps = [
+        "//source/common/network:radix_tree_ip_list_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "cidr_range_test",
     srcs = ["cidr_range_test.cc"],

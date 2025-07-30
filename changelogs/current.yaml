@@ -77,5 +77,8 @@ new_features:
   change: |
     Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
     :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
+- area: ip_matcher
+  change: |
+    Switch to using Radix Tree instead of Trie for performance improvements.
 
 deprecated:

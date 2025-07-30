@@ -64,6 +64,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "radix_tree_ip_list_lib",
+    srcs = ["radix_tree_ip_list.cc"],
+    hdrs = ["radix_tree_ip_list.h"],
+    deps = [
+        ":cidr_range_lib",
+        ":lc_trie_lib",
+        ":utility_lib",
+        "//envoy/network:address_interface",
+        "//source/common/common:radix_tree_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "connection_balancer_lib",
     srcs = ["connection_balancer_impl.cc"],
     hdrs = ["connection_balancer_impl.h"],

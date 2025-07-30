@@ -180,24 +180,63 @@ bool HeaderMatcher::matches(const Network::Connection&,
   return header_->matchesHeaders(headers);
 }
 
+IPMatcher::IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type) : type_(type) {
+  // Convert single range to RadixTree for consistency.
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange> ranges;
+  *ranges.Add() = range;
+
+  auto radix_result = Network::Address::RadixTreeIpList::create(ranges);
+  if (!radix_result.ok()) {
+    throwEnvoyExceptionOrPanic(fmt::format("Failed to create RadixTree for IP range: {}",
+                                           radix_result.status().message()));
+  }
+  radix_ip_list_ = std::move(radix_result.value());
+}
+
+// static
+absl::StatusOr<std::unique_ptr<IPMatcher>>
+IPMatcher::create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& ranges,
+                  Type type) {
+  if (ranges.empty()) {
+    return absl::InvalidArgumentError("Empty IP range list provided");
+  }
+
+  // Use RadixTree for optimal performance in all cases.
+  auto radix_result = Network::Address::RadixTreeIpList::create(ranges);
+  if (!radix_result.ok()) {
+    return radix_result.status();
+  }
+
+  return std::unique_ptr<IPMatcher>(new IPMatcher(std::move(radix_result.value()), type));
+}
+
+IPMatcher::IPMatcher(std::unique_ptr<Network::Address::RadixTreeIpList> radix_ip_list, Type type)
+    : radix_ip_list_(std::move(radix_ip_list)), type_(type) {}
+
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
                         const StreamInfo::StreamInfo& info) const {
-  Envoy::Network::Address::InstanceConstSharedPtr ip;
+  const auto ip = extractIpAddress(connection, info);
+  if (!ip) {
+    return false;
+  }
+
+  return radix_ip_list_->contains(*ip);
+}
+
+Network::Address::InstanceConstSharedPtr
+IPMatcher::extractIpAddress(const Network::Connection& connection,
+                            const StreamInfo::StreamInfo& info) const {
   switch (type_) {
   case ConnectionRemote:
-    ip = connection.connectionInfoProvider().remoteAddress();
-    break;
+    return connection.connectionInfoProvider().remoteAddress();
   case DownstreamLocal:
-    ip = info.downstreamAddressProvider().localAddress();
-    break;
+    return info.downstreamAddressProvider().localAddress();
   case DownstreamDirectRemote:
-    ip = info.downstreamAddressProvider().directRemoteAddress();
-    break;
+    return info.downstreamAddressProvider().directRemoteAddress();
   case DownstreamRemote:
-    ip = info.downstreamAddressProvider().remoteAddress();
-    break;
+    return info.downstreamAddressProvider().remoteAddress();
   }
-  return range_.isInRange(*ip.get());
+  return nullptr;
 }
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
