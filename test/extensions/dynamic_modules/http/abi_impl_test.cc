@@ -1082,9 +1082,7 @@ TEST(ABIImpl, Log) {
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Warn, ptr, len);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error, ptr, len);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Critical, ptr, len);
-  // Invalid log level should not crash.
-  envoy_dynamic_module_callback_log(static_cast<envoy_dynamic_module_type_log_level>(9999), ptr,
-                                    len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off, ptr, len);
 }
 
 } // namespace HttpFilters

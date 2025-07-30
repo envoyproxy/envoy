@@ -426,6 +426,7 @@ typedef enum {
   envoy_dynamic_module_type_log_level_Warn,
   envoy_dynamic_module_type_log_level_Error,
   envoy_dynamic_module_type_log_level_Critical,
+  envoy_dynamic_module_type_log_level_Off,
 } envoy_dynamic_module_type_log_level;
 
 /**
