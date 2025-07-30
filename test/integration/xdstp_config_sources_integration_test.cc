@@ -67,7 +67,9 @@ public:
     // upstream for a backend (H/1).
     authority1_upstream_ = createAdsUpstream();
     default_authority_upstream_ = createAdsUpstream();
-    addFakeUpstream(Http::CodecType::HTTP1);
+    if (test_requires_additional_upstream_) {
+      addFakeUpstream(Http::CodecType::HTTP1);
+    }
   }
 
   bool isSotw() const {
@@ -154,6 +156,8 @@ public:
         name, Network::Test::getLoopbackAddressString(ipVersion()),
         fake_upstreams_.back().get()->localAddress()->ip()->port());
   }
+
+  bool test_requires_additional_upstream_{true};
 
   // Data members that emulate the authority1 server.
   FakeUpstream* authority1_upstream_;
@@ -399,4 +403,49 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigDefaultSource) {
 
 // TODO(adisuissa): add a test that validates that two clusters with the same
 // config source multiplex the request on the same stream.
+
+// Validate that a bootstrap cluster that has an xds-tp based config RDS source
+// works.
+TEST_P(XdsTpConfigsIntegrationTest, RdsOnlyConfigAuthority1) {
+  test_requires_additional_upstream_ = false;
+  const std::string route_config_name =
+      "xdstp://authority1.com/envoy.config.route.v3.RouteConfiguration/my_routes/route1";
+  // Set up the listener to point to an RDS resource (that will route to the
+  // the default cluster_0).
+  // Update the route to the xdstp-based cluster.
+  config_helper_.addConfigModifier(
+      [&route_config_name](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) { hcm.mutable_rds()->set_route_config_name(route_config_name); });
+
+  // Envoy will request the routes of the listener in the bootstrap during the
+  // initialization phase. This will make sure the xDS server answers with the
+  // correct assignment.
+  on_server_init_function_ = [this, &route_config_name]() {
+    connectAuthority1();
+    connectDefaultAuthority();
+
+    // Authority1 should receive the RDS request.
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::TestTypeUrl::get().RouteConfiguration, "", {route_config_name}, {route_config_name},
+        {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+    sendDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
+        Config::TestTypeUrl::get().RouteConfiguration,
+        {ConfigHelper::buildRouteConfig(route_config_name, "cluster_0")},
+        {ConfigHelper::buildRouteConfig(route_config_name, "cluster_0")}, {}, "1", {},
+        authority1_xds_stream_.get());
+
+    // Expect an RDS ACK.
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::TestTypeUrl::get().RouteConfiguration, "1", {route_config_name}, {}, {}, false,
+        Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+  };
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  // Try to send a request and see that it reaches the backend (backend 0).
+  testRouterHeaderOnlyRequestAndResponse(nullptr);
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace Envoy
