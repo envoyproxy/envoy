@@ -767,7 +767,7 @@ case $CI_TARGET in
         bazel build "${BAZEL_BUILD_OPTIONS[@]}" \
               "${BAZEL_RELEASE_OPTIONS[@]}" \
               --remote_download_outputs=toplevel \
-              -c opt //source/exe:envoy-static
+              -c opt //source/common/common:assert_lib
         exit 0
 
         # Build release binaries
