@@ -69,12 +69,11 @@ RedisCluster::RedisCluster(
           info(), context.serverFactoryContext().api())),
       auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
           info(), context.serverFactoryContext().api())),
-      cluster_name_(cluster.name()),
-      refresh_manager_(Common::Redis::getClusterRefreshManager(
-          context.serverFactoryContext().singletonManager(),
-          context.serverFactoryContext().mainThreadDispatcher(),
-          context.serverFactoryContext().clusterManager(),
-          context.serverFactoryContext().api().timeSource())),
+      cluster_name_(cluster.name()), refresh_manager_(Common::Redis::getClusterRefreshManager(
+                                         context.serverFactoryContext().singletonManager(),
+                                         context.serverFactoryContext().mainThreadDispatcher(),
+                                         context.serverFactoryContext().clusterManager(),
+                                         context.serverFactoryContext().api().timeSource())),
       registration_handle_(nullptr) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
@@ -89,8 +88,7 @@ RedisCluster::RedisCluster(
   std::weak_ptr<RedisDiscoverySession> weak_session = redis_discovery_session_;
   registration_handle_ = refresh_manager_->registerCluster(
       cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
-      failure_refresh_threshold_, host_degraded_refresh_threshold_,
-      [weak_session]() {
+      failure_refresh_threshold_, host_degraded_refresh_threshold_, [weak_session]() {
         // Try to lock the weak pointer to ensure the session is still alive
         auto session = weak_session.lock();
         if (session && session->resolve_timer_) {
@@ -244,14 +242,13 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
           }
 
           if (!resolve_timer_) {
-            resolve_timer_ =
-                parent_.dispatcher_.createTimer([this]() -> void {
-                  // Check if the parent cluster is being destroyed
-                  if (parent_.is_destroying_.load()) {
-                    return;
-                  }
-                  startResolveDns();
-                });
+            resolve_timer_ = parent_.dispatcher_.createTimer([this]() -> void {
+              // Check if the parent cluster is being destroyed
+              if (parent_.is_destroying_.load()) {
+                return;
+              }
+              startResolveDns();
+            });
           }
           // if the initial dns resolved to empty, we'll skip the redis discovery phase and
           // treat it as an empty cluster.

@@ -1513,16 +1513,16 @@ TEST_F(RedisClusterTest, NoSegfaultOnClusterDestructionWithPendingCallback) {
   std::bitset<ResponseReplicaFlagSize> no_replica(0);
   expectClusterSlotResponse(createResponse(single_slot_primary, no_replica));
   expectHealthyHosts(std::list<std::string>({"127.0.0.1:22120"}));
-  
+
   // Now destroy the cluster. With the fix in place (destructor setting is_destroying_
   // and resetting redis_discovery_session_), this should not crash.
   // Without the fix, accessing resolve_timer_ after destruction would segfault.
   cluster_.reset();
-  
+
   // If we reach here without crashing, the test passes.
   // The fix ensures that:
   // 1. The destructor sets is_destroying_ = true
-  // 2. The destructor resets redis_discovery_session_ 
+  // 2. The destructor resets redis_discovery_session_
   // 3. Timer callbacks check is_destroying_ before accessing cluster members
 }
 
