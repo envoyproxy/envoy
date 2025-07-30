@@ -2292,6 +2292,7 @@ Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
       should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
     ConnectionImpl::goAway();
+    sent_go_away_on_dispatch_ = true;
     return envoyOverloadError(
         "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
   }
