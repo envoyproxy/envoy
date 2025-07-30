@@ -9,4 +9,4 @@ http_filters:
         "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
         metadata_namespace: nested_namespace
         value:
-          custom_field: "typed_value" 
+          custom_field: "typed_value"

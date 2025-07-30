@@ -15,4 +15,4 @@ http_filters:
       allow_overwrite: true
       value:
         upstream_cluster: "backend"
-        retry_policy: "aggressive" 
+        retry_policy: "aggressive"

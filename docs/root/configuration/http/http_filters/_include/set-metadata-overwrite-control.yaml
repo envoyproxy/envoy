@@ -21,4 +21,4 @@ http_filters:
       value:
         counter: 3
         list: ["third"]
-        new_field: "added" 
+        new_field: "added"

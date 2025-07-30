@@ -9,4 +9,4 @@ http_filters:
         environment: "production"
         features:
           - "feature_a"
-          - "feature_b" 
+          - "feature_b"
