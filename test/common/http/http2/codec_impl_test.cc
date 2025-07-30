@@ -4340,7 +4340,6 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDi
         return false;
       }));
 
-
   // Drive new streams to be created within a single server dispatch.
   const int num_streams_to_create = 20;
   TestRequestHeaderMapImpl request_headers;
