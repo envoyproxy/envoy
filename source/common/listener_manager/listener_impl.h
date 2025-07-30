@@ -227,6 +227,7 @@ public:
   absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                              bool workers_started, uint64_t hash);
+  // Create a new listener from an existing listener with delta filter chains.
   absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(absl::optional<absl::string_view>& fcds_version_info,
                              const FilterChainRefVector& added_filter_chains,
@@ -480,7 +481,6 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool ignore_global_conn_limit_;
   const bool bypass_overload_manager_;
-  const bool created_by_fcds_;
 
   std::shared_ptr<Init::TargetImpl> tracking_init_target_;
   std::shared_ptr<Init::WatcherImpl> tracking_init_watcher_;

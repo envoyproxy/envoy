@@ -315,7 +315,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
-      bypass_overload_manager_(config.bypass_overload_manager()), created_by_fcds_(false),
+      bypass_overload_manager_(config.bypass_overload_manager()),
       listener_init_target_(std::make_shared<Init::TargetImpl>(
           fmt::format("Listener-init-target {}", name),
           [this]() { dynamic_init_manager_->initialize(*local_init_watcher_); })),
@@ -447,7 +447,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(config.ignore_global_conn_limit()),
-      bypass_overload_manager_(config.bypass_overload_manager()), created_by_fcds_(false),
+      bypass_overload_manager_(config.bypass_overload_manager()),
       // listener_init_target_ is not used during in place update because we expect server started.
       listener_init_target_(std::make_shared<Init::TargetImpl>("", nullptr)),
       dynamic_init_manager_(std::make_shared<Init::ManagerImpl>(
@@ -508,7 +508,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin, const FilterChainRefVector& add
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
       ignore_global_conn_limit_(origin.ignore_global_conn_limit_),
-      bypass_overload_manager_(origin.bypass_overload_manager_), created_by_fcds_(true),
+      bypass_overload_manager_(origin.bypass_overload_manager_),
       // Used in case where FCDS is received while server is initializing and the listener has a
       // dependency on FCDS update to arrive to complete initialization.
       listener_init_target_(std::make_shared<Init::TargetImpl>(
