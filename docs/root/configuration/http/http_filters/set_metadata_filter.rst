@@ -83,98 +83,36 @@ Basic Static Metadata
 
 A simple configuration that adds static metadata to the ``envoy.lb`` namespace:
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: envoy.filters.http.set_metadata
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
-      metadata:
-      - metadata_namespace: envoy.lb
-        value:
-          version: "v1.2.3"
-          environment: "production"
-          features:
-            - "feature_a"
-            - "feature_b"
+.. literalinclude:: _include/set-metadata-basic-static.yaml
+    :language: yaml
+    :caption: :download:`set-metadata-basic-static.yaml <_include/set-metadata-basic-static.yaml>`
 
 Multiple Metadata Entries
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Configuration with multiple metadata entries targeting different namespaces:
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: envoy.filters.http.set_metadata
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
-      metadata:
-      # Service identification metadata
-      - metadata_namespace: envoy.lb
-        allow_overwrite: true
-        value:
-          service: "user-service"
-          version: "v2.1.0"
-
-      # Request routing metadata
-      - metadata_namespace: envoy.filters.http.fault
-        allow_overwrite: true
-        value:
-          upstream_cluster: "backend"
-          retry_policy: "aggressive"
+.. literalinclude:: _include/set-metadata-multiple-entries.yaml
+    :language: yaml
+    :caption: :download:`set-metadata-multiple-entries.yaml <_include/set-metadata-multiple-entries.yaml>`
 
 Typed Metadata Configuration
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Configuration using typed metadata with ``google.protobuf.Any``:
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: envoy.filters.http.set_metadata
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
-      metadata:
-      - metadata_namespace: custom.typed
-        allow_overwrite: true
-        typed_value:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
-          metadata_namespace: nested_namespace
-          value:
-            custom_field: "typed_value"
+.. literalinclude:: _include/set-metadata-typed-configuration.yaml
+    :language: yaml
+    :caption: :download:`set-metadata-typed-configuration.yaml <_include/set-metadata-typed-configuration.yaml>`
 
 Overwrite Control
 ^^^^^^^^^^^^^^^^^
 
 Configuration demonstrating overwrite control behavior:
 
-.. code-block:: yaml
-
-  http_filters:
-  - name: envoy.filters.http.set_metadata
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
-      metadata:
-      # First entry - will be set initially
-      - metadata_namespace: test.namespace
-        value:
-          counter: 1
-          list: ["first"]
-
-      # Second entry - will be ignored without allow_overwrite
-      - metadata_namespace: test.namespace
-        value:
-          counter: 2
-          list: ["second"]
-
-      # Third entry - will merge with allow_overwrite: true
-      - metadata_namespace: test.namespace
-        allow_overwrite: true
-        value:
-          counter: 3
-          list: ["third"]
-          new_field: "added"
+.. literalinclude:: _include/set-metadata-overwrite-control.yaml
+    :language: yaml
+    :caption: :download:`set-metadata-overwrite-control.yaml <_include/set-metadata-overwrite-control.yaml>`
 
 .. note::
 

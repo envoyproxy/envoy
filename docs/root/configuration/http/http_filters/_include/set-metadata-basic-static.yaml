@@ -1,0 +1,12 @@
+http_filters:
+- name: envoy.filters.http.set_metadata
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+    metadata:
+    - metadata_namespace: envoy.lb
+      value:
+        version: "v1.2.3"
+        environment: "production"
+        features:
+          - "feature_a"
+          - "feature_b" 

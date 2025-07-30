@@ -1,0 +1,24 @@
+http_filters:
+- name: envoy.filters.http.set_metadata
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Config
+    metadata:
+    # First entry - will be set initially
+    - metadata_namespace: test.namespace
+      value:
+        counter: 1
+        list: ["first"]
+
+    # Second entry - will be ignored without allow_overwrite
+    - metadata_namespace: test.namespace
+      value:
+        counter: 2
+        list: ["second"]
+
+    # Third entry - will merge with allow_overwrite: true
+    - metadata_namespace: test.namespace
+      allow_overwrite: true
+      value:
+        counter: 3
+        list: ["third"]
+        new_field: "added" 
