@@ -59,7 +59,7 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator, /*prefer_gro=*/true) {
+                                  generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     InstallDecrypter(quic::ENCRYPTION_FORWARD_SECURE,
