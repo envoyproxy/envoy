@@ -152,6 +152,7 @@ proto_library(
         "//envoy/extensions/filters/http/rate_limit_quota/v3:pkg",
         "//envoy/extensions/filters/http/ratelimit/v3:pkg",
         "//envoy/extensions/filters/http/rbac/v3:pkg",
+        "//envoy/extensions/filters/http/reverse_conn/v3:pkg",
         "//envoy/extensions/filters/http/router/v3:pkg",
         "//envoy/extensions/filters/http/set_filter_state/v3:pkg",
         "//envoy/extensions/filters/http/set_metadata/v3:pkg",

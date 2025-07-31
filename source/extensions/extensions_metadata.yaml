@@ -576,6 +576,13 @@ envoy.filters.http.router:
   status: stable
   type_urls:
   - envoy.extensions.filters.http.router.v3.Router
+envoy.filters.http.reverse_conn:
+  categories:
+  - envoy.filters.http
+  security_posture: robust_to_untrusted_downstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.reverse_conn.v3.ReverseConn
 envoy.filters.http.set_metadata:
   categories:
   - envoy.filters.http
