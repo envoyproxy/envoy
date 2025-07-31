@@ -26,6 +26,9 @@ removed_config_or_runtime:
 - area: dfp
   change: |
     Removed runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.prefer_quic_client_udp_gro`` and legacy code paths.
 
 new_features:
 - area: health_check
