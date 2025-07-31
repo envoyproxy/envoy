@@ -46,7 +46,7 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
           new EnvoyQuicPacketWriter(
               std::make_unique<Network::UdpDefaultWriter>(connection_socket->ioHandle())),
           /*owns_writer=*/true, supported_versions, dispatcher, std::move(connection_socket),
-          generato) {}
+          generator) {}
 
 EnvoyQuicClientConnection::EnvoyQuicClientConnection(
     const quic::QuicConnectionId& server_connection_id, quic::QuicConnectionHelperInterface& helper,
