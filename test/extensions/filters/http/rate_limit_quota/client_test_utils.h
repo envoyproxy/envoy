@@ -54,7 +54,8 @@ public:
   void expectClientCreation() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
                 getOrCreateRawAsyncClientWithHashKey(_, _, _))
-        .WillOnce(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
+        .Times(testing::AtLeast(1))
+        .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
   }
 
   void expectStreamCreation(int times) {
@@ -127,9 +128,11 @@ public:
   void expectTimeSource() {}
 
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
-    auto client = std::make_shared<Grpc::MockAsyncClient>();
-    async_client_ = client.get();
-    return client;
+    if (async_client_ != nullptr) {
+      return async_client_;
+    }
+    async_client_ = std::make_shared<Grpc::MockAsyncClient>();
+    return async_client_;
   }
 
   void setStreamStartToFail(int fail_starts) { fail_starts_ = fail_starts; }
@@ -150,7 +153,7 @@ public:
 
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   envoy::config::core::v3::GrpcService grpc_service_;
-  Grpc::MockAsyncClient* async_client_ = nullptr;
+  std::shared_ptr<Grpc::MockAsyncClient> async_client_ = nullptr;
   Grpc::MockAsyncStream stream_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;

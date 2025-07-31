@@ -5,6 +5,7 @@
 #include "envoy/http/filter_factory.h"
 
 #include "source/extensions/filters/http/rate_limit_quota/config.h"
+#include "source/extensions/filters/http/rate_limit_quota/filter_persistence.h"
 
 #include "test/extensions/filters/http/rate_limit_quota/client_test_utils.h"
 #include "test/mocks/http/mocks.h"
@@ -63,6 +64,8 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProtoTyped(
       filter_config, stats_prefix, mock_stream_client->context_);
   cb(filter_callback);
+
+  GlobalTlsStores::clear();
 }
 
 } // namespace
