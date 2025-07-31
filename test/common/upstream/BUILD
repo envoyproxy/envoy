@@ -21,6 +21,7 @@ envoy_cc_test(
         "//envoy/config:subscription_interface",
         "//source/common/stats:isolated_store_lib",
         "//source/common/upstream:od_cds_api_lib",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:missing_cluster_notifier_mocks",

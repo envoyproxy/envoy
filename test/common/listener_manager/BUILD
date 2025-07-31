@@ -177,6 +177,7 @@ envoy_cc_test(
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:listener_manager_mocks",

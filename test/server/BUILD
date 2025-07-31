@@ -379,6 +379,7 @@ envoy_cc_test(
         "//test/config:v2_link_hacks",
         "//test/integration:integration_lib",
         "//test/mocks/api:api_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/server:bootstrap_extension_factory_mocks",
         "//test/mocks/server:fatal_action_factory_mocks",
         "//test/mocks/server:hot_restart_mocks",

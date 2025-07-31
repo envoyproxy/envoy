@@ -401,8 +401,89 @@ TEST_P(XdsTpConfigsIntegrationTest, EdsOnlyConfigDefaultSource) {
   cleanupUpstreamAndDownstream();
 }
 
-// TODO(adisuissa): add a test that validates that two clusters with the same
-// config source multiplex the request on the same stream.
+// Validate that two clusters with the same source multiplex the request on the
+// same stream.
+TEST_P(XdsTpConfigsIntegrationTest, TwoClustersWithEdsOnlyConfigAuthority1) {
+  // Setup a static cluster that requires EDS from authority1.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* static_resources = bootstrap.mutable_static_resources();
+
+    // Add 2 EDS clusters that will fetch endpoints from authority1.
+    static_resources->mutable_clusters()->Add()->CopyFrom(
+        TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+            R"EOF(
+                name: xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1
+                type: EDS
+                eds_cluster_config: {}
+            )EOF"));
+    static_resources->mutable_clusters()->Add()->CopyFrom(
+        TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(
+            R"EOF(
+                name: xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2
+                type: EDS
+                eds_cluster_config: {}
+            )EOF"));
+  });
+
+  // Update the route to the xdstp-based cluster.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_routes(0)
+            ->mutable_route()
+            ->set_cluster("xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                          "clusters/cluster1");
+      });
+
+  // Envoy will request the endpoints of the cluster in the bootstrap during the
+  // initialization phase. This will make sure the xDS server answers with the
+  // correct assignment.
+  on_server_init_function_ = [this]() {
+    connectAuthority1();
+    connectDefaultAuthority();
+
+    // Authority1 should receive the EDS request containing the 2 resources.
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "",
+        {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
+         "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
+        {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
+         "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
+        {}, true, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+    sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+        Config::TestTypeUrl::get().ClusterLoadAssignment,
+        {buildClusterLoadAssignment(
+             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
+             "cluster1"),
+         buildClusterLoadAssignment(
+             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
+             "cluster2")},
+        {buildClusterLoadAssignment(
+             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
+             "cluster1"),
+         buildClusterLoadAssignment(
+             "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/"
+             "cluster2")},
+        {}, "1", {}, authority1_xds_stream_.get());
+
+    // Expect an EDS ACK.
+    EXPECT_TRUE(compareDiscoveryRequest(
+        Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
+        {"xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster1",
+         "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/clusters/cluster2"},
+        {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+  };
+
+  initialize();
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  EXPECT_EQ(5, test_server_->gauge("cluster_manager.active_clusters")->value());
+  // Try to send a request and see that it reaches the backend (backend 3).
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 3);
+  cleanupUpstreamAndDownstream();
+}
 
 // Validate that a bootstrap cluster that has an xds-tp based config RDS source
 // works.
