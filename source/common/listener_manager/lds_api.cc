@@ -23,13 +23,13 @@ namespace Server {
 
 LdsApiImpl::LdsApiImpl(const envoy::config::core::v3::ConfigSource& lds_config,
                        const xds::core::v3::ResourceLocator* lds_resources_locator,
-                       Upstream::ClusterManager& cm, Init::Manager& init_manager,
-                       Stats::Scope& scope, ListenerManager& lm,
+                       Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
+                       Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
     : Envoy::Config::SubscriptionBase<envoy::config::listener::v3::Listener>(validation_visitor,
                                                                              "name"),
-      listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
-      init_target_("LDS", [this]() { subscription_->start({}); }) {
+      listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")),
+      xds_manager_(xds_manager), init_target_("LDS", [this]() { subscription_->start({}); }) {
   const auto resource_name = getResourceName();
   if (lds_resources_locator == nullptr) {
     subscription_ = THROW_OR_RETURN_VALUE(cm.subscriptionFactory().subscriptionFromConfigSource(
@@ -49,14 +49,11 @@ absl::Status
 LdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
                            const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                            const std::string& system_version_info) {
-  Config::ScopedResume maybe_resume_rds_sds;
-  if (cm_.adsMux()) {
-    const std::vector<std::string> paused_xds_types{
-        Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
-        Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
-        Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-    maybe_resume_rds_sds = cm_.adsMux()->pause(paused_xds_types);
-  }
+  const std::vector<std::string> paused_xds_types{
+      Config::getTypeUrl<envoy::config::route::v3::RouteConfiguration>(),
+      Config::getTypeUrl<envoy::config::route::v3::ScopedRouteConfiguration>(),
+      Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
+  Config::ScopedResume resume_rds_sds = xds_manager_.pause(paused_xds_types);
 
   bool any_applied = false;
   listener_manager_.beginListenerUpdate();

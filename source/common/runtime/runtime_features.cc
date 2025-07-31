@@ -34,7 +34,6 @@
 RUNTIME_GUARD(envoy_reloadable_features_allow_alt_svc_for_ips);
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
-RUNTIME_GUARD(envoy_reloadable_features_dfp_fail_on_empty_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
 RUNTIME_GUARD(envoy_reloadable_features_enable_compression_bomb_protection);
@@ -69,11 +68,11 @@ RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_prefer_ipv6_dns_on_macos);
-RUNTIME_GUARD(envoy_reloadable_features_prefer_quic_client_udp_gro);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_104);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_ssl_port);
 RUNTIME_GUARD(envoy_reloadable_features_proxy_status_mapping_more_core_response_flags);
+RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // Ignore the automated "remove this flag" issue: we should keep this for 1 year. Confirm with
 // @danzh2010 or @RyanTheOptimist before removing.
 RUNTIME_GUARD(envoy_reloadable_features_quic_send_server_preferred_address_to_all_clients);
@@ -130,8 +129,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_reject_all);
 // For more information about Universal Header Validation, please see
 // https://github.com/envoyproxy/envoy/issues/10646
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_universal_header_validator);
-// TODO(pksohn): enable after canarying the feature internally without problems.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_defer_logging_to_ack_listener);
 // TODO(alyssar) evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reresolve_null_addresses);
 // TODO(alyssar) evaluate and either make this a config knob or remove.

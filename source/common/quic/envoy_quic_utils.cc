@@ -184,8 +184,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       const bool prefer_gro) {
+                       const Network::ConnectionSocket::OptionsSharedPtr& options) {
   ASSERT(peer_addr != nullptr);
   // NOTE: If changing the default cache size from 4 entries, make sure to profile it using
   // the benchmark test: //test/common/network:io_socket_handle_impl_benchmark
@@ -212,7 +211,7 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildRxQueueOverFlowOptions());
   connection_socket->addOptions(Network::SocketOptionFactory::buildIpRecvTosOptions());
-  if (prefer_gro && Api::OsSysCallsSingleton::get().supportsUdpGro()) {
+  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {

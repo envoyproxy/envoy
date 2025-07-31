@@ -107,17 +107,26 @@ protected:
     for (const CustomTagCase& cas : cases) {
       envoy::type::tracing::v3::CustomTag custom_tag;
       TestUtility::loadFromYaml(cas.custom_tag, custom_tag);
-      config.custom_tags_.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
+      custom_tags.emplace(custom_tag.tag(), CustomTagUtility::createCustomTag(custom_tag));
       if (cas.set) {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), Eq(cas.value)));
       } else {
         EXPECT_CALL(span, setTag(Eq(custom_tag.tag()), _)).Times(0);
       }
     }
+
+    EXPECT_CALL(config, modifySpan(_)).WillOnce(Invoke([this](Span& span) {
+      const CustomTagContext ctx{trace_context, stream_info};
+      for (const auto& [_, custom_tag] : custom_tags) {
+        custom_tag->applySpan(span, ctx);
+      }
+    }));
   }
 
   NiceMock<MockSpan> span;
   NiceMock<MockConfig> config;
+  Tracing::CustomTagMap custom_tags;
+  Tracing::TestTraceContextImpl trace_context;
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info_{
       std::make_shared<NiceMock<Upstream::MockClusterInfo>>()};
@@ -127,7 +136,7 @@ protected:
 TEST_F(FinalizerImplTest, TestAll) {
   TestEnvironment::setEnvVar("E_CC", "c", 1);
 
-  Tracing::TestTraceContextImpl trace_context{{"x-request-id", "id"}, {"x-bb", "b"}};
+  trace_context.context_map_ = {{"x-request-id", "id"}, {"x-bb", "b"}};
   trace_context.context_host_ = "test.com";
   trace_context.context_method_ = "method";
   trace_context.context_path_ = "TestService";
@@ -197,7 +206,7 @@ TEST_F(FinalizerImplTest, TestAll) {
         {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
     });
 
-    TracerUtility::finalizeSpan(span, trace_context, stream_info, config, true);
+    TracerUtility::finalizeSpan(span, stream_info, config, true);
   }
 
   {
@@ -232,7 +241,7 @@ TEST_F(FinalizerImplTest, TestAll) {
         {"{ tag: cc-3, environment: { name: E_CC_NOT_FOUND} }", false, ""},
     });
 
-    TracerUtility::finalizeSpan(span, trace_context, stream_info, config, false);
+    TracerUtility::finalizeSpan(span, stream_info, config, false);
   }
 }
 
@@ -240,9 +249,10 @@ TEST(EgressConfigImplTest, EgressConfigImplTest) {
   EgressConfigImpl config_impl;
 
   EXPECT_EQ(OperationName::Egress, config_impl.operationName());
-  EXPECT_EQ(nullptr, config_impl.customTags());
   EXPECT_EQ(false, config_impl.verbose());
   EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config_impl.maxPathTagLength());
+  NiceMock<MockSpan> span;
+  config_impl.modifySpan(span);
 }
 
 TEST(NullTracerTest, BasicFunctionality) {
