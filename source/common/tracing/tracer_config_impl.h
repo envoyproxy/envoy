@@ -30,10 +30,10 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
-class ConnectionManagerTracingConfigImpl : public ConnectionManagerTracingConfig {
+class ConnectionManagerTracingConfig {
 public:
-  ConnectionManagerTracingConfigImpl(envoy::config::core::v3::TrafficDirection traffic_direction,
-                                     const ConnectionManagerTracingConfigProto& tracing_config) {
+  ConnectionManagerTracingConfig(envoy::config::core::v3::TrafficDirection traffic_direction,
+                                 const ConnectionManagerTracingConfigProto& tracing_config) {
 
     // Listener level traffic direction overrides the operation name
     switch (traffic_direction) {
@@ -77,34 +77,28 @@ public:
                                                            Tracing::DefaultMaxPathTagLength);
   }
 
-  ConnectionManagerTracingConfigImpl(Tracing::OperationName operation_name,
-                                     Tracing::CustomTagMap custom_tags,
-                                     envoy::type::v3::FractionalPercent client_sampling,
-                                     envoy::type::v3::FractionalPercent random_sampling,
-                                     envoy::type::v3::FractionalPercent overall_sampling,
-                                     bool verbose, uint32_t max_path_tag_length)
-      : operation_name_(operation_name), custom_tags_(custom_tags),
-        client_sampling_(client_sampling), random_sampling_(random_sampling),
-        overall_sampling_(overall_sampling), verbose_(verbose),
+  ConnectionManagerTracingConfig(Tracing::OperationName operation_name,
+                                 Tracing::CustomTagMap custom_tags,
+                                 envoy::type::v3::FractionalPercent client_sampling,
+                                 envoy::type::v3::FractionalPercent random_sampling,
+                                 envoy::type::v3::FractionalPercent overall_sampling, bool verbose,
+                                 uint32_t max_path_tag_length)
+      : operation_name_(operation_name), custom_tags_(std::move(custom_tags)),
+        client_sampling_(std::move(client_sampling)), random_sampling_(std::move(random_sampling)),
+        overall_sampling_(std::move(overall_sampling)), verbose_(verbose),
         max_path_tag_length_(max_path_tag_length) {}
 
-  ConnectionManagerTracingConfigImpl() = default;
+  ConnectionManagerTracingConfig() = default;
 
-  const envoy::type::v3::FractionalPercent& getClientSampling() const override {
-    return client_sampling_;
-  }
-  const envoy::type::v3::FractionalPercent& getRandomSampling() const override {
-    return random_sampling_;
-  }
-  const envoy::type::v3::FractionalPercent& getOverallSampling() const override {
-    return overall_sampling_;
-  }
-  const Tracing::CustomTagMap& getCustomTags() const override { return custom_tags_; }
+  const envoy::type::v3::FractionalPercent& getClientSampling() const { return client_sampling_; }
+  const envoy::type::v3::FractionalPercent& getRandomSampling() const { return random_sampling_; }
+  const envoy::type::v3::FractionalPercent& getOverallSampling() const { return overall_sampling_; }
+  const Tracing::CustomTagMap& getCustomTags() const { return custom_tags_; }
 
-  Tracing::OperationName operationName() const override { return operation_name_; }
-  bool verbose() const override { return verbose_; }
-  uint32_t maxPathTagLength() const override { return max_path_tag_length_; }
-  bool spawnUpstreamSpan() const override { return spawn_upstream_span_; }
+  Tracing::OperationName operationName() const { return operation_name_; }
+  bool verbose() const { return verbose_; }
+  uint32_t maxPathTagLength() const { return max_path_tag_length_; }
+  bool spawnUpstreamSpan() const { return spawn_upstream_span_; }
 
   // TODO(wbpcode): keep this field be public for compatibility. Then the HCM needn't change much
   // code to use this config.
@@ -117,6 +111,8 @@ public:
   uint32_t max_path_tag_length_{};
   bool spawn_upstream_span_{};
 };
+
+using ConnectionManagerTracingConfigPtr = std::unique_ptr<ConnectionManagerTracingConfig>;
 
 } // namespace Tracing
 } // namespace Envoy

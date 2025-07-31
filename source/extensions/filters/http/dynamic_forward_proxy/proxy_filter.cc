@@ -303,13 +303,11 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::RequestHeaderMap& hea
 
   latchTime(decoder_callbacks_, DNS_START);
   const bool is_proxying = isProxying();
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_fail_on_empty_host_header")) {
-    if (headers.Host()->value().getStringView().empty()) {
-      decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
-                                         ResponseStrings::get().EmptyHostHeader, nullptr,
-                                         absl::nullopt, RcDetails::get().EmptyHostHeader);
-      return Http::FilterHeadersStatus::StopIteration;
-    }
+  if (headers.Host()->value().getStringView().empty()) {
+    decoder_callbacks_->sendLocalReply(Http::Code::BadRequest,
+                                       ResponseStrings::get().EmptyHostHeader, nullptr,
+                                       absl::nullopt, RcDetails::get().EmptyHostHeader);
+    return Http::FilterHeadersStatus::StopIteration;
   }
 
   // Get host value from the request headers.

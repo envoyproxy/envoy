@@ -149,35 +149,21 @@ BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext&
       [] { return std::make_shared<BuilderInstance>(createBuilder(nullptr)); });
 }
 
-// Converts from CEL canonical to CEL v1alpha1
-absl::optional<google::api::expr::v1alpha1::Expr>
-getExpr(const ::xds::type::v3::CelExpression& expression) {
-  ::cel::expr::Expr expr;
+absl::optional<cel::expr::Expr> getExpr(const ::xds::type::v3::CelExpression& expression) {
   if (expression.has_cel_expr_checked()) {
-    expr = expression.cel_expr_checked().expr();
+    return expression.cel_expr_checked().expr();
   } else if (expression.has_cel_expr_parsed()) {
-    expr = expression.cel_expr_parsed().expr();
+    return expression.cel_expr_parsed().expr();
   } else {
     return {};
   }
-
-  std::string data;
-  if (!expr.SerializeToString(&data)) {
-    return {};
-  }
-
-  // Parse the string into the target namespace message
-  google::api::expr::v1alpha1::Expr v1alpha1Expr;
-  if (!v1alpha1Expr.ParseFromString(data)) {
-    return {};
-  }
-
-  return v1alpha1Expr;
 }
 
-ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr) {
-  google::api::expr::v1alpha1::SourceInfo source_info;
-  auto cel_expression_status = builder.CreateExpression(&expr, &source_info);
+ExpressionPtr createExpression(Builder& builder, const cel::expr::Expr& expr) {
+  cel::expr::SourceInfo source_info;
+  std::vector<absl::Status> warnings;
+
+  auto cel_expression_status = builder.CreateExpression(&expr, &source_info, &warnings);
   if (!cel_expression_status.ok()) {
     throw CelException(
         absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
@@ -186,11 +172,11 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
 }
 
 absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
-                                  const LocalInfo::LocalInfo* local_info,
+                                  const ::Envoy::LocalInfo::LocalInfo* local_info,
                                   const StreamInfo::StreamInfo& info,
-                                  const Http::RequestHeaderMap* request_headers,
-                                  const Http::ResponseHeaderMap* response_headers,
-                                  const Http::ResponseTrailerMap* response_trailers) {
+                                  const ::Envoy::Http::RequestHeaderMap* request_headers,
+                                  const ::Envoy::Http::ResponseHeaderMap* response_headers,
+                                  const ::Envoy::Http::ResponseTrailerMap* response_trailers) {
   auto activation =
       createActivation(local_info, info, request_headers, response_headers, response_trailers);
   auto eval_status = expr.Evaluate(*activation, &arena);

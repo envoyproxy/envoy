@@ -38,6 +38,7 @@ envoy_cc_extension(
         "//source/common/access_log:access_log_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/config:xds_resource_lib",
         "//source/common/filter:config_discovery_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:default_server_string_lib",
