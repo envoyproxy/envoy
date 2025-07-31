@@ -1,21 +1,8 @@
-From d88b2a2d81e62335708057b3a044abada46de2a3 Mon Sep 17 00:00:00 2001
-From: Rohit Agrawal <rohit.agrawal@databricks.com>
-Date: Tue, 6 May 2025 17:30:08 +0900
-Subject: [PATCH] Patches for cel-cpp v0.11.0
-
-Signed-off-by: Rohit Agrawal <rohit.agrawal@databricks.com>
----
- common/internal/byte_string.cc |  8 ++++++++
- common/value.h                 |  2 +-
- common/values/value_variant.h  | 10 ++++++++++
- runtime/type_registry.h        |  4 ++--
- 4 files changed, 21 insertions(+), 3 deletions(-)
-
 diff --git a/common/internal/byte_string.cc b/common/internal/byte_string.cc
 index e01c797f8..12345678a 100644
 --- a/common/internal/byte_string.cc
 +++ b/common/internal/byte_string.cc
-@@ -104,6 +104,14 @@
+@@ -104,6 +104,13 @@
  
  ByteString::ByteString(Allocator<> allocator, absl::string_view string) {
    ABSL_DCHECK_LE(string.size(), max_size());
@@ -26,18 +13,48 @@ index e01c797f8..12345678a 100644
 +    SetSmallEmpty(allocator.arena());
 +    return;
 +  }
-+
    auto* arena = allocator.arena();
    if (string.size() <= kSmallByteStringCapacity) {
      SetSmall(arena, string);
-diff --git a/common/value.h b/common/value.h
+diff --git a/common/typeinfo.h b/common/typeinfo.h
 index 06a03c13d..9f5d77980 100644
+--- a/common/typeinfo.h
++++ b/common/typeinfo.h
+@@ -80,7 +80,7 @@
+     std::conjunction_v<common_internal::HasNativeTypeTraitsId<T>,
+                        std::negation<common_internal::HasCelTypeId<T>>>,
+     TypeInfo>
+-TypeId(const T& t) {
++TypeId(const T& t [[maybe_unused]]) {
+   return NativeTypeTraits<absl::remove_cvref_t<T>>::Id(t);
+ }
+ 
+@@ -90,7 +90,7 @@
+                        std::negation<common_internal::HasCelTypeId<T>>,
+                        std::is_final<T>>,
+     TypeInfo>
+-TypeId(const T& t) {
++TypeId(const T& t [[maybe_unused]]) {
+   return cel::TypeId<absl::remove_cvref_t<T>>();
+ }
+ 
+@@ -99,7 +99,7 @@
+     std::conjunction_v<std::negation<common_internal::HasNativeTypeTraitsId<T>>,
+                        common_internal::HasCelTypeId<T>>,
+     TypeInfo>
+-TypeId(const T& t) {
++TypeId(const T& t [[maybe_unused]]) {
+   return CelTypeId(t);
+ }
+ 
+diff --git a/common/value.h b/common/value.h
+index abcdef123..987654fed 100644
 --- a/common/value.h
 +++ b/common/value.h
-@@ -2733,7 +2733,7 @@
-     absl::Nonnull<const google::protobuf::DescriptorPool*> descriptor_pool,
-     absl::Nonnull<google::protobuf::MessageFactory*> message_factory,
-     absl::Nonnull<google::protobuf::Arena*> arena) const {
+@@ -2726,7 +2726,7 @@
+     const google::protobuf::DescriptorPool* absl_nonnull descriptor_pool,
+     google::protobuf::MessageFactory* absl_nonnull message_factory,
+     google::protobuf::Arena* absl_nonnull arena) const {
 -  ABSL_DCHECK_GT(qualifiers.size(), 0);
 +  ABSL_DCHECK_GT(static_cast<int>(qualifiers.size()), 0);
    ABSL_DCHECK(descriptor_pool != nullptr);
@@ -47,42 +64,22 @@ diff --git a/common/values/value_variant.h b/common/values/value_variant.h
 index 61c19ce5f..fc7969bc8 100644
 --- a/common/values/value_variant.h
 +++ b/common/values/value_variant.h
-@@ -732,6 +732,13 @@
-       const bool rhs_trivial =
-           (rhs.flags_ & ValueFlags::kNonTrivial) == ValueFlags::kNone;
-       if (lhs_trivial && rhs_trivial) {
-+        // We need to suppress the compiler warnings about memory manipulation.
-+        // The memcpy usage here is intentional for performance optimization
-+        // Only suppress this warning on GCC, as Clang doesn't have this warning
-+#if defined(__GNUC__) && !defined(__clang__)
-+#pragma GCC diagnostic push
-+#pragma GCC diagnostic ignored "-Wclass-memaccess"
-+#endif
+@@ -737,9 +737,6 @@
+ #if defined(__GNUC__) && !defined(__clang__)
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wclass-memaccess"
+-#elif defined(__clang__)
+-#pragma clang diagnostic push
+-#pragma clang diagnostic ignored "-Wnontrivial-memcall"
+ #endif
          alignas(ValueVariant) std::byte tmp[sizeof(ValueVariant)];
          // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
-         std::memcpy(tmp, std::addressof(lhs), sizeof(ValueVariant));
-@@ -740,6 +747,9 @@
-                     sizeof(ValueVariant));
-         // NOLINTNEXTLINE(bugprone-undefined-memory-manipulation)
+@@ -751,8 +748,6 @@
          std::memcpy(std::addressof(rhs), tmp, sizeof(ValueVariant));
-+#if defined(__GNUC__) && !defined(__clang__)
-+#pragma GCC diagnostic pop
-+#endif
+ #if defined(__GNUC__) && !defined(__clang__)
+ #pragma GCC diagnostic pop
+-#elif defined(__clang__)
+-#pragma clang diagnostic pop
+ #endif
        } else {
          SlowSwap(lhs, rhs, lhs_trivial, rhs_trivial);
-       }
-diff --git a/runtime/type_registry.h b/runtime/type_registry.h
-index 2b247946c..3e5ad423b 100644
---- a/runtime/type_registry.h
-+++ b/runtime/type_registry.h
-@@ -77,8 +77,8 @@
-   // Move-only
-   TypeRegistry(const TypeRegistry& other) = delete;
-   TypeRegistry& operator=(TypeRegistry& other) = delete;
--  TypeRegistry(TypeRegistry&& other) = default;
--  TypeRegistry& operator=(TypeRegistry&& other) = default;
-+  TypeRegistry(TypeRegistry&& other) = delete;
-+  TypeRegistry& operator=(TypeRegistry&& other) = delete;
- 
-   // Registers a type such that it can be accessed by name, i.e. `type(foo) ==
-   // my_type`. Where `my_type` is the type being registered.
