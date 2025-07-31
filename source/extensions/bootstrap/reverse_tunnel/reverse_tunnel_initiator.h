@@ -634,8 +634,9 @@ public:
     return "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface";
   }
 
-private:
   ReverseTunnelInitiatorExtension* extension_;
+
+private:
   Server::Configuration::ServerFactoryContext* context_;
 };
 

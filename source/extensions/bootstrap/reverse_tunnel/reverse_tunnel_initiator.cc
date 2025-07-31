@@ -6,7 +6,6 @@
 
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/extensions/filters/http/reverse_conn/v3/reverse_conn.pb.h"
-#include "envoy/http/async_client.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
@@ -169,13 +168,12 @@ Network::FilterStatus RCConnectionWrapper::SimpleConnReadFilter::onData(Buffer::
 
       if (!response_body.empty()) {
         // Try to parse the protobuf response
-        envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeRet ret;
+        envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeRet ret;
         if (ret.ParseFromString(response_body)) {
           ENVOY_LOG(debug, "Successfully parsed protobuf response: {}", ret.DebugString());
 
           // Check if the status is ACCEPTED
-          if (ret.status() == envoy::extensions::filters::http::reverse_conn::v3::
-                                  ReverseConnHandshakeRet::ACCEPTED) {
+          if (ret.status() == envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeRet::ACCEPTED) {
             ENVOY_LOG(debug, "Reverse connection accepted by cloud side");
             parent_->onHandshakeSuccess();
             return Network::FilterStatus::StopIteration;
@@ -229,7 +227,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
 
   // Use HTTP handshake logic
-  envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeArg arg;
+        envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeArg arg;
   arg.set_tenant_uuid(src_tenant_id);
   arg.set_cluster_uuid(src_cluster_id);
   arg.set_node_uuid(src_node_id);

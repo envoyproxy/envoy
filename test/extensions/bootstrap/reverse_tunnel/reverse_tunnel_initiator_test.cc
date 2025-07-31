@@ -17,7 +17,7 @@
 #include "test/test_common/test_runtime.h"
 
 // Include the protobuf message for HTTP handshake testing
-#include "envoy/extensions/filters/http/reverse_conn/v3/reverse_conn.pb.h"
+#include "envoy/extensions/bootstrap/reverse_connection_handshake/v3/reverse_connection_handshake.pb.h"
 
 #include <sys/socket.h>
 
@@ -2779,7 +2779,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
   EXPECT_FALSE(body.empty());
 
   // Verify the protobuf content by deserializing it
-  envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeArg arg;
+      envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeArg arg;
   bool parse_success = arg.ParseFromString(body);
   EXPECT_TRUE(parse_success);
   EXPECT_EQ(arg.tenant_uuid(), "test-tenant");
@@ -3525,9 +3525,8 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithProtobufResponse) {
   auto filter = createFilter(wrapper.get());
 
   // Create a proper ReverseConnHandshakeRet protobuf response
-  envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeRet ret;
-  ret.set_status(
-      envoy::extensions::filters::http::reverse_conn::v3::ReverseConnHandshakeRet::ACCEPTED);
+      envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeRet ret;
+      ret.set_status(envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeRet::ACCEPTED);
   ret.set_status_message("Connection accepted");
 
   std::string protobuf_data = ret.SerializeAsString();
