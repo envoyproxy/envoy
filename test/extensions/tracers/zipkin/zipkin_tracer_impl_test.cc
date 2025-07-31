@@ -503,8 +503,8 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_TRUE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
@@ -517,8 +517,8 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, false});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_FALSE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_FALSE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
@@ -533,8 +533,8 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_TRUE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
@@ -549,8 +549,8 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, false});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_FALSE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_FALSE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
@@ -630,8 +630,8 @@ TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_FALSE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_FALSE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
@@ -647,13 +647,12 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
   zipkin_span->setTag("key", "value");
 
-  Span& zipkin_zipkin_span = zipkin_span->span();
-  EXPECT_EQ(1ULL, zipkin_zipkin_span.binaryAnnotations().size());
-  EXPECT_EQ("key", zipkin_zipkin_span.binaryAnnotations()[0].key());
-  EXPECT_EQ("value", zipkin_zipkin_span.binaryAnnotations()[0].value());
+  EXPECT_EQ(1ULL, zipkin_span->binaryAnnotations().size());
+  EXPECT_EQ("key", zipkin_span->binaryAnnotations()[0].key());
+  EXPECT_EQ("value", zipkin_span->binaryAnnotations()[0].value());
 
   // ====
   // Test setTag() with SR annotated span
@@ -670,29 +669,27 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   Tracing::SpanPtr span2 = driver_->startSpan(config_, request_headers_, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span2(dynamic_cast<ZipkinSpan*>(span2.release()));
+  Zipkin::SpanPtr zipkin_span2(dynamic_cast<Zipkin::Span*>(span2.release()));
   zipkin_span2->setTag("key2", "value2");
 
-  Span& zipkin_zipkin_span2 = zipkin_span2->span();
-  EXPECT_EQ(1ULL, zipkin_zipkin_span2.binaryAnnotations().size());
-  EXPECT_EQ("key2", zipkin_zipkin_span2.binaryAnnotations()[0].key());
-  EXPECT_EQ("value2", zipkin_zipkin_span2.binaryAnnotations()[0].value());
+  EXPECT_EQ(1ULL, zipkin_span2->binaryAnnotations().size());
+  EXPECT_EQ("key2", zipkin_span2->binaryAnnotations()[0].key());
+  EXPECT_EQ("value2", zipkin_span2->binaryAnnotations()[0].value());
 
   // ====
   // Test setTag() with empty annotations vector
   // ====
   Tracing::SpanPtr span3 = driver_->startSpan(config_, request_headers_, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
-  ZipkinSpanPtr zipkin_span3(dynamic_cast<ZipkinSpan*>(span3.release()));
-  Span& zipkin_zipkin_span3 = zipkin_span3->span();
+  Zipkin::SpanPtr zipkin_span3(dynamic_cast<Zipkin::Span*>(span3.release()));
 
   std::vector<Annotation> annotations;
-  zipkin_zipkin_span3.setAnnotations(annotations);
+  zipkin_span3->setAnnotations(annotations);
 
   zipkin_span3->setTag("key3", "value3");
-  EXPECT_EQ(1ULL, zipkin_zipkin_span3.binaryAnnotations().size());
-  EXPECT_EQ("key3", zipkin_zipkin_span3.binaryAnnotations()[0].key());
-  EXPECT_EQ("value3", zipkin_zipkin_span3.binaryAnnotations()[0].value());
+  EXPECT_EQ(1ULL, zipkin_span3->binaryAnnotations().size());
+  EXPECT_EQ("key3", zipkin_span3->binaryAnnotations()[0].key());
+  EXPECT_EQ("value3", zipkin_span3->binaryAnnotations()[0].value());
 
   // ====
   // Test effective log()
@@ -706,11 +703,10 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
       std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count();
   span4->log(timestamp, "abc");
 
-  ZipkinSpanPtr zipkin_span4(dynamic_cast<ZipkinSpan*>(span4.release()));
-  Span& zipkin_zipkin_span4 = zipkin_span4->span();
-  EXPECT_FALSE(zipkin_zipkin_span4.annotations().empty());
-  EXPECT_EQ(timestamp_count, zipkin_zipkin_span4.annotations().back().timestamp());
-  EXPECT_EQ("abc", zipkin_zipkin_span4.annotations().back().value());
+  Zipkin::SpanPtr zipkin_span4(dynamic_cast<Zipkin::Span*>(span4.release()));
+  EXPECT_FALSE(zipkin_span4->annotations().empty());
+  EXPECT_EQ(timestamp_count, zipkin_span4->annotations().back().timestamp());
+  EXPECT_EQ("abc", zipkin_span4->annotations().back().value());
 
   // ====
   // Test baggage noop
@@ -745,12 +741,12 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
 
-  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
-  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
-  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  EXPECT_EQ(trace_id, zipkin_span->traceIdAsHexString());
+  EXPECT_EQ(span_id, zipkin_span->idAsHexString());
+  EXPECT_EQ(parent_id, zipkin_span->parentIdAsHexString());
+  EXPECT_TRUE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
@@ -769,8 +765,8 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_TRUE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
@@ -791,14 +787,14 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
 
-  EXPECT_EQ(trace_id_high, zipkin_span->span().traceIdHigh());
-  EXPECT_EQ(trace_id_low, zipkin_span->span().traceId());
-  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
-  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
-  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  EXPECT_EQ(trace_id_high, zipkin_span->traceIdHigh());
+  EXPECT_EQ(trace_id_low, zipkin_span->traceId());
+  EXPECT_EQ(trace_id, zipkin_span->traceIdAsHexString());
+  EXPECT_EQ(span_id, zipkin_span->idAsHexString());
+  EXPECT_EQ(parent_id, zipkin_span->parentIdAsHexString());
+  EXPECT_TRUE(zipkin_span->sampled());
   EXPECT_EQ(trace_id, zipkin_span->getTraceId());
   EXPECT_EQ("", zipkin_span->getSpanId());
 }
