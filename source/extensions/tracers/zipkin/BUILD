@@ -15,7 +15,6 @@ envoy_cc_library(
     name = "zipkin_lib",
     srcs = [
         "span_buffer.cc",
-        "span_context.cc",
         "span_context_extractor.cc",
         "tracer.cc",
         "util.cc",

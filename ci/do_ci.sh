@@ -18,7 +18,6 @@ echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
 
-
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
 elif [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
@@ -597,7 +596,7 @@ case $CI_TARGET in
             # then load to Docker (ie local build)
             export DOCKER_LOAD_IMAGES=1
         fi
-        "${ENVOY_SRCDIR}/ci/docker_ci.sh"
+        "${ENVOY_SRCDIR}/distribution/docker/docker_ci.sh"
         ;;
 
     dockerhub-publish)
@@ -855,6 +854,11 @@ case $CI_TARGET in
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //distribution:verify_packages \
               "$PACKAGE_BUILD"
+        ;;
+
+    verify-distroless)
+        docker build -f ci/Dockerfile-distroless-testing -t distroless-testing .
+        docker run --rm distroless-testing
         ;;
 
     verify_examples)

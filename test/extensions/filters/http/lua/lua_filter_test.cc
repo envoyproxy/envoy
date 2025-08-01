@@ -116,6 +116,27 @@ public:
     ON_CALL(*decoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
+  void setupVirtualHostMetadata(const std::string& yaml) {
+    TestUtility::loadFromYaml(yaml, virtual_host_metadata_);
+
+    auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+    stream_info_.virtual_host_ = virtual_host;
+
+    ON_CALL(*virtual_host, metadata()).WillByDefault(ReturnRef(virtual_host_metadata_));
+
+    ON_CALL(decoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
+    ON_CALL(encoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
+
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+    EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+
+    const std::string filter_name = "lua-filter-config-name";
+    ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(Return(filter_name));
+    ON_CALL(encoder_callbacks_, filterConfigName()).WillByDefault(Return(filter_name));
+
+    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -126,6 +147,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   envoy::config::core::v3::Metadata metadata_;
+  envoy::config::core::v3::Metadata virtual_host_metadata_;
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
@@ -3891,6 +3913,209 @@ TEST_F(LuaHttpFilterTest, GetStreamInfoTypedMetadataUnpackFailure) {
                       EXPECT_EQ(Http::FilterHeadersStatus::Continue,
                                 filter_->decodeHeaders(request_headers, true)));
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test that handle:virtualHost():metadata() works when both virtual host and route match.
+// This verifies that when a virtual host is matched and a route is found for the request,
+// the virtualHost() function returns a valid object and metadata can be accessed
+// successfully from both request and response handles.
+TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandle) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:virtualHost():metadata()
+      request_handle:logTrace(metadata:get("foo.bar")["name"])
+      request_handle:logTrace(metadata:get("foo.bar")["prop"])
+    end
+    function envoy_on_response(response_handle)
+      local metadata = response_handle:virtualHost():metadata()
+      response_handle:logTrace(metadata:get("baz.bat")["name"])
+      response_handle:logTrace(metadata:get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupVirtualHostMetadata(METADATA);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->encodeHeaders(response_headers, true));
+                             });
+}
+
+// Test that handle:virtualHost():metadata() returns empty metadata when no filter-specific metadata
+// exists. This verifies that when a virtual host has metadata for other filters but not for the
+// current one, the metadata object is empty.
+TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoLuaMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function is_metadata_empty(metadata)
+      for _, _ in pairs(metadata) do
+        return false
+      end
+      return true
+    end
+    function envoy_on_request(request_handle)
+      if is_metadata_empty(request_handle:virtualHost():metadata()) then
+        request_handle:logTrace("No metadata found on request")
+      end
+    end
+    function envoy_on_response(response_handle)
+      if is_metadata_empty(response_handle:virtualHost():metadata()) then
+        response_handle:logTrace("No metadata found on response")
+      end
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.some_filter:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupVirtualHostMetadata(METADATA);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found on request", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found on response", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+}
+
+// Test that handle:virtualHost() returns a valid virtual host wrapper object that can be
+// safely accessed when no virtual host matches the request authority.
+// This verifies that calling metadata() returns an empty metadata object.
+TEST_F(LuaHttpFilterTest, GetVirtualHostFromHandleNoVirtualHost) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local virtual_host = request_handle:virtualHost()
+      for _, _ in pairs(virtual_host:metadata()) do
+        return
+      end
+      request_handle:logTrace("No metadata found during request handling")
+    end
+    function envoy_on_response(response_handle)
+      local virtual_host = response_handle:virtualHost()
+      for _, _ in pairs(virtual_host:metadata()) do
+        return
+      end
+      response_handle:logTrace("No metadata found during response handling")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during request handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during response handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test that handle:virtualHost():metadata() still works when there is no route.
+// This verifies that when a virtual host is matched but no route is found for the request,
+// the virtualHost() function returns a valid object and metadata can still be accessed
+// successfully from both request and response handles.
+TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoRoute) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:virtualHost():metadata()
+      request_handle:logTrace(metadata:get("foo.bar")["name"])
+      request_handle:logTrace(metadata:get("foo.bar")["prop"])
+    end
+    function envoy_on_response(response_handle)
+      local metadata = response_handle:virtualHost():metadata()
+      response_handle:logTrace(metadata:get("baz.bat")["name"])
+      response_handle:logTrace(metadata:get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupVirtualHostMetadata(METADATA);
+
+  // Request path
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+
+  // Response path
+  ON_CALL(encoder_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->encodeHeaders(response_headers, true));
+                             });
 }
 
 } // namespace

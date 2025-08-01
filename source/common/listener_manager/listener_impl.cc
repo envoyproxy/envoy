@@ -1072,14 +1072,10 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
-  for (const auto& message_and_filter_chain : filter_chain_manager_->filterChainsByMessage()) {
-    if (another_listener.filter_chain_manager_->filterChainsByMessage().find(
-            message_and_filter_chain.first) ==
-        another_listener.filter_chain_manager_->filterChainsByMessage().end()) {
-      // The filter chain exists in `this` listener but not in the listener passed in.
-      callback(*message_and_filter_chain.second);
-    }
+  for (const auto& draining_filter_chain : filter_chain_manager_->drainingFilterChains()) {
+    callback(*draining_filter_chain);
   }
+
   // Filter chain manager maintains an optional default filter chain besides the filter chains
   // indexed by message.
   if (auto eq = MessageUtil();
