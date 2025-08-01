@@ -135,7 +135,7 @@ As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy s
       catch_all_route:
         cluster: cluster_0
     settings:
-      op_timeout: 5
+      op_timeout: 5s
       enable_redirection: true
       dns_cache_config:
         name: dns_cache_for_redis
@@ -196,4 +196,3 @@ an AWS IAM Policy containing the Action `memorydb:Connect`, and that policy must
           service_name: elasticache
           cache_name: testcache
           expiration_time: 900s
-
