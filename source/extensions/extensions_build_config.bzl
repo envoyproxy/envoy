@@ -56,6 +56,7 @@ EXTENSIONS = {
     #
 
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
+    "envoy.bootstrap.cel":                              "//source/extensions/bootstrap/cel:config",
 
     #
     # Health checkers

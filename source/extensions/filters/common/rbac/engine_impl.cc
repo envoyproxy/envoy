@@ -51,8 +51,8 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
       builder_with_arena_ = std::make_unique<ExprBuilderWithArena>();
-      builder_with_arena_->builder_ = Expr::createBuilder(&builder_with_arena_->constant_arena_);
-      builder = builder_with_arena_->builder_.get();
+      builder_with_arena_->builder_instance_ = Expr::getBuilder(context);
+      builder = &builder_with_arena_->builder_instance_->builder();
       break;
     }
   }

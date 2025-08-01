@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
         "//source/common/runtime:runtime_features_lib",
+        "//source/extensions/bootstrap/cel:cel_proto_cc_proto",
         "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
         "@com_google_cel_cpp//eval/public:activation",
         "@com_google_cel_cpp//eval/public:builtin_func_registrar",
@@ -26,6 +27,7 @@ envoy_cc_library(
         "@com_google_cel_cpp//eval/public:cel_expression",
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//extensions:regex_functions",
+        "@com_google_cel_cpp//extensions:strings",
     ],
 )
 
