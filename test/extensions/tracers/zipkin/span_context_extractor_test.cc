@@ -412,9 +412,9 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackDisabledByDefault) {
   // Test that W3C headers are ignored when w3c_fallback is disabled (default)
   Tracing::TestTraceContextImpl request_headers{
       {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"}};
-  SpanContextExtractor extractor(request_headers);  // w3c_fallback disabled by default
+  SpanContextExtractor extractor(request_headers); // w3c_fallback disabled by default
   auto context = extractor.extractSpanContext(true);
-  EXPECT_FALSE(context.second);  // Should not extract context from W3C headers
+  EXPECT_FALSE(context.second); // Should not extract context from W3C headers
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
@@ -422,17 +422,17 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackEnabled) {
   // Test that W3C headers are used when w3c_fallback is enabled
   Tracing::TestTraceContextImpl request_headers{
       {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"}};
-  SpanContextExtractor extractor(request_headers, true);  // w3c_fallback enabled
+  SpanContextExtractor extractor(request_headers, true); // w3c_fallback enabled
   auto context = extractor.extractSpanContext(true);
-  EXPECT_TRUE(context.second);  // Should extract context from W3C headers
+  EXPECT_TRUE(context.second); // Should extract context from W3C headers
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
-  
+
   // Verify the converted values
-  EXPECT_EQ(0xb7ad6b7169203331, context.first.id());  // W3C parent-id becomes span-id
-  EXPECT_EQ(0, context.first.parentId());  // No parent in W3C conversion
+  EXPECT_EQ(0xb7ad6b7169203331, context.first.id()); // W3C parent-id becomes span-id
+  EXPECT_EQ(0, context.first.parentId());            // No parent in W3C conversion
   EXPECT_TRUE(context.first.is128BitTraceId());
-  EXPECT_EQ(0x8448eb211c80319c, context.first.traceId());  // Low 64 bits
-  EXPECT_EQ(0x0af7651916cd43dd, context.first.traceIdHigh());  // High 64 bits
+  EXPECT_EQ(0x8448eb211c80319c, context.first.traceId());     // Low 64 bits
+  EXPECT_EQ(0x0af7651916cd43dd, context.first.traceIdHigh()); // High 64 bits
 }
 
 TEST(ZipkinSpanContextExtractorTest, B3TakesPrecedenceOverW3C) {
@@ -440,24 +440,23 @@ TEST(ZipkinSpanContextExtractorTest, B3TakesPrecedenceOverW3C) {
   Tracing::TestTraceContextImpl request_headers{
       {"b3", fmt::format("{}-{}-1", trace_id, span_id)},
       {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"}};
-  SpanContextExtractor extractor(request_headers, true);  // w3c_fallback enabled
+  SpanContextExtractor extractor(request_headers, true); // w3c_fallback enabled
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second);
-  
+
   // Should use B3 values, not W3C values
-  EXPECT_EQ(3, context.first.id());  // From B3 span_id
+  EXPECT_EQ(3, context.first.id()); // From B3 span_id
   EXPECT_EQ(0, context.first.parentId());
-  EXPECT_FALSE(context.first.is128BitTraceId());  // B3 uses 64-bit in this test
-  EXPECT_EQ(1, context.first.traceId());  // From B3 trace_id
+  EXPECT_FALSE(context.first.is128BitTraceId()); // B3 uses 64-bit in this test
+  EXPECT_EQ(1, context.first.traceId());         // From B3 trace_id
 }
 
 TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidHeaders) {
   // Test that invalid W3C headers are handled gracefully
-  Tracing::TestTraceContextImpl request_headers{
-      {"traceparent", "invalid-header-format"}};
-  SpanContextExtractor extractor(request_headers, true);  // w3c_fallback enabled
+  Tracing::TestTraceContextImpl request_headers{{"traceparent", "invalid-header-format"}};
+  SpanContextExtractor extractor(request_headers, true); // w3c_fallback enabled
   auto context = extractor.extractSpanContext(true);
-  EXPECT_FALSE(context.second);  // Should not extract context from invalid W3C headers
+  EXPECT_FALSE(context.second); // Should not extract context from invalid W3C headers
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 

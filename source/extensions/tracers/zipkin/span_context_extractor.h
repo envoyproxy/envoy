@@ -34,13 +34,14 @@ private:
    * See: "https://github.com/openzipkin/b3-propagation
    */
   std::pair<SpanContext, bool> extractSpanContextFromB3SingleFormat(bool is_sampled);
-  
+
   /*
    * Convert W3C span context to Zipkin span context format
    */
-  std::pair<SpanContext, bool> convertW3CToZipkin(const Extensions::Tracers::OpenTelemetry::SpanContext& w3c_context,
-                                                  bool fallback_sampled);
-  
+  std::pair<SpanContext, bool>
+  convertW3CToZipkin(const Extensions::Tracers::OpenTelemetry::SpanContext& w3c_context,
+                     bool fallback_sampled);
+
   bool tryExtractSampledFromB3SingleFormat();
   const Tracing::TraceContext& trace_context_;
   bool w3c_fallback_enabled_;
