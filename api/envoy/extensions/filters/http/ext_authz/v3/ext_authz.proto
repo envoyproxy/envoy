@@ -476,6 +476,7 @@ message ExtAuthzPerRoute {
 }
 
 // Extra settings for the check request.
+// [#next-free-field: 6]
 message CheckSettings {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.CheckSettings";
