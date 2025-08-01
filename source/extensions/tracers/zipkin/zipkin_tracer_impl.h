@@ -136,6 +136,7 @@ public:
   const std::string& hostname() { return hostname_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
+  bool w3cFallbackEnabled() const { return w3c_fallback_enabled_; }
 
 private:
   /**
@@ -156,6 +157,7 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   TimeSource& time_source_;
+  bool w3c_fallback_enabled_;
 };
 
 /**

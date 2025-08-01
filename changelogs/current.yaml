@@ -267,6 +267,12 @@ new_features:
     Included the asterisk ``*`` in the match pattern when using the ``*`` or ``**`` operators in the URL template.
     This behavioral change can be temporarily reverted by setting runtime guard
     ``envoy.reloadable_features.uri_template_match_on_asterisk`` to ``false``.
+- area: tracing
+  change: |
+    Added :ref:`w3c_fallback <envoy_v3_api_field_config.trace.v3.ZipkinConfig.w3c_fallback>`
+    to the Zipkin tracer config. This allows the Zipkin tracer to extract trace information from W3C trace headers
+    when x-b3 headers are not present or cannot be extracted. This feature is disabled by default to maintain
+    backward compatibility.
 - area: socket
   change: |
     Added ``network_namespace_filepath`` to ``SocketAddress``. Currently only used by listeners.

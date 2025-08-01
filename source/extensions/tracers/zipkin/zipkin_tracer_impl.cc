@@ -76,7 +76,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
     : cm_(cluster_manager),
       tracer_stats_{ZIPKIN_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
-      time_source_(time_source) {
+      time_source_(time_source), w3c_fallback_enabled_(zipkin_config.w3c_fallback()) {
   THROW_IF_NOT_OK_REF(Config::Utility::checkCluster("envoy.tracers.zipkin",
                                                     zipkin_config.collector_cluster(), cm_,
                                                     /* allow_added_via_api */ true)
@@ -117,7 +117,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
-  SpanContextExtractor extractor(trace_context);
+  SpanContextExtractor extractor(trace_context, w3c_fallback_enabled_);
   bool sampled{extractor.extractSampled(tracing_decision)};
   TRY_NEEDS_AUDIT {
     auto ret_span_context = extractor.extractSpanContext(sampled);
