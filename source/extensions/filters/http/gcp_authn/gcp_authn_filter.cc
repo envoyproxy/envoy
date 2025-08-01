@@ -6,6 +6,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_replace.h"
 
