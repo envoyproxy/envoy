@@ -29,6 +29,12 @@ removed_config_or_runtime:
 - area: quic
   change: |
     Removed runtime guard ``envoy.reloadable_features.prefer_quic_client_udp_gro`` and legacy code paths.
+- area: udp_proxy
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
 
 new_features:
 - area: health_check
