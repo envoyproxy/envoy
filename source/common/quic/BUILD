@@ -463,6 +463,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/quic:quic_io_handle_wrapper_lib",
+        "//source/common/runtime:runtime_lib",
         "@com_github_google_quiche//:quic_core_config_lib",
         "@com_github_google_quiche//:quic_core_http_header_list_lib",
         "@com_github_google_quiche//:quic_platform",
