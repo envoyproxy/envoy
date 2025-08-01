@@ -1708,7 +1708,7 @@ envoy.matching.custom_matchers.domain_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.ServerNameMatcher
-envoy.matching.custom_matchers.trie_matcher:
+envoy.matching.custom_matchers.ip_range_matcher:
   categories:
   - envoy.matching.http.custom_matchers
   - envoy.matching.network.custom_matchers

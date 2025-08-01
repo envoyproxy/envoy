@@ -49,7 +49,7 @@ envoy_cc_test_library(
         "//source/common/listener_manager:listener_manager_lib",
         "//source/common/tls:server_context_lib",
         "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
-        "//source/extensions/common/matcher:trie_matcher_lib",
+        "//source/extensions/common/matcher:ip_range_matcher_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/network:network_mocks",
