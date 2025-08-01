@@ -6,6 +6,7 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "extensions/regex_functions.h"
+#include "extensions/strings.h"
 
 #include "cel/expr/syntax.pb.h"
 #include "eval/public/builtin_func_registrar.h"
@@ -101,7 +102,8 @@ ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
                                             response_trailers);
 }
 
-BuilderPtr createBuilder(Protobuf::Arena* arena) {
+BuilderPtr createBuilder(Protobuf::Arena* arena,
+                         const envoy::extensions::bootstrap::cel::CelEvaluatorConfig* config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   google::api::expr::runtime::InterpreterOptions options;
 
@@ -110,8 +112,15 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   options.enable_regex = true;
   options.regex_max_program_size = 100;
   options.enable_qualified_identifier_rewrites = true;
-  options.enable_string_conversion = false;
-  options.enable_string_concat = false;
+
+  // Use configuration if provided, otherwise use security-oriented defaults
+  if (config != nullptr) {
+    options.enable_string_conversion = config->enable_string_conversion();
+    options.enable_string_concat = config->enable_string_concat();
+  } else {
+    options.enable_string_conversion = false;
+    options.enable_string_concat = false;
+  }
   options.enable_list_concat = false;
 
   // Performance-oriented defaults
@@ -138,6 +147,15 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
     throw CelException(absl::StrCat("failed to register extension regex functions: ",
                                     ext_register_status.message()));
   }
+  // Register string extension functions only if enabled in configuration
+  if (config != nullptr && config->enable_string_functions()) {
+    auto string_register_status =
+        cel::extensions::RegisterStringsFunctions(builder->GetRegistry(), options);
+    if (!string_register_status.ok()) {
+      throw CelException(absl::StrCat("failed to register extension string functions: ",
+                                      string_register_status.message()));
+    }
+  }
   return builder;
 }
 
@@ -146,7 +164,26 @@ SINGLETON_MANAGER_REGISTRATION(expression_builder);
 BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
   return context.singletonManager().getTyped<BuilderInstance>(
       SINGLETON_MANAGER_REGISTERED_NAME(expression_builder),
-      [] { return std::make_shared<BuilderInstance>(createBuilder(nullptr)); });
+      [&context]() -> std::shared_ptr<BuilderInstance> {
+        auto& server_context = dynamic_cast<Server::Configuration::GenericFactoryContext&>(context)
+                                   .serverFactoryContext();
+        const auto& bootstrap = server_context.bootstrap();
+        const auto& extensions = bootstrap.bootstrap_extensions();
+        const envoy::extensions::bootstrap::cel::CelEvaluatorConfig* config = nullptr;
+
+        // Look for CEL bootstrap extension configuration
+        for (const auto& extension : extensions) {
+          if (extension.name() == "envoy.bootstrap.cel") {
+            auto message =
+                std::make_unique<envoy::extensions::bootstrap::cel::CelEvaluatorConfig>();
+            if (extension.typed_config().UnpackTo(message.get())) {
+              config = message.release();
+              break;
+            }
+          }
+        }
+        return std::make_shared<BuilderInstance>(createBuilder(nullptr, config));
+      });
 }
 
 absl::optional<cel::expr::Expr> getExpr(const ::xds::type::v3::CelExpression& expression) {
