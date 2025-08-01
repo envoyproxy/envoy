@@ -103,7 +103,7 @@ public:
   Stats::TestUtil::TestStore store_;
   ConfigSharedPtr cfg_;
   std::unique_ptr<Filter> filter_;
-  Network::MockListenerFilterCallbacks cb_;
+  NiceMock<Network::MockListenerFilterCallbacks> cb_;
   Network::MockConnectionSocket socket_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::FileReadyCb file_event_callback_;
@@ -287,6 +287,9 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_THAT(cb_.filterState().getDataReadOnly<FilterState>(FilterState::key),
+              Pointee(testing::Property(&FilterState::error_type,
+                                        FilterState::ErrorType::ClientHelloTooLarge)));
 }
 
 // Test that the filter sets the `JA3` hash
@@ -416,6 +419,9 @@ TEST_P(TlsInspectorTest, NotSsl) {
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
   EXPECT_EQ(5, bytes_processed[0]);
+  EXPECT_THAT(cb_.filterState().getDataReadOnly<FilterState>(FilterState::key),
+              Pointee(testing::Property(&FilterState::error_type,
+                                        FilterState::ErrorType::ClientHelloNotDetected)));
 }
 
 TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {

@@ -7,6 +7,7 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
@@ -82,6 +83,22 @@ private:
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
+ * TLS inspector filter state
+ */
+class FilterState : public Envoy::StreamInfo::FilterState::Object {
+public:
+  enum class ErrorType { ClientHelloTooLarge, ClientHelloNotDetected };
+
+  FilterState(ErrorType error_type) : error_type_(error_type) {}
+  ErrorType error_type() const { return error_type_; }
+
+  static constexpr char key[] = "envoy.tls_inspector_filter_state";
+
+private:
+  const ErrorType error_type_;
+};
+
+/**
  * TLS inspector listener filter.
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
@@ -101,6 +118,7 @@ private:
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   void createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
+  void setFilterState(FilterState::ErrorType error_type);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};
