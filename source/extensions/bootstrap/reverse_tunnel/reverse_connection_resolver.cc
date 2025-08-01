@@ -17,7 +17,7 @@ ReverseConnectionResolver::resolve(const envoy::config::core::v3::SocketAddress&
         "Expected format: rc://src_node_id:src_cluster_id:src_tenant_id@cluster_name:count"));
   }
 
-  // For reverse connections, only port 0 is supported
+  // For reverse connections, only port 0 is supported.
   if (socket_address.port_value() != 0) {
     return absl::InvalidArgumentError(
         fmt::format("Only port 0 is supported for reverse connections. Got port: {}",

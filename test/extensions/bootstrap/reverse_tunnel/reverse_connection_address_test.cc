@@ -3,6 +3,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include "source/common/network/socket_interface.h"
+#include "source/common/singleton/threadsafe_singleton.h"
+#include "test/mocks/network/mocks.h"
+
 using testing::_;
 using testing::Return;
 using testing::ReturnRef;
@@ -144,6 +148,24 @@ TEST_F(ReverseConnectionAddressTest, SocketInterface) {
   // Should return a socket interface (either reverse connection or default)
   const auto& socket_interface = address.socketInterface();
   EXPECT_NE(&socket_interface, nullptr);
+}
+
+// Test socket interface with registered reverse connection interface
+TEST_F(ReverseConnectionAddressTest, SocketInterfaceWithReverseInterface) {
+  // Create a mock socket interface with supported IP versions
+  auto mock_socket_interface = std::make_unique<NiceMock<Network::MockSocketInterface>>(
+      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4, Network::Address::IpVersion::v6});
+  auto* mock_interface_ptr = mock_socket_interface.get();
+  
+  // Use StackedScopedInjectableLoaderForTest to inject the mock interface
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(std::move(mock_socket_interface));
+  
+  auto config = createTestConfig();
+  ReverseConnectionAddress address(config);
+
+  // Should return the injected mock socket interface
+  const auto& socket_interface = address.socketInterface();
+  EXPECT_EQ(&socket_interface, mock_interface_ptr);
 }
 
 // Test with empty configuration values

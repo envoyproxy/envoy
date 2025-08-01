@@ -10,7 +10,6 @@ option java_outer_classname = "ReverseConnectionHandshakeProto";
 option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_connection_handshake/v3;reverse_connection_handshakev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
-option (udpa.annotations.file_status).work_in_progress = true;
 
 // [#protodoc-title: Reverse Connection Handshake]
 // Reverse Connection Handshake :ref:`configuration overview <config_bootstrap_reverse_connection_handshake>`.
@@ -34,7 +33,7 @@ message ReverseConnHandshakeArg {
   string node_uuid = 3;
 }
 
-// Config used by the remote cluser in response to the above 'ReverseConnHandshakeArg'.
+// Config used by the remote cluster in response to the above 'ReverseConnHandshakeArg'.
 message ReverseConnHandshakeRet {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.filters.http.reverse_conn.v3.ReverseConnHandshakeRet";
@@ -50,4 +49,4 @@ message ReverseConnHandshakeRet {
   // This field can be used to transmit success/warning/error messages
   // describing the status of the reverse connection, if needed.
   string status_message = 2;
-} 
+}

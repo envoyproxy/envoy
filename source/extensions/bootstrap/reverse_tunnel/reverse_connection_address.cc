@@ -17,12 +17,12 @@ namespace ReverseConnection {
 ReverseConnectionAddress::ReverseConnectionAddress(const ReverseConnectionConfig& config)
     : config_(config) {
 
-  // Create the logical name (rc:// address) for identification
+  // Create the logical name (rc:// address) for identification.
   logical_name_ = fmt::format("rc://{}:{}:{}@{}:{}", config.src_node_id, config.src_cluster_id,
                               config.src_tenant_id, config.remote_cluster, config.connection_count);
 
   // Use localhost with a random port for the actual address string to pass IP validation
-  // This will be used by the filter chain manager for matching
+  // This will be used by the filter chain manager for matching.
   address_string_ = "127.0.0.1:0";
 
   ENVOY_LOG_MISC(info, "Reverse connection address: logical_name={}, address_string={}",
@@ -48,7 +48,7 @@ absl::string_view ReverseConnectionAddress::asStringView() const { return addres
 const std::string& ReverseConnectionAddress::logicalName() const { return logical_name_; }
 
 const sockaddr* ReverseConnectionAddress::sockAddr() const {
-  // Return a valid localhost sockaddr structure for IP validation
+  // Return a valid localhost sockaddr structure for IP validation.
   static struct sockaddr_in addr;
   addr.sin_family = AF_INET;
   addr.sin_port = htons(0);                      // Port 0

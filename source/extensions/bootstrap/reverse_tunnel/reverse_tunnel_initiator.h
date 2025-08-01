@@ -490,7 +490,7 @@ private:
   };
 
   // Map from host address to connection info.
-  std::unordered_map<std::string, HostConnectionInfo> host_to_conn_info_map_;
+  absl::flat_hash_map<std::string, HostConnectionInfo> host_to_conn_info_map_;
   // Map from cluster name to set of resolved hosts
   absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>> cluster_to_resolved_hosts_map_;
 
@@ -503,7 +503,7 @@ private:
   std::vector<std::unique_ptr<RCConnectionWrapper>>
       connection_wrappers_; // Active connection wrappers
   // Mapping from wrapper to host. This designates the number of successful connections to a host.
-  std::unordered_map<RCConnectionWrapper*, std::string> conn_wrapper_to_host_map_;
+  absl::flat_hash_map<RCConnectionWrapper*, std::string> conn_wrapper_to_host_map_;
 
   // Simple pipe-based trigger mechanism to wake up accept() when a connection is established.
   // Inlined directly for simplicity and reduced test coverage requirements.

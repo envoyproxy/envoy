@@ -1,3 +1,6 @@
+#include <sys/socket.h>
+
+#include "envoy/extensions/bootstrap/reverse_connection_handshake/v3/reverse_connection_handshake.pb.h"
 #include "envoy/extensions/bootstrap/reverse_connection_socket_interface/v3/reverse_connection_socket_interface.pb.h"
 #include "envoy/network/socket_interface.h"
 #include "envoy/server/factory_context.h"
@@ -6,6 +9,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/thread_local/thread_local_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_initiator.h"
 
@@ -16,11 +20,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/test_runtime.h"
 
-// Include the protobuf message for HTTP handshake testing
-#include "envoy/extensions/bootstrap/reverse_connection_handshake/v3/reverse_connection_handshake.pb.h"
-
-#include <sys/socket.h>
-
+#include "absl/container/flat_hash_map.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -806,6 +806,7 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
+  Event::GlobalTimeSystem time_system_;
 
   envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
@@ -822,6 +823,9 @@ protected:
   std::shared_ptr<DownstreamSocketThreadLocal> thread_local_registry_;
   std::unique_ptr<ThreadLocal::TypedSlot<DownstreamSocketThreadLocal>> another_tls_slot_;
   std::shared_ptr<DownstreamSocketThreadLocal> another_thread_local_registry_;
+
+  // Mock socket for testing
+  std::unique_ptr<Network::ConnectionSocket> mock_socket_;
 
   // Thread Local Setup Helpers
 
@@ -909,7 +913,7 @@ protected:
 
   // Data Access Helpers
 
-  const std::unordered_map<std::string, ReverseConnectionIOHandle::HostConnectionInfo>&
+  const absl::flat_hash_map<std::string, ReverseConnectionIOHandle::HostConnectionInfo>&
   getHostToConnInfoMap() const {
     return io_handle_->host_to_conn_info_map_;
   }
@@ -926,7 +930,7 @@ protected:
     return io_handle_->connection_wrappers_;
   }
 
-  const std::unordered_map<RCConnectionWrapper*, std::string>& getConnWrapperToHostMap() const {
+  const absl::flat_hash_map<RCConnectionWrapper*, std::string>& getConnWrapperToHostMap() const {
     return io_handle_->conn_wrapper_to_host_map_;
   }
 
@@ -953,6 +957,32 @@ protected:
     auto mock_address = std::make_shared<Network::Address::Ipv4Instance>(address, 8080);
     EXPECT_CALL(*mock_host, address()).WillRepeatedly(Return(mock_address));
     return mock_host;
+  }
+
+  // Helper method to set up mock connection with proper socket expectations
+  std::unique_ptr<NiceMock<Network::MockClientConnection>> setupMockConnection() {
+    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+
+    // Create a mock socket for the connection
+    auto mock_socket_ptr = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+
+    // Set up IO handle expectations
+    EXPECT_CALL(*mock_io_handle, resetFileEvents()).WillRepeatedly(Return());
+
+    // Set up socket expectations
+    EXPECT_CALL(*mock_socket_ptr, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+
+    // Store the mock_io_handle in the socket before casting
+    mock_socket_ptr->io_handle_ = std::move(mock_io_handle);
+
+    // Cast the mock to the base ConnectionSocket type and store it in member variable
+    mock_socket_ = std::unique_ptr<Network::ConnectionSocket>(mock_socket_ptr.release());
+
+    // Set up connection expectations for getSocket()
+    EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(mock_socket_));
+
+    return mock_connection;
   }
 
   // Helper to access private members for testing
@@ -1546,8 +1576,7 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureExponentialBackoff) 
   const auto& host_info_1 = getHostConnectionInfo("192.168.1.1");
   EXPECT_EQ(host_info_1.failure_count, 1);
   // Verify backoff_until is set to a future time (approximately current_time + 1000ms)
-  auto now = std::chrono::steady_clock::now();
-  auto backoff_duration_1 = host_info_1.backoff_until - now;
+  auto backoff_duration_1 = host_info_1.backoff_until - time_system_.monotonicTime();
   // backoff_delay_ms = 1000 * 2^(1-1) = 1000 * 2^0 = 1000 * 1 = 1000ms
   auto backoff_ms_1 =
       std::chrono::duration_cast<std::chrono::milliseconds>(backoff_duration_1).count();
@@ -1559,7 +1588,7 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureExponentialBackoff) 
   const auto& host_info_2 = getHostConnectionInfo("192.168.1.1");
   EXPECT_EQ(host_info_2.failure_count, 2);
   // backoff_delay_ms = 1000 * 2^(2-1) = 1000 * 2^1 = 1000 * 2 = 2000ms
-  auto backoff_duration_2 = host_info_2.backoff_until - now;
+  auto backoff_duration_2 = host_info_2.backoff_until - time_system_.monotonicTime();
   auto backoff_ms_2 =
       std::chrono::duration_cast<std::chrono::milliseconds>(backoff_duration_2).count();
   EXPECT_GE(backoff_ms_2, 1900); // Should be at least 1900ms
@@ -1570,7 +1599,7 @@ TEST_F(ReverseConnectionIOHandleTest, TrackConnectionFailureExponentialBackoff) 
   const auto& host_info_3 = getHostConnectionInfo("192.168.1.1");
   EXPECT_EQ(host_info_3.failure_count, 3);
   // backoff_delay_ms = 1000 * 2^(3-1) = 1000 * 2^2 = 1000 * 4 = 4000ms
-  auto backoff_duration_3 = host_info_3.backoff_until - now;
+  auto backoff_duration_3 = host_info_3.backoff_until - time_system_.monotonicTime();
   auto backoff_ms_3 =
       std::chrono::duration_cast<std::chrono::milliseconds>(backoff_duration_3).count();
   EXPECT_GE(backoff_ms_3, 3900); // Should be at least 3900ms
@@ -2169,7 +2198,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneSuccess) {
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
   // Create a successful connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = setupMockConnection();
+
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
   success_conn_data.host_description_ = mock_host;
@@ -2247,7 +2277,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
   // Step 1: Create initial connection
-  auto mock_connection1 = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection1 = setupMockConnection();
+
   Upstream::MockHost::MockCreateConnectionData success_conn_data1;
   success_conn_data1.connection_ = mock_connection1.get();
   success_conn_data1.host_description_ = mock_host;
@@ -2298,7 +2329,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnConnectionDoneFailureAndRecovery) {
   EXPECT_FALSE(shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
 
   // Step 3: Create a new connection for recovery
-  auto mock_connection2 = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection2 = setupMockConnection();
+
   Upstream::MockHost::MockCreateConnectionData success_conn_data2;
   success_conn_data2.connection_ = mock_connection2.get();
   success_conn_data2.host_description_ = mock_host;
@@ -2409,7 +2441,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
   // Step 1: Create initial connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = setupMockConnection();
+
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
   success_conn_data.host_description_ = mock_host;
@@ -2481,7 +2514,8 @@ TEST_F(ReverseConnectionIOHandleTest, OnDownstreamConnectionClosedTriggersReInit
   EXPECT_EQ(host_it->second.connection_keys.count(connection_key), 0);
 
   // Step 5: Set up expectation for new connection attempts
-  auto mock_connection2 = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection2 = setupMockConnection();
+
   Upstream::MockHost::MockCreateConnectionData success_conn_data2;
   success_conn_data2.connection_ = mock_connection2.get();
   success_conn_data2.host_description_ = mock_host;
@@ -2672,7 +2706,7 @@ protected:
     return io_handle_->connection_wrappers_;
   }
 
-  const std::unordered_map<RCConnectionWrapper*, std::string>& getConnWrapperToHostMap() const {
+  const absl::flat_hash_map<RCConnectionWrapper*, std::string>& getConnWrapperToHostMap() const {
     return io_handle_->conn_wrapper_to_host_map_;
   }
 
@@ -2701,6 +2735,32 @@ protected:
     return mock_host;
   }
 
+  // Helper method to set up mock connection with proper socket expectations
+  std::unique_ptr<NiceMock<Network::MockClientConnection>> setupMockConnection() {
+    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+
+    // Create a mock socket for the connection
+    auto mock_socket_ptr = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
+    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
+
+    // Set up IO handle expectations
+    EXPECT_CALL(*mock_io_handle, resetFileEvents()).WillRepeatedly(Return());
+
+    // Set up socket expectations
+    EXPECT_CALL(*mock_socket_ptr, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
+
+    // Store the mock_io_handle in the socket before casting
+    mock_socket_ptr->io_handle_ = std::move(mock_io_handle);
+
+    // Cast the mock to the base ConnectionSocket type and store it in member variable
+    mock_socket_ = std::unique_ptr<Network::ConnectionSocket>(mock_socket_ptr.release());
+
+    // Set up connection expectations for getSocket()
+    EXPECT_CALL(*mock_connection, getSocket()).WillRepeatedly(ReturnRef(mock_socket_));
+
+    return mock_connection;
+  }
+
   // Test fixtures
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -2714,6 +2774,11 @@ protected:
   std::unique_ptr<ReverseConnectionIOHandle> io_handle_;
   std::unique_ptr<ThreadLocal::TypedSlot<DownstreamSocketThreadLocal>> tls_slot_;
   std::shared_ptr<DownstreamSocketThreadLocal> thread_local_registry_;
+
+  // Mock socket for testing
+  std::unique_ptr<Network::ConnectionSocket> mock_socket_;
+
+  Event::GlobalTimeSystem time_system_;
 };
 
 // Test RCConnectionWrapper::connect() method with HTTP/1.1 handshake success
@@ -2779,7 +2844,7 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
   EXPECT_FALSE(body.empty());
 
   // Verify the protobuf content by deserializing it
-      envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeArg arg;
+  envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeArg arg;
   bool parse_success = arg.ParseFromString(body);
   EXPECT_TRUE(parse_success);
   EXPECT_EQ(arg.tenant_uuid(), "test-tenant");
@@ -2862,8 +2927,8 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
   // Create HostConnectionInfo entry
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection with proper socket setup
+  auto mock_connection = setupMockConnection();
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
   success_conn_data.host_description_ = mock_host;
@@ -2935,8 +3000,7 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailure) {
   // Create HostConnectionInfo entry
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  auto mock_connection = setupMockConnection();
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
   success_conn_data.host_description_ = mock_host;
@@ -3012,8 +3076,8 @@ TEST_F(RCConnectionWrapperTest, OnEventRemoteClose) {
   // Create HostConnectionInfo entry
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection with proper socket setup
+  auto mock_connection = setupMockConnection();
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
   success_conn_data.host_description_ = mock_host;
@@ -3089,8 +3153,8 @@ TEST_F(RCConnectionWrapperTest, OnEventConnected) {
   // Create HostConnectionInfo entry
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection with proper socket setup
+  auto mock_connection = setupMockConnection();
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
   success_conn_data.host_description_ = mock_host;
@@ -3157,8 +3221,8 @@ TEST_F(RCConnectionWrapperTest, OnEventWithNullConnection) {
   // Create HostConnectionInfo entry
   addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
 
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection with proper socket setup
+  auto mock_connection = setupMockConnection();
   Upstream::MockHost::MockCreateConnectionData success_conn_data;
   success_conn_data.connection_ = mock_connection.get();
   success_conn_data.host_description_ = mock_host;
@@ -3201,8 +3265,8 @@ TEST_F(RCConnectionWrapperTest, OnEventWithNullConnection) {
 
 // Test RCConnectionWrapper::releaseConnection method
 TEST_F(RCConnectionWrapperTest, ReleaseConnection) {
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection with proper socket setup
+  auto mock_connection = setupMockConnection();
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   // Create RCConnectionWrapper with the mock connection
@@ -3221,8 +3285,8 @@ TEST_F(RCConnectionWrapperTest, ReleaseConnection) {
 
 // Test RCConnectionWrapper::getConnection method
 TEST_F(RCConnectionWrapperTest, GetConnection) {
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection with proper socket setup
+  auto mock_connection = setupMockConnection();
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   // Create RCConnectionWrapper with the mock connection
@@ -3241,8 +3305,8 @@ TEST_F(RCConnectionWrapperTest, GetConnection) {
 
 // Test RCConnectionWrapper::getHost method
 TEST_F(RCConnectionWrapperTest, GetHost) {
-  // Create a mock connection and host
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection and host with proper socket setup
+  auto mock_connection = setupMockConnection();
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   // Create RCConnectionWrapper with the mock connection
@@ -3257,8 +3321,8 @@ TEST_F(RCConnectionWrapperTest, GetHost) {
 
 // Test RCConnectionWrapper::onAboveWriteBufferHighWatermark method (no-op)
 TEST_F(RCConnectionWrapperTest, OnAboveWriteBufferHighWatermark) {
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection with proper socket setup
+  auto mock_connection = setupMockConnection();
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   // Create RCConnectionWrapper with the mock connection
@@ -3270,8 +3334,8 @@ TEST_F(RCConnectionWrapperTest, OnAboveWriteBufferHighWatermark) {
 
 // Test RCConnectionWrapper::onBelowWriteBufferLowWatermark method (no-op)
 TEST_F(RCConnectionWrapperTest, OnBelowWriteBufferLowWatermark) {
-  // Create a mock connection
-  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  // Create a mock connection with proper socket setup
+  auto mock_connection = setupMockConnection();
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
   // Create RCConnectionWrapper with the mock connection
@@ -3286,7 +3350,7 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
   // Test 1: Shutdown with open connection
   std::cout << "Test 1: Shutdown with open connection" << std::endl;
   {
-    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_connection = setupMockConnection();
     auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
     // Set up connection expectations for open connection
@@ -3304,7 +3368,7 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
   std::cout << "Test 2: Shutdown with already closed connection" << std::endl;
   // Test 2: Shutdown with already closed connection
   {
-    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_connection = setupMockConnection();
     auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
     // Set up connection expectations for closed connection
@@ -3324,7 +3388,7 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
 
   // Test 3: Shutdown with closing connection
   {
-    auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+    auto mock_connection = setupMockConnection();
     auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
     // Set up connection expectations for closing connection
@@ -3525,8 +3589,9 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithProtobufResponse) {
   auto filter = createFilter(wrapper.get());
 
   // Create a proper ReverseConnHandshakeRet protobuf response
-      envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeRet ret;
-      ret.set_status(envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeRet::ACCEPTED);
+  envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeRet ret;
+  ret.set_status(envoy::extensions::bootstrap::reverse_connection_handshake::v3::
+                     ReverseConnHandshakeRet::ACCEPTED);
   ret.set_status_message("Connection accepted");
 
   std::string protobuf_data = ret.SerializeAsString();

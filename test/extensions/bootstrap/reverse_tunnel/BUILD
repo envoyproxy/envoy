@@ -29,8 +29,8 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_connection_handshake/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/reverse_conn/v3:pkg_cc_proto",
     ],
 )
 
@@ -40,6 +40,7 @@ envoy_cc_test(
     srcs = ["reverse_connection_address_test.cc"],
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/singleton:threadsafe_singleton",
         "//source/extensions/bootstrap/reverse_tunnel:reverse_connection_address_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:test_runtime_lib",
