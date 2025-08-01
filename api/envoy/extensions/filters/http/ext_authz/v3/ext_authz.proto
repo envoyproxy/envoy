@@ -514,13 +514,15 @@ message CheckSettings {
   // may be specified.
   BufferSettings with_request_body = 3;
 
-  // Set a different gRPC service for this route than the default.
-  // This allows different routes to use different external authorization service backends.
-  //
-  // .. note::
-  //
-  //   This setting is only applied to a filter configured with a
-  //   :ref:`grpc_service<envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.grpc_service>`.
-  //   If the filter is configured with an ``http_service``, this field is ignored.
-  config.core.v3.GrpcService grpc_service = 4;
+  // Override the external authorization service for this route.
+  // This allows different routes to use different external authorization service backends
+  // and service types (gRPC or HTTP). If specified, this overrides the filter-level service
+  // configuration regardless of the original service type.
+  oneof service_override {
+    // Override with a gRPC service configuration.
+    config.core.v3.GrpcService grpc_service = 4;
+
+    // Override with an HTTP service configuration.
+    HttpService http_service = 5;
+  }
 }

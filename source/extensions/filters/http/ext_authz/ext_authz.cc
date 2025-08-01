@@ -178,35 +178,19 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
     : context_extensions_(less_specific.context_extensions_),
-      check_settings_(less_specific.check_settings_), disabled_(more_specific.disabled_),
-      grpc_service_(more_specific.grpc_service_.has_value() ? more_specific.grpc_service_
-                                                            : less_specific.grpc_service_) {
-  // First, merge context extensions from less specific check_settings_ here.
-  for (const auto& extension : less_specific.check_settings_.context_extensions()) {
-    context_extensions_[extension.first] = extension.second;
-  }
-
-  // Then, merge context extensions from more specific configuration overriding less specific.
-  auto begin_it = more_specific.context_extensions_.begin();
-  auto end_it = more_specific.context_extensions_.end();
-  for (auto it = begin_it; it != end_it; ++it) {
-    context_extensions_[it->first] = it->second;
-  }
-
-  // Merge check settings. More specific settings override less specific ones.
-  if (more_specific.check_settings_.has_grpc_service()) {
-    check_settings_.mutable_grpc_service()->CopyFrom(more_specific.check_settings_.grpc_service());
-  }
-  if (more_specific.check_settings_.has_with_request_body()) {
-    check_settings_.mutable_with_request_body()->CopyFrom(
-        more_specific.check_settings_.with_request_body());
-  }
-  if (more_specific.check_settings_.disable_request_body_buffering()) {
-    check_settings_.set_disable_request_body_buffering(true);
-  }
-  // Merge context extensions in check_settings as well.
-  for (const auto& extension : more_specific.check_settings_.context_extensions()) {
-    (*check_settings_.mutable_context_extensions())[extension.first] = extension.second;
+      check_settings_(more_specific.check_settings_), disabled_(more_specific.disabled_),
+      // Use most specific service override. If more specific has either service, use only that.
+      // This prevents having both services when one should override the other.
+      grpc_service_(more_specific.grpc_service_.has_value()
+                        ? more_specific.grpc_service_
+                        : (more_specific.http_service_.has_value() ? absl::nullopt
+                                                                   : less_specific.grpc_service_)),
+      http_service_(more_specific.http_service_.has_value()
+                        ? more_specific.http_service_
+                        : (more_specific.grpc_service_.has_value() ? absl::nullopt
+                                                                   : less_specific.http_service_)) {
+  // Merge context extensions from more specific configuration, overriding less specific ones.
+  for (const auto& extension : more_specific.context_extensions_) {
     context_extensions_[extension.first] = extension.second;
   }
 }
@@ -220,9 +204,9 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
     return nullptr;
   }
 
-  // Use the same timeout as the default configuration.
-  // TODO(agrawroh): Consider making this configurable per-route as well.
-  const uint32_t timeout_ms = kDefaultPerRouteTimeoutMs;
+  // Use the timeout from the gRPC service configuration, use default if not specified.
+  const uint32_t timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, kDefaultPerRouteTimeoutMs);
 
   // We can skip transport version check for per-route gRPC service here.
   // The transport version is already validated at the main configuration level.
@@ -242,6 +226,33 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
 
   return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
       client_or_error.value(), std::chrono::milliseconds(timeout_ms));
+}
+
+Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
+    const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service) {
+  if (server_context_ == nullptr) {
+    ENVOY_STREAM_LOG(
+        debug, "ext_authz filter: server context not available for per-route HTTP client creation.",
+        *decoder_callbacks_);
+    return nullptr;
+  }
+
+  // Use the timeout from the HTTP service configuration, use default if not specified.
+  const uint32_t timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(http_service.server_uri(), timeout, kDefaultPerRouteTimeoutMs);
+
+  ENVOY_STREAM_LOG(debug, "ext_authz filter: creating per-route HTTP client for URI: {}.",
+                   *decoder_callbacks_, http_service.server_uri().uri());
+
+  // Create a temporary ExtAuthz config with the HTTP service for the ClientConfig constructor.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz temp_config;
+  temp_config.mutable_http_service()->CopyFrom(http_service);
+
+  const auto client_config = std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
+      temp_config, timeout_ms, http_service.path_prefix(), *server_context_);
+
+  return std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
+      server_context_->clusterManager(), client_config);
 }
 
 void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
@@ -289,24 +300,43 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
   }
 
-  // Check if we need to use a per-route gRPC service.
+  // Check if we need to use a per-route service override (gRPC or HTTP).
   Filters::Common::ExtAuthz::ClientPtr* client_to_use = &client_;
-  if (maybe_merged_per_route_config && maybe_merged_per_route_config->grpcService().has_value()) {
-    const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
-    ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route gRPC service configuration.",
-                     *decoder_callbacks_);
-
-    // Create a new gRPC client for this route.
-    per_route_client_ = createPerRouteGrpcClient(grpc_service);
-    if (per_route_client_ != nullptr) {
-      client_to_use = &per_route_client_;
-      ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
+  if (maybe_merged_per_route_config) {
+    if (maybe_merged_per_route_config->grpcService().has_value()) {
+      const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
+      ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route gRPC service configuration.",
                        *decoder_callbacks_);
-    } else {
-      ENVOY_STREAM_LOG(
-          warn,
-          "ext_authz filter: failed to create per-route gRPC client, falling back to default.",
-          *decoder_callbacks_);
+
+      // Create a new gRPC client for this route.
+      per_route_client_ = createPerRouteGrpcClient(grpc_service);
+      if (per_route_client_ != nullptr) {
+        client_to_use = &per_route_client_;
+        ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
+                         *decoder_callbacks_);
+      } else {
+        ENVOY_STREAM_LOG(
+            warn,
+            "ext_authz filter: failed to create per-route gRPC client, falling back to default.",
+            *decoder_callbacks_);
+      }
+    } else if (maybe_merged_per_route_config->httpService().has_value()) {
+      const auto& http_service = maybe_merged_per_route_config->httpService().value();
+      ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route HTTP service configuration.",
+                       *decoder_callbacks_);
+
+      // Create a new HTTP client for this route.
+      per_route_client_ = createPerRouteHttpClient(http_service);
+      if (per_route_client_ != nullptr) {
+        client_to_use = &per_route_client_;
+        ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route HTTP client.",
+                         *decoder_callbacks_);
+      } else {
+        ENVOY_STREAM_LOG(
+            warn,
+            "ext_authz filter: failed to create per-route HTTP client, falling back to default.",
+            *decoder_callbacks_);
+      }
     }
   }
 

@@ -4382,14 +4382,14 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingMultipleLevels) {
   EXPECT_EQ(final_merged.grpcService().value().envoy_grpc().cluster_name(), "route_cluster");
 }
 
-// Test per-route context extensions take precedence over check_settings context extensions
+// Test per-route context extensions take precedence over check_settings context extensions.
 TEST_P(HttpFilterTestParam, PerRouteContextExtensionsPrecedence) {
   if (std::get<1>(GetParam())) {
-    // Skip HTTP client test - context extensions apply to gRPC clients
+    // Skip HTTP client test as context extensions apply to gRPC clients.
     return;
   }
 
-  // Create configuration with context extensions in both places
+  // Create configuration with context extensions in both places.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
   base_config.mutable_check_settings()->mutable_context_extensions()->insert(
       {"check_key", "check_value"});
@@ -4402,12 +4402,12 @@ TEST_P(HttpFilterTestParam, PerRouteContextExtensionsPrecedence) {
   specific_config.mutable_check_settings()->mutable_context_extensions()->insert(
       {"shared_key", "specific_check_shared_value"});
 
-  // Test merging using the merge constructor
+  // Test merging using the merge constructor.
   FilterConfigPerRoute base_filter_config(base_config);
   FilterConfigPerRoute specific_filter_config(specific_config);
   FilterConfigPerRoute merged_config(base_filter_config, specific_filter_config);
 
-  // Verify context extensions are properly merged
+  // Verify context extensions are properly merged.
   const auto& merged_extensions = merged_config.contextExtensions();
   EXPECT_EQ(merged_extensions.size(), 3);
   EXPECT_EQ(merged_extensions.at("check_key"), "check_value");
@@ -4416,10 +4416,10 @@ TEST_P(HttpFilterTestParam, PerRouteContextExtensionsPrecedence) {
             "specific_check_shared_value"); // More specific wins
 }
 
-// Test per-route Google gRPC service configuration
+// Test per-route Google gRPC service configuration.
 TEST_P(HttpFilterTestParam, PerRouteGoogleGrpcServiceConfiguration) {
   if (std::get<1>(GetParam())) {
-    // Skip HTTP client test - per-route gRPC service only applies to gRPC clients
+    // Skip HTTP client test as per-route gRPC service only applies to gRPC clients.
     return;
   }
 
@@ -4439,12 +4439,12 @@ TEST_P(HttpFilterTestParam, PerRouteGoogleGrpcServiceConfiguration) {
             "https://ext-authz.googleapis.com");
 }
 
-// Test existing functionality still works with new logic
+// Test existing functionality still works with new logic.
 TEST_P(HttpFilterTestParam, ExistingFunctionalityWithNewLogic) {
-  // Test that the existing functionality still works with our new per-route merging logic
+  // Test that the existing functionality still works with our new per-route merging logic.
   prepareCheck();
 
-  // Mock the default client check call (no per-route config)
+  // Mock the default client check call (no per-route config).
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
@@ -4458,25 +4458,25 @@ TEST_P(HttpFilterTestParam, ExistingFunctionalityWithNewLogic) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 }
 
-// Test per-route configuration merging with empty configurations
+// Test per-route configuration merging with empty configurations.
 TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithEmptyConfigurations) {
   if (std::get<1>(GetParam())) {
-    // Skip HTTP client test - configuration merging applies to gRPC clients
+    // Skip HTTP client test as configuration merging applies to gRPC clients.
     return;
   }
 
-  // Create empty base configuration
+  // Create empty base configuration.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
 
-  // Create empty specific configuration
+  // Create empty specific configuration.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute specific_config;
 
-  // Test merging using the merge constructor
+  // Test merging using the merge constructor.
   FilterConfigPerRoute base_filter_config(base_config);
   FilterConfigPerRoute specific_filter_config(specific_config);
   FilterConfigPerRoute merged_config(base_filter_config, specific_filter_config);
 
-  // Verify merged configuration has empty context extensions
+  // Verify merged configuration has empty context extensions.
   const auto& merged_extensions = merged_config.contextExtensions();
   EXPECT_EQ(merged_extensions.size(), 0);
 
@@ -4484,19 +4484,19 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithEmptyConfigurations)
   EXPECT_FALSE(merged_config.grpcService().has_value());
 }
 
-// Test per-route gRPC service configuration merging functionality
+// Test per-route gRPC service configuration merging functionality.
 TEST_P(HttpFilterTestParam, PerRouteGrpcServiceMergingWithBaseConfiguration) {
   if (std::get<1>(GetParam())) {
-    // Skip HTTP client test - per-route gRPC service only applies to gRPC clients
+    // Skip HTTP client test as per-route gRPC service only applies to gRPC clients.
     return;
   }
 
-  // Create base per-route configuration
+  // Create base per-route configuration.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
   (*base_config.mutable_check_settings()->mutable_context_extensions())["base"] = "value";
   FilterConfigPerRoute base_filter_config(base_config);
 
-  // Create per-route configuration with gRPC service
+  // Create per-route configuration with gRPC service.
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
   per_route_config.mutable_check_settings()
       ->mutable_grpc_service()
@@ -4504,29 +4504,29 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcServiceMergingWithBaseConfiguration) {
       ->set_cluster_name("per_route_cluster");
   (*per_route_config.mutable_check_settings()->mutable_context_extensions())["route"] = "override";
 
-  // Test merging constructor
+  // Test merging constructor.
   FilterConfigPerRoute merged_config(base_filter_config, per_route_config);
 
-  // Verify the merged configuration has the gRPC service from the per-route config
+  // Verify the merged configuration has the gRPC service from the per-route config.
   EXPECT_TRUE(merged_config.grpcService().has_value());
   EXPECT_TRUE(merged_config.grpcService().value().has_envoy_grpc());
   EXPECT_EQ(merged_config.grpcService().value().envoy_grpc().cluster_name(), "per_route_cluster");
 
-  // Verify that context extensions are properly merged
+  // Verify that context extensions are properly merged.
   const auto& merged_settings = merged_config.checkSettings();
   EXPECT_TRUE(merged_settings.context_extensions().contains("route"));
   EXPECT_EQ(merged_settings.context_extensions().at("route"), "override");
 }
 
-// Test focused integration test to verify per-route configuration is processed correctly
+// Test focused integration test to verify per-route configuration is processed correctly.
 TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
   if (std::get<1>(GetParam())) {
-    // Skip HTTP client test - per-route gRPC service only applies to gRPC clients
+    // Skip HTTP client test - per-route gRPC service only applies to gRPC clients.
     return;
   }
 
   // This test covers the per-route configuration processing in initiateCall
-  // which exercises the lines where getAllPerFilterConfig is called and processed
+  // which exercises the lines where getAllPerFilterConfig is called and processed.
 
   // Set up per-route configuration with gRPC service override
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
@@ -4535,29 +4535,29 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
       ->mutable_envoy_grpc()
       ->set_cluster_name("per_route_cluster");
 
-  // Add context extensions to test that path too
+  // Add context extensions to test that path too.
   (*per_route_config.mutable_check_settings()->mutable_context_extensions())["test_key"] =
       "test_value";
 
   std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
       std::make_unique<FilterConfigPerRoute>(per_route_config);
 
-  // Mock decoder callbacks to return per-route config
+  // Mock decoder callbacks to return per-route config.
   ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
       .WillByDefault(Return(per_route_filter_config.get()));
 
-  // Mock perFilterConfigs to return the per-route config vector
+  // Mock perFilterConfigs to return the per-route config vector.
   Router::RouteSpecificFilterConfigs per_route_configs;
   per_route_configs.push_back(per_route_filter_config.get());
   ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
 
-  // Set up basic request headers
+  // Set up basic request headers.
   Http::TestRequestHeaderMapImpl headers{
       {":method", "GET"}, {":path", "/test"}, {":scheme", "https"}, {"host", "example.com"}};
 
   prepareCheck();
 
-  // Mock client check to capture and verify the check request has proper context extensions
+  // Mock client check to capture and verify the check request has proper context extensions.
   EXPECT_CALL(*client_, check(_, _, _, _))
       .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& check_request,
@@ -4574,7 +4574,7 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
       }));
 
   // This exercises the per-route configuration processing logic which includes
-  // the getAllPerFilterConfig call and per-route gRPC service detection
+  // the getAllPerFilterConfig call and per-route gRPC service detection.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
 }
 
@@ -4647,9 +4647,210 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationAndUsage) {
             return nullptr; // No async request handle needed for immediate response.
           }));
 
-  // Since per-route gRPC client creation succeeds, the per-route client (GrpcClientImpl)
-  // should be used instead of the default client. We won't see a call to new_client_ptr.
+  // Since per-route gRPC client creation succeeds, the per-route client should be used
+  // instead of the default client. We won't see a call to new_client_ptr.
   EXPECT_CALL(*new_client_ptr, check(_, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            new_filter->decodeHeaders(request_headers_, false));
+}
+
+// Test per-route HTTP service configuration parsing.
+TEST_P(HttpFilterTestParam, PerRouteHttpServiceConfigurationParsing) {
+  if (!std::get<1>(GetParam())) {
+    // Skip gRPC client test as per-route HTTP service only applies to HTTP clients.
+    return;
+  }
+
+  // Create per-route configuration with valid HTTP service.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()->mutable_http_service()->mutable_server_uri()->set_uri(
+      "https://per-route-ext-authz.example.com");
+  per_route_config.mutable_check_settings()
+      ->mutable_http_service()
+      ->mutable_server_uri()
+      ->set_cluster("per_route_http_cluster");
+  per_route_config.mutable_check_settings()->mutable_http_service()->set_path_prefix(
+      "/api/v2/auth");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  // Verify the per-route HTTP service configuration is correctly parsed
+  EXPECT_TRUE(per_route_filter_config->httpService().has_value());
+  EXPECT_FALSE(per_route_filter_config->grpcService().has_value());
+
+  const auto& http_service = per_route_filter_config->httpService().value();
+  EXPECT_EQ(http_service.server_uri().uri(), "https://per-route-ext-authz.example.com");
+  EXPECT_EQ(http_service.server_uri().cluster(), "per_route_http_cluster");
+  EXPECT_EQ(http_service.path_prefix(), "/api/v2/auth");
+}
+
+// Test error handling when server context is not available for per-route gRPC client.
+TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationNoServerContext) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - per-route gRPC service only applies to gRPC clients.
+    return;
+  }
+
+  // Create per-route configuration with gRPC service.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_grpc_cluster");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  prepareCheck();
+
+  // Create filter without server context. This should cause per-route client creation to fail.
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* new_client_ptr = new_client.get();
+  auto new_filter = std::make_unique<Filter>(config_, std::move(new_client)); // No server context
+  new_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Since per-route client creation fails (no server context), should fall back to default client.
+  EXPECT_CALL(*new_client_ptr, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        // Verify this is using the default client.
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::move(response));
+      }));
+
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            new_filter->decodeHeaders(request_headers_, false));
+}
+
+// Test error handling when server context is not available for per-route HTTP client.
+TEST_P(HttpFilterTestParam, PerRouteHttpClientCreationNoServerContext) {
+  if (!std::get<1>(GetParam())) {
+    // Skip gRPC client test as per-route HTTP service only applies to HTTP clients.
+    return;
+  }
+
+  // Create per-route configuration with HTTP service.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()->mutable_http_service()->mutable_server_uri()->set_uri(
+      "https://per-route-ext-authz.example.com");
+  per_route_config.mutable_check_settings()
+      ->mutable_http_service()
+      ->mutable_server_uri()
+      ->set_cluster("per_route_http_cluster");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  prepareCheck();
+
+  // Create filter without server context.
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* new_client_ptr = new_client.get();
+  auto new_filter = std::make_unique<Filter>(config_, std::move(new_client)); // No server context
+  new_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Since per-route client creation fails, should fall back to default client.
+  EXPECT_CALL(*new_client_ptr, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::move(response));
+      }));
+
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            new_filter->decodeHeaders(request_headers_, false));
+}
+
+// Test per-route timeout configuration is correctly used in gRPC client creation.
+TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test as per-route gRPC service only applies to gRPC clients.
+    return;
+  }
+
+  // Create per-route configuration with custom timeout.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
+  grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_grpc_cluster");
+  grpc_service->mutable_timeout()->set_seconds(30); // Custom 30s timeout
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  prepareCheck();
+
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* new_client_ptr = new_client.get();
+  auto new_filter = std::make_unique<Filter>(config_, std::move(new_client), factory_context_);
+  new_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Mock gRPC client manager.
+  auto mock_grpc_client_manager = std::make_shared<Grpc::MockAsyncClientManager>();
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+  ON_CALL(cm_, grpcAsyncClientManager()).WillByDefault(ReturnRef(*mock_grpc_client_manager));
+
+  auto mock_raw_grpc_client = std::make_shared<Grpc::MockAsyncClient>();
+  EXPECT_CALL(*mock_grpc_client_manager, getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
+
+  // Mock the sendRaw call and verify the timeout is used correctly.
+  EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillOnce(Invoke([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                          Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+        // Verify that the timeout from the per-route config is used (30s = 30000ms)
+        EXPECT_TRUE(options.timeout.has_value());
+        EXPECT_EQ(options.timeout->count(), 30000);
+
+        envoy::service::auth::v3::CheckResponse check_response;
+        check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+        check_response.mutable_ok_response();
+
+        std::string serialized_response;
+        check_response.SerializeToString(&serialized_response);
+        auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
+
+        callbacks.onSuccessRaw(std::move(response), parent_span);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(*new_client_ptr, check(_, _, _, _)).Times(0);
+
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             new_filter->decodeHeaders(request_headers_, false));

@@ -256,6 +256,278 @@ TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfiguration) {
   EXPECT_EQ(context_extensions.at("route_type"), "high_qps");
 }
 
+TEST_F(ExtAuthzFilterHttpTest, PerRouteHttpServiceConfiguration) {
+  const std::string per_route_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      virtual_host: "my_virtual_host"
+      route_type: "high_qps"
+    http_service:
+      server_uri:
+        uri: "https://ext-authz-http.example.com"
+        cluster: "ext_authz_http_cluster"
+        timeout: 2s
+      path_prefix: "/api/auth"
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  auto route_config = factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                              context.messageValidationVisitor());
+  EXPECT_TRUE(route_config.ok());
+
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  EXPECT_FALSE(typed_config.disabled());
+  EXPECT_TRUE(typed_config.httpService().has_value());
+  EXPECT_FALSE(typed_config.grpcService().has_value());
+
+  const auto& http_service = typed_config.httpService().value();
+  EXPECT_EQ(http_service.server_uri().uri(), "https://ext-authz-http.example.com");
+  EXPECT_EQ(http_service.server_uri().cluster(), "ext_authz_http_cluster");
+  EXPECT_EQ(http_service.server_uri().timeout().seconds(), 2);
+  EXPECT_EQ(http_service.path_prefix(), "/api/auth");
+
+  const auto& context_extensions = typed_config.contextExtensions();
+  EXPECT_EQ(context_extensions.at("virtual_host"), "my_virtual_host");
+  EXPECT_EQ(context_extensions.at("route_type"), "high_qps");
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitching) {
+  // Test that we can switch service types - e.g., have gRPC in less specific and HTTP in more
+  // specific
+  const std::string less_specific_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      base_setting: "from_base"
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_grpc_cluster"
+  )EOF";
+
+  const std::string more_specific_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      override_setting: "from_override"
+    http_service:
+      server_uri:
+        uri: "https://ext-authz-http.example.com"
+        cluster: "ext_authz_http_cluster"
+        timeout: 3s
+      path_prefix: "/auth/check"
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+
+  // Create less specific configuration with gRPC service
+  ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
+  FilterConfigPerRoute less_specific_config(
+      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+          less_specific_proto.get()));
+
+  // Create more specific configuration with HTTP service
+  ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
+  FilterConfigPerRoute more_specific_config(
+      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+          more_specific_proto.get()));
+
+  // Merge configurations - should use HTTP service from more specific config
+  FilterConfigPerRoute merged_config(less_specific_config, more_specific_config);
+
+  // Verify that HTTP service from more specific config is used (service type switching)
+  EXPECT_TRUE(merged_config.httpService().has_value());
+  EXPECT_FALSE(merged_config.grpcService().has_value());
+
+  const auto& http_service = merged_config.httpService().value();
+  EXPECT_EQ(http_service.server_uri().uri(), "https://ext-authz-http.example.com");
+  EXPECT_EQ(http_service.server_uri().cluster(), "ext_authz_http_cluster");
+  EXPECT_EQ(http_service.path_prefix(), "/auth/check");
+
+  // Verify context extensions are properly merged (less specific preserved, more specific
+  // overrides)
+  const auto& context_extensions = merged_config.contextExtensions();
+  EXPECT_EQ(context_extensions.size(), 2);
+  EXPECT_EQ(context_extensions.at("base_setting"), "from_base");
+  EXPECT_EQ(context_extensions.at("override_setting"), "from_override");
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteServiceTypeSwitchingHttpToGrpc) {
+  // Test that we can switch from HTTP service to gRPC service (reverse of the other test)
+  const std::string less_specific_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      base_setting: "from_base"
+    http_service:
+      server_uri:
+        uri: "https://ext-authz-http.example.com"
+        cluster: "ext_authz_http_cluster"
+        timeout: 1s
+      path_prefix: "/auth"
+  )EOF";
+
+  const std::string more_specific_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      override_setting: "from_override"
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_grpc_cluster"
+        authority: "ext-authz.example.com"
+      timeout: 5s
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+
+  // Create less specific configuration with HTTP service
+  ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
+  FilterConfigPerRoute less_specific_config(
+      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+          less_specific_proto.get()));
+
+  // Create more specific configuration with gRPC service
+  ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
+  FilterConfigPerRoute more_specific_config(
+      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+          more_specific_proto.get()));
+
+  // Merge configurations - should use gRPC service from more specific config
+  FilterConfigPerRoute merged_config(less_specific_config, more_specific_config);
+
+  // Verify that gRPC service from more specific config is used (service type switching)
+  EXPECT_TRUE(merged_config.grpcService().has_value());
+  EXPECT_FALSE(merged_config.httpService().has_value());
+
+  const auto& grpc_service = merged_config.grpcService().value();
+  EXPECT_TRUE(grpc_service.has_envoy_grpc());
+  EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_grpc_cluster");
+  EXPECT_EQ(grpc_service.envoy_grpc().authority(), "ext-authz.example.com");
+  EXPECT_EQ(grpc_service.timeout().seconds(), 5);
+
+  // Verify context extensions are properly merged
+  const auto& context_extensions = merged_config.contextExtensions();
+  EXPECT_EQ(context_extensions.size(), 2);
+  EXPECT_EQ(context_extensions.at("base_setting"), "from_base");
+  EXPECT_EQ(context_extensions.at("override_setting"), "from_override");
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteHttpServiceWithTimeout) {
+  // Test HTTP service configuration with custom timeout
+  const std::string per_route_config_yaml = R"EOF(
+  check_settings:
+    http_service:
+      server_uri:
+        uri: "https://ext-authz-custom.example.com"
+        cluster: "ext_authz_custom_cluster"
+        timeout: 10s
+      path_prefix: "/custom/auth"
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  auto route_config = factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                              context.messageValidationVisitor());
+  EXPECT_TRUE(route_config.ok());
+
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  EXPECT_TRUE(typed_config.httpService().has_value());
+  EXPECT_FALSE(typed_config.grpcService().has_value());
+
+  const auto& http_service = typed_config.httpService().value();
+  EXPECT_EQ(http_service.server_uri().uri(), "https://ext-authz-custom.example.com");
+  EXPECT_EQ(http_service.server_uri().cluster(), "ext_authz_custom_cluster");
+  EXPECT_EQ(http_service.server_uri().timeout().seconds(), 10);
+  EXPECT_EQ(http_service.path_prefix(), "/custom/auth");
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceWithTimeout) {
+  // Test gRPC service configuration with custom timeout
+  const std::string per_route_config_yaml = R"EOF(
+  check_settings:
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "ext_authz_custom_grpc"
+        authority: "custom-ext-authz.example.com"
+      timeout: 15s
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(per_route_config_yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  auto route_config = factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                                              context.messageValidationVisitor());
+  EXPECT_TRUE(route_config.ok());
+
+  const auto& typed_config = dynamic_cast<const FilterConfigPerRoute&>(*route_config.value());
+  EXPECT_TRUE(typed_config.grpcService().has_value());
+  EXPECT_FALSE(typed_config.httpService().has_value());
+
+  const auto& grpc_service = typed_config.grpcService().value();
+  EXPECT_TRUE(grpc_service.has_envoy_grpc());
+  EXPECT_EQ(grpc_service.envoy_grpc().cluster_name(), "ext_authz_custom_grpc");
+  EXPECT_EQ(grpc_service.envoy_grpc().authority(), "custom-ext-authz.example.com");
+  EXPECT_EQ(grpc_service.timeout().seconds(), 15);
+}
+
+TEST_F(ExtAuthzFilterHttpTest, PerRouteEmptyContextExtensionsMerging) {
+  // Test merging when one config has empty context extensions
+  const std::string less_specific_config_yaml = R"EOF(
+  check_settings:
+    context_extensions:
+      base_key: "base_value"
+      shared_key: "base_shared"
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "base_cluster"
+  )EOF";
+
+  const std::string more_specific_config_yaml = R"EOF(
+  check_settings:
+    grpc_service:
+      envoy_grpc:
+        cluster_name: "specific_cluster"
+  )EOF";
+
+  ExtAuthzFilterConfig factory;
+
+  ProtobufTypes::MessagePtr less_specific_proto = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(less_specific_config_yaml, *less_specific_proto);
+  FilterConfigPerRoute less_specific_config(
+      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+          less_specific_proto.get()));
+
+  ProtobufTypes::MessagePtr more_specific_proto = factory.createEmptyRouteConfigProto();
+  TestUtility::loadFromYaml(more_specific_config_yaml, *more_specific_proto);
+  FilterConfigPerRoute more_specific_config(
+      *dynamic_cast<const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute*>(
+          more_specific_proto.get()));
+
+  FilterConfigPerRoute merged_config(less_specific_config, more_specific_config);
+
+  // Should use gRPC service from more specific
+  EXPECT_TRUE(merged_config.grpcService().has_value());
+  EXPECT_EQ(merged_config.grpcService().value().envoy_grpc().cluster_name(), "specific_cluster");
+
+  // Should preserve context extensions from less specific since more specific has none
+  const auto& context_extensions = merged_config.contextExtensions();
+  EXPECT_EQ(context_extensions.size(), 2);
+  EXPECT_EQ(context_extensions.at("base_key"), "base_value");
+  EXPECT_EQ(context_extensions.at("shared_key"), "base_shared");
+}
+
 TEST_F(ExtAuthzFilterHttpTest, PerRouteGrpcServiceConfigurationMerging) {
   // Test merging of per-route configurations
   const std::string less_specific_config_yaml = R"EOF(

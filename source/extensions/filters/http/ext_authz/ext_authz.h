@@ -311,6 +311,9 @@ public:
         disabled_(config.disabled()),
         grpc_service_(config.has_check_settings() && config.check_settings().has_grpc_service()
                           ? absl::make_optional(config.check_settings().grpc_service())
+                          : absl::nullopt),
+        http_service_(config.has_check_settings() && config.check_settings().has_http_service()
+                          ? absl::make_optional(config.check_settings().http_service())
                           : absl::nullopt) {
     if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
         config.check_settings().has_with_request_body()) {
@@ -348,6 +351,14 @@ public:
     return grpc_service_;
   }
 
+  /**
+   * @return The HTTP service override for this route, if any.
+   */
+  const absl::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>&
+  httpService() const {
+    return http_service_;
+  }
+
 private:
   // We save the context extensions as a protobuf map instead of a std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
@@ -355,6 +366,8 @@ private:
   envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
   const bool disabled_;
   const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const absl::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>
+      http_service_;
 };
 
 /**
@@ -412,6 +425,10 @@ private:
   // Create a new gRPC client for per-route gRPC service configuration.
   Filters::Common::ExtAuthz::ClientPtr
   createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);
+
+  // Create a new HTTP client for per-route HTTP service configuration.
+  Filters::Common::ExtAuthz::ClientPtr createPerRouteHttpClient(
+      const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service);
 
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
