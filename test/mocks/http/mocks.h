@@ -988,11 +988,4 @@ template <typename K, typename V> Http::HeaderValueOfMatcher ContainsHeader(K ke
                                     testing::SafeMatcherCast<absl::string_view>(value));
 }
 
-// Test that a HeaderMapPtr argument includes a given key-value pair.
-// See ContainsHeader above for details.
-template <typename K, typename V>
-testing::Matcher<const Http::HeaderMap*> PointeeContainsHeader(K key, V value) {
-  return testing::Pointee(ContainsHeader(key, value));
-}
-
 } // namespace Envoy
