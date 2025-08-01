@@ -222,7 +222,9 @@ The following core load shed points are supported:
     - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
       level AND immediately force close the downstream connection. If both this and
       ``http2_server_go_away_on_dispatch`` are configured and shouldShedLoad()
-      returns true for both, this takes precedence.
+      returns true for both, this takes precedence. This is a disruptive action
+      (causes downstream connections to ungracefully close) that should only be
+      used with a very high threshold (if at all).
 
 .. _config_overload_manager_reducing_timeouts:
 
