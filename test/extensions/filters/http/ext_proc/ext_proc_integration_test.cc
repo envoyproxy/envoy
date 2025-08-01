@@ -360,8 +360,8 @@ protected:
 
   void verifyChunkedEncoding(const Http::RequestOrResponseHeaderMap& headers) {
     EXPECT_EQ(headers.ContentLength(), nullptr);
-    EXPECT_THAT(headers, HeaderValueOf(Http::Headers::get().TransferEncoding,
-                                       Http::Headers::get().TransferEncodingValues.Chunked));
+    EXPECT_THAT(headers, ContainsHeader(Http::Headers::get().TransferEncoding,
+                                        Http::Headers::get().TransferEncodingValues.Chunked));
   }
 
   void handleUpstreamRequestWithTrailer() {

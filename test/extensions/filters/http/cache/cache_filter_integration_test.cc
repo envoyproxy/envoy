@@ -150,8 +150,7 @@ TEST_P(CacheIntegrationTest, MissInsertHit) {
         sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body(), response_body);
-    EXPECT_THAT(response_decoder->headers(),
-                HeaderHasValueRef(Http::CustomHeaders::get().Age, "10"));
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader(Http::CustomHeaders::get().Age, "10"));
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
@@ -222,8 +221,7 @@ TEST_P(CacheIntegrationTest, ExpiredValidated) {
   {
     IntegrationStreamDecoderPtr response_decoder =
         sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
-    EXPECT_THAT(response_decoder->headers(),
-                HeaderHasValueRef(Http::CustomHeaders::get().Age, "1"));
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader(Http::CustomHeaders::get().Age, "1"));
 
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
@@ -355,8 +353,7 @@ TEST_P(CacheIntegrationTest, GetRequestWithResponseTrailers) {
     IntegrationStreamDecoderPtr response_decoder =
         sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
-    EXPECT_THAT(response_decoder->headers(),
-                HeaderHasValueRef(Http::CustomHeaders::get().Age, "10"));
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader(Http::CustomHeaders::get().Age, "10"));
     EXPECT_EQ(response_decoder->body(), response_body);
     ASSERT_TRUE(response_decoder->trailers() != nullptr);
     simTime().advanceTimeWait(Seconds(1));
@@ -434,8 +431,7 @@ TEST_P(CacheIntegrationTest, ServeHeadFromCacheAfterGetRequest) {
         sendHeaderOnlyRequestAwaitResponse(request_headers, serveFromCache());
     EXPECT_THAT(response_decoder->headers(), IsSupersetOfHeaders(response_headers));
     EXPECT_EQ(response_decoder->body().size(), 0);
-    EXPECT_THAT(response_decoder->headers(),
-                HeaderHasValueRef(Http::CustomHeaders::get().Age, "10"));
+    EXPECT_THAT(response_decoder->headers(), ContainsHeader(Http::CustomHeaders::get().Age, "10"));
     // Advance time to force a log flush.
     simTime().advanceTimeWait(Seconds(1));
     EXPECT_THAT(waitForAccessLog(access_log_name_, 1),
