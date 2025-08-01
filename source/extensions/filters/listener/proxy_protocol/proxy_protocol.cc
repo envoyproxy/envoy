@@ -573,7 +573,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
                              tlv_type);
         } else {
           Protobuf::BytesValue tlv_byte_value;
-          tlv_byte_value.set_value(tlv_value.data(), tlv_value.size());
+          tlv_byte_value.set_value(tlv_value);
           tlvs_metadata.mutable_typed_metadata()->insert(
               {key_value_pair->key(), tlv_byte_value.value()});
           ProtobufWkt::Any typed_metadata;
