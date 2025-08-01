@@ -360,6 +360,28 @@ createUpstreamLocalAddressSelector(
           !(cluster_name.has_value()) ? "Bootstrap"
                                       : fmt::format("Cluster {}", cluster_name.value())));
     }
+
+#if !defined(__linux__)
+    auto fail_status = absl::InvalidArgumentError(fmt::format(
+        "{}'s upstream binding config contains addresses with network namespace filepaths, but the "
+        "OS is not Linux. Network namespaces can only be used on Linux.",
+        !(cluster_name.has_value()) ? "Bootstrap"
+                                    : fmt::format("Cluster {}", cluster_name.value())));
+    if (bind_config->has_source_address() &&
+        !bind_config->source_address().network_namespace_filepath().empty()) {
+      return fail_status;
+    };
+    for (const auto& addr : bind_config->extra_source_addresses()) {
+      if (addr.has_address() && !addr.address().network_namespace_filepath().empty()) {
+        return fail_status;
+      }
+    }
+    for (const auto& addr : bind_config->additional_source_addresses()) {
+      if (!addr.network_namespace_filepath().empty()) {
+        return fail_status;
+      }
+    }
+#endif
   }
   UpstreamLocalAddressSelectorFactory* local_address_selector_factory;
   const envoy::config::core::v3::TypedExtensionConfig* const local_address_selector_config =
@@ -473,6 +495,9 @@ HostDescriptionImplBase::HostDescriptionImplBase(
     // for a pipe address is a misconfiguration.
     creation_status = absl::InvalidArgumentError(
         fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+  } else if (dest_address && dest_address->networkNamespace().has_value()) {
+    creation_status = absl::InvalidArgumentError(
+        "Invalid host configuration: hosts cannot specify network namespaces with their address");
   }
 }
 

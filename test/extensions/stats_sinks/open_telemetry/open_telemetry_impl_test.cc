@@ -35,19 +35,22 @@ public:
     }
   }
 
-  const OtlpOptionsSharedPtr otlpOptions(bool report_counters_as_deltas = false,
-                                         bool report_histograms_as_deltas = false,
-                                         bool emit_tags_as_attributes = true,
-                                         bool use_tag_extracted_name = true,
-                                         const std::string& stat_prefix = "") {
+  const OtlpOptionsSharedPtr
+  otlpOptions(bool report_counters_as_deltas = false, bool report_histograms_as_deltas = false,
+              bool emit_tags_as_attributes = true, bool use_tag_extracted_name = true,
+              const std::string& stat_prefix = "",
+              absl::flat_hash_map<std::string, std::string> resource_attributes = {}) {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
     sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
     sink_config.mutable_emit_tags_as_attributes()->set_value(emit_tags_as_attributes);
     sink_config.mutable_use_tag_extracted_name()->set_value(use_tag_extracted_name);
     sink_config.set_prefix(stat_prefix);
-
-    return std::make_shared<OtlpOptions>(sink_config);
+    Tracers::OpenTelemetry::Resource resource;
+    for (const auto& [key, value] : resource_attributes) {
+      resource.attributes_[key] = value;
+    }
+    return std::make_shared<OtlpOptions>(sink_config, resource);
   }
 
   std::string getTagExtractedName(const std::string name) { return name + "-tagged"; }
@@ -431,6 +434,20 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
   expectMetricsCount(metrics, 2);
   expectHistogram(metricAt(0, metrics), getTagExtractedName("test_histogram1"), true);
   expectHistogram(metricAt(1, metrics), getTagExtractedName("test_histogram2"), true);
+}
+
+TEST_F(OtlpMetricsFlusherTests, SetResourceAttributes) {
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(true, false, true, true, "", {{"key_foo", "val_foo"}}));
+  addCounterToSnapshot("test_counter1", 1, 1);
+  MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_);
+  expectMetricsCount(metrics, 1);
+  expectSum(metricAt(0, metrics), getTagExtractedName("test_counter1"), 1, true);
+  EXPECT_EQ(1, metrics->resource_metrics().size());
+  EXPECT_EQ(1, metrics->resource_metrics()[0].resource().attributes().size());
+  EXPECT_EQ("key_foo", metrics->resource_metrics()[0].resource().attributes()[0].key());
+  EXPECT_EQ("val_foo",
+            metrics->resource_metrics()[0].resource().attributes()[0].value().string_value());
 }
 
 class MockOpenTelemetryGrpcMetricsExporter : public OpenTelemetryGrpcMetricsExporter {
