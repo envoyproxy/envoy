@@ -955,9 +955,10 @@ void InstanceBase::loadServerFlags(const absl::optional<std::string>& flags_path
 }
 
 RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
-                     Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-                     Init::Manager& init_manager, OverloadManager& overload_manager,
-                     OverloadManager& null_overload_manager, std::function<void()> post_init_cb)
+                     Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
+                     AccessLog::AccessLogManager& access_log_manager, Init::Manager& init_manager,
+                     OverloadManager& overload_manager, OverloadManager& null_overload_manager,
+                     std::function<void()> post_init_cb)
     : init_watcher_("RunHelper", [&instance, post_init_cb]() {
         if (!instance.isShutdown()) {
           post_init_cb();
@@ -1009,7 +1010,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop
   // starts.
-  cm.setInitializedCb([&instance, &init_manager, &cm, this]() {
+  cm.setInitializedCb([&instance, &init_manager, &xds_manager, this]() {
     if (instance.isShutdown()) {
       return;
     }
@@ -1018,10 +1019,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     // Pause RDS to ensure that we don't send any requests until we've
     // subscribed to all the RDS resources. The subscriptions happen in the init callbacks,
     // so we pause RDS until we've completed all the callbacks.
-    Config::ScopedResume maybe_resume_rds;
-    if (cm.adsMux()) {
-      maybe_resume_rds = cm.adsMux()->pause(type_url);
-    }
+    Config::ScopedResume resume_rds = xds_manager.pause(type_url);
 
     ENVOY_LOG(info, "all clusters initialized. initializing init manager");
     init_manager.initialize(init_watcher_);
@@ -1036,8 +1034,8 @@ void InstanceBase::run() {
   // RunHelper exists primarily to facilitate testing of how we respond to early shutdown during
   // startup (see RunHelperTest in server_test.cc).
   const auto run_helper =
-      RunHelper(*this, options_, *dispatcher_, clusterManager(), access_log_manager_, init_manager_,
-                overloadManager(), nullOverloadManager(), [this] {
+      RunHelper(*this, options_, *dispatcher_, xdsManager(), clusterManager(), access_log_manager_,
+                init_manager_, overloadManager(), nullOverloadManager(), [this] {
                   notifyCallbacksForStage(Stage::PostInit);
                   startWorkers();
                 });
