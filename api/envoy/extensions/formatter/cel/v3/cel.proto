@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.formatter.cel.v3;
 
+import "envoy/config/core/v3/cel.proto";
+
 import "udpa/annotations/status.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.formatter.cel.v3";
@@ -53,4 +55,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   This extension is treated as built-in extension and will be enabled by default now.
 //   It is unnecessary to configure this extension.
 message Cel {
+  // CEL expression configuration that modifies the behavior of CEL expressions evaluated
+  // by this formatter. If specified, string conversion, concatenation, and manipulation
+  // functions may be enabled for CEL expressions. See
+  // :ref:`CelExpressionConfig <envoy_v3_api_msg_config.core.v3.CelExpressionConfig>`
+  // for more details.
+  config.core.v3.CelExpressionConfig cel_config = 1;
 }

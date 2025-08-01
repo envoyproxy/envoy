@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "CelProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: CEL Expression Configuration]
+
+// CEL expression evaluation configuration.
+// These options control the behavior of the Common Expression Language runtime for
+// individual CEL expressions.
+message CelExpressionConfig {
+  // Enable string conversion functions for CEL expressions. When enabled, CEL expressions
+  // can convert values to strings using the ``string()`` function.
+  //
+  // .. attention::
+  //
+  //   This option is disabled by default for security reasons. Enabling it will allow
+  //   CEL expressions to convert arbitrary values to strings, which may impact request
+  //   processing performance and could potentially be leveraged in security exploits.
+  bool enable_string_conversion = 1;
+
+  // Enable string concatenation for CEL expressions. When enabled, CEL expressions
+  // can concatenate strings using the ``+`` operator.
+  //
+  // .. attention::
+  //
+  //   This option is disabled by default for security reasons. Enabling it allows
+  //   CEL expressions to dynamically construct strings, which may impact performance
+  //   and memory usage.
+  bool enable_string_concat = 2;
+
+  // Enable string manipulation functions for CEL expressions. When enabled, CEL
+  // expressions can use additional string functions:
+  //
+  // * ``replace(old, new)`` - Replaces all occurrences of ``old`` with ``new``.
+  // * ``split(separator)`` - Splits a string into a list of substrings.
+  // * ``lowerAscii()`` - Converts ASCII characters to lowercase.
+  // * ``upperAscii()`` - Converts ASCII characters to uppercase.
+  // * ``contains(substring)`` - Checks if a string contains a substring.
+  // * ``startsWith(prefix)`` - Checks if a string starts with a prefix.
+  // * ``endsWith(suffix)`` - Checks if a string ends with a suffix.
+  //
+  // .. attention::
+  //
+  //   This option is disabled by default for security reasons. Enabling these functions
+  //   allows complex string manipulations in CEL expressions, which may impact performance
+  //   and could potentially be exploited for request smuggling or header manipulation attacks.
+  bool enable_string_functions = 3;
+}
