@@ -6,6 +6,7 @@ Bootstrap
   :maxdepth: 2
 
   ../config/bootstrap/v3/bootstrap.proto
+  ../extensions/bootstrap/cel/v3/cel.proto
   ../extensions/bootstrap/internal_listener/v3/internal_listener.proto
   ../config/metrics/v3/metrics_service.proto
   ../config/overload/v3/overload.proto

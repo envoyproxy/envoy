@@ -116,6 +116,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/access_loggers/wasm @mpwarres @kyessenov @lizan
 # webassembly bootstrap extensions
 /*/extensions/bootstrap/wasm @mpwarres @kyessenov @lizan
+# cel bootstrap extension
+/*/extensions/bootstrap/cel @agrawroh @kyessenov
 # webassembly http extensions
 /*/extensions/filters/http/wasm @mpwarres @kyessenov @lizan
 # webassembly network extensions
