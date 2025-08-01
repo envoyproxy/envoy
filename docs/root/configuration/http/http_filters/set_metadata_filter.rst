@@ -85,6 +85,9 @@ A simple configuration that adds static metadata to the ``envoy.lb`` namespace:
 
 .. literalinclude:: _include/set-metadata-basic-static.yaml
     :language: yaml
+    :lines: 29-39
+    :lineno-start: 29
+    :linenos:
     :caption: :download:`set-metadata-basic-static.yaml <_include/set-metadata-basic-static.yaml>`
 
 Multiple Metadata Entries
@@ -94,6 +97,9 @@ Configuration with multiple metadata entries targeting different namespaces:
 
 .. literalinclude:: _include/set-metadata-multiple-entries.yaml
     :language: yaml
+    :lines: 29-44
+    :lineno-start: 29
+    :linenos:
     :caption: :download:`set-metadata-multiple-entries.yaml <_include/set-metadata-multiple-entries.yaml>`
 
 Typed Metadata Configuration
@@ -103,6 +109,9 @@ Configuration using typed metadata with ``google.protobuf.Any``:
 
 .. literalinclude:: _include/set-metadata-typed-configuration.yaml
     :language: yaml
+    :lines: 29-39
+    :lineno-start: 29
+    :linenos:
     :caption: :download:`set-metadata-typed-configuration.yaml <_include/set-metadata-typed-configuration.yaml>`
 
 Overwrite Control
@@ -112,6 +121,9 @@ Configuration demonstrating overwrite control behavior:
 
 .. literalinclude:: _include/set-metadata-overwrite-control.yaml
     :language: yaml
+    :lines: 29-49
+    :lineno-start: 29
+    :linenos:
     :caption: :download:`set-metadata-overwrite-control.yaml <_include/set-metadata-overwrite-control.yaml>`
 
 .. note::
