@@ -48,9 +48,8 @@ envoy_cc_library(
         # the harder it is to runtime-guard without dependency loops.
         "@com_google_absl//absl/flags:commandlineflag",
         "@com_google_absl//absl/flags:flag",
-        "//envoy/http:codec_interface",
+        "//envoy/http:codec_runtime_overrides",
         "//envoy/runtime:runtime_interface",
-        "//source/common/common:hash_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
