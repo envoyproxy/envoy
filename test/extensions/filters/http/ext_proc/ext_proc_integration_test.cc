@@ -788,9 +788,7 @@ protected:
     verifyDownstreamResponse(*response, 200);
   }
 
-  IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
-                                                                bool end_of_stream,
-                                                                bool both_direction = false) {
+  void initializeConfigDuplexStreamed(bool both_direction = false) {
     config_helper_.setBufferLimits(1024, 1024);
     auto* processing_mode = proto_config_.mutable_processing_mode();
     processing_mode->set_request_header_mode(ProcessingMode::SEND);
@@ -806,6 +804,12 @@ protected:
 
     initializeConfig();
     HttpIntegrationTest::initialize();
+  }
+
+  IntegrationStreamDecoderPtr initAndSendDataDuplexStreamedMode(absl::string_view body_sent,
+                                                                bool end_of_stream,
+                                                                bool both_direction = false) {
+    initializeConfigDuplexStreamed(both_direction);
     codec_client_ = makeHttpConnection(lookupPort("http"));
     Http::TestRequestHeaderMapImpl default_headers;
     HttpTestUtility::addDefaultHeaders(default_headers);
@@ -879,7 +883,7 @@ protected:
   }
 
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
-                                        bool response = false) {
+                                        bool response = false, absl::string_view body_sent = "") {
     for (uint32_t i = 0; i < total_resp_body_msg; i++) {
       ProcessingResponse response_body;
       BodyResponse* body_resp;
@@ -891,7 +895,11 @@ protected:
 
       auto* body_mut = body_resp->mutable_response()->mutable_body_mutation();
       auto* streamed_response = body_mut->mutable_streamed_response();
-      streamed_response->set_body("r");
+      if (!body_sent.empty()) {
+        streamed_response->set_body(body_sent);
+      } else {
+        streamed_response->set_body("r");
+      }
       if (end_of_stream) {
         const bool end_of_stream = (i == total_resp_body_msg - 1) ? true : false;
         streamed_response->set_end_of_stream(end_of_stream);
@@ -5513,6 +5521,45 @@ TEST_P(ExtProcIntegrationTest, ServerWaitForBodyBeforeSendsHeaderRespDuplexStrea
   EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
   EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
   verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
+  const std::string body_sent(2 * 1024 * 1024, 's');
+  initializeConfigDuplexStreamed(false);
+
+  // Sends 30 consecutive request, each carrying 2MB data.
+  for (int i = 0; i < 30; i++) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+    Http::TestRequestHeaderMapImpl default_headers;
+    HttpTestUtility::addDefaultHeaders(default_headers);
+
+    std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr> encoder_decoder =
+        codec_client_->startRequest(default_headers);
+    request_encoder_ = &encoder_decoder.first;
+    IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+    codec_client_->sendData(*request_encoder_, body_sent, true);
+    // The ext_proc server receives the headers.
+    ProcessingRequest header_request;
+    serverReceiveHeaderDuplexStreamed(header_request);
+    // The ext_proc server receives the body.
+    uint32_t total_req_body_msg = serverReceiveBodyDuplexStreamed(body_sent);
+    EXPECT_GT(total_req_body_msg, 0);
+    // The ext_proc server sends back the header response.
+    serverSendHeaderRespDuplexStreamed();
+    // The ext_proc server sends back body responses, which include 50 chunks,
+    // and each chunk contains 64KB data, thus totally ~3MB per request.
+    uint32_t total_resp_body_msg = 50;
+    const std::string body_response(64 * 1024, 'r');
+    const std::string body_upstream(total_resp_body_msg * 64 * 1024, 'r');
+    serverSendBodyRespDuplexStreamed(total_resp_body_msg, /*end_of_stream*/ true,
+                                     /*response*/ false, body_response);
+
+    handleUpstreamRequest();
+    EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+    EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
+    verifyDownstreamResponse(*response, 200);
+    TearDown();
+  }
 }
 
 // Buffer the whole message including header, body and trailer before sending response.
