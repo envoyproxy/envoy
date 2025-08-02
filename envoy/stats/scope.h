@@ -71,8 +71,10 @@ public:
    * See also scopeFromStatName, which is preferred.
    *
    * @param name supplies the scope's namespace prefix.
+   * @param evictable whether unused metrics can be deleted from the scope caches. This requires
+   * that the metrics are not stored by reference.
    */
-  virtual ScopeSharedPtr createScope(const std::string& name) PURE;
+  virtual ScopeSharedPtr createScope(const std::string& name, bool evictable = false) PURE;
 
   /**
    * Allocate a new scope. NOTE: The implementation should correctly handle overlapping scopes
@@ -80,8 +82,10 @@ public:
    * gracefully swapped in while an old scope with the same name is being destroyed.
    *
    * @param name supplies the scope's namespace prefix.
+   * @param evictable whether unused metrics can be deleted from the scope caches. This requires
+   * that the metrics are not stored by reference.
    */
-  virtual ScopeSharedPtr scopeFromStatName(StatName name) PURE;
+  virtual ScopeSharedPtr scopeFromStatName(StatName name, bool evictable = false) PURE;
 
   /**
    * Creates a Counter from the stat name. Tag extraction will be performed on the name.
@@ -217,19 +221,6 @@ public:
    * @return a reference to a text readout within the scope's namespace, if it exists.
    */
   virtual TextReadoutOptConstRef findTextReadout(StatName name) const PURE;
-
-  // evictAndMarkUsed removes unused stats and marks all the remaining stats
-  // unused. This should be called from a timer to reduce the cardinality
-  // of the time series.
-  //
-  // NOTE: Do not use this function when scope stats are stored on the
-  // workers by reference, since deletion on the worker might invalidate the
-  // reference.
-  //
-  // NOTE: Removal of stats is not deferred until the sink flush. This function
-  // should not be called more frequently than the stats flush interval.
-  // See https://github.com/envoyproxy/envoy/issues/23619.
-  virtual void evictAndMarkUnused() PURE;
 
   /**
    * @return a reference to the symbol table.

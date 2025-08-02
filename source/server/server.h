@@ -132,9 +132,11 @@ public:
    * flush() on each sink.
    * @param sinks supplies the list of sinks.
    * @param store provides the store being flushed.
+   * @param evict whether to delete the stale metrics and clear the usage flags.
    */
   static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                  Upstream::ClusterManager& cm, TimeSource& time_source);
+                                  Upstream::ClusterManager& cm, TimeSource& time_source,
+                                  bool evict);
 
   /**
    * Load a bootstrap config and perform validation.
@@ -468,8 +470,10 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
+  // MetricSnapshotImpl captures a snapshot of metrics by latching the delta usage, and optionally
+  // marking the stats as used.
   explicit MetricSnapshotImpl(Stats::Store& store, Upstream::ClusterManager& cluster_manager,
-                              TimeSource& time_source);
+                              TimeSource& time_source, bool mark_unused);
 
   // Stats::MetricSnapshot
   const std::vector<CounterSnapshot>& counters() override { return counters_; }

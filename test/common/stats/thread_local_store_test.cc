@@ -606,14 +606,16 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   tls_.shutdownThread();
 }
 
-TEST_F(StatsThreadLocalStoreTest, EvictAndMarkUnused) {
+TEST_F(StatsThreadLocalStoreTest, Eviction) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  ScopeSharedPtr scope = store_->createScope("scope.");
+  ScopeSharedPtr scope = store_->createScope("scope.", true);
+  ScopeSharedPtr scope1 = store_->createScope("scope.", true);
+  // References will become invalid, so we create a lexical scope.
   {
-    // References will become invalid.
     Counter& c1 = scope->counterFromString("c1");
+    EXPECT_EQ(&c1, &scope1->counterFromString("c1"));
     c1.add(1);
     EXPECT_TRUE(c1.used());
 
@@ -628,38 +630,66 @@ TEST_F(StatsThreadLocalStoreTest, EvictAndMarkUnused) {
     Histogram& h1 = scope->histogramFromString("h1", Histogram::Unit::Unspecified);
     EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
     h1.recordValue(1);
+    store_->mergeHistograms([]() -> void {});
 
-    // Mark unused.
-    EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
-    scope->evictAndMarkUnused();
+    // Eviction does nothing.
+    store_->evictUnused();
 
     EXPECT_EQ(&c1, &scope->counterFromString("c1"));
-    EXPECT_FALSE(c1.used());
+    EXPECT_TRUE(c1.used());
     EXPECT_EQ(1, c1.value());
     EXPECT_EQ(1UL, store_->counters().size());
 
     EXPECT_EQ(&g1, &scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
-    EXPECT_FALSE(g1.used());
+    EXPECT_EQ(&g1, &scope1->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
+    EXPECT_TRUE(g1.used());
     EXPECT_EQ(5, g1.value());
     EXPECT_EQ(1UL, store_->gauges().size());
 
     EXPECT_EQ(&t1, &scope->textReadoutFromString("t1"));
-    EXPECT_FALSE(t1.used());
+    EXPECT_EQ(&t1, &scope1->textReadoutFromString("t1"));
+    EXPECT_TRUE(t1.used());
     EXPECT_EQ("hello", t1.value());
     EXPECT_EQ(1UL, store_->textReadouts().size());
 
     EXPECT_EQ(&h1, &scope->histogramFromString("h1", Histogram::Unit::Unspecified));
-    EXPECT_FALSE(t1.used());
+    EXPECT_EQ(&h1, &scope1->histogramFromString("h1", Histogram::Unit::Unspecified));
+    EXPECT_TRUE(h1.used());
     EXPECT_EQ(1UL, store_->histograms().size());
+
+    // Mark unused all metrics.
+    c1.markUnused();
+    g1.markUnused();
+    t1.markUnused();
+    h1.markUnused();
+    EXPECT_FALSE(c1.used());
+    EXPECT_FALSE(g1.used());
+    EXPECT_FALSE(t1.used());
+    EXPECT_FALSE(h1.used());
   }
 
-  // Remove.
+  // Eviction removes here.
   EXPECT_CALL(tls_, runOnAllThreads(_, _)).Times(testing::AtLeast(1));
-  scope->evictAndMarkUnused();
+  store_->evictUnused();
   EXPECT_EQ(0UL, store_->counters().size());
   EXPECT_EQ(0UL, store_->gauges().size());
   EXPECT_EQ(0UL, store_->textReadouts().size());
   EXPECT_EQ(0UL, store_->histograms().size());
+
+  // Make sure no stale data is on caches.
+  {
+    scope->counterFromString("c1").add(1);
+    scope1->counterFromString("c1").add(1);
+    scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate).set(5);
+    scope1->gaugeFromString("g1", Gauge::ImportMode::Accumulate).set(5);
+    scope->textReadoutFromString("t1").set("hello");
+    scope1->textReadoutFromString("t1").set("hello");
+    Histogram& h1 = scope->histogramFromString("h1", Histogram::Unit::Unspecified);
+    EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 1));
+    h1.recordValue(1);
+    Histogram& h2 = scope1->histogramFromString("h1", Histogram::Unit::Unspecified);
+    EXPECT_EQ(&h1, &h2);
+  }
 
   tls_.shutdownGlobalThreading();
   store_->shutdownThreading();

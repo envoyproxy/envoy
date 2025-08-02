@@ -203,6 +203,10 @@ public:
     }
   }
 
+  void evictUnused() override {
+    // Do nothing. Eviction is only supported on thread local stores.
+  }
+
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {
     forEachCounter(f_size, f_stat);
   }
@@ -295,8 +299,8 @@ public:
                                        StatNameTagVectorOptConstRef tags) override {
     return store_.counters_.get(prefix(), name, tags, symbolTable());
   }
-  ScopeSharedPtr createScope(const std::string& name) override;
-  ScopeSharedPtr scopeFromStatName(StatName name) override;
+  ScopeSharedPtr createScope(const std::string& name, bool evictable) override;
+  ScopeSharedPtr scopeFromStatName(StatName name, bool evictable) override;
   Gauge& gaugeFromStatNameWithTags(const StatName& name, StatNameTagVectorOptConstRef tags,
                                    Gauge::ImportMode import_mode) override {
     Gauge& gauge = store_.gauges_.get(prefix(), name, tags, symbolTable(), import_mode);
@@ -351,10 +355,6 @@ public:
   TextReadout& textReadoutFromString(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
     return textReadoutFromStatName(storage.statName());
-  }
-
-  void evictAndMarkUnused() override {
-    // Do nothing. Eviction is only supported on thread local stores.
   }
 
   StatName prefix() const override { return prefix_.statName(); }

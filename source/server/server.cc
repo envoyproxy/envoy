@@ -170,15 +170,18 @@ void InstanceBase::failHealthcheck(bool fail) {
 
 MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
                                        Upstream::ClusterManager& cluster_manager,
-                                       TimeSource& time_source) {
+                                       TimeSource& time_source, bool mark_unused) {
   store.forEachSinkedCounter(
       [this](std::size_t size) {
         snapped_counters_.reserve(size);
         counters_.reserve(size);
       },
-      [this](Stats::Counter& counter) {
+      [this, mark_unused](Stats::Counter& counter) {
         snapped_counters_.push_back(Stats::CounterSharedPtr(&counter));
         counters_.push_back({counter.latch(), counter});
+        if (mark_unused) {
+          counter.markUnused();
+        }
       });
 
   store.forEachSinkedGauge(
@@ -186,9 +189,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
         snapped_gauges_.reserve(size);
         gauges_.reserve(size);
       },
-      [this](Stats::Gauge& gauge) {
+      [this, mark_unused](Stats::Gauge& gauge) {
         snapped_gauges_.push_back(Stats::GaugeSharedPtr(&gauge));
         gauges_.push_back(gauge);
+        if (mark_unused) {
+          gauge.markUnused();
+        }
       });
 
   store.forEachSinkedHistogram(
@@ -196,9 +202,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
         snapped_histograms_.reserve(size);
         histograms_.reserve(size);
       },
-      [this](Stats::ParentHistogram& histogram) {
+      [this, mark_unused](Stats::ParentHistogram& histogram) {
         snapped_histograms_.push_back(Stats::ParentHistogramSharedPtr(&histogram));
         histograms_.push_back(histogram);
+        if (mark_unused) {
+          histogram.markUnused();
+        }
       });
 
   store.forEachSinkedTextReadout(
@@ -206,9 +215,12 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
         snapped_text_readouts_.reserve(size);
         text_readouts_.reserve(size);
       },
-      [this](Stats::TextReadout& text_readout) {
+      [this, mark_unused](Stats::TextReadout& text_readout) {
         snapped_text_readouts_.push_back(Stats::TextReadoutSharedPtr(&text_readout));
         text_readouts_.push_back(text_readout);
+        if (mark_unused) {
+          text_readout.markUnused();
+        }
       });
 
   Upstream::HostUtility::forEachHostMetric(
@@ -224,12 +236,19 @@ MetricSnapshotImpl::MetricSnapshotImpl(Stats::Store& store,
 }
 
 void InstanceUtil::flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                       Upstream::ClusterManager& cm, TimeSource& time_source) {
+                                       Upstream::ClusterManager& cm, TimeSource& time_source,
+                                       bool evict) {
+  // Eviction will schedule deletion of the stale metrics from the central caches on the main loop,
+  // so they are still present for the duration of this function.
+  if (evict) {
+    store.evictUnused();
+  }
+
   // Create a snapshot and flush to all sinks.
   // NOTE: Even if there are no sinks, creating the snapshot has the important property that it
   //       latches all counters on a periodic basis. The hot restart code assumes this is being
   //       done so this should not be removed.
-  MetricSnapshotImpl snapshot(store, cm, time_source);
+  MetricSnapshotImpl snapshot(store, cm, time_source, evict);
   for (const auto& sink : sinks) {
     sink->flush(snapshot);
   }
@@ -291,7 +310,7 @@ void InstanceBase::flushStatsInternal() {
   updateServerStats();
   auto& stats_config = config_.statsConfig();
   InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
-                                    timeSource());
+                                    timeSource(), true);
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(stats_config.flushInterval());

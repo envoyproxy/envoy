@@ -38,7 +38,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     well_known_tags_->rememberBuiltin(desc.name_);
   }
   StatNameManagedStorage empty("", alloc.symbolTable());
-  auto new_scope = std::make_shared<ScopeImpl>(*this, StatName(empty.statName()));
+  auto new_scope = std::make_shared<ScopeImpl>(*this, StatName(empty.statName()), false);
   addScope(new_scope);
   default_scope_ = new_scope;
 }
@@ -154,14 +154,15 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   return ret;
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name) {
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::createScope(const std::string& name,
+                                                            bool evictable) {
   StatNameManagedStorage stat_name_storage(Utility::sanitizeStatsName(name), symbolTable());
-  return scopeFromStatName(stat_name_storage.statName());
+  return scopeFromStatName(stat_name_storage.statName(), evictable);
 }
 
-ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name) {
+ScopeSharedPtr ThreadLocalStoreImpl::ScopeImpl::scopeFromStatName(StatName name, bool evictable) {
   SymbolTable::StoragePtr joined = symbolTable().join({prefix_.statName(), name});
-  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()));
+  auto new_scope = std::make_shared<ScopeImpl>(parent_, StatName(joined.get()), evictable);
   parent_.addScope(new_scope);
   return new_scope;
 }
@@ -394,8 +395,9 @@ void ThreadLocalStoreImpl::clearHistogramsFromCaches() {
   }
 }
 
-ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix)
-    : scope_id_(parent.next_scope_id_++), parent_(parent),
+ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix,
+                                           bool evictable)
+    : scope_id_(parent.next_scope_id_++), parent_(parent), evictable_(evictable),
       prefix_(prefix, parent.alloc_.symbolTable()),
       central_cache_(new CentralCacheEntry(parent.alloc_.symbolTable())) {}
 
@@ -772,79 +774,6 @@ TextReadoutOptConstRef ThreadLocalStoreImpl::ScopeImpl::findTextReadout(StatName
   return findStatLockHeld<TextReadout>(name, central_cache_->text_readouts_);
 }
 
-void ThreadLocalStoreImpl::ScopeImpl::evictAndMarkUnused() {
-  ASSERT_IS_MAIN_OR_TEST_THREAD();
-
-  // If we are shutting down, we no longer perform eviction as workers may be shutting down
-  // and not able to complete their work.
-  if (!parent_.shutting_down_ && parent_.tls_cache_) {
-    auto stale_counters = std::make_shared<StatNameHashMap<CounterSharedPtr>>();
-    auto stale_gauges = std::make_shared<StatNameHashMap<GaugeSharedPtr>>();
-    auto stale_text_readouts = std::make_shared<StatNameHashMap<TextReadoutSharedPtr>>();
-    auto stale_histograms = std::make_shared<StatNameHashMap<ParentHistogramSharedPtr>>();
-
-    auto collect_stale = []<typename T>(std::shared_ptr<StatNameHashMap<T>>& stale_metrics) {
-      return [stale_metrics](std::pair<StatName, T> kv) {
-        const auto& [name, metric] = kv;
-        if constexpr (std::same_as<T, ParentHistogramSharedPtr>) {
-          // Histograms usage can only be detected after merge (which happens
-          // only during flush). Since eviction is less frequent than flushing,
-          // we can merge histograms here as well.
-          metric->merge();
-        }
-        if (metric->used()) {
-          metric->markUnused();
-          return false;
-        } else {
-          stale_metrics->try_emplace(name, metric);
-          return true;
-        }
-      };
-    };
-
-    {
-      Thread::LockGuard lock(parent_.lock_);
-      absl::erase_if(central_cache_->counters_, collect_stale(stale_counters));
-      absl::erase_if(central_cache_->gauges_, collect_stale(stale_gauges));
-      absl::erase_if(central_cache_->text_readouts_, collect_stale(stale_text_readouts));
-      absl::erase_if(central_cache_->histograms_, collect_stale(stale_histograms));
-    }
-
-    // At this point, central cache no longer returns the evicted stats, but we
-    // need to keep the storage for the evicted stats until after the thread
-    // local caches are cleared.
-    parent_.tls_cache_->runOnAllThreads(
-        [scope_id = scope_id_, stale_counters, stale_gauges, stale_text_readouts,
-         stale_histograms](OptRef<TlsCache> tls_cache) {
-          TlsCacheEntry& entry = tls_cache->insertScope(scope_id);
-          absl::erase_if(entry.counters_,
-                         [=](std::pair<StatName, std::reference_wrapper<Counter>> kv) {
-                           return stale_counters->contains(kv.first);
-                         });
-          absl::erase_if(entry.gauges_, [=](std::pair<StatName, std::reference_wrapper<Gauge>> kv) {
-            return stale_gauges->contains(kv.first);
-          });
-          absl::erase_if(entry.text_readouts_,
-                         [=](std::pair<StatName, std::reference_wrapper<TextReadout>> kv) {
-                           return stale_text_readouts->contains(kv.first);
-                         });
-          absl::erase_if(entry.parent_histograms_,
-                         [=](std::pair<StatName, ParentHistogramSharedPtr> kv) {
-                           return stale_histograms->contains(kv.first);
-                         });
-        },
-        [stale_counters, stale_gauges, stale_text_readouts, stale_histograms]() {
-          // We want to delete stale stats on the main thread since stat destructors lock the stats
-          // allocator. Note that we might have received fresh values on the stale cache-local
-          // stats. Eventually, we might also want to defer the deletion further until the values
-          // are flushed to the sinks.
-          ENVOY_LOG(debug, "deleting stale {} counters, {} gauges, {} text readouts, {} histograms",
-                    stale_counters->size(), stale_gauges->size(), stale_text_readouts->size(),
-                    stale_histograms->size());
-        });
-  }
-}
-
 Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint64_t id) {
   // tlsHistogram() is generally not called for a histogram that is rejected by
   // the matcher, so no further rejection-checking is needed at this level.
@@ -1108,6 +1037,103 @@ void ThreadLocalStoreImpl::forEachScope(std::function<void(std::size_t)> f_size,
   }
   for (const ScopeSharedPtr& scope : scopes) {
     f_scope(*scope);
+  }
+}
+
+namespace {
+struct MetricBag {
+  explicit MetricBag(uint64_t scope_id) : scope_id_(scope_id) {}
+  const uint64_t scope_id_;
+  StatNameHashMap<CounterSharedPtr> counters_;
+  StatNameHashMap<GaugeSharedPtr> gauges_;
+  StatNameHashMap<ParentHistogramImplSharedPtr> histograms_;
+  StatNameHashMap<TextReadoutSharedPtr> text_readouts_;
+  bool empty() const {
+    return counters_.empty() && gauges_.empty() && histograms_.empty() && text_readouts_.empty();
+  }
+};
+
+} // namespace
+
+void ThreadLocalStoreImpl::evictUnused() {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
+  // If we are shutting down, we no longer perform eviction as workers may be shutting down
+  // and not able to complete their work.
+  if (shutting_down_ || !tls_cache_) {
+    return;
+  }
+
+  auto evicted_metrics = std::make_shared<std::vector<MetricBag>>();
+  {
+    Thread::LockGuard lock(lock_);
+    iterateScopesLockHeld([evicted_metrics](const ScopeImplSharedPtr& scope) -> bool {
+      if (scope->evictable_) {
+        MetricBag metrics(scope->scope_id_);
+        CentralCacheEntrySharedPtr& central_cache = scope->centralCacheMutableNoThreadAnalysis();
+        auto collect_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
+          return [&unused_metrics](std::pair<StatName, T> kv) {
+            const auto& [name, metric] = kv;
+            if (metric->used()) {
+              return false;
+            } else {
+              unused_metrics.try_emplace(name, metric);
+              return true;
+            }
+          };
+        };
+        absl::erase_if(central_cache->counters_, collect_unused(metrics.counters_));
+        absl::erase_if(central_cache->gauges_, collect_unused(metrics.gauges_));
+        absl::erase_if(central_cache->text_readouts_, collect_unused(metrics.text_readouts_));
+        absl::erase_if(central_cache->histograms_, collect_unused(metrics.histograms_));
+        if (!metrics.empty()) {
+          evicted_metrics->push_back(std::move(metrics));
+        }
+      }
+      return true;
+    });
+  }
+
+  // At this point, central caches no longer return the evicted stats, but we
+  // need to keep the storage for the evicted stats until after the thread
+  // local caches are cleared.
+  if (!evicted_metrics->empty()) {
+    tls_cache_->runOnAllThreads(
+        [evicted_metrics](OptRef<TlsCache> tls_cache) {
+          for (const auto& metrics : *evicted_metrics) {
+            TlsCacheEntry& entry = tls_cache->insertScope(metrics.scope_id_);
+            absl::erase_if(entry.counters_,
+                           [=](std::pair<StatName, std::reference_wrapper<Counter>> kv) {
+                             return metrics.counters_.contains(kv.first);
+                           });
+            absl::erase_if(entry.gauges_,
+                           [=](std::pair<StatName, std::reference_wrapper<Gauge>> kv) {
+                             return metrics.gauges_.contains(kv.first);
+                           });
+            absl::erase_if(entry.text_readouts_,
+                           [=](std::pair<StatName, std::reference_wrapper<TextReadout>> kv) {
+                             return metrics.text_readouts_.contains(kv.first);
+                           });
+            absl::erase_if(entry.parent_histograms_,
+                           [=](std::pair<StatName, ParentHistogramSharedPtr> kv) {
+                             return metrics.histograms_.contains(kv.first);
+                           });
+          }
+        },
+        [evicted_metrics]() {
+          // We want to delete stale stats on the main thread since stat
+          // destructors lock the stats allocator. Note that we might have
+          // received fresh values on the stale cache-local stats. Eventually, we
+          // might also want to defer the deletion further in the allocator until
+          // the values are flushed to the sinks.
+          for (const auto& metrics : *evicted_metrics) {
+            ENVOY_LOG(info,
+                      "deleted stale {} counters, {} gauges, {} text readouts, {} histograms from "
+                      "scope {}",
+                      metrics.counters_.size(), metrics.gauges_.size(),
+                      metrics.text_readouts_.size(), metrics.histograms_.size(), metrics.scope_id_);
+          }
+        });
   }
 }
 
