@@ -27,7 +27,7 @@ class NetworkConfigurationFilter final
       public Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryCallbacks,
       public std::enable_shared_from_this<NetworkConfigurationFilter> {
 public:
-  NetworkConfigurationFilter(Network::ConnectivityManagerSharedPtr connectivity_manager,
+  NetworkConfigurationFilter(Network::ConnectivityManagerImplSharedPtr connectivity_manager,
                              bool enable_drain_post_dns_refresh, bool enable_interface_binding)
       : connectivity_manager_(connectivity_manager),
         extra_stream_info_(nullptr), // always set in setDecoderFilterCallbacks
@@ -61,7 +61,7 @@ private:
   // This is only present if there is an active proxy DNS lookup in progress.
   std::unique_ptr<Extensions::Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryHandle>
       dns_cache_handle_;
-  Network::ConnectivityManagerSharedPtr connectivity_manager_;
+  Network::ConnectivityManagerImplSharedPtr connectivity_manager_;
   StreamInfo::ExtraStreamInfo* extra_stream_info_;
   bool enable_drain_post_dns_refresh_;
   bool enable_interface_binding_;

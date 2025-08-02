@@ -217,7 +217,24 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           Envoy::Server::GenericFactoryContextImpl generic_context(
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
+
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
+          Network::DefaultNetworkChangeCallback cb =
+              [this](envoy_netconf_t current_configuration_key) {
+                dispatcher_->post([this, current_configuration_key]() {
+                  if (connectivity_manager_->getConfigurationKey() != current_configuration_key) {
+                    // The default network has changed to a different one.
+                    return;
+                  }
+                  resetHttpPropertiesAndDrainHosts(probeAndGetLocalAddr(AF_INET6) != nullptr);
+                  if (!disable_dns_refresh_on_network_change_) {
+                    // This call will possibly drain all connections asynchronously.
+                    connectivity_manager_->reallyRefreshDns(current_configuration_key,
+                                                            /*drain_connections=*/true);
+                  }
+                });
+              };
+          connectivity_manager_->setDefaultNetworkChangeCallback(std::move(cb));
           if (Runtime::runtimeFeatureEnabled(
                   "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
             if (probeAndGetLocalAddr(AF_INET6) == nullptr) {
@@ -398,8 +415,17 @@ void InternalEngine::onDefaultNetworkUnavailable() {
 }
 
 void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
-  envoy_netconf_t configuration =
-      Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
+  envoy_netconf_t configuration = connectivity_manager_->setPreferredNetwork(network_type);
+
+  resetHttpPropertiesAndDrainHosts(has_ipv6_connectivity);
+  if (!disable_dns_refresh_on_network_change_) {
+    // Refresh DNS upon network changes.
+    // This call will possibly drain all connections asynchronously.
+    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
+  }
+}
+
+void InternalEngine::resetHttpPropertiesAndDrainHosts(const bool has_ipv6_connectivity) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
       Runtime::runtimeFeatureEnabled(
@@ -433,11 +459,7 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
       ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
       getClusterManager().drainConnections([](const Upstream::Host&) { return true; });
     }
-    return;
   }
-  // Refresh DNS upon network changes.
-  // This call will possibly drain all connections asynchronously.
-  connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
 }
 
 envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,

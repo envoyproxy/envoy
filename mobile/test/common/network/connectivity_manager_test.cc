@@ -22,20 +22,20 @@ public:
         connectivity_manager_(std::make_shared<ConnectivityManagerImpl>(cm_, dns_cache_manager_)) {
     ON_CALL(*dns_cache_manager_, lookUpCacheByName(_)).WillByDefault(Return(dns_cache_));
     // Toggle network to reset network state.
-    ConnectivityManagerImpl::setPreferredNetwork(1);
-    ConnectivityManagerImpl::setPreferredNetwork(2);
+    connectivity_manager_->setPreferredNetwork(1);
+    connectivity_manager_->setPreferredNetwork(2);
   }
 
   std::shared_ptr<NiceMock<Extensions::Common::DynamicForwardProxy::MockDnsCacheManager>>
       dns_cache_manager_;
   std::shared_ptr<Extensions::Common::DynamicForwardProxy::MockDnsCache> dns_cache_;
   NiceMock<Upstream::MockClusterManager> cm_{};
-  std::shared_ptr<ConnectivityManagerImpl> connectivity_manager_;
+  ConnectivityManagerImplSharedPtr connectivity_manager_;
 };
 
 TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigurationKey) {
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t new_key = ConnectivityManagerImpl::setPreferredNetwork(4);
+  envoy_netconf_t new_key = connectivity_manager_->setPreferredNetwork(4);
   EXPECT_NE(original_key, new_key);
   EXPECT_EQ(new_key, connectivity_manager_->getConfigurationKey());
 }
@@ -43,7 +43,7 @@ TEST_F(ConnectivityManagerTest, SetPreferredNetworkWithNewNetworkChangesConfigur
 TEST_F(ConnectivityManagerTest,
        DISABLED_SetPreferredNetworkWithUnchangedNetworkReturnsStaleConfigurationKey) {
   envoy_netconf_t original_key = connectivity_manager_->getConfigurationKey();
-  envoy_netconf_t stale_key = ConnectivityManagerImpl::setPreferredNetwork(2);
+  envoy_netconf_t stale_key = connectivity_manager_->setPreferredNetwork(2);
   EXPECT_NE(original_key, stale_key);
   EXPECT_EQ(original_key, connectivity_manager_->getConfigurationKey());
 }
@@ -262,6 +262,24 @@ TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash
   }
   EXPECT_NE(hash1, hash2);
 }
+
+// Verifies that when a network is connected and then becomes the default
+// default_network_change_callback_ called at the end rather than in the middle.
+TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenBecomesDefault) {}
+
+// Verifies that when a network becomes the default without becoming connected,
+// default_network_change_callback_ is not called. And it should be called once the network is
+// connected.
+TEST_F(ConnectivityManagerTest, AndroidNetworkBecomesDefaultAndThenConnected) {}
+
+// Verifies that the observer is notified about a network becoming connected and
+// disconnected.
+TEST_F(ConnectivityManagerTest, AndroidNetworkConnectedAndThenDisconnected) {}
+
+// Verifies that the observer is notified about networks becoming disconnected when they are purged.
+// But if the network is exempted from purging, observer shouldn't be notified about it being
+// disconnected.
+TEST_F(ConnectivityManagerTest, AndroidPurgeNetworks) {}
 
 } // namespace Network
 } // namespace Envoy

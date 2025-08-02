@@ -7,6 +7,7 @@
 
 #include "absl/strings/string_view.h"
 #include "library/common/extensions/cert_validator/platform_bridge/c_types.h"
+#include "library/common/network/network_types.h"
 
 namespace Envoy {
 
@@ -39,6 +40,12 @@ public:
    */
   virtual void cleanupAfterCertificateValidation() PURE;
 
+  /**
+   * Invokes platform APIs to retrieve a handle to the current default network.
+   */
+  virtual int64_t getDefaultNetworkHandle() PURE;
+
+  virtual std::vector<std::pair<int64_t, ConnectionType>> getAllConnectedNetworks() PURE;
   /**
    * @return a reference to the current SystemHelper instance.
    */

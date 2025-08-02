@@ -16,4 +16,10 @@ DefaultSystemHelper::validateCertificateChain(const std::vector<std::string>& ce
 
 void DefaultSystemHelper::cleanupAfterCertificateValidation() { JNI::jvmDetachThread(); }
 
+int64_t DefaultSystemHelper::getDefaultNetworkHandle() { return JNI::getDefaultNetworkHandle(); }
+
+std::vector<std::pair<int64_t, ConnectionType>> DefaultSystemHelper::getAllConnectedNetworks() {
+  return JNI::getAllConnectedNetworks();
+}
+
 } // namespace Envoy

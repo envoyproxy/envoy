@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyConnectionType;
+import io.envoyproxy.envoymobile.engine.types.NetworkWithType;
 
 import static android.net.ConnectivityManager.TYPE_VPN;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
@@ -795,5 +796,20 @@ public class AndroidNetworkMonitorV2 {
     if (mDefaultNetworkCallback != null) {
       mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
     }
+  }
+
+  public NetworkWithType[] getAllNetworksAndTypes() {
+    Network[] filteredNetworks = getAllNetworksFiltered(null);
+    int size = filteredNetworks.length;
+
+    // Directly create the array with the known size.
+    NetworkWithType[] networks = new NetworkWithType[size];
+
+    for (int i = 0; i < size; i++) {
+      Network network = filteredNetworks[i];
+      final EnvoyConnectionType connectionType = getEnvoyConnectionType(network);
+      networks[i] = new NetworkWithType(network.getNetworkHandle(), connectionType);
+    }
+    return networks;
   }
 }
