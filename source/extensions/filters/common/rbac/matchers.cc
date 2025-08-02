@@ -180,24 +180,72 @@ bool HeaderMatcher::matches(const Network::Connection&,
   return header_->matchesHeaders(headers);
 }
 
+IPMatcher::IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type) : type_(type) {
+  // Convert single range to LC Trie for consistency.
+  std::vector<Network::Address::CidrRange> ranges;
+  ranges.push_back(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(range),
+                                         Network::Address::CidrRange));
+
+  trie_ = std::make_unique<Network::LcTrie::LcTrie<bool>>(
+      std::vector<std::pair<bool, std::vector<Network::Address::CidrRange>>>{{true, ranges}});
+}
+
+// static
+absl::StatusOr<std::unique_ptr<IPMatcher>>
+IPMatcher::create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& ranges,
+                  Type type) {
+  if (ranges.empty()) {
+    return absl::InvalidArgumentError("Empty IP range list provided");
+  }
+
+  // Convert protobuf ranges to CidrRange vector.
+  std::vector<Network::Address::CidrRange> cidr_ranges;
+  cidr_ranges.reserve(ranges.size());
+  for (const auto& range : ranges) {
+    auto cidr_result = Network::Address::CidrRange::create(range);
+    if (!cidr_result.ok()) {
+      return absl::InvalidArgumentError(
+          fmt::format("Failed to create CIDR range: {}", cidr_result.status().message()));
+    }
+    cidr_ranges.push_back(std::move(cidr_result.value()));
+  }
+
+  // Create LC Trie directly following the pattern from Unified IP Matcher.
+  // Note: LcTrie constructor may throw EnvoyException on invalid input, but this
+  // should be rare since we've already validated the CIDR ranges above.
+  auto trie = std::make_unique<Network::LcTrie::LcTrie<bool>>(
+      std::vector<std::pair<bool, std::vector<Network::Address::CidrRange>>>{{true, cidr_ranges}});
+
+  return std::unique_ptr<IPMatcher>(new IPMatcher(std::move(trie), type));
+}
+
+IPMatcher::IPMatcher(std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie, Type type)
+    : trie_(std::move(trie)), type_(type) {}
+
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
                         const StreamInfo::StreamInfo& info) const {
-  Envoy::Network::Address::InstanceConstSharedPtr ip;
+  const auto ip = extractIpAddress(connection, info);
+  if (!ip) {
+    return false;
+  }
+
+  return !trie_->getData(ip).empty();
+}
+
+Network::Address::InstanceConstSharedPtr
+IPMatcher::extractIpAddress(const Network::Connection& connection,
+                            const StreamInfo::StreamInfo& info) const {
   switch (type_) {
   case ConnectionRemote:
-    ip = connection.connectionInfoProvider().remoteAddress();
-    break;
+    return connection.connectionInfoProvider().remoteAddress();
   case DownstreamLocal:
-    ip = info.downstreamAddressProvider().localAddress();
-    break;
+    return info.downstreamAddressProvider().localAddress();
   case DownstreamDirectRemote:
-    ip = info.downstreamAddressProvider().directRemoteAddress();
-    break;
+    return info.downstreamAddressProvider().directRemoteAddress();
   case DownstreamRemote:
-    ip = info.downstreamAddressProvider().remoteAddress();
-    break;
+    return info.downstreamAddressProvider().remoteAddress();
   }
-  return range_.isInRange(*ip.get());
+  return nullptr;
 }
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
