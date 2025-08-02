@@ -15,6 +15,7 @@
 
 using testing::Expectation;
 using testing::InSequence;
+using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -1558,6 +1559,142 @@ TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoVirtualHost) {
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
       VirtualHostWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"),
       true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+class LuaRouteWrapperTest : public Filters::Common::Lua::LuaWrappersTestBase<RouteWrapper> {
+public:
+  void setup(const std::string& script) override {
+    Filters::Common::Lua::LuaWrappersTestBase<RouteWrapper>::setup(script);
+    state_->registerType<Filters::Common::Lua::MetadataMapWrapper>();
+    state_->registerType<Filters::Common::Lua::MetadataMapIterator>();
+  }
+
+  const std::string NO_METADATA_FOUND_SCRIPT{R"EOF(
+    function callMe(object)
+      for _, _ in pairs(object:metadata()) do
+        return
+      end
+      testPrint("No metadata found")
+    end
+  )EOF"};
+};
+
+// Test that RouteWrapper returns metadata under the current filter configured name.
+// This verifies that when route has filter metadata configured under the current filter
+// configured name, the wrapper can successfully retrieves and returns it.
+TEST_F(LuaRouteWrapperTest, GetFilterMetadataBasic) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local metadata = object:metadata()
+      testPrint(metadata:get("foo.bar")["name"])
+      testPrint(metadata:get("foo.bar")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Create a mock route and load metadata into it.
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  TestUtility::loadFromYaml(METADATA, route->metadata_);
+
+  // Set up the mock stream info to return the mock route.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_CALL(printer_, testPrint("foo"));
+  EXPECT_CALL(printer_, testPrint("bar"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that RouteWrapper returns an empty metadata object when no metadata exists
+// under the current filter configured name.
+TEST_F(LuaRouteWrapperTest, GetMetadataNoMetadataUnderFilterName) {
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.some_filter:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Create a mock route and load metadata into it.
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  TestUtility::loadFromYaml(METADATA, route->metadata_);
+
+  // Set up the mock stream info to return the mock route.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that RouteWrapper returns an empty metadata object when no metadata is configured on
+// the route. This verifies that the wrapper correctly handles cases where the route
+// has no filter_metadata section, returning an empty metadata object without crashing.
+TEST_F(LuaRouteWrapperTest, GetMetadataNoMetadataAtAll) {
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Create a mock route but DO NOT load metadata into it.
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+
+  // Set up the mock stream info to return the mock route.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that RouteWrapper returns an empty metadata object when no route matches the
+// request. This verifies that the wrapper correctly handles cases where the stream info
+// does not have a route, returning an empty metadata object without crashing.
+TEST_F(LuaRouteWrapperTest, GetMetadataNoRoute) {
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Set up the mock stream info but DO NOT config it to return a valid route.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
 
   EXPECT_CALL(printer_, testPrint("No metadata found"));
 
