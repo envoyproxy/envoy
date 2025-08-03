@@ -97,5 +97,9 @@ new_features:
     to the Zipkin tracer config. This allows the Zipkin tracer to extract trace information from W3C trace headers
     when x-b3 headers are not present or cannot be extracted. This feature is disabled by default to maintain
     backward compatibility.
+- area: rbac
+  change: |
+    Switch the IP matcher to use LC-Trie for performance improvements.
+
 
 deprecated:
