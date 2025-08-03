@@ -143,6 +143,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
+- area: udp
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.udp_set_do_not_fragment`` and legacy code paths.
 
 new_features:
 - area: stats

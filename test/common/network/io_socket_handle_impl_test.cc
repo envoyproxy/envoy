@@ -176,6 +176,7 @@ TEST(IoSocketHandleImpl, ErrnoIfaddrs) {
   EXPECT_FALSE(maybe_interface_name.has_value());
 }
 
+#ifdef SO_RXQ_OVFL
 TEST(IoSocketHandleImpl, DroppedUdpDatagramsMsg) {
   NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
   auto os_calls =
@@ -224,7 +225,9 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMsg) {
   // creation It's expected to see the same value after the second recvmsg call.
   EXPECT_EQ(dropped_packets, 5);
 }
+#endif // SO_RXQ_OVFL
 
+#ifdef SO_RXQ_OVFL
 TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
   NiceMock<Envoy::Api::MockOsSysCalls> os_sys_calls;
   auto os_calls =
@@ -277,6 +280,7 @@ TEST(IoSocketHandleImpl, DroppedUdpDatagramsMmsg) {
   // creation It's expected to see the same value after the second recvmmsg call.
   EXPECT_EQ(dropped_packets, 5);
 }
+#endif // SO_RXQ_OVFL
 
 class IoSocketHandleImplTest : public testing::TestWithParam<Network::Address::IpVersion> {};
 INSTANTIATE_TEST_SUITE_P(IpVersions, IoSocketHandleImplTest,

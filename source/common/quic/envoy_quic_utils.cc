@@ -215,25 +215,23 @@ createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr
   if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
     connection_socket->addOptions(Network::SocketOptionFactory::buildUdpGroOptions());
   }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment")) {
-    int v6_only = 0;
-    if (connection_socket->ipVersion().has_value() &&
-        connection_socket->ipVersion().value() == Network::Address::IpVersion::v6) {
-      socklen_t v6_only_len = sizeof(v6_only);
-      Api::SysCallIntResult result =
-          connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &v6_only, &v6_only_len);
-      if (result.return_value_ != 0) {
-        ENVOY_LOG_MISC(
-            error, "Failed to get IPV6_V6ONLY socket option, getsockopt() returned {}, errno {}",
-            result.return_value_, result.errno_);
-        connection_socket->close();
-        return connection_socket;
-      }
+  int v6_only = 0;
+  if (connection_socket->ipVersion().has_value() &&
+      connection_socket->ipVersion().value() == Network::Address::IpVersion::v6) {
+    socklen_t v6_only_len = sizeof(v6_only);
+    Api::SysCallIntResult result =
+        connection_socket->getSocketOption(IPPROTO_IPV6, IPV6_V6ONLY, &v6_only, &v6_only_len);
+    if (result.return_value_ != 0) {
+      ENVOY_LOG_MISC(error,
+                     "Failed to get IPV6_V6ONLY socket option, getsockopt() returned {}, errno {}",
+                     result.return_value_, result.errno_);
+      connection_socket->close();
+      return connection_socket;
     }
-    connection_socket->addOptions(Network::SocketOptionFactory::buildDoNotFragmentOptions(
-        /*mapped_v6*/ connection_socket->ipVersion().value() == Network::Address::IpVersion::v6 &&
-        v6_only == 0));
   }
+  connection_socket->addOptions(Network::SocketOptionFactory::buildDoNotFragmentOptions(
+      /*mapped_v6*/ connection_socket->ipVersion().value() == Network::Address::IpVersion::v6 &&
+      v6_only == 0));
   if (options != nullptr) {
     connection_socket->addOptions(options);
   }
