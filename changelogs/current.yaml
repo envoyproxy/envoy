@@ -8,6 +8,10 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: listeners
+  change: |
+    fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` timed out
+    when used with other listener_filters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
