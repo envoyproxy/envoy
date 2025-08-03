@@ -428,7 +428,7 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackEnabled) {
   EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 
   // Verify the converted values
-  EXPECT_EQ(0xb7ad6b7169203331, context.first.id()); // W3C parent-id becomes span-id
+  EXPECT_EQ(0xb7ad6b7169203331, context.first.id()); // W3C span-id becomes span-id
   EXPECT_EQ(0, context.first.parentId());            // No parent in W3C conversion
   EXPECT_TRUE(context.first.is128BitTraceId());
   EXPECT_EQ(0x8448eb211c80319c, context.first.traceId());     // Low 64 bits

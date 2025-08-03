@@ -278,20 +278,20 @@ std::pair<SpanContext, bool> SpanContextExtractor::convertW3CToZipkin(
     throw ExtractorException(fmt::format("Invalid W3C trace ID: {}", trace_id_str));
   }
 
-  // Convert W3C parent ID (16 hex chars) to Zipkin span ID
-  const std::string& parent_id_str = w3c_context.parentId();
-  if (parent_id_str.length() != 16) {
+  // Convert W3C span ID (16 hex chars) to Zipkin span ID
+  const std::string& span_id_str = w3c_context.spanId();
+  if (span_id_str.length() != 16) {
     throw ExtractorException(
-        fmt::format("Invalid W3C parent ID length: {}", parent_id_str.length()));
+        fmt::format("Invalid W3C span ID length: {}", span_id_str.length()));
   }
 
   uint64_t span_id(0);
-  if (!StringUtil::atoull(parent_id_str.c_str(), span_id, 16)) {
-    throw ExtractorException(fmt::format("Invalid W3C parent ID: {}", parent_id_str));
+  if (!StringUtil::atoull(span_id_str.c_str(), span_id, 16)) {
+    throw ExtractorException(fmt::format("Invalid W3C span ID: {}", span_id_str));
   }
 
   // W3C doesn't have a direct parent span concept like B3
-  // The W3C parent-id becomes our span-id, and we don't set a parent
+  // The W3C span-id becomes our span-id, and we don't set a parent
   uint64_t parent_id(0);
 
   // Use W3C sampling decision, or fallback if not specified
