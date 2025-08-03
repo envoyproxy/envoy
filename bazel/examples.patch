@@ -11,3 +11,25 @@ index d271833..8386adc 100644
      "dynamic-config-fs",
      "ext_authz",
      # "fault-injection",
+diff --git a/single-page-app/verify.sh b/single-page-app/verify.sh
+index 582917dd6f..1bb5c40281 100755
+--- a/single-page-app/verify.sh
++++ b/single-page-app/verify.sh
+@@ -265,7 +265,7 @@ mkdir -p .local.ci/production
+ cp -a xds .local.ci/production
+ cp -a ui/index.html .local.ci/ui/
+ export XDS_PATH=./.local.ci/production/xds
+-docker compose up --build -d envoy
++docker compose up --build --pull missing --quiet-pull -d --force-recreate envoy
+ docker compose run --rm ui build.sh
+ 
+ run_log "Check the created routes"
+@@ -314,7 +314,7 @@ echo "VITE_APP_AUTH_PROVIDER=github" > .local.ci/ui/.env.local
+ run_log "Rebuild the app and restart Envoy (Github)"
+ export ENVOY_CONFIG=.local.ci/envoy.yml
+ docker compose run --rm ui build.sh
+-docker compose up --build -d envoy
++docker compose up --build --pull missing --quiet-pull -d --force-recreate envoy
+ 
+ run_log "Test dev app (Github)"
+ wait_for 5 \
