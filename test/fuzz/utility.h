@@ -208,7 +208,7 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
       data_chunks.push_back(http_data);
     }
   } else if (data.has_proto_body()) {
-    const std::string serialized = data.proto_body().message().value();
+    const std::string serialized(data.proto_body().message().value());
     data_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chunk_size()));
   }
 
