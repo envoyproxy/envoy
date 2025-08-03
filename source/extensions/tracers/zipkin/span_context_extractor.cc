@@ -281,8 +281,7 @@ std::pair<SpanContext, bool> SpanContextExtractor::convertW3CToZipkin(
   // Convert W3C span ID (16 hex chars) to Zipkin span ID
   const std::string& span_id_str = w3c_context.spanId();
   if (span_id_str.length() != 16) {
-    throw ExtractorException(
-        fmt::format("Invalid W3C span ID length: {}", span_id_str.length()));
+    throw ExtractorException(fmt::format("Invalid W3C span ID length: {}", span_id_str.length()));
   }
 
   uint64_t span_id(0);
