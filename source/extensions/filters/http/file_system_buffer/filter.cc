@@ -1,6 +1,8 @@
 #include "filter.h"
 #include "source/extensions/filters/http/file_system_buffer/filter.h"
 
+#include "source/extensions/common/async_files/async_file_context_thread_pool.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -282,9 +284,28 @@ bool FileSystemBufferFilter::maybeOutputResponse() {
 }
 
 void BufferedStreamState::close() {
+  *is_closed_ = true;
   if (async_file_handle_) {
     auto queued = async_file_handle_->close(nullptr, [](absl::Status) {});
-    ASSERT(queued.ok());
+    // We ignore any close errors during cleanup to prevent crashes. Close failures during
+    // destruction are generally not recoverable and should not prevent the filter from
+    // being destroyed.
+    queued.IgnoreError();
+  }
+}
+
+BufferedStreamState::~BufferedStreamState() {
+  // During destruction, the async file system might already be torn down and attempting
+  // to close the file handle could be unsafe. We need to ensure the file descriptor is
+  // set to -1 here to meet the expectations of AsyncFileContextThreadPool destructor.
+  if (!*is_closed_ && async_file_handle_) {
+    *is_closed_ = true;
+    if (auto thread_pool_context =
+            std::dynamic_pointer_cast<Extensions::Common::AsyncFiles::AsyncFileContextThreadPool>(
+                async_file_handle_)) {
+      thread_pool_context->fileDescriptor() = -1;
+    }
+    async_file_handle_.reset();
   }
 }
 
@@ -378,7 +399,17 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
       auto queued = (**earliest_storage_fragment)
                         .fromStorage(state.async_file_handle_, request_callbacks_->dispatcher(),
                                      getOnFileActionCompleted());
-      ASSERT(queued.ok());
+      if (!queued.ok()) {
+        // Fragment is not in storage state. It may be in transition due to concurrent async
+        // operations. This can happen when multiple onStateChange() calls occur simultaneously
+        // during high load. Revert the state accounting changes we made optimistically and skip
+        // this operation. The filter will retry on the next state change if still needed.
+        state.storage_used_ += size;
+        state.memory_used_ -= size;
+        ENVOY_STREAM_LOG(debug, "skipping fromStorage(). fragment is not in the storage state: {}",
+                         callbacks, queued.status().ToString());
+        return false;
+      }
       cancel_in_flight_async_action_ = std::move(queued.value());
       return true;
     }
@@ -393,10 +424,18 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
       // racily created it will be closed.
       cancel_in_flight_async_action_ = config_->asyncFileManager().createAnonymousFile(
           &request_callbacks_->dispatcher(), config_->storageBufferPath(),
-          [this, &state](absl::StatusOr<AsyncFileHandle> file_handle) {
+          [this, &state,
+           is_closed = state.is_closed_](absl::StatusOr<AsyncFileHandle> file_handle) {
             if (!file_handle.ok()) {
               filterError(fmt::format("{} failed to create buffer file: {}", filterName(),
                                       file_handle.status().ToString()));
+              return;
+            }
+            // Check if close() was already called during filter destruction. If so, close the
+            // newly created file handle immediately to prevent any resource leaks.
+            if (*is_closed) {
+              file_handle.value()->close(nullptr, [](absl::Status) {}).IgnoreError();
+              cancel_in_flight_async_action_ = nullptr;
               return;
             }
             state.async_file_handle_ = std::move(file_handle.value());
@@ -416,7 +455,18 @@ bool FileSystemBufferFilter::maybeStorage(BufferedStreamState& state,
     auto to_storage =
         fragment->toStorage(state.async_file_handle_, state.storage_offset_,
                             request_callbacks_->dispatcher(), getOnFileActionCompleted());
-    ASSERT(to_storage.ok());
+    if (!to_storage.ok()) {
+      // Fragment is not in memory state. It may be in transition due to concurrent async
+      // operations. This can happen when multiple onStateChange() calls occur simultaneously during
+      // high load. Revert the state accounting changes we made optimistically and skip this
+      // operation. The filter will retry on the next state change if still needed.
+      state.storage_used_ -= size;
+      state.storage_consumed_ -= size;
+      state.memory_used_ += size;
+      ENVOY_STREAM_LOG(debug, "skipping toStorage(). fragment is not in the memory state: {}",
+                       callbacks, to_storage.status().ToString());
+      return false;
+    }
     cancel_in_flight_async_action_ = std::move(to_storage.value());
     state.storage_offset_ += size;
     return true;

@@ -201,6 +201,62 @@ TEST_F(FileSystemBufferFilterFragmentTest, ReturnsErrorOnReadIncomplete) {
   resolveFileActions();
 }
 
+TEST_F(FileSystemBufferFilterFragmentTest, ToStorageFailsWhenNotInMemoryState) {
+  // Create a fragment that's already in storage state.
+  Buffer::OwnedImpl input("hello");
+  Fragment frag(input);
+  moveFragmentToStorage(&frag);
+  EXPECT_TRUE(frag.isStorage());
+
+  // Attempting toStorage() on a storage fragment should fail gracefully.
+  MockFunction<void(absl::Status)> callback;
+  auto result = frag.toStorage(handle_, 123, *dispatcher_, callback.AsStdFunction());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kFailedPrecondition);
+  EXPECT_THAT(result.status().message(), HasSubstr("not in the memory state"));
+}
+
+TEST_F(FileSystemBufferFilterFragmentTest, FromStorageFailsWhenNotInStorageState) {
+  // Create a fragment in memory state.
+  Buffer::OwnedImpl input("hello");
+  Fragment frag(input);
+  EXPECT_TRUE(frag.isMemory());
+
+  // Attempting fromStorage() on a memory fragment should fail gracefully.
+  MockFunction<void(absl::Status)> callback;
+  auto result = frag.fromStorage(handle_, *dispatcher_, callback.AsStdFunction());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kFailedPrecondition);
+  EXPECT_THAT(result.status().message(), HasSubstr("not in the storage state"));
+}
+
+TEST_F(FileSystemBufferFilterFragmentTest, ToStorageFailsWhenInTransitionState) {
+  // Create a fragment and start moving it to storage but don't complete the operation.
+  Buffer::OwnedImpl input("hello");
+  Fragment frag(input);
+
+  // Start the toStorage operation. This puts fragment in "writing" state.
+  EXPECT_CALL(*handle_, write(_, _, _, _))
+      .WillOnce([](Event::Dispatcher*, Buffer::Instance&, off_t,
+                   absl::AnyInvocable<void(absl::StatusOr<size_t>)>) {
+        // Don't call the callback and leave the fragment in transition state.
+        return []() {};
+      });
+
+  MockFunction<void(absl::Status)> write_callback;
+  EXPECT_OK(frag.toStorage(handle_, 123, *dispatcher_, write_callback.AsStdFunction()));
+  // Fragment is now in transition state - neither memory nor storage
+  EXPECT_FALSE(frag.isMemory());
+  EXPECT_FALSE(frag.isStorage());
+
+  // Attempting another toStorage() should fail.
+  MockFunction<void(absl::Status)> second_callback;
+  auto result = frag.toStorage(handle_, 456, *dispatcher_, second_callback.AsStdFunction());
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kFailedPrecondition);
+  EXPECT_THAT(result.status().message(), HasSubstr("not in the memory state"));
+}
+
 } // namespace FileSystemBuffer
 } // namespace HttpFilters
 } // namespace Extensions
