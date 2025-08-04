@@ -299,22 +299,16 @@ private:
   AnnotationType annotation_type_{};
 };
 
-using SpanPtr = std::unique_ptr<Span>;
-
 /**
  * Represents a Zipkin span. This class is based on Zipkin's Thrift definition of a span.
  */
-class Span : public ZipkinBase {
+class Span : public ZipkinBase, public Tracing::Span {
 public:
-  /**
-   * Copy constructor.
-   */
-  Span(const Span&);
-
   /**
    * Default constructor. Creates an empty span.
    */
-  explicit Span(TimeSource& time_source) : time_source_(time_source) {}
+  explicit Span(TimeSource& time_source, TracerInterface& tracer)
+      : time_source_(time_source), tracer_(tracer) {}
 
   /**
    * Sets the span's trace id attribute.
@@ -324,7 +318,7 @@ public:
   /**
    * Sets the span's name attribute.
    */
-  void setName(const std::string& val) { name_ = val; }
+  void setName(absl::string_view val) { name_ = std::string(val); }
 
   /**
    * Sets the span's id.
@@ -340,11 +334,6 @@ public:
    * @return Whether or not the parent_id attribute is set.
    */
   bool isSetParentId() const { return parent_id_.has_value(); }
-
-  /**
-   * Set the span's sampled flag.
-   */
-  void setSampled(bool val) { sampled_ = val; }
 
   /**
    * @return a vector with all annotations added to the span.
@@ -547,18 +536,14 @@ public:
   const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
 
   /**
-   * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked
-   * by the span's finish() method so that the tracer can decide what to do with the span
-   * when it is finished.
+   * @return the span's context.
    *
-   * @param tracer Represents the Tracer object to be associated with the span.
+   * This method returns a SpanContext object that contains the span's trace id, span id, parent id,
+   * and sampled attributes.
    */
-  void setTracer(TracerInterface* tracer) { tracer_ = tracer; }
+  SpanContext spanContext() const;
 
-  /**
-   * @return the Tracer object associated with the span.
-   */
-  TracerInterface* tracer() const { return tracer_; }
+  // Tracing::Span
 
   /**
    * Marks a successful end of the span. This method will:
@@ -568,23 +553,20 @@ public:
    * (2) compute and set the span's duration; and
    * (3) invoke the tracer's reportSpan() method if a tracer has been associated with the span.
    */
-  void finish();
+  void finishSpan() override;
+  void setTag(absl::string_view name, absl::string_view value) override;
+  void log(SystemTime timestamp, const std::string& event) override;
+  void setSampled(bool val) override { sampled_ = val; }
+  void setOperation(absl::string_view operation) override { setName(std::string(operation)); }
+  void injectContext(Tracing::TraceContext& trace_context,
+                     const Tracing::UpstreamContext&) override;
+  Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
+                              SystemTime start_time) override;
 
-  /**
-   * Adds a binary annotation to the span.
-   *
-   * @param name The binary annotation's key.
-   * @param value The binary annotation's value.
-   */
-  void setTag(absl::string_view name, absl::string_view value);
-
-  /**
-   * Adds an annotation to the span
-   *
-   * @param timestamp The annotation's timestamp.
-   * @param event The annotation's value.
-   */
-  void log(SystemTime timestamp, const std::string& event);
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
+  std::string getSpanId() const override { return EMPTY_STRING; };
+  std::string getTraceId() const override { return traceIdAsHexString(); };
 
 private:
   static const std::string EMPTY_HEX_STRING_;
@@ -600,9 +582,11 @@ private:
   absl::optional<int64_t> duration_;
   absl::optional<uint64_t> trace_id_high_;
   int64_t monotonic_start_time_{0};
-  TracerInterface* tracer_{nullptr};
   TimeSource& time_source_;
+  TracerInterface& tracer_;
 };
+
+using SpanPtr = std::unique_ptr<Span>;
 
 } // namespace Zipkin
 } // namespace Tracers

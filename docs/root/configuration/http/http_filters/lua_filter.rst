@@ -54,8 +54,8 @@ A simple example of configuring the Lua HTTP filter that contains only :ref:`def
 
 .. literalinclude:: _include/lua-filter.yaml
     :language: yaml
-    :lines: 34-46
-    :lineno-start: 34
+    :lines: 41-53
+    :lineno-start: 41
     :linenos:
     :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
@@ -486,8 +486,8 @@ Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_c
 
 .. literalinclude:: _include/lua-filter.yaml
     :language: yaml
-    :lines: 26-32
-    :lineno-start: 26
+    :lines: 33-39
+    :lineno-start: 33
     :linenos:
     :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
 
@@ -677,6 +677,22 @@ Timestamp function. The timestamp is returned as a string. It represents the int
 since epoch. ``resolution`` is an optional enum parameter to indicate the resolution of the timestamp.
 Supported resolutions are ``EnvoyTimestampResolution.MILLISECOND`` and ``EnvoyTimestampResolution.MICROSECOND``.
 The default resolution is millisecond if ``resolution`` is not set.
+
+.. _config_http_filters_lua_stream_handle_api_virtual_host:
+
+``virtualHost()``
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local virtual_host = handle:virtualHost()
+
+Returns a virtual host object that provides access to the virtual host configuration. This method always returns
+a valid object, even when the request does not match any configured virtual host. However, if no virtual host
+matches, calling methods on the returned object will return ``nil`` or, in the case of the ``metadata()`` method,
+an empty metadata object.
+
+Returns a :ref:`virtual host object <config_http_filters_lua_virtual_host_wrapper>`.
 
 .. _config_http_filters_lua_header_wrapper:
 
@@ -1576,3 +1592,32 @@ field or if the field can't be converted to a UTF8 string.
 
 Returns the string representation of O fields (as a table) from the X.509 name. Returns an empty
 table if there is no such field or if the field can't be converted to a UTF8 string.
+
+.. _config_http_filters_lua_virtual_host_wrapper:
+
+Virtual host object API
+-----------------------
+
+.. include:: ../../../_include/lua_common.rst
+
+``metadata()``
+^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  local metadata = virtual_host:metadata()
+
+Returns the virtual host metadata. Note that the metadata should be specified
+under the :ref:`filter config name
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpFilter.name>`.
+
+Below is an example of a ``metadata`` in a :ref:`route entry <envoy_v3_api_msg_config.route.v3.VirtualHost>`.
+
+.. literalinclude:: _include/lua-filter.yaml
+    :language: yaml
+    :lines: 20-26
+    :lineno-start: 20
+    :linenos:
+    :caption: :download:`lua-filter.yaml <_include/lua-filter.yaml>`
+
+Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.

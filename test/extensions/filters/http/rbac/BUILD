@@ -36,8 +36,8 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
+        "//source/extensions/common/matcher:ip_range_matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
-        "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "//source/extensions/matching/http/cel_input:cel_input_lib",
@@ -67,8 +67,8 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
+        "//source/extensions/common/matcher:ip_range_matcher_lib",
         "//source/extensions/common/matcher:matcher_lib",
-        "//source/extensions/common/matcher:trie_matcher_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//source/extensions/filters/http/header_to_metadata:config",
         "//source/extensions/filters/http/rbac:config",

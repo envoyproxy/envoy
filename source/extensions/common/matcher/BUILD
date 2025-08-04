@@ -22,9 +22,9 @@ envoy_cc_library(
 )
 
 envoy_cc_extension(
-    name = "trie_matcher_lib",
-    srcs = ["trie_matcher.cc"],
-    hdrs = ["trie_matcher.h"],
+    name = "ip_range_matcher_lib",
+    srcs = ["ip_range_matcher.cc"],
+    hdrs = ["ip_range_matcher.h"],
     extra_visibility = [
         "//source/common/listener_manager:__subpackages__",
         "//test:__subpackages__",

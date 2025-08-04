@@ -454,6 +454,30 @@ public:
   enum Resolution { Millisecond, Microsecond, Undefined };
 };
 
+class VirtualHostWrapper : public Filters::Common::Lua::BaseLuaObject<VirtualHostWrapper> {
+public:
+  VirtualHostWrapper(const StreamInfo::StreamInfo& stream_info,
+                     const absl::string_view filter_config_name)
+      : stream_info_{stream_info}, filter_config_name_{filter_config_name} {}
+
+  static ExportedFunctions exportedFunctions() { return {{"metadata", static_luaMetadata}}; }
+
+private:
+  /**
+   * @return a handle to the metadata.
+   */
+  DECLARE_LUA_FUNCTION(VirtualHostWrapper, luaMetadata);
+
+  const ProtobufWkt::Struct& getMetadata() const;
+
+  // Filters::Common::Lua::BaseLuaObject
+  void onMarkDead() override { metadata_wrapper_.reset(); }
+
+  const StreamInfo::StreamInfo& stream_info_;
+  const absl::string_view filter_config_name_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+};
+
 } // namespace Lua
 } // namespace HttpFilters
 } // namespace Extensions

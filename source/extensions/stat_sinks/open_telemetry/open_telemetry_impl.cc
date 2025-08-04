@@ -7,14 +7,27 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
-OtlpOptions::OtlpOptions(const SinkConfig& sink_config)
+Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
+generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes;
+  for (const auto& attr : resource.attributes_) {
+    auto* attribute = resource_attributes.Add();
+    attribute->set_key(attr.first);
+    attribute->mutable_value()->set_string_value(attr.second);
+  }
+  return resource_attributes;
+}
+
+OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
+                         const Tracers::OpenTelemetry::Resource& resource)
     : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
       report_histograms_as_deltas_(sink_config.report_histograms_as_deltas()),
       emit_tags_as_attributes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
       use_tag_extracted_name_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
-      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : "") {}
+      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
+      resource_attributes_(generateResourceAttributes(resource)) {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
     const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
@@ -46,7 +59,8 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
   auto request = std::make_unique<MetricsExportRequest>();
   auto* resource_metrics = request->add_resource_metrics();
   auto* scope_metrics = resource_metrics->add_scope_metrics();
-
+  resource_metrics->mutable_resource()->mutable_attributes()->CopyFrom(
+      config_->resource_attributes());
   int64_t snapshot_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                  snapshot.snapshotTime().time_since_epoch())
                                  .count();

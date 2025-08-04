@@ -10,7 +10,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/empty_string.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/strings/match.h"

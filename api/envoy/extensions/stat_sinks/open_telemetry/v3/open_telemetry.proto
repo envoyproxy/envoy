@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.stat_sinks.open_telemetry.v3;
 
+import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -19,7 +20,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message SinkConfig {
   oneof protocol_specifier {
     option (validate.required) = true;
@@ -27,6 +28,10 @@ message SinkConfig {
     // The upstream gRPC cluster that implements the OTLP/gRPC collector.
     config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
   }
+
+  // Attributes to be associated with the resource in the OTLP message.
+  // [#extension-category: envoy.tracers.opentelemetry.resource_detectors]
+  repeated config.core.v3.TypedExtensionConfig resource_detectors = 7;
 
   // If set to true, counters will be emitted as deltas, and the OTLP message will have
   // ``AGGREGATION_TEMPORALITY_DELTA`` set as AggregationTemporality.

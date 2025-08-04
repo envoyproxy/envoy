@@ -50,7 +50,6 @@ TypeUrlToV3ServiceMap* buildTypeUrlToServiceMap() {
   for (absl::string_view name : {
            "envoy.service.route.v3.RouteDiscoveryService",
            "envoy.service.route.v3.ScopedRoutesDiscoveryService",
-           "envoy.service.route.v3.ScopedRoutesDiscoveryService",
            "envoy.service.route.v3.VirtualHostDiscoveryService",
            "envoy.service.secret.v3.SecretDiscoveryService",
            "envoy.service.cluster.v3.ClusterDiscoveryService",

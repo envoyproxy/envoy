@@ -41,9 +41,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "codec_runtime_overrides",
+    hdrs = ["codec_runtime_overrides.h"],
+    deps = ["@com_google_absl//absl/strings"],
+)
+
+envoy_cc_library(
     name = "codec_interface",
     hdrs = ["codec.h"],
     deps = [
+        ":codec_runtime_overrides",
         ":header_map_interface",
         ":metadata_interface",
         ":protocol_interface",

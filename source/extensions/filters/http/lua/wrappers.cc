@@ -445,6 +445,32 @@ int FilterStateWrapper::luaGet(lua_State* state) {
   return 0;
 }
 
+const ProtobufWkt::Struct& VirtualHostWrapper::getMetadata() const {
+  const auto& virtual_host = stream_info_.virtualHost();
+  if (virtual_host == nullptr) {
+    return ProtobufWkt::Struct::default_instance();
+  }
+
+  const auto& metadata = virtual_host->metadata();
+  auto filter_it = metadata.filter_metadata().find(filter_config_name_);
+
+  if (filter_it != metadata.filter_metadata().end()) {
+    return filter_it->second;
+  }
+
+  return ProtobufWkt::Struct::default_instance();
+}
+
+int VirtualHostWrapper::luaMetadata(lua_State* state) {
+  if (metadata_wrapper_.get() != nullptr) {
+    metadata_wrapper_.pushStack();
+  } else {
+    metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
+                            true);
+  }
+  return 1;
+}
+
 } // namespace Lua
 } // namespace HttpFilters
 } // namespace Extensions

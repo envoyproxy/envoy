@@ -467,7 +467,6 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:non_copyable",
         "//source/common/common:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
         "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],

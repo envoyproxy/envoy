@@ -25,7 +25,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/ssl_socket.h"
-#include "source/extensions/common/matcher/trie_matcher.h"
+#include "source/extensions/common/matcher/ip_range_matcher.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 

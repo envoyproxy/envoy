@@ -80,9 +80,9 @@ Custom Matching Algorithms
 In addition to the built-in exact and prefix matchers, these custom matchers
 are available in some contexts:
 
-.. _extension_envoy.matching.custom_matchers.trie_matcher:
+.. _extension_envoy.matching.custom_matchers.ip_range_matcher:
 
-* :ref:`Trie-based IP matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
+* :ref:`IP range matcher <envoy_v3_api_msg_.xds.type.matcher.v3.IPMatcher>` applies to network inputs.
 
 .. _extension_envoy.matching.custom_matchers.domain_matcher:
 

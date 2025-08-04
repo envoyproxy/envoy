@@ -113,30 +113,6 @@ const ProtobufWkt::Struct BinaryAnnotation::toStruct(Util::Replacements& replace
 
 const std::string Span::EMPTY_HEX_STRING_ = "0000000000000000";
 
-Span::Span(const Span& span) : time_source_(span.time_source_) {
-  trace_id_ = span.traceId();
-  if (span.isSetTraceIdHigh()) {
-    trace_id_high_ = span.traceIdHigh();
-  }
-  name_ = span.name();
-  id_ = span.id();
-  if (span.isSetParentId()) {
-    parent_id_ = span.parentId();
-  }
-  debug_ = span.debug();
-  sampled_ = span.sampled();
-  annotations_ = span.annotations();
-  binary_annotations_ = span.binaryAnnotations();
-  if (span.isSetTimestamp()) {
-    timestamp_ = span.timestamp();
-  }
-  if (span.isSetDuration()) {
-    duration_ = span.duration();
-  }
-  monotonic_start_time_ = span.startTime();
-  tracer_ = span.tracer();
-}
-
 void Span::setServiceName(const std::string& service_name) {
   for (auto& annotation : annotations_) {
     annotation.changeEndpointServiceName(service_name);
@@ -169,6 +145,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
 
   if (!annotations_.empty()) {
     std::vector<ProtobufWkt::Value> annotation_list;
+    annotation_list.reserve(annotations_.size());
     for (auto& annotation : annotations_) {
       annotation_list.push_back(ValueUtil::structValue(annotation.toStruct(replacements)));
     }
@@ -177,6 +154,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
 
   if (!binary_annotations_.empty()) {
     std::vector<ProtobufWkt::Value> binary_annotation_list;
+    binary_annotation_list.reserve(binary_annotations_.size());
     for (auto& binary_annotation : binary_annotations_) {
       binary_annotation_list.push_back(
           ValueUtil::structValue(binary_annotation.toStruct(replacements)));
@@ -187,9 +165,8 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
   return span;
 }
 
-void Span::finish() {
+void Span::finishSpan() {
   // Assumption: Span will have only one annotation when this method is called.
-  SpanContext context(*this);
   if (annotations_[0].value() == SERVER_RECV) {
     // Need to set the SS annotation
     Annotation ss;
@@ -218,9 +195,7 @@ void Span::finish() {
     setDuration(monotonic_stop_time - monotonic_start_time_);
   }
 
-  if (auto t = tracer()) {
-    t->reportSpan(std::move(*this));
-  }
+  tracer_.reportSpan(std::move(*this));
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
@@ -235,6 +210,31 @@ void Span::log(SystemTime timestamp, const std::string& event) {
       std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count());
   annotation.setValue(event);
   addAnnotation(std::move(annotation));
+}
+
+void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
+  // Set the trace-id and span-id headers properly, based on the newly-created span structure.
+  ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, traceIdAsHexString());
+  ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, idAsHexString());
+
+  // Set the parent-span header properly, based on the newly-created span structure.
+  if (isSetParentId()) {
+    ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.setRefKey(trace_context, parentIdAsHexString());
+  }
+
+  // Set the sampled header.
+  ZipkinCoreConstants::get().X_B3_SAMPLED.setRefKey(trace_context,
+                                                    sampled() ? SAMPLED : NOT_SAMPLED);
+}
+Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
+                                  SystemTime start_time) {
+  return tracer_.startSpan(config, name, start_time, spanContext());
+}
+
+SpanContext Span::spanContext() const {
+  // The inner_context is set to true because this SpanContext is context of Envoy created span
+  // rather than the one that extracted from the downstream request headers.
+  return {trace_id_high_.value_or(0), trace_id_, id_, parent_id_.value_or(0), sampled_, true};
 }
 
 } // namespace Zipkin

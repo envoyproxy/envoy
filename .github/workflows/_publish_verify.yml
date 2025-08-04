@@ -55,7 +55,8 @@ jobs:
         - name: examples
           target: verify_examples
           downloads: |
-            docker: build_images
+            oci.arm64: build_images
+            oci.x64: build_images
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -74,7 +75,7 @@ jobs:
                 for image in "${IMAGES[@]}"; do
                     src_name="$(echo ${image} | cut -d: -f1)"
                     dest_name="$(echo ${image} | cut -d: -f2)"
-                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.tar"
+                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.amd64.tar"
                     dest="docker-daemon:envoyproxy/envoy:${dest_name}"
                     echo "Copy image: ${src} ${dest}"
                     skopeo copy -q "${src}" "${dest}"
@@ -109,7 +110,7 @@ jobs:
         - name: distroless
           target: verify-distroless
           downloads: |
-            docker: build_images
+            oci.x64: build_images
           rbe: false
           source: |
             export NO_BUILD_SETUP=1
@@ -120,7 +121,7 @@ jobs:
                 for image in "${IMAGES[@]}"; do
                     src_name="$(echo ${image} | cut -d: -f1)"
                     dest_name="$(echo ${image} | cut -d: -f2)"
-                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.tar"
+                    src="oci-archive:%{{ runner.temp }}/build_images/${src_name}.amd64.tar"
                     dest="docker-daemon:envoyproxy/envoy:${dest_name}"
                     echo "Copy image: ${src} ${dest}"
                     skopeo copy -q "${src}" "${dest}"
