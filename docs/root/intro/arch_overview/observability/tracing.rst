@@ -101,7 +101,7 @@ Alternatively the trace context can be manually propagated by the service:
   supported, which is a more compressed format.
   
   The Zipkin tracer can optionally be configured to fallback to extracting trace information from
-  W3C trace headers (:ref:`traceparent <config_http_conn_man_headers_traceparent>` and 
+  W3C trace headers (:ref:`traceparent <config_http_conn_man_headers_traceparent>` and
   :ref:`tracestate <config_http_conn_man_headers_tracestate>`) when B3 headers are not present or
   cannot be extracted. This is controlled by the
   :ref:`w3c_fallback <envoy_v3_api_field_config.trace.v3.ZipkinConfig.w3c_fallback>` configuration option,
