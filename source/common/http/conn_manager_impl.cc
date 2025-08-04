@@ -510,9 +510,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     } else if (isEnvoyOverloadError(status)) {
-      // The other codecs aren't wired to send this status.
-      ASSERT(codec_->protocol() < Protocol::Http2,
-             "Expected only HTTP1.1 and below to send overload error.");
       stats_.named_.downstream_rq_overload_close_.inc();
       handleCodecOverloadError(status.message());
       return Network::FilterStatus::StopIteration;

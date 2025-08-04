@@ -2214,10 +2214,16 @@ ServerConnectionImpl::ServerConnectionImpl(
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)) {
+          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
+      should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)) {
   ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
                     "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(
+      trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
+      "found. Is it configured?");
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
   auto direct_visitor = std::make_unique<Http2Visitor>(this);
@@ -2283,6 +2289,13 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
+  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+    ConnectionImpl::goAway();
+    sent_go_away_on_dispatch_ = true;
+    return envoyOverloadError(
+        "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+  }
   if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
       should_send_go_away_on_dispatch_->shouldShedLoad()) {
     ConnectionImpl::goAway();
