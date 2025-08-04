@@ -1614,6 +1614,33 @@ TEST_F(ReverseConnectionIOHandleTest, ShouldAttemptConnectionToHostValidHost) {
   // Test with valid host and no existing connections.
   bool should_attempt = shouldAttemptConnectionToHost("192.168.1.1", "test-cluster");
   EXPECT_TRUE(should_attempt);
+
+  // Test circuit breaker disabled scenario - should always return true regardless of backoff state.
+  // First, put the host in backoff by tracking a failure.
+  trackConnectionFailure("192.168.1.1", "test-cluster");
+
+  // Verify host is in backoff with circuit breaker enabled (default).
+  EXPECT_FALSE(shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
+
+  // Now create a new IO handle with circuit breaker disabled.
+  auto config_disabled = createDefaultTestConfig();
+  config_disabled.enable_circuit_breaker = false;
+  auto io_handle_disabled = createTestIOHandle(config_disabled);
+  EXPECT_NE(io_handle_disabled, nullptr);
+
+  // Set up the same thread local cluster for the new IO handle.
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  // Call maintainClusterConnections to create HostConnectionInfo entries in the new IO handle.
+  maintainClusterConnections("test-cluster", cluster_config);
+
+  // Put the host in backoff in the new IO handle.
+  io_handle_disabled->trackConnectionFailure("192.168.1.1", "test-cluster");
+
+  // With circuit breaker disabled, shouldAttemptConnectionToHost should always return true.
+  EXPECT_TRUE(io_handle_disabled->shouldAttemptConnectionToHost("192.168.1.1", "test-cluster"));
 }
 
 // Test trackConnectionFailure puts host in backoff.
@@ -3003,6 +3030,66 @@ TEST_F(ReverseConnectionIOHandleTest, OnBelowWriteBufferLowWatermark) {
   // The test passes if no exceptions are thrown.
 }
 
+// Test updateStateGauge() method with null extension.
+TEST_F(ReverseConnectionIOHandleTest, UpdateStateGaugeWithNullExtension) {
+  // Create a test IO handle with null extension BEFORE setting up thread local slot.
+  auto config = createDefaultTestConfig();
+  int test_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  EXPECT_GE(test_fd, 0);
+
+  auto io_handle_null_extension = std::make_unique<ReverseConnectionIOHandle>(
+      test_fd, config, cluster_manager_, nullptr, *stats_scope_);
+
+  // Call updateConnectionState which internally calls updateStateGauge.
+  // This should exit early when extension is null.
+  io_handle_null_extension->updateConnectionState("test-host2", "test-cluster", "test-key2",
+                                                  ReverseConnectionState::Connected);
+
+  // Now set up thread local slot and create a test IO handle with extension.
+  setupThreadLocalSlot();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  io_handle_->updateConnectionState("test-host", "test-cluster", "test-key",
+                                    ReverseConnectionState::Connected);
+
+  // Verify that stats were updated with extension.
+  auto stat_map_with_extension = extension_->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map_with_extension["test_scope.reverse_connections.host.test-host.connected"], 1);
+  EXPECT_EQ(
+      stat_map_with_extension["test_scope.reverse_connections.cluster.test-cluster.connected"], 1);
+
+  // Check that no stats exist for the null extension call
+  EXPECT_EQ(stat_map_with_extension["test_scope.reverse_connections.host.test-host2.connected"], 0);
+}
+
+// Test updateStateGauge() method with unknown state.
+TEST_F(ReverseConnectionIOHandleTest, UpdateStateGaugeWithUnknownState) {
+  // Set up thread local slot first so stats can be properly tracked.
+  setupThreadLocalSlot();
+
+  // Create a test IO handle with extension.
+  auto config = createDefaultTestConfig();
+  io_handle_ = createTestIOHandle(config);
+  EXPECT_NE(io_handle_, nullptr);
+
+  // First ensure host entry exists so the updateConnectionState call doesn't fail.
+  addHostConnectionInfo("test-host", "test-cluster", 1);
+
+  // Call updateConnectionState with an unknown state value.
+  // We'll use a value that's not in the enum to trigger the default case.
+  io_handle_->updateConnectionState("test-host", "test-cluster", "test-key",
+                                    static_cast<ReverseConnectionState>(999));
+
+  // Verify that the unknown state was handled correctly by checking if a gauge was created
+  // with "unknown" suffix.
+  auto stat_map = extension_->getCrossWorkerStatMap();
+
+  // The unknown state should have been handled and a gauge with "unknown" suffix should exist.
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.host.test-host.unknown"], 1);
+  EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.test-cluster.unknown"], 1);
+}
+
 // RCConnectionWrapper Tests.
 
 class RCConnectionWrapperTest : public testing::Test {
@@ -3198,6 +3285,78 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
 
   // Check that the body contains the protobuf serialized data.
   // The protobuf should contain tenant_uuid, cluster_uuid, and node_uuid.
+  EXPECT_THAT(written_data, testing::HasSubstr("\r\n\r\n")); // Empty line after headers
+
+  // Extract the body (everything after the double CRLF)
+  size_t body_start = written_data.find("\r\n\r\n");
+  EXPECT_NE(body_start, std::string::npos);
+  std::string body = written_data.substr(body_start + 4);
+  EXPECT_FALSE(body.empty());
+
+  // Verify the protobuf content by deserializing it.
+  envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeArg arg;
+  bool parse_success = arg.ParseFromString(body);
+  EXPECT_TRUE(parse_success);
+  EXPECT_EQ(arg.tenant_uuid(), "test-tenant");
+  EXPECT_EQ(arg.cluster_uuid(), "test-cluster");
+  EXPECT_EQ(arg.node_uuid(), "test-node");
+}
+
+// Test RCConnectionWrapper::connect() method with HTTP proxy (internal address) scenario.
+TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithHttpProxy) {
+  // Create a mock connection.
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+
+  // Set up connection expectations.
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(12345));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+
+  // Set up socket expectations for internal address (HTTP proxy scenario).
+  auto mock_internal_address = std::make_shared<Network::Address::EnvoyInternalInstance>(
+      "internal_listener_name", "endpoint_id_123");
+  auto mock_local_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 12345);
+
+  // Set up connection info provider expectations with internal address.
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke(
+          [mock_internal_address, mock_local_address]() -> const Network::ConnectionInfoProvider& {
+            static auto mock_provider = std::make_unique<Network::ConnectionInfoSetterImpl>(
+                mock_local_address, mock_internal_address);
+            return *mock_provider;
+          }));
+
+  // Capture the written buffer to verify HTTP POST content.
+  Buffer::OwnedImpl captured_buffer;
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillOnce(Invoke(
+          [&captured_buffer](Buffer::Instance& buffer, bool) { captured_buffer.add(buffer); }));
+
+  // Create a mock host.
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  // Create RCConnectionWrapper with the mock connection.
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  // Call connect() method.
+  std::string result = wrapper.connect("test-tenant", "test-cluster", "test-node");
+
+  // Verify connect() returns the local address.
+  EXPECT_EQ(result, "127.0.0.1:12345");
+
+  // Verify the HTTP POST request content.
+  std::string written_data = captured_buffer.toString();
+
+  // Check HTTP headers.
+  EXPECT_THAT(written_data, testing::HasSubstr("POST /reverse_connections/request HTTP/1.1"));
+  // For HTTP proxy scenario, the Host header should use the endpoint ID from the internal address.
+  EXPECT_THAT(written_data, testing::HasSubstr("Host: endpoint_id_123"));
+  EXPECT_THAT(written_data, testing::HasSubstr("Accept: */*"));
+  EXPECT_THAT(written_data, testing::HasSubstr("Content-length:"));
+
+  // Check that the body contains the protobuf serialized data.
   EXPECT_THAT(written_data, testing::HasSubstr("\r\n\r\n")); // Empty line after headers
 
   // Extract the body (everything after the double CRLF)

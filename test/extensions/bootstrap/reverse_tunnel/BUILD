@@ -40,9 +40,11 @@ envoy_cc_test(
     srcs = ["reverse_connection_address_test.cc"],
     deps = [
         "//source/common/network:address_lib",
+        "//source/common/network:default_socket_interface_lib",
         "//source/common/singleton:threadsafe_singleton",
         "//source/extensions/bootstrap/reverse_tunnel:reverse_connection_address_lib",
         "//test/mocks/network:network_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:test_runtime_lib",
     ],
 )

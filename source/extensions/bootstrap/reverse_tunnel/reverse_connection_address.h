@@ -58,6 +58,7 @@ public:
     auto* reverse_socket_interface = Network::socketInterface(
         "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface");
     if (reverse_socket_interface) {
+      ENVOY_LOG_MISC(debug, "Reverse connection address: using reverse socket interface");
       return *reverse_socket_interface;
     }
     // Fallback to default socket interface if reverse connection interface is not available.

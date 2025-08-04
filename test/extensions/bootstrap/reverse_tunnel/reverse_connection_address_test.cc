@@ -1,8 +1,10 @@
+#include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/singleton/threadsafe_singleton.h"
 #include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_address.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/registry.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -20,38 +22,41 @@ class ReverseConnectionAddressTest : public testing::Test {
 protected:
   void SetUp() override {}
 
-  // Helper function to create a test config
+  // Helper function to create a test config.
   ReverseConnectionAddress::ReverseConnectionConfig createTestConfig() {
     return ReverseConnectionAddress::ReverseConnectionConfig{
         "test-node-123", "test-cluster-456", "test-tenant-789", "remote-cluster-abc", 5};
   }
 
-  // Helper function to create a test address
+  // Helper function to create a test address.
   ReverseConnectionAddress createTestAddress() {
     return ReverseConnectionAddress(createTestConfig());
   }
+
+  // Set log level to debug for this test class.
+  LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 };
 
-// Test constructor and basic properties
+// Test constructor and basic properties.
 TEST_F(ReverseConnectionAddressTest, BasicSetup) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 
-  // Test that the address string is set correctly
+  // Test that the address string is set correctly.
   EXPECT_EQ(address.asString(), "127.0.0.1:0");
   EXPECT_EQ(address.asStringView(), "127.0.0.1:0");
 
-  // Test that the logical name is formatted correctly
+  // Test that the logical name is formatted correctly.
   std::string expected_logical_name =
       "rc://test-node-123:test-cluster-456:test-tenant-789@remote-cluster-abc:5";
   EXPECT_EQ(address.logicalName(), expected_logical_name);
 
-  // Test address type
+  // Test address type.
   EXPECT_EQ(address.type(), Network::Address::Type::Ip);
   EXPECT_EQ(address.addressType(), "reverse_connection");
 }
 
-// Test equality operator
+// Test equality operator.
 TEST_F(ReverseConnectionAddressTest, EqualityOperator) {
   auto config1 = createTestConfig();
   auto config2 = createTestConfig();
@@ -59,31 +64,31 @@ TEST_F(ReverseConnectionAddressTest, EqualityOperator) {
   ReverseConnectionAddress address1(config1);
   ReverseConnectionAddress address2(config2);
 
-  // Same config should be equal
+  // Same config should be equal.
   EXPECT_TRUE(address1 == address2);
   EXPECT_TRUE(address2 == address1);
 
-  // Different configs should not be equal
+  // Different configs should not be equal.
   config2.src_node_id = "different-node";
   ReverseConnectionAddress address3(config2);
   EXPECT_FALSE(address1 == address3);
   EXPECT_FALSE(address3 == address1);
 }
 
-// Test equality with different address types
+// Test equality with different address types.
 TEST_F(ReverseConnectionAddressTest, EqualityWithDifferentTypes) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 
-  // Create a regular IPv4 address
+  // Create a regular IPv4 address.
   auto regular_address = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080);
 
-  // Should not be equal to different address types
+  // Should not be equal to different address types.
   EXPECT_FALSE(address == *regular_address);
   EXPECT_FALSE(*regular_address == address);
 }
 
-// Test reverse connection config accessor
+// Test reverse connection config accessor.
 TEST_F(ReverseConnectionAddressTest, ReverseConnectionConfig) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
@@ -97,22 +102,22 @@ TEST_F(ReverseConnectionAddressTest, ReverseConnectionConfig) {
   EXPECT_EQ(retrieved_config.connection_count, config.connection_count);
 }
 
-// Test IP address properties
+// Test IP address properties.
 TEST_F(ReverseConnectionAddressTest, IpAddressProperties) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 
-  // Should have IP address
+  // Should have IP address.
   EXPECT_NE(address.ip(), nullptr);
   EXPECT_EQ(address.ip()->addressAsString(), "127.0.0.1");
   EXPECT_EQ(address.ip()->port(), 0);
 
-  // Should not have pipe or envoy internal address
+  // Should not have pipe or envoy internal address.
   EXPECT_EQ(address.pipe(), nullptr);
   EXPECT_EQ(address.envoyInternalAddress(), nullptr);
 }
 
-// Test socket address properties
+// Test socket address properties.
 TEST_F(ReverseConnectionAddressTest, SocketAddressProperties) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
@@ -123,54 +128,101 @@ TEST_F(ReverseConnectionAddressTest, SocketAddressProperties) {
   socklen_t addr_len = address.sockAddrLen();
   EXPECT_EQ(addr_len, sizeof(struct sockaddr_in));
 
-  // Verify the sockaddr structure
+  // Verify the sockaddr structure.
   const struct sockaddr_in* addr_in = reinterpret_cast<const struct sockaddr_in*>(sock_addr);
   EXPECT_EQ(addr_in->sin_family, AF_INET);
   EXPECT_EQ(addr_in->sin_port, htons(0));                      // Port 0
   EXPECT_EQ(addr_in->sin_addr.s_addr, htonl(INADDR_LOOPBACK)); // 127.0.0.1
 }
 
-// Test network namespace
+// Test network namespace.
 TEST_F(ReverseConnectionAddressTest, NetworkNamespace) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 
-  // Should not have a network namespace
+  // Should not have a network namespace.
   auto namespace_opt = address.networkNamespace();
   EXPECT_FALSE(namespace_opt.has_value());
 }
 
-// Test socket interface
+// Test socket interface.
 TEST_F(ReverseConnectionAddressTest, SocketInterface) {
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 
-  // Should return a socket interface (either reverse connection or default)
+  // Should return the default socket interface.
   const auto& socket_interface = address.socketInterface();
   EXPECT_NE(&socket_interface, nullptr);
 }
 
-// Test socket interface with registered reverse connection interface
+// Test socket interface with registered reverse connection interface.
 TEST_F(ReverseConnectionAddressTest, SocketInterfaceWithReverseInterface) {
-  // Create a mock socket interface with supported IP versions
-  auto mock_socket_interface = std::make_unique<NiceMock<Network::MockSocketInterface>>(
-      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4,
-                                               Network::Address::IpVersion::v6});
-  auto* mock_interface_ptr = mock_socket_interface.get();
+  // Create a mock socket interface that extends SocketInterfaceBase and registers itself
+  class TestReverseSocketInterface : public Network::SocketInterfaceBase {
+  public:
+    TestReverseSocketInterface() = default;
 
-  // Use StackedScopedInjectableLoaderForTest to inject the mock interface
-  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(
-      std::move(mock_socket_interface));
+    // Network::SocketInterface
+    Network::IoHandlePtr socket(Network::Socket::Type socket_type, Network::Address::Type addr_type,
+                                Network::Address::IpVersion version, bool socket_v6only,
+                                const Network::SocketCreationOptions& options) const override {
+      UNREFERENCED_PARAMETER(socket_v6only);
+      UNREFERENCED_PARAMETER(options);
+      // Create a regular socket for testing
+      if (socket_type == Network::Socket::Type::Stream && addr_type == Network::Address::Type::Ip) {
+        int domain = (version == Network::Address::IpVersion::v4) ? AF_INET : AF_INET6;
+        int sock_fd = ::socket(domain, SOCK_STREAM, 0);
+        if (sock_fd == -1) {
+          return nullptr;
+        }
+        return std::make_unique<Network::IoSocketHandleImpl>(sock_fd);
+      }
+      return nullptr;
+    }
+
+    Network::IoHandlePtr socket(Network::Socket::Type socket_type,
+                                const Network::Address::InstanceConstSharedPtr addr,
+                                const Network::SocketCreationOptions& options) const override {
+      // Delegate to the other socket method
+      return socket(socket_type, addr->type(),
+                    addr->ip() ? addr->ip()->version() : Network::Address::IpVersion::v4, false,
+                    options);
+    }
+
+    bool ipFamilySupported(int domain) override { return domain == AF_INET || domain == AF_INET6; }
+
+    // Server::Configuration::BootstrapExtensionFactory
+    Server::BootstrapExtensionPtr
+    createBootstrapExtension(const Protobuf::Message& config,
+                             Server::Configuration::ServerFactoryContext& context) override {
+      UNREFERENCED_PARAMETER(config);
+      UNREFERENCED_PARAMETER(context);
+      return nullptr;
+    }
+
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+
+    std::string name() const override {
+      return "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface";
+    }
+
+    std::set<std::string> configTypes() override { return {}; }
+  };
+
+  // Register the test interface in the registry
+  TestReverseSocketInterface test_interface;
+  Registry::InjectFactory<Server::Configuration::BootstrapExtensionFactory> registered_factory(
+      test_interface);
 
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 
-  // Should return the injected mock socket interface
+  // Should return the registered test socket interface.
   const auto& socket_interface = address.socketInterface();
-  EXPECT_EQ(&socket_interface, mock_interface_ptr);
+  EXPECT_EQ(&socket_interface, &test_interface);
 }
 
-// Test with empty configuration values
+// Test with empty configuration values.
 TEST_F(ReverseConnectionAddressTest, EmptyConfigValues) {
   ReverseConnectionAddress::ReverseConnectionConfig config;
   config.src_node_id = "";
@@ -181,7 +233,7 @@ TEST_F(ReverseConnectionAddressTest, EmptyConfigValues) {
 
   ReverseConnectionAddress address(config);
 
-  // Should still work with empty values
+  // Should still work with empty values.
   EXPECT_EQ(address.asString(), "127.0.0.1:0");
   EXPECT_EQ(address.logicalName(), "rc://::@:0");
 
@@ -193,7 +245,7 @@ TEST_F(ReverseConnectionAddressTest, EmptyConfigValues) {
   EXPECT_EQ(retrieved_config.connection_count, 0);
 }
 
-// Test multiple instances with different configurations
+// Test multiple instances with different configurations.
 TEST_F(ReverseConnectionAddressTest, MultipleInstances) {
   ReverseConnectionAddress::ReverseConnectionConfig config1;
   config1.src_node_id = "node1";
@@ -212,29 +264,29 @@ TEST_F(ReverseConnectionAddressTest, MultipleInstances) {
   ReverseConnectionAddress address1(config1);
   ReverseConnectionAddress address2(config2);
 
-  // Should not be equal
+  // Should not be equal.
   EXPECT_FALSE(address1 == address2);
   EXPECT_FALSE(address2 == address1);
 
-  // Should have different logical names
+  // Should have different logical names.
   EXPECT_NE(address1.logicalName(), address2.logicalName());
 
   // Should have same address string (both use 127.0.0.1:0)
   EXPECT_EQ(address1.asString(), address2.asString());
 }
 
-// Test copy constructor and assignment (if implemented)
+// Test copy constructor and assignment (if implemented).
 TEST_F(ReverseConnectionAddressTest, CopyAndAssignment) {
   auto config = createTestConfig();
   ReverseConnectionAddress original(config);
 
-  // Test copy constructor
+  // Test copy constructor.
   ReverseConnectionAddress copied(original);
   EXPECT_TRUE(original == copied);
   EXPECT_EQ(original.logicalName(), copied.logicalName());
   EXPECT_EQ(original.asString(), copied.asString());
 
-  // Test assignment operator
+  // Test assignment operator.
   ReverseConnectionAddress::ReverseConnectionConfig config2;
   config2.src_node_id = "different-node";
   config2.src_cluster_id = "different-cluster";

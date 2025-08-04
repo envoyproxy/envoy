@@ -733,9 +733,8 @@ private:
  */
 class ReverseConnectionLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
-  explicit ReverseConnectionLoadBalancerContext(const std::string& host_to_select) {
-    host_to_select_ = std::make_pair(host_to_select, false);
-  }
+  explicit ReverseConnectionLoadBalancerContext(const std::string& host_to_select)
+      : host_string_(host_to_select), host_to_select_(std::make_pair(host_string_, false)) {}
 
   /**
    * @return optional OverrideHost specifying the host to initiate reverse connection to.
@@ -745,7 +744,10 @@ public:
   }
 
 private:
-  OverrideHost host_to_select_;
+  // Own the string data. This is to prevent use after free when the host_to_select
+  // is destroyed.
+  std::string host_string_;
+  OverrideHost host_to_select_; // string_view references host_string_
 };
 
 /**

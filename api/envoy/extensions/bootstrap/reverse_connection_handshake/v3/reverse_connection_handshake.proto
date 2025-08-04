@@ -15,6 +15,16 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Reverse Connection Handshake protocol for establishing reverse connections between Envoy instances.
 // [#extension: envoy.bootstrap.reverse_connection_handshake]
 
+// Configuration for the reverse connection handshake extension.
+// This extension provides message definitions for establishing reverse connections
+// between Envoy instances.
+message ReverseConnectionHandshakeConfig {
+  // This is a placeholder config message for the reverse connection handshake extension.
+  // The extension primarily provides message definitions for the handshake protocol
+  // rather than configuration.
+  bool enabled = 1;
+}
+
 // Config sent by the local cluster as part of the Initiation workflow.
 // This message combined with message 'ReverseConnHandshakeRet' which is
 // sent as a response can be used to transfer/negotiate parameter between the

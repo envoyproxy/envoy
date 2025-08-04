@@ -220,6 +220,11 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
             body.length(), arg.DebugString());
   std::string host_value;
   const auto& remote_address = connection_->connectionInfoProvider().remoteAddress();
+  // This is used when reverse connections need to be established through a HTTP proxy.
+  // The reverse connection listener connects to an internal cluster, to which an
+  // internal listener listens. This internal listener has tunneling configuration
+  // to tcp proxy the reverse connection requests over HTTP/1 CONNECT to the remote
+  // proxy.
   if (remote_address->type() == Network::Address::Type::EnvoyInternal) {
     const auto& internal_address =
         std::dynamic_pointer_cast<const Network::Address::EnvoyInternalInstance>(remote_address);
