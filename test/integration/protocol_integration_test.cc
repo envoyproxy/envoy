@@ -1878,9 +1878,9 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
       Http::TestRequestTrailerMapImpl{{"trailer1", "value1"}, {"trailer_2", "value2"}});
   waitForNextUpstreamRequest();
 
-  EXPECT_THAT(upstream_request_->headers(), Not(HeaderHasValueRef("foo_bar", "baz")));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("foo_bar", "baz")));
   // Headers with underscores should be dropped from request headers and trailers.
-  EXPECT_THAT(*upstream_request_->trailers(), Not(HeaderHasValueRef("trailer_2", "value2")));
+  EXPECT_THAT(*upstream_request_->trailers(), Not(ContainsHeader("trailer_2", "value2")));
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, false);
   upstream_request_->encodeData("b", false);
@@ -1890,8 +1890,8 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresDropped) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   // Both response headers and trailers must retain headers with underscores.
-  EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
-  EXPECT_THAT(*response->trailers(), HeaderHasValueRef("response_trailer", "ok"));
+  EXPECT_THAT(response->headers(), ContainsHeader("bar_baz", "fooz"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader("response_trailer", "ok"));
   Stats::Store& stats = test_server_->server().stats();
   std::string stat_name;
   switch (downstreamProtocol()) {
@@ -1924,13 +1924,13 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresRemainByDefault) {
                                      {"foo_bar", "baz"}});
   waitForNextUpstreamRequest();
 
-  EXPECT_THAT(upstream_request_->headers(), HeaderHasValueRef("foo_bar", "baz"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("foo_bar", "baz"));
   upstream_request_->encodeHeaders(
       Http::TestResponseHeaderMapImpl{{":status", "200"}, {"bar_baz", "fooz"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
+  EXPECT_THAT(response->headers(), ContainsHeader("bar_baz", "fooz"));
 }
 
 // Verify that request with headers containing underscores is rejected when configured.
@@ -2036,8 +2036,8 @@ TEST_P(ProtocolIntegrationTest, HeadersWithUnderscoresInResponseAllowRequest) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   // Both response headers and trailers must retain headers with underscores.
-  EXPECT_THAT(response->headers(), HeaderHasValueRef("bar_baz", "fooz"));
-  EXPECT_THAT(*response->trailers(), HeaderHasValueRef("response_trailer", "ok"));
+  EXPECT_THAT(response->headers(), ContainsHeader("bar_baz", "fooz"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader("response_trailer", "ok"));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ValidZeroLengthContent) {
@@ -5556,7 +5556,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidSchemeHeaderWithWhitespace) {
     // The scheme header is not conveyed in HTTP/1.
     EXPECT_EQ(nullptr, upstream_request_->headers().Scheme());
   } else {
-    EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().Scheme, "http"));
+    EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Http::Headers::get().Scheme, "http"));
   }
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
