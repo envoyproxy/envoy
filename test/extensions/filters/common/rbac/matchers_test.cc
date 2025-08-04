@@ -14,6 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -229,22 +230,22 @@ TEST(IPMatcher, IPMatcher) {
 
   auto connection_remote_matcher =
       IPMatcher::create(connection_remote_cidr, IPMatcher::Type::ConnectionRemote);
-  ASSERT_TRUE(connection_remote_matcher.ok());
+  ASSERT_OK(connection_remote_matcher);
   checkMatcher(*connection_remote_matcher.value(), true, conn, headers, info);
 
   auto downstream_local_matcher =
       IPMatcher::create(downstream_local_cidr, IPMatcher::Type::DownstreamLocal);
-  ASSERT_TRUE(downstream_local_matcher.ok());
+  ASSERT_OK(downstream_local_matcher);
   checkMatcher(*downstream_local_matcher.value(), true, conn, headers, info);
 
   auto downstream_direct_remote_matcher =
       IPMatcher::create(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote);
-  ASSERT_TRUE(downstream_direct_remote_matcher.ok());
+  ASSERT_OK(downstream_direct_remote_matcher);
   checkMatcher(*downstream_direct_remote_matcher.value(), true, conn, headers, info);
 
   auto downstream_remote_matcher =
       IPMatcher::create(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote);
-  ASSERT_TRUE(downstream_remote_matcher.ok());
+  ASSERT_OK(downstream_remote_matcher);
   checkMatcher(*downstream_remote_matcher.value(), true, conn, headers, info);
 
   connection_remote_cidr.set_address_prefix("4.5.6.7");
@@ -254,22 +255,22 @@ TEST(IPMatcher, IPMatcher) {
 
   auto connection_remote_matcher2 =
       IPMatcher::create(connection_remote_cidr, IPMatcher::Type::ConnectionRemote);
-  ASSERT_TRUE(connection_remote_matcher2.ok());
+  ASSERT_OK(connection_remote_matcher2);
   checkMatcher(*connection_remote_matcher2.value(), false, conn, headers, info);
 
   auto downstream_local_matcher2 =
       IPMatcher::create(downstream_local_cidr, IPMatcher::Type::DownstreamLocal);
-  ASSERT_TRUE(downstream_local_matcher2.ok());
+  ASSERT_OK(downstream_local_matcher2);
   checkMatcher(*downstream_local_matcher2.value(), false, conn, headers, info);
 
   auto downstream_direct_remote_matcher2 =
       IPMatcher::create(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote);
-  ASSERT_TRUE(downstream_direct_remote_matcher2.ok());
+  ASSERT_OK(downstream_direct_remote_matcher2);
   checkMatcher(*downstream_direct_remote_matcher2.value(), false, conn, headers, info);
 
   auto downstream_remote_matcher2 =
       IPMatcher::create(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote);
-  ASSERT_TRUE(downstream_remote_matcher2.ok());
+  ASSERT_OK(downstream_remote_matcher2);
   checkMatcher(*downstream_remote_matcher2.value(), false, conn, headers, info);
 }
 
@@ -1202,7 +1203,7 @@ TEST(IPMatcher, MatchesWithNullIpAddress) {
   range.mutable_prefix_len()->set_value(24);
 
   auto matcher_result = IPMatcher::create(range, IPMatcher::Type::ConnectionRemote);
-  ASSERT_TRUE(matcher_result.ok());
+  ASSERT_OK(matcher_result);
   const auto& matcher = *matcher_result.value();
 
   NiceMock<Envoy::Network::MockConnection> conn;
@@ -1223,7 +1224,7 @@ TEST(IPMatcher, MatchesWithConnectionRemoteAddress) {
 
   // Create matcher with a specific type
   auto matcher_result = IPMatcher::create(range, IPMatcher::Type::ConnectionRemote);
-  ASSERT_TRUE(matcher_result.ok());
+  ASSERT_OK(matcher_result);
   const auto& matcher = *matcher_result.value();
 
   NiceMock<Envoy::Network::MockConnection> conn;

@@ -1,5 +1,6 @@
 #include "source/extensions/filters/common/rbac/matchers.h"
 
+#include "envoy/common/exception.h"
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -26,10 +27,7 @@ MatcherConstPtr Matcher::create(const envoy::config::rbac::v3::Permission& permi
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationIp: {
     auto matcher_result =
         IPMatcher::create(permission.destination_ip(), IPMatcher::Type::DownstreamLocal);
-    if (!matcher_result.ok()) {
-      throwEnvoyExceptionOrPanic(
-          fmt::format("Failed to create IP matcher: {}", matcher_result.status().message()));
-    }
+    THROW_IF_NOT_OK_REF(matcher_result.status());
     return std::move(matcher_result.value());
   }
   case envoy::config::rbac::v3::Permission::RuleCase::kDestinationPort:
@@ -83,28 +81,19 @@ MatcherConstPtr Matcher::create(const envoy::config::rbac::v3::Principal& princi
   case envoy::config::rbac::v3::Principal::IdentifierCase::kSourceIp: {
     auto matcher_result =
         IPMatcher::create(principal.source_ip(), IPMatcher::Type::ConnectionRemote);
-    if (!matcher_result.ok()) {
-      throwEnvoyExceptionOrPanic(
-          fmt::format("Failed to create IP matcher: {}", matcher_result.status().message()));
-    }
+    THROW_IF_NOT_OK_REF(matcher_result.status());
     return std::move(matcher_result.value());
   }
   case envoy::config::rbac::v3::Principal::IdentifierCase::kDirectRemoteIp: {
     auto matcher_result =
         IPMatcher::create(principal.direct_remote_ip(), IPMatcher::Type::DownstreamDirectRemote);
-    if (!matcher_result.ok()) {
-      throwEnvoyExceptionOrPanic(
-          fmt::format("Failed to create IP matcher: {}", matcher_result.status().message()));
-    }
+    THROW_IF_NOT_OK_REF(matcher_result.status());
     return std::move(matcher_result.value());
   }
   case envoy::config::rbac::v3::Principal::IdentifierCase::kRemoteIp: {
     auto matcher_result =
         IPMatcher::create(principal.remote_ip(), IPMatcher::Type::DownstreamRemote);
-    if (!matcher_result.ok()) {
-      throwEnvoyExceptionOrPanic(
-          fmt::format("Failed to create IP matcher: {}", matcher_result.status().message()));
-    }
+    THROW_IF_NOT_OK_REF(matcher_result.status());
     return std::move(matcher_result.value());
   }
   case envoy::config::rbac::v3::Principal::IdentifierCase::kHeader:
@@ -260,28 +249,25 @@ IPMatcher::IPMatcher(std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie, Type t
 
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
                         const StreamInfo::StreamInfo& info) const {
-  // Directly get address and check trie without intermediate shared_ptr copies.
-  Network::Address::InstanceConstSharedPtr ip;
+  // Get address and check trie.
+  Network::Address::InstanceConstSharedPtr address;
   switch (type_) {
   case ConnectionRemote:
-    ip = connection.connectionInfoProvider().remoteAddress();
+    address = connection.connectionInfoProvider().remoteAddress();
     break;
   case DownstreamLocal:
-    ip = info.downstreamAddressProvider().localAddress();
+    address = info.downstreamAddressProvider().localAddress();
     break;
   case DownstreamDirectRemote:
-    ip = info.downstreamAddressProvider().directRemoteAddress();
+    address = info.downstreamAddressProvider().directRemoteAddress();
     break;
   case DownstreamRemote:
-    ip = info.downstreamAddressProvider().remoteAddress();
+    address = info.downstreamAddressProvider().remoteAddress();
     break;
   }
 
-  if (!ip) {
-    return false;
-  }
-
-  return !trie_->getData(ip).empty();
+  // Check if address is null and directly pass to trie getData.
+  return address && !trie_->getData(address).empty();
 }
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
