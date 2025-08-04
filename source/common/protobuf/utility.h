@@ -382,7 +382,7 @@ public:
   }
 
   /**
-   * Utility method to make transition to protobuf bytes using absl::Cord instead of std::string.
+   * Utility method to swap between protobuf bytes type using absl::Cord instead of std::string.
    * Noop for now.
    */
   static const std::string& bytesToString(const std::string& bytes) { return bytes; }
