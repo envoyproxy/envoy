@@ -510,9 +510,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     } else if (isEnvoyOverloadError(status)) {
-      // The other codecs aren't wired to send this status.
-      ASSERT(codec_->protocol() < Protocol::Http2,
-             "Expected only HTTP1.1 and below to send overload error.");
       stats_.named_.downstream_rq_overload_close_.inc();
       handleCodecOverloadError(status.message());
       return Network::FilterStatus::StopIteration;
@@ -1647,7 +1644,7 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
 
   // See how long this stream has been alive, and adjust the timeout
   // accordingly.
-  std::chrono::duration time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
+  std::chrono::milliseconds time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
       connection_manager_.timeSource().monotonicTime() -
       filter_manager_.streamInfo().startTimeMonotonic());
   if (timeout > time_used) {

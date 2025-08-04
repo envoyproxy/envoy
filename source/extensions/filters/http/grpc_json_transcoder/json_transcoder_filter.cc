@@ -667,6 +667,11 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
+  if (error_ || !transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     ENVOY_STREAM_LOG(
         debug,
@@ -674,10 +679,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
         "without transcoding.",
         *encoder_callbacks_);
     error_ = true;
-  }
-
-  if (error_ || !transcoder_) {
-    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
