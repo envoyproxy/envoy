@@ -37,7 +37,7 @@ SpanContextExtractor::~SpanContextExtractor() = default;
 bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decision) {
   bool sampled(false);
 
-  // Try B3 single format first
+  // Try B3 single format first.
   auto b3_header_entry = ZipkinCoreConstants::get().B3.get(trace_context_);
   if (b3_header_entry.has_value()) {
     // This is an implicitly untrusted header, so only the first value is used.
@@ -64,7 +64,7 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
     return getSamplingFlags(b3[sampled_pos], tracing_decision);
   }
 
-  // Try individual B3 sampled header
+  // Try individual B3 sampled header.
   auto x_b3_sampled_entry = ZipkinCoreConstants::get().X_B3_SAMPLED.get(trace_context_);
   if (x_b3_sampled_entry.has_value()) {
     // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
@@ -75,7 +75,7 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
     return sampled;
   }
 
-  // Try W3C Trace Context format as fallback only if enabled
+  // Try W3C Trace Context format as fallback only if enabled.
   if (w3c_fallback_enabled_) {
     Extensions::Tracers::OpenTelemetry::SpanContextExtractor w3c_extractor(
         const_cast<Tracing::TraceContext&>(trace_context_));
@@ -91,12 +91,12 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
 }
 
 std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sampled) {
-  // Try B3 single format first
+  // Try B3 single format first.
   if (ZipkinCoreConstants::get().B3.get(trace_context_).has_value()) {
     return extractSpanContextFromB3SingleFormat(is_sampled);
   }
 
-  // Try individual B3 headers
+  // Try individual B3 headers.
   auto b3_trace_id_entry = ZipkinCoreConstants::get().X_B3_TRACE_ID.get(trace_context_);
   auto b3_span_id_entry = ZipkinCoreConstants::get().X_B3_SPAN_ID.get(trace_context_);
   if (b3_span_id_entry.has_value() && b3_trace_id_entry.has_value()) {
@@ -139,7 +139,7 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
     return {SpanContext(trace_id_high, trace_id, span_id, parent_id, is_sampled), true};
   }
 
-  // Try W3C Trace Context format as fallback only if enabled
+  // Try W3C Trace Context format as fallback only if enabled.
   if (w3c_fallback_enabled_) {
     Extensions::Tracers::OpenTelemetry::SpanContextExtractor w3c_extractor(
         const_cast<Tracing::TraceContext&>(trace_context_));
@@ -239,7 +239,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
     }
 
     if (b3.length() > pos) {
-      // If we are at this point, we should have a parent ID, encoded as "-[0-9a-f]{16}"
+      // If we are at this point, we should have a parent ID, encoded as "-[0-9a-f]{16}".
       if (b3.length() != pos + 17) {
         throw ExtractorException("Invalid input: truncated");
       }
@@ -260,14 +260,14 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
 
 std::pair<SpanContext, bool> SpanContextExtractor::convertW3CToZipkin(
     const Extensions::Tracers::OpenTelemetry::SpanContext& w3c_context, bool fallback_sampled) {
-  // Convert W3C 128-bit trace ID (32 hex chars) to Zipkin format
+  // Convert W3C 128-bit trace ID (32 hex chars) to Zipkin format.
   const std::string& trace_id_str = w3c_context.traceId();
 
   if (trace_id_str.length() != 32) {
     throw ExtractorException(fmt::format("Invalid W3C trace ID length: {}", trace_id_str.length()));
   }
 
-  // Split 128-bit trace ID into high and low 64-bit parts for Zipkin
+  // Split 128-bit trace ID into high and low 64-bit parts for Zipkin.
   const std::string trace_id_high_str = trace_id_str.substr(0, 16);
   const std::string trace_id_low_str = trace_id_str.substr(16, 16);
 
@@ -278,7 +278,7 @@ std::pair<SpanContext, bool> SpanContextExtractor::convertW3CToZipkin(
     throw ExtractorException(fmt::format("Invalid W3C trace ID: {}", trace_id_str));
   }
 
-  // Convert W3C span ID (16 hex chars) to Zipkin span ID
+  // Convert W3C span ID (16 hex chars) to Zipkin span ID.
   const std::string& span_id_str = w3c_context.spanId();
   if (span_id_str.length() != 16) {
     throw ExtractorException(fmt::format("Invalid W3C span ID length: {}", span_id_str.length()));
@@ -290,10 +290,10 @@ std::pair<SpanContext, bool> SpanContextExtractor::convertW3CToZipkin(
   }
 
   // W3C doesn't have a direct parent span concept like B3
-  // The W3C span-id becomes our span-id, and we don't set a parent
+  // The W3C span-id becomes our span-id, and we don't set a parent.
   uint64_t parent_id(0);
 
-  // Use W3C sampling decision, or fallback if not specified
+  // Use W3C sampling decision, or fallback if not specified.
   bool sampled = w3c_context.sampled() || fallback_sampled;
 
   return {SpanContext(trace_id_high, trace_id, span_id, parent_id, sampled), true};

@@ -206,6 +206,54 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
   }
 }
 
+TEST_F(ZipkinDriverTest, W3cFallbackConfiguration) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  {
+    // Test default w3c_fallback value (false).
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_FALSE(driver_->w3cFallbackEnabled());
+  }
+
+  {
+    // Test w3c_fallback explicitly set to false.
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    w3c_fallback: false
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_FALSE(driver_->w3cFallbackEnabled());
+  }
+
+  {
+    // Test w3c_fallback explicitly set to true.
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    w3c_fallback: true
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_TRUE(driver_->w3cFallbackEnabled());
+  }
+}
+
 TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
   cm_.initializeClusters({"fake_cluster"}, {});
   ON_CALL(*cm_.active_clusters_["fake_cluster"]->info_, addedViaApi()).WillByDefault(Return(true));
