@@ -1,11 +1,11 @@
+#include "source/common/network/socket_interface.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 #include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_address.h"
+
+#include "test/mocks/network/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-#include "source/common/network/socket_interface.h"
-#include "source/common/singleton/threadsafe_singleton.h"
-#include "test/mocks/network/mocks.h"
 
 using testing::_;
 using testing::Return;
@@ -154,12 +154,14 @@ TEST_F(ReverseConnectionAddressTest, SocketInterface) {
 TEST_F(ReverseConnectionAddressTest, SocketInterfaceWithReverseInterface) {
   // Create a mock socket interface with supported IP versions
   auto mock_socket_interface = std::make_unique<NiceMock<Network::MockSocketInterface>>(
-      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4, Network::Address::IpVersion::v6});
+      std::vector<Network::Address::IpVersion>{Network::Address::IpVersion::v4,
+                                               Network::Address::IpVersion::v6});
   auto* mock_interface_ptr = mock_socket_interface.get();
-  
+
   // Use StackedScopedInjectableLoaderForTest to inject the mock interface
-  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(std::move(mock_socket_interface));
-  
+  StackedScopedInjectableLoaderForTest<Network::SocketInterface> new_interface(
+      std::move(mock_socket_interface));
+
   auto config = createTestConfig();
   ReverseConnectionAddress address(config);
 

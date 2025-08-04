@@ -208,6 +208,7 @@ class ReverseConnectionIOHandle : public Network::IoSocketHandleImpl,
 
   friend class ReverseConnectionIOHandleTest;
   friend class RCConnectionWrapperTest;
+  friend class DownstreamReverseConnectionIOHandleTest;
 
 public:
   /**
@@ -301,12 +302,6 @@ public:
    * No-op for reverse connections.
    */
   void onBelowWriteBufferLowWatermark() override {}
-
-  /**
-   * Check if trigger mechanism is ready for accepting connections.
-   * @return true if the trigger mechanism is initialized and ready.
-   */
-  bool isTriggerReady() const;
 
   /**
    * Get the file descriptor for the pipe monitor used to wake up accept().
@@ -481,10 +476,10 @@ private:
     absl::flat_hash_set<std::string> connection_keys; // Connection keys for stats tracking
     uint32_t target_connection_count;                 // Target connection count for the host
     uint32_t failure_count{0};                        // Number of consecutive failures
-    std::chrono::steady_clock::time_point last_failure_time{
-        std::chrono::steady_clock::now()}; // Time of last failure
-    std::chrono::steady_clock::time_point backoff_until{
-        std::chrono::steady_clock::now()}; // Backoff end time
+    // The thread local dispatcher may not be available during construction for
+    // calling dispatcher.timeSource().monotonicTime().
+    std::chrono::steady_clock::time_point last_failure_time; // NO_CHECK_FORMAT(real_time)
+    std::chrono::steady_clock::time_point backoff_until;     // NO_CHECK_FORMAT(real_time)
     absl::flat_hash_map<std::string, ReverseConnectionState>
         connection_states; // State tracking per connection
   };
@@ -751,6 +746,39 @@ public:
 
 private:
   OverrideHost host_to_select_;
+};
+
+/**
+ * Custom IoHandle for downstream reverse connections that owns a ConnectionSocket.
+ * This class is used internally by ReverseConnectionIOHandle to manage the lifecycle
+ * of accepted downstream connections.
+ */
+class DownstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
+public:
+  /**
+   * Constructor that takes ownership of the socket and stores parent pointer and connection key.
+   */
+  DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
+                                      ReverseConnectionIOHandle* parent,
+                                      const std::string& connection_key);
+
+  ~DownstreamReverseConnectionIOHandle() override;
+
+  // Network::IoHandle overrides
+  Api::IoCallUint64Result close() override;
+
+  /**
+   * Get the owned socket for read-only access.
+   */
+  const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
+
+private:
+  // The socket that this IOHandle owns and manages lifetime for
+  Network::ConnectionSocketPtr owned_socket_;
+  // Pointer to parent ReverseConnectionIOHandle for connection lifecycle management
+  ReverseConnectionIOHandle* parent_;
+  // Connection key for tracking this specific connection
+  std::string connection_key_;
 };
 
 } // namespace ReverseConnection

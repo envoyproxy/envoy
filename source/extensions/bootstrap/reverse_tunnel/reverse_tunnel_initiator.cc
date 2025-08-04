@@ -13,6 +13,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/address_impl.h"
@@ -28,77 +29,57 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-/**
- * Custom IoHandle for downstream reverse connections that owns a ConnectionSocket.
- */
-class DownstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
-public:
-  /**
-   * Constructor that takes ownership of the socket and stores parent pointer and connection key.
-   */
-  DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
-                                      ReverseConnectionIOHandle* parent,
-                                      const std::string& connection_key)
-      : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), owned_socket_(std::move(socket)),
-        parent_(parent), connection_key_(connection_key) {
+// DownstreamReverseConnectionIOHandle constructor implementation
+DownstreamReverseConnectionIOHandle::DownstreamReverseConnectionIOHandle(
+    Network::ConnectionSocketPtr socket, ReverseConnectionIOHandle* parent,
+    const std::string& connection_key)
+    : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), owned_socket_(std::move(socket)),
+      parent_(parent), connection_key_(connection_key) {
+  ENVOY_LOG(debug,
+            "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {} for "
+            "connection key: {}",
+            fd_, connection_key_);
+}
+
+// DownstreamReverseConnectionIOHandle destructor implementation
+DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
+  ENVOY_LOG(
+      debug,
+      "DownstreamReverseConnectionIOHandle: destroying handle for FD: {} with connection key: {}",
+      fd_, connection_key_);
+}
+
+// DownstreamReverseConnectionIOHandle close() implementation
+Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
+  ENVOY_LOG(
+      debug,
+      "DownstreamReverseConnectionIOHandle: closing handle for FD: {} with connection key: {}", fd_,
+      connection_key_);
+
+  // Prevent double-closing by checking if already closed
+  if (fd_ < 0) {
     ENVOY_LOG(debug,
-              "DownstreamReverseConnectionIOHandle: taking ownership of socket with FD: {} for "
-              "connection key: {}",
-              fd_, connection_key_);
+              "DownstreamReverseConnectionIOHandle: handle already closed for connection key: {}",
+              connection_key_);
+    return Api::ioCallUint64ResultNoError();
   }
 
-  ~DownstreamReverseConnectionIOHandle() override {
+  // Notify parent that this downstream connection has been closed
+  // This will trigger re-initiation of the reverse connection if needed.
+  if (parent_) {
+    parent_->onDownstreamConnectionClosed(connection_key_);
     ENVOY_LOG(
         debug,
-        "DownstreamReverseConnectionIOHandle: destroying handle for FD: {} with connection key: {}",
-        fd_, connection_key_);
+        "DownstreamReverseConnectionIOHandle: notified parent of connection closure for key: {}",
+        connection_key_);
   }
 
-  // Network::IoHandle overrides
-  Api::IoCallUint64Result close() override {
-    ENVOY_LOG(
-        debug,
-        "DownstreamReverseConnectionIOHandle: closing handle for FD: {} with connection key: {}",
-        fd_, connection_key_);
-
-    // Prevent double-closing by checking if already closed
-    if (fd_ < 0) {
-      ENVOY_LOG(debug,
-                "DownstreamReverseConnectionIOHandle: handle already closed for connection key: {}",
-                connection_key_);
-      return Api::ioCallUint64ResultNoError();
-    }
-
-    // Notify parent that this downstream connection has been closed
-    // This will trigger re-initiation of the reverse connection if needed.
-    if (parent_) {
-      parent_->onDownstreamConnectionClosed(connection_key_);
-      ENVOY_LOG(
-          debug,
-          "DownstreamReverseConnectionIOHandle: notified parent of connection closure for key: {}",
-          connection_key_);
-    }
-
-    // Reset the owned socket to properly close the connection.
-    if (owned_socket_) {
-      owned_socket_.reset();
-    }
-    return IoSocketHandleImpl::close();
+  // Reset the owned socket to properly close the connection.
+  if (owned_socket_) {
+    owned_socket_.reset();
   }
-
-  /**
-   * Get the owned socket for read-only access.
-   */
-  const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
-
-private:
-  // The socket that this IOHandle owns and manages lifetime for
-  Network::ConnectionSocketPtr owned_socket_;
-  // Pointer to parent ReverseConnectionIOHandle for connection lifecycle management
-  ReverseConnectionIOHandle* parent_;
-  // Connection key for tracking this specific connection
-  std::string connection_key_;
-};
+  return IoSocketHandleImpl::close();
+}
 
 // Forward declaration.
 class ReverseConnectionIOHandle;
@@ -234,7 +215,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   ENVOY_LOG(debug,
             "RCConnectionWrapper: Creating protobuf with tenant='{}', cluster='{}', node='{}'",
             src_tenant_id, src_cluster_id, src_node_id);
-  std::string body = arg.SerializeAsString();
+  std::string body = arg.SerializeAsString(); // NOLINT(protobuf-use-MessageUtil-hash)
   ENVOY_LOG(debug, "RCConnectionWrapper: Serialized protobuf body length: {}, debug: '{}'",
             body.length(), arg.DebugString());
   std::string host_value;
@@ -505,7 +486,10 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
             socklen_t addr_len = remote_addr->sockAddrLen();
 
             if (*addrlen >= addr_len) {
-              memcpy(addr, sock_addr, addr_len);
+              // Use memcpy directly because socket addresses have variable lengths
+              // (sockaddr_in vs sockaddr_in6) and safeMemcpy functions only work with fixed-size
+              // types
+              memcpy(addr, sock_addr, addr_len); // NOLINT(safe-memcpy)
               *addrlen = addr_len;
               ENVOY_LOG(trace, "ReverseConnectionIOHandle: copied {} bytes of address data",
                         addr_len);
@@ -525,7 +509,10 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
             const sockaddr* sock_addr = synthetic_addr->sockAddr();
             socklen_t addr_len = synthetic_addr->sockAddrLen();
             if (*addrlen >= addr_len) {
-              memcpy(addr, sock_addr, addr_len);
+              // Use memcpy directly because socket addresses have variable lengths
+              // (sockaddr_in vs sockaddr_in6) and safeMemcpy functions only work with fixed-size
+              // types
+              memcpy(addr, sock_addr, addr_len); // NOLINT(safe-memcpy)
               *addrlen = addr_len;
             } else {
               ENVOY_LOG(error, "ReverseConnectionIOHandle: buffer too small for synthetic address");
@@ -645,13 +632,6 @@ void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
   ENVOY_LOG(trace, "ReverseConnectionIOHandle: event: {}", static_cast<int>(event));
 }
 
-bool ReverseConnectionIOHandle::isTriggerReady() const {
-  // Note: isPipeTriggerReady() doesn't exist, using a simple check for now
-  bool ready = (trigger_pipe_read_fd_ >= 0);
-  ENVOY_LOG(debug, "isTriggerReady() returning: {}", ready);
-  return ready;
-}
-
 int ReverseConnectionIOHandle::getPipeMonitorFd() const { return trigger_pipe_read_fd_; }
 
 // Use the thread-local registry to get the dispatcher
@@ -666,7 +646,10 @@ Event::Dispatcher& ReverseConnectionIOHandle::getThreadLocalDispatcher() const {
     return local_registry->dispatcher();
   }
 
-  throw EnvoyException("Failed to get dispatcher from thread-local registry");
+  ENVOY_BUG(false, "Failed to get dispatcher from thread-local registry");
+  // This should never happen in normal operation, but we need to handle it gracefully
+  RELEASE_ASSERT(worker_dispatcher_ != nullptr, "No dispatcher available");
+  return *worker_dispatcher_;
 }
 
 // Safe wrapper for accessing thread-local dispatcher
@@ -807,9 +790,11 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
           {},                                      // connection_keys - empty set initially
           cluster_config.reverse_connection_count, // target_connection_count from config
           0,                                       // failure_count
-          std::chrono::steady_clock::now(),        // last_failure_time
-          std::chrono::steady_clock::now(),        // backoff_until
-          {}                                       // connection_states
+          // last_failure_time
+          std::chrono::steady_clock::now(), // NO_CHECK_FORMAT(real_time)
+          // backoff_until
+          std::chrono::steady_clock::now(), // NO_CHECK_FORMAT(real_time)
+          {}                                // connection_states
       };
     }
 
@@ -888,7 +873,12 @@ bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string&
     return true;
   }
   auto& host_info = host_it->second;
-  auto now = std::chrono::steady_clock::now();
+  auto now = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
+  ENVOY_LOG(debug, "host: {} now: {} ms backoff_until: {} ms", host_address,
+            std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count(),
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                host_info.backoff_until.time_since_epoch())
+                .count());
   // Check if we're still in backoff period.
   if (now < host_info.backoff_until) {
     auto remaining_ms =
@@ -911,7 +901,7 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
   }
   auto& host_info = host_it->second;
   host_info.failure_count++;
-  host_info.last_failure_time = std::chrono::steady_clock::now();
+  host_info.last_failure_time = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
   // Calculate exponential backoff: base_delay * 2^(failure_count - 1)
   const uint32_t base_delay_ms = 1000; // 1 second base delay
   const uint32_t max_delay_ms = 30000; // 30 seconds max delay
@@ -947,7 +937,7 @@ void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address
   }
 
   auto& host_info = host_it->second;
-  auto now = std::chrono::steady_clock::now();
+  auto now = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
 
   // Check if the host is actually in backoff before resetting.
   if (now >= host_info.backoff_until) {
@@ -956,7 +946,7 @@ void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address
   }
 
   host_info.failure_count = 0;
-  host_info.backoff_until = std::chrono::steady_clock::now();
+  host_info.backoff_until = std::chrono::steady_clock::now(); // NO_CHECK_FORMAT(real_time)
   ENVOY_LOG(debug, "ReverseConnectionIOHandle: Reset backoff for host {}", host_address);
 
   // Mark host as recovered using the same key used by backoff to change the state from backoff to
@@ -1475,8 +1465,14 @@ Envoy::Network::IoHandlePtr ReverseTunnelInitiator::createReverseConnectionSocke
     Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
     Envoy::Network::Address::IpVersion version, const ReverseConnectionSocketConfig& config) const {
 
+  // Return early if no remote clusters are configured
+  if (config.remote_clusters.empty()) {
+    ENVOY_LOG(debug, "ReverseTunnelInitiator: No remote clusters configured, returning nullptr");
+    return nullptr;
+  }
+
   ENVOY_LOG(debug, "ReverseTunnelInitiator: Creating reverse connection socket for cluster: {}",
-            config.remote_clusters.empty() ? "unknown" : config.remote_clusters[0].cluster_name);
+            config.remote_clusters[0].cluster_name);
 
   // For stream sockets on IP addresses, create our reverse connection IOHandle.
   if (socket_type == Envoy::Network::Socket::Type::Stream &&

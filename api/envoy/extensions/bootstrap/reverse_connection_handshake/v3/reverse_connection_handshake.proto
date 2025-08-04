@@ -12,7 +12,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/boo
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Reverse Connection Handshake]
-// Reverse Connection Handshake :ref:`configuration overview <config_bootstrap_reverse_connection_handshake>`.
+// Reverse Connection Handshake protocol for establishing reverse connections between Envoy instances.
 // [#extension: envoy.bootstrap.reverse_connection_handshake]
 
 // Config sent by the local cluster as part of the Initiation workflow.

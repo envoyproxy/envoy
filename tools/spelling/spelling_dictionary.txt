@@ -6,6 +6,7 @@
 addrlen
 itr
 STREQ
+htonl
 ABI
 ACK
 ACL
