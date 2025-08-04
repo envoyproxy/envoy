@@ -27,6 +27,7 @@ message Config {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.header_to_metadata.v2.Config";
 
+  // Specifies the value type to use in metadata.
   enum ValueType {
     STRING = 0;
 
@@ -37,14 +38,18 @@ message Config {
     PROTOBUF_VALUE = 2;
   }
 
-  // ValueEncode defines the encoding algorithm.
+  // Specifies the encoding scheme for the value.
   enum ValueEncode {
-    // The value is not encoded.
+    // No encoding is applied.
     NONE = 0;
 
     // The value is encoded in `Base64 <https://tools.ietf.org/html/rfc4648#section-4>`_.
-    // Note: this is mostly used for STRING and PROTOBUF_VALUE to escape the
-    // non-ASCII characters in the header.
+    //
+    // .. note::
+    //
+    //   This is mostly used for ``STRING`` and ``PROTOBUF_VALUE`` to escape the
+    //   non-ASCII characters in the header.
+    //
     BASE64 = 1;
   }
 
@@ -74,7 +79,10 @@ message Config {
     //
     // This is only used for :ref:`on_header_present <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.Rule.on_header_present>`.
     //
-    // Note: if the ``value`` field is non-empty this field should be empty.
+    // .. note::
+    //
+    //   If the ``value`` field is non-empty this field should be empty.
+    //
     type.matcher.v3.RegexMatchAndSubstitute regex_value_rewrite = 6
         [(udpa.annotations.field_migrate).oneof_promotion = "value_type"];
 
@@ -106,15 +114,15 @@ message Config {
       (udpa.annotations.field_migrate).oneof_promotion = "header_cookie_specifier"
     ];
 
-    // If the header or cookie is present, apply this metadata KeyValuePair.
+    // If the header or cookie is present, apply this metadata ``KeyValuePair``.
     //
-    // If the value in the KeyValuePair is non-empty, it'll be used instead
+    // If the value in the ``KeyValuePair`` is non-empty, it'll be used instead
     // of the header or cookie value.
     KeyValuePair on_header_present = 2 [(udpa.annotations.field_migrate).rename = "on_present"];
 
-    // If the header or cookie is not present, apply this metadata KeyValuePair.
+    // If the header or cookie is not present, apply this metadata ``KeyValuePair``.
     //
-    // The value in the KeyValuePair must be set, since it'll be used in lieu
+    // The value in the ``KeyValuePair`` must be set, since it'll be used in lieu
     // of the missing header or cookie value.
     KeyValuePair on_header_missing = 3 [(udpa.annotations.field_migrate).rename = "on_missing"];
 

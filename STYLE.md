@@ -160,6 +160,9 @@ A few general notes on our error handling philosophy:
     should be used where it may be useful to detect if an efficient condition is violated in
     production (and fatal check in debug-only builds). This will also log a stack trace
     of the previous calls leading up to `ENVOY_BUG`.
+  - `ENVOY_NOTIFICATION`: logs and increments the ``envoy_notifications`` counter. These should be
+    used where it may be useful to detect if an efficient condition is met in production, for
+    example before rolling out a potentially disruptive configuration change.
 
 * Sub-macros alias the macros above and can be used to annotate specific situations:
   - `ENVOY_BUG_ALPHA` (alias `ENVOY_BUG`): Used for alpha or rapidly changing protocols that need

@@ -17,15 +17,6 @@
 namespace Envoy {
 namespace {
 
-MATCHER_P2(SingleHeaderValueIs, key, value,
-           absl::StrFormat("Header \"%s\" equals \"%s\"", key, value)) {
-  const auto hdr = arg.get(::Envoy::Http::LowerCaseString(std::string(key)));
-  if (hdr.size() != 1) {
-    return false;
-  }
-  return hdr[0]->value() == value;
-}
-
 void validateClusters(const Upstream::ClusterManager::ClusterInfoMap& active_cluster_map,
                       const std::string& cluster, size_t expected_active_clusters,
                       size_t hosts_expected, size_t healthy_hosts, size_t degraded_hosts) {
@@ -235,7 +226,7 @@ public:
     EXPECT_EQ(status, response->headers().getStatusValue());
     if (numerator == 100) {
       EXPECT_THAT(response->headers(),
-                  SingleHeaderValueIs("x-envoy-unconditional-drop-overload", "true"));
+                  ContainsHeader("x-envoy-unconditional-drop-overload", "true"));
     }
     cleanupUpstreamAndDownstream();
   }

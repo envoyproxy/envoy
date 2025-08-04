@@ -5,6 +5,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
+#include "cel/expr/syntax.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -13,7 +15,7 @@ namespace ExternalProcessing {
 class ExpressionManager : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   struct CelExpression {
-    google::api::expr::v1alpha1::ParsedExpr parsed_expr_;
+    cel::expr::ParsedExpr parsed_expr_;
     Filters::Common::Expr::ExpressionPtr compiled_expr_;
   };
 

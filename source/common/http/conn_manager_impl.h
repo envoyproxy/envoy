@@ -332,7 +332,6 @@ private:
 
     void refreshCachedRoute(const Router::RouteCallback& cb);
 
-    void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
     void refreshIdleTimeout();
     void refreshAccessLogFlushTimer();
@@ -405,13 +404,6 @@ private:
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
       s.dumpState(os);
       return os;
-    }
-
-    Tracing::CustomTagMap& getOrMakeTracingCustomTagMap() {
-      if (tracing_custom_tags_ == nullptr) {
-        tracing_custom_tags_ = std::make_unique<Tracing::CustomTagMap>();
-      }
-      return *tracing_custom_tags_;
     }
 
     // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
@@ -507,7 +499,6 @@ private:
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
     const std::string* decorated_operation_{nullptr};
     absl::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
-    std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
     Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;
@@ -517,7 +508,7 @@ private:
     // returned by the public tracingConfig() method.
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
-    const Tracing::CustomTagMap* customTags() const override;
+    void modifySpan(Tracing::Span& span) const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
     bool spawnUpstreamSpan() const override;
