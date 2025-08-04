@@ -516,10 +516,6 @@ Http::Status HeaderUtility::checkRequiredRequestHeaders(const Http::RequestHeade
 }
 
 Http::Status HeaderUtility::checkValidRequestHeaders(const Http::RequestHeaderMap& headers) {
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.validate_upstream_headers")) {
-    return Http::okStatus();
-  }
-
   const HeaderEntry* invalid_entry = nullptr;
   bool invalid_key = false;
   headers.iterate([&invalid_entry, &invalid_key](const HeaderEntry& header) -> HeaderMap::Iterate {

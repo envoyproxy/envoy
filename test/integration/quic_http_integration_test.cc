@@ -529,8 +529,6 @@ TEST_P(QuicHttpIntegrationTest, DoNotValidatePseudoHeaders) {
 }
 
 TEST_P(QuicHttpIntegrationTest, ResetRequestWithInvalidCharacter) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
-
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

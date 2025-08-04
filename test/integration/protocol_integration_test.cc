@@ -4656,7 +4656,6 @@ TEST_P(ProtocolIntegrationTest, ValidateUpstreamHeadersWithOverride) {
   }
   useAccessLog("%RESPONSE_CODE_DETAILS%");
 
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
   config_helper_.prependFilter("{ name: invalid-header-filter, typed_config: { \"@type\": "
                                "type.googleapis.com/google.protobuf.Empty } }");
 
@@ -5048,7 +5047,7 @@ TEST_P(ProtocolIntegrationTest, LocalInterfaceNameForUpstreamConnection) {
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
   // TODO(yanavlasov): remove runtime override after making disable_client_header_validation_ work
   // for non UHV builds
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+
   disable_client_header_validation_ = true;
   initialize();
 
@@ -5077,7 +5076,7 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderName) {
 TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
   // TODO(yanavlasov): remove runtime override after making disable_client_header_validation_ work
   // for non UHV builds
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
+
   disable_client_header_validation_ = true;
   // For H/1 this test is equivalent to InvalidRequestHeaderName
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
@@ -5112,8 +5111,6 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidRequestHeaderNameStreamError) {
 
 TEST_P(ProtocolIntegrationTest, InvalidResponseHeaderName) {
   useAccessLog("%RESPONSE_CODE_DETAILS%");
-
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers", "false");
 
   initialize();
 
