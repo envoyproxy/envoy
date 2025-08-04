@@ -90,8 +90,7 @@ public:
     // This allows sending NUL, CR and LF in headers without triggering ASSERTs in Envoy
     Http::HeaderStringValidator::disable_validation_for_tests_ = true;
     disable_client_header_validation_ = true;
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.validate_upstream_headers",
-                                      "false");
+
     config_helper_.addRuntimeOverride("envoy.reloadable_features.http_reject_path_with_fragment",
                                       "false");
   }
