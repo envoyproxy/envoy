@@ -16,6 +16,8 @@ public:
   MOCK_METHOD(envoy_cert_validation_result, validateCertificateChain,
               (const std::vector<std::string>& certs, absl::string_view hostname));
   MOCK_METHOD(void, cleanupAfterCertificateValidation, ());
+  MOCK_METHOD(int64_t, getDefaultNetworkHandle, ());
+  MOCK_METHOD((std::vector<std::pair<int64_t, ConnectionType>>), getAllConnectedNetworks, ());
 };
 
 // SystemHelperPeer allows the replacement of the SystemHelper singleton

@@ -283,6 +283,7 @@ public:
   void setDefaultNetworkChangeCallback(DefaultNetworkChangeCallback cb) {
     default_network_change_callback_ = cb;
   }
+  void setNetworkChangeObserver(NetworkChangeObserver* observer) { observer_ = observer; }
 
   void reallyRefreshDns(envoy_netconf_t configuration_key, bool drain_connections);
 

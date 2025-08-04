@@ -1,4 +1,3 @@
-#include "default_system_helper.h"
 #include "library/common/system/default_system_helper.h"
 
 namespace Envoy {

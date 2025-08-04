@@ -1,4 +1,3 @@
-#include "connectivity_manager.h"
 #include "library/common/network/connectivity_manager.h"
 
 #include <net/if.h>
@@ -576,18 +575,6 @@ void ConnectivityManagerImpl::onNetworkConnectAndroid(ConnectionType connection_
   }
 }
 
-void ConnectivityManagerImpl::initializeNetworkStates() {
-  NetworkHandle default_net_id = SystemHelper::getInstance().getDefaultNetworkHandle();
-  std::vector<std::pair<int64_t, ConnectionType>> all_connected_networks =
-      SystemHelper::getInstance().getAllConnectedNetworks();
-
-  Thread::LockGuard lock{network_mutex_};
-  default_network_handle_ = default_net_id;
-  for (auto& entry : all_connected_networks) {
-    connected_networks_[entry.first] = entry.second;
-  }
-}
-
 void ConnectivityManagerImpl::purgeActiveNetworkListAndroid(
     const std::vector<NetworkHandle>& active_network_ids) {
   std::vector<int64_t> disconnected_networks;
@@ -608,6 +595,18 @@ void ConnectivityManagerImpl::purgeActiveNetworkListAndroid(
   }
   for (auto disconnected_network : disconnected_networks) {
     onNetworkDisconnectAndroid(disconnected_network);
+  }
+}
+
+void ConnectivityManagerImpl::initializeNetworkStates() {
+  NetworkHandle default_net_id = SystemHelper::getInstance().getDefaultNetworkHandle();
+  std::vector<std::pair<int64_t, ConnectionType>> all_connected_networks =
+      SystemHelper::getInstance().getAllConnectedNetworks();
+
+  Thread::LockGuard lock{network_mutex_};
+  default_network_handle_ = default_net_id;
+  for (auto& entry : all_connected_networks) {
+    connected_networks_[entry.first] = entry.second;
   }
 }
 

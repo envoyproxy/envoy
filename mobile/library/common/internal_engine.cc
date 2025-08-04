@@ -217,7 +217,6 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
           Envoy::Server::GenericFactoryContextImpl generic_context(
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
-
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
           Network::DefaultNetworkChangeCallback cb =
               [this](envoy_netconf_t current_configuration_key) {
