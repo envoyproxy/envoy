@@ -6,8 +6,6 @@ directories:
   source/common: 96.4
   source/common/api: 95.3  # some syscalls require sandboxing
   source/common/api/posix: 94.9  # setns requires Linux CAP_NET_ADMIN privileges
-  source/common/common/posix: 96.2  # flaky due to posix: be careful adjusting
-  source/common/config: 96.5
   source/common/crypto: 95.5
   source/common/event: 96.5  # Emulated edge events guards don't report LCOV and setns requires Linux CAP_NET_ADMIN privileges.
   source/common/filesystem/posix: 96.4  # FileReadToEndNotReadable fails in some env; createPath can't test all failure branches.
@@ -22,14 +20,14 @@ directories:
   source/common/quic: 93.2
   source/common/signal: 87.4  # Death tests don't report LCOV
   source/common/thread: 0.0  # Death tests don't report LCOV
-  source/common/tls: 94.4  # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
+  source/common/tls: 94.5  # FIPS code paths impossible to trigger on non-FIPS builds and vice versa
   source/common/tls/cert_validator: 95.0
   source/common/tls/private_key: 88.9
-  source/common/tracing: 95.4
+  source/common/tracing: 95.8
   source/common/watchdog: 60.0  # Death tests don't report LCOV
   source/exe: 94.4  # increased by #32346, need coverage for terminate_handler and hot restart failures
   source/extensions/api_listeners: 55.0  # Many IS_ENVOY_BUG are not covered.
-  source/extensions/api_listeners/default_api_listener: 55.0  # Many IS_ENVOY_BUG are not covered.
+  source/extensions/api_listeners/default_api_listener: 59.0  # Many IS_ENVOY_BUG are not covered.
   source/extensions/common/aws: 98.5
   source/extensions/common/aws/credential_providers: 100.0
   source/extensions/common/proxy_protocol: 94.6  # Adjusted for security patch
@@ -41,9 +39,9 @@ directories:
   source/extensions/filters/common/rbac: 92.6
   source/extensions/filters/common/lua: 95.6
   source/extensions/filters/http/cache: 95.9
-  source/extensions/filters/http/dynamic_forward_proxy: 94.3
+  source/extensions/filters/http/dynamic_forward_proxy: 94.8
   source/extensions/filters/http/decompressor: 95.9
-  source/extensions/filters/http/ext_proc: 96.3
+  source/extensions/filters/http/ext_proc: 96.5
   source/extensions/filters/http/grpc_json_reverse_transcoder: 94.8
   source/extensions/filters/http/grpc_json_transcoder: 94.0  # TODO(#28232)
   source/extensions/filters/http/ip_tagging: 95.9
@@ -51,23 +49,23 @@ directories:
   source/extensions/filters/http/oauth2: 97.6
   source/extensions/filters/listener: 96.5
   source/extensions/filters/listener/original_src: 92.1
-  source/extensions/filters/listener/tls_inspector: 94.0
+  source/extensions/filters/listener/tls_inspector: 94.1
   source/extensions/filters/network/dubbo_proxy: 96.2
   source/extensions/filters/network/mongo_proxy: 96.1
   source/extensions/filters/network/sni_cluster: 88.9
-  source/extensions/formatter/cel: 90.5
+  source/extensions/formatter/cel: 93.9
   source/extensions/internal_redirect: 86.2
   source/extensions/internal_redirect/safe_cross_scheme: 81.3
   source/extensions/internal_redirect/allow_listed_routes: 85.7
   source/extensions/internal_redirect/previous_routes: 89.3
-  source/extensions/load_balancing_policies/maglev: 94.8
+  source/extensions/load_balancing_policies/maglev: 94.9
   source/extensions/load_balancing_policies/round_robin: 96.4
   source/extensions/load_balancing_policies/ring_hash: 96.9
   source/extensions/rate_limit_descriptors: 95.0
   source/extensions/rate_limit_descriptors/expr: 88.2
   source/extensions/stat_sinks/graphite_statsd: 82.8  # Death tests don't report LCOV
   source/extensions/stat_sinks/statsd: 85.2  # Death tests don't report LCOV
-  source/extensions/tracers/zipkin: 95.9
+  source/extensions/tracers/zipkin: 96.1
   source/extensions/transport_sockets/proxy_protocol: 96.2
   source/extensions/wasm_runtime/wamr: 0.0  # Not enabled in coverage build
   source/extensions/wasm_runtime/wasmtime: 0.0  # Not enabled in coverage build
@@ -76,9 +74,9 @@ directories:
   source/extensions/listener_managers/validation_listener_manager: 77.3
   source/extensions/watchdog/profile_action: 86.1
   source/server: 91.0  # flaky: be careful adjusting. See https://github.com/envoyproxy/envoy/issues/15239
-  source/server/config_validation: 92.3
+  source/server/config_validation: 93.1
   source/extensions/health_checkers: 96.1
-  source/extensions/health_checkers/http: 94.2
+  source/extensions/health_checkers/http: 94.6
   source/extensions/health_checkers/grpc: 92.3
   source/extensions/config_subscription/rest: 94.9
   source/extensions/matching/input_matchers/cel_matcher: 82.6  # Death tests don't report LCOV

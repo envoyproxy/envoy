@@ -1,7 +1,9 @@
 date: Pending
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: ext_proc
+  change: |
+    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -35,6 +37,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: gcp_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.gcp_authn_use_fixed_url`` and legacy code paths.
 
 new_features:
 - area: health_check
@@ -91,5 +96,8 @@ new_features:
     Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
     implemented is ``metadata()``, allowing Lua scripts to access virtual host metadata scoped to the specific filter name. See
     :ref:`Virtual host object API <config_http_filters_lua_virtual_host_wrapper>` for more details.
+- area: rbac
+  change: |
+    Switch the IP matcher to use LC-Trie for performance improvements.
 
 deprecated:

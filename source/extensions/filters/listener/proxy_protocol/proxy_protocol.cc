@@ -572,10 +572,7 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
                              "proxy_protocol: Failed to unpack typed metadata for TLV type ",
                              tlv_type);
         } else {
-          Protobuf::BytesValue tlv_byte_value;
-          tlv_byte_value.set_value(tlv_value);
-          tlvs_metadata.mutable_typed_metadata()->insert(
-              {key_value_pair->key(), tlv_byte_value.value()});
+          (*tlvs_metadata.mutable_typed_metadata())[key_value_pair->key()] = tlv_value;
           ProtobufWkt::Any typed_metadata;
           typed_metadata.PackFrom(tlvs_metadata);
           cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
