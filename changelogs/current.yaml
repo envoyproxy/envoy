@@ -10,6 +10,11 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http3
+  change: |
+    Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
+    reverted by setting the runtime guard
+    ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
