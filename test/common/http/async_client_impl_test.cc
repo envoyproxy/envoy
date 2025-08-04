@@ -527,8 +527,10 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   request->sendData(empty, true);
 
   ResponseHeaderMapPtr response_headers(new TestResponseHeaderMapImpl{{":status", "200"}});
-  // On request end, we expect to run the low watermark callbacks.
+  // On request end, we expect to run the low watermark callbacks and remove the
+  // downstream watermark callbacks.
   EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks);
   response_decoder_->decodeHeaders(std::move(response_headers), true);
 }
 
@@ -567,8 +569,10 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   dynamic_cast<MockStream&>(stream_encoder_.getStream()).runHighWatermarkCallbacks();
 
-  // Reset the stream, which will call the low watermark callbacks.
+  // Reset the stream, which will call the low watermark callbacks and remove
+  // the downstream watermark callbacks.
   EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+  EXPECT_CALL(watermark_callbacks, removeDownstreamWatermarkCallbacks);
   expectSuccess(request, 503);
   stream_encoder_.getStream().resetStream(StreamResetReason::RemoteReset);
 }
@@ -2176,19 +2180,45 @@ TEST_F(AsyncClientImplTest, MultipleDataStream) {
                      .value());
 }
 
-TEST_F(AsyncClientImplTest, WatermarkCallbacks) {
-  AsyncClient::Stream* stream = client_.start(stream_callbacks_, AsyncClient::StreamOptions());
+TEST_F(AsyncClientImplTest, HighLowWatermarkCallbacks) {
+  StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  AsyncClient::Stream* stream = client_.start(
+      stream_callbacks_,
+      AsyncClient::StreamOptions().setSidestreamWatermarkCallbacks(
+          &watermark_callbacks));
   stream->sendHeaders(headers_, false);
   Http::StreamDecoderFilterCallbacks* filter_callbacks =
       dynamic_cast<Http::AsyncStreamImpl*>(stream);
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark()).Times(2);
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterAboveWriteBufferHighWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark()).Times(2);
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_TRUE(stream->isAboveWriteBufferHighWatermark());
   filter_callbacks->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_FALSE(stream->isAboveWriteBufferHighWatermark());
+  EXPECT_CALL(stream_callbacks_, onReset());
+}
+
+TEST_F(AsyncClientImplTest, DownstreamWatermarkCallbacks) {
+  StrictMock<MockSidestreamWatermarkCallbacks> sidestream_watermark_callbacks;
+  AsyncClient::Stream* stream = client_.start(
+      stream_callbacks_,
+      AsyncClient::StreamOptions().setSidestreamWatermarkCallbacks(
+          &sidestream_watermark_callbacks));
+  stream->sendHeaders(headers_, false);
+  StrictMock<MockDownstreamWatermarkCallbacks> downstream_watermark_callbacks;
+  Http::StreamDecoderFilterCallbacks* filter_callbacks =
+      dynamic_cast<Http::AsyncStreamImpl*>(stream);
+  EXPECT_CALL(sidestream_watermark_callbacks, addDownstreamWatermarkCallbacks);
+  filter_callbacks->addDownstreamWatermarkCallbacks(
+      downstream_watermark_callbacks);
+  EXPECT_CALL(sidestream_watermark_callbacks,
+              removeDownstreamWatermarkCallbacks);
+  filter_callbacks->removeDownstreamWatermarkCallbacks(
+      downstream_watermark_callbacks);
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 

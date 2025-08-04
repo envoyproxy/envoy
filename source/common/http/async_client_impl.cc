@@ -159,6 +159,10 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
     buffered_body_ = std::make_unique<Buffer::OwnedImpl>(account_);
   }
 
+  if (options.sidestream_watermark_callbacks != nullptr) {
+    setWatermarkCallbacks(*options.sidestream_watermark_callbacks);
+  }
+
   router_.setDecoderFilterCallbacks(*this);
   // TODO(mattklein123): Correctly set protocol in stream info when we support access logging.
 }

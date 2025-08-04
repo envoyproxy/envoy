@@ -167,6 +167,8 @@ protected:
   absl::optional<AsyncClient::StreamDestructorCallbacks> destructor_callback_;
   // Callback to listen for low/high/overflow watermark events.
   absl::optional<std::reference_wrapper<SidestreamWatermarkCallbacks>> watermark_callbacks_;
+  absl::optional<std::reference_wrapper<DownstreamWatermarkCallbacks>>
+      downstream_watermark_callbacks_;
   bool complete_{};
   const bool discard_response_body_;
 
@@ -226,8 +228,18 @@ private:
       watermark_callbacks_->get().onSidestreamBelowLowWatermark();
     }
   }
-  void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
-  void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
+  void addDownstreamWatermarkCallbacks(
+      DownstreamWatermarkCallbacks& callbacks) override {
+    if (watermark_callbacks_.has_value()) {
+      watermark_callbacks_->get().addDownstreamWatermarkCallbacks(callbacks);
+    }
+  }
+  void removeDownstreamWatermarkCallbacks(
+      DownstreamWatermarkCallbacks& cb) override {
+    if (watermark_callbacks_.has_value()) {
+      watermark_callbacks_->get().removeDownstreamWatermarkCallbacks(cb);
+    }
+  }
   void sendGoAwayAndClose() override {}
 
   void setDecoderBufferLimit(uint32_t) override {
