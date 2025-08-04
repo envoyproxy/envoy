@@ -2,6 +2,23 @@ date: Pending
 
 behavior_changes:
 # *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: cache_filter
+  change: |
+    CacheFilter (WIP) has been completely reworked. Any existing cache implementations
+    will need to be modified to fit the new API. The new cache API is much simpler, as
+    individual cache implementations no longer need to comprehend various http headers,
+    only read and write at keys. Cache filter now handles "thundering herds" - if
+    multiple requests for the same resource arrive before the cache is populated,
+    now only one request goes upstream, and there is only one insert to the cache.
+    Range requests now convert to an upstream request for the entire resource, to
+    populate the cache.
+    Surprising behavior change may result if there are any active filters upstream
+    of a CacheFilter, including if RouteConfiguration does any actions
+    (e.g. adding headers) - it is recommended that for anything other than the most
+    simplistic configuration (for which the CacheFilter should be the furthest
+    upstream filter), a CacheFilter should be configured to make its requests
+    to an InternalListener which duplicates the RouteConfiguration and any filter
+    chain upstream of the CacheFilter. This is recognized as far from ideal.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

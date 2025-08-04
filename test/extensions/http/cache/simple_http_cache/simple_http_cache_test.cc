@@ -4,6 +4,7 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/http/cache/cache_entry_utils.h"
 #include "source/extensions/filters/http/cache/cache_headers_utils.h"
+#include "source/extensions/filters/http/cache/cache_sessions.h"
 #include "source/extensions/http/cache/simple_http_cache/simple_http_cache.h"
 
 #include "test/extensions/filters/http/cache/http_cache_implementation_test_common.h"
@@ -21,11 +22,10 @@ namespace {
 
 class SimpleHttpCacheTestDelegate : public HttpCacheTestDelegate {
 public:
-  std::shared_ptr<HttpCache> cache() override { return cache_; }
-  bool validationEnabled() const override { return true; }
+  HttpCache& cache() override { return cache_; }
 
 private:
-  std::shared_ptr<SimpleHttpCache> cache_ = std::make_shared<SimpleHttpCache>();
+  SimpleHttpCache cache_;
 };
 
 INSTANTIATE_TEST_SUITE_P(SimpleHttpCacheTest, HttpCacheImplementationTest,
