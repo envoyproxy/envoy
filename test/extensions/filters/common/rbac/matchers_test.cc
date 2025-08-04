@@ -1304,7 +1304,7 @@ TEST(Matcher, CreatePermissionDestinationIpInvalidCidr) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(Matcher::create(permission, validation_visitor, context), EnvoyException,
-                          "Failed to create IP matcher:.*malformed IP address");
+                          "Failed to create CIDR range:.*malformed IP address");
 }
 
 // Tests for RULE_NOT_SET case that falls through to PANIC.
@@ -1344,7 +1344,7 @@ TEST(Matcher, CreatePrincipalSourceIpInvalidCidr) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
-                          "Failed to create IP matcher:.*malformed IP address");
+                          "Failed to create CIDR range:.*malformed IP address");
 }
 
 // Tests for kDirectRemoteIp case in Principal matcher creation.
@@ -1370,7 +1370,7 @@ TEST(Matcher, CreatePrincipalDirectRemoteIpInvalidCidr) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
-                          "Failed to create IP matcher:.*malformed IP address");
+                          "Failed to create CIDR range:.*malformed IP address");
 }
 
 // Tests for kRemoteIp case in Principal matcher creation.
@@ -1396,7 +1396,7 @@ TEST(Matcher, CreatePrincipalRemoteIpInvalidCidr) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
-                          "Failed to create IP matcher:.*malformed IP address");
+                          "Failed to create CIDR range:.*malformed IP address");
 }
 
 // Tests for IDENTIFIER_NOT_SET case that falls through to PANIC.

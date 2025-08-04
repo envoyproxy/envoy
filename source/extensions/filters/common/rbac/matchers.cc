@@ -247,26 +247,26 @@ IPMatcher::create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::Cidr
 IPMatcher::IPMatcher(std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie, Type type)
     : trie_(std::move(trie)), type_(type) {}
 
-bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
-                        const StreamInfo::StreamInfo& info) const {
-  // Get address and check trie.
-  Network::Address::InstanceConstSharedPtr address;
+const Network::Address::InstanceConstSharedPtr&
+IPMatcher::extractIpAddress(const Network::Connection& connection,
+                            const StreamInfo::StreamInfo& info) const {
   switch (type_) {
   case ConnectionRemote:
-    address = connection.connectionInfoProvider().remoteAddress();
-    break;
+    return connection.connectionInfoProvider().remoteAddress();
   case DownstreamLocal:
-    address = info.downstreamAddressProvider().localAddress();
-    break;
+    return info.downstreamAddressProvider().localAddress();
   case DownstreamDirectRemote:
-    address = info.downstreamAddressProvider().directRemoteAddress();
-    break;
+    return info.downstreamAddressProvider().directRemoteAddress();
   case DownstreamRemote:
-    address = info.downstreamAddressProvider().remoteAddress();
-    break;
+    return info.downstreamAddressProvider().remoteAddress();
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
 
-  // Check if address is null and directly pass to trie getData.
+bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap&,
+                        const StreamInfo::StreamInfo& info) const {
+  // Extract IP address using reference to avoid shared_ptr copies.
+  const auto& address = extractIpAddress(connection, info);
   return address && !trie_->getData(address).empty();
 }
 
