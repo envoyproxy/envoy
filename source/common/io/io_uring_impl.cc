@@ -195,6 +195,70 @@ IoUringResult IoUringImpl::prepareShutdown(os_fd_t fd, int how, Request* user_da
   return IoUringResult::Ok;
 }
 
+IoUringResult IoUringImpl::prepareSend(os_fd_t fd, const void* buf, size_t len, int flags,
+                                       Request* user_data) {
+  ENVOY_LOG(trace, "prepare send for fd = {}, len = {}, flags = {}", fd, len, flags);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare send for fd = {}", fd);
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_send(sqe, fd, buf, len, flags);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareRecv(os_fd_t fd, void* buf, size_t len, int flags,
+                                       Request* user_data) {
+  ENVOY_LOG(trace, "prepare recv for fd = {}, len = {}, flags = {}", fd, len, flags);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare recv for fd = {}", fd);
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_recv(sqe, fd, buf, len, flags);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareSendmsg(os_fd_t fd, const struct msghdr* msg, int flags,
+                                          Request* user_data) {
+  ENVOY_LOG(trace, "prepare sendmsg for fd = {}, flags = {}", fd, flags);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare sendmsg for fd = {}", fd);
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_sendmsg(sqe, fd, msg, flags);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
+IoUringResult IoUringImpl::prepareRecvmsg(os_fd_t fd, struct msghdr* msg, int flags,
+                                          Request* user_data) {
+  ENVOY_LOG(trace, "prepare recvmsg for fd = {}, flags = {}", fd, flags);
+  // TODO (soulxu): Handling the case of CQ ring is overflow.
+  ASSERT(!(*(ring_.sq.kflags) & IORING_SQ_CQ_OVERFLOW));
+  struct io_uring_sqe* sqe = io_uring_get_sqe(&ring_);
+  if (sqe == nullptr) {
+    ENVOY_LOG(trace, "failed to prepare recvmsg for fd = {}", fd);
+    return IoUringResult::Failed;
+  }
+
+  io_uring_prep_recvmsg(sqe, fd, msg, flags);
+  io_uring_sqe_set_data(sqe, user_data);
+  return IoUringResult::Ok;
+}
+
 IoUringResult IoUringImpl::submit() {
   int res = io_uring_submit(&ring_);
   RELEASE_ASSERT(res >= 0 || res == -EBUSY, "unable to submit io_uring queue entries");

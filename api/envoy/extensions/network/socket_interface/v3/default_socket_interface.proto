@@ -14,6 +14,22 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Default socket interface configuration]
 
+// io_uring operation mode that determines which underlying syscalls are used for I/O operations.
+enum IoUringMode {
+  // Use readv/writev operations (default). It provides vectored I/O with good performance
+  // for most use cases.
+  READ_WRITEV = 0;
+
+  // Use send/recv operations for simple streaming data. It is optimized for TCP sockets and
+  // could provide performance improvement over readv/writev for non-vectored data transfers.
+  SEND_RECV = 1;
+
+  // Use sendmsg/recvmsg operations for advanced use cases. It supports scatter-gather I/O
+  // with control messages and peer addresses and could provide performance improvement for
+  // complex I/O patterns.
+  SENDMSG_RECVMSG = 2;
+}
+
 // Configuration for default socket interface that relies on OS dependent syscall to create
 // sockets.
 message DefaultSocketInterface {
@@ -23,6 +39,7 @@ message DefaultSocketInterface {
   IoUringOptions io_uring_options = 1;
 }
 
+// [#next-free-field: 6]
 message IoUringOptions {
   // The size for io_uring submission queues (SQ). io_uring is built with a fixed size in each
   // thread during configuration, and each io_uring operation creates a submission queue
@@ -43,4 +60,9 @@ message IoUringOptions {
   // asynchronously. If the remote stops reading, the io_uring write operation may never complete.
   // The operation is canceled and the socket is closed after the timeout. The default is 1000.
   google.protobuf.UInt32Value write_timeout_ms = 4;
+
+  // The io_uring operation mode that determines which syscalls are used for I/O operations.
+  // This allows users to choose the mode based on their specific workloads.
+  // It defaults to ``READ_WRITEV``.
+  IoUringMode mode = 5;
 }

@@ -5,13 +5,12 @@
 namespace Envoy {
 namespace Io {
 
-IoUringWorkerFactoryImpl::IoUringWorkerFactoryImpl(uint32_t io_uring_size,
-                                                   bool use_submission_queue_polling,
-                                                   uint32_t read_buffer_size,
-                                                   uint32_t write_timeout_ms,
-                                                   ThreadLocal::SlotAllocator& tls)
+IoUringWorkerFactoryImpl::IoUringWorkerFactoryImpl(
+    uint32_t io_uring_size, bool use_submission_queue_polling, uint32_t read_buffer_size,
+    uint32_t write_timeout_ms, ThreadLocal::SlotAllocator& tls, IoUringMode mode)
     : io_uring_size_(io_uring_size), use_submission_queue_polling_(use_submission_queue_polling),
-      read_buffer_size_(read_buffer_size), write_timeout_ms_(write_timeout_ms), tls_(tls) {}
+      read_buffer_size_(read_buffer_size), write_timeout_ms_(write_timeout_ms), mode_(mode),
+      tls_(tls) {}
 
 OptRef<IoUringWorker> IoUringWorkerFactoryImpl::getIoUringWorker() {
   auto ret = tls_.get();
@@ -24,10 +23,11 @@ OptRef<IoUringWorker> IoUringWorkerFactoryImpl::getIoUringWorker() {
 void IoUringWorkerFactoryImpl::onWorkerThreadInitialized() {
   tls_.set([io_uring_size = io_uring_size_,
             use_submission_queue_polling = use_submission_queue_polling_,
-            read_buffer_size = read_buffer_size_,
-            write_timeout_ms = write_timeout_ms_](Event::Dispatcher& dispatcher) {
+            read_buffer_size = read_buffer_size_, write_timeout_ms = write_timeout_ms_,
+            mode = mode_](Event::Dispatcher& dispatcher) {
     return std::make_shared<IoUringWorkerImpl>(io_uring_size, use_submission_queue_polling,
-                                               read_buffer_size, write_timeout_ms, dispatcher);
+                                               read_buffer_size, write_timeout_ms, dispatcher,
+                                               mode);
   });
 }
 

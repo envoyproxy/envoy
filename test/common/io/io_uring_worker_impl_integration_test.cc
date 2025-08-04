@@ -971,6 +971,355 @@ TEST_F(IoUringWorkerIntegrationTest, ClientSocketConnectError) {
   cleanup();
 }
 
+// ======================== IoUringMode Integration Tests ========================
+
+class IoUringWorkerModeTestImpl : public IoUringWorkerImpl {
+public:
+  IoUringWorkerModeTestImpl(IoUringPtr io_uring_instance, Event::Dispatcher& dispatcher,
+                            IoUringMode mode)
+      : IoUringWorkerImpl(std::move(io_uring_instance), 8192, 1000, dispatcher, mode) {}
+
+  const std::list<IoUringSocketEntryPtr>& getSockets() const { return sockets_; }
+};
+
+class IoUringWorkerModeIntegrationTest : public testing::Test {
+protected:
+  IoUringWorkerModeIntegrationTest() : should_skip_(!isIoUringSupported()) {}
+
+  void SetUp() override {
+    if (should_skip_) {
+      GTEST_SKIP();
+    }
+  }
+
+  void initializeWithMode(IoUringMode mode) {
+    api_ = Api::createApiForTest(time_system_);
+    dispatcher_ = api_->allocateDispatcher("test_thread");
+    io_uring_worker_ = std::make_unique<IoUringWorkerModeTestImpl>(
+        std::make_unique<IoUringImpl>(20, false), *dispatcher_, mode);
+  }
+
+  void createSocketPair() {
+    int sockets[2];
+    ASSERT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, sockets), 0);
+    client_socket_ = sockets[0];
+    server_socket_ = sockets[1];
+
+    // Make both sockets non-blocking.
+    int flags = fcntl(client_socket_, F_GETFL);
+    fcntl(client_socket_, F_SETFL, flags | O_NONBLOCK);
+    flags = fcntl(server_socket_, F_GETFL);
+    fcntl(server_socket_, F_SETFL, flags | O_NONBLOCK);
+  }
+
+  void cleanup() {
+    if (SOCKET_VALID(client_socket_)) {
+      Api::OsSysCallsSingleton::get().close(client_socket_);
+    }
+    if (SOCKET_VALID(server_socket_)) {
+      Api::OsSysCallsSingleton::get().close(server_socket_);
+    }
+  }
+
+  void runToClose(os_fd_t fd) {
+    UNREFERENCED_PARAMETER(fd);
+    while (io_uring_worker_->getSockets().size() > 0) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+  }
+
+  DangerousDeprecatedTestTime time_system_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr dispatcher_;
+  std::unique_ptr<IoUringWorkerModeTestImpl> io_uring_worker_;
+  os_fd_t client_socket_{INVALID_SOCKET};
+  os_fd_t server_socket_{INVALID_SOCKET};
+  const bool should_skip_;
+};
+
+TEST_F(IoUringWorkerModeIntegrationTest, SendRecvModeBasicIO) {
+  initializeWithMode(IoUringMode::SendRecv);
+  createSocketPair();
+
+  // Test data exchange using send/recv operations.
+  std::string test_data = "Hello SendRecv Mode Integration Test!";
+  absl::optional<int32_t> read_result = absl::nullopt;
+  absl::optional<int32_t> write_result = absl::nullopt;
+  std::string received_data;
+
+  // Add server socket that will receive data.
+  OptRef<IoUringSocket> server_socket;
+  server_socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&server_socket, &read_result, &received_data](uint32_t events) {
+        if (events == Event::FileReadyType::Read) {
+          EXPECT_NE(absl::nullopt, server_socket->getReadParam());
+          read_result = server_socket->getReadParam()->result_;
+          if (read_result.value() > 0) {
+            auto& buf = server_socket->getReadParam()->buf_;
+            received_data.append(buf.toString());
+            buf.drain(buf.length());
+          }
+        }
+        return absl::OkStatus();
+      },
+      false);
+
+  // Add client socket that will send data.
+  OptRef<IoUringSocket> client_socket;
+  client_socket = io_uring_worker_->addServerSocket(
+      client_socket_,
+      [&client_socket, &write_result](uint32_t events) {
+        if (events == Event::FileReadyType::Write) {
+          EXPECT_NE(absl::nullopt, client_socket->getWriteParam());
+          write_result = client_socket->getWriteParam()->result_;
+        }
+        return absl::OkStatus();
+      },
+      false);
+
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 2);
+  EXPECT_EQ(io_uring_worker_->getMode(), IoUringMode::SendRecv);
+
+  // Send data from client to server.
+  Buffer::OwnedImpl send_buffer;
+  send_buffer.add(test_data);
+  client_socket->write(send_buffer);
+
+  // Wait for operations to complete.
+  while (!read_result.has_value() || !write_result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Verify results.
+  EXPECT_EQ(write_result.value(), static_cast<int32_t>(test_data.length()));
+  EXPECT_EQ(read_result.value(), static_cast<int32_t>(test_data.length()));
+  EXPECT_EQ(received_data, test_data);
+
+  // Clean up.
+  server_socket->close(false);
+  client_socket->close(false);
+  runToClose(server_socket_);
+  runToClose(client_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerModeIntegrationTest, SendmsgRecvmsgModeBasicIO) {
+  initializeWithMode(IoUringMode::SendmsgRecvmsg);
+  createSocketPair();
+
+  // Test data exchange using sendmsg/recvmsg operations.
+  std::string test_data = "Hello SendmsgRecvmsg Mode Integration Test!";
+  absl::optional<int32_t> read_result = absl::nullopt;
+  absl::optional<int32_t> write_result = absl::nullopt;
+  std::string received_data;
+
+  // Add server socket that will receive data.
+  OptRef<IoUringSocket> server_socket;
+  server_socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&server_socket, &read_result, &received_data](uint32_t events) {
+        if (events == Event::FileReadyType::Read) {
+          EXPECT_NE(absl::nullopt, server_socket->getReadParam());
+          read_result = server_socket->getReadParam()->result_;
+          if (read_result.value() > 0) {
+            auto& buf = server_socket->getReadParam()->buf_;
+            received_data.append(buf.toString());
+            buf.drain(buf.length());
+          }
+        }
+        return absl::OkStatus();
+      },
+      false);
+
+  // Add client socket that will send data.
+  OptRef<IoUringSocket> client_socket;
+  client_socket = io_uring_worker_->addServerSocket(
+      client_socket_,
+      [&client_socket, &write_result](uint32_t events) {
+        if (events == Event::FileReadyType::Write) {
+          EXPECT_NE(absl::nullopt, client_socket->getWriteParam());
+          write_result = client_socket->getWriteParam()->result_;
+        }
+        return absl::OkStatus();
+      },
+      false);
+
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 2);
+  EXPECT_EQ(io_uring_worker_->getMode(), IoUringMode::SendmsgRecvmsg);
+
+  // Send data from client to server using multiple buffer segments.
+  std::string part1 = "Hello ";
+  std::string part2 = "SendmsgRecvmsg ";
+  std::string part3 = "Mode Integration Test!";
+
+  Buffer::OwnedImpl send_buffer;
+  send_buffer.add(part1);
+  send_buffer.add(part2);
+  send_buffer.add(part3);
+  client_socket->write(send_buffer);
+
+  // Wait for operations to complete.
+  while (!read_result.has_value() || !write_result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Verify results.
+  EXPECT_EQ(write_result.value(), static_cast<int32_t>(test_data.length()));
+  EXPECT_EQ(read_result.value(), static_cast<int32_t>(test_data.length()));
+  EXPECT_EQ(received_data, test_data);
+
+  // Clean up.
+  server_socket->close(false);
+  client_socket->close(false);
+  runToClose(server_socket_);
+  runToClose(client_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerModeIntegrationTest, ReadWritevModeBackwardCompatibility) {
+  initializeWithMode(IoUringMode::ReadWritev);
+  createSocketPair();
+
+  // Test that ReadWritev mode works exactly like the original implementation.
+  std::string test_data = "Backward Compatibility Test!";
+  absl::optional<int32_t> read_result = absl::nullopt;
+  absl::optional<int32_t> write_result = absl::nullopt;
+  std::string received_data;
+
+  // Add server socket that will receive data.
+  OptRef<IoUringSocket> server_socket;
+  server_socket = io_uring_worker_->addServerSocket(
+      server_socket_,
+      [&server_socket, &read_result, &received_data](uint32_t events) {
+        if (events == Event::FileReadyType::Read) {
+          EXPECT_NE(absl::nullopt, server_socket->getReadParam());
+          read_result = server_socket->getReadParam()->result_;
+          if (read_result.value() > 0) {
+            auto& buf = server_socket->getReadParam()->buf_;
+            received_data.append(buf.toString());
+            buf.drain(buf.length());
+          }
+        }
+        return absl::OkStatus();
+      },
+      false);
+
+  // Add client socket that will send data.
+  OptRef<IoUringSocket> client_socket;
+  client_socket = io_uring_worker_->addServerSocket(
+      client_socket_,
+      [&client_socket, &write_result](uint32_t events) {
+        if (events == Event::FileReadyType::Write) {
+          EXPECT_NE(absl::nullopt, client_socket->getWriteParam());
+          write_result = client_socket->getWriteParam()->result_;
+        }
+        return absl::OkStatus();
+      },
+      false);
+
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 2);
+  EXPECT_EQ(io_uring_worker_->getMode(), IoUringMode::ReadWritev);
+
+  // Send data from client to server.
+  Buffer::OwnedImpl send_buffer;
+  send_buffer.add(test_data);
+  client_socket->write(send_buffer);
+
+  // Wait for operations to complete.
+  while (!read_result.has_value() || !write_result.has_value()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  // Verify results.
+  EXPECT_EQ(write_result.value(), static_cast<int32_t>(test_data.length()));
+  EXPECT_EQ(read_result.value(), static_cast<int32_t>(test_data.length()));
+  EXPECT_EQ(received_data, test_data);
+
+  // Clean up.
+  server_socket->close(false);
+  client_socket->close(false);
+  runToClose(server_socket_);
+  runToClose(client_socket_);
+  EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+  cleanup();
+}
+
+TEST_F(IoUringWorkerModeIntegrationTest, PerformanceComparison) {
+  // This test verifies that all modes handle the same workload correctly.
+  // In a real performance test, you would measure latency/throughput differences.
+
+  const std::string test_data = "Performance Test Data: " + std::string(1000, 'X');
+  const int iterations = 10;
+
+  for (auto mode : {IoUringMode::ReadWritev, IoUringMode::SendRecv, IoUringMode::SendmsgRecvmsg}) {
+    initializeWithMode(mode);
+    createSocketPair();
+
+    int completed_operations = 0;
+    size_t total_bytes_transferred = 0;
+
+    // Add server socket.
+    OptRef<IoUringSocket> server_socket;
+    server_socket = io_uring_worker_->addServerSocket(
+        server_socket_,
+        [&server_socket, &completed_operations, &total_bytes_transferred](uint32_t events) {
+          if (events == Event::FileReadyType::Read) {
+            EXPECT_NE(absl::nullopt, server_socket->getReadParam());
+            int32_t result = server_socket->getReadParam()->result_;
+            if (result > 0) {
+              total_bytes_transferred += result;
+              auto& buf = server_socket->getReadParam()->buf_;
+              buf.drain(buf.length());
+              completed_operations++;
+            }
+          }
+          return absl::OkStatus();
+        },
+        false);
+
+    // Add client socket.
+    OptRef<IoUringSocket> client_socket;
+    client_socket = io_uring_worker_->addServerSocket(
+        client_socket_,
+        [](uint32_t events) {
+          UNREFERENCED_PARAMETER(events);
+          return absl::OkStatus();
+        },
+        false);
+
+    // Send data multiple times.
+    for (int i = 0; i < iterations; i++) {
+      Buffer::OwnedImpl send_buffer;
+      send_buffer.add(test_data);
+      client_socket->write(send_buffer);
+    }
+
+    // Wait for all operations to complete.
+    while (completed_operations < iterations) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
+
+    // Verify all data was transferred correctly.
+    EXPECT_EQ(completed_operations, iterations);
+    EXPECT_EQ(total_bytes_transferred, iterations * test_data.length());
+
+    // Clean up.
+    server_socket->close(false);
+    client_socket->close(false);
+    runToClose(server_socket_);
+    runToClose(client_socket_);
+    EXPECT_EQ(io_uring_worker_->getSockets().size(), 0);
+    cleanup();
+
+    // Reset for next mode.
+    io_uring_worker_.reset();
+    dispatcher_.reset();
+  }
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
