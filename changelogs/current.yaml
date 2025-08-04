@@ -1,7 +1,9 @@
 date: Pending
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: ext_proc
+  change: |
+    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
