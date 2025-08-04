@@ -196,6 +196,8 @@ public:
   MOCK_METHOD(absl::Status, sign,
               (Http::RequestMessage & message, bool sign_body,
                const absl::string_view override_region));
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestHeaderMap&, const std::string&, const absl::string_view));
 
 private:
   MOCK_METHOD(std::string, createCredentialScope,
