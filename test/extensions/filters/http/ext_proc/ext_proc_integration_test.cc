@@ -5553,7 +5553,7 @@ TEST_P(ExtProcIntegrationTest, LargeBodyTestDuplexStreamed) {
                                      /*response*/ false, body_response);
 
     handleUpstreamRequest();
-    EXPECT_THAT(upstream_request_->headers(), SingleHeaderValueIs("x-new-header", "new"));
+    EXPECT_THAT(upstream_request_->headers(), ContainsHeader("x-new-header", "new"));
     EXPECT_EQ(upstream_request_->body().toString(), body_upstream);
     verifyDownstreamResponse(*response, 200);
     TearDown();
