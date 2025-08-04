@@ -5186,9 +5186,12 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.allow_multiplexed_upstream_half_close", "true");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_defer_logging_to_ack_listener",
-                                    "false");
-  useAccessLog("%DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% %RESPONSE_DURATION% "
-               "%RESPONSE_TX_DURATION%");
+                                    "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream", "true");
+
+  useAccessLog("%DURATION% %ROUNDTRIP_DURATION% %REQUEST_DURATION% %REQUEST_TX_DURATION% "
+               "%RESPONSE_DURATION% %RESPONSE_TX_DURATION%");
   constexpr uint32_t kStreamWindowSize = 64 * 1024;
   // Set buffer limit large enough to accommodate H/2 stream window, so we can cause downstream
   // codec to buffer data without pushing back on upstream.
@@ -5264,15 +5267,29 @@ TEST_P(ProtocolIntegrationTest, ServerHalfCloseBeforeClientWithBufferedResponseD
     }
   }
 
-  std::string timing = waitForAccessLog(access_log_name_);
+  std::string log = waitForAccessLog(access_log_name_);
+  std::vector<std::string> timings = absl::StrSplit(log, ' ');
+  ASSERT_EQ(timings.size(), 6);
   if (fake_upstreams_[0]->httpType() != Http::CodecType::HTTP1 &&
       downstreamProtocol() != Http::CodecType::HTTP1) {
-    // All duration values should be present (no '-' in the access log) when neither upstream nor
-    // downstream is H/1
-    ASSERT_FALSE(absl::StrContains(timing, '-'));
+    // All duration values except for ROUNDTRIP_DURATION should be present (no '-' in the access
+    // log) when neither upstream nor downstream is H/1
+    EXPECT_GE(/* DURATION */ std::stoi(timings.at(0)), 0);
+    if (downstreamProtocol() == Http::CodecType::HTTP3) {
+      // Only H/3 populate this metric.
+      EXPECT_GT(/* ROUNDTRIP_DURATION */ std::stoi(timings.at(1)), 0);
+    }
+    EXPECT_GE(/* REQUEST_DURATION */ std::stoi(timings.at(2)), 0);
+    EXPECT_GE(/* REQUEST_TX_DURATION */ std::stoi(timings.at(3)), 0);
+    EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(timings.at(4)), 0);
+    EXPECT_GE(/* RESPONSE_TX_DURATION */ std::stoi(timings.at(5)), 0);
   } else {
     // When one the peers is H/1 the stream is reset and request duration values will be unset
-    ASSERT_TRUE(absl::StrContains(timing, " - - "));
+    EXPECT_GE(/* DURATION */ std::stoi(timings.at(0)), 0);
+    EXPECT_EQ(/* ROUNDTRIP_DURATION */ timings.at(1), "-");
+    EXPECT_EQ(/* REQUEST_DURATION */ timings.at(2), "-");
+    EXPECT_EQ(/* REQUEST_TX_DURATION */ timings.at(3), "-");
+    EXPECT_GE(/* RESPONSE_DURATION */ std::stoi(timings.at(4)), 0);
   }
 }
 
