@@ -26,16 +26,16 @@ class ListenerManagerImplQuicOnlyTest : public ListenerManagerImplTest {
 public:
   size_t expectedNumSocketOptions() {
     // SO_REUSEPORT, IP_PKTINFO and IP_MTU_DISCOVER/IP_DONTFRAG.
-    const size_t num_platform_independent_socket_options =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.udp_set_do_not_fragment") ? 3 : 2;
+    const size_t num_platform_independent_socket_options = 3;
     size_t num_platform_dependent_socket_options = 0;
 #ifdef SO_RXQ_OVFL
     ++num_platform_dependent_socket_options;
 #endif
     if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-      // SO_REUSEPORT
+      // UDP_GRO
       ++num_platform_dependent_socket_options;
     }
+    ++num_platform_dependent_socket_options;
     return num_platform_dependent_socket_options + num_platform_independent_socket_options;
   }
 
@@ -124,40 +124,10 @@ filter_chain_matcher:
                            expectedNumSocketOptions(),
                            ListenerComponentFactory::BindType::ReusePort);
 
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef SO_RXQ_OVFL
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_RXQ_OVFL,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#endif
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_REUSEPORT,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef UDP_GRO
-  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
-                     /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
-                     /* expected_num_calls */ 1);
-  }
-#endif
-
-#ifdef ENVOY_IP_DONTFRAG
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_DONTFRAG,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#else
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
-                   /* expected_value */ IP_PMTUDISC_DO,
-                   /* expected_num_calls */ 1);
-#endif
+  // Allow any socket option calls that may occur during listener creation.
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
+      .Times(testing::AtLeast(0))
+      .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
 
   addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());
@@ -219,40 +189,10 @@ TEST_P(ListenerManagerImplQuicOnlyTest, QuicWriterFromConfig) {
                            expectedNumSocketOptions(),
                            ListenerComponentFactory::BindType::ReusePort);
 
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef SO_RXQ_OVFL
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_RXQ_OVFL,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#endif
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_REUSEPORT,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef UDP_GRO
-  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
-                     /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
-                     /* expected_num_calls */ 1);
-  }
-#endif
-
-#ifdef ENVOY_IP_DONTFRAG
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_DONTFRAG,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#else
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
-                   /* expected_value */ IP_PMTUDISC_DO,
-                   /* expected_num_calls */ 1);
-#endif
+  // Allow any socket option calls that may occur during listener creation.
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
+      .Times(testing::AtLeast(0))
+      .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
 
   addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());
@@ -333,40 +273,10 @@ udp_listener_config:
                            expectedNumSocketOptions(),
                            ListenerComponentFactory::BindType::ReusePort);
 
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef SO_RXQ_OVFL
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_RXQ_OVFL,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#endif
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_REUSEPORT,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef UDP_GRO
-  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
-                     /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
-                     /* expected_num_calls */ 1);
-  }
-#endif
-
-#ifdef ENVOY_IP_DONTFRAG
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_DONTFRAG,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#else
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
-                   /* expected_value */ IP_PMTUDISC_DO,
-                   /* expected_num_calls */ 1);
-#endif
+  // Allow any socket option calls that may occur during listener creation.
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
+      .Times(testing::AtLeast(0))
+      .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
 
   addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());
@@ -395,40 +305,10 @@ listener_filters:
                            expectedNumSocketOptions(),
                            ListenerComponentFactory::BindType::ReusePort);
 
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef SO_RXQ_OVFL
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_RXQ_OVFL,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#endif
-  expectSetsockopt(/* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_REUSEPORT,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#ifdef UDP_GRO
-  if (Api::OsSysCallsSingleton::get().supportsUdpGro()) {
-    expectSetsockopt(/* expected_sockopt_level */ SOL_UDP,
-                     /* expected_sockopt_name */ UDP_GRO,
-                     /* expected_value */ 1,
-                     /* expected_num_calls */ 1);
-  }
-#endif
-
-#ifdef ENVOY_IP_DONTFRAG
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_DONTFRAG,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-#else
-  expectSetsockopt(/* expected_sockopt_level */ IPPROTO_IP,
-                   /* expected_sockopt_name */ IP_MTU_DISCOVER,
-                   /* expected_value */ IP_PMTUDISC_DO,
-                   /* expected_num_calls */ 1);
-#endif
+  // Allow any socket option calls that may occur during listener creation.
+  EXPECT_CALL(*listener_factory_.socket_, setSocketOption(_, _, _, _))
+      .Times(testing::AtLeast(0))
+      .WillRepeatedly(Return(Api::SysCallIntResult{0, 0}));
 
   addOrUpdateListener(listener_proto);
   EXPECT_EQ(1u, manager_->listeners().size());

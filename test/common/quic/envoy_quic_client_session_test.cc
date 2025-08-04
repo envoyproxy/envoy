@@ -766,6 +766,8 @@ public:
     EnvoyQuicClientSessionTest::SetUp();
   }
 
+  void TearDown() override { EnvoyQuicClientSessionTest::TearDown(); }
+
 protected:
   NiceMock<MockOsSysCallsImpl> os_sys_calls_;
   const bool is_udp_gro_supported_on_platform_;
@@ -828,6 +830,8 @@ public:
         {{"envoy.reloadable_features.disallow_quic_client_udp_mmsg", "false"}});
     EnvoyQuicClientSessionTest::SetUp();
   }
+
+  void TearDown() override { EnvoyQuicClientSessionTest::TearDown(); }
 
 protected:
   NiceMock<MockOsSysCallsImpl> os_sys_calls_;
