@@ -176,6 +176,7 @@ For details on each command's usage see the official
   GEOPOS, Geo
   GEORADIUS_RO, Geo
   GEORADIUSBYMEMBER_RO, Geo
+  GEOSEARCH, Geo
   HDEL, Hash
   HEXISTS, Hash
   HGET, Hash
