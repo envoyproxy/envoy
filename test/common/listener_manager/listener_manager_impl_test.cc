@@ -25,7 +25,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/tls/ssl_socket.h"
-#include "source/extensions/common/matcher/trie_matcher.h"
+#include "source/extensions/common/matcher/ip_range_matcher.h"
 #include "source/extensions/filters/listener/original_dst/original_dst.h"
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
@@ -856,6 +856,36 @@ filter_chains:
 
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("bar").value());
   EXPECT_EQ(1UL, server_.stats_store_.counterFromString("listener.127.0.0.1_1234.foo").value());
+}
+
+TEST_P(ListenerManagerImplTest, ListenerWithTargetNetworkNamespace) {
+  constexpr absl::string_view listener_yaml_tmpl = R"EOF(
+name: listener_with_ns
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 0
+    network_namespace_filepath: "{}"
+filter_chains:
+- filters:
+  - name: envoy.filters.network.tcp_proxy
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.network.tcp_proxy.v3.TcpProxy
+      stat_prefix: tcp
+      cluster: cluster_0
+)EOF";
+
+  const std::string namespace_path = "/var/run/netns/test_listener_ns";
+  envoy::config::listener::v3::Listener listener_config =
+      parseListenerFromV3Yaml(fmt::format(listener_yaml_tmpl, namespace_path));
+
+  auto status = manager_->addOrUpdateListener(listener_config, "", true);
+#if defined(__linux__)
+  // On Linux, adding the listener should succeed.
+  EXPECT_TRUE(status.ok());
+#else
+  EXPECT_FALSE(status.ok());
+#endif
 }
 
 TEST_P(ListenerManagerImplTest, MultipleSocketTypeSpecifiedInAddresses) {

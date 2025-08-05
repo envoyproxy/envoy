@@ -2694,7 +2694,7 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
@@ -2747,7 +2747,7 @@ TEST_F(RouterTest, RetryRequestDuringBody) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1), false));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -2805,7 +2805,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1 + body2), false));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -2888,7 +2888,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1 + body2), true));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -2938,7 +2938,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1), false));
   EXPECT_CALL(encoder2, encodeTrailers(HeaderMapEqualRef(&trailers)));
   router_->retry_state_->callback_();
@@ -4930,8 +4930,8 @@ TEST_P(RouterShadowingTest, StreamingShadow) {
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(0);
-  EXPECT_CALL(foo_request, captureAndSendTrailers_(Http::HeaderValueOf("some", "trailer")));
-  EXPECT_CALL(fizz_request, captureAndSendTrailers_(Http::HeaderValueOf("some", "trailer")));
+  EXPECT_CALL(foo_request, captureAndSendTrailers_(ContainsHeader("some", "trailer")));
+  EXPECT_CALL(fizz_request, captureAndSendTrailers_(ContainsHeader("some", "trailer")));
   router_->decodeTrailers(trailers);
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());

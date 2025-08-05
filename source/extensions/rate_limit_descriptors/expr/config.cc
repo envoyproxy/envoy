@@ -24,7 +24,7 @@ public:
   ExpressionDescriptor(
       const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor& config,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr& builder,
-      const google::api::expr::v1alpha1::Expr& input_expr)
+      const cel::expr::Expr& input_expr)
       : builder_(builder), input_expr_(input_expr), descriptor_key_(config.descriptor_key()),
         skip_if_error_(config.skip_if_error()) {
     compiled_expr_ =
@@ -50,7 +50,7 @@ public:
 
 private:
   Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
-  const google::api::expr::v1alpha1::Expr input_expr_;
+  const cel::expr::Expr input_expr_;
   const std::string descriptor_key_;
   const bool skip_if_error_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
@@ -79,11 +79,21 @@ ExprDescriptorFactory::createDescriptorProducerFromProto(
       return absl::InvalidArgumentError(absl::StrCat("Unable to parse descriptor expression: ",
                                                      parse_status.status().ToString()));
     }
+
     return std::make_unique<ExpressionDescriptor>(config, builder, parse_status.value().expr());
   }
 #endif
-  case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed:
-    return std::make_unique<ExpressionDescriptor>(config, builder, config.parsed());
+  case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed: {
+    std::string serialized;
+    if (!config.parsed().SerializeToString(&serialized)) {
+      return absl::InvalidArgumentError("Failed to serialize parsed expression");
+    }
+    cel::expr::Expr new_expr;
+    if (!new_expr.ParseFromString(serialized)) {
+      return absl::InvalidArgumentError("Failed to convert parsed expression to new format");
+    }
+    return std::make_unique<ExpressionDescriptor>(config, builder, new_expr);
+  }
   default:
     return absl::InvalidArgumentError(
         "Rate limit descriptor extension failed: expression specifier is not set");

@@ -21,6 +21,7 @@ envoy_cc_test(
         "//envoy/config:subscription_interface",
         "//source/common/stats:isolated_store_lib",
         "//source/common/upstream:od_cds_api_lib",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:missing_cluster_notifier_mocks",
@@ -386,6 +387,7 @@ envoy_cc_test(
     srcs = ["load_stats_reporter_test.cc"],
     rbe_pool = "6gig",
     deps = [
+        "//source/common/network:address_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:load_stats_reporter_lib",
         "//test/common/upstream:utility_lib",
