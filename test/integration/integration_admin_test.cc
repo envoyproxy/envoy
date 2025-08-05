@@ -53,13 +53,13 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   EXPECT_EQ("200", request("admin", "POST", "/logging", response));
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
+              ContainsHeader(Http::Headers::get().XContentTypeOptions, "nosniff"));
 
   // Bad level
   EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah", response));
   EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().XContentTypeOptions, "nosniff"));
+              ContainsHeader(Http::Headers::get().XContentTypeOptions, "nosniff"));
   EXPECT_THAT(response->body(), HasSubstr("error: unknown logger level\n"));
 
   // Bad logger
