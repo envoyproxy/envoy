@@ -171,17 +171,16 @@ protected:
     EXPECT_EQ(expected_body_size, response->body().size());
     EXPECT_THAT(
         response->headers(),
-        Http::HeaderValueOf(
+        ContainsHeader(
             Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
             expected_limit));
+    EXPECT_THAT(response->headers(),
+                ContainsHeader(Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get()
+                                   .XRateLimitRemaining,
+                               expected_remaining));
     EXPECT_THAT(
         response->headers(),
-        Http::HeaderValueOf(Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get()
-                                .XRateLimitRemaining,
-                            expected_remaining));
-    EXPECT_THAT(
-        response->headers(),
-        Http::HeaderValueOf(
+        ContainsHeader(
             Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
             expected_reset));
   }
