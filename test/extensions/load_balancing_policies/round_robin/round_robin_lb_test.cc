@@ -983,23 +983,23 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareUseHostWeight) {
   // Zone B: 1L with 200 weight, 1U with 100 weight
 
   HostVectorSharedPtr upstream_hosts(
-      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}));
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", zone_b)}));
   HostVectorSharedPtr local_hosts(
-      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:2", simTime(), zone_b)}));
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:1", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:2", zone_b)}));
   HostsPerLocalitySharedPtr upstream_hosts_per_locality =
       makeHostsPerLocality({{// zone A
-                             makeTestHost(info_, "tcp://127.0.0.1:80", simTime(), zone_a)},
+                             makeTestHost(info_, "tcp://127.0.0.1:80", zone_a)},
                             {// zone B
-                             makeTestHost(info_, "tcp://127.0.0.1:81", simTime(), zone_b)}});
+                             makeTestHost(info_, "tcp://127.0.0.1:81", zone_b)}});
   HostsPerLocalitySharedPtr local_hosts_per_locality =
       makeHostsPerLocality({{// zone A
-                             makeTestHost(info_, "tcp://127.0.0.1:0", simTime(), zone_a),
-                             makeTestHost(info_, "tcp://127.0.0.1:1", simTime(), zone_a)},
+                             makeTestHost(info_, "tcp://127.0.0.1:0", zone_a),
+                             makeTestHost(info_, "tcp://127.0.0.1:1", zone_a)},
                             {// zone B
-                             makeTestHost(info_, "tcp://127.0.0.1:2", simTime(), zone_b)}});
+                             makeTestHost(info_, "tcp://127.0.0.1:2", zone_b)}});
 
   local_hosts_per_locality->get()[0][0]->weight(100);
   local_hosts_per_locality->get()[0][1]->weight(100);
