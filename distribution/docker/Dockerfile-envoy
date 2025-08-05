@@ -1,11 +1,11 @@
 ARG BUILD_OS=ubuntu
 ARG BUILD_TAG=22.04
-ARG BUILD_SHA=59ccd419c0dc0edf9e3bff1a3b2b073ea15a2ce4bc45ce7c989278b225b09af3
+ARG BUILD_SHA=1ec65b2719518e27d4d25f104d93f9fac60dc437f81452302406825c46fcc9cb
 ARG ENVOY_VRP_BASE_IMAGE=envoy-base
 
 
 FROM scratch AS binary
-COPY ci/docker-entrypoint.sh /
+COPY distribution/docker/docker-entrypoint.sh /
 ADD configs/envoyproxy_io_proxy.yaml /etc/envoy/envoy.yaml
 # See https://github.com/docker/buildx/issues/510 for why this _must_ be this way
 ARG TARGETPLATFORM

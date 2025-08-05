@@ -186,7 +186,12 @@ def envoy_dependencies(skip_targets = []):
     _com_google_protobuf()
     _com_github_envoyproxy_sqlparser()
     _v8()
-    _com_googlesource_chromium_base_trace_event_common()
+    _fast_float()
+    _highway()
+    _dragonbox()
+    _fp16()
+    _simdutf()
+    _intel_ittapi()
     _com_github_google_quiche()
     _com_googlesource_googleurl()
     _io_hyperscan()
@@ -710,10 +715,19 @@ def _v8():
         name = "v8",
         patches = [
             "@envoy//bazel:v8.patch",
-            "@envoy//bazel:v8_include.patch",
             "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
+        patch_cmds = [
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/simdutf/simdutf.h\"!#include \"simdutf.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
+        ],
+        repo_mapping = {
+            "@abseil-cpp": "@com_google_absl",
+            "@icu": "@com_github_unicode_org_icu",
+        },
     )
 
     # Needed by proxy_wasm_cpp_host.
@@ -722,16 +736,38 @@ def _v8():
         actual = "@v8//:wee8",
     )
 
-def _com_googlesource_chromium_base_trace_event_common():
+def _fast_float():
     external_http_archive(
-        name = "com_googlesource_chromium_base_trace_event_common",
-        build_file = "@v8//:bazel/BUILD.trace_event_common",
+        name = "fast_float",
     )
 
-    # Needed by v8.
-    native.bind(
-        name = "base_trace_event_common",
-        actual = "@com_googlesource_chromium_base_trace_event_common//:trace_event_common",
+def _highway():
+    external_http_archive(
+        name = "highway",
+    )
+
+def _dragonbox():
+    external_http_archive(
+        name = "dragonbox",
+        build_file = "@envoy//bazel/external:dragonbox.BUILD",
+    )
+
+def _fp16():
+    external_http_archive(
+        name = "fp16",
+        build_file = "@envoy//bazel/external:fp16.BUILD",
+    )
+
+def _simdutf():
+    external_http_archive(
+        name = "simdutf",
+        build_file = "@envoy//bazel/external:simdutf.BUILD",
+    )
+
+def _intel_ittapi():
+    external_http_archive(
+        name = "intel_ittapi",
+        build_file = "@envoy//bazel/external:intel_ittapi.BUILD",
     )
 
 def _com_github_google_quiche():
