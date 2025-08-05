@@ -189,6 +189,38 @@ TEST(QuicLbTest, Unencrypted) {
             absl::Span(expected, sizeof(expected)));
 }
 
+TEST(QuicLbTest, Base64ServerId) {
+  constexpr absl::string_view id_data_base64 = "dGVzdHRlc3Q=";
+  constexpr absl::string_view id_data = "testtest";
+
+  envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config cfg;
+  cfg.set_unsafe_unencrypted_testing_mode(true);
+  cfg.mutable_server_id()->set_inline_string(id_data_base64);
+  cfg.set_server_id_base64_encoded(true);
+  cfg.set_expected_server_id_length(id_data.length());
+  cfg.set_nonce_length_bytes(8);
+  cfg.mutable_encryption_parameters()->set_name(kSecretName);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+
+  auto status = factory_context.server_factory_context_.secretManager().addStaticSecret(
+      encryptionParamaters(0));
+  absl::StatusOr<std::unique_ptr<Factory>> factory_or_status =
+      Factory::create(cfg, factory_context);
+  auto generator = createTypedIdGenerator(*factory_or_status.value());
+  auto new_cid = generator->GenerateNextConnectionId(quic::QuicConnectionId{});
+  EXPECT_TRUE(new_cid.has_value());
+  uint8_t expected[1 + id_data.size()];
+  expected[0] = 16; // Configured length of encoded portion of CID. Zero version means the high bits
+                    // are all unset.
+  memcpy(expected + 1, id_data.data(), id_data.size());
+  ASSERT_GT(new_cid->length(), sizeof(expected));
+
+  // First bytes should be the version followed by unencrypted server ID.
+  EXPECT_EQ(absl::Span(reinterpret_cast<const uint8_t*>(new_cid->data()), sizeof(expected)),
+            absl::Span(expected, sizeof(expected)));
+}
+
 TEST(QuicLbTest, TooLong) {
   uint8_t id_data[] = {0xab, 0xcd, 0xef, 0x12, 0x34, 0x56};
   envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config cfg;
