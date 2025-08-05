@@ -25,9 +25,6 @@ WrrLocalityLoadBalancer::WorkerLocalLbFactory::create(Upstream::LoadBalancerPara
       ::Envoy::Upstream::ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory*>(
       endpoint_picking_policy_factory_.get());
   if (client_side_weighted_round_robin_factory == nullptr) {
-    ENVOY_BUG(true, "Currently WrrLocalityLoadBalancer only supports "
-                    "ClientSideWeightedRoundRobinLoadBalancer as its endpoint "
-                    "picking policy.");
     return nullptr;
   }
   // Tell the worker local LB to use locality weights.
