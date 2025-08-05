@@ -1094,6 +1094,45 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
       "overload.envoy.load_shed_points.http2_server_go_away_on_dispatch.scale_percent", 0);
 }
 
+TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayAndClosesConnection) {
+  // Test only applies to HTTP2.
+  if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::LoadShedPoint>(R"EOF(
+      name: "envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          threshold:
+            value: 0.90
+    )EOF"));
+
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto [first_request_encoder, first_request_decoder] =
+      codec_client_->startRequest(default_request_headers_);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_http2_total", 1);
+
+  // Put envoy in overloaded state to send GOAWAY frames and close the connection.
+  updateResource(0.95);
+  test_server_->waitForGaugeEq(
+      "overload.envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch.scale_percent",
+      100);
+
+  auto second_request_decoder = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // The downstream should receive the GOAWAY and the connection should be closed.
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  EXPECT_TRUE(codec_client_->sawGoAway());
+  test_server_->waitForCounterEq("http2.goaway_sent", 1);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
+
+  // The second request will not complete.
+  EXPECT_FALSE(second_request_decoder->complete());
+}
+
 TEST_P(LoadShedPointIntegrationTest, HttpConnectionMnagerCloseConnectionCreatingCodec) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP3) {
     return;

@@ -99,14 +99,14 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, SimpleRequest) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   std::string expected_request = "{\"author\":\"John Doe\",\"id\":\"123\",\"title\":\"Kids book\"}";
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().ContentType,
+                             Http::Headers::get().ContentTypeValues.Json));
   EXPECT_THAT(
       upstream_request_->headers(),
-      HeaderValueOf(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.Json));
+      ContainsHeader(Http::Headers::get().ContentLength, std::to_string(expected_request.size())));
   EXPECT_THAT(upstream_request_->headers(),
-              Http::HeaderValueOf(Http::Headers::get().ContentLength,
-                                  std::to_string(expected_request.size())));
-  EXPECT_THAT(upstream_request_->headers(),
-              Http::HeaderValueOf(Http::Headers::get().Path, "/shelves/12345/books/123"));
+              ContainsHeader(Http::Headers::get().Path, "/shelves/12345/books/123"));
   EXPECT_EQ(upstream_request_->body().toString(), expected_request);
 
   Http::TestResponseHeaderMapImpl response_headers;
@@ -124,8 +124,8 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, SimpleRequest) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().ContentType,
-                                                 Http::Headers::get().ContentTypeValues.Grpc));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().ContentType,
+                                                  Http::Headers::get().ContentTypeValues.Grpc));
 
   bookstore::Book expected_book;
   expected_book.set_id(123);
@@ -143,7 +143,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, SimpleRequest) {
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_book, book));
 
-  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -176,14 +176,13 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, HttpBodyRequestResponse) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  EXPECT_THAT(
-      upstream_request_->headers(),
-      HeaderValueOf(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.Text));
-  EXPECT_THAT(
-      upstream_request_->headers(),
-      Http::HeaderValueOf(Http::Headers::get().ContentLength, std::to_string(request_str.size())));
   EXPECT_THAT(upstream_request_->headers(),
-              Http::HeaderValueOf(Http::Headers::get().Path, "/echoRawBody"));
+              ContainsHeader(Http::Headers::get().ContentType,
+                             Http::Headers::get().ContentTypeValues.Text));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Http::Headers::get().ContentLength,
+                                                           std::to_string(request_str.size())));
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().Path, "/echoRawBody"));
   EXPECT_EQ(upstream_request_->body().toString(), request_str);
 
   Http::TestResponseHeaderMapImpl response_headers;
@@ -202,8 +201,8 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, HttpBodyRequestResponse) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().ContentType,
-                                                 Http::Headers::get().ContentTypeValues.Grpc));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().ContentType,
+                                                  Http::Headers::get().ContentTypeValues.Grpc));
 
   google::api::HttpBody expected_res;
   expected_res.set_content_type(Http::Headers::get().ContentTypeValues.Html);
@@ -219,7 +218,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, HttpBodyRequestResponse) {
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 
-  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -261,13 +260,13 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, NestedHttpBodyRequest) {
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
-  EXPECT_THAT(
-      upstream_request_->headers(),
-      HeaderValueOf(Http::Headers::get().ContentType, Http::Headers::get().ContentTypeValues.Json));
-  EXPECT_THAT(upstream_request_->headers(), Http::HeaderValueOf(Http::Headers::get().ContentLength,
-                                                                std::to_string(book_str.size())));
   EXPECT_THAT(upstream_request_->headers(),
-              Http::HeaderValueOf(Http::Headers::get().Path, "/v2/shelves/12345/books"));
+              ContainsHeader(Http::Headers::get().ContentType,
+                             Http::Headers::get().ContentTypeValues.Json));
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().ContentLength, std::to_string(book_str.size())));
+  EXPECT_THAT(upstream_request_->headers(),
+              ContainsHeader(Http::Headers::get().Path, "/v2/shelves/12345/books"));
   EXPECT_EQ(upstream_request_->body().toString(), book_str);
 
   Http::TestResponseHeaderMapImpl response_headers;
@@ -286,8 +285,8 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, NestedHttpBodyRequest) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().ContentType,
-                                                 Http::Headers::get().ContentTypeValues.Grpc));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().ContentType,
+                                                  Http::Headers::get().ContentTypeValues.Grpc));
 
   google::api::HttpBody expected_res;
   expected_res.set_content_type(Http::Headers::get().ContentTypeValues.Html);
@@ -303,7 +302,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, NestedHttpBodyRequest) {
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 
-  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -337,10 +336,10 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get));
+              ContainsHeader(Http::Headers::get().Method, Http::Headers::get().MethodValues.Get));
   EXPECT_THAT(upstream_request_->headers(),
-              Http::HeaderValueOf(Http::Headers::get().Path,
-                                  "/shelves/12345/books:unary?author=567&theme=Science%20Fiction"));
+              ContainsHeader(Http::Headers::get().Path,
+                             "/shelves/12345/books:unary?author=567&theme=Science%20Fiction"));
 
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(200);
@@ -359,8 +358,8 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
-  EXPECT_THAT(response->headers(), HeaderValueOf(Http::Headers::get().ContentType,
-                                                 Http::Headers::get().ContentTypeValues.Grpc));
+  EXPECT_THAT(response->headers(), ContainsHeader(Http::Headers::get().ContentType,
+                                                  Http::Headers::get().ContentTypeValues.Grpc));
 
   bookstore::ListBooksResponse expected_res;
   auto* book = expected_res.add_books();
@@ -378,7 +377,7 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, RequestWithQueryParams) {
 
   EXPECT_TRUE(MessageDifferencer::Equals(expected_res, transcoded_res));
 
-  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
+  EXPECT_THAT(*response->trailers(), ContainsHeader(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
@@ -410,9 +409,9 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, ErrorFromBackend) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderValueOf(Http::Headers::get().Method, Http::Headers::get().MethodValues.Put));
+              ContainsHeader(Http::Headers::get().Method, Http::Headers::get().MethodValues.Put));
   EXPECT_THAT(upstream_request_->headers(),
-              Http::HeaderValueOf(Http::Headers::get().Path, "/shelves/12345/books"));
+              ContainsHeader(Http::Headers::get().Path, "/shelves/12345/books"));
 
   Http::TestResponseHeaderMapImpl response_headers;
   response_headers.setStatus(400);
@@ -431,10 +430,10 @@ TEST_P(GrpcJsonReverseTranscoderIntegrationTest, ErrorFromBackend) {
 
   ASSERT_TRUE(response->trailers());
   EXPECT_THAT(*response->trailers(),
-              Http::HeaderValueOf(Http::Headers::get().GrpcStatus,
-                                  std::to_string(Grpc::Status::WellKnownGrpcStatus::Internal)));
+              ContainsHeader(Http::Headers::get().GrpcStatus,
+                             std::to_string(Grpc::Status::WellKnownGrpcStatus::Internal)));
   EXPECT_THAT(*response->trailers(),
-              Http::HeaderValueOf(Http::Headers::get().GrpcMessage, response_str));
+              ContainsHeader(Http::Headers::get().GrpcMessage, response_str));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());

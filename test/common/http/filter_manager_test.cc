@@ -180,7 +180,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringDecodingGrpcClassiciation) {
   EXPECT_CALL(filter_manager_callbacks_, setResponseHeaders_(_))
       .WillOnce(Invoke([](auto& response_headers) {
         EXPECT_THAT(response_headers,
-                    HeaderHasValueRef(Http::Headers::get().ContentType, "application/grpc"));
+                    ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
       }));
   EXPECT_CALL(filter_manager_callbacks_, resetIdleTimer());
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
@@ -245,7 +245,7 @@ TEST_F(FilterManagerTest, SendLocalReplyDuringEncodingGrpcClassiciation) {
       .WillOnce(Invoke([](auto&) {}))
       .WillOnce(Invoke([](auto& response_headers) {
         EXPECT_THAT(response_headers,
-                    HeaderHasValueRef(Http::Headers::get().ContentType, "application/grpc"));
+                    ContainsHeader(Http::Headers::get().ContentType, "application/grpc"));
       }));
   EXPECT_CALL(filter_manager_callbacks_, encodeHeaders(_, _));
   EXPECT_CALL(filter_manager_callbacks_, endStream());

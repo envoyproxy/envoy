@@ -114,9 +114,9 @@ TEST_P(StaticConfigResourceDetectorIntegrationTest, TestResourceAttributeSet) {
   ASSERT_TRUE(backend_request_->waitForEndStream(*dispatcher_));
 
   // Sanity checking that we sent the expected data.
-  EXPECT_THAT(backend_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(backend_request_->headers(), ContainsHeader(Http::Headers::get().Method, "POST"));
   EXPECT_THAT(backend_request_->headers(),
-              HeaderValueOf(Http::Headers::get().Path, "/api/v2/traces"));
+              ContainsHeader(Http::Headers::get().Path, "/api/v2/traces"));
 
   backend_request_->encodeHeaders(default_response_headers_, true /*end_stream*/);
 

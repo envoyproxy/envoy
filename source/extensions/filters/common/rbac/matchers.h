@@ -10,6 +10,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/network/lc_trie.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matcher_interface.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
@@ -113,23 +114,34 @@ private:
 };
 
 /**
- * Perform a match against an IP CIDR range. This rule can be applied to connection remote,
+ * Perform a match against IP CIDR ranges. This rule can be applied to connection remote,
  * downstream local address, downstream direct remote address or downstream remote address.
+ * Uses LC Trie algorithm for optimal O(log n) performance in IP address range matching.
  */
 class IPMatcher : public Matcher {
 public:
   enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
 
-  IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
-      : range_(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(range),
-                                     Network::Address::CidrRange)),
-        type_(type) {}
+  // Single IP range constructor.
+  IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type);
+
+  // Multiple IP ranges constructor.
+  static absl::StatusOr<std::unique_ptr<IPMatcher>>
+  create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& ranges, Type type);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
-  const Network::Address::CidrRange range_;
+  // Private constructor for LC Trie-based matcher.
+  IPMatcher(std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie, Type type);
+
+  // Extract IP address based on matcher type.
+  Network::Address::InstanceConstSharedPtr
+  extractIpAddress(const Network::Connection& connection, const StreamInfo::StreamInfo& info) const;
+
+  std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie_;
+
   const Type type_;
 };
 

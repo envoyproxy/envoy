@@ -31,7 +31,6 @@ constexpr absl::string_view expected_types[] = {
 
 using HttpFilterProto =
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
-using Http::HeaderValueOf;
 using testing::Not;
 
 class UpstreamHttpFilterIntegrationTestBase : public HttpIntegrationTest {
@@ -174,8 +173,8 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
   initialize();
 
   auto headers = sendRequestAndGetHeaders();
-  EXPECT_THAT(*headers, Not(HeaderValueOf("x-test-router", "aa")));
-  EXPECT_THAT(*headers, HeaderValueOf("x-test-cluster", "bb"));
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-router", "aa")));
+  EXPECT_THAT(*headers, ContainsHeader("x-test-cluster", "bb"));
 }
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, ClusterUpstreamFiltersDisabled) {
@@ -185,7 +184,7 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, ClusterUpstreamFiltersDisabl
   initialize();
 
   auto headers = sendRequestAndGetHeaders();
-  EXPECT_THAT(*headers, Not(HeaderValueOf("x-test-router", "aa")));
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-router", "aa")));
 }
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, RouterUpstreamFiltersDisabled) {
@@ -195,7 +194,7 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, RouterUpstreamFiltersDisable
   initialize();
 
   auto headers = sendRequestAndGetHeaders();
-  EXPECT_THAT(*headers, Not(HeaderValueOf("x-test-cluster", "bb")));
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-cluster", "bb")));
 }
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
@@ -213,9 +212,9 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
 
   auto headers = sendRequestAndGetHeaders();
   if (useRouterFilters()) {
-    EXPECT_THAT(*headers, Not(HeaderValueOf(default_header_key_, default_header_value_)));
+    EXPECT_THAT(*headers, Not(ContainsHeader(default_header_key_, default_header_value_)));
   } else {
-    EXPECT_THAT(*headers, HeaderValueOf(default_header_key_, default_header_value_));
+    EXPECT_THAT(*headers, ContainsHeader(default_header_key_, default_header_value_));
   }
 }
 

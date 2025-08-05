@@ -70,7 +70,8 @@ addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
                                            const DenyResponseSettings& settings,
                                            StreamInfo::CoreResponseFlag flag) {
-  cb->sendLocalReply(getDenyResponseCode(settings), settings.http_body().value(),
+  cb->sendLocalReply(getDenyResponseCode(settings),
+                     MessageUtil::bytesToString(settings.http_body().value()),
                      addDenyResponseHeadersCb(settings), absl::nullopt, "");
   cb->streamInfo().setResponseFlag(flag);
   return Envoy::Http::FilterHeadersStatus::StopIteration;

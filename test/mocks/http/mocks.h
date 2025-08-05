@@ -800,14 +800,6 @@ private:
   const testing::Matcher<absl::string_view> matcher_;
 };
 
-// Test that a HeaderMap argument contains exactly one header with the given
-// key, whose value satisfies the given expectation. The expectation can be a
-// matcher, or a string that the value should equal.
-template <typename T, typename K> HeaderValueOfMatcher HeaderValueOf(K key, const T& matcher) {
-  return HeaderValueOfMatcher(LowerCaseString(key),
-                              testing::SafeMatcherCast<absl::string_view>(matcher));
-}
-
 // Tests the provided Envoy HeaderMap for the provided HTTP status code.
 MATCHER_P(HttpStatusIs, expected_code, "") {
   const HeaderEntry* status = arg.Status();
@@ -987,16 +979,13 @@ MATCHER_P(HeaderMapEqualRef, rhs, "") {
   return equal;
 }
 
-// Test that a HeaderMapPtr argument includes a given key-value pair, e.g.,
-//  HeaderHasValue("Upgrade", "WebSocket")
-template <typename K, typename V>
-testing::Matcher<const Http::HeaderMap*> HeaderHasValue(K key, V value) {
-  return testing::Pointee(Http::HeaderValueOf(key, value));
-}
-
-// Like HeaderHasValue, but matches against a HeaderMap& argument.
-template <typename K, typename V> Http::HeaderValueOfMatcher HeaderHasValueRef(K key, V value) {
-  return Http::HeaderValueOf(key, value);
+// Test that a HeaderMap& argument includes a given key-value pair, e.g.,
+// ContainsHeader("Upgrade", "WebSocket"). Key is case-insensitive.
+// Value can be a matcher, e.g.
+// ContainsHeader("Upgrade", HasSubstr("Socket"))
+template <typename K, typename V> Http::HeaderValueOfMatcher ContainsHeader(K key, V value) {
+  return Http::HeaderValueOfMatcher(Http::LowerCaseString(key),
+                                    testing::SafeMatcherCast<absl::string_view>(value));
 }
 
 } // namespace Envoy

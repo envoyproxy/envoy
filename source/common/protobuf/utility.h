@@ -1,6 +1,7 @@
 #pragma once
 
 #include <numeric>
+#include <string>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
@@ -17,6 +18,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
@@ -380,6 +382,12 @@ public:
   }
 
   /**
+   * Utility method to swap between protobuf bytes type using absl::Cord instead of std::string.
+   * Noop for now.
+   */
+  static const std::string& bytesToString(const std::string& bytes) { return bytes; }
+
+  /**
    * Convert from a typed message into a google.protobuf.Any. This should be used
    * instead of the inbuilt PackTo, as PackTo is not available with lite protos.
    *
@@ -416,9 +424,9 @@ public:
     if (any.Is<ProtobufWkt::BytesValue>()) {
       Protobuf::BytesValue b;
       RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, b));
-      return b.value();
+      return bytesToString(b.value());
     }
-    return any.value();
+    return bytesToString(any.value());
   };
 
   /**

@@ -17,7 +17,7 @@ downstream-Envoy-upstream communication.
 Envoy includes some custom Google Mock matchers to make test expectation
 statements simpler to write and easier to understand.
 
-### HeaderValueOf
+### ContainsHeader
 
 Tests that a HeaderMap argument contains exactly one header with the given key,
 whose value satisfies the given expectation. The expectation can be a matcher,
@@ -26,13 +26,13 @@ or a string that the value should equal.
 Examples:
 
 ```cpp
-EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Server, "envoy"));
+EXPECT_THAT(response->headers(), ContainsHeader(Headers::get().Server, "envoy"));
 ```
 
 ```cpp
 using testing::HasSubstr;
 EXPECT_THAT(request->headers(),
-            HeaderValueOf(Headers::get().AcceptEncoding, HasSubstr("gzip")));
+            ContainsHeader(Headers::get().AcceptEncoding, HasSubstr("gzip")));
 ```
 
 ### HttpStatusIs

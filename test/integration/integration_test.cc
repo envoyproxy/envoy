@@ -28,7 +28,6 @@
 #include "gtest/gtest.h"
 
 using Envoy::Http::Headers;
-using Envoy::Http::HeaderValueOf;
 using Envoy::Http::HttpStatusIs;
 using testing::Combine;
 using testing::ContainsRegex;
@@ -408,7 +407,7 @@ TEST_P(IntegrationTest, ConnectionCloseHeader) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Connection, "close"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Headers::get().Connection, "close"));
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
 }
 
@@ -1633,8 +1632,8 @@ TEST_P(IntegrationTest, TestHead) {
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
   EXPECT_EQ(response->headers().ContentLength(), nullptr);
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Headers::get().TransferEncoding,
-                            Http::Headers::get().TransferEncodingValues.Chunked));
+              ContainsHeader(Headers::get().TransferEncoding,
+                             Http::Headers::get().TransferEncodingValues.Chunked));
   EXPECT_EQ(0, response->body().size());
 
   // Preserve explicit content length.
@@ -1643,7 +1642,7 @@ TEST_P(IntegrationTest, TestHead) {
   response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().ContentLength, "12"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Headers::get().ContentLength, "12"));
   EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
   EXPECT_EQ(0, response->body().size());
 }
@@ -1756,13 +1755,13 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
                                      {"via", "foo"},
                                      {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Headers::get().Via, "foo, bar"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Via, "bar"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Headers::get().Via, "bar"));
 }
 
 // Validate that 100-continue works as expected with via header addition on both request and
@@ -2652,7 +2651,7 @@ TEST_P(IntegrationTest, AppendXForwardedPort) {
                                      {":authority", "host"},
                                      {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "")));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader(Headers::get().ForwardedPort, "")));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2695,7 +2694,7 @@ TEST_P(IntegrationTest, IgnoreAppendingXForwardedPortIfHasBeenSet) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "8080"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "8080"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Headers::get().ForwardedPort, "8080"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2717,7 +2716,7 @@ TEST_P(IntegrationTest, PreserveXForwardedPortFromTrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Headers::get().ForwardedPort, "80"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2739,7 +2738,8 @@ TEST_P(IntegrationTest, OverwriteXForwardedPortFromUntrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "80")));
+  EXPECT_THAT(upstream_request_->headers(),
+              Not(ContainsHeader(Headers::get().ForwardedPort, "80")));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2761,7 +2761,7 @@ TEST_P(IntegrationTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Headers::get().ForwardedPort, "80"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());

@@ -8,48 +8,6 @@ using ::testing::_;
 using ::testing::Not;
 
 namespace Http {
-TEST(HeaderValueOfTest, ConstHeaderMap) {
-  const TestRequestHeaderMapImpl header_map{{"key", "expected value"}};
-
-  // Positive checks.
-  EXPECT_THAT(header_map, HeaderValueOf("key", "expected value"));
-  EXPECT_THAT(header_map, HeaderValueOf("key", _));
-
-  // Negative checks.
-  EXPECT_THAT(header_map, Not(HeaderValueOf("key", "other value")));
-  EXPECT_THAT(header_map, Not(HeaderValueOf("other key", _)));
-}
-
-TEST(HeaderValueOfTest, MutableHeaderMap) {
-  TestRequestHeaderMapImpl header_map;
-
-  // Negative checks.
-  EXPECT_THAT(header_map, Not(HeaderValueOf("key", "other value")));
-  EXPECT_THAT(header_map, Not(HeaderValueOf("other key", _)));
-
-  header_map.addCopy("key", "expected value");
-
-  // Positive checks.
-  EXPECT_THAT(header_map, HeaderValueOf("key", "expected value"));
-  EXPECT_THAT(header_map, HeaderValueOf("key", _));
-}
-
-TEST(HeaderValueOfTest, LowerCaseString) {
-  TestRequestHeaderMapImpl header_map;
-  LowerCaseString key("key");
-  LowerCaseString other_key("other_key");
-
-  // Negative checks.
-  EXPECT_THAT(header_map, Not(HeaderValueOf(key, "other value")));
-  EXPECT_THAT(header_map, Not(HeaderValueOf(other_key, _)));
-
-  header_map.addCopy(key, "expected value");
-  header_map.addCopy(other_key, "ValUe");
-
-  // Positive checks.
-  EXPECT_THAT(header_map, HeaderValueOf(key, "expected value"));
-  EXPECT_THAT(header_map, HeaderValueOf(other_key, _));
-}
 
 TEST(HttpStatusIsTest, CheckStatus) {
   TestResponseHeaderMapImpl header_map;
@@ -106,36 +64,47 @@ TEST(IsSupersetOfHeadersTest, MutableHeaderMap) {
 }
 } // namespace Http
 
-TEST(HeaderHasValueRefTest, MutableValueRef) {
-  Http::TestRequestHeaderMapImpl header_map;
-
-  EXPECT_THAT(header_map, Not(HeaderHasValueRef("key", "value")));
-  EXPECT_THAT(header_map, Not(HeaderHasValueRef("other key", "value")));
-
-  header_map.addCopy("key", "value");
-
-  EXPECT_THAT(header_map, HeaderHasValueRef("key", "value"));
-  EXPECT_THAT(header_map, Not(HeaderHasValueRef("key", "wrong value")));
-}
-
-TEST(HeaderHasValueRefTest, ConstValueRef) {
+TEST(ContainsHeaderTest, ConstHeaderMap) {
   const Http::TestRequestHeaderMapImpl header_map{{"key", "expected value"}};
 
-  EXPECT_THAT(header_map, Not(HeaderHasValueRef("key", "other value")));
-  EXPECT_THAT(header_map, HeaderHasValueRef("key", "expected value"));
+  // Positive checks.
+  EXPECT_THAT(header_map, ContainsHeader("key", "expected value"));
+  EXPECT_THAT(header_map, ContainsHeader("key", _));
+
+  // Negative checks.
+  EXPECT_THAT(header_map, Not(ContainsHeader("key", "other value")));
+  EXPECT_THAT(header_map, Not(ContainsHeader("other key", _)));
 }
 
-TEST(HeaderHasValueRefTest, LowerCaseStringArguments) {
-  Http::LowerCaseString key("key"), other_key("other key");
+TEST(ContainsHeaderTest, MutableHeaderMap) {
   Http::TestRequestHeaderMapImpl header_map;
 
-  EXPECT_THAT(header_map, Not(HeaderHasValueRef(key, "value")));
-  EXPECT_THAT(header_map, Not(HeaderHasValueRef(other_key, "value")));
+  // Negative checks.
+  EXPECT_THAT(header_map, Not(ContainsHeader("key", "other value")));
+  EXPECT_THAT(header_map, Not(ContainsHeader("other key", _)));
 
-  header_map.addCopy(key, "value");
+  header_map.addCopy("key", "expected value");
 
-  EXPECT_THAT(header_map, HeaderHasValueRef(key, "value"));
-  EXPECT_THAT(header_map, Not(HeaderHasValueRef(other_key, "wrong value")));
+  // Positive checks.
+  EXPECT_THAT(header_map, ContainsHeader("key", "expected value"));
+  EXPECT_THAT(header_map, ContainsHeader("key", _));
+}
+
+TEST(ContainsHeaderTest, LowerCaseStringArguments) {
+  Http::TestRequestHeaderMapImpl header_map;
+  Http::LowerCaseString key("key");
+  Http::LowerCaseString other_key("other_key");
+
+  // Negative checks.
+  EXPECT_THAT(header_map, Not(ContainsHeader(key, "other value")));
+  EXPECT_THAT(header_map, Not(ContainsHeader(other_key, _)));
+
+  header_map.addCopy(key, "expected value");
+  header_map.addCopy(other_key, "ValUe");
+
+  // Positive checks.
+  EXPECT_THAT(header_map, ContainsHeader(key, "expected value"));
+  EXPECT_THAT(header_map, ContainsHeader(other_key, _));
 }
 
 TEST(HeaderMatcherTest, OutputsActualHeadersOnMatchFailure) {

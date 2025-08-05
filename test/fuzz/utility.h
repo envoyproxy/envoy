@@ -6,6 +6,7 @@
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/fuzz/common.pb.h"
@@ -208,8 +209,8 @@ inline std::vector<std::string> parseHttpData(const test::fuzz::HttpData& data) 
       data_chunks.push_back(http_data);
     }
   } else if (data.has_proto_body()) {
-    const std::string serialized = data.proto_body().message().value();
-    data_chunks = absl::StrSplit(serialized, absl::ByLength(data.proto_body().chunk_size()));
+    data_chunks = absl::StrSplit(MessageUtil::bytesToString(data.proto_body().message().value()),
+                                 absl::ByLength(data.proto_body().chunk_size()));
   }
 
   return data_chunks;

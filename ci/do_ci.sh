@@ -566,6 +566,8 @@ case $CI_TARGET in
         fi
         ENVOY_ARCH_DIR="$(dirname "${ENVOY_BUILD_DIR}")"
         ENVOY_TARBALL_DIR="${ENVOY_TARBALL_DIR:-${ENVOY_ARCH_DIR}}"
+        ENVOY_OCI_DIR="${ENVOY_BUILD_DIR}/${ENVOY_OCI_DIR}"
+        export ENVOY_OCI_DIR
         _PLATFORMS=()
         PLATFORM_NAMES=(
             x64:linux/amd64
@@ -591,12 +593,12 @@ case $CI_TARGET in
         fi
         PLATFORMS="$(IFS=, ; echo "${_PLATFORMS[*]}")"
         export DOCKER_PLATFORM="$PLATFORMS"
-        if [[ -z "${DOCKERHUB_PASSWORD}" && "${#_PLATFORMS[@]}" -eq 1 && -z $ENVOY_DOCKER_SAVE_IMAGE ]]; then
-            # if you are not pushing the images and there is only one platform
-            # then load to Docker (ie local build)
+        if [[ -z "$ENVOY_DOCKER_SAVE_IMAGE" ]]; then
+            # if you are not saving the images as OCI then load to Docker (ie local build)
             export DOCKER_LOAD_IMAGES=1
         fi
-        "${ENVOY_SRCDIR}/distribution/docker/docker_ci.sh"
+        echo "BUILDING FOR: ${PLATFORMS}"
+        "${ENVOY_SRCDIR}/distribution/docker/build.sh"
         ;;
 
     dockerhub-publish)

@@ -380,17 +380,17 @@ public:
 
     if (opts.failure_mode_allowed_header) {
       EXPECT_THAT(upstream_request_->headers(),
-                  Http::HeaderValueOf("x-envoy-auth-failure-mode-allowed", "true"));
+                  ContainsHeader("x-envoy-auth-failure-mode-allowed", "true"));
     }
     // Check that ext_authz didn't remove this downstream header which should be immune to
     // mutations.
     EXPECT_THAT(upstream_request_->headers(),
-                Http::HeaderValueOf("disallow-mutation-downstream-req",
-                                    "authz resp cannot set or append to this header"));
+                ContainsHeader("disallow-mutation-downstream-req",
+                               "authz resp cannot set or append to this header"));
 
     for (const auto& header_to_add : opts.headers_to_add) {
       EXPECT_THAT(upstream_request_->headers(),
-                  Http::HeaderValueOf(header_to_add.first, header_to_add.second));
+                  ContainsHeader(header_to_add.first, header_to_add.second));
       // For headers_to_add (with append = false), the original request headers have no "-replaced"
       // suffix, but the ones from the authorization server have it.
       EXPECT_TRUE(absl::EndsWith(header_to_add.second, "-replaced"));
@@ -403,7 +403,7 @@ public:
       // header is existed in the original request headers).
       EXPECT_THAT(
           upstream_request_->headers(),
-          Http::HeaderValueOf(
+          ContainsHeader(
               header_to_append.first,
               // In this test, the keys and values of the original request headers have the same
               // string value. Hence for "header2" key, the value is "header2,header2-appended".
@@ -430,7 +430,7 @@ public:
       // headers_to_append_multiple has append = false for the first entry of multiple entries, and
       // append = true for the rest entries.
       EXPECT_THAT(upstream_request_->headers(),
-                  Http::HeaderValueOf("multiple", "multiple-first,multiple-second"));
+                  ContainsHeader("multiple", "multiple-first,multiple-second"));
     }
 
     for (const auto& header_to_remove : opts.headers_to_remove) {
@@ -746,11 +746,11 @@ public:
     result = ext_authz_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
 
-    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("allowed-prefix-one", "one"));
-    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("allowed-prefix-two", "two"));
-    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("authorization", "legit"));
-    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("regex-food", "food"));
-    EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("regex-fool", "fool"));
+    EXPECT_THAT(ext_authz_request_->headers(), ContainsHeader("allowed-prefix-one", "one"));
+    EXPECT_THAT(ext_authz_request_->headers(), ContainsHeader("allowed-prefix-two", "two"));
+    EXPECT_THAT(ext_authz_request_->headers(), ContainsHeader("authorization", "legit"));
+    EXPECT_THAT(ext_authz_request_->headers(), ContainsHeader("regex-food", "food"));
+    EXPECT_THAT(ext_authz_request_->headers(), ContainsHeader("regex-fool", "fool"));
 
     EXPECT_TRUE(ext_authz_request_->headers()
                     .get(Http::LowerCaseString(std::string("not-allowed")))
@@ -859,7 +859,7 @@ public:
     // The original client request header value of "baz" is "foo". Since we configure to "override"
     // the value of "baz", we expect the request headers to be sent to upstream contain only one
     // "baz" with value "baz" (set by the authorization server).
-    EXPECT_THAT(upstream_request_->headers(), Http::HeaderValueOf("baz", "baz"));
+    EXPECT_THAT(upstream_request_->headers(), ContainsHeader("baz", "baz"));
 
     // The original client request header value of "bat" is "foo". Since we configure to "append"
     // the value of "bat", we expect the request headers to be sent to upstream contain two "bat"s,
@@ -1428,7 +1428,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, DefaultCaseSensitiveStringMatcher) {
 // Verifies that "X-Forwarded-For" header is unmodified.
 TEST_P(ExtAuthzHttpIntegrationTest, UnmodifiedForwardedForHeader) {
   setup(false);
-  EXPECT_THAT(ext_authz_request_->headers(), Http::HeaderValueOf("x-forwarded-for", "1.2.3.4"));
+  EXPECT_THAT(ext_authz_request_->headers(), ContainsHeader("x-forwarded-for", "1.2.3.4"));
 }
 
 // Verifies that by default HTTP service uses the case-sensitive string matcher
@@ -1548,7 +1548,7 @@ TEST_P(ExtAuthzHttpIntegrationTest, TimeoutFailOpen) {
   RELEASE_ASSERT(result, result.message());
 
   EXPECT_THAT(upstream_request_->headers(),
-              Http::HeaderValueOf("x-envoy-auth-failure-mode-allowed", "true"));
+              ContainsHeader("x-envoy-auth-failure-mode-allowed", "true"));
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response_->waitForEndStream());

@@ -31,6 +31,7 @@ envoy_extension_cc_test(
         "//source/server:transport_socket_config_lib",
         "//test/common/upstream:utility_lib",
         "//test/extensions/clusters/redis:redis_cluster_mocks",
+        "//test/extensions/common/redis:mocks_lib",
         "//test/extensions/filters/network/common/redis:redis_mocks",
         "//test/extensions/filters/network/common/redis:test_utils_lib",
         "//test/extensions/filters/network/redis_proxy:redis_mocks",

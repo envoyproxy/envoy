@@ -330,8 +330,7 @@ TEST_F(JwksFetcherTest, TestSchemeHeaderHttps) {
       .WillOnce(testing::Invoke(
           [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_THAT(message->headers(),
-                        HeaderHasValueRef(Http::Headers::get().Scheme, "https"));
+            EXPECT_THAT(message->headers(), ContainsHeader(Http::Headers::get().Scheme, "https"));
             return nullptr;
           }));
 
@@ -356,7 +355,7 @@ TEST_F(JwksFetcherTest, TestSchemeHeaderHttp) {
       .WillOnce(testing::Invoke(
           [](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks&,
              const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            EXPECT_THAT(message->headers(), HeaderHasValueRef(Http::Headers::get().Scheme, "http"));
+            EXPECT_THAT(message->headers(), ContainsHeader(Http::Headers::get().Scheme, "http"));
             return nullptr;
           }));
 

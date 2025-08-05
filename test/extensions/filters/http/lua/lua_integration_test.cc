@@ -11,8 +11,6 @@
 
 #include "gtest/gtest.h"
 
-using Envoy::Http::HeaderValueOf;
-
 namespace Envoy {
 namespace {
 
@@ -789,8 +787,8 @@ typed_config:
   ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
   ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   // Sanity checking that we sent the expected data.
-  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Path, "/"));
+  EXPECT_THAT(lua_request_->headers(), ContainsHeader(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(lua_request_->headers(), ContainsHeader(Http::Headers::get().Path, "/"));
 
   waitForNextUpstreamRequest();
 

@@ -592,6 +592,47 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   EXPECT_EQ(expected_response_trailers, response_trailers);
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, NoTranscodingWithStreamedRequest) {
+  // It should not be an error to pass-through a non-transcoded request/response when
+  // the downstream sends more data after the upstream headers have been sent.
+  // This is a bit of an odd thing to test for specifically, but there was a bug here
+  // that caused debug builds to assert, so this is an anti-regression test.
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":method", "POST"},
+                                                 {":path", "/grpc.service/UnknownGrpcMethod"}};
+
+  Http::TestRequestHeaderMapImpl expected_request_headers{
+      {"content-type", "application/grpc"},
+      {":method", "POST"},
+      {":path", "/grpc.service/UnknownGrpcMethod"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(expected_request_headers, request_headers);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
+
+  // Not grpc response.
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/json"},
+                                                   {":status", "200"}};
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{{"content-type", "application/json"},
+                                                            {":status", "200"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(expected_response_headers, response_headers);
+
+  // decodeData after pass-through encodeHeaders should not provoke an ASSERT.
+  Buffer::OwnedImpl request_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+  EXPECT_EQ(2, request_data.length());
+
+  Buffer::OwnedImpl response_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_data, true));
+  EXPECT_EQ(2, response_data.length());
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};

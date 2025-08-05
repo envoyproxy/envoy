@@ -6,11 +6,17 @@ permissions:
 on:
   workflow_call:
     secrets:
+      dockerhub-password:
+      dockerhub-username:
       ENVOY_CI_SYNC_APP_ID:
       ENVOY_CI_SYNC_APP_KEY:
       ENVOY_CI_PUBLISH_APP_ID:
       ENVOY_CI_PUBLISH_APP_KEY:
       gcs-cache-key:
+        required: true
+      gpg-key:
+        required: true
+      gpg-key-password:
         required: true
     inputs:
       gcs-cache-bucket:
@@ -33,7 +39,65 @@ concurrency:
 
 
 jobs:
-  publish:
+  sign:
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      gcs-cache-key: ${{ secrets.gcs-cache-key }}
+      gpg-key: ${{ secrets.gpg-key }}
+      gpg-key-password: ${{ secrets.gpg-key-password }}
+    if: ${{ vars.ENVOY_CI_RELEASE || github.repository == 'envoyproxy/envoy' }}
+    name: Sign packages
+    uses: ./.github/workflows/_run.yml
+    with:
+      target: release.signed
+      bazel-extra: >-
+        --//distribution:x64-packages=//distribution:custom/x64/packages.x64.tar.gz
+        --//distribution:arm64-packages=//distribution:custom/arm64/packages.arm64.tar.gz
+        --//distribution:x64-release=//distribution:custom/x64/bin/release.tar.zst
+        --//distribution:arm64-release=//distribution:custom/arm64/bin/release.tar.zst
+      cache-build-image: ${{ fromJSON(inputs.request).request.build-image.default }}
+      diskspace-hack: true
+      downloads: |
+        packages.arm64: envoy/arm64/
+        packages.x64: envoy/x64/
+        release.arm64: envoy/arm64/bin/
+        release.x64: envoy/x64/bin/
+      gcs-cache-bucket: ${{ inputs.gcs-cache-bucket }}
+      import-gpg: true
+      request: ${{ inputs.request }}
+      source: |
+        export NO_BUILD_SETUP=1
+      trusted: ${{ inputs.trusted }}
+      upload-name: release.signed
+      upload-path: envoy/release.signed.tar.zst
+      steps-pre: |
+        - run: |
+            mkdir distribution/custom
+            cp -a %{{ runner.temp }}/envoy/x64 %{{ runner.temp }}/envoy/arm64 distribution/custom
+          shell: bash
+
+  container:
+    secrets:
+      dockerhub-username: ${{ secrets.dockerhub-username }}
+      dockerhub-password: ${{ secrets.dockerhub-password }}
+    permissions:
+      contents: read
+      packages: read
+    name: Publish container images
+    uses: ./.github/workflows/_publish_release_container.yml
+    with:
+      dockerhub-repo: ${{ vars.DOCKERHUB_REPO || 'envoy' }}
+      dev: ${{ fromJSON(inputs.request).request.version.dev }}
+      sha: ${{ fromJSON(inputs.request).request.sha }}
+      target-branch: ${{ fromJSON(inputs.request).request.target-branch }}
+      trusted: ${{ inputs.trusted }}
+      version-major: ${{ fromJSON(inputs.request).request.version.major }}
+      version-minor: ${{ fromJSON(inputs.request).request.version.minor }}
+      version-patch: ${{ fromJSON(inputs.request).request.version.patch }}
+
+  release:
     secrets:
       app-id: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_ID || '' }}
       app-key: ${{ inputs.trusted && secrets.ENVOY_CI_PUBLISH_APP_KEY || '' }}
@@ -41,6 +105,9 @@ jobs:
     permissions:
       contents: read
       packages: read
+    needs:
+    - container
+    - sign
     name: ${{ matrix.name || matrix.target }}
     uses: ./.github/workflows/_run.yml
     with:
@@ -65,7 +132,7 @@ jobs:
             export ENVOY_REPO=${{ github.repository }}
             export ENVOY_PUBLISH_DRY_RUN=${{ (fromJSON(inputs.request).request.version.dev || ! inputs.trusted) && 1 || '' }}
 
-  publish_docs:
+  docs:
     # For normal commits to Envoy main this will trigger an update in the website repo,
     # which will update its envoy dep shas, and rebuild the website for the latest docs
     #
@@ -76,7 +143,7 @@ jobs:
     if: ${{ inputs.trusted && github.repository == 'envoyproxy/envoy' }}
     runs-on: ${{ fromJSON(inputs.request).config.ci.agent-ubuntu }}
     needs:
-    - publish
+    - release
     steps:
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.24
       id: appauth

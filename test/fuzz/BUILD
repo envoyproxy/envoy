@@ -66,6 +66,7 @@ envoy_cc_test_library(
         "//source/common/common:logger_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib_header",
         "//test/common/stream_info:test_util",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
