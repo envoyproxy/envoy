@@ -176,8 +176,8 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
 }
 
 void Filter::setFilterState(FilterState::ErrorType error_type) {
-  cb_->filterState().setData(FilterState::key, std::make_unique<FilterState>(error_type),
-                             StreamInfo::FilterState::StateType::ReadOnly,
+  cb_->filterState().setData(FilterState::key(), std::make_unique<FilterState>(error_type),
+                             StreamInfo::FilterState::StateType::Mutable,
                              StreamInfo::FilterState::LifeSpan::Connection);
 }
 
@@ -376,6 +376,10 @@ void Filter::createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
   std::string fingerprint = JA4Fingerprinter::create(ssl_client_hello);
   ENVOY_LOG(trace, "tls:createJA4Hash(), fingerprint: {}", fingerprint);
   cb_->socket().setJA4Hash(fingerprint);
+}
+
+const std::string& FilterState::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tls_inspector_filter_state");
 }
 
 } // namespace TlsInspector

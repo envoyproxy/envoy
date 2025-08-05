@@ -92,7 +92,7 @@ public:
   FilterState(ErrorType error_type) : error_type_(error_type) {}
   ErrorType error_type() const { return error_type_; }
 
-  static constexpr char key[] = "envoy.tls_inspector_filter_state";
+  static const std::string& key();
 
 private:
   const ErrorType error_type_;
