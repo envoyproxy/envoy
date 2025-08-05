@@ -103,6 +103,14 @@ public:
       builder_.enableDnsCache(true, /* save_interval_seconds */ 1);
     }
 
+    // Initialize the connectivity manager with a WIFI default network and another network with
+    // unknown type.
+    std::vector<std::pair<int64_t, ConnectionType>> connected_networks{
+        {1, ConnectionType::CONNECTION_WIFI}, {2, ConnectionType::CONNECTION_UNKNOWN}};
+    EXPECT_CALL(helper_handle_->mock_helper(), getDefaultNetworkHandle()).WillOnce(Return(1));
+    EXPECT_CALL(helper_handle_->mock_helper(), getAllConnectedNetworks())
+        .WillOnce(Return(connected_networks));
+
     BaseClientIntegrationTest::initialize();
 
     if (getCodecType() == Http::CodecType::HTTP3) {
@@ -361,6 +369,33 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
   EXPECT_TRUE(found_force_dns_refresh);
   EXPECT_EQ(4, current_change_event);
 }
+
+/*
+TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
+    absl::Notification handled_network_change;
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
+    if (msg.find("Default network state has been changed. Current net configuration key") !=
+std::string::npos) { handled_network_change.Notify();
+    }
+  };
+  builder_.setLogger(std::move(logger));
+  builder_.setDisableDnsRefreshOnNetworkChange(false);
+
+  initialize();
+  EXPECT_EQ(0, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
+
+  // A new WIFI network appears and becomes the default network. Even though
+  // the test is initialized with a WIFI network, this should still have triggred
+  // a network change event as it has a different network handle.
+  internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_WIFI, 123);
+  internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 123);
+  // The HTTP status reset and DNS refresh should have been posted to the network thread and to be
+handled there. handled_network_change.WaitForNotification();
+  // DNS has been force refreshed.
+  EXPECT_EQ(1, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
+}
+*/
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();

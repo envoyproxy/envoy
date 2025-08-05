@@ -102,7 +102,7 @@ envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(int network) {
 
 void ConnectivityManagerImpl::setPreferredNetworkNoLock(int network_type)
     ABSL_EXCLUSIVE_LOCKS_REQUIRED(network_mutex_) {
-  ENVOY_LOG_EVENT(debug, "netconf_network_change", "{}",
+  ENVOY_LOG_EVENT(debug, "netconf_network_change", "network_type changed to {}",
                   std::to_string(static_cast<int>(network_type)));
 
   network_state_.configuration_key_++;
@@ -501,6 +501,9 @@ void ConnectivityManagerImpl::onDefaultNetworkChangedAndroid(ConnectionType conn
   envoy_netconf_t current_configuration_key{0};
   {
     Thread::LockGuard lock{network_mutex_};
+    ENVOY_LOG_EVENT(debug, "android_default_network_changed",
+                    "default network changed from {} to {}, new connection_type {}, ",
+                    default_network_handle_, net_id, static_cast<int>(connection_type));
     if (net_id == default_network_handle_) {
       return;
     }

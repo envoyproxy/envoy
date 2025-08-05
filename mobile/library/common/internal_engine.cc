@@ -2,6 +2,8 @@
 
 #include <sys/resource.h>
 
+#include <filesystem>
+
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
@@ -227,6 +229,10 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
                     // The default network has changed to a different one.
                     return;
                   }
+                  ENVOY_LOG_MISC(
+                      trace,
+                      "Default network state has been changed. Current net configuration key {}",
+                      current_configuration_key);
                   resetHttpPropertiesAndDrainHosts(probeAndGetLocalAddr(AF_INET6) != nullptr);
                   if (!disable_dns_refresh_on_network_change_) {
                     // This call will possibly drain all connections asynchronously.
@@ -391,23 +397,21 @@ void InternalEngine::onDefaultNetworkChanged(int network) {
   });
 }
 
-void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType /*connection_type*/,
-                                                    int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling the default network changed callback on Android");
+void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType connection_type,
+                                                    int64_t net_id) {
+  connectivity_manager_->onDefaultNetworkChangedAndroid(connection_type, net_id);
 }
 
-void InternalEngine::onNetworkDisconnectAndroid(int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling network disconnect callback on Android");
+void InternalEngine::onNetworkDisconnectAndroid(int64_t net_id) {
+  connectivity_manager_->onNetworkDisconnectAndroid(net_id);
 }
 
-void InternalEngine::onNetworkConnectAndroid(ConnectionType /*connection_type*/,
-                                             int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling network connect callback on Android");
+void InternalEngine::onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id) {
+  connectivity_manager_->onNetworkConnectAndroid(connection_type, net_id);
 }
 
-void InternalEngine::purgeActiveNetworkListAndroid(
-    const std::vector<int64_t>& /*active_network_ids*/) {
-  ENVOY_LOG_MISC(trace, "Calling network purge callback on Android");
+void InternalEngine::purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids) {
+  connectivity_manager_->purgeActiveNetworkListAndroid(active_network_ids);
 }
 
 void InternalEngine::onDefaultNetworkUnavailable() {
