@@ -50,6 +50,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: proxy_filter
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_ssl_port`` and legacy code paths.
 - area: gcp_authn
   change: |
     Removed runtime guard ``envoy.reloadable_features.gcp_authn_use_fixed_url`` and legacy code paths.
