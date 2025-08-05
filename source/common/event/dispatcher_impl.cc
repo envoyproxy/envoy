@@ -80,13 +80,8 @@ DispatcherImpl::DispatcherImpl(const std::string& name, Thread::ThreadFactory& t
   ASSERT(!name_.empty());
   FatalErrorHandler::registerFatalErrorHandler(*this);
   updateApproximateMonotonicTimeInternal();
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.fix_dispatcher_approximate_now")) {
-    base_scheduler_.registerOnCheckCallback(
-        std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
-  } else {
-    base_scheduler_.registerOnPrepareCallback(
-        std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
-  }
+  base_scheduler_.registerOnCheckCallback(
+      std::bind(&DispatcherImpl::updateApproximateMonotonicTime, this));
 }
 
 DispatcherImpl::~DispatcherImpl() {
