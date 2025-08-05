@@ -1983,8 +1983,6 @@ TEST_F(HostImplTest, ProxyOverridesHappyEyeballs) {
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_config_in_happy_eyeballs", "true"}});
   MockClusterMockPrioritySet cluster;
 
   // pass in custom happy_eyeballs_config
@@ -2039,12 +2037,10 @@ TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithConfig) {
 }
 
 TEST_F(HostImplTest, CreateConnectionHappyEyeballsWithEmptyConfig) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.use_config_in_happy_eyeballs", "true"}});
   MockClusterMockPrioritySet cluster;
 
   // pass in empty happy_eyeballs_config
-  // a default config will be created when flag turned on
+  // a default config will be created
   EXPECT_CALL(*(cluster.info_), happyEyeballsConfig()).WillRepeatedly(Return(absl::nullopt));
 
   envoy::config::core::v3::Metadata metadata;
