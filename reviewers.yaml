@@ -29,6 +29,10 @@ keith:
   maintainer: true
   opsgenie: Keith
   slack: UGS5P90CF
+krinkinmu:
+  maintainer: true
+  opsgenie: Mike
+  slack: U07KZ4B0H5J
 kyessenov:
   opsgenie: kuat
   slack: U7KTRAA8M
@@ -69,7 +73,7 @@ silverstar194:
   slack: U03LNPC8JN9
 tonya11en:
   maintainer: true
-  opsgenie: Tony
+  opsgenie: tony
   slack: U989BG2CW
 tyxia:
   maintainer: true

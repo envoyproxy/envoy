@@ -23,8 +23,8 @@ struct SupportedCommands {
         absl::flat_hash_set<std::string>, "append", "bf.add", "bf.card", "bf.exists", "bf.info",
         "bf.insert", "bf.loadchunk", "bf.madd", "bf.mexists", "bf.reserve", "bf.scandump",
         "bitcount", "bitfield", "bitpos", "decr", "decrby", "dump", "expire", "expireat", "geoadd",
-        "geodist", "geohash", "geopos", "georadius_ro", "georadiusbymember_ro", "get", "getbit",
-        "getdel", "getrange", "getset", "hdel", "hexists", "hget", "hgetall", "hincrby",
+        "geodist", "geohash", "geopos", "georadius_ro", "georadiusbymember_ro", "geosearch", "get",
+        "getbit", "getdel", "getrange", "getset", "hdel", "hexists", "hget", "hgetall", "hincrby",
         "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hscan", "hset", "hsetnx", "hstrlen",
         "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lmove", "lpop",
         "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat",
@@ -121,6 +121,11 @@ struct SupportedCommands {
    * @return info command
    */
   static const std::string& info() { CONSTRUCT_ON_FIRST_USE(std::string, "info"); }
+
+  /**
+   * @return role command
+   */
+  static const std::string& role() { CONSTRUCT_ON_FIRST_USE(std::string, "role"); }
 
   /**
    * @return commands which alters the state of redis

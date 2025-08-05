@@ -27,12 +27,32 @@ using ::Envoy::Matcher::HasActionWithType;
 using ::Envoy::Matcher::HasNoMatch;
 using testing::NiceMock;
 
+inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";
+
 // A class for testing filter config related capabilities eg, parsing and storing the filter
 // config in internal data structures, etc.
 class ProtoApiScrubberFilterConfigTest : public ::testing::Test {
 protected:
   ProtoApiScrubberFilterConfigTest() : api_(Api::createApiForTest()) {
+    setupMocks();
+    initDefaultProtoConfig();
+  }
+
+  void initDefaultProtoConfig() {
     Protobuf::TextFormat::ParseFromString(getDefaultProtoConfig(), &proto_config_);
+    *proto_config_.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+  }
+
+  void setupMocks() {
+    // factory_context.serverFactoryContext().api() is used to read descriptor file during filter
+    // config initialization. This mock setup ensures that test API is propagated properly to the
+    // filter.
+    ON_CALL(server_factory_context_, api()).WillByDefault(testing::ReturnRef(*api_));
+    ON_CALL(factory_context_, serverFactoryContext())
+        .WillByDefault(testing::ReturnRef(server_factory_context_));
   }
 
   std::string getDefaultProtoConfig() {
@@ -163,6 +183,10 @@ protected:
         method_name);
     ProtoApiScrubberConfig proto_config;
     Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
     return proto_config;
   }
 
@@ -184,6 +208,10 @@ protected:
         field_mask);
     ProtoApiScrubberConfig proto_config;
     Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
     return proto_config;
   }
 
@@ -251,6 +279,10 @@ protected:
                                                      input_type);
     ProtoApiScrubberConfig proto_config;
     Protobuf::TextFormat::ParseFromString(filter_conf_string, &proto_config);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
     return proto_config;
   }
 
@@ -258,6 +290,7 @@ protected:
   ProtoApiScrubberConfig proto_config_;
   std::shared_ptr<const ProtoApiScrubberFilterConfig> filter_config_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
 };
 
 // Tests whether the match trees are initialized properly for each field mask.
@@ -322,13 +355,161 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MatchTreeValidation) {
   }
 }
 
+TEST_F(ProtoApiScrubberFilterConfigTest, DescriptorValidations) {
+  absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config;
+
+  {
+    // Top level `descriptor_set` not defined.
+    ProtoApiScrubberConfig config;
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_EQ(filter_config.status().message(),
+              "Error encountered during config initialization. Unsupported DataSource case `0` for "
+              "configuring `descriptor_set`");
+  }
+
+  {
+    // Invalid descriptor format (non-binary) from inline bytes.
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() = "123";
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("Error encountered during config initialization. Unable to "
+                                   "parse proto descriptor from inline bytes"));
+  }
+
+  {
+    // Invalid descriptor format but invalid descriptor (eg, duplicate message definition) from
+    // inline bytes.
+    Protobuf::FileDescriptorProto file_proto;
+    file_proto.set_name("test_file.proto");
+    file_proto.set_package("test_package");
+    file_proto.set_syntax("proto3");
+
+    // Add duplicate message types to make the descriptor invalid.
+    file_proto.add_message_type()->set_name("TestMessage");
+    file_proto.add_message_type()->set_name("TestMessage");
+
+    std::string invalid_binary_descriptor;
+    file_proto.SerializeToString(&invalid_binary_descriptor);
+
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        invalid_binary_descriptor;
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("Error encountered during config initialization. Unable to "
+                                   "parse proto descriptor from inline bytes"));
+  }
+
+  {
+    // Invalid descriptor format but invalid descriptor (eg, duplicate message definition in two
+    // separate files) from inline bytes.
+    Envoy::Protobuf::FileDescriptorSet descriptor_set;
+
+    Protobuf::FileDescriptorProto file1_proto;
+    file1_proto.set_name("test_file1.proto");
+    file1_proto.set_package("test_package");
+    file1_proto.set_syntax("proto3");
+    file1_proto.add_message_type()->set_name("TestMessage");
+
+    Protobuf::FileDescriptorProto file2_proto;
+    file2_proto.set_name("test_file2.proto");
+    file2_proto.set_package("test_package");
+    file2_proto.set_syntax("proto3");
+    // Duplicate definition - TestMessage is already defined in test_file1.proto
+    file2_proto.add_message_type()->set_name("TestMessage");
+
+    descriptor_set.add_file()->CopyFrom(file1_proto);
+    descriptor_set.add_file()->CopyFrom(file2_proto);
+
+    std::string invalid_binary_descriptor;
+    descriptor_set.SerializeToString(&invalid_binary_descriptor);
+
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        invalid_binary_descriptor;
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(
+        filter_config.status().message(),
+        testing::HasSubstr("Error encountered during config initialization. Error occurred in file "
+                           "`test_file2.proto` while trying to build proto descriptors."));
+  }
+
+  {
+    // Valid descriptors from inline bytes.
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_bytes() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
+    EXPECT_EQ(filter_config.status().message(), "");
+  }
+
+  {
+    // Non-existent file path.
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
+        TestEnvironment::runfilesPath("path/to/non-existent-file.descriptor");
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr(
+                    "Error encountered during config initialization. Unable to read from file"));
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("path/to/non-existent-file.descriptor"));
+  }
+
+  {
+    // Invalid descriptors from file.
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
+        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem");
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("Error encountered during config initialization. Unable to "
+                                   "parse proto descriptor from file"));
+    EXPECT_THAT(filter_config.status().message(),
+                testing::HasSubstr("test/config/integration/certs/upstreamcacert.pem"));
+  }
+
+  {
+    // Valid descriptors from file.
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
+        TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath);
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
+    EXPECT_EQ(filter_config.status().message(), "");
+  }
+
+  {
+    // Unsupported descriptor type - string.
+    ProtoApiScrubberConfig config;
+    *config.mutable_descriptor_set()->mutable_data_source()->mutable_inline_string() =
+        api_->fileSystem()
+            .fileReadToEnd(Envoy::TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath))
+            .value();
+    filter_config = ProtoApiScrubberFilterConfig::create(config, factory_context_);
+    EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_EQ(filter_config.status().message(),
+              "Error encountered during config initialization. Unsupported DataSource case `3` for "
+              "configuring `descriptor_set`");
+  }
+}
+
 TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config;
 
   {
     filter_config =
-        ProtoApiScrubberFilterConfig::create(getConfigWithMethodName(""), factory_context);
+        ProtoApiScrubberFilterConfig::create(getConfigWithMethodName(""), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(), "Error encountered during config initialization. "
                                                 "Invalid method name: ''. Method name is empty.");
@@ -336,7 +517,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithMethodName("/library.BookService/*"), factory_context);
+        getConfigWithMethodName("/library.BookService/*"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid method name: "
@@ -345,7 +526,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(getConfigWithMethodName("/library.*/*"),
-                                                         factory_context);
+                                                         factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(
         filter_config.status().message(),
@@ -355,7 +536,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config =
-        ProtoApiScrubberFilterConfig::create(getConfigWithMethodName("*"), factory_context);
+        ProtoApiScrubberFilterConfig::create(getConfigWithMethodName("*"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(
         filter_config.status().message(),
@@ -365,7 +546,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithMethodName("/library.BookService.GetBook"), factory_context);
+        getConfigWithMethodName("/library.BookService.GetBook"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid method name: "
@@ -375,7 +556,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithMethodName("library.BookService/GetBook"), factory_context);
+        getConfigWithMethodName("library.BookService/GetBook"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid method name: "
@@ -385,7 +566,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithMethodName("library.BookService.GetBook"), factory_context);
+        getConfigWithMethodName("library.BookService.GetBook"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid method name: "
@@ -395,7 +576,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithMethodName("/library_BookService/GetBook"), factory_context);
+        getConfigWithMethodName("/library_BookService/GetBook"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid method name: "
@@ -405,7 +586,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithMethodName("/library/BookService/GetBook"), factory_context);
+        getConfigWithMethodName("/library/BookService/GetBook"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid method name: "
@@ -415,7 +596,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithMethodName("/library.BookService/"), factory_context);
+        getConfigWithMethodName("/library.BookService/"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid method name: "
@@ -425,7 +606,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(getConfigWithMethodName("/./GetBook"),
-                                                         factory_context);
+                                                         factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid method name: '/./GetBook'. "
@@ -434,19 +615,18 @@ TEST_F(ProtoApiScrubberFilterConfigTest, MethodNameValidations) {
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithMethodName("/library.BookService/GetBook"), factory_context);
+        getConfigWithMethodName("/library.BookService/GetBook"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
   }
 }
 
 TEST_F(ProtoApiScrubberFilterConfigTest, FieldMaskValidations) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config;
 
   {
     filter_config =
-        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask(""), factory_context);
+        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask(""), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(), "Error encountered during config initialization. "
                                                 "Invalid field mask: ''. Field mask is empty.");
@@ -454,7 +634,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FieldMaskValidations) {
 
   {
     filter_config =
-        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("*"), factory_context);
+        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("*"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid field mask: '*'. Field mask "
@@ -463,7 +643,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FieldMaskValidations) {
 
   {
     filter_config =
-        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("book.*"), factory_context);
+        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("book.*"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid field mask: 'book.*'. Field "
@@ -472,7 +652,7 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FieldMaskValidations) {
 
   {
     filter_config =
-        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("*.book"), factory_context);
+        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("*.book"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Invalid field mask: '*.book'. Field "
@@ -481,34 +661,35 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FieldMaskValidations) {
 
   {
     filter_config =
-        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("book"), factory_context);
+        ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("book"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
   }
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(getConfigWithFieldMask("book.inner_book"),
-                                                         factory_context);
+                                                         factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
   }
 
   {
     filter_config = ProtoApiScrubberFilterConfig::create(
-        getConfigWithFieldMask("book.inner_book.debug_info"), factory_context);
+        getConfigWithFieldMask("book.inner_book.debug_info"), factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
   }
 }
 
 TEST_F(ProtoApiScrubberFilterConfigTest, FilteringModeValidations) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   ProtoApiScrubberConfig proto_config;
   absl::StatusOr<std::shared_ptr<const ProtoApiScrubberFilterConfig>> filter_config;
 
   {
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"pb(filtering_mode: 0)pb", &proto_config));
-    filter_config = ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
+        TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath);
+    filter_config = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kOk);
     EXPECT_EQ(filter_config.status().message(), "");
     EXPECT_EQ(filter_config.value()->filteringMode(),
@@ -517,7 +698,9 @@ TEST_F(ProtoApiScrubberFilterConfigTest, FilteringModeValidations) {
 
   {
     ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(R"pb(filtering_mode: 999)pb", &proto_config));
-    filter_config = ProtoApiScrubberFilterConfig::create(proto_config, factory_context);
+    *proto_config.mutable_descriptor_set()->mutable_data_source()->mutable_filename() =
+        TestEnvironment::runfilesPath(kApiKeysDescriptorRelativePath);
+    filter_config = ProtoApiScrubberFilterConfig::create(proto_config, factory_context_);
     EXPECT_EQ(filter_config.status().code(), absl::StatusCode::kInvalidArgument);
     EXPECT_EQ(filter_config.status().message(),
               "Error encountered during config initialization. Unsupported 'filtering_mode': .");

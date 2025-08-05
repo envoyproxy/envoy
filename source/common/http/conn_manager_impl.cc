@@ -510,9 +510,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     } else if (isEnvoyOverloadError(status)) {
-      // The other codecs aren't wired to send this status.
-      ASSERT(codec_->protocol() < Protocol::Http2,
-             "Expected only HTTP1.1 and below to send overload error.");
       stats_.named_.downstream_rq_overload_close_.inc();
       handleCodecOverloadError(status.message());
       return Network::FilterStatus::StopIteration;
@@ -1647,7 +1644,7 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
 
   // See how long this stream has been alive, and adjust the timeout
   // accordingly.
-  std::chrono::duration time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
+  std::chrono::milliseconds time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
       connection_manager_.timeSource().monotonicTime() -
       filter_manager_.streamInfo().startTimeMonotonic());
   if (timeout > time_used) {
@@ -1671,7 +1668,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
     return;
   }
 
-  Router::RouteConstSharedPtr route;
+  Router::VirtualHostRoute route_result;
   if (request_headers_ != nullptr) {
     if (connection_manager_.config_->isRoutable() &&
         connection_manager_.config_->scopedRouteConfigProvider() != nullptr &&
@@ -1680,35 +1677,12 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
       snapScopedRouteConfig();
     }
     if (snapped_route_config_ != nullptr) {
-      route = snapped_route_config_->route(cb, *request_headers_, filter_manager_.streamInfo(),
-                                           stream_id_);
+      route_result = snapped_route_config_->route(cb, *request_headers_,
+                                                  filter_manager_.streamInfo(), stream_id_);
     }
   }
 
-  setRoute(std::move(route));
-}
-
-void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
-  if (!connection_manager_tracing_config_.has_value()) {
-    return;
-  }
-  const Tracing::CustomTagMap& conn_manager_tags = connection_manager_tracing_config_->custom_tags_;
-  const Tracing::CustomTagMap* route_tags = nullptr;
-  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
-    route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
-  }
-  const bool configured_in_conn = !conn_manager_tags.empty();
-  const bool configured_in_route = route_tags && !route_tags->empty();
-  if (!configured_in_conn && !configured_in_route) {
-    return;
-  }
-  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
-  if (configured_in_route) {
-    custom_tag_map.insert(route_tags->begin(), route_tags->end());
-  }
-  if (configured_in_conn) {
-    custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
-  }
+  setVirtualHostRoute(std::move(route_result));
 }
 
 // TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
@@ -2039,8 +2013,29 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_tracing_config_->operation_name_;
 }
 
-const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
-  return tracing_custom_tags_.get();
+void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+
+  const Tracing::HttpTraceContext trace_context(*request_headers_);
+  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo()};
+
+  // Cache the optional custom tags from the route first.
+  OptRef<const Tracing::CustomTagMap> route_custom_tags;
+
+  if (hasCachedRoute() && cached_route_.value()->tracingConfig() != nullptr) {
+    route_custom_tags.emplace(cached_route_.value()->tracingConfig()->getCustomTags());
+    for (const auto& tag : *route_custom_tags) {
+      tag.second->applySpan(span, ctx);
+    }
+  }
+
+  for (const auto& tag : connection_manager_tracing_config_->custom_tags_) {
+    if (!route_custom_tags.has_value() || !route_custom_tags->contains(tag.first)) {
+      // If the tag is defined in both the connection manager and the route,
+      // use the route's tag.
+      tag.second->applySpan(span, ctx);
+    }
+  }
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
@@ -2103,6 +2098,15 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
   return cached_route_.value();
 }
 
+void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
+  Router::VirtualHostRoute vhost_route;
+  if (route != nullptr) {
+    vhost_route.vhost = route->virtualHost();
+    vhost_route.route = std::move(route);
+  }
+  setVirtualHostRoute(std::move(vhost_route));
+}
+
 /**
  * Sets the cached route to the RouteConstSharedPtr argument passed in. Handles setting the
  * cached_route_/cached_cluster_info_ ActiveStream attributes, the FilterManager streamInfo, tracing
@@ -2111,14 +2115,15 @@ ConnectionManagerImpl::ActiveStream::route(const Router::RouteCallback& cb) {
  * Declared as a StreamFilterCallbacks member function for filters to call directly, but also
  * functions as a helper to refreshCachedRoute(const Router::RouteCallback& cb).
  */
-void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr route) {
+void ConnectionManagerImpl::ActiveStream::setVirtualHostRoute(
+    Router::VirtualHostRoute vhost_route) {
   // If the cached route is blocked then any attempt to clear it or refresh it
   // will be ignored.
-  // setRoute() may be called directly by the interface of DownstreamStreamFilterCallbacks,
-  // so check for routeCacheBlocked() here again.
   if (routeCacheBlocked()) {
     return;
   }
+
+  Router::RouteConstSharedPtr route = std::move(vhost_route.route);
 
   // Update the cached route.
   setCachedRoute({route});
@@ -2131,11 +2136,12 @@ void ConnectionManagerImpl::ActiveStream::setRoute(Router::RouteConstSharedPtr r
     cached_cluster_info_ = (nullptr == cluster) ? nullptr : cluster->info();
   }
 
-  // Update route and cluster info in the filter manager's stream info.
-  filter_manager_.streamInfo().route_ = std::move(route); // Now can move route here safely.
+  // Update route, vhost and cluster info in the filter manager's stream info.
+  // Now can move route here safely.
+  filter_manager_.streamInfo().route_ = std::move(route);
+  filter_manager_.streamInfo().vhost_ = std::move(vhost_route.vhost);
   filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
 
-  refreshCachedTracingCustomTags();
   refreshDurationTimeout();
   refreshIdleTimeout();
 }
@@ -2178,10 +2184,27 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   }
 
   setCachedRoute({});
-
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
-  if (tracing_custom_tags_) {
-    tracing_custom_tags_->clear();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {
+  // If there is no cached route, or route cache is frozen, or the request headers are not
+  // available, then do not refresh the route cluster.
+  if (!hasCachedRoute() || routeCacheBlocked() || request_headers_ == nullptr) {
+    return;
+  }
+  if (const auto* entry = (*cached_route_)->routeEntry(); entry != nullptr) {
+    // Refresh the cluster if possible.
+    entry->refreshRouteCluster(*request_headers_, filter_manager_.streamInfo());
+
+    // Refresh the cached cluster info is necessary.
+    if (!cached_cluster_info_.has_value() || cached_cluster_info_.value() == nullptr ||
+        (*cached_cluster_info_)->name() != entry->clusterName()) {
+      auto* cluster =
+          connection_manager_.cluster_manager_.getThreadLocalCluster(entry->clusterName());
+      cached_cluster_info_ = (nullptr == cluster) ? nullptr : cluster->info();
+      filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
+    }
   }
 }
 

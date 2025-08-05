@@ -297,8 +297,7 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeRawHttpConnection(
   }
 
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
-      timeSystem())};
+      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
   // in-connection version negotiation.
   auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),
@@ -423,17 +422,6 @@ void HttpIntegrationTest::initialize() {
 #else
   ASSERT(false, "running a QUIC integration test without compiling QUIC");
 #endif
-}
-
-void HttpIntegrationTest::setupHttp1ImplOverrides(Http1ParserImpl http1_implementation) {
-  switch (http1_implementation) {
-  case Http1ParserImpl::HttpParser:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "false");
-    break;
-  case Http1ParserImpl::BalsaParser:
-    config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_use_balsa_parser", "true");
-    break;
-  }
 }
 
 void HttpIntegrationTest::setupHttp2ImplOverrides(Http2Impl http2_implementation) {

@@ -64,6 +64,7 @@ envoy_cc_library(
         "//envoy/protobuf:message_validator_interface",
         "//source/common/common:statusor_lib",
         "//source/common/common:stl_helpers",
+        "@com_google_absl//absl/strings",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )

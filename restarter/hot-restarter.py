@@ -32,7 +32,6 @@ def term_all_children():
     # First uninstall the SIGCHLD handler so that we don't get called again.
     signal.signal(signal.SIGCHLD, signal.SIG_DFL)
 
-    global pid_list
     for pid in pid_list:
         logger.info("sending TERM to PID={}".format(pid))
         try:
@@ -114,7 +113,6 @@ def sighup_handler(signum, frame):
 def sigusr1_handler(signum, frame):
     """ Handler for SIGUSR1. Propagate SIGUSR1 to all of the child processes """
 
-    global pid_list
     for pid in pid_list:
         logger.info("sending SIGUSR1 to PID={}".format(pid))
         try:
@@ -132,7 +130,6 @@ def sigchld_handler(signum, frame):
     logger.info("got SIGCHLD")
 
     kill_all_and_exit = False
-    global pid_list
     pid_list_copy = list(pid_list)
     for pid in pid_list_copy:
         ret_pid, exit_status = os.waitpid(pid, os.WNOHANG)

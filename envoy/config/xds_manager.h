@@ -47,6 +47,63 @@ public:
   initializeAdsConnections(const envoy::config::bootstrap::v3::Bootstrap& bootstrap) PURE;
 
   /**
+   * Start all xDS-TP config-based gRPC muxes (if any).
+   * This includes both the servers defined in the `config_sources`, and
+   * `default_config_source` in the bootstrap.
+   */
+  virtual void startXdstpAdsMuxes() PURE;
+
+  /**
+   * Subscription to a singleton resource.
+   * This will create a subscription to a singleton resource, based on the resource_name and the
+   * config source. If an xDS-TP based resource name is given, then the config sources defined in
+   * the Bootstrap config_sources/default_config_source may be used.
+   *
+   * @param resource_name absl::string_view the resource to subscribe to.
+   * @param config OptRef<const envoy::config::core::v3::ConfigSource> an optional config source to
+   * use.
+   * @param type_url type URL for the resource being subscribed to.
+   * @param scope stats scope for any stats tracked by the subscription.
+   * @param callbacks the callbacks needed by all Subscription objects, to deliver config updates.
+   *                  The callbacks must not result in the deletion of the Subscription object.
+   * @param resource_decoder how incoming opaque resource objects are to be decoded.
+   * @param options subscription options.
+   *
+   * @return SubscriptionPtr subscription object corresponding for config and type_url or error
+   * status.
+   */
+  virtual absl::StatusOr<SubscriptionPtr> subscribeToSingletonResource(
+      absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
+      absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) PURE;
+
+  /**
+   * Pause discovery requests for a given API type on all ADS types (both xdstp-based and "old"
+   * ADS). This is useful, for example, when we're processing an update for LDS or CDS and don't
+   * want a flood of updates for RDS or EDS respectively. Discovery requests may later be resumed
+   * with after the returned ScopedResume object is destroyed.
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.config.cluster.v3.Cluster.
+   *
+   * @return a ScopedResume object, which when destructed, resumes the paused discovery requests.
+   * A discovery request will be sent if one would have been sent during the pause.
+   */
+  ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::string& type_url) PURE;
+
+  /**
+   * Pause discovery requests for given API types on all ADS types (both xdstp-based and "old" ADS).
+   * This is useful, for example, when we're processing an update for LDS or CDS and don't want a
+   * flood of updates for RDS or EDS respectively. Discovery requests may later be resumed with
+   * after the returned ScopedResume object is destroyed.
+   * @param type_urls type URLs corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.config.cluster.v3.Cluster.
+   *
+   * @return a ScopedResume object, which when destructed, resumes the paused discovery requests.
+   * A discovery request will be sent if one would have been sent during the pause.
+   */
+  ABSL_MUST_USE_RESULT virtual ScopedResume pause(const std::vector<std::string>& type_urls) PURE;
+
+  /**
    * Shuts down the xDS-Manager and all the configured connections to the config
    * servers.
    */

@@ -36,8 +36,7 @@ static constexpr HostUtility::HostStatusSet DegradedStatus =
 
 TEST(HostUtilityTest, All) {
   auto cluster = std::make_shared<NiceMock<MockClusterInfo>>();
-  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80", *time_source);
+  HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80");
   EXPECT_EQ("healthy", HostUtility::healthFlagsToString(*host));
 
   host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -67,15 +66,12 @@ TEST(HostUtilityTest, All) {
 
 TEST(HostLogging, FmtUtils) {
   auto cluster = std::make_shared<NiceMock<MockClusterInfo>>();
-  auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  auto time_ms = std::chrono::milliseconds(5);
-  ON_CALL(*time_source, monotonicTime()).WillByDefault(Return(MonotonicTime(time_ms)));
   EXPECT_LOG_CONTAINS("warn", "Logging host info 127.0.0.1:80 end", {
-    HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80", *time_source);
+    HostSharedPtr host = makeTestHost(cluster, "tcp://127.0.0.1:80");
     ENVOY_LOG_MISC(warn, "Logging host info {} end", *host);
   });
   EXPECT_LOG_CONTAINS("warn", "Logging host info hostname end", {
-    HostSharedPtr host = makeTestHost(cluster, "hostname", "tcp://127.0.0.1:80", *time_source);
+    HostSharedPtr host = makeTestHost(cluster, "hostname", "tcp://127.0.0.1:80");
     ENVOY_LOG_MISC(warn, "Logging host info {} end", *host);
   });
 }

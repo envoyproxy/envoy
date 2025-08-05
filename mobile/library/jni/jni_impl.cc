@@ -36,7 +36,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jc
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
     JNIEnv* env, jclass, jobject on_engine_running, jobject envoy_logger,
-    jobject envoy_event_tracker) {
+    jobject envoy_event_tracker, jboolean disable_dns_refresh_on_network_change) {
   //================================================================================================
   // EngineCallbacks
   //================================================================================================
@@ -108,7 +108,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   }
 
   return reinterpret_cast<jlong>(
-      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker)));
+      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
+                                /*network_thread_priority*/ absl::nullopt,
+                                (disable_dns_refresh_on_network_change == JNI_TRUE)));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
@@ -1300,6 +1302,37 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChangeEvent(JNI
                                                                              jlong engine,
                                                                              jint network_type) {
   reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChangeEvent(network_type);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChangedV2(JNIEnv*, jclass,
+                                                                           jlong engine,
+                                                                           jint connection_type,
+                                                                           jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChangedAndroid(
+      static_cast<Envoy::ConnectionType>(connection_type), net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkDisconnect(JNIEnv*, jclass, jlong engine,
+                                                                     jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkDisconnectAndroid(net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkConnect(
+    JNIEnv*, jclass, jlong engine, jint connection_type, jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkConnectAndroid(
+      static_cast<Envoy::ConnectionType>(connection_type), net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_purgeActiveNetworkList(JNIEnv* env, jclass,
+                                                                        jlong engine,
+                                                                        jlongArray active_net_ids) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::vector<int64_t> active_networks;
+  javaLongArrayToInt64Vector(jni_helper, active_net_ids, &active_networks);
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->purgeActiveNetworkListAndroid(active_networks);
 }
 
 extern "C" JNIEXPORT void JNICALL

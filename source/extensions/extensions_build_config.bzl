@@ -488,7 +488,8 @@ EXTENSIONS = {
     # Custom matchers
     #
 
-    "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
+    "envoy.matching.custom_matchers.ip_range_matcher":     "//source/extensions/common/matcher:ip_range_matcher_lib",
+    "envoy.matching.custom_matchers.domain_matcher":   "//source/extensions/common/matcher:domain_matcher_lib",
 
     #
     # Header Validators
@@ -548,7 +549,8 @@ EXTENSIONS = {
     #
     # cluster specifier plugin
     #
-    "envoy.router.cluster_specifier_plugin.lua": "//source/extensions/router/cluster_specifiers/lua:config",
+    "envoy.router.cluster_specifier_plugin.lua":     "//source/extensions/router/cluster_specifiers/lua:config",
+    "envoy.router.cluster_specifier_plugin.matcher": "//source/extensions/router/cluster_specifiers/matcher:config",
 
     #
     # Extensions for generic proxy

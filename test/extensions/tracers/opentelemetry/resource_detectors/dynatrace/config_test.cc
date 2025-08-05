@@ -25,7 +25,7 @@ TEST(DynatraceResourceDetectorFactoryTest, Basic) {
   )EOF";
   TestUtility::loadFromYaml(yaml, typed_config);
 
-  NiceMock<Server::Configuration::MockTracerFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
   EXPECT_NE(factory->createResourceDetector(typed_config.typed_config(), context), nullptr);
   EXPECT_STREQ(factory->name().c_str(), "envoy.tracers.opentelemetry.resource_detectors.dynatrace");
 }

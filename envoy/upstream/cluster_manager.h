@@ -46,6 +46,13 @@ class EnvoyQuicNetworkObserverRegistry;
 
 } // namespace Quic
 
+namespace Config {
+// TODO(adisuissa): This forward declaration is needed because OD-CDS code is
+// part of the Envoy::Upstream namespace but should be eventually moved to the
+// Envoy::Config namespace (next to the XdsManager).
+class XdsManager;
+} // namespace Config
+
 namespace Upstream {
 
 /**
@@ -340,7 +347,25 @@ public:
    *
    * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
    */
-  virtual OptRef<const Cluster> getActiveCluster(absl::string_view cluster_name) const PURE;
+  virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
+
+  /**
+   * Returns true iff the given cluster name is known in the cluster-manager
+   * (either as active or as warming).
+   * @param cluster_name the name of the cluster.
+   * @return bool true if the cluster name is known, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasCluster(const std::string& cluster_name) const PURE;
+
+  /**
+   * Returns true iff there's an active cluster in the cluster-manager.
+   * @return bool true if there is an active cluster, and false otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual bool hasActiveClusters() const PURE;
 
   using ClusterSet = absl::flat_hash_set<std::string>;
 
@@ -497,9 +522,9 @@ public:
 
   using OdCdsCreationFunction = std::function<absl::StatusOr<std::shared_ptr<OdCdsApi>>(
       const envoy::config::core::v3::ConfigSource& odcds_config,
-      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
-      MissingClusterNotifier& notifier, Stats::Scope& scope,
-      ProtobufMessage::ValidationVisitor& validation_visitor)>;
+      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+      Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
+      Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)>;
 
   virtual absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,
@@ -604,7 +629,7 @@ public:
    * Allocate a cluster from configuration proto.
    */
   virtual absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
-  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3::Cluster& cluster,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) PURE;
 
   /**

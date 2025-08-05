@@ -79,7 +79,7 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator, /*prefer_gro=*/true) {}
+                                  generator) {}
 
   MOCK_METHOD(quic::MessageStatus, SendMessage,
               (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
