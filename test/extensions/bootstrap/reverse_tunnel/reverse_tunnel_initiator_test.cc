@@ -2220,7 +2220,6 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
   EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_))
       .WillRepeatedly(testing::Invoke([success_conn_data1, failed_conn_data,
                                        success_conn_data3](Upstream::LoadBalancerContext* context) {
-        // Cast to our custom context to get the host address.
         auto* reverse_context =
             dynamic_cast<ReverseConnection::ReverseConnectionLoadBalancerContext*>(context);
         EXPECT_NE(reverse_context, nullptr);
