@@ -252,6 +252,7 @@ For details on each command's usage see the official
   GET, String
   GETBIT, String
   GETDEL, String
+  GETEX, String
   GETRANGE, String
   GETSET, String
   INCR, String
