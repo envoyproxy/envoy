@@ -137,6 +137,22 @@ public:
     EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
   }
 
+  void setupRouteMetadata(const std::string& yaml) {
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    TestUtility::loadFromYaml(yaml, route->metadata_);
+
+    ON_CALL(stream_info_, route()).WillByDefault(Return(route));
+
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+    EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+
+    const std::string filter_name = "lua-filter-config-name";
+    ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(Return(filter_name));
+    ON_CALL(encoder_callbacks_, filterConfigName()).WillByDefault(Return(filter_name));
+
+    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -4116,6 +4132,148 @@ TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoRoute) {
                                EXPECT_EQ(Http::FilterHeadersStatus::Continue,
                                          filter_->encodeHeaders(response_headers, true));
                              });
+}
+
+// Test that handle:route():metadata() returns metadata when route matches the request.
+// This verifies that when a route is found for the request, the route() function returns
+// a valid object and metadata can be successfully accessed from both request and response handles.
+TEST_F(LuaHttpFilterTest, GetRouteMetadataFromHandle) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:route():metadata()
+      request_handle:logTrace(metadata:get("foo.bar")["name"])
+      request_handle:logTrace(metadata:get("foo.bar")["prop"])
+    end
+    function envoy_on_response(response_handle)
+      local metadata = response_handle:route():metadata()
+      response_handle:logTrace(metadata:get("baz.bat")["name"])
+      response_handle:logTrace(metadata:get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupRouteMetadata(METADATA);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->encodeHeaders(response_headers, true));
+                             });
+}
+
+// Test that handle:route():metadata() returns empty metadata when no filter-specific metadata
+// exists. This verifies that when a route has metadata for other filters but not for the
+// current one, the metadata object is empty.
+TEST_F(LuaHttpFilterTest, GetRouteMetadataFromHandleNoLuaMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function is_metadata_empty(metadata)
+      for _, _ in pairs(metadata) do
+        return false
+      end
+      return true
+    end
+    function envoy_on_request(request_handle)
+      if is_metadata_empty(request_handle:route():metadata()) then
+        request_handle:logTrace("No metadata found during request handling")
+      end
+    end
+    function envoy_on_response(response_handle)
+      if is_metadata_empty(response_handle:route():metadata()) then
+        response_handle:logTrace("No metadata found during response handling")
+      end
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.some_filter:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupRouteMetadata(METADATA);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during request handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during response handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+}
+
+// Test that handle:route() returns a valid route wrapper object that can be
+// safely accessed when no route matches the request.
+// This verifies that calling metadata() returns an empty metadata object.
+TEST_F(LuaHttpFilterTest, GetRouteFromHandleNoRoute) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local route = request_handle:route()
+      for _, _ in pairs(route:metadata()) do
+        return
+      end
+      request_handle:logTrace("No metadata found during request handling")
+    end
+    function envoy_on_response(response_handle)
+      local route = response_handle:route()
+      for _, _ in pairs(route:metadata()) do
+        return
+      end
+      response_handle:logTrace("No metadata found during response handling")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during request handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during response handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
 } // namespace
