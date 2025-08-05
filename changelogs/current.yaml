@@ -1,13 +1,25 @@
 date: Pending
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: ext_proc
+  change: |
+    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: testing
+  change: |
+    In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader`` and ``HeaderHasValueRef``
+    must be replaced with ``ContainsHeader``.
+    Any uses of matcher ``HeaderHasValue(...)`` should be replaced with ``::testing::Pointee(ContainsHeader(...))``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: http3
+  change: |
+    Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
+    reverted by setting the runtime guard
+    ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -35,6 +47,15 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: gcp_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.gcp_authn_use_fixed_url`` and legacy code paths.
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` and legacy code paths.
+- area: dispatcher
+  change: |
+    Removed runtime guard ``envoy.restart_features.fix_dispatcher_approximate_now`` and legacy code paths.
 - area: upstream
   change: |
     Removed runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` and legacy code paths.
@@ -75,6 +96,9 @@ new_features:
     :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields will be ignored. However,
     :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
     will take precedence over this field.
+- area: redis
+  change: |
+    Added support for ``GEOSEARCH``.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in produiction environments.
@@ -85,6 +109,13 @@ new_features:
   change: |
     Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
     endpoint statistics and metrics, but only for endpoints with updated stats, optimizing report size and efficiency.
+- area: overload management
+  change: |
+        Added load shed point ``envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch``
+        that sends ``GOAWAY`` AND closes connections for HTTP2 server processing of requests.  When
+        a ``GOAWAY`` frame is submitted by this the counter ``http2.goaway_sent`` will be
+        incremented.
+
 - area: otlp_stat_sink
   change: |
     Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via

@@ -4304,13 +4304,39 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway
   EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
-TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointIsOnlyConsultedOncePerDispatch) {
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointSendGoAwayAndClose) {
+  expect_buffered_data_on_teardown_ = true;
+
+  initialize();
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(server_->server_go_away_and_close_on_dispatch, shouldShedLoad())
+      .WillOnce(Return(true));
+  EXPECT_CALL(client_callbacks_, onGoAway(_));
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDispatch) {
   initialize();
 
-  int times_shed_load_invoked = 0;
+  int times_shed_load_goaway_invoked = 0;
   EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad())
-      .WillRepeatedly(Invoke([&times_shed_load_invoked]() {
-        ++times_shed_load_invoked;
+      .WillRepeatedly(Invoke([&times_shed_load_goaway_invoked]() {
+        ++times_shed_load_goaway_invoked;
+        return false;
+      }));
+  int times_shed_load_goaway_and_close_invoked = 0;
+  EXPECT_CALL(server_->server_go_away_and_close_on_dispatch, shouldShedLoad())
+      .WillRepeatedly(Invoke([&times_shed_load_goaway_and_close_invoked]() {
+        ++times_shed_load_goaway_and_close_invoked;
         return false;
       }));
 
@@ -4338,7 +4364,8 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointIsOnlyConsultedOncePerDisp
   // All the newly created streams are queued in the connection buffer.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).Times(num_streams_to_create);
   driveToCompletion();
-  EXPECT_EQ(1, times_shed_load_invoked);
+  EXPECT_EQ(1, times_shed_load_goaway_invoked);
+  EXPECT_EQ(1, times_shed_load_goaway_and_close_invoked);
   EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
