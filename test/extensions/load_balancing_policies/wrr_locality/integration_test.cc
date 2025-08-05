@@ -693,7 +693,7 @@ TEST_P(WrrLocalityEdsIntegrationTest, UseLocalityWeight) {
       {cluster1_endpoints_}, {}, {"cluster_1"}, "2");
 
   // Upstream QPS for ORCA load reports.
-  // Upstrean 0 reports 100 QPS, and 1 reports 200 QPS.
+  // Upstream 0 reports 100 QPS, and 1 reports 200 QPS.
   // Upstream 2 reports 100 QPS, and 3 reports 200 QPS.
   const std::vector<uint64_t> upstream_qps = {100, 200, 100, 200};
   // Send 100 requests to cluster1 so host weights are updated.

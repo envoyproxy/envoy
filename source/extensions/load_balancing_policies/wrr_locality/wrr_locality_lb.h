@@ -38,34 +38,12 @@ using WrrLocalityLbProto =
  */
 class WrrLocalityLbConfig : public Upstream::LoadBalancerConfig {
 public:
-  WrrLocalityLbConfig(const WrrLocalityLbProto& config,
-                      Server::Configuration::ServerFactoryContext& context) {
-    Envoy::Extensions::LoadBalancingPolices::ClientSideWeightedRoundRobin::Factory cswrr_factory;
-    // Iterate through the list of endpoint picking policies to find the first
-    // one that we know about.
-    for (const auto& policy : config.endpoint_picking_policy().policies()) {
-      auto* factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(
-          policy.typed_extension_config(),
-          /*is_optional=*/true);
+  WrrLocalityLbConfig(Upstream::TypedLoadBalancerFactory& endpoint_picking_policy_factory,
+                      Upstream::LoadBalancerConfigPtr endpoint_picking_policy_config)
+      : endpoint_picking_policy_factory_(endpoint_picking_policy_factory),
+        endpoint_picking_policy_config_(std::move(endpoint_picking_policy_config)) {}
 
-      if (factory != nullptr) {
-        // Load and validate the configuration.
-        auto sub_lb_proto_message = factory->createEmptyConfigProto();
-        THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
-            policy.typed_extension_config().typed_config(), context.messageValidationVisitor(),
-            *sub_lb_proto_message));
-
-        absl::Status creation_status;
-        auto lb_config_or_error = factory->loadConfig(context, *sub_lb_proto_message);
-        SET_AND_RETURN_IF_NOT_OK(lb_config_or_error.status(), creation_status);
-        endpoint_picking_policy_config_ = std::move(lb_config_or_error.value());
-        endpoint_picking_policy_factory_ = factory;
-        break;
-      }
-    }
-  }
-
-  Upstream::TypedLoadBalancerFactory* endpoint_picking_policy_factory_{};
+  Upstream::TypedLoadBalancerFactory& endpoint_picking_policy_factory_;
   Upstream::LoadBalancerConfigPtr endpoint_picking_policy_config_;
 };
 

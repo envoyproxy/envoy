@@ -58,12 +58,41 @@ TEST(WrrLocalityConfigTest, ValidateSuccess) {
   EXPECT_NE(nullptr, thread_local_lb);
 }
 
-TEST(WrrLocalityConfigTest, ValidateFailure) {
+TEST(WrrLocalityConfigTest, ValidateFailureWithoutEndpointPickingPolicy) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  // WrrLocality policy without endpoint picking policy.
+  envoy::extensions::load_balancing_policies::wrr_locality::v3::WrrLocality wrr_locality_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig wrr_locality_config;
+  wrr_locality_config.set_name("envoy.load_balancing_policies.wrr_locality");
+  wrr_locality_config.mutable_typed_config()->PackFrom(wrr_locality_config_msg);
+
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(wrr_locality_config);
+  EXPECT_EQ("envoy.load_balancing_policies.wrr_locality", factory.name());
+
+  EXPECT_EQ(factory.loadConfig(context, wrr_locality_config_msg).status(),
+            absl::InvalidArgumentError("No supported endpoint picking policy."));
+}
+
+TEST(WrrLocalityConfigTest, ValidateFailureUnsupportedEndpointPickingPolicy) {
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   // WrrLocality policy WITHOUT ClientSideWeightedRoundRobin policy for endpoint
   // picking is currently not supported.
+  // Random lb policy for endpoint picking.
+  envoy::extensions::load_balancing_policies::random::v3::Random epp_config_msg;
+  envoy::config::core::v3::TypedExtensionConfig epp_config;
+
+  epp_config.set_name("envoy.load_balancing_policies.random");
+  epp_config.mutable_typed_config()->PackFrom(epp_config_msg);
+
+  // WrrLocality policy with Random policy for endpoint picking.
   envoy::extensions::load_balancing_policies::wrr_locality::v3::WrrLocality wrr_locality_config_msg;
+  *(wrr_locality_config_msg.mutable_endpoint_picking_policy()
+        ->add_policies()
+        ->mutable_typed_extension_config()) = epp_config;
+
   envoy::config::core::v3::TypedExtensionConfig wrr_locality_config;
   wrr_locality_config.set_name("envoy.load_balancing_policies.wrr_locality");
   wrr_locality_config.mutable_typed_config()->PackFrom(wrr_locality_config_msg);

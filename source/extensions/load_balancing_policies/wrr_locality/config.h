@@ -40,18 +40,43 @@ public:
   loadConfig(Server::Configuration::ServerFactoryContext& context,
              const Protobuf::Message& config) override {
     const auto& lb_config = dynamic_cast<const WrrLocalityLbProto&>(config);
-    auto wrr_locality_lb_config = std::make_unique<WrrLocalityLbConfig>(lb_config, context);
-    // Ensure that the endpoint picking policy is a
-    // ClientSideWeightedRoundRobin.
-    auto* client_side_weighted_round_robin_factory = dynamic_cast<
-        ::Envoy::Extensions::LoadBalancingPolices::ClientSideWeightedRoundRobin::Factory*>(
-        wrr_locality_lb_config->endpoint_picking_policy_factory_);
-    if (client_side_weighted_round_robin_factory == nullptr) {
-      return absl::InvalidArgumentError("Currently WrrLocalityLoadBalancer only supports "
-                                        "ClientSideWeightedRoundRobinLoadBalancer as its endpoint "
-                                        "picking policy.");
+    Upstream::TypedLoadBalancerFactory* endpoint_picking_policy_factory = nullptr;
+    // Iterate through the list of endpoint picking policies to find the first one that we know
+    // about.
+    for (const auto& endpoint_picking_policy : lb_config.endpoint_picking_policy().policies()) {
+      endpoint_picking_policy_factory =
+          Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(
+              endpoint_picking_policy.typed_extension_config(),
+              /*is_optional=*/true);
+
+      if (endpoint_picking_policy_factory != nullptr) {
+        // Ensure that the endpoint picking policy is a ClientSideWeightedRoundRobin.
+        auto* client_side_weighted_round_robin_factory = dynamic_cast<
+            ::Envoy::Extensions::LoadBalancingPolices::ClientSideWeightedRoundRobin::Factory*>(
+            endpoint_picking_policy_factory);
+        if (client_side_weighted_round_robin_factory == nullptr) {
+          return absl::InvalidArgumentError(
+              "Currently WrrLocalityLoadBalancer only supports "
+              "ClientSideWeightedRoundRobinLoadBalancer as its endpoint "
+              "picking policy.");
+        }
+        // Load and validate the configuration.
+        auto sub_lb_proto_message = endpoint_picking_policy_factory->createEmptyConfigProto();
+        RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+            endpoint_picking_policy.typed_extension_config().typed_config(),
+            context.messageValidationVisitor(), *sub_lb_proto_message));
+
+        auto lb_config_or_error =
+            endpoint_picking_policy_factory->loadConfig(context, *sub_lb_proto_message);
+        RETURN_IF_NOT_OK(lb_config_or_error.status());
+
+        auto wrr_locality_lb_config = std::make_unique<WrrLocalityLbConfig>(
+            *endpoint_picking_policy_factory, std::move(lb_config_or_error.value()));
+        return Upstream::LoadBalancerConfigPtr{wrr_locality_lb_config.release()};
+      }
     }
-    return Upstream::LoadBalancerConfigPtr{wrr_locality_lb_config.release()};
+
+    return absl::InvalidArgumentError("No supported endpoint picking policy.");
   }
 };
 

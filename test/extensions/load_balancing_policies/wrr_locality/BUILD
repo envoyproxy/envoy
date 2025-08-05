@@ -17,6 +17,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.load_balancing_policies.wrr_locality"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/wrr_locality:config",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",

@@ -11,7 +11,7 @@ WrrLocalityLoadBalancer::WrrLocalityLoadBalancer(
     Envoy::Random::RandomGenerator& random, TimeSource& time_source) {
   const auto* typed_lb_config = dynamic_cast<const WrrLocalityLbConfig*>(lb_config.ptr());
   ASSERT(typed_lb_config != nullptr);
-  endpoint_picking_policy_ = typed_lb_config->endpoint_picking_policy_factory_->create(
+  endpoint_picking_policy_ = typed_lb_config->endpoint_picking_policy_factory_.create(
       *typed_lb_config->endpoint_picking_policy_config_, cluster_info, priority_set, runtime,
       random, time_source);
   factory_ =
@@ -20,8 +20,7 @@ WrrLocalityLoadBalancer::WrrLocalityLoadBalancer(
 
 Upstream::LoadBalancerPtr
 WrrLocalityLoadBalancer::WorkerLocalLbFactory::create(Upstream::LoadBalancerParams params) {
-  // Ensure that the endpoint picking policy is a
-  // ClientSideWeightedRoundRobinLoadBalancer.
+  // Ensure that the endpoint picking policy is a ClientSideWeightedRoundRobinLoadBalancer.
   auto* client_side_weighted_round_robin_factory = dynamic_cast<
       ::Envoy::Upstream::ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory*>(
       endpoint_picking_policy_factory_.get());
