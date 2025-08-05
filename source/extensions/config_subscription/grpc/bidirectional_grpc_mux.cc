@@ -1,6 +1,12 @@
 #include "source/extensions/config_subscription/grpc/bidirectional_grpc_mux.h"
 
+#include <memory>
+#include <string>
+
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/config_subscription/grpc/grpc_mux_context.h"
+#include "source/extensions/config_subscription/grpc/new_grpc_mux_impl.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -10,7 +16,6 @@ namespace Config {
 // ClientResourceRegistry implementation
 void ClientResourceRegistry::registerProvider(const std::string& type_url,
                                              ClientResourceProviderPtr provider) {
-  ENVOY_LOG(info, "Registering client resource provider for type: {}", type_url);
   providers_[type_url] = std::move(provider);
 }
 
@@ -19,27 +24,10 @@ ClientResourceProvider* ClientResourceRegistry::getProvider(const std::string& t
   return it != providers_.end() ? it->second.get() : nullptr;
 }
 
-// BidirectionalGrpcMuxImpl implementation
-BidirectionalGrpcMuxImpl::BidirectionalGrpcMuxImpl(
-    Grpc::RawAsyncClientPtr&& async_client,
-    bool skip_subsequent_node,
-    const envoy::config::core::v3::ApiConfigSource& ads_config,
-    Event::Dispatcher& dispatcher,
-    Grpc::RawAsyncClientFactory& async_client_factory,
-    Stats::Scope& scope,
-    const RateLimitSettings& rate_limit_settings,
-    const LocalInfo::LocalInfo& local_info,
-    CustomConfigValidatorsPtr&& config_validators,
-    BackOffStrategyPtr&& backoff_strategy,
-    OptRef<XdsConfigTracker> xds_config_tracker,
-    OptRef<XdsResourcesDelegate> xds_resources_delegate,
-    bool enable_type_url_downgrade_and_upgrade)
-    : NewGrpcMuxImpl(std::move(async_client), skip_subsequent_node, ads_config, dispatcher,
-                     async_client_factory, scope, rate_limit_settings, local_info,
-                     std::move(config_validators), std::move(backoff_strategy),
-                     xds_config_tracker, xds_resources_delegate,
-                     enable_type_url_downgrade_and_upgrade) {
-  ENVOY_LOG(info, "Created bidirectional gRPC mux for reverse xDS");
+// BidirectionalGrpcMuxImpl implementation using composition
+BidirectionalGrpcMuxImpl::BidirectionalGrpcMuxImpl(std::shared_ptr<GrpcMux> base_mux)
+    : base_mux_(std::move(base_mux)) {
+  // Bidirectional functionality will be added in future iterations
 }
 
 void BidirectionalGrpcMuxImpl::registerClientResourceProvider(const std::string& type_url,
@@ -47,114 +35,103 @@ void BidirectionalGrpcMuxImpl::registerClientResourceProvider(const std::string&
   client_resource_registry_.registerProvider(type_url, std::move(provider));
 }
 
-GrpcStreamInterfacePtr<envoy::service::discovery::v3::DiscoveryRequest,
-                      envoy::service::discovery::v3::DiscoveryResponse>
-BidirectionalGrpcMuxImpl::createGrpcStreamObject(
-    Grpc::RawAsyncClientPtr&& async_client,
-    const Protobuf::MethodDescriptor& service_method,
-    Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
-    const RateLimitSettings& rate_limit_settings) {
-  
-  // Create a bidirectional stream instead of a regular one
-  auto bidirectional_stream = std::make_unique<BidirectionalGrpcStream<
-      envoy::service::discovery::v3::DiscoveryRequest,
-      envoy::service::discovery::v3::DiscoveryResponse>>(
-      this, std::move(async_client), service_method, dispatcher_, scope,
-      std::move(backoff_strategy), rate_limit_settings,
-      typename GrpcStream<envoy::service::discovery::v3::DiscoveryRequest,
-                         envoy::service::discovery::v3::DiscoveryResponse>::ConnectedStateValue::FIRST_ENTRY);
-  
-  // Store reference for sending reverse responses
-  bidirectional_stream_ = bidirectional_stream.get();
-  
-  return std::move(bidirectional_stream);
+// Delegate all GrpcMux methods to the base implementation
+void BidirectionalGrpcMuxImpl::start() {
+  base_mux_->start();
 }
 
-void BidirectionalGrpcMuxImpl::onDiscoveryRequest(
-    std::unique_ptr<envoy::service::discovery::v3::DiscoveryRequest>&& request) {
-  
-  ENVOY_LOG(debug, "Received reverse xDS request from management server for type: {}", 
-            request->type_url());
-
-  // Detect if this is a reverse xDS request by checking the type_url
-  if (request->type_url().find("envoy.admin.") != std::string::npos ||
-      request->type_url().find("envoy.service.status.") != std::string::npos) {
-    // This is a reverse xDS request - management server asking us for client resources
-    auto response = handleReverseRequest(*request);
-    
-    // Send the response back on the bidirectional stream
-    if (bidirectional_stream_) {
-      bidirectional_stream_->sendResponse(response);
-      ENVOY_LOG(debug, "Sent reverse xDS response for type: {}, version: {}", 
-                response.type_url(), response.version_info());
-    }
-  } else {
-    // This shouldn't happen - configuration requests should come as responses, not requests
-    ENVOY_LOG(warn, "Received unexpected DiscoveryRequest for config type: {}", request->type_url());
-  }
+ScopedResume BidirectionalGrpcMuxImpl::pause(const std::string& type_url) {
+  return base_mux_->pause(type_url);
 }
 
-envoy::service::discovery::v3::DiscoveryResponse
-BidirectionalGrpcMuxImpl::handleReverseRequest(const envoy::service::discovery::v3::DiscoveryRequest& request) {
-  envoy::service::discovery::v3::DiscoveryResponse response;
-  
-  // Set basic response fields
-  response.set_type_url(request.type_url());
-  response.set_nonce(generateReverseNonce());
-  
-  // Find the provider for this resource type
-  auto* provider = client_resource_registry_.getProvider(request.type_url());
-  if (!provider) {
-    ENVOY_LOG(warn, "No client resource provider registered for type: {}", request.type_url());
-    response.set_version_info("0");
-    return response;
-  }
-  
-  // Get requested resource names
-  std::vector<std::string> requested_names(request.resource_names().begin(), 
-                                          request.resource_names().end());
-  
-  // Get resources from the provider
-  auto resources = provider->getResources(requested_names);
-  response.set_version_info(provider->getVersionInfo());
-  
-  // Add resources to response
-  for (auto& resource : resources) {
-    *response.add_resources() = std::move(resource);
-  }
-  
-  ENVOY_LOG(debug, "Generated reverse xDS response with {} resources", resources.size());
-  return response;
+ScopedResume BidirectionalGrpcMuxImpl::pause(const std::vector<std::string> type_urls) {
+  return base_mux_->pause(type_urls);
 }
 
-std::string BidirectionalGrpcMuxImpl::generateReverseNonce() {
-  return absl::StrCat("reverse_", reverse_nonce_counter_.fetch_add(1));
+GrpcMuxWatchPtr BidirectionalGrpcMuxImpl::addWatch(const std::string& type_url,
+                                                  const absl::flat_hash_set<std::string>& resources,
+                                                  SubscriptionCallbacks& callbacks,
+                                                  OpaqueResourceDecoderSharedPtr resource_decoder,
+                                                  const SubscriptionOptions& options) {
+  return base_mux_->addWatch(type_url, resources, callbacks, resource_decoder, options);
+}
+
+void BidirectionalGrpcMuxImpl::requestOnDemandUpdate(const std::string& type_url,
+                                                    const absl::flat_hash_set<std::string>& for_update) {
+  base_mux_->requestOnDemandUpdate(type_url, for_update);
+}
+
+EdsResourcesCacheOptRef BidirectionalGrpcMuxImpl::edsResourcesCache() {
+  return base_mux_->edsResourcesCache();
+}
+
+absl::Status BidirectionalGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
+                                                      Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+                                                      BackOffStrategyPtr&& backoff_strategy,
+                                                      const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
+  return base_mux_->updateMuxSource(std::move(primary_async_client), std::move(failover_async_client), 
+                                   scope, std::move(backoff_strategy), ads_config_source);
+}
+
+void BidirectionalGrpcMuxImpl::handleReverseRequest(const std::string& type_url,
+                                                   const std::vector<std::string>& resource_names) {
+  // Placeholder for future reverse xDS functionality
+  // This would be called when the management server sends a request to the client
+  // For now, we just log that a reverse request was received
+  ENVOY_LOG_MISC(debug, "Received reverse xDS request for type: {} with {} resources", 
+                type_url, resource_names.size());
 }
 
 // BidirectionalGrpcMuxFactory implementation
-ProtobufTypes::MessagePtr BidirectionalGrpcMuxFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::core::v3::ApiConfigSource>();
+void BidirectionalGrpcMuxFactory::shutdownAll() {
+  // Delegate to the base NewGrpcMuxImpl shutdown functionality
+  NewGrpcMuxImpl::shutdownAll();
 }
 
-GrpcMuxSharedPtr BidirectionalGrpcMuxFactory::create(
-    Grpc::RawAsyncClientPtr&& async_client,
-    Event::Dispatcher& dispatcher,
-    Grpc::RawAsyncClientFactory& async_client_factory,
-    Stats::Scope& scope,
-    const envoy::config::core::v3::ApiConfigSource& ads_config,
+std::shared_ptr<GrpcMux> BidirectionalGrpcMuxFactory::create(
+    std::unique_ptr<Grpc::RawAsyncClient>&& async_client,
+    std::unique_ptr<Grpc::RawAsyncClient>&& async_failover_client,
+    Event::Dispatcher& dispatcher, Random::RandomGenerator& /*random*/, Stats::Scope& scope,
+    const envoy::config::core::v3::ApiConfigSource& /*ads_config*/,
     const LocalInfo::LocalInfo& local_info,
-    CustomConfigValidatorsPtr&& config_validators,
-    BackOffStrategyPtr&& backoff_strategy,
-    OptRef<XdsConfigTracker> xds_config_tracker,
-    OptRef<XdsResourcesDelegate> xds_resources_delegate,
-    bool skip_subsequent_node) {
+    std::unique_ptr<CustomConfigValidators>&& config_validators,
+    BackOffStrategyPtr&& backoff_strategy, OptRef<XdsConfigTracker> xds_config_tracker,
+    OptRef<XdsResourcesDelegate> xds_resources_delegate, bool /*use_eds_resources_cache*/) {
   
-  return std::make_shared<BidirectionalGrpcMuxImpl>(
-      std::move(async_client), skip_subsequent_node, ads_config, dispatcher,
-      async_client_factory, scope, RateLimitSettings{}, local_info,
-      std::move(config_validators), std::move(backoff_strategy),
-      xds_config_tracker, xds_resources_delegate, true);
+  // Create the service method descriptor
+  const auto* method_descriptor = 
+      Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "envoy.service.discovery.v3.AggregatedDiscoveryService.StreamAggregatedResources");
+  
+  if (!method_descriptor) {
+    throw EnvoyException("Could not find ADS method descriptor");
+  }
+  
+  // Create GrpcMuxContext for the new API
+  GrpcMuxContext grpc_mux_context{
+      std::move(async_client),
+      std::move(async_failover_client),
+      dispatcher,
+      *method_descriptor,
+      local_info,
+      RateLimitSettings{}, // Default rate limit settings
+      scope,
+      std::move(config_validators),
+      xds_resources_delegate,
+      xds_config_tracker,
+      std::move(backoff_strategy),
+      "", // target_xds_authority - empty for now
+      nullptr // eds_resources_cache - will be created if needed
+  };
+  
+  // Create base NewGrpcMuxImpl first
+  auto base_mux = std::make_shared<NewGrpcMuxImpl>(grpc_mux_context);
+  
+  // Wrap it with bidirectional functionality
+  return std::make_shared<BidirectionalGrpcMuxImpl>(base_mux);
 }
+
+REGISTER_FACTORY(BidirectionalGrpcMuxFactory, MuxFactory);
 
 } // namespace Config
-} // namespace Envoy 
+} // namespace Envoy

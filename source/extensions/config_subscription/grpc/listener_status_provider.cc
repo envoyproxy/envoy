@@ -1,4 +1,4 @@
-#include "source/server/listener_status_provider.h"
+#include "source/extensions/config_subscription/grpc/listener_status_provider.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -114,7 +114,6 @@ envoy::admin::v3::ListenerReadinessStatus ListenerStatusProvider::createStatus(
   status.set_error_message(error_message);
   
   // Set timestamp
-  auto now = std::chrono::system_clock::now();
   auto timestamp = Protobuf::util::TimeUtil::GetCurrentTime();
   *status.mutable_last_updated() = timestamp;
   

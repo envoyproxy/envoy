@@ -314,3 +314,12 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_library(
+    name = "bidirectional_xds_config_lib",
+    srcs = ["bidirectional_xds_config.cc"],
+    hdrs = ["bidirectional_xds_config.h"],
+    deps = [
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)

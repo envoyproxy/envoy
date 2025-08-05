@@ -296,3 +296,20 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "bidirectional_grpc_mux_test",
+    srcs = ["bidirectional_grpc_mux_test.cc"],
+    deps = [
+        "//source/extensions/config_subscription/grpc:bidirectional_grpc_mux_lib",
+        "//source/extensions/config_subscription/grpc:listener_status_provider_lib",
+        "//test/mocks/config:config_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)

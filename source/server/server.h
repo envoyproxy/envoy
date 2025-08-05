@@ -44,6 +44,7 @@
 #ifdef ENVOY_ADMIN_FUNCTIONALITY
 #include "source/server/admin/admin.h"
 #endif
+#include "source/server/bidirectional_xds_manager.h"
 #include "source/server/configuration_impl.h"
 #include "source/server/listener_hooks.h"
 #include "source/server/worker_impl.h"
@@ -422,6 +423,7 @@ private:
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Config::XdsManagerPtr xds_manager_;
+  std::unique_ptr<BidirectionalXdsManager> bidirectional_xds_manager_;
   std::unique_ptr<HdsDelegateApi> hds_delegate_;
   std::unique_ptr<OverloadManager> overload_manager_;
   std::unique_ptr<OverloadManager> null_overload_manager_;

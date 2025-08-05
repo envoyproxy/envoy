@@ -793,6 +793,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
   xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, stats_store_,
                                                           *local_info_, validation_context_, *this);
 
+  // Create the bidirectional xDS manager for reverse xDS functionality
+  bidirectional_xds_manager_ = std::make_unique<BidirectionalXdsManager>(*this);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       serverFactoryContext(), stats_store_, thread_local_, http_context_,
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
@@ -840,6 +843,11 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     // Just setup the timer.
     stat_flush_timer_ = dispatcher_->createTimer([this]() -> void { flushStats(); });
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
+  }
+
+  // Initialize bidirectional xDS after all core components are set up
+  if (bidirectional_xds_manager_) {
+    bidirectional_xds_manager_->initialize();
   }
 
   // Now that we are initialized, notify the bootstrap extensions.

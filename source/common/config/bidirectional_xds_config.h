@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 
 namespace Envoy {
 namespace Config {

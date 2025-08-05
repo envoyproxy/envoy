@@ -405,6 +405,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/config:xds_manager_lib",
         "//source/common/config:xds_resource_lib",
+        "//source/server:bidirectional_xds_manager_lib",
         "//source/common/grpc:async_client_manager_lib",
         "//source/common/grpc:context_lib",
         "//source/common/http:codes_lib",
@@ -523,5 +524,19 @@ envoy_cc_library(
     hdrs = ["generic_factory_context.h"],
     deps = [
         "//envoy/server:factory_context_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "bidirectional_xds_manager_lib",
+    srcs = ["bidirectional_xds_manager.cc"],
+    hdrs = ["bidirectional_xds_manager.h"],
+    deps = [
+        "//envoy/config:xds_manager_interface",
+        "//envoy/server:instance_interface",
+        "//source/common/config:bidirectional_xds_config_lib",
+        "//source/common/runtime:runtime_features_lib",
+        "//source/extensions/config_subscription/grpc:bidirectional_grpc_mux_lib",
+        "//source/extensions/config_subscription/grpc:listener_status_provider_lib",
     ],
 )
