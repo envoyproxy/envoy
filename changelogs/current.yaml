@@ -26,6 +26,9 @@ removed_config_or_runtime:
 - area: router
   change: |
     Removed runtime guard ``envoy.reloadable_features.shadow_policy_inherit_trace_sampling`` and legacy code paths.
+- area: dns
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` and legacy code paths.
 - area: dynamic_forward_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update`` and legacy code paths.
@@ -44,14 +47,43 @@ removed_config_or_runtime:
 - area: udp_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
+- area: network
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: dns_resolver
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.getaddrinfo_num_retries`` and legacy code paths.
+- area: proxy_filter
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_ssl_port`` and legacy code paths.
 - area: gcp_authn
   change: |
     Removed runtime guard ``envoy.reloadable_features.gcp_authn_use_fixed_url`` and legacy code paths.
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` and legacy code paths.
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_authn_validate_uri`` and legacy code paths.
+- area: dispatcher
+  change: |
+    Removed runtime guard ``envoy.restart_features.fix_dispatcher_approximate_now`` and legacy code paths.
+- area: upstream
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
+- area: quic
+  change: |
+    Added new option to support :ref:`base64 encoded server ID
+    <envoy_v3_api_field_extensions.quic.connection_id_generator.quic_lb.v3.Config.server_id_base64_encoded>`
+    in QUIC-LB.
 - area: health_check
   change: |
     Added support for request payloads in HTTP health checks. The ``send`` field in ``HttpHealthCheck`` can now be
@@ -87,6 +119,9 @@ new_features:
     :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields will be ignored. However,
     :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
     will take precedence over this field.
+- area: redis
+  change: |
+    Added support for ``GEOSEARCH``.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in produiction environments.
