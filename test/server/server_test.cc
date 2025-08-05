@@ -964,6 +964,38 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
   server_thread->join();
 }
 
+TEST_P(ServerInstanceImplTest, EvictStats) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_evict_bootstrap.yaml", true);
+  EXPECT_EQ(2, server_->statsConfig().evictOnFlush());
+  EXPECT_EQ(std::chrono::seconds(5), server_->statsConfig().flushInterval());
+
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(1L, counter->value());
+  EXPECT_EQ(0, stats_store_.evictionCount());
+
+  // Eviction applied here: side-effect is that c1 is now marked as unused.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(2L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(3L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  // Second pass of eviction deletes the counter.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(4L, counter->value());
+  EXPECT_EQ(2, stats_store_.evictionCount());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
 TEST_P(ServerInstanceImplTest, ConcurrentFlushes) {
   CustomStatsSinkFactory factory;
   Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);

@@ -132,11 +132,9 @@ public:
    * flush() on each sink.
    * @param sinks supplies the list of sinks.
    * @param store provides the store being flushed.
-   * @param evict whether to delete the stale metrics and clear the usage flags.
    */
   static void flushMetricsToSinks(const std::list<Stats::SinkPtr>& sinks, Stats::Store& store,
-                                  Upstream::ClusterManager& cm, TimeSource& time_source,
-                                  bool evict);
+                                  Upstream::ClusterManager& cm, TimeSource& time_source);
 
   /**
    * Load a bootstrap config and perform validation.
@@ -455,6 +453,8 @@ private:
         : RaiiListElement<T>(callbacks, callback) {}
   };
 
+  uint32_t stats_eviction_counter_{0};
+
 #ifdef ENVOY_PERFETTO
   std::unique_ptr<perfetto::TracingSession> tracing_session_{};
   os_fd_t tracing_fd_{INVALID_HANDLE};
@@ -473,7 +473,7 @@ public:
   // MetricSnapshotImpl captures a snapshot of metrics by latching the delta usage, and optionally
   // marking the stats as used.
   explicit MetricSnapshotImpl(Stats::Store& store, Upstream::ClusterManager& cluster_manager,
-                              TimeSource& time_source, bool mark_unused);
+                              TimeSource& time_source);
 
   // Stats::MetricSnapshot
   const std::vector<CounterSnapshot>& counters() override { return counters_; }

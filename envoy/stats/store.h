@@ -118,7 +118,7 @@ public:
   virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
-   * Evict unused metrics from all the scope caches.
+   * Delete unused metrics from all the evictable scope caches, and mark the rest as unused.
    */
   virtual void evictUnused() PURE;
 

@@ -204,7 +204,7 @@ public:
   }
 
   void evictUnused() override {
-    // Do nothing. Eviction is only supported on thread local stores.
+    // Do nothing. Eviction is only supported on the thread local stores.
   }
 
   void forEachSinkedCounter(SizeFn f_size, StatFn<Counter> f_stat) const override {

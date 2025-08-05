@@ -914,7 +914,7 @@ bool ParentHistogramImpl::used() const {
 
 void ParentHistogramImpl::markUnused() {
   merged_ = false;
-  Thread::ReleasableLockGuard lock(merge_lock_);
+  Thread::LockGuard lock(merge_lock_);
   for (const TlsHistogramSharedPtr& tls_histogram : tls_histograms_) {
     tls_histogram->markUnused();
   }
@@ -1071,10 +1071,11 @@ void ThreadLocalStoreImpl::evictUnused() {
       if (scope->evictable_) {
         MetricBag metrics(scope->scope_id_);
         CentralCacheEntrySharedPtr& central_cache = scope->centralCacheMutableNoThreadAnalysis();
-        auto collect_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
+        auto filter_unused = []<typename T>(StatNameHashMap<T>& unused_metrics) {
           return [&unused_metrics](std::pair<StatName, T> kv) {
             const auto& [name, metric] = kv;
             if (metric->used()) {
+              metric->markUnused();
               return false;
             } else {
               unused_metrics.try_emplace(name, metric);
@@ -1082,10 +1083,10 @@ void ThreadLocalStoreImpl::evictUnused() {
             }
           };
         };
-        absl::erase_if(central_cache->counters_, collect_unused(metrics.counters_));
-        absl::erase_if(central_cache->gauges_, collect_unused(metrics.gauges_));
-        absl::erase_if(central_cache->text_readouts_, collect_unused(metrics.text_readouts_));
-        absl::erase_if(central_cache->histograms_, collect_unused(metrics.histograms_));
+        absl::erase_if(central_cache->counters_, filter_unused(metrics.counters_));
+        absl::erase_if(central_cache->gauges_, filter_unused(metrics.gauges_));
+        absl::erase_if(central_cache->text_readouts_, filter_unused(metrics.text_readouts_));
+        absl::erase_if(central_cache->histograms_, filter_unused(metrics.histograms_));
         if (!metrics.empty()) {
           evicted_metrics->push_back(std::move(metrics));
         }
@@ -1103,19 +1104,19 @@ void ThreadLocalStoreImpl::evictUnused() {
           for (const auto& metrics : *evicted_metrics) {
             TlsCacheEntry& entry = tls_cache->insertScope(metrics.scope_id_);
             absl::erase_if(entry.counters_,
-                           [=](std::pair<StatName, std::reference_wrapper<Counter>> kv) {
+                           [&](std::pair<StatName, std::reference_wrapper<Counter>> kv) {
                              return metrics.counters_.contains(kv.first);
                            });
             absl::erase_if(entry.gauges_,
-                           [=](std::pair<StatName, std::reference_wrapper<Gauge>> kv) {
+                           [&](std::pair<StatName, std::reference_wrapper<Gauge>> kv) {
                              return metrics.gauges_.contains(kv.first);
                            });
             absl::erase_if(entry.text_readouts_,
-                           [=](std::pair<StatName, std::reference_wrapper<TextReadout>> kv) {
+                           [&](std::pair<StatName, std::reference_wrapper<TextReadout>> kv) {
                              return metrics.text_readouts_.contains(kv.first);
                            });
             absl::erase_if(entry.parent_histograms_,
-                           [=](std::pair<StatName, ParentHistogramSharedPtr> kv) {
+                           [&](std::pair<StatName, ParentHistogramSharedPtr> kv) {
                              return metrics.histograms_.contains(kv.first);
                            });
           }
@@ -1123,16 +1124,21 @@ void ThreadLocalStoreImpl::evictUnused() {
         [evicted_metrics]() {
           // We want to delete stale stats on the main thread since stat
           // destructors lock the stats allocator. Note that we might have
-          // received fresh values on the stale cache-local stats. Eventually, we
-          // might also want to defer the deletion further in the allocator until
-          // the values are flushed to the sinks.
+          // received fresh values on the stale cache-local stats after deleting them from the
+          // central cache.. Eventually, we might also want to defer the deletion further in the
+          // allocator until the values are flushed to the sinks.
+          size_t scopes = 0, counters = 0, gauges = 0, readouts = 0, histograms = 0;
           for (const auto& metrics : *evicted_metrics) {
-            ENVOY_LOG(info,
-                      "deleted stale {} counters, {} gauges, {} text readouts, {} histograms from "
-                      "scope {}",
-                      metrics.counters_.size(), metrics.gauges_.size(),
-                      metrics.text_readouts_.size(), metrics.histograms_.size(), metrics.scope_id_);
+            scopes += 1;
+            counters += metrics.counters_.size();
+            gauges += metrics.gauges_.size();
+            readouts += metrics.text_readouts_.size();
+            histograms += metrics.histograms_.size();
           }
+          ENVOY_LOG(debug,
+                    "deleted stale {} counters, {} gauges, {} text readouts, {} histograms from "
+                    "{} scopes",
+                    counters, gauges, readouts, histograms, scopes);
         });
   }
 }

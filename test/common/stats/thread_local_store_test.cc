@@ -632,40 +632,30 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
     h1.recordValue(1);
     store_->mergeHistograms([]() -> void {});
 
-    // Eviction does nothing.
+    // Eviction only marks unused but does not remove the counters.
     store_->evictUnused();
 
     EXPECT_EQ(&c1, &scope->counterFromString("c1"));
-    EXPECT_TRUE(c1.used());
+    EXPECT_FALSE(c1.used());
     EXPECT_EQ(1, c1.value());
     EXPECT_EQ(1UL, store_->counters().size());
 
     EXPECT_EQ(&g1, &scope->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
     EXPECT_EQ(&g1, &scope1->gaugeFromString("g1", Gauge::ImportMode::Accumulate));
-    EXPECT_TRUE(g1.used());
+    EXPECT_FALSE(g1.used());
     EXPECT_EQ(5, g1.value());
     EXPECT_EQ(1UL, store_->gauges().size());
 
     EXPECT_EQ(&t1, &scope->textReadoutFromString("t1"));
     EXPECT_EQ(&t1, &scope1->textReadoutFromString("t1"));
-    EXPECT_TRUE(t1.used());
+    EXPECT_FALSE(t1.used());
     EXPECT_EQ("hello", t1.value());
     EXPECT_EQ(1UL, store_->textReadouts().size());
 
     EXPECT_EQ(&h1, &scope->histogramFromString("h1", Histogram::Unit::Unspecified));
     EXPECT_EQ(&h1, &scope1->histogramFromString("h1", Histogram::Unit::Unspecified));
-    EXPECT_TRUE(h1.used());
-    EXPECT_EQ(1UL, store_->histograms().size());
-
-    // Mark unused all metrics.
-    c1.markUnused();
-    g1.markUnused();
-    t1.markUnused();
-    h1.markUnused();
-    EXPECT_FALSE(c1.used());
-    EXPECT_FALSE(g1.used());
-    EXPECT_FALSE(t1.used());
     EXPECT_FALSE(h1.used());
+    EXPECT_EQ(1UL, store_->histograms().size());
   }
 
   // Eviction removes here.
@@ -676,7 +666,7 @@ TEST_F(StatsThreadLocalStoreTest, Eviction) {
   EXPECT_EQ(0UL, store_->textReadouts().size());
   EXPECT_EQ(0UL, store_->histograms().size());
 
-  // Make sure no stale data is on caches.
+  // Make sure no dangling data is on caches and it is safe to use the same metrics.
   {
     scope->counterFromString("c1").add(1);
     scope1->counterFromString("c1").add(1);
