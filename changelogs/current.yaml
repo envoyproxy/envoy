@@ -59,6 +59,9 @@ removed_config_or_runtime:
 - area: upstream
   change: |
     Removed runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
 - area: health_check
