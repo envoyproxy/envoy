@@ -1,8 +1,5 @@
 #include "source/extensions/load_balancing_policies/wrr_locality/config.h"
 
-// #include "third_party/envoy/src/envoy/registry/registry.h"
-// #include "third_party/envoy/src/envoy/upstream/load_balancer.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace LoadBalancingPolicies {

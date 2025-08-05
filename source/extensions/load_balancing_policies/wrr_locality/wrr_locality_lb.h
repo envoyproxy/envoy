@@ -1,10 +1,5 @@
 #pragma once
 
-#ifndef NET_ENVOY_SOURCE_EXTENSIONS_LOAD_BALANCERS_WRR_LOCALITY_WRR_LOCALITY_LB_H_
-#define NET_ENVOY_SOURCE_EXTENSIONS_LOAD_BALANCERS_WRR_LOCALITY_WRR_LOCALITY_LB_H_
-
-#pragma once
-
 #include <memory>
 #include <utility>
 
@@ -89,5 +84,3 @@ private:
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy
-
-#endif // NET_ENVOY_SOURCE_EXTENSIONS_LOAD_BALANCERS_WRR_LOCALITY_WRR_LOCALITY_LB_H_

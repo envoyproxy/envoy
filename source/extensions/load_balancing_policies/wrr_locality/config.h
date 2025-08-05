@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef NET_ENVOY_SOURCE_EXTENSIONS_LOAD_BALANCERS_WRR_LOCALITY_CONFIG_H_
-#define NET_ENVOY_SOURCE_EXTENSIONS_LOAD_BALANCERS_WRR_LOCALITY_CONFIG_H_
-
 #include <memory>
 
 #include "envoy/event/dispatcher.h"
@@ -86,5 +83,3 @@ DECLARE_FACTORY(Factory);
 } // namespace LoadBalancingPolicies
 } // namespace Extensions
 } // namespace Envoy
-
-#endif // NET_ENVOY_SOURCE_EXTENSIONS_LOAD_BALANCERS_WRR_LOCALITY_CONFIG_H_
