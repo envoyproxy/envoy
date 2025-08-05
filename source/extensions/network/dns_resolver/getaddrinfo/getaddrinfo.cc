@@ -61,8 +61,7 @@ ActiveDnsQuery* GetAddrInfoDnsResolver::resolve(const std::string& dns_name,
   ActiveDnsQuery* active_query = new_query.get();
   {
     absl::MutexLock guard(&mutex_);
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.getaddrinfo_num_retries") &&
-        config_.has_num_retries()) {
+    if (config_.has_num_retries()) {
       // + 1 to include the initial query.
       pending_queries_.push_back({std::move(new_query), config_.num_retries().value() + 1});
     } else {
