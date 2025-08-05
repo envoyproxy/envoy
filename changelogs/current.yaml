@@ -50,6 +50,12 @@ removed_config_or_runtime:
 - area: gcp_authn
   change: |
     Removed runtime guard ``envoy.reloadable_features.gcp_authn_use_fixed_url`` and legacy code paths.
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` and legacy code paths.
+- area: dispatcher
+  change: |
+    Removed runtime guard ``envoy.restart_features.fix_dispatcher_approximate_now`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
@@ -90,6 +96,9 @@ new_features:
     :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields will be ignored. However,
     :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
     will take precedence over this field.
+- area: redis
+  change: |
+    Added support for ``GEOSEARCH``.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in produiction environments.
