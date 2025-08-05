@@ -59,6 +59,9 @@ removed_config_or_runtime:
 - area: jwt_authn
   change: |
     Removed runtime guard ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` and legacy code paths.
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_authn_validate_uri`` and legacy code paths.
 - area: dispatcher
   change: |
     Removed runtime guard ``envoy.restart_features.fix_dispatcher_approximate_now`` and legacy code paths.
