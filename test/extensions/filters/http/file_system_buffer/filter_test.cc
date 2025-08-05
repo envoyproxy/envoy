@@ -795,6 +795,30 @@ TEST_F(FileSystemBufferFilterTest, PassesThroughMetadata) {
   EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->encodeMetadata(metadata));
 }
 
+TEST_F(FileSystemBufferFilterTest, BufferedStreamStateCloseMethodSetsClosedFlag) {
+  BufferedStreamState state;
+
+  // Initially not closed.
+  EXPECT_FALSE(*state.is_closed_);
+
+  // Call close.
+  state.close();
+
+  // Should be marked as closed.
+  EXPECT_TRUE(*state.is_closed_);
+}
+
+TEST_F(FileSystemBufferFilterTest, BufferedStreamStateDestructorHandlesEmptyState) {
+  // Create a BufferedStreamState and let it be destroyed to test destructor logic.
+  auto state = std::make_unique<BufferedStreamState>();
+
+  // Initially not closed.
+  EXPECT_FALSE(*state->is_closed_);
+
+  // Destructor should handle cleanup without crashing even without file handle.
+  state.reset(); // Will trigger destructor; No crash means test passed.
+}
+
 } // namespace FileSystemBuffer
 } // namespace HttpFilters
 } // namespace Extensions

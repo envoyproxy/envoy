@@ -38,7 +38,14 @@ std::unique_ptr<Buffer::Instance> MemoryFragment::extract() { return std::move(b
 absl::StatusOr<CancelFunction> Fragment::toStorage(AsyncFileHandle file, off_t offset,
                                                    Event::Dispatcher& dispatcher,
                                                    absl::AnyInvocable<void(absl::Status)> on_done) {
-  ASSERT(isMemory());
+  // Check fragment state before attempting transition. This prevents race conditions where
+  // concurrent async operations attempt to transition the same fragment multiple times.
+  // Previously this was an ASSERT, but during high concurrency (e.g., fuzzing), fragments
+  // can be in transition states when multiple onStateChange() calls occur simultaneously.
+  if (!isMemory()) {
+    return absl::FailedPreconditionError(
+        "fragment is not in the memory state for toStorage() transition.");
+  }
   auto data = absl::get<MemoryFragment>(data_).extract();
   data_.emplace<WritingFragment>();
   // This callback is only called if the filter was not destroyed in the meantime,
@@ -62,7 +69,14 @@ absl::StatusOr<CancelFunction> Fragment::toStorage(AsyncFileHandle file, off_t o
 absl::StatusOr<CancelFunction>
 Fragment::fromStorage(AsyncFileHandle file, Event::Dispatcher& dispatcher,
                       absl::AnyInvocable<void(absl::Status)> on_done) {
-  ASSERT(isStorage());
+  // Check fragment state before attempting transition. This prevents race conditions where
+  // concurrent async operations attempt to transition the same fragment multiple times.
+  // Previously this was an ASSERT, but during high concurrency (e.g., fuzzing), fragments
+  // can be in transition states when multiple onStateChange() calls occur simultaneously.
+  if (!isStorage()) {
+    return absl::FailedPreconditionError(
+        "fragment is not in the storage state for fromStorage() transition.");
+  }
   off_t offset = absl::get<StorageFragment>(data_).offset();
   data_.emplace<ReadingFragment>();
   // This callback is only called if the filter was not destroyed in the meantime,

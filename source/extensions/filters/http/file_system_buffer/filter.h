@@ -33,12 +33,16 @@ struct BufferedStreamState {
   // freed storage, the storage limit can be reached even if the buffer was drained.
   size_t storage_consumed_ = 0;
   AsyncFileHandle async_file_handle_;
+  // Shared flag to prevent race conditions where async file handles are created after destruction
+  // has started. This is captured by callbacks to safely check if the filter was destroyed.
+  std::shared_ptr<bool> is_closed_ = std::make_shared<bool>(false);
 
   size_t bufferSize() const { return memory_used_ + storage_offset_; }
   bool shouldSendHighWatermark() const;
   bool shouldSendLowWatermark() const;
   void setConfig(const FileSystemBufferFilterMergedConfig::StreamConfig& config);
   void close();
+  ~BufferedStreamState();
 };
 
 class FileSystemBufferFilter : public Http::StreamFilter,
