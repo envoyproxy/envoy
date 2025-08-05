@@ -460,6 +460,68 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidHeaders) {
   EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
 }
 
+TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidTraceIdLength) {
+  // Test invalid W3C trace ID length (too short)
+  Tracing::TestTraceContextImpl request_headers{{"traceparent", "00-0af7651916cd43dd8448eb211c80319-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor(request_headers, true);
+  auto context = extractor.extractSpanContext(true);
+  EXPECT_FALSE(context.second);
+  
+  // Test invalid W3C trace ID length (too long)
+  Tracing::TestTraceContextImpl request_headers2{{"traceparent", "00-0af7651916cd43dd8448eb211c80319c123-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor2(request_headers2, true);
+  auto context2 = extractor2.extractSpanContext(true);
+  EXPECT_FALSE(context2.second);
+}
+
+TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidSpanIdLength) {
+  // Test invalid W3C span ID length (too short)
+  Tracing::TestTraceContextImpl request_headers{{"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b716920331-01"}};
+  SpanContextExtractor extractor(request_headers, true);
+  auto context = extractor.extractSpanContext(true);
+  EXPECT_FALSE(context.second);
+  
+  // Test invalid W3C span ID length (too long)  
+  Tracing::TestTraceContextImpl request_headers2{{"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331123-01"}};
+  SpanContextExtractor extractor2(request_headers2, true);
+  auto context2 = extractor2.extractSpanContext(true);
+  EXPECT_FALSE(context2.second);
+}
+
+TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidHexCharacters) {
+  // Test invalid hex characters in trace ID
+  Tracing::TestTraceContextImpl request_headers{{"traceparent", "00-0af7651916cd43dd8448eb211c80319g-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor(request_headers, true);
+  auto context = extractor.extractSpanContext(true);
+  EXPECT_FALSE(context.second);
+  
+  // Test invalid hex characters in span ID
+  Tracing::TestTraceContextImpl request_headers2{{"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331g-01"}};
+  SpanContextExtractor extractor2(request_headers2, true);
+  auto context2 = extractor2.extractSpanContext(true);
+  EXPECT_FALSE(context2.second);
+}
+
+TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithMalformedTraceparent) {
+  // Test missing components
+  Tracing::TestTraceContextImpl request_headers{{"traceparent", "00-0af7651916cd43dd8448eb211c80319c"}};
+  SpanContextExtractor extractor(request_headers, true);
+  auto context = extractor.extractSpanContext(true);
+  EXPECT_FALSE(context.second);
+  
+  // Test wrong number of dashes
+  Tracing::TestTraceContextImpl request_headers2{{"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01-extra"}};
+  SpanContextExtractor extractor2(request_headers2, true);
+  auto context2 = extractor2.extractSpanContext(true);
+  EXPECT_FALSE(context2.second);
+  
+  // Test empty traceparent
+  Tracing::TestTraceContextImpl request_headers3{{"traceparent", ""}};
+  SpanContextExtractor extractor3(request_headers3, true);
+  auto context3 = extractor3.extractSpanContext(true);
+  EXPECT_FALSE(context3.second);
+}
+
 } // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions

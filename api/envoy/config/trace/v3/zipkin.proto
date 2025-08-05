@@ -90,7 +90,7 @@ message ZipkinConfig {
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Determines whether to fallback to extracting trace information from W3C trace headers
-  // (traceparent and tracestate) when B3 headers (x-b3-*) are not present or cannot be extracted.
+  // (traceparent and tracestate) when B3 headers (x-b3-\*) are not present or cannot be extracted.
   // Here is the spec for W3C trace headers: https://www.w3.org/TR/trace-context/
   // When enabled, the Zipkin tracer will attempt to extract trace context from W3C headers as a
   // secondary option if B3 headers are unavailable. B3 headers always take precedence when present.

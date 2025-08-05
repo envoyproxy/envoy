@@ -637,6 +637,26 @@ The ``x-amzn-trace-id`` HTTP header is used by the AWS X-Ray tracer in Envoy. Th
 parent ID and sampling decision are added to HTTP requests in the tracing header. See more on AWS X-Ray tracing
 `here <https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader>`__.
 
+.. _config_http_conn_man_headers_traceparent:
+
+traceparent
+-----------
+
+The ``traceparent`` HTTP header is used for W3C trace context propagation. It contains version, trace ID,
+parent ID, and trace flags in a standardized format. This header is supported by the Zipkin tracer as a
+fallback when B3 headers are not present. See more on W3C Trace Context
+`here <https://www.w3.org/TR/trace-context/#traceparent-header>`__.
+
+.. _config_http_conn_man_headers_tracestate:
+
+tracestate
+----------
+
+The ``tracestate`` HTTP header is used for W3C trace context propagation. It carries vendor-specific trace
+identification data as a set of name/value pairs. This header is supported by the Zipkin tracer as a
+fallback when B3 headers are not present. See more on W3C Trace Context
+`here <https://www.w3.org/TR/trace-context/#tracestate-header>`__.
+
 .. _config_http_conn_man_headers_custom_request_headers:
 
 Custom request/response headers
