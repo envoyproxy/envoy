@@ -10,7 +10,9 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-using StreamBase = Envoy::Extensions::Common::ExternalProcessing::StreamBase;
+using StreamBase = Envoy::Extensions::Common::ExternalProcessing::StreamBase<
+    envoy::service::ext_proc::v3::ProcessingRequest,
+    envoy::service::ext_proc::v3::ProcessingResponse>;
 using RequestCallbacks = Envoy::Extensions::Common::ExternalProcessing::RequestCallbacks<
     envoy::service::ext_proc::v3::ProcessingResponse>;
 
