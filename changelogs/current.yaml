@@ -49,6 +49,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
 - area: http
   change: |
+    Removed runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips`` and legacy code paths.
+- area: http
+  change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
 - area: dns_resolver
   change: |
