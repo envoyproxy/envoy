@@ -27,8 +27,8 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
+#include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/static/static_cluster.h"
-#include "source/extensions/clusters/strict_dns/strict_dns_cluster.h"
 #include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/round_robin/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -82,7 +82,7 @@ protected:
     return std::dynamic_pointer_cast<StaticClusterImpl>(status_or_cluster->first);
   }
 
-  absl::StatusOr<std::shared_ptr<StrictDnsClusterImpl>>
+  absl::StatusOr<std::shared_ptr<ClusterImplBase>>
   createStrictDnsCluster(const envoy::config::cluster::v3::Cluster& cluster_config,
                          ClusterFactoryContext& factory_context,
                          std::shared_ptr<Network::DnsResolver> dns_resolver) {
@@ -96,7 +96,7 @@ protected:
     if (!status_or_cluster.ok()) {
       return status_or_cluster.status();
     }
-    return (std::dynamic_pointer_cast<StrictDnsClusterImpl>(status_or_cluster->first));
+    return (std::dynamic_pointer_cast<ClusterImplBase>(status_or_cluster->first));
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
@@ -153,35 +153,39 @@ struct ResolverData {
 };
 
 using StrictDnsConfigTuple =
-    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>;
+    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>, std::string>;
 std::vector<StrictDnsConfigTuple> generateStrictDnsParams() {
   std::vector<StrictDnsConfigTuple> dns_config;
   {
     std::string family_yaml("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: v4_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: v6_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
     std::list<std::string> dns_response{"::1", "::2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: auto
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
   }
   return dns_config;
 }
@@ -190,6 +194,9 @@ class StrictDnsParamTest : public testing::TestWithParam<StrictDnsConfigTuple>,
                            public UpstreamImplTestBase {
 public:
   void dropOverloadRuntimeTest(uint64_t numerator, float drop_ratio) {
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
     auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
     ReadyWatcher initialized;
     const std::string yaml = R"EOF(
@@ -229,6 +236,9 @@ INSTANTIATE_TEST_SUITE_P(DnsParam, StrictDnsParamTest,
                          testing::ValuesIn(generateStrictDnsParams()));
 
 TEST_P(StrictDnsParamTest, ImmediateResolve) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -270,6 +280,9 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -296,6 +309,9 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -322,6 +338,9 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -349,6 +368,9 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -377,6 +399,9 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
 }
 
 TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
   ReadyWatcher initialized;
   const std::string yaml = R"EOF(
@@ -428,8 +453,19 @@ protected:
       std::make_shared<Network::MockDnsResolver>();
 };
 
-TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
+class StrictDnsClusterImplParamTest : public StrictDnsClusterImplTest,
+                                      public testing::WithParamInterface<const char*> {
+public:
+  TestScopedRuntime scoped_runtime;
+};
+
+INSTANTIATE_TEST_SUITE_P(DnsImplementations, StrictDnsClusterImplParamTest,
+                         testing::ValuesIn({"true", "false"}));
+
+TEST_P(StrictDnsClusterImplParamTest, ZeroHostsIsInializedImmediately) {
   ReadyWatcher initialized;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
 
   const std::string yaml = R"EOF(
     name: name
@@ -456,8 +492,10 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsIsInializedImmediately) {
 }
 
 // Resolve zero hosts, while using health checking.
-TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
+TEST_P(StrictDnsClusterImplParamTest, ZeroHostsHealthChecker) {
   ReadyWatcher initialized;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
 
   const std::string yaml = R"EOF(
     name: name
@@ -498,7 +536,9 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
+TEST_P(StrictDnsClusterImplParamTest, DontWaitForDNSOnInit) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -550,7 +590,9 @@ TEST_F(StrictDnsClusterImplTest, DontWaitForDNSOnInit) {
                          TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 }
 
-TEST_F(StrictDnsClusterImplTest, Basic) {
+TEST_P(StrictDnsClusterImplParamTest, Basic) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver1(*dns_resolver_, server_context_.dispatcher_);
@@ -754,7 +796,10 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
 
 // Verifies that host removal works correctly when hosts are being health checked
 // but the cluster is configured to always remove hosts
-TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
+TEST_P(StrictDnsClusterImplParamTest, HostRemovalActiveHealthSkipped) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -814,7 +859,10 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
 
 // Verify that a host is not removed if it is removed from DNS but still passing active health
 // checking.
-TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
+TEST_P(StrictDnsClusterImplParamTest, HostRemovalAfterHcFail) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -893,7 +941,10 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   }
 }
 
-TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
+TEST_P(StrictDnsClusterImplParamTest, HostUpdateWithDisabledACEndpoint) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -961,7 +1012,10 @@ TEST_F(StrictDnsClusterImplTest, HostUpdateWithDisabledACEndpoint) {
   }
 }
 
-TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
+TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   // gmock matches in LIFO order which is why these are swapped.
   ResolverData resolver3(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
@@ -1226,7 +1280,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
               cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned));
 }
 
-TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
+TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasicMultiplePriorities) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver3(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver2(*dns_resolver_, server_context_.dispatcher_);
   ResolverData resolver1(*dns_resolver_, server_context_.dispatcher_);
@@ -1370,7 +1427,10 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 }
 
 // Verifies that specifying a custom resolver when using STRICT_DNS fails
-TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
+TEST_P(StrictDnsClusterImplParamTest, CustomResolverFails) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -1393,12 +1453,23 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
   Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
                                                              false);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
-      EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+    auto cluster_or_error = createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+    EXPECT_FALSE(cluster_or_error.ok());
+    EXPECT_EQ(cluster_or_error.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_EQ(cluster_or_error.status().message(),
+              "STRICT_DNS clusters must NOT have a custom resolver name set");
+  } else {
+    EXPECT_THROW_WITH_MESSAGE(
+        auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
+        EnvoyException, "STRICT_DNS clusters must NOT have a custom resolver name set");
+  }
 }
 
-TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+TEST_P(StrictDnsClusterImplParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1447,7 +1518,10 @@ TEST_F(StrictDnsClusterImplTest, FailureRefreshRateBackoffResetsWhenSuccessHappe
                          TestUtility::makeDnsResponse({}));
 }
 
-TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig) {
+TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfig) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1486,7 +1560,10 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig) {
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
 }
 
-TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
+TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfig2) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1528,7 +1605,7 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfig2) {
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(30)));
 }
 
-TEST_F(StrictDnsClusterImplTest, ClusterTypeConfigTypedDnsResolverConfig) {
+TEST_P(StrictDnsClusterImplParamTest, ClusterTypeConfigTypedDnsResolverConfig) {
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory(dns_resolver_factory);
   EXPECT_CALL(dns_resolver_factory, createDnsResolver(_, _, _)).WillOnce(Return(dns_resolver_));
@@ -1568,7 +1645,10 @@ TEST_F(StrictDnsClusterImplTest, ClusterTypeConfigTypedDnsResolverConfig) {
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, nullptr);
 }
 
-TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
+TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateNoJitter) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1623,7 +1703,10 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateNoJitter) {
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
-TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
+TEST_P(StrictDnsClusterImplParamTest, NegativeDnsJitter) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     type: STRICT_DNS
@@ -1646,7 +1729,11 @@ TEST_F(StrictDnsClusterImplTest, NegativeDnsJitter) {
       auto x = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_),
       EnvoyException, "(?s)Invalid duration: Expected positive duration:.*seconds: -1\n");
 }
-TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
+
+TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateYesJitter) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1688,7 +1775,10 @@ TEST_F(StrictDnsClusterImplTest, TtlAsDnsRefreshRateYesJitter) {
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(ttl_s)));
 }
 
-TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
+TEST_P(StrictDnsClusterImplParamTest, ExtremeJitter) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   ResolverData resolver(*dns_resolver_, server_context_.dispatcher_);
 
   const std::string yaml = R"EOF(
@@ -1722,7 +1812,10 @@ TEST_F(StrictDnsClusterImplTest, ExtremeJitter) {
 }
 
 // Ensures that HTTP/2 user defined SETTINGS parameter validation is enforced on clusters.
-TEST_F(StrictDnsClusterImplTest, Http2UserDefinedSettingsParametersValidation) {
+TEST_P(StrictDnsClusterImplParamTest, Http2UserDefinedSettingsParametersValidation) {
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4191,16 +4284,16 @@ class ClusterInfoImplTest : public testing::Test, public UpstreamImplTestBase {
 public:
   ClusterInfoImplTest() { ON_CALL(server_context_, api()).WillByDefault(ReturnRef(*api_)); }
 
-  std::shared_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
+  std::shared_ptr<ClusterImplBase> makeCluster(const std::string& yaml) {
     cluster_config_ = parseClusterFromV3Yaml(yaml);
 
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(
         server_context_, [this]() { return dns_resolver_; }, nullptr, false);
 
-    StrictDnsClusterFactory factory{};
+    DnsClusterFactory factory{};
     auto status_or_cluster = factory.create(cluster_config_, factory_context);
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
-    return std::dynamic_pointer_cast<StrictDnsClusterImpl>(status_or_cluster->first);
+    return std::dynamic_pointer_cast<ClusterImplBase>(status_or_cluster->first);
   }
 
   class RetryBudgetTestClusterInfo : public ClusterInfoImpl {
@@ -4216,12 +4309,19 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   Api::ApiPtr api_ = Api::createApiForTest(stats_, random_);
   NiceMock<Runtime::MockLoader>& runtime_ = server_context_.runtime_loader_;
+  TestScopedRuntime scoped_runtime_;
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
 
   ReadyWatcher initialized_;
   envoy::config::cluster::v3::Cluster cluster_config_;
 };
+
+class ParametrizedClusterInfoImplTest : public ClusterInfoImplTest,
+                                        public testing::WithParamInterface<const char*> {};
+
+INSTANTIATE_TEST_SUITE_P(DnsImplementations, ParametrizedClusterInfoImplTest,
+                         testing::ValuesIn({"true", "false"}));
 
 struct Foo : public Envoy::Config::TypedMetadata::Object {};
 
@@ -4249,7 +4349,9 @@ public:
 };
 
 // Cluster metadata and common config retrieval.
-TEST_F(ClusterInfoImplTest, Metadata) {
+TEST_P(ParametrizedClusterInfoImplTest, Metadata) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4284,7 +4386,7 @@ TEST_F(ClusterInfoImplTest, Metadata) {
 }
 
 // Verify retry budget default values are honored.
-TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
+TEST_P(ParametrizedClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4347,7 +4449,7 @@ TEST_F(ClusterInfoImplTest, RetryBudgetDefaultPopulation) {
   EXPECT_EQ(min_retry_concurrency, 123UL);
 }
 
-TEST_F(ClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
+TEST_P(ParametrizedClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
   std::string yaml = R"EOF(
     name: name
     type: STRICT_DNS
@@ -4363,7 +4465,7 @@ TEST_F(ClusterInfoImplTest, LoadStatsConflictWithPerEndpointStats) {
                             "load_stats_config can be specified");
 }
 
-TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
+TEST_P(ParametrizedClusterInfoImplTest, UnsupportedPerHostFields) {
   std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4383,7 +4485,7 @@ TEST_F(ClusterInfoImplTest, UnsupportedPerHostFields) {
 }
 
 // Eds service_name is populated.
-TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
+TEST_P(ParametrizedClusterInfoImplTest, EdsServiceNamePopulation) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4430,7 +4532,7 @@ TEST_F(ClusterInfoImplTest, EdsServiceNamePopulation) {
 }
 
 // Typed metadata loading throws exception.
-TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
+TEST_P(ParametrizedClusterInfoImplTest, BrokenTypedMetadata) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4458,7 +4560,7 @@ TEST_F(ClusterInfoImplTest, BrokenTypedMetadata) {
 }
 
 // Cluster extension protocol options fails validation when configured for an unregistered filter.
-TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
+TEST_P(ParametrizedClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4484,7 +4586,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
                             "protocol options implementation for name: 'no_such_filter'");
 }
 
-TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
+TEST_P(ParametrizedClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4508,7 +4610,7 @@ TEST_F(ClusterInfoImplTest, TypedExtensionProtocolOptionsForUnknownFilter) {
                             "protocol options implementation for name: 'no_such_filter'");
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   const std::string yaml_disabled = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4543,7 +4645,7 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizesNotSetInConfig) {
   EXPECT_FALSE(cluster->info()->requestResponseSizeStats().has_value());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackRequestResponseSizes) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4564,7 +4666,7 @@ TEST_F(ClusterInfoImplTest, TestTrackRequestResponseSizes) {
   EXPECT_EQ(Stats::Histogram::Unit::Bytes, req_resp_stats.upstream_rs_body_size_.unit());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4611,7 +4713,7 @@ TEST_F(ClusterInfoImplTest, TestTrackRemainingResourcesGauges) {
   EXPECT_EQ(4U, high_remaining_retries.value());
 }
 
-TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
+TEST_P(ParametrizedClusterInfoImplTest, DefaultConnectTimeout) {
   const std::string yaml = R"EOF(
   name: cluster1
   type: STRICT_DNS
@@ -4625,7 +4727,7 @@ TEST_F(ClusterInfoImplTest, DefaultConnectTimeout) {
   EXPECT_EQ(std::chrono::seconds(5), cluster->info()->connectTimeout());
 }
 
-TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
+TEST_P(ParametrizedClusterInfoImplTest, MaxConnectionDurationTest) {
   constexpr absl::string_view yaml_base = R"EOF(
   name: {}
   type: STRICT_DNS
@@ -4654,7 +4756,7 @@ TEST_F(ClusterInfoImplTest, MaxConnectionDurationTest) {
   EXPECT_EQ(absl::nullopt, cluster3->info()->maxConnectionDuration());
 }
 
-TEST_F(ClusterInfoImplTest, Timeouts) {
+TEST_P(ParametrizedClusterInfoImplTest, Timeouts) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -4745,7 +4847,7 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   }
 }
 
-TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
+TEST_P(ParametrizedClusterInfoImplTest, TcpPoolIdleTimeout) {
   constexpr absl::string_view yaml_base = R"EOF(
   name: {}
   type: STRICT_DNS
@@ -4771,7 +4873,7 @@ TEST_F(ClusterInfoImplTest, TcpPoolIdleTimeout) {
   EXPECT_EQ(absl::nullopt, cluster3->info()->tcpPoolIdleTimeout());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -4807,7 +4909,7 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgetsNotSetInConfig) {
   EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 }
 
-TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
+TEST_P(ParametrizedClusterInfoImplTest, TestTrackTimeoutBudgets) {
   // Check that with the flag, the histogram is created.
   const std::string yaml = R"EOF(
     name: name
@@ -4828,7 +4930,7 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
             tb_stats.upstream_rq_timeout_budget_per_try_percent_used_.unit());
 }
 
-TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
+TEST_P(ParametrizedClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld)) {
   // Check that without the flag specified, the histogram is null.
   const std::string yaml_disabled = R"EOF(
     name: name
@@ -4862,7 +4964,7 @@ TEST_F(ClusterInfoImplTest, DEPRECATED_FEATURE_TEST(TestTrackTimeoutBudgetsOld))
 }
 
 // Validates HTTP2 SETTINGS config.
-TEST_F(ClusterInfoImplTest, Http2ProtocolOptions) {
+TEST_P(ParametrizedClusterInfoImplTest, Http2ProtocolOptions) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -5102,7 +5204,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 
   // This vector is used to gather clusters with extension_protocol_options from the different
   // types of extension factories (network, http).
-  std::vector<std::shared_ptr<StrictDnsClusterImpl>> clusters;
+  std::vector<std::shared_ptr<ClusterImplBase>> clusters;
 
   {
     // Get the cluster with extension_protocol_options for a network filter factory.

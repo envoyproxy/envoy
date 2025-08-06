@@ -95,8 +95,8 @@ envoy_extension_cc_test(
     deps = [
         ":modify_host_filter_lib",
         ":test_resolver_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//source/extensions/filters/http/set_filter_state:config",
         "//source/extensions/key_value/file_based:config_lib",
@@ -130,8 +130,8 @@ envoy_extension_cc_test(
     deps = [
         ":modify_host_filter_lib",
         ":test_resolver_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:config",
         "//source/extensions/filters/http/set_filter_state:config",
         "//source/extensions/key_value/file_based:config_lib",
