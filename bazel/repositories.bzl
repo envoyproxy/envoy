@@ -401,6 +401,8 @@ def _com_github_intel_qatlib():
     external_http_archive(
         name = "com_github_intel_qatlib",
         build_file_content = BUILD_ALL_CONTENT,
+        patches = ["@envoy//bazel/foreign_cc:qatlib.patch"],
+        patch_args = ["-p1"],
     )
 
 def _com_github_intel_qatzip():
