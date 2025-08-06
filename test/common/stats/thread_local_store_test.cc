@@ -2153,53 +2153,15 @@ TEST_F(StatsThreadLocalStoreTest, SetSinkPredicates) {
   EXPECT_EQ(expected_sinked_stats, num_sinked_text_readouts);
 }
 
-enum class EnableIncludeHistograms { No = 0, Yes };
-class HistogramParameterisedTest : public HistogramTest,
-                                   public ::testing::WithParamInterface<EnableIncludeHistograms> {
+class HistogramParameterisedTest : public HistogramTest {
 public:
-  HistogramParameterisedTest() { local_info_.node_.set_cluster(""); }
+  HistogramParameterisedTest() {}
 
 protected:
-  void SetUp() override {
-    HistogramTest::SetUp();
-
-    // Set the feature flag in SetUp as store_ is constructed in HistogramTest::SetUp.
-    api_ = Api::createApiForTest(*store_);
-    Protobuf::Struct base =
-        TestUtility::parseYaml<Protobuf::Struct>(GetParam() == EnableIncludeHistograms::Yes ? R"EOF(
-    envoy.reloadable_features.enable_include_histograms: true
-    )EOF"
-                                                                                            : R"EOF(
-    envoy.reloadable_features.enable_include_histograms: false
-    )EOF");
-    envoy::config::bootstrap::v3::LayeredRuntime layered_runtime;
-    {
-      auto* layer = layered_runtime.add_layers();
-      layer->set_name("base");
-      layer->mutable_static_layer()->MergeFrom(base);
-    }
-    {
-      auto* layer = layered_runtime.add_layers();
-      layer->set_name("admin");
-      layer->mutable_admin_layer();
-    }
-    absl::StatusOr<std::unique_ptr<Runtime::LoaderImpl>> loader =
-        Runtime::LoaderImpl::create(dispatcher_, tls_, layered_runtime, local_info_, *store_,
-                                    generator_, validation_visitor_, *api_);
-    THROW_IF_NOT_OK(loader.status());
-    loader_ = std::move(loader.value());
-  }
-
-  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  Event::MockDispatcher dispatcher_;
-  Api::ApiPtr api_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Random::MockRandomGenerator generator_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  std::unique_ptr<Runtime::LoaderImpl> loader_;
+  void SetUp() override { HistogramTest::SetUp(); }
 };
 
-TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
+TEST_F(HistogramParameterisedTest, ForEachSinkedHistogram) {
   std::unique_ptr<TestUtil::TestSinkPredicates> test_sink_predicates =
       std::make_unique<TestUtil::TestSinkPredicates>();
   std::vector<std::reference_wrapper<Histogram>> sinked_histograms;
@@ -2248,18 +2210,11 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
   store_->forEachSinkedHistogram(
       [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
       [&num_iterations, &sink_predicates](ParentHistogram& histogram) {
-        if (GetParam() == EnableIncludeHistograms::Yes) {
-          EXPECT_TRUE(sink_predicates.has(histogram.statName()));
-        }
+        EXPECT_TRUE(sink_predicates.has(histogram.statName()));
         ++num_iterations;
       });
-  if (GetParam() == EnableIncludeHistograms::Yes) {
-    EXPECT_EQ(num_sinked_histograms, 3);
-    EXPECT_EQ(num_iterations, 3);
-  } else {
-    EXPECT_EQ(num_sinked_histograms, 11);
-    EXPECT_EQ(num_iterations, 11);
-  }
+  EXPECT_EQ(num_sinked_histograms, 3);
+  EXPECT_EQ(num_iterations, 3);
   // Verify that rejecting histograms removes them from the sink set.
   envoy::config::metrics::v3::StatsConfig stats_config_;
   stats_config_.mutable_stats_matcher()->set_reject_all(true);
@@ -2276,7 +2231,7 @@ TEST_P(HistogramParameterisedTest, ForEachSinkedHistogram) {
 
 // Verify that histograms that are not flushed to sinks are merged in the call
 // to mergeHistograms
-TEST_P(HistogramParameterisedTest, UnsinkedHistogramsAreMerged) {
+TEST_F(HistogramParameterisedTest, UnsinkedHistogramsAreMerged) {
   store_->setSinkPredicates(std::make_unique<TestUtil::TestSinkPredicates>());
   auto& sink_predicates = testSinkPredicatesOrDie();
   StatName stat_name = pool_.add("h1");
@@ -2310,18 +2265,11 @@ TEST_P(HistogramParameterisedTest, UnsinkedHistogramsAreMerged) {
     store_->forEachSinkedHistogram(
         [&num_sinked_histograms](std::size_t size) { num_sinked_histograms = size; },
         [&num_iterations, &sink_predicates](ParentHistogram& histogram) {
-          if (GetParam() == EnableIncludeHistograms::Yes) {
-            EXPECT_TRUE(sink_predicates.has(histogram.statName()));
-          }
+          EXPECT_TRUE(sink_predicates.has(histogram.statName()));
           ++num_iterations;
         });
-    if (GetParam() == EnableIncludeHistograms::Yes) {
-      EXPECT_EQ(num_sinked_histograms, 1);
-      EXPECT_EQ(num_iterations, 1);
-    } else {
-      EXPECT_EQ(num_sinked_histograms, 2);
-      EXPECT_EQ(num_iterations, 2);
-    }
+    EXPECT_EQ(num_sinked_histograms, 1);
+    EXPECT_EQ(num_iterations, 1);
   });
 
   EXPECT_THAT(h1.cumulativeStatistics().bucketSummary(), HasSubstr(" B10: 1,"));
@@ -2332,13 +2280,5 @@ TEST_P(HistogramParameterisedTest, UnsinkedHistogramsAreMerged) {
   EXPECT_EQ(h1.used(), true);
   EXPECT_EQ(h2.used(), true);
 }
-
-INSTANTIATE_TEST_SUITE_P(HistogramParameterisedTestGroup, HistogramParameterisedTest,
-                         testing::Values(EnableIncludeHistograms::Yes, EnableIncludeHistograms::No),
-                         [](const testing::TestParamInfo<EnableIncludeHistograms>& info) {
-                           return info.param == EnableIncludeHistograms::No
-                                      ? "DisableIncludeHistograms"
-                                      : "EnableIncludeHistograms";
-                         });
 } // namespace Stats
 } // namespace Envoy
