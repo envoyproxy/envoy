@@ -56,6 +56,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream`` and legacy code paths.
 - area: dns_resolver
   change: |
     Removed runtime guard ``envoy.reloadable_features.getaddrinfo_num_retries`` and legacy code paths.
