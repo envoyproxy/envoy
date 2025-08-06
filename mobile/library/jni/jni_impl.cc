@@ -1397,3 +1397,9 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_callClearTestRootCertificateFro
   jni_helper.callStaticVoidMethod(java_android_network_library_class,
                                   java_clear_test_root_certificates_method_id);
 }
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_callGetDefaultNetworkHandleFromNative(JNIEnv*,
+                                                                                       jclass) {
+  return Envoy::JNI::getDefaultNetworkHandle();
+}

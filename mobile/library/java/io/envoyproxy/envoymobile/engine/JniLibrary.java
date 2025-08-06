@@ -306,6 +306,12 @@ public class JniLibrary {
   public static native void callClearTestRootCertificateFromNative();
 
   /**
+   * Mimic a call to AndroidNetworkLibrary#getDefaultNetworkHandle from native code.
+   * To be used for testing only.
+   */
+  public static native long callGetDefaultNetworkHandleFromNative();
+
+  /**
    * Given a filter name, create the proto config for adding the native filter
    *
    * @param filterName the name of the native filter
