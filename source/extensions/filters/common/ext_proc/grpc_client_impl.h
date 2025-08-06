@@ -49,9 +49,7 @@ public:
     if (!stream_closed_) {
       // Remove the parent stream info to avoid a dangling reference.
       stream_.streamInfo().clearParentStreamInfo();
-      if (grpc_side_stream_flow_control_) {
-        stream_.removeWatermarkCallbacks();
-      }
+      stream_.removeWatermarkCallbacks();
     }
   }
 
@@ -66,14 +64,13 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_.streamInfo(); }
   StreamInfo::StreamInfo& streamInfo() override { return stream_.streamInfo(); }
 
-  bool grpcSidestreamFlowControl() { return grpc_side_stream_flow_control_; }
+  bool grpcSidestreamFlowControl() { return true; }
 
 private:
   // Private constructor only can be invoked within this class.
   ProcessorStreamImpl(ProcessorCallbacks<ResponseType>& callbacks, absl::string_view service_method)
       : callbacks_(callbacks), service_method_(service_method),
-        grpc_side_stream_flow_control_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.grpc_side_stream_flow_control")) {}
+        grpc_side_stream_flow_control_(true) {}
 
   // Start the gRPC async stream: It returns true if the start succeeded. Otherwise it returns false
   // if it failed to start.
@@ -87,7 +84,7 @@ private:
   // The service method name. The service-method for ext-proc is statically
   // defined in Envoy's source files, so keeping a reference here is valid.
   absl::string_view service_method_;
-  // Boolean flag initiated by runtime flag.
+  // This flag is now always true as the feature has been fully deployed.
   const bool grpc_side_stream_flow_control_;
 };
 
@@ -134,7 +131,7 @@ bool ProcessorStreamImpl<RequestType, ResponseType>::close() {
   if (!stream_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
     // Unregister the watermark callbacks, if any exist (e.g., filter is not destroyed yet)
-    if (grpc_side_stream_flow_control_ && callbacks_.has_value()) {
+    if (callbacks_.has_value()) {
       stream_.removeWatermarkCallbacks();
     }
     stream_.closeStream();
@@ -150,7 +147,7 @@ bool ProcessorStreamImpl<RequestType, ResponseType>::halfCloseAndDeleteOnRemoteC
   if (!stream_closed_) {
     ENVOY_LOG(debug, "Closing gRPC stream");
     // Unregister the watermark callbacks, if any exist (e.g., filter is not destroyed yet)
-    if (grpc_side_stream_flow_control_ && callbacks_.has_value()) {
+    if (callbacks_.has_value()) {
       stream_.removeWatermarkCallbacks();
     }
     // half close client side of the stream

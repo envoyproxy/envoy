@@ -5184,17 +5184,6 @@ TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamObservabilityMode) {
   testSidestreamPushbackDownstream(16 * 1024, true);
 }
 
-TEST_P(ExtProcIntegrationTest, SidestreamPushbackDownstreamRuntimeDisable) {
-  if (!IsEnvoyGrpc()) {
-    return;
-  }
-
-  scoped_runtime_.mergeValues(
-      {{"envoy.reloadable_features.grpc_side_stream_flow_control", "false"}});
-
-  testSidestreamPushbackDownstream(1030, false);
-}
-
 TEST_P(ExtProcIntegrationTest, SidestreamPushbackUpstream) {
   if (!IsEnvoyGrpc()) {
     return;

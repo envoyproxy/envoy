@@ -223,18 +223,15 @@ TEST_F(ExtProcStreamTest, StreamInfoAndCleanup) {
 
   auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
-  // Verify we can access stream info
+  // Verify we can access stream info.
   EXPECT_EQ(&stream->streamInfo(), &stream_info_);
   const auto& const_stream = *stream;
   EXPECT_EQ(&const_stream.streamInfo(), &stream_info_);
 
-  // Mock stream watermark callbacks if flow control is enabled
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_side_stream_flow_control")) {
-    // Mock stream for removeWatermarkCallbacks
-    EXPECT_CALL(stream_, removeWatermarkCallbacks());
-  }
+  // Mock stream callbacks for removeWatermarkCallbacks.
+  EXPECT_CALL(stream_, removeWatermarkCallbacks());
 
-  // Notify filter destroy - should trigger cleanup
+  // Notify filter destroy. This should trigger cleanup.
   stream->notifyFilterDestroy();
 
   EXPECT_CALL(stream_, closeStream());
@@ -251,13 +248,8 @@ TEST_F(ExtProcStreamTest, WatermarkCallbacksCleanup) {
 
   auto stream = client_->start(*this, config_with_hash_key_, options, watermark_callbacks_);
 
-  const bool flow_control_enabled =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.grpc_side_stream_flow_control");
-
-  if (flow_control_enabled) {
-    // Set up expectation before calling notifyFilterDestroy
-    EXPECT_CALL(stream_, removeWatermarkCallbacks());
-  }
+  // Set up expectation before calling notifyFilterDestroy
+  EXPECT_CALL(stream_, removeWatermarkCallbacks());
 
   // Verify cleanup happens on filter destroy
   stream->notifyFilterDestroy();
