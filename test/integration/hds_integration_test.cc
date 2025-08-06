@@ -268,6 +268,10 @@ transport_socket_matches:
 
   void waitForEndpointHealthResponse(envoy::config::core::v3::HealthStatus healthy) {
     ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
+    if (!response_.has_endpoint_health_response() ||
+        response_.endpoint_health_response().endpoints_health_size() == 0) {
+      return;
+    }
     while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                                         healthy, host_upstream_->localAddress())) {
       ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -1282,6 +1286,42 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttpHdsReconnect) {
 
   // Receive updates until the one we expect arrives
   waitForEndpointHealthResponse(envoy::config::core::v3::HEALTHY);
+
+  // Clean up connections
+  cleanupHostConnections();
+  cleanupHdsConnection();
+}
+
+TEST_P(HdsIntegrationTest, RemoveClusterDuringHealthCheck) {
+  initialize();
+
+  // Server <--> Envoy
+  waitForHdsStream();
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.health_check_request().capability().health_check_protocols(0),
+            envoy::service::health::v3::Capability::HTTP);
+
+  // Server asks for health checking
+  server_health_check_specifier_ =
+      makeHttpHealthCheckSpecifier(envoy::type::v3::CodecClientType::HTTP1, false);
+  hds_stream_->startGrpcStream();
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // Envoy sends a health check message to an endpoint
+  healthcheckEndpoints();
+
+  server_health_check_specifier_ = envoy::service::health::v3::HealthCheckSpecifier();
+  server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
+
+  hds_stream_->sendGrpcMessage(server_health_check_specifier_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
+
+  // As the HDS cluster is destroyed, existing connections should be closed.
+  EXPECT_TRUE(host_fake_connection_->waitForDisconnect());
+
+  // Receive updates until the one we expect arrives
+  waitForEndpointHealthResponse(envoy::config::core::v3::UNHEALTHY);
 
   // Clean up connections
   cleanupHostConnections();

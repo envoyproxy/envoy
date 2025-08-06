@@ -76,6 +76,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "ssl_socket_extended_info_interface",
     hdrs = ["ssl_socket_extended_info.h"],
+    deps = [":handshaker_interface"],
 )
 
 envoy_cc_library(
