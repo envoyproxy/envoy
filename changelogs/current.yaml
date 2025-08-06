@@ -50,6 +50,9 @@ removed_config_or_runtime:
 - area: quic
   change: |
     Removed runtime guard ``envoy.reloadable_features.report_stream_reset_error_code`` and legacy code paths.
+- area: http3
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
 - area: network
   change: |
     Removed runtime guard ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` and legacy code paths.
@@ -59,6 +62,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: http3
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_happy_eyeballs`` and legacy code paths.
 - area: dns_resolver
   change: |
     Removed runtime guard ``envoy.reloadable_features.getaddrinfo_num_retries`` and legacy code paths.
