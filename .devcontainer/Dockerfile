@@ -8,7 +8,14 @@ ENV BUILD_DIR=/build
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update \
-  && apt-get -y install --no-install-recommends libpython2.7 net-tools psmisc vim 2>&1 \
+  && apt-get -y install --no-install-recommends libpython2.7 net-tools psmisc vim python3-pip wget 2>&1 \
+  # Install Go (use latest 1.22 to avoid toolchain issues)
+  && GO_VERSION=1.22.8 \
+  && wget -q "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+  && tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz" \
+  && rm "go${GO_VERSION}.linux-amd64.tar.gz" \
+  # Disable Go toolchain auto-download
+  && echo 'export GOTOOLCHAIN=local' >> /etc/environment \
   # Create a non-root user to use if preferred - see https://aka.ms/vscode-remote/containers/non-root-user.
   && groupadd --gid $USER_GID $USERNAME \
   && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME -G pcap -d /build \
@@ -17,6 +24,7 @@ RUN apt-get -y update \
   && chmod 0440 /etc/sudoers.d/$USERNAME
 
 ENV DEBIAN_FRONTEND=
-ENV PATH=/opt/llvm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV PATH=/usr/local/go/bin:/opt/llvm/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV GOTOOLCHAIN=local
 
 ENV CLANG_FORMAT=/opt/llvm/bin/clang-format

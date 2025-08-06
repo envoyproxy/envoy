@@ -1,0 +1,161 @@
+admin:
+  address:
+    socket_address:
+      protocol: TCP
+      address: 127.0.0.1
+      port_value: 9901
+
+# Dynamic resources - all configuration will come from ADS
+dynamic_resources:
+  lds_config:
+    ads: {}
+    resource_api_version: V3
+  
+  cds_config:
+    ads: {}
+    resource_api_version: V3
+
+  ads_config:
+    api_type: GRPC
+    transport_api_version: V3
+    grpc_services:
+    - envoy_grpc:
+        cluster_name: xds_cluster
+    set_node_on_first_message_only: true
+
+# Node identification
+node:
+  cluster: bidirectional-xds-cluster
+  id: envoy-bidirectional-test
+  metadata:
+    # Enable bidirectional xDS features
+    bidirectional_xds:
+      enabled: true
+      provide_listener_status: true
+
+# Static resources
+static_resources:
+  listeners:
+  - name: static_listener
+    address:
+      socket_address:
+        protocol: TCP
+        address: 0.0.0.0
+        port_value: 8000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: static_http
+          codec_type: AUTO
+          route_config:
+            name: static_route
+            virtual_hosts:
+            - name: static_backend
+              domains: ["*"]
+              routes:
+              - match:
+                  prefix: "/"
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: |
+                      {
+                        "message": "Hello from static Envoy listener!",
+                        "service": "reverse-xds-demo",
+                        "listener": "static",
+                        "port": 8000,
+                        "timestamp": "$(REQUEST_TIME)",
+                        "headers": {
+                          "x-envoy-upstream-service-time": "$(RESPONSE_DURATION)",
+                          "server": "envoy-reverse-xds"
+                        }
+                      }
+              - match:
+                  prefix: "/health"
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: |
+                      {
+                        "status": "healthy",
+                        "service": "reverse-xds-demo",
+                        "listener": "static",
+                        "checks": {
+                          "envoy": "ok",
+                          "management_server": "connected"
+                        }
+                      }
+              - match:
+                  prefix: "/info"
+                direct_response:
+                  status: 200
+                  body:
+                    inline_string: |
+                      {
+                        "service": "reverse-xds-demo",
+                        "description": "Static HTTP listener for testing",
+                        "listener_type": "static",
+                        "port": 8000,
+                        "endpoints": [
+                          {"path": "/", "description": "Main endpoint with service info"},
+                          {"path": "/health", "description": "Health check endpoint"},
+                          {"path": "/info", "description": "Service information"},
+                          {"path": "/admin", "description": "Admin interface (port 9901)"}
+                        ],
+                        "dynamic_listener": {
+                          "expected_port": 8080,
+                          "status": "configured_via_xds",
+                          "note": "Dynamic listener will be created by management server"
+                        }
+                      }
+          http_filters:
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  # Static cluster to connect to the management server  
+  clusters:
+  - name: xds_cluster
+    connect_timeout: 0.25s
+    type: LOGICAL_DNS
+    http2_protocol_options: {}
+    lb_policy: ROUND_ROBIN
+    # Enable bidirectional xDS on this cluster
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: xds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 18000
+    
+    # Health checking for the management server
+    health_checks:
+    - timeout: 1s
+      interval: 5s
+      unhealthy_threshold: 3
+      healthy_threshold: 2
+      grpc_health_check:
+        service_name: "envoy.service.discovery.v3.AggregatedDiscoveryService"
+
+# Bidirectional xDS configuration
+# Note: This is a custom extension that would be configured
+# through the bidirectional_grpc_mux_factory
+layered_runtime:
+  layers:
+  - name: static_layer_0
+    static_layer:
+      # Enable reverse xDS features
+      envoy:
+        reloadable_features:
+          # Enable bidirectional xDS mux
+          enable_bidirectional_xds: true

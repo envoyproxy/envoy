@@ -144,7 +144,9 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
       absl::Status status = Config::Utility::checkTransportVersion(dyn_resources.ads_config());
       RETURN_IF_NOT_OK(status);
       std::string name;
-      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_bidirectional_xds")) {
+        name = "bidirectional_grpc_mux";
+      } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
         name = "envoy.config_mux.sotw_grpc_mux_factory";
       } else {
         name = "envoy.config_mux.grpc_mux_factory";
@@ -366,7 +368,9 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     absl::Status status = Config::Utility::checkTransportVersion(api_config_source);
     RETURN_IF_NOT_OK(status);
     std::string name;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_bidirectional_xds")) {
+      name = "bidirectional_grpc_mux";
+    } else if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.unified_mux")) {
       name = "envoy.config_mux.sotw_grpc_mux_factory";
     } else {
       name = "envoy.config_mux.grpc_mux_factory";

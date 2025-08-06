@@ -46,7 +46,8 @@
         "llvm-vs-code-extensions.vscode-clangd",
         "vadimcn.vscode-lldb",
         "webfreak.debug",
-        "ms-python.python"
+        "ms-python.python",
+        "golang.go"
       ]
     }
   },
