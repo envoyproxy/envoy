@@ -11,6 +11,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
+	"github.com/envoyproxy/go-control-plane/pkg/server/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
 
@@ -34,7 +35,7 @@ const (
 	UpstreamPort = 443
 )
 
-type server struct {
+type xdsServer struct {
 	cache cache.SnapshotCache
 }
 
@@ -65,6 +66,15 @@ func (cb *Callbacks) OnStreamOpen(ctx context.Context, id int64, typ string) err
 
 func (cb *Callbacks) OnStreamClosed(id int64) {
 	log.Printf("🔗 OnStreamClosed %d closed", id)
+}
+
+func (cb *Callbacks) OnDeltaStreamOpen(ctx context.Context, id int64, typ string, node *core.Node) error {
+	log.Printf("🔗 OnDeltaStreamOpen %d open for %s (node: %v)", id, typ, node)
+	return nil
+}
+
+func (cb *Callbacks) OnDeltaStreamClosed(id int64, node *core.Node) {
+	log.Printf("🔗 OnDeltaStreamClosed %d closed (node: %v)", id, node)
 }
 
 func (cb *Callbacks) OnStreamRequest(id int64, req *discoverygrpc.DiscoveryRequest) error {
@@ -99,6 +109,22 @@ func (cb *Callbacks) OnFetchRequest(ctx context.Context, req *discoverygrpc.Disc
 
 func (cb *Callbacks) OnFetchResponse(req *discoverygrpc.DiscoveryRequest, resp *discoverygrpc.DiscoveryResponse) {
 	log.Printf("🔍 OnFetchResponse: %s", resp.GetTypeUrl())
+}
+
+// Additional delta methods that might be required
+func (cb *Callbacks) OnDeltaStreamRequest(id int64, req *discoverygrpc.DeltaDiscoveryRequest) error {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.requests++
+	log.Printf("📨 OnDeltaStreamRequest[%d]: %s", id, req.GetTypeUrl())
+	return nil
+}
+
+func (cb *Callbacks) OnDeltaStreamResponse(id int64, req *discoverygrpc.DeltaDiscoveryRequest, resp *discoverygrpc.DeltaDiscoveryResponse) {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.responses++
+	log.Printf("📤 OnDeltaStreamResponse[%d]: %s", id, resp.GetTypeUrl())
 }
 
 func makeCluster(clusterName string) *cluster.Cluster {
@@ -243,6 +269,14 @@ func (s *BidirectionalXDSServer) StreamAggregatedResources(stream discoverygrpc.
 	return s.Server.StreamAggregatedResources(stream)
 }
 
+// DeltaAggregatedResources implements the delta ADS interface
+func (s *BidirectionalXDSServer) DeltaAggregatedResources(stream discoverygrpc.AggregatedDiscoveryService_DeltaAggregatedResourcesServer) error {
+	log.Println("🚀 New delta ADS stream established")
+
+	// Handle the delta stream using the control plane server
+	return s.Server.DeltaAggregatedResources(stream)
+}
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -252,16 +286,16 @@ func main() {
 	// Create a cache
 	cache := cache.NewSnapshotCache(false, cache.IDHash{}, nil)
 
-	// Create callbacks
-	callbacks := &Callbacks{}
+	// Create callbacks - use nil for simplicity, server will use default callbacks
+	// callbacks := &Callbacks{}
 
-	// Create the xDS server
-	srv := server.NewServer(context.Background(), cache, callbacks)
+	// Create the xDS server with nil callbacks (will use defaults)
+	srv := server.NewServer(context.Background(), cache, nil)
 
 	// Wrap with bidirectional support
 	bidirectionalServer := &BidirectionalXDSServer{
 		Server:    srv,
-		callbacks: callbacks,
+		callbacks: nil,
 	}
 
 	// Create initial snapshot
@@ -298,13 +332,13 @@ func main() {
 	log.Printf("   • Listener: %s (port %d)", ListenerName, ListenerPort)
 	log.Printf("   • Upstream: %s:%d", UpstreamHost, UpstreamPort)
 
-	// Start stats reporting
-	go func() {
-		for {
-			time.Sleep(10 * time.Second)
-			callbacks.Report()
-		}
-	}()
+	// Start stats reporting (disabled - no callbacks)
+	// go func() {
+	// 	for {
+	// 		time.Sleep(10 * time.Second)
+	// 		callbacks.Report()
+	// 	}
+	// }()
 
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("❌ Failed to serve: %v", err)
