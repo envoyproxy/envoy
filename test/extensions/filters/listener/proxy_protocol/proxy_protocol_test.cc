@@ -1536,10 +1536,6 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsLargeThanInitMaxReadBytes) {
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
-  });
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
@@ -1564,7 +1560,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
   expectData("DATA");
 
   EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
@@ -1622,10 +1618,6 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
-  });
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
@@ -1664,7 +1656,7 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
   expectData("DATA");
 
   EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
@@ -1687,10 +1679,6 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
 }
 
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
-  });
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted.
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
@@ -1731,7 +1719,7 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
   expectData("DATA");
 
   EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
