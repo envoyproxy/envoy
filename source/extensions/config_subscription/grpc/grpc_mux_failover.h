@@ -160,6 +160,15 @@ public:
     primary_grpc_stream_->sendMessage(request);
   }
 
+  void maybeRecordRequestStats(uint64_t payload_size, uint64_t resource_count) override {
+    if (connectingToOrConnectedToFailover()) {
+      failover_grpc_stream_->maybeRecordRequestStats(payload_size, resource_count);
+      return;
+    }
+    // Either connecting/connected to the primary, or no connection was attempted.
+    primary_grpc_stream_->maybeRecordRequestStats(payload_size, resource_count);
+  }
+
   // Updates the queue size of the underlying stream.
   void maybeUpdateQueueSizeStat(uint64_t size) override {
     if (connectingToOrConnectedToFailover()) {

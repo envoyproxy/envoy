@@ -195,6 +195,7 @@ void GrpcMuxImpl::sendDiscoveryRequest(absl::string_view type_url) {
   }
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.ShortDebugString());
   grpc_stream_->sendMessage(request);
+  grpc_stream_->maybeRecordRequestStats(request.ByteSizeLong(), resources.size());
   first_stream_request_ = false;
 
   // clear error_detail after the request is sent if it exists.
@@ -359,6 +360,9 @@ void GrpcMuxImpl::onDiscoveryResponse(
     ControlPlaneStats& control_plane_stats) {
   const std::string type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
+
+  control_plane_stats.discovery_response_size_.recordValue(message->ByteSizeLong());
+  control_plane_stats.discovery_response_resource_count_.recordValue(message->resources_size());
 
   if (api_state_.count(type_url) == 0) {
     // TODO(yuval-k): This should never happen. consider dropping the stream as this is a
