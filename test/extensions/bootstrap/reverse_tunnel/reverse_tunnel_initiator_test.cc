@@ -1442,13 +1442,6 @@ TEST_F(ReverseConnectionIOHandleTest, NoThreadLocalClusterCannotConnect) {
   // Verify that CannotConnect gauge was updated for the cluster.
   auto stat_map = extension_->getCrossWorkerStatMap();
 
-  // Debug: Print all stats to verify the stat map.
-  std::cout << "\n=== NoThreadLocalClusterCannotConnect Stats ===" << std::endl;
-  for (const auto& [stat_name, value] : stat_map) {
-    std::cout << "Stat: " << stat_name << " = " << value << std::endl;
-  }
-  std::cout << "===============================================" << std::endl;
-
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.non-existent-cluster.cannot_connect"],
             1);
 }
@@ -2254,15 +2247,6 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateMultipleConnectionsMixedResults) {
   // Verify final stats.
   auto stat_map = extension_->getCrossWorkerStatMap();
 
-  // Print stats for debugging.
-  std::cout << "=== Mixed Results Stats ===" << std::endl;
-  for (const auto& [key, value] : stat_map) {
-    if (key.find("192.168.1") != std::string::npos) {
-      std::cout << "Stat: " << key << " = " << value << std::endl;
-    }
-  }
-  std::cout << "============================" << std::endl;
-
   // Verify connecting stats for successful connections.
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.1.connecting"], 1); // Success
   EXPECT_EQ(stat_map["test_scope.reverse_connections.host.192.168.1.3.connecting"], 1); // Success
@@ -2921,7 +2905,6 @@ TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithoutTriggerPipe) {
 
   // Get initial file descriptor (this is the original socket FD)
   int initial_fd = io_handle_->fdDoNotUse();
-  std::cout << "initial_fd: " << initial_fd << std::endl;
   EXPECT_GE(initial_fd, 0);
 
   // Call close() - should close only the original socket FD and delegate to base class.
@@ -2963,7 +2946,6 @@ TEST_F(ReverseConnectionIOHandleTest, CloseMethodWithTriggerPipe) {
   // 2. Let base class close() handle fd_
 
   auto result = io_handle_->close();
-  std::cout << "result: " << result.return_value_ << std::endl;
   EXPECT_EQ(result.return_value_, 0);
   EXPECT_EQ(io_handle_->fdDoNotUse(), -1);
 }
@@ -3486,14 +3468,6 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeSuccess) {
   // Verify that connected stats were incremented.
   EXPECT_EQ(final_stats[host_stat_name], initial_stats[host_stat_name] + 1);
   EXPECT_EQ(final_stats[cluster_stat_name], initial_stats[cluster_stat_name] + 1);
-
-  // Debug: Print stats for verification.
-  std::cout << "\n=== OnHandshakeSuccess Stats ===" << std::endl;
-  std::cout << "Host stat '" << host_stat_name << "': " << initial_stats[host_stat_name] << " -> "
-            << final_stats[host_stat_name] << std::endl;
-  std::cout << "Cluster stat '" << cluster_stat_name << "': " << initial_stats[cluster_stat_name]
-            << " -> " << final_stats[cluster_stat_name] << std::endl;
-  std::cout << "=================================" << std::endl;
 }
 
 // Test RCConnectionWrapper::onHandshakeFailure method.
@@ -3560,16 +3534,6 @@ TEST_F(RCConnectionWrapperTest, OnHandshakeFailure) {
   // Verify that failed stats were incremented.
   EXPECT_EQ(final_stats[host_failed_stat_name], initial_stats[host_failed_stat_name] + 1);
   EXPECT_EQ(final_stats[cluster_failed_stat_name], initial_stats[cluster_failed_stat_name] + 1);
-
-  // Debug: Print stats for verification.
-  std::cout << "\n=== OnHandshakeFailure Stats ===" << std::endl;
-  std::cout << "Host failed stat '" << host_failed_stat_name
-            << "': " << initial_stats[host_failed_stat_name] << " -> "
-            << final_stats[host_failed_stat_name] << std::endl;
-  std::cout << "Cluster failed stat '" << cluster_failed_stat_name
-            << "': " << initial_stats[cluster_failed_stat_name] << " -> "
-            << final_stats[cluster_failed_stat_name] << std::endl;
-  std::cout << "==================================" << std::endl;
 }
 
 // Test RCConnectionWrapper::onEvent method with RemoteClose event.
@@ -3634,19 +3598,7 @@ TEST_F(RCConnectionWrapperTest, OnEventRemoteClose) {
   // Get stats after onEvent.
   auto final_stats = extension_->getCrossWorkerStatMap();
 
-  // Verify that the connection closure was handled.
-  // Note: The exact stat changes depend on the implementation of onConnectionDone.
-  // For RemoteClose, we expect the connection to be marked as closed.
-
-  // Debug: Print stats for verification.
-  std::cout << "\n=== OnEventRemoteClose Stats ===" << std::endl;
-  std::cout << "Host connected stat '" << host_connected_stat_name
-            << "': " << initial_stats[host_connected_stat_name] << " -> "
-            << final_stats[host_connected_stat_name] << std::endl;
-  std::cout << "Cluster connected stat '" << cluster_connected_stat_name
-            << "': " << initial_stats[cluster_connected_stat_name] << " -> "
-            << final_stats[cluster_connected_stat_name] << std::endl;
-  std::cout << "=================================" << std::endl;
+  // Verify that the connection closure was handled gracefully.
 }
 
 // Test RCConnectionWrapper::onEvent method with Connected event (should be ignored)
@@ -3710,11 +3662,6 @@ TEST_F(RCConnectionWrapperTest, OnEventConnected) {
   // Verify that Connected event doesn't change stats (it should be ignored)
   // The stats should remain the same.
   EXPECT_EQ(final_stats, initial_stats);
-
-  // Debug: Print stats for verification.
-  std::cout << "\n=== OnEventConnected Stats ===" << std::endl;
-  std::cout << "Stats unchanged after Connected event (as expected)" << std::endl;
-  std::cout << "=================================" << std::endl;
 }
 
 // Test RCConnectionWrapper::onEvent method with null connection.
@@ -3777,11 +3724,6 @@ TEST_F(RCConnectionWrapperTest, OnEventWithNullConnection) {
 
   // Verify that the event was handled gracefully even with connection closure.
   // The exact behavior depends on the implementation, but it should not crash.
-
-  // Debug: Print stats for verification.
-  std::cout << "\n=== OnEventWithNullConnection Stats ===" << std::endl;
-  std::cout << "Event handled gracefully after connection closure" << std::endl;
-  std::cout << "===============================================" << std::endl;
 }
 
 // Test RCConnectionWrapper::releaseConnection method.
@@ -3869,7 +3811,6 @@ TEST_F(RCConnectionWrapperTest, OnBelowWriteBufferLowWatermark) {
 // Test RCConnectionWrapper::shutdown method.
 TEST_F(RCConnectionWrapperTest, Shutdown) {
   // Test 1: Shutdown with open connection.
-  std::cout << "Test 1: Shutdown with open connection" << std::endl;
   {
     auto mock_connection = setupMockConnection();
     auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -3886,7 +3827,6 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
     wrapper.shutdown();
     EXPECT_EQ(wrapper.getConnection(), nullptr);
   }
-  std::cout << "Test 2: Shutdown with already closed connection" << std::endl;
   // Test 2: Shutdown with already closed connection.
   {
     auto mock_connection = setupMockConnection();
@@ -3905,7 +3845,6 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
     wrapper.shutdown();
     EXPECT_EQ(wrapper.getConnection(), nullptr);
   }
-  std::cout << "Test 3: Shutdown with closing connection" << std::endl;
 
   // Test 3: Shutdown with closing connection.
   {
@@ -3926,7 +3865,6 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
     wrapper.shutdown();
     EXPECT_EQ(wrapper.getConnection(), nullptr);
   }
-  std::cout << "Test 4: Shutdown with null connection" << std::endl;
   // Test 4: Shutdown with null connection (should be safe)
   {
     auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -3938,7 +3876,6 @@ TEST_F(RCConnectionWrapperTest, Shutdown) {
     wrapper.shutdown(); // Should not crash
     EXPECT_EQ(wrapper.getConnection(), nullptr);
   }
-  std::cout << "Test 5: Multiple shutdown calls" << std::endl;
   // Test 5: Multiple shutdown calls (should be safe)
   {
     auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
