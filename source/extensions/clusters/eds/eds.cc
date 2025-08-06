@@ -9,10 +9,29 @@
 #include "source/common/common/utility.h"
 #include "source/common/config/api_version.h"
 #include "source/common/config/decoded_resource_impl.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/grpc/common.h"
 
 namespace Envoy {
 namespace Upstream {
+
+EndpointDedupKey EndpointDedupKey::fromLbEndpoint(const std::string& address_string,
+                                                 const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint) {
+  EndpointDedupKey key;
+  key.address = address_string;
+
+  // Include transport socket match metadata in deduplication key
+  if (lb_endpoint.has_metadata()) {
+    const auto& filter_metadata = lb_endpoint.metadata().filter_metadata();
+    auto it = filter_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_TRANSPORT_SOCKET_MATCH);
+    if (it != filter_metadata.end()) {
+      // Serialize the transport socket match metadata
+      it->second.SerializeToString(&key.transport_socket_match_metadata);
+    }
+  }
+
+  return key;
+}
 
 absl::StatusOr<std::unique_ptr<EdsClusterImpl>>
 EdsClusterImpl::create(const envoy::config::cluster::v3::Cluster& cluster,
@@ -74,7 +93,7 @@ EdsClusterImpl::~EdsClusterImpl() {
 void EdsClusterImpl::startPreInit() { subscription_->start({edsServiceName()}); }
 
 void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& host_update_cb) {
-  absl::flat_hash_set<std::string> all_new_hosts;
+  absl::flat_hash_set<EndpointDedupKey, EndpointDedupKeyHash> all_new_hosts;
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb,
                                               parent_.random_);
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
@@ -112,6 +131,12 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   HostMapConstSharedPtr all_hosts = parent_.prioritySet().crossPriorityHostMap();
   ASSERT(all_hosts != nullptr);
 
+  // Convert EndpointDedupKey set to string set for compatibility with updateHostsPerLocality
+  absl::flat_hash_set<std::string> all_new_hosts_strings;
+  for (const auto& key : all_new_hosts) {
+    all_new_hosts_strings.insert(key.address);
+  }
+
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
   const bool weighted_priority_health =
@@ -129,14 +154,14 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
       cluster_rebuilt |= parent_.updateHostsPerLocality(
           i, weighted_priority_health, overprovisioning_factor, *priority_state[i].first,
           parent_.locality_weights_map_[i], priority_state[i].second, priority_state_manager,
-          *all_hosts, all_new_hosts);
+          *all_hosts, all_new_hosts_strings);
     } else {
       // If the new update contains a priority with no hosts, call the update function with an empty
       // set of hosts.
       cluster_rebuilt |=
           parent_.updateHostsPerLocality(i, weighted_priority_health, overprovisioning_factor, {},
                                          parent_.locality_weights_map_[i], empty_locality_map,
-                                         priority_state_manager, *all_hosts, all_new_hosts);
+                                         priority_state_manager, *all_hosts, all_new_hosts_strings);
     }
   }
 
@@ -149,7 +174,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
     }
     cluster_rebuilt |= parent_.updateHostsPerLocality(
         i, weighted_priority_health, overprovisioning_factor, {}, parent_.locality_weights_map_[i],
-        empty_locality_map, priority_state_manager, *all_hosts, all_new_hosts);
+        empty_locality_map, priority_state_manager, *all_hosts, all_new_hosts_strings);
   }
 
   if (!cluster_rebuilt) {
@@ -164,7 +189,7 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
 void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
     const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
-    PriorityStateManager& priority_state_manager, absl::flat_hash_set<std::string>& all_new_hosts) {
+    PriorityStateManager& priority_state_manager, absl::flat_hash_set<EndpointDedupKey, EndpointDedupKeyHash>& all_new_hosts) {
   const auto address =
       THROW_OR_RETURN_VALUE(parent_.resolveProtoAddress(lb_endpoint.endpoint().address()),
                             const Network::Address::InstanceConstSharedPtr);
@@ -184,15 +209,19 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
     }
   }
 
-  // When the configuration contains duplicate hosts, only the first one will be retained.
+  // When the configuration contains duplicate hosts, only the first one will be retained,
+  // except when LB endpoints with the same addresses have distinct metadata for the
+  // transport_socket_match filter.
   const auto address_as_string = address->asString();
-  if (all_new_hosts.contains(address_as_string)) {
+  EndpointDedupKey dedup_key = EndpointDedupKey::fromLbEndpoint(address_as_string, lb_endpoint);
+
+  if (all_new_hosts.contains(dedup_key)) {
     return;
   }
 
   priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
                                                  address_list, locality_lb_endpoint, lb_endpoint);
-  all_new_hosts.emplace(address_as_string);
+  all_new_hosts.emplace(std::move(dedup_key));
 }
 
 absl::Status
