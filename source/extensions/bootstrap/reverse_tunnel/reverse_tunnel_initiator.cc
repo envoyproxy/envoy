@@ -101,7 +101,6 @@ RCConnectionWrapper::~RCConnectionWrapper() {
   shutdown();
 }
 
-// RCConnectionWrapper method implementations
 void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose) {
     if (!connection_) {
@@ -307,13 +306,10 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
     : IoSocketHandleImpl(fd), config_(config), cluster_manager_(cluster_manager),
       extension_(extension), original_socket_fd_(fd) {
   (void)scope; // Mark as unused
-  ENVOY_LOG(debug, "Created ReverseConnectionIOHandle: fd={}, src_node={}, num_clusters={}", fd_,
-            config_.src_node_id, config_.remote_clusters.size());
-  ENVOY_LOG(debug,
-            "Creating ReverseConnectionIOHandle - src_cluster: {}, src_node: {}, "
-            "health_check_interval: {}ms, connection_timeout: {}ms",
-            config_.src_cluster_id, config_.src_node_id, config_.health_check_interval_ms,
-            config_.connection_timeout_ms);
+  ENVOY_LOG(
+      debug,
+      "Created ReverseConnectionIOHandle: fd={}, src_node={}, src_cluster: {}, num_clusters={}",
+      fd_, config_.src_node_id, config_.src_cluster_id, config_.remote_clusters.size());
 }
 
 ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
@@ -491,9 +487,6 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
             socklen_t addr_len = remote_addr->sockAddrLen();
 
             if (*addrlen >= addr_len) {
-              // Use memcpy directly because socket addresses have variable lengths
-              // (sockaddr_in vs sockaddr_in6) and safeMemcpy functions only work with fixed-size
-              // types
               memcpy(addr, sock_addr, addr_len); // NOLINT(safe-memcpy)
               *addrlen = addr_len;
               ENVOY_LOG(trace, "ReverseConnectionIOHandle: copied {} bytes of address data",
@@ -514,9 +507,6 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
             const sockaddr* sock_addr = synthetic_addr->sockAddr();
             socklen_t addr_len = synthetic_addr->sockAddrLen();
             if (*addrlen >= addr_len) {
-              // Use memcpy directly because socket addresses have variable lengths
-              // (sockaddr_in vs sockaddr_in6) and safeMemcpy functions only work with fixed-size
-              // types
               memcpy(addr, sock_addr, addr_len); // NOLINT(safe-memcpy)
               *addrlen = addr_len;
             } else {
@@ -632,27 +622,27 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
 }
 
 void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
-  // This is called when connection events occur
-  // For reverse connections, we handle these events through RCConnectionWrapper
+  // This is called when connection events occur.
+  // For reverse connections, we handle these events through RCConnectionWrapper.
   ENVOY_LOG(trace, "ReverseConnectionIOHandle: event: {}", static_cast<int>(event));
 }
 
 int ReverseConnectionIOHandle::getPipeMonitorFd() const { return trigger_pipe_read_fd_; }
 
-// Use the thread-local registry to get the dispatcher
+// Use the thread-local registry to get the dispatcher.
 Event::Dispatcher& ReverseConnectionIOHandle::getThreadLocalDispatcher() const {
-  // Get the thread-local dispatcher from the socket interface's registry
+  // Get the thread-local dispatcher from the socket interface's registry.
   auto* local_registry = extension_->getLocalRegistry();
 
   if (local_registry) {
-    // Return the dispatcher from the thread-local registry
+    // Return the dispatcher from the thread-local registry.
     ENVOY_LOG(debug, "ReverseConnectionIOHandle: dispatcher: {}",
               local_registry->dispatcher().name());
     return local_registry->dispatcher();
   }
 
   ENVOY_BUG(false, "Failed to get dispatcher from thread-local registry");
-  // This should never happen in normal operation, but we need to handle it gracefully
+  // This should never happen in normal operation, but we need to handle it gracefully.
   RELEASE_ASSERT(worker_dispatcher_ != nullptr, "No dispatcher available");
   return *worker_dispatcher_;
 }
@@ -1120,6 +1110,7 @@ void ReverseConnectionIOHandle::maintainReverseConnections() {
 
   // Enable the retry timer to periodically check for missing connections (like maintainConnCount)
   if (rev_conn_retry_timer_) {
+    // TODO(basundhara-c): Make the retry timeout configurable.
     const std::chrono::milliseconds retry_timeout(10000); // 10 seconds
     rev_conn_retry_timer_->enableTimer(retry_timeout);
     ENVOY_LOG(debug, "Enabled retry timer for next connection check in 10 seconds.");
@@ -1169,7 +1160,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
   }
 
   // Create wrapper to manage the connection
-  // The wrapper will determine whether to use gRPC or HTTP based on parent's gRPC config.
+  // The wrapper will initiate and manage the reverse connection handshake using HTTP.
   auto wrapper = std::make_unique<RCConnectionWrapper>(*this, std::move(conn_data.connection_),
                                                        conn_data.host_description_, cluster_name);
 
@@ -1533,7 +1524,7 @@ ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
     RemoteClusterConnectionConfig cluster_config(config.remote_cluster, config.connection_count);
     socket_config.remote_clusters.push_back(cluster_config);
 
-    // Thread-safe: Pass config directly to helper method.
+    // Pass config directly to helper method.
     return createReverseConnectionSocket(
         socket_type, addr->type(),
         addr->ip() ? addr->ip()->version() : Envoy::Network::Address::IpVersion::v4, socket_config);
@@ -1631,12 +1622,16 @@ void ReverseTunnelInitiatorExtension::updatePerWorkerConnectionStats(
   auto& stats_store = context_.scope();
 
   // Get dispatcher name from the thread local dispatcher.
-  std::string dispatcher_name = "main_thread"; // Default for main thread
+  std::string dispatcher_name;
   auto* local_registry = getLocalRegistry();
-  if (local_registry) {
-    // Dispatcher name is of the form "worker_x" where x is the worker index
-    dispatcher_name = local_registry->dispatcher().name();
+  if (local_registry == nullptr) {
+    ENVOY_LOG(error, "ReverseTunnelInitiatorExtension: No local registry found");
+    return;
   }
+  // Dispatcher name is of the form "worker_x" where x is the worker index
+  dispatcher_name = local_registry->dispatcher().name();
+  ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: Updating stats for worker {}",
+            dispatcher_name);
 
   // Create/update per-worker host connection stat.
   if (!host_address.empty() && !state_suffix.empty()) {
@@ -1769,6 +1764,8 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelInitiatorExtension::getP
     // Dispatcher name is of the form "worker_x" where x is the worker index.
     dispatcher_name = local_registry->dispatcher().name();
   }
+  ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: Getting per worker stats map for {}",
+            dispatcher_name);
 
   // Iterate through all gauges and filter for the current dispatcher.
   Stats::IterateFn<Stats::Gauge> gauge_callback =
