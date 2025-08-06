@@ -105,10 +105,7 @@ bool ConnectivityGrid::WrapperCallbacks::shouldAttemptSecondHttp3Connection() {
   if (has_tried_http3_alternate_address_) {
     return false;
   }
-  // Branch on reloadable flags.
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
-    return false;
-  }
+
   // QUIC "happy eyeballs" currently only handles one v4 and one v6 address. If
   // there's not multiple families don't bother.
   return hasBothAddressFamilies(grid_.host_);

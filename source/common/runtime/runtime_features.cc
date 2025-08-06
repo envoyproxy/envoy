@@ -49,7 +49,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_ex
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
-RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
 RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_cookie);
 RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_trailers);
 // Delay deprecation and decommission until UHV is enabled.
