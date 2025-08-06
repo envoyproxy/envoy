@@ -46,10 +46,7 @@ namespace ProtoMessageExtraction {
 
 namespace {
 
-using ::Envoy::Protobuf::Field;
 using ::Envoy::Protobuf::Map;
-using ::Envoy::Protobuf::Type;
-using ::Envoy::Protobuf::field_extraction::FieldExtractor;
 using ::Envoy::Protobuf::internal::WireFormatLite;
 using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::Protobuf::io::CodedOutputStream;
@@ -57,8 +54,11 @@ using ::Envoy::Protobuf::io::CordOutputStream;
 using ::Envoy::Protobuf::util::JsonParseOptions;
 using ::Envoy::Protobuf::util::converter::JsonObjectWriter;
 using ::Envoy::Protobuf::util::converter::ProtoStreamObjectSource;
+using ::Envoy::ProtobufWkt::Field;
 using ::Envoy::ProtobufWkt::Struct;
+using ::Envoy::ProtobufWkt::Type;
 using ::Envoy::ProtobufWkt::Value;
+using ::Envoy::ProtobufWkt::field_extraction::FieldExtractor;
 
 std::string kLocationRegionExtractorPattern = R"((?:^|/)(?:locations|regions)/([^/]+))";
 
@@ -151,7 +151,7 @@ WireFormatLite::WireType getWireType(const Field& field_desc) {
 
 absl::StatusOr<int64_t>
 ExtractRepeatedFieldSizeHelper(const FieldExtractor& field_extractor, const std::string& path,
-                               const Protobuf::field_extraction::MessageData& message) {
+                               const ProtobufWkt::field_extraction::MessageData& message) {
   if (path.empty()) {
     return absl::InvalidArgumentError("Field mask path cannot be empty.");
   }
@@ -206,8 +206,8 @@ ExtractRepeatedFieldSizeHelper(const FieldExtractor& field_extractor, const std:
     return count;
   };
 
-  Protobuf::field_extraction::MessageData& msg(
-      const_cast<Protobuf::field_extraction::MessageData&>(message));
+  ProtobufWkt::field_extraction::MessageData& msg(
+      const_cast<ProtobufWkt::field_extraction::MessageData&>(message));
 
   return field_extractor.ExtractFieldInfo<int64_t>(path, msg.CreateCodedInputStreamWrapper()->Get(),
                                                    extract_func);
@@ -215,8 +215,8 @@ ExtractRepeatedFieldSizeHelper(const FieldExtractor& field_extractor, const std:
 
 int64_t ExtractRepeatedFieldSize(const Type& type,
                                  std::function<const Type*(const std::string&)> type_finder,
-                                 const Protobuf::FieldMask* field_mask,
-                                 const Protobuf::field_extraction::MessageData& message) {
+                                 const ProtobufWkt::FieldMask* field_mask,
+                                 const ProtobufWkt::field_extraction::MessageData& message) {
   int64_t num_response_items = -1LL;
   if (field_mask == nullptr || field_mask->paths_size() < 1) {
     return num_response_items;
@@ -326,7 +326,7 @@ absl::StatusOr<std::string> SingularFieldUseLastValue(const std::string first_va
 
 absl::StatusOr<std::string> ExtractStringFieldValue(
     const Type& type, std::function<const Type*(const std::string&)> type_finder,
-    const std::string& path, const Protobuf::field_extraction::MessageData& message) {
+    const std::string& path, const ProtobufWkt::field_extraction::MessageData& message) {
   if (path.empty()) {
     return absl::InvalidArgumentError("Field mask path cannot be empty.");
   }
@@ -387,7 +387,7 @@ absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator pa
                                  (*fields)[current_piece].mutable_struct_value());
 }
 
-absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
+absl::Status ConvertToStruct(const ProtobufWkt::field_extraction::MessageData& message,
                              const Envoy::ProtobufWkt::Type& type,
                              ::Envoy::Protobuf::util::TypeResolver* type_resolver,
                              Struct* message_struct) {
@@ -413,14 +413,14 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
   }
 
   (*message_struct->mutable_fields())[kTypeProperty].set_string_value(
-      google::protobuf::util::converter::GetFullTypeWithUrl(type.name()));
+      Protobuf::util::converter::GetFullTypeWithUrl(type.name()));
   return absl::OkStatus();
 }
 
 bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
                    const Envoy::ProtobufWkt::Type& type,
                    const ::google::grpc::transcoding::TypeHelper& type_helper,
-                   Protobuf::field_extraction::MessageData* message,
+                   ProtobufWkt::field_extraction::MessageData* message,
                    Envoy::ProtobufWkt::Struct* message_struct) {
   message_struct->Clear();
 

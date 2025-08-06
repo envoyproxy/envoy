@@ -18,7 +18,7 @@ namespace HttpFilters {
 namespace GrpcFieldExtraction {
 
 using CreateMessageDataFunc =
-    std::function<std::unique_ptr<Protobuf::field_extraction::MessageData>()>;
+    std::function<std::unique_ptr<ProtobufWkt::field_extraction::MessageData>()>;
 
 // The output for the parseGrpcMessage function.
 struct ParsedGrpcMessage {
@@ -32,7 +32,7 @@ struct ParsedGrpcMessage {
 
   // The parsed `RawMessage`. Message does not own any of the underlying data.
   // Data is stored in the `owned_bytes` buffer instead.
-  std::unique_ptr<Protobuf::field_extraction::MessageData> message;
+  std::unique_ptr<ProtobufWkt::field_extraction::MessageData> message;
 
   // Envoy buffer that owns the underlying data.
   // Remember, data can NOT be moved out of this buffer anytime.

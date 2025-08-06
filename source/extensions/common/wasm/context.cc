@@ -580,7 +580,7 @@ WasmResult Context::getProperty(std::string_view path, std::string* result) {
         return WasmResult::NotFound;
       }
       const Protobuf::Descriptor* desc = msg->GetDescriptor();
-      const Protobuf::FieldDescriptor* field_desc = desc->FindFieldByName(std::string(part));
+      const ProtobufWkt::FieldDescriptor* field_desc = desc->FindFieldByName(std::string(part));
       if (field_desc == nullptr) {
         return WasmResult::NotFound;
       }

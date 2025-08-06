@@ -85,7 +85,7 @@ ProtoExtractor::ProtoExtractor(ScrubberContext scrubber_context, const TypeHelpe
   // Initialize proto scrubber that retains fields annotated with EXTRACT and
   // EXTRACT_REDACT. Fields that are EXTRACT_REDACT will be redacted after
   // extraction.
-  Protobuf::FieldMask extracted_message_field_mask;
+  ProtobufWkt::FieldMask extracted_message_field_mask;
   FieldMaskUtil::Union(FindWithDefault(ExtractedMessageDirective::EXTRACT),
                        FindWithDefault(ExtractedMessageDirective::EXTRACT_REDACT),
                        &extracted_message_field_mask);
@@ -117,15 +117,15 @@ ProtoExtractor::Create(ScrubberContext scrubber_context, const TypeHelper* type_
       new ProtoExtractor(scrubber_context, type_helper, message_type, field_policies));
 }
 
-ExtractedMessageMetadata
-ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& raw_message) const {
-  Protobuf::field_extraction::CordMessageData message_copy(raw_message.ToCord());
+ExtractedMessageMetadata ProtoExtractor::ExtractMessage(
+    const ProtobufWkt::field_extraction::MessageData& raw_message) const {
+  ProtobufWkt::field_extraction::CordMessageData message_copy(raw_message.ToCord());
 
   ExtractedMessageMetadata extracted_message_metadata;
 
   // Populate extracted message metadata before extracting message.
   for (const auto& directive : directives_mapping_) {
-    const Protobuf::FieldMask& field_mask = directive.second;
+    const ProtobufWkt::FieldMask& field_mask = directive.second;
     switch (directive.first) {
     case ExtractedMessageDirective::EXTRACT:
 
@@ -145,8 +145,7 @@ ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& ra
   // property.
   if (scrubber_ == nullptr) {
     (*extracted_message_metadata.extracted_message.mutable_fields())[kTypeProperty]
-        .set_string_value(
-            google::protobuf::util::converter::GetFullTypeWithUrl(message_type_->name()));
+        .set_string_value(Protobuf::util::converter::GetFullTypeWithUrl(message_type_->name()));
     return extracted_message_metadata;
   }
 
@@ -164,7 +163,7 @@ ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& ra
     // resulting proto struct keys are in camel case.
     std::vector<std::string> redact_paths_camel_case;
     for (const std::string& path : redact_field_mask->second.paths()) {
-      redact_paths_camel_case.push_back(google::protobuf::util::converter::ToCamelCase(path));
+      redact_paths_camel_case.push_back(Protobuf::util::converter::ToCamelCase(path));
     }
     RedactPaths(redact_paths_camel_case, &extracted_message_metadata.extracted_message);
   }
@@ -172,8 +171,9 @@ ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& ra
 }
 
 void ProtoExtractor::GetTargetResourceOrTargetResourceCallback(
-    const Protobuf::FieldMask& field_mask, const Protobuf::field_extraction::MessageData& message,
-    bool callback, ExtractedMessageMetadata* extracted_message_metadata) const {
+    const ProtobufWkt::FieldMask& field_mask,
+    const ProtobufWkt::field_extraction::MessageData& message, bool callback,
+    ExtractedMessageMetadata* extracted_message_metadata) const {
   // There should be only one target resource; this is checked at config
   // compile time.
   if (field_mask.paths().empty()) {

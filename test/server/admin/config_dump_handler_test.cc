@@ -763,7 +763,7 @@ TEST_P(AdminInstanceTest, InvalidFieldMaskWithResourceDoesNotCrash) {
                 "/config_dump?resource=static_clusters&mask=cluster.transport_socket_matches.name",
                 header_map, response));
   std::string expected_mask_text = R"pb(paths: "cluster.transport_socket_matches.name")pb";
-  Protobuf::FieldMask expected_mask_proto;
+  ProtobufWkt::FieldMask expected_mask_proto;
   Protobuf::TextFormat::ParseFromString(expected_mask_text, &expected_mask_proto);
   EXPECT_EQ(fmt::format("FieldMask {} could not be successfully used.",
                         expected_mask_proto.DebugString()),

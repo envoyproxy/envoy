@@ -32,7 +32,7 @@ public:
 
   // Input message must be a message data.
   ExtractedMessageMetadata
-  ExtractMessage(const Protobuf::field_extraction::MessageData& message) const override;
+  ExtractMessage(const ProtobufWkt::field_extraction::MessageData& message) const override;
 
 private:
   // Initializes an instance of ProtoExtractor using FieldPolicies.
@@ -44,8 +44,9 @@ private:
   // Populate the target resource or the target resource callback in the extracted message
   // metadata.
   void GetTargetResourceOrTargetResourceCallback(
-      const Protobuf::FieldMask& field_mask, const Protobuf::field_extraction::MessageData& message,
-      bool callback, ExtractedMessageMetadata* extracted_message_metadata) const;
+      const ProtobufWkt::FieldMask& field_mask,
+      const ProtobufWkt::field_extraction::MessageData& message, bool callback,
+      ExtractedMessageMetadata* extracted_message_metadata) const;
 
   // Function to get the value associated with a key
   const ProtobufWkt::FieldMask& FindWithDefault(ExtractedMessageDirective directive);

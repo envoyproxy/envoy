@@ -35,7 +35,7 @@ public:
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
-    ProtobufWkt::Arena arena;
+    Protobuf::Arena arena;
     const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, nullptr, info,
                                                         &headers, nullptr, nullptr);
     if (!result.has_value() || result.value().IsError()) {

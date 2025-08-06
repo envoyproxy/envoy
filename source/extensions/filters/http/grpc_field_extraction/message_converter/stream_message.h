@@ -14,7 +14,7 @@ namespace GrpcFieldExtraction {
 // It is neither copyable nor movable.
 class StreamMessage {
 public:
-  StreamMessage(std::unique_ptr<Protobuf::field_extraction::MessageData> message,
+  StreamMessage(std::unique_ptr<ProtobufWkt::field_extraction::MessageData> message,
                 Buffer::InstancePtr owned_bytes, std::shared_ptr<uint64_t> ref_to_bytes_usage)
       : message_(std::move(message)), owned_bytes_(std::move(owned_bytes)),
         ref_to_bytes_usage_(ref_to_bytes_usage) {
@@ -50,16 +50,16 @@ public:
   bool is_first_message_ = false;
   bool is_final_message_ = false;
 
-  Protobuf::field_extraction::MessageData* message() {
+  ProtobufWkt::field_extraction::MessageData* message() {
     return message_ != nullptr ? message_.get() : nullptr;
   }
 
-  void set(std::unique_ptr<Protobuf::field_extraction::MessageData> message) {
+  void set(std::unique_ptr<ProtobufWkt::field_extraction::MessageData> message) {
     message_ = std::move(message);
   }
 
 private:
-  std::unique_ptr<Protobuf::field_extraction::MessageData> message_;
+  std::unique_ptr<ProtobufWkt::field_extraction::MessageData> message_;
 
   // Envoy buffer that owns the underlying data.
   // This data can NOT be mutated during the lifetime of this message.

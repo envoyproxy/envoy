@@ -16,7 +16,7 @@ namespace HttpFilters {
 namespace GrpcFieldExtraction {
 namespace {
 
-using Protobuf::field_extraction::FieldValueExtractorFactory;
+using ProtobufWkt::field_extraction::FieldValueExtractorFactory;
 
 } // namespace
 
@@ -44,7 +44,7 @@ absl::Status ExtractorImpl::init(
 }
 
 absl::StatusOr<ExtractionResult>
-ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) const {
+ExtractorImpl::processRequest(ProtobufWkt::field_extraction::MessageData& message) const {
 
   ExtractionResult result;
   for (const auto& it : per_field_extractors_) {

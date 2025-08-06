@@ -565,7 +565,7 @@ TEST_P(RateLimitQuotaIntegrationTest, BasicFlowMultiDifferentRequest) {
   RateLimitQuotaUsageReports reports;
   ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
 
-  const Protobuf::FieldDescriptor* time_elapsed_desc =
+  const ProtobufWkt::FieldDescriptor* time_elapsed_desc =
       RateLimitQuotaUsageReports::BucketQuotaUsage::GetDescriptor()->FindFieldByName(
           "time_elapsed");
   ASSERT_THAT(reports, ProtoEqIgnoringFieldAndOrdering(expected_reports, time_elapsed_desc));
@@ -791,7 +791,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
   RateLimitQuotaUsageReports reports;
   ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
 
-  const Protobuf::FieldDescriptor* time_elapsed_desc =
+  const ProtobufWkt::FieldDescriptor* time_elapsed_desc =
       RateLimitQuotaUsageReports::BucketQuotaUsage::GetDescriptor()->FindFieldByName(
           "time_elapsed");
   ASSERT_THAT(reports, ProtoEqIgnoringFieldAndOrdering(expected_reports, time_elapsed_desc));
@@ -858,7 +858,7 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementDenyAll)
   RateLimitQuotaUsageReports reports;
   ASSERT_TRUE(rlqs_stream_->waitForGrpcMessage(*dispatcher_, reports));
 
-  const Protobuf::FieldDescriptor* time_elapsed_desc =
+  const ProtobufWkt::FieldDescriptor* time_elapsed_desc =
       RateLimitQuotaUsageReports::BucketQuotaUsage::GetDescriptor()->FindFieldByName(
           "time_elapsed");
   ASSERT_THAT(reports, ProtoEqIgnoringFieldAndOrdering(expected_reports, time_elapsed_desc));

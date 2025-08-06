@@ -24,7 +24,7 @@ namespace Formatter {
 class SubstitutionFormatStringUtils {
 public:
   using FormattersConfig =
-      ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>;
+      Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>;
 
   /**
    * Parse list of formatter configurations to commands.

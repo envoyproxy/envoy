@@ -53,7 +53,7 @@ ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& a
   }
 
   for (const auto& hash_entry : expr) {
-    ProtobufWkt::Arena arena;
+    Protobuf::Arena arena;
     const auto result = hash_entry.second.compiled_expr_->Evaluate(activation, &arena);
     if (!result.ok()) {
       // TODO: Stats?

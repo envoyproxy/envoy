@@ -12,7 +12,7 @@ namespace GrpcFieldExtraction {
 namespace {
 
 TEST(StreamMessage, SetterGetter) {
-  auto msg = std::make_unique<Protobuf::field_extraction::CordMessageData>(absl::Cord("aa"));
+  auto msg = std::make_unique<ProtobufWkt::field_extraction::CordMessageData>(absl::Cord("aa"));
   auto* msg_addr = msg.get();
   StreamMessage stream_message(nullptr, nullptr, nullptr);
 

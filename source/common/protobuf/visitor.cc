@@ -52,11 +52,11 @@ absl::Status traverseMessageWorker(ConstProtoVisitor& visitor, const Protobuf::M
   const Protobuf::Descriptor* descriptor = reflectable_message->GetDescriptor();
   const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
-    const Protobuf::FieldDescriptor* field = descriptor->field(i);
+    const ProtobufWkt::FieldDescriptor* field = descriptor->field(i);
     visitor.onField(message, *field);
 
     // If this is a message, recurse in to the sub-message.
-    if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+    if (field->cpp_type() == ProtobufWkt::FieldDescriptor::CPPTYPE_MESSAGE) {
       Helper::ScopedMessageParents scoped_parents(parents, message);
 
       if (field->is_repeated()) {

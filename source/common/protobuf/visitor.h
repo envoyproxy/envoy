@@ -14,7 +14,7 @@ public:
   virtual ~ConstProtoVisitor() = default;
 
   // Invoked when a field is visited, with the message, and field descriptor.
-  virtual void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) PURE;
+  virtual void onField(const Protobuf::Message&, const ProtobufWkt::FieldDescriptor&) PURE;
 
   // Invoked when a message is visited, with the message and visited parents.
   // @param was_any_or_top_level supplies whether the message was either the top level message or an

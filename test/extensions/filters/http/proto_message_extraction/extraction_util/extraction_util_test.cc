@@ -35,12 +35,12 @@ namespace HttpFilters {
 namespace ProtoMessageExtraction {
 namespace {
 
-using ::Envoy::Protobuf::Field;
-using ::Envoy::Protobuf::FieldMask;
 using Envoy::Protobuf::FileDescriptorSet;
-using ::Envoy::Protobuf::Type;
-using ::Envoy::Protobuf::field_extraction::CordMessageData;
+using ::Envoy::ProtobufWkt::Field;
+using ::Envoy::ProtobufWkt::FieldMask;
 using ::Envoy::ProtobufWkt::Struct;
+using ::Envoy::ProtobufWkt::Type;
+using ::Envoy::ProtobufWkt::field_extraction::CordMessageData;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
 using ::extraction::TestRequest;
@@ -127,8 +127,9 @@ const char kTestResponse[] = R"pb(
 class ExtractionUtilTest : public ::testing::Test {
 protected:
   ExtractionUtilTest() = default;
-  const Protobuf::Type* findType(const std::string& type_url) {
-    absl::StatusOr<const Protobuf::Type*> result = type_helper_->Info()->ResolveTypeUrl(type_url);
+  const ProtobufWkt::Type* findType(const std::string& type_url) {
+    absl::StatusOr<const ProtobufWkt::Type*> result =
+        type_helper_->Info()->ResolveTypeUrl(type_url);
     if (!result.ok()) {
       return nullptr;
     }
@@ -211,11 +212,11 @@ protected:
   std::function<const Type*(const std::string&)> type_finder_;
 
   TestRequest test_request_proto_;
-  Protobuf::field_extraction::CordMessageData test_request_raw_proto_;
+  ProtobufWkt::field_extraction::CordMessageData test_request_raw_proto_;
   const Type* request_type_;
 
   TestResponse test_response_proto_;
-  Protobuf::field_extraction::CordMessageData test_response_raw_proto_;
+  ProtobufWkt::field_extraction::CordMessageData test_response_raw_proto_;
   const Type* response_type_;
 
   FieldMask field_mask_;

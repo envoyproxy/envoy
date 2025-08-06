@@ -841,7 +841,7 @@ TEST(Context, ConnectionAttributes) {
 
 TEST(Context, FilterStateAttributes) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   FilterStateWrapper wrapper(arena, filter_state);
   auto status_or = wrapper.ListKeys(&arena);
   EXPECT_EQ(status_or.status().message(), "ListKeys() is not implemented");

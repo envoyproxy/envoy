@@ -47,7 +47,7 @@ ProtoApiScrubberFilter::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bo
   is_valid_grpc_request_ = true;
 
   auto cord_message_data_factory = std::make_unique<CreateMessageDataFunc>(
-      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
+      []() { return std::make_unique<ProtobufWkt::field_extraction::CordMessageData>(); });
 
   request_msg_converter_ = std::make_unique<MessageConverter>(
       std::move(cord_message_data_factory), decoder_callbacks_->decoderBufferLimit());

@@ -70,17 +70,17 @@ void GetMonitoredResourceLabels(absl::string_view label_extractor,
 // In case of error or nullptr/empty field_mask, it returns a negative value and
 // logs the error.
 int64_t
-ExtractRepeatedFieldSize(const Protobuf::Type& type,
-                         std::function<const Protobuf::Type*(const std::string&)> type_finder,
-                         const Protobuf::FieldMask* field_mask,
-                         const Protobuf::field_extraction::MessageData& message);
+ExtractRepeatedFieldSize(const ProtobufWkt::Type& type,
+                         std::function<const ProtobufWkt::Type*(const std::string&)> type_finder,
+                         const ProtobufWkt::FieldMask* field_mask,
+                         const ProtobufWkt::field_extraction::MessageData& message);
 
 // Extract the size of the repeated field represented by given field mask
 // path from given proto message. `path` must represent a repeated field.
 absl::StatusOr<int64_t>
-ExtractRepeatedFieldSizeHelper(const Protobuf::field_extraction::FieldExtractor& field_extractor,
+ExtractRepeatedFieldSizeHelper(const ProtobufWkt::field_extraction::FieldExtractor& field_extractor,
                                const std::string& path,
-                               const Protobuf::field_extraction::MessageData& message);
+                               const ProtobufWkt::field_extraction::MessageData& message);
 
 absl::string_view ExtractLocationIdFromResourceName(absl::string_view resource_name);
 
@@ -95,7 +95,7 @@ void RedactPaths(absl::Span<const std::string> paths_to_redact, ProtobufWkt::Str
 // value. Returns an empty string if there is only one string field. Returns
 // an error if the resource is malformed in case that the search goes forever.
 absl::StatusOr<std::string>
-FindSingularLastValue(const Protobuf::Field* field,
+FindSingularLastValue(const ProtobufWkt::Field* field,
                       Envoy::Protobuf::io::CodedInputStream* input_stream);
 
 // Non-repeated fields can be repeat in a wire-format, in that case use the
@@ -105,14 +105,14 @@ FindSingularLastValue(const Protobuf::Field* field,
 // non-repeated field. However, parsers are expected to handle the case in
 // which they do."
 absl::StatusOr<std::string>
-SingularFieldUseLastValue(const std::string first_value, const Protobuf::Field* field,
+SingularFieldUseLastValue(const std::string first_value, const ProtobufWkt::Field* field,
                           Envoy::Protobuf::io::CodedInputStream* input_stream);
 
 absl::StatusOr<std::string>
-ExtractStringFieldValue(const Protobuf::Type& type,
-                        std::function<const Protobuf::Type*(const std::string&)> type_finder,
+ExtractStringFieldValue(const ProtobufWkt::Type& type,
+                        std::function<const ProtobufWkt::Type*(const std::string&)> type_finder,
                         const std::string& path,
-                        const Protobuf::field_extraction::MessageData& message);
+                        const ProtobufWkt::field_extraction::MessageData& message);
 
 absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator path_pieces_begin,
                                      std::vector<std::string>::const_iterator path_pieces_end,
@@ -121,7 +121,7 @@ absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator pa
 // Converts given proto message to Struct. It also adds
 // a "@type" property with proto type url to the generated Struct. Expects the
 // TypeResolver to handle types prefixed with "type.googleapis.com/".
-absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
+absl::Status ConvertToStruct(const ProtobufWkt::field_extraction::MessageData& message,
                              const Envoy::ProtobufWkt::Type& type,
                              ::Envoy::Protobuf::util::TypeResolver* type_resolver,
                              ::Envoy::ProtobufWkt::Struct* message_struct);
@@ -135,7 +135,7 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
 bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
                    const Envoy::ProtobufWkt::Type& type,
                    const ::google::grpc::transcoding::TypeHelper& type_helper,
-                   Protobuf::field_extraction::MessageData* message,
+                   ProtobufWkt::field_extraction::MessageData* message,
                    Envoy::ProtobufWkt::Struct* message_struct);
 
 } // namespace ProtoMessageExtraction

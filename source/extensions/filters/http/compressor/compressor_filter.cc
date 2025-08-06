@@ -155,8 +155,8 @@ CompressorFilterConfig::ResponseDirectionConfig::commonConfig(
     config.set_allocated_min_content_length(
         // According to
         // https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#embeddedmessage
-        // the message Compressor takes ownership of the allocated Protobuf::Uint32Value object.
-        new Protobuf::UInt32Value(proto_config.content_length()));
+        // the message Compressor takes ownership of the allocated ProtobufWkt::Uint32Value object.
+        new ProtobufWkt::UInt32Value(proto_config.content_length()));
   }
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks)
   for (const std::string& ctype : proto_config.content_type()) {

@@ -483,7 +483,7 @@ public:
                                            const std::string& field_name) {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     const Protobuf::Descriptor* descriptor = reflectable_message->GetDescriptor();
-    const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
+    const ProtobufWkt::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     return reflection->GetString(*reflectable_message, name_field);
   }

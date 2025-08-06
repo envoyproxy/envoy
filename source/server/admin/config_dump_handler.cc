@@ -19,7 +19,7 @@ namespace {
 // Validates that `field_mask` is valid for `message` and applies `TrimMessage`.
 // Necessary because TrimMessage crashes if `field_mask` is invalid.
 // Returns `true` on success.
-bool checkFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
+bool checkFieldMaskAndTrimMessage(const ProtobufWkt::FieldMask& field_mask,
                                   Protobuf::Message& message) {
   for (const auto& path : field_mask.paths()) {
     if (!ProtobufUtil::FieldMaskUtil::GetFieldDescriptors(message.GetDescriptor(), path, nullptr)) {
@@ -52,13 +52,13 @@ bool checkFieldMaskAndTrimMessage(const Protobuf::FieldMask& field_mask,
 /**
  * @return true on success, false if `field_mask` is invalid.
  */
-bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Message& message) {
+bool trimResourceMessage(const ProtobufWkt::FieldMask& field_mask, Protobuf::Message& message) {
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
   // Figure out which paths cover Any fields. For each field, gather the paths to
   // an inner mask, switch the outer mask to cover only the original field.
-  Protobuf::FieldMask outer_field_mask;
-  Protobuf::FieldMask inner_field_mask;
+  ProtobufWkt::FieldMask outer_field_mask;
+  ProtobufWkt::FieldMask inner_field_mask;
   std::string any_field_name;
   for (int i = 0; i < field_mask.paths().size(); ++i) {
     const std::string& path = field_mask.paths(i);
@@ -66,7 +66,7 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
     if (frags.empty()) {
       continue;
     }
-    const Protobuf::FieldDescriptor* field = descriptor->FindFieldByName(frags[0]);
+    const ProtobufWkt::FieldDescriptor* field = descriptor->FindFieldByName(frags[0]);
     // Only a single Any field supported, repeated fields don't support further
     // indexing.
     // TODO(htuch): should add support for DynamicListener for multiple Any
@@ -91,7 +91,7 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
   }
 
   if (!any_field_name.empty()) {
-    const Protobuf::FieldDescriptor* any_field = descriptor->FindFieldByName(any_field_name);
+    const ProtobufWkt::FieldDescriptor* any_field = descriptor->FindFieldByName(any_field_name);
     if (reflection->HasField(message, any_field)) {
       ASSERT(any_field != nullptr);
       // Unpack to a DynamicMessage.
@@ -220,7 +220,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
     auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
     for (Protobuf::Message& msg : repeated) {
       if (mask.has_value()) {
-        Protobuf::FieldMask field_mask;
+        ProtobufWkt::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
         if (!trimResourceMessage(field_mask, msg)) {
           return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
@@ -260,7 +260,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConf
     ASSERT(message);
 
     if (mask.has_value()) {
-      Protobuf::FieldMask field_mask;
+      ProtobufWkt::FieldMask field_mask;
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
       // We don't use trimMessage() above here since masks don't support
       // indexing through repeated fields. We don't return error on failure

@@ -36,9 +36,9 @@ public:
   //  called.
   absl::Status init();
 
-  void processRequest(Protobuf::field_extraction::MessageData& message) override;
+  void processRequest(ProtobufWkt::field_extraction::MessageData& message) override;
 
-  void processResponse(Protobuf::field_extraction::MessageData& message) override;
+  void processResponse(ProtobufWkt::field_extraction::MessageData& message) override;
 
   const ExtractedMessageResult& GetResult() const override { return result_; }
 
