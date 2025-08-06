@@ -2563,24 +2563,6 @@ TEST_P(Http2FrameIntegrationTest, HostSameAsAuthority) {
   tcp_client_->close();
 }
 
-TEST_P(Http2FrameIntegrationTest, HostConcatenatedWithAuthorityWithOverride) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.http2_discard_host_header", "false");
-  beginSession();
-
-  uint32_t request_idx = 0;
-  auto request = Http2Frame::makeRequest(Http2Frame::makeClientStreamId(request_idx),
-                                         "one.example.com", "/path", {{"host", "two.example.com"}});
-  sendFrame(request);
-
-  waitForNextUpstreamRequest();
-  EXPECT_EQ(upstream_request_->headers().getHostValue(), "one.example.com,two.example.com");
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  auto frame = readFrame();
-  EXPECT_EQ(Http2Frame::Type::Headers, frame.type());
-  EXPECT_EQ(Http2Frame::ResponseStatus::Ok, frame.responseStatus());
-  tcp_client_->close();
-}
-
 // All HTTP/2 static headers must be before non-static headers.
 // Verify that codecs validate this.
 TEST_P(Http2FrameIntegrationTest, HostBeforeAuthorityIsRejected) {
