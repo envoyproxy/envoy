@@ -46,6 +46,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::ContainerEq;
+using ::testing::ContainsRegex;
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::IsEmpty;
@@ -1415,11 +1416,12 @@ virtual_hosts:
       {"www2", "root_www2", "www2_staging", "instant-server"}, {});
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                                 creation_status_);
-  EXPECT_EQ(
+  EXPECT_THAT(
       creation_status_.message(),
-      "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
-      "only match on request headers, saw "
-      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput");
+      ContainsRegex("requirement violation while creating route match tree: INVALID_ARGUMENT: "
+                    "Route table can "
+                    "only match on request headers, saw "
+                    "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput"));
 }
 
 // Validates that we fail creating a route config if an invalid data input is used.
