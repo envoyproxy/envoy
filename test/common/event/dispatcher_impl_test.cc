@@ -807,11 +807,9 @@ TEST_F(NotStartedDispatcherImplTest, IsThreadSafe) {
   EXPECT_TRUE(dispatcher_->isThreadSafe());
 }
 
-class DispatcherMonotonicTimeTest : public testing::TestWithParam<bool> {
+class DispatcherMonotonicTimeTest : public testing::Test {
 protected:
   DispatcherMonotonicTimeTest() : api_(Api::createApiForTest()) {
-    runtime_.mergeValues({{"envoy.restart_features.fix_dispatcher_approximate_now",
-                           (GetParam() ? "true" : "false")}});
     dispatcher_ = api_->allocateDispatcher("test_thread");
     dispatcher_->initializeStats(scope_);
   }
@@ -825,28 +823,23 @@ protected:
   MonotonicTime time_;
 };
 
-INSTANTIATE_TEST_SUITE_P(DispatcherMonotonicTimeTests, DispatcherMonotonicTimeTest,
-                         ::testing::ValuesIn({false, true}));
-
-TEST_P(DispatcherMonotonicTimeTest, UpdateApproximateMonotonicTime) {
+TEST_F(DispatcherMonotonicTimeTest, UpdateApproximateMonotonicTime) {
   dispatcher_->updateApproximateMonotonicTime();
   MonotonicTime time1 = dispatcher_->approximateMonotonicTime();
   Event::TimerPtr timer = dispatcher_->createTimer([&] {
     // Approximate time should have been updated in this loop to 1s later.
     MonotonicTime time2 = dispatcher_->approximateMonotonicTime();
     EXPECT_LT(time1, time2);
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.fix_dispatcher_approximate_now")) {
-      // Time2 should be updated roughly 2000ms later than time1.
-      EXPECT_NEAR(
-          2000, std::chrono::duration_cast<std::chrono::milliseconds>(time2 - time1).count(), 100);
-    }
+    // Time2 should be updated roughly 2000ms later than time1.
+    EXPECT_NEAR(2000, std::chrono::duration_cast<std::chrono::milliseconds>(time2 - time1).count(),
+                100);
   });
   timer->enableTimer(std::chrono::seconds(2));
 
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
-TEST_P(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
+TEST_F(DispatcherMonotonicTimeTest, ApproximateMonotonicTime) {
   // approximateMonotonicTime is constant within one event loop run.
   dispatcher_->post([this]() {
     {
