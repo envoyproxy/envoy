@@ -93,7 +93,7 @@ void OdCdsApiImpl::sendAwaiting() {
   // InitialFetchDone (which happens on the first received response), the awaiting names list is not
   // used any more.
   ENVOY_LOG(debug, "odcds: sending request for awaiting cluster names {}",
-            fmt::join(awaiting_names_, ", "));
+            absl::StrJoin(awaiting_names_, ", "));
   subscription_->requestOnDemandUpdate(awaiting_names_);
   awaiting_names_.clear();
 }

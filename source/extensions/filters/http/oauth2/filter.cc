@@ -1293,7 +1293,14 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   // Return 401 unauthorized if the query parameters contain an error response.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError).has_value()) {
-    ENVOY_LOG(debug, "OAuth server returned an error: \n{}", query_parameters.data());
+    ENVOY_LOG(
+        debug, "OAuth server returned an error: \n{}",
+        absl::StrJoin(
+            query_parameters.data(), ";",
+            [](std::string* out,
+               const absl::btree_map<std::string, std::vector<std::string>>::value_type& value) {
+              absl::StrAppend(out, value.first, ": ", absl::StrJoin(value.second, ","));
+            }));
     return {false, "", ""};
   }
 
@@ -1301,7 +1308,14 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   auto codeVal = query_parameters.getFirstValue(queryParamsCode);
   auto stateVal = query_parameters.getFirstValue(queryParamsState);
   if (!codeVal.has_value() || !stateVal.has_value()) {
-    ENVOY_LOG(error, "code or state query param does not exist: \n{}", query_parameters.data());
+    ENVOY_LOG(
+        error, "code or state query param does not exist: \n{}",
+        absl::StrJoin(
+            query_parameters.data(), ";",
+            [](std::string* out,
+               const absl::btree_map<std::string, std::vector<std::string>>::value_type& value) {
+              absl::StrAppend(out, value.first, ": ", absl::StrJoin(value.second, ","));
+            }));
     return {false, "", ""};
   }
 
