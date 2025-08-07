@@ -1,0 +1,56 @@
+diff --git a/BUILD b/BUILD
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/BUILD
+@@ -0,0 +1,50 @@
++load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library")
++load("@envoy//bazel/external:quiche.bzl", "quiche_copts")
++
++licenses(["notice"])  # Apache 2
++
++# Essential QUICHE targets for Envoy
++envoy_cc_library(
++    name = "http2_adapter_http2_protocol",
++    srcs = ["quiche/http2/adapter/http2_protocol.cc"],
++    hdrs = ["quiche/http2/adapter/http2_protocol.h"],
++    copts = quiche_copts,
++    repository = "@envoy",
++    visibility = ["//visibility:public"],
++    deps = [
++        "@com_google_absl//absl/strings",
++        "@com_google_absl//absl/types:variant",
++    ],
++)
++
++envoy_cc_library(
++    name = "quiche_common_platform_export",
++    srcs = ["quiche/common/platform/api/quiche_export.cc"],
++    hdrs = ["quiche/common/platform/api/quiche_export.h"],
++    copts = quiche_copts,
++    repository = "@envoy",
++    visibility = ["//visibility:public"],
++)
++
++envoy_cc_library(
++    name = "quiche_common_platform",
++    srcs = glob([
++        "quiche/common/platform/default/*.cc",
++        "quiche/common/platform/default/*.h",
++    ]),
++    copts = quiche_copts,
++    repository = "@envoy",
++    visibility = ["//visibility:public"],
++    deps = [":quiche_common_platform_export"],
++)
++
++envoy_cc_library(
++    name = "quiche_common_platform_test",
++    srcs = glob([
++        "quiche/common/platform/default/*_test.cc",
++    ]),
++    copts = quiche_copts,
++    repository = "@envoy",
++    visibility = ["//visibility:public"],
++    deps = [":quiche_common_platform"],
++)

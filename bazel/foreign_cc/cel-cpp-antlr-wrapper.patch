@@ -1,0 +1,31 @@
+diff --git a/bazel/antlr4_tool_wrapper.sh b/bazel/antlr4_tool_wrapper.sh
+new file mode 100755
+index 0000000..1234567
+--- /dev/null
++++ b/bazel/antlr4_tool_wrapper.sh
+@@ -0,0 +1,22 @@
++#!/bin/bash
++# Wrapper script for ANTLR4 tool to work with Bazel 8
++# The JAR file is passed via the data dependency in Bazel's runfiles
++
++# Bazel sets RUNFILES_DIR or we can compute it
++if [ -z "$RUNFILES_DIR" ]; then
++    # If running via bazel, runfiles are relative to the script location  
++    RUNFILES_DIR="$0.runfiles"
++fi
++
++# Look for the JAR in various possible locations
++JAR_LOCATIONS=(
++    "external/antlr4_jar/jar/downloaded.jar"
++    "$RUNFILES_DIR/antlr4_jar/jar/downloaded.jar" 
++    "$RUNFILES_DIR/envoy/external/antlr4_jar/jar/downloaded.jar"
++)
++
++for loc in "${JAR_LOCATIONS[@]}"; do
++    if [ -f "$loc" ]; then
++        exec java -jar "$loc" "$@"
++    fi
++done
++
++echo "Error: Cannot find ANTLR JAR file" >&2
++exit 1

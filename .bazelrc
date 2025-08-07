@@ -12,12 +12,16 @@
 startup --host_jvm_args=-Xmx3g
 
 common --noenable_bzlmod
+common --enable_workspace
 
 fetch --color=yes
 run --color=yes
 
 build --color=yes
 build --jobs=HOST_CPUS-1
+build --noincompatible_disallow_empty_glob
+build --noincompatible_disallow_ctx_resolve_tools
+build --noincompatible_disallow_struct_provider_syntax
 build --workspace_status_command="bash bazel/get_workspace_status"
 build --incompatible_strict_action_env
 build --java_runtime_version=remotejdk_11
@@ -65,7 +69,7 @@ test --test_verbose_timeout_warnings
 test --experimental_ui_max_stdouterr_bytes=11712829 #default 1048576
 
 # Allow tags to influence execution requirements
-common --experimental_allow_tags_propagation
+common --incompatible_allow_tags_propagation
 
 build:linux --copt=-fdebug-types-section
 # Enable position independent code (this is the default on macOS and Windows)
@@ -82,7 +86,8 @@ build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
 build --define absl=1
 
 # Disable ICU linking for googleurl.
-build --@com_googlesource_googleurl//build_config:system_icu=0
+# Temporarily disabled due to Bazel 8 compatibility issues
+# build --@com_googlesource_googleurl//build_config:system_icu=0
 
 # Common flags for sanitizers
 build:sanitizer --define tcmalloc=disabled
@@ -562,7 +567,8 @@ common:remote-cache-envoy-engflow --config=common-envoy-engflow
 common:remote-cache-envoy-engflow --config=cache-envoy-engflow
 
 # Specifies the rustfmt.toml for all rustfmt_test targets.
-build --@rules_rust//rust/settings:rustfmt.toml=//:rustfmt.toml
+# Temporarily disabled due to Bazel 8 compatibility issues
+# build --@rules_rust//rust/settings:rustfmt.toml=//:rustfmt.toml
 
 #############################################################################
 # debug: Various Bazel debugging flags

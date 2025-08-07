@@ -1,0 +1,28 @@
+diff --git a/bazel/BUILD b/bazel/BUILD
+index 82a3b1d..d6e7f9c 100644
+--- a/bazel/BUILD
++++ b/bazel/BUILD
+@@ -1,11 +1,17 @@
++package(default_visibility = ["//visibility:public"])
++
+ load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
+-load("@rules_java//java:defs.bzl", "java_binary")
+ 
+-java_binary(
++# For Bazel 8 compatibility, use a shell script wrapper instead of java_binary
++# This avoids Java toolchain dependencies while still providing the antlr4_tool target
++sh_binary(
+     name = "antlr4_tool",
+-    main_class = "org.antlr.v4.Tool",
+-    runtime_deps = ["@antlr4_jar//jar"],
++    srcs = ["antlr4_tool_wrapper.sh"],
++    data = ["@antlr4_jar//jar:file"],
++    args = [
++        "$(location @antlr4_jar//jar:file)",
++    ],
++    visibility = ["//visibility:public"],
++    env = {"ANTLR_JAR": "$(location @antlr4_jar//jar:file)"},
+ )
+ 
+-package(default_visibility = ["//visibility:public"])
+-

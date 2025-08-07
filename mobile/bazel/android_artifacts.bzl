@@ -1,5 +1,6 @@
 load("@envoy_mobile//bazel:dokka.bzl", "sources_javadocs")
 load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
+# Use rules_android override for android_binary
 load("@rules_android//android:rules.bzl", "android_binary")
 load("@rules_java//java:defs.bzl", "java_binary")
 
