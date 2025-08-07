@@ -179,16 +179,13 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
                                            const FilterConfigPerRoute& more_specific)
     : context_extensions_(less_specific.context_extensions_),
       check_settings_(more_specific.check_settings_), disabled_(more_specific.disabled_),
-      // Use most specific service override. If more specific has either service, use only that.
-      // This prevents having both services when one should override the other.
-      grpc_service_(more_specific.grpc_service_.has_value()
-                        ? more_specific.grpc_service_
-                        : (more_specific.http_service_.has_value() ? absl::nullopt
-                                                                   : less_specific.grpc_service_)),
-      http_service_(more_specific.http_service_.has_value()
-                        ? more_specific.http_service_
-                        : (more_specific.grpc_service_.has_value() ? absl::nullopt
-                                                                   : less_specific.http_service_)) {
+      // Only use the most specific per-route override. Do not inherit overrides from less
+      // specific configuration. If the more specific configuration has no override, leave both
+      // unset so that the main filter configuration is used.
+      grpc_service_(more_specific.grpc_service_.has_value() ? more_specific.grpc_service_
+                                                           : absl::nullopt),
+      http_service_(more_specific.http_service_.has_value() ? more_specific.http_service_
+                                                           : absl::nullopt) {
   // Merge context extensions from more specific configuration, overriding less specific ones.
   for (const auto& extension : more_specific.context_extensions_) {
     context_extensions_[extension.first] = extension.second;
@@ -217,7 +214,12 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
                              .grpcAsyncClientManager()
                              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key,
                                                                    server_context_->scope(), true);
-  THROW_IF_NOT_OK_REF(client_or_error.status());
+  if (!client_or_error.ok()) {
+    ENVOY_STREAM_LOG(warn,
+                     "ext_authz filter: failed to create per-route gRPC client: {}. Falling back to default client.",
+                     *decoder_callbacks_, client_or_error.status().ToString());
+    return nullptr;
+  }
 
   ENVOY_STREAM_LOG(debug, "ext_authz filter: created per-route gRPC client for cluster: {}.",
                    *decoder_callbacks_,
