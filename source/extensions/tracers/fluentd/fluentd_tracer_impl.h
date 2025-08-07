@@ -29,27 +29,28 @@ using FluentdConfigSharedPtr = std::shared_ptr<FluentdConfig>;
 class SpanContext {
 public:
   SpanContext() = default;
-  SpanContext(absl::string_view version, absl::string_view trace_id, absl::string_view parent_id,
-              bool sampled, absl::string_view tracestate)
-      : version_(version), trace_id_(trace_id), parent_id_(parent_id), sampled_(sampled),
-        tracestate_(tracestate) {}
+  SpanContext(absl::string_view version, absl::string_view trace_id, absl::string_view span_id,
+              bool sampled, std::string tracestate)
+      : version_(version), trace_id_(trace_id), span_id_(span_id), sampled_(sampled),
+        tracestate_(std::move(tracestate)) {}
 
   const std::string& version() const { return version_; }
 
   const std::string& traceId() const { return trace_id_; }
 
-  const std::string& parentId() const { return parent_id_; }
+  const std::string& spanId() const { return span_id_; }
 
   bool sampled() const { return sampled_; }
+  void setSampled(bool sampled) { sampled_ = sampled; }
 
   const std::string& tracestate() const { return tracestate_; }
 
 private:
-  const std::string version_;
-  const std::string trace_id_;
-  const std::string parent_id_;
-  const bool sampled_{false};
-  const std::string tracestate_;
+  std::string version_;
+  std::string trace_id_;
+  std::string span_id_;
+  bool sampled_{false};
+  std::string tracestate_;
 };
 
 // Trace context definitions
@@ -82,12 +83,11 @@ public:
                     BackOffStrategyPtr backoff_strategy, Stats::Scope& parent_scope,
                     Random::RandomGenerator& random);
 
-  Tracing::SpanPtr startSpan(Tracing::TraceContext& trace_context, SystemTime start_time,
-                             const std::string& operation_name, Tracing::Decision tracing_decision);
+  Tracing::SpanPtr startSpan(SystemTime start_time, const std::string& operation_name,
+                             Tracing::Decision tracing_decision);
 
-  Tracing::SpanPtr startSpan(Tracing::TraceContext& trace_context, SystemTime start_time,
-                             const std::string& operation_name, Tracing::Decision tracing_decision,
-                             const SpanContext& previous_span_context);
+  Tracing::SpanPtr startSpan(SystemTime start_time, const std::string& operation_name,
+                             const SpanContext& parent_context);
 
   void packMessage(MessagePackPacker& packer) override;
 
@@ -157,9 +157,8 @@ private:
 // Span holds the span context and handles span operations
 class Span : public Tracing::Span {
 public:
-  Span(Tracing::TraceContext& trace_context, SystemTime start_time,
-       const std::string& operation_name, Tracing::Decision tracing_decision,
-       FluentdTracerSharedPtr tracer, const SpanContext& span_context, TimeSource& time_source);
+  Span(SystemTime start_time, const std::string& operation_name, FluentdTracerSharedPtr tracer,
+       SpanContext&& span_context, TimeSource& time_source, bool ignore_decision);
 
   // Tracing::Span
   void setOperation(absl::string_view operation) override;
@@ -170,11 +169,14 @@ public:
                      const Tracing::UpstreamContext& upstream) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
-  void setSampled(bool sampled) override;
-  // The Fluentd tracer never parses the external context and the Envoy tracing decision
-  // is always be used.
-  void setDecision(bool decision) override { setSampled(decision); }
-  bool sampled() const { return sampled_; }
+  void setSampled(bool sampled) override { span_context_.setSampled(sampled); }
+  bool sampled() const { return span_context_.sampled(); }
+  void setDecision(bool decision) override {
+    if (!ignore_decision_) {
+      setSampled(decision);
+    }
+  }
+
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
   std::string getTraceId() const override;
@@ -182,16 +184,14 @@ public:
 
 private:
   // config
-  Tracing::TraceContext& trace_context_;
   SystemTime start_time_;
   std::string operation_;
-  Tracing::Decision tracing_decision_;
 
   FluentdTracerSharedPtr tracer_;
   SpanContext span_context_;
   std::map<std::string, std::string> tags_;
-  bool sampled_;
   Envoy::TimeSource& time_source_;
+  const bool ignore_decision_{false};
 };
 
 } // namespace Fluentd

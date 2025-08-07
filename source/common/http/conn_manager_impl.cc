@@ -510,9 +510,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     } else if (isEnvoyOverloadError(status)) {
-      // The other codecs aren't wired to send this status.
-      ASSERT(codec_->protocol() < Protocol::Http2,
-             "Expected only HTTP1.1 and below to send overload error.");
       stats_.named_.downstream_rq_overload_close_.inc();
       handleCodecOverloadError(status.message());
       return Network::FilterStatus::StopIteration;
@@ -1691,7 +1688,7 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
 
   // See how long this stream has been alive, and adjust the timeout
   // accordingly.
-  std::chrono::duration time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
+  std::chrono::milliseconds time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
       connection_manager_.timeSource().monotonicTime() -
       filter_manager_.streamInfo().startTimeMonotonic());
   if (timeout > time_used) {
@@ -1756,29 +1753,6 @@ void ConnectionManagerImpl::ActiveStream::refreshTracing() {
   active_span_->setDecision(tracing_decision.traced);
 
   setRequestDecorator(*request_headers_);
-}
-
-void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
-  if (!connection_manager_tracing_config_.has_value()) {
-    return;
-  }
-  const Tracing::CustomTagMap& conn_manager_tags = connection_manager_tracing_config_->custom_tags_;
-  const Tracing::CustomTagMap* route_tags = nullptr;
-  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
-    route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
-  }
-  const bool configured_in_conn = !conn_manager_tags.empty();
-  const bool configured_in_route = route_tags && !route_tags->empty();
-  if (!configured_in_conn && !configured_in_route) {
-    return;
-  }
-  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
-  if (configured_in_route) {
-    custom_tag_map.insert(route_tags->begin(), route_tags->end());
-  }
-  if (configured_in_conn) {
-    custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
-  }
 }
 
 // TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
@@ -2088,8 +2062,29 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_tracing_config_->operation_name_;
 }
 
-const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
-  return tracing_custom_tags_.get();
+void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+
+  const Tracing::HttpTraceContext trace_context(*request_headers_);
+  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo()};
+
+  // Cache the optional custom tags from the route first.
+  OptRef<const Tracing::CustomTagMap> route_custom_tags;
+
+  if (hasCachedRoute() && cached_route_.value()->tracingConfig() != nullptr) {
+    route_custom_tags.emplace(cached_route_.value()->tracingConfig()->getCustomTags());
+    for (const auto& tag : *route_custom_tags) {
+      tag.second->applySpan(span, ctx);
+    }
+  }
+
+  for (const auto& tag : connection_manager_tracing_config_->custom_tags_) {
+    if (!route_custom_tags.has_value() || !route_custom_tags->contains(tag.first)) {
+      // If the tag is defined in both the connection manager and the route,
+      // use the route's tag.
+      tag.second->applySpan(span, ctx);
+    }
+  }
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
@@ -2197,7 +2192,6 @@ void ConnectionManagerImpl::ActiveStream::setVirtualHostRoute(
   filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
 
   refreshTracing();
-  refreshCachedTracingCustomTags();
   refreshDurationTimeout();
   refreshIdleTimeout();
 }
@@ -2240,11 +2234,7 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   }
 
   setCachedRoute({});
-
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
-  if (tracing_custom_tags_) {
-    tracing_custom_tags_->clear();
-  }
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {
