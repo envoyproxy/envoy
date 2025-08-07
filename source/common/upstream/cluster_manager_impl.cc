@@ -42,6 +42,9 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 
+#include "absl/status/status.h"
+#include "envoy/grpc/async_client.h"
+
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
 #include "source/common/http/http3/conn_pool.h"
@@ -500,11 +503,11 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
         *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
     RETURN_IF_NOT_OK_REF(factory_or_error.status());
-    absl::StatusOr<Grpc::RawAsyncClientPtr> client_or_error =
+    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error =
         factory_or_error.value()->createUncachedRawAsyncClient();
     RETURN_IF_NOT_OK_REF(client_or_error.status());
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, *this, *stats_.rootScope(), std::move(*client_or_error), dispatcher_);
+        local_info_, *this, *stats_.rootScope(), client_or_error.value(), dispatcher_);
   }
   return absl::OkStatus();
 }

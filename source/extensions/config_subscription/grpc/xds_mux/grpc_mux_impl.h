@@ -106,8 +106,8 @@ public:
   }
 
   absl::Status
-  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
                   BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
 
@@ -179,10 +179,12 @@ private:
   // Helper function to create the grpc_stream_ object.
   // TODO(adisuissa): this should be removed when envoy.restart_features.xds_failover_support
   // is deprecated.
-  std::unique_ptr<GrpcStreamInterface<RQ, RS>> createGrpcStreamObject(
-      Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
-      const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
-      BackOffStrategyPtr&& backoff_strategy, const RateLimitSettings& rate_limit_settings);
+  std::unique_ptr<GrpcStreamInterface<RQ, RS>>
+  createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_client,
+                         Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                         const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+                         BackOffStrategyPtr&& backoff_strategy,
+                         const RateLimitSettings& rate_limit_settings);
 
   // Checks whether external conditions allow sending a DeltaDiscoveryRequest. (Does not check
   // whether we *want* to send a (Delta)DiscoveryRequest).
@@ -300,8 +302,8 @@ public:
                                    SubscriptionCallbacks&, OpaqueResourceDecoderSharedPtr,
                                    const SubscriptionOptions&) override;
 
-  absl::Status updateMuxSource(Grpc::RawAsyncClientPtr&&, Grpc::RawAsyncClientPtr&&, Stats::Scope&,
-                               BackOffStrategyPtr&&,
+  absl::Status updateMuxSource(Grpc::RawAsyncClientSharedPtr&&, Grpc::RawAsyncClientSharedPtr&&,
+                               Stats::Scope&, BackOffStrategyPtr&&,
                                const envoy::config::core::v3::ApiConfigSource&) override {
     return absl::UnimplementedError("");
   }
