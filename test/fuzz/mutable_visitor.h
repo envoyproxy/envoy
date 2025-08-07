@@ -14,7 +14,7 @@ public:
   virtual ~ProtoVisitor() = default;
 
   // Invoked when a field is visited, with the message, and field descriptor.
-  virtual void onField(Protobuf::Message&, const Protobuf::FieldDescriptor&,
+  virtual void onField(Protobuf::Message&, const ProtobufWkt::FieldDescriptor&,
                        const absl::Span<const Protobuf::Message* const>) PURE;
 
   // Invoked when a message is visited, with the message and visited parents.

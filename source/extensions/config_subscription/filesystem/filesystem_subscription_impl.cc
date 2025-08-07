@@ -137,7 +137,7 @@ FilesystemCollectionSubscriptionImpl::refreshInternal(ProtobufTypes::MessagePtr*
   const auto* collection_entries_field_descriptor = collection_descriptor->field(0);
   // Verify collection message type structure.
   if (collection_entries_field_descriptor == nullptr ||
-      collection_entries_field_descriptor->type() != Protobuf::FieldDescriptor::TYPE_MESSAGE ||
+      collection_entries_field_descriptor->type() != ProtobufWkt::FieldDescriptor::TYPE_MESSAGE ||
       collection_entries_field_descriptor->message_type()->full_name() !=
           "xds.core.v3.CollectionEntry" ||
       !collection_entries_field_descriptor->is_repeated()) {

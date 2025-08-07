@@ -19,7 +19,7 @@ namespace HttpFilters {
 namespace GrpcFieldExtraction {
 
 using FieldValueExtractorPtr =
-    std::unique_ptr<Protobuf::field_extraction::FieldValueExtractorInterface>;
+    std::unique_ptr<ProtobufWkt::field_extraction::FieldValueExtractorInterface>;
 class ExtractorImpl : public Extractor {
 public:
   static absl::StatusOr<ExtractorImpl>
@@ -28,7 +28,7 @@ public:
              field_extractions);
 
   absl::StatusOr<ExtractionResult>
-  processRequest(Protobuf::field_extraction::MessageData& message) const override;
+  processRequest(ProtobufWkt::field_extraction::MessageData& message) const override;
 
 private:
   ExtractorImpl() = default;

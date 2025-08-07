@@ -204,7 +204,7 @@ void ValidatedInputGenerator::handleAnyRules(
 }
 
 void ValidatedInputGenerator::handleMessageTypedField(
-    Protobuf::Message& msg, const Protobuf::FieldDescriptor& field,
+    Protobuf::Message& msg, const ProtobufWkt::FieldDescriptor& field,
     const Protobuf::Reflection* reflection, const validate::FieldRules& rules,
     const absl::Span<const Protobuf::Message* const>& parents, bool force_create, bool cut_off) {
 
@@ -264,7 +264,7 @@ void ValidatedInputGenerator::handleMessageTypedField(
 template <typename T, auto FIELDGETTER, auto FIELDSETTER, auto REPGETTER, auto REPSETTER,
           auto FIELDADDER, auto RULEGETTER, auto TYPEHANDLER>
 void ValidatedInputGenerator::handleIntrinsicTypedField(Protobuf::Message& msg,
-                                                        const Protobuf::FieldDescriptor& field,
+                                                        const ProtobufWkt::FieldDescriptor& field,
                                                         const Protobuf::Reflection* reflection,
                                                         const validate::FieldRules& rules,
                                                         bool force) {
@@ -315,13 +315,13 @@ void ValidatedInputGenerator::handleIntrinsicTypedField(Protobuf::Message& msg,
 }
 
 void ValidatedInputGenerator::onField(Protobuf::Message& msg,
-                                      const Protobuf::FieldDescriptor& field,
+                                      const ProtobufWkt::FieldDescriptor& field,
                                       const absl::Span<const Protobuf::Message* const> parents) {
   onField(msg, field, parents, false, false);
 }
 
 void ValidatedInputGenerator::onField(Protobuf::Message& msg,
-                                      const Protobuf::FieldDescriptor& field,
+                                      const ProtobufWkt::FieldDescriptor& field,
                                       const absl::Span<const Protobuf::Message* const> parents,
                                       bool force_create, bool cut_off) {
   const Protobuf::Reflection* reflection = msg.GetReflection();
@@ -335,7 +335,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
   }
 
   switch (field.cpp_type()) {
-  case Protobuf::FieldDescriptor::CPPTYPE_INT32: {
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_INT32: {
     handleIntrinsicTypedField<
         std::int32_t, &Protobuf::Reflection::GetInt32, &Protobuf::Reflection::SetInt32,
         &Protobuf::Reflection::GetRepeatedInt32, &Protobuf::Reflection::SetRepeatedInt32,
@@ -343,7 +343,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                                                        rules, force_create);
     break;
   }
-  case Protobuf::FieldDescriptor::CPPTYPE_INT64: {
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_INT64: {
     handleIntrinsicTypedField<
         std::int64_t, &Protobuf::Reflection::GetInt64, &Protobuf::Reflection::SetInt64,
         &Protobuf::Reflection::GetRepeatedInt64, &Protobuf::Reflection::SetRepeatedInt64,
@@ -351,7 +351,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                                                        rules, force_create);
     break;
   }
-  case Protobuf::FieldDescriptor::CPPTYPE_UINT32: {
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_UINT32: {
     handleIntrinsicTypedField<
         std::uint32_t, &Protobuf::Reflection::GetUInt32, &Protobuf::Reflection::SetUInt32,
         &Protobuf::Reflection::GetRepeatedUInt32, &Protobuf::Reflection::SetRepeatedUInt32,
@@ -359,7 +359,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                                                          rules, force_create);
     break;
   }
-  case Protobuf::FieldDescriptor::CPPTYPE_UINT64: {
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_UINT64: {
     handleIntrinsicTypedField<
         std::uint64_t, &Protobuf::Reflection::GetUInt64, &Protobuf::Reflection::SetUInt64,
         &Protobuf::Reflection::GetRepeatedUInt64, &Protobuf::Reflection::SetRepeatedUInt64,
@@ -367,7 +367,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                                                          rules, force_create);
     break;
   }
-  case Protobuf::FieldDescriptor::CPPTYPE_DOUBLE: {
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_DOUBLE: {
     handleIntrinsicTypedField<
         double, &Protobuf::Reflection::GetDouble, &Protobuf::Reflection::SetDouble,
         &Protobuf::Reflection::GetRepeatedDouble, &Protobuf::Reflection::SetRepeatedDouble,
@@ -375,7 +375,7 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                                                           rules, force_create);
     break;
   }
-  case Protobuf::FieldDescriptor::CPPTYPE_FLOAT: {
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_FLOAT: {
     handleIntrinsicTypedField<
         float, &Protobuf::Reflection::GetFloat, &Protobuf::Reflection::SetFloat,
         &Protobuf::Reflection::GetRepeatedFloat, &Protobuf::Reflection::SetRepeatedFloat,
@@ -383,22 +383,22 @@ void ValidatedInputGenerator::onField(Protobuf::Message& msg,
                                                                         rules, force_create);
     break;
   }
-  case Protobuf::FieldDescriptor::CPPTYPE_BOOL:
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_BOOL:
     break;
-  case Protobuf::FieldDescriptor::CPPTYPE_ENUM:
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_ENUM:
     break;
-  case Protobuf::FieldDescriptor::CPPTYPE_STRING: {
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_STRING: {
     handleIntrinsicTypedField<
         std::string, &Protobuf::Reflection::GetString,
         static_cast<void (Protobuf::Reflection::*)(
-            Protobuf::Message*, const Protobuf::FieldDescriptor*, std::string) const>(
+            Protobuf::Message*, const ProtobufWkt::FieldDescriptor*, std::string) const>(
             &Protobuf::Reflection::SetString),
         &Protobuf::Reflection::GetRepeatedString, &Protobuf::Reflection::SetRepeatedString,
         &Protobuf::Reflection::AddString, &validate::FieldRules::string, &handleStringRules>(
         msg, field, reflection, rules, force_create);
     break;
   }
-  case Protobuf::FieldDescriptor::CPPTYPE_MESSAGE: {
+  case ProtobufWkt::FieldDescriptor::CPPTYPE_MESSAGE: {
     handleMessageTypedField(msg, field, reflection, rules, parents, force_create, cut_off);
     break;
   }

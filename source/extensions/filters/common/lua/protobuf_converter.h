@@ -79,7 +79,7 @@ public:
    * then pushes that value onto the Lua stack.
    */
   static void pushLuaValueFromField(lua_State* state, const Protobuf::ReflectableMessage& message,
-                                    const Protobuf::FieldDescriptor* field);
+                                    const ProtobufWkt::FieldDescriptor* field);
 
   /**
    * Push a Lua table onto the stack that represents a protobuf map field
@@ -92,7 +92,7 @@ public:
    */
   static void pushLuaTableFromMapField(lua_State* state,
                                        const Protobuf::ReflectableMessage& message,
-                                       const Protobuf::FieldDescriptor* field);
+                                       const ProtobufWkt::FieldDescriptor* field);
 
   /**
    * Push a Lua array onto the stack that represents a repeated field
@@ -105,7 +105,7 @@ public:
    */
   static void pushLuaArrayFromRepeatedField(lua_State* state,
                                             const Protobuf::ReflectableMessage& message,
-                                            const Protobuf::FieldDescriptor* field);
+                                            const ProtobufWkt::FieldDescriptor* field);
 };
 
 } // namespace Lua

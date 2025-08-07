@@ -22,7 +22,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ProtoMessageExtraction {
 
-using ::Envoy::Protobuf::Type;
+using ::Envoy::ProtobufWkt::Type;
 
 using TypeFinder = std::function<const Envoy::ProtobufWkt::Type*(const std::string&)>;
 
@@ -48,14 +48,14 @@ public:
   // for a client streaming call.
   // It can be called on every message too if callers don't know which one
   // is the last message. It only keeps the result from the first and the last.
-  virtual void processRequest(Protobuf::field_extraction::MessageData& message) = 0;
+  virtual void processRequest(ProtobufWkt::field_extraction::MessageData& message) = 0;
 
   // Extract EXTRACT fields on a response message.
   // It only needs to be called for the first response message and the last
   // for a server streaming call.
   // It can be called on every message too if callers don't know which one
   // is the last message. It only keeps the result from the first one the last.
-  virtual void processResponse(Protobuf::field_extraction::MessageData& message) = 0;
+  virtual void processResponse(ProtobufWkt::field_extraction::MessageData& message) = 0;
 
   virtual const ExtractedMessageResult& GetResult() const = 0;
 

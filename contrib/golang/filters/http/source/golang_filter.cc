@@ -1394,7 +1394,7 @@ CAPIStatus Filter::getStringPropertyInternal(absl::string_view path, std::string
         return CAPIStatus::CAPIValueNotFound;
       }
       const Protobuf::Descriptor* desc = msg->GetDescriptor();
-      const Protobuf::FieldDescriptor* field_desc = desc->FindFieldByName(std::string(part));
+      const ProtobufWkt::FieldDescriptor* field_desc = desc->FindFieldByName(std::string(part));
       if (field_desc == nullptr) {
         return CAPIStatus::CAPIValueNotFound;
       }

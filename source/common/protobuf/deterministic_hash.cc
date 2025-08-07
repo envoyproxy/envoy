@@ -14,47 +14,47 @@ namespace {
 // template.
 template <typename T>
 T reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                const Protobuf::FieldDescriptor& field);
+                const ProtobufWkt::FieldDescriptor& field);
 
 template <>
 uint32_t reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                       const Protobuf::FieldDescriptor& field) {
+                       const ProtobufWkt::FieldDescriptor& field) {
   return reflection.GetUInt32(message, &field);
 }
 
 template <>
 int32_t reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                      const Protobuf::FieldDescriptor& field) {
+                      const ProtobufWkt::FieldDescriptor& field) {
   return reflection.GetInt32(message, &field);
 }
 
 template <>
 uint64_t reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                       const Protobuf::FieldDescriptor& field) {
+                       const ProtobufWkt::FieldDescriptor& field) {
   return reflection.GetUInt64(message, &field);
 }
 
 template <>
 int64_t reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                      const Protobuf::FieldDescriptor& field) {
+                      const ProtobufWkt::FieldDescriptor& field) {
   return reflection.GetInt64(message, &field);
 }
 
 template <>
 float reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                    const Protobuf::FieldDescriptor& field) {
+                    const ProtobufWkt::FieldDescriptor& field) {
   return reflection.GetFloat(message, &field);
 }
 
 template <>
 double reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                     const Protobuf::FieldDescriptor& field) {
+                     const ProtobufWkt::FieldDescriptor& field) {
   return reflection.GetDouble(message, &field);
 }
 
 template <>
 bool reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                   const Protobuf::FieldDescriptor& field) {
+                   const ProtobufWkt::FieldDescriptor& field) {
   return reflection.GetBool(message, &field);
 }
 
@@ -62,7 +62,7 @@ bool reflectionGet(const Protobuf::Reflection& reflection, const Protobuf::Messa
 // the function hashes each of its elements.
 template <typename T, std::enable_if_t<std::is_scalar_v<T>, bool> = true>
 uint64_t hashScalarField(const Protobuf::Reflection& reflection, const Protobuf::Message& message,
-                         const Protobuf::FieldDescriptor& field, uint64_t seed) {
+                         const ProtobufWkt::FieldDescriptor& field, uint64_t seed) {
   if (field.is_repeated()) {
     for (const T& scalar : reflection.GetRepeatedFieldRef<T>(message, &field)) {
       seed = HashUtil::xxHash64Value(scalar, seed);
@@ -75,21 +75,21 @@ uint64_t hashScalarField(const Protobuf::Reflection& reflection, const Protobuf:
 
 uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed = 0);
 uint64_t reflectionHashField(const Protobuf::Message& message,
-                             const Protobuf::FieldDescriptor& field, uint64_t seed);
+                             const ProtobufWkt::FieldDescriptor& field, uint64_t seed);
 
 // To make a map serialize deterministically we need to ignore the order of
 // the map fields. To do that, we simply combine the hashes of each entry
 // using an unordered operator (addition), and then apply that combined hash to
 // the seed.
 uint64_t reflectionHashMapField(const Protobuf::Message& message,
-                                const Protobuf::FieldDescriptor& field, uint64_t seed) {
+                                const ProtobufWkt::FieldDescriptor& field, uint64_t seed) {
   const Protobuf::Reflection& reflection = *message.GetReflection();
   ASSERT(field.is_map());
   const auto& entries = reflection.GetRepeatedFieldRef<Protobuf::Message>(message, &field);
   ASSERT(!entries.empty());
   const Protobuf::Descriptor& map_descriptor = *entries.begin()->GetDescriptor();
-  const Protobuf::FieldDescriptor& key_field = *map_descriptor.map_key();
-  const Protobuf::FieldDescriptor& value_field = *map_descriptor.map_value();
+  const ProtobufWkt::FieldDescriptor& key_field = *map_descriptor.map_key();
+  const ProtobufWkt::FieldDescriptor& value_field = *map_descriptor.map_value();
   uint64_t combined_hash = 0;
   for (const Protobuf::Message& entry : entries) {
     uint64_t entry_hash = reflectionHashField(entry, key_field, 0);
@@ -100,8 +100,8 @@ uint64_t reflectionHashMapField(const Protobuf::Message& message,
 }
 
 uint64_t reflectionHashField(const Protobuf::Message& message,
-                             const Protobuf::FieldDescriptor& field, uint64_t seed) {
-  using Protobuf::FieldDescriptor;
+                             const ProtobufWkt::FieldDescriptor& field, uint64_t seed) {
+  using ProtobufWkt::FieldDescriptor;
   const Protobuf::Reflection& reflection = *message.GetReflection();
   seed = HashUtil::xxHash64Value(field.number(), seed);
   switch (field.cpp_type()) {
@@ -197,7 +197,7 @@ std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const ProtobufWkt::Any
 
 // This is intentionally ignoring unknown fields.
 uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) {
-  using Protobuf::FieldDescriptor;
+  using ProtobufWkt::FieldDescriptor;
   const Protobuf::Reflection* reflection = message.GetReflection();
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   seed = HashUtil::xxHash64(descriptor->full_name(), seed);

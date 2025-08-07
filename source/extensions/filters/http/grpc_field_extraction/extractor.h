@@ -19,7 +19,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcFieldExtraction {
 
-using TypeFinder = std::function<const Protobuf::Type*(const std::string&)>;
+using TypeFinder = std::function<const ProtobufWkt::Type*(const std::string&)>;
 struct RequestField {
   // The request field path.
   absl::string_view path;
@@ -36,7 +36,7 @@ public:
 
   // Process a request message to extract targeted fields.
   virtual absl::StatusOr<ExtractionResult>
-  processRequest(Protobuf::field_extraction::MessageData& message) const = 0;
+  processRequest(ProtobufWkt::field_extraction::MessageData& message) const = 0;
 };
 
 using ExtractorPtr = std::unique_ptr<Extractor>;

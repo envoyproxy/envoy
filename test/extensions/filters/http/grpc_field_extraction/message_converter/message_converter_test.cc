@@ -248,7 +248,7 @@ void batchMutateStreamMessages(const std::vector<StreamMessagePtr>& message_data
 
 std::unique_ptr<CreateMessageDataFunc> factory() {
   return std::make_unique<CreateMessageDataFunc>(
-      []() { return std::make_unique<Protobuf::field_extraction::CordMessageData>(); });
+      []() { return std::make_unique<ProtobufWkt::field_extraction::CordMessageData>(); });
 }
 
 // Base class that all tests in this file inherit from.

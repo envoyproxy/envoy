@@ -228,7 +228,7 @@ public:
   }
 
 protected:
-  ProtobufWkt::Arena& arena_;
+  Protobuf::Arena& arena_;
 };
 
 class RequestWrapper : public BaseWrapper {

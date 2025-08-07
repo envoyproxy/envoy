@@ -32,14 +32,15 @@ using ::envoy::extensions::filters::http::proto_message_extraction::v3::MethodEx
 using ::Envoy::Extensions::HttpFilters::ProtoMessageExtraction::ExtractedMessageDirective;
 using ::Envoy::Extensions::HttpFilters::ProtoMessageExtraction::ExtractedMessageMetadata;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
-using Protobuf::field_extraction::FieldValueExtractorFactory;
+using ProtobufWkt::field_extraction::FieldValueExtractorFactory;
 
 // The type property value that will be included into the converted Struct.
 constexpr char kTypeProperty[] = "@type";
 
 ABSL_CONST_INIT const char* const kTypeServiceBaseUrl = "type.googleapis.com";
 
-void extract(ProtoExtractorInterface& extractor, Protobuf::field_extraction::MessageData& message,
+void extract(ProtoExtractorInterface& extractor,
+             ProtobufWkt::field_extraction::MessageData& message,
              std::vector<ExtractedMessageMetadata>& vect) {
   ExtractedMessageMetadata data = extractor.ExtractMessage(message);
   ENVOY_LOG_MISC(debug, "Extracted fields: {}", data.extracted_message.DebugString());
@@ -111,11 +112,11 @@ absl::Status ExtractorImpl::init() {
   return absl::OkStatus();
 }
 
-void ExtractorImpl::processRequest(Protobuf::field_extraction::MessageData& message) {
+void ExtractorImpl::processRequest(ProtobufWkt::field_extraction::MessageData& message) {
   extract(*request_extractor_, message, result_.request_data);
 }
 
-void ExtractorImpl::processResponse(Protobuf::field_extraction::MessageData& message) {
+void ExtractorImpl::processResponse(ProtobufWkt::field_extraction::MessageData& message) {
   extract(*response_extractor_, message, result_.response_data);
 }
 } // namespace ProtoMessageExtraction

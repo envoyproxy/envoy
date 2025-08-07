@@ -189,10 +189,10 @@ namespace {
 
 void checkForDeprecatedNonRepeatedEnumValue(
     const Protobuf::Message& message, absl::string_view filename,
-    const Protobuf::FieldDescriptor* field, const Protobuf::Reflection* reflection,
+    const ProtobufWkt::FieldDescriptor* field, const Protobuf::Reflection* reflection,
     Runtime::Loader* runtime, ProtobufMessage::ValidationVisitor& validation_visitor) {
   // Repeated fields will be handled by recursion in checkForUnexpectedFields.
-  if (field->is_repeated() || field->cpp_type() != Protobuf::FieldDescriptor::CPPTYPE_ENUM) {
+  if (field->is_repeated() || field->cpp_type() != ProtobufWkt::FieldDescriptor::CPPTYPE_ENUM) {
     return;
   }
 
@@ -229,7 +229,8 @@ public:
                               Runtime::Loader* runtime)
       : validation_visitor_(validation_visitor), runtime_(runtime) {}
 
-  void onField(const Protobuf::Message& message, const Protobuf::FieldDescriptor& field) override {
+  void onField(const Protobuf::Message& message,
+               const ProtobufWkt::FieldDescriptor& field) override {
     Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     absl::string_view filename = filenameFromPath(field.file()->name());
@@ -335,7 +336,7 @@ namespace {
 // as defined by Envoy's duration constraints.
 class DurationFieldProtoVisitor : public ProtobufMessage::ConstProtoVisitor {
 public:
-  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+  void onField(const Protobuf::Message&, const ProtobufWkt::FieldDescriptor&) override {}
 
   absl::Status onMessage(const Protobuf::Message& message,
                          absl::Span<const Protobuf::Message* const>, bool) override {
@@ -383,7 +384,7 @@ public:
     return absl::OkStatus();
   }
 
-  void onField(const Protobuf::Message&, const Protobuf::FieldDescriptor&) override {}
+  void onField(const Protobuf::Message&, const ProtobufWkt::FieldDescriptor&) override {}
 };
 
 } // namespace
@@ -460,7 +461,7 @@ namespace {
 void redact(Protobuf::Message* message, bool ancestor_is_sensitive);
 
 using Transform = std::function<void(Protobuf::Message*, const Protobuf::Reflection*,
-                                     const Protobuf::FieldDescriptor*)>;
+                                     const ProtobufWkt::FieldDescriptor*)>;
 
 // To redact opaque types, namely `Any` and `TypedStruct`, we have to reify them to the concrete
 // message types specified by their `type_url` before we can redact their contents. This is mostly
@@ -529,14 +530,14 @@ bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
   return redactOpaque(
       message, ancestor_is_sensitive, "google.protobuf.Any",
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
-                const Protobuf::FieldDescriptor* field_descriptor) {
+                const ProtobufWkt::FieldDescriptor* field_descriptor) {
         Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To unpack an `Any`, parse the serialized proto.
         typed_message->ParseFromString(
             reflection->GetString(*reflectable_message, field_descriptor));
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
-                const Protobuf::FieldDescriptor* field_descriptor) {
+                const ProtobufWkt::FieldDescriptor* field_descriptor) {
         Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(*message);
         // To repack an `Any`, reserialize its proto.
         reflection->SetString(&(*reflectable_message), field_descriptor,
@@ -550,7 +551,7 @@ bool redactTypedStruct(Protobuf::Message* message, const char* typed_struct_type
   return redactOpaque(
       message, ancestor_is_sensitive, typed_struct_type,
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
-                const Protobuf::FieldDescriptor* field_descriptor) {
+                const ProtobufWkt::FieldDescriptor* field_descriptor) {
 #ifdef ENVOY_ENABLE_YAML
         // To unpack a `TypedStruct`, convert the struct from JSON.
         MessageUtil::jsonConvert(reflection->GetMessage(*message, field_descriptor),
@@ -564,7 +565,7 @@ bool redactTypedStruct(Protobuf::Message* message, const char* typed_struct_type
 #endif
       },
       [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
-                const Protobuf::FieldDescriptor* field_descriptor) {
+                const ProtobufWkt::FieldDescriptor* field_descriptor) {
   // To repack a `TypedStruct`, convert the message back to JSON.
 #ifdef ENVOY_ENABLE_YAML
         MessageUtil::jsonConvert(*typed_message,
@@ -597,7 +598,7 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
     const bool sensitive = ancestor_is_sensitive ||
                            field_descriptor->options().GetExtension(udpa::annotations::sensitive);
 
-    if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+    if (field_descriptor->type() == ProtobufWkt::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
       if (field_descriptor->is_map()) {
         // Redact values of maps only. Redacting both leaves the map with multiple "[redacted]"
@@ -608,10 +609,10 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
               reflection->MutableRepeatedMessage(&(*reflectable_message), field_descriptor, i);
           Protobuf::ReflectableMessage map_pair = createReflectableMessage(*map_pair_base);
           auto* value_field_desc = map_pair->GetDescriptor()->FindFieldByName("value");
-          if (sensitive && (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
-                            value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_BYTES)) {
+          if (sensitive && (value_field_desc->type() == ProtobufWkt::FieldDescriptor::TYPE_STRING ||
+                            value_field_desc->type() == ProtobufWkt::FieldDescriptor::TYPE_BYTES)) {
             map_pair->GetReflection()->SetString(&(*map_pair), value_field_desc, "[redacted]");
-          } else if (value_field_desc->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+          } else if (value_field_desc->type() == ProtobufWkt::FieldDescriptor::TYPE_MESSAGE) {
             redact(map_pair->GetReflection()->MutableMessage(&(*map_pair), value_field_desc),
                    sensitive);
           } else if (sensitive) {
@@ -629,8 +630,8 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
       }
     } else if (sensitive) {
       // Base case: replace strings and bytes with "[redacted]" and clear all others.
-      if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
-          field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_BYTES) {
+      if (field_descriptor->type() == ProtobufWkt::FieldDescriptor::TYPE_STRING ||
+          field_descriptor->type() == ProtobufWkt::FieldDescriptor::TYPE_BYTES) {
         if (field_descriptor->is_repeated()) {
           const int field_size = reflection->FieldSize(*reflectable_message, field_descriptor);
           for (int i = 0; i < field_size; ++i) {

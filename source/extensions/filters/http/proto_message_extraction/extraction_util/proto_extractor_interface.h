@@ -40,7 +40,7 @@ public:
   // that contains the extracted message and other extracted message metadata obtained during
   // extraction.
   virtual ExtractedMessageMetadata
-  ExtractMessage(const Protobuf::field_extraction::MessageData& message) const = 0;
+  ExtractMessage(const ProtobufWkt::field_extraction::MessageData& message) const = 0;
 
   virtual ~ProtoExtractorInterface() = default;
 };

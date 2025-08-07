@@ -56,11 +56,11 @@ void traverseMessageWorkerExt(ProtoVisitor& visitor, Protobuf::Message& message,
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   const Protobuf::Reflection* reflection = message.GetReflection();
   for (int i = 0; i < descriptor->field_count(); ++i) {
-    const Protobuf::FieldDescriptor* field = descriptor->field(i);
+    const ProtobufWkt::FieldDescriptor* field = descriptor->field(i);
     visitor.onField(message, *field, parents);
 
     // If this is a message, recurse in to the sub-message.
-    if (field->cpp_type() == Protobuf::FieldDescriptor::CPPTYPE_MESSAGE) {
+    if (field->cpp_type() == ProtobufWkt::FieldDescriptor::CPPTYPE_MESSAGE) {
       Helper::ScopedMessageParents scoped_parents(parents, message);
 
       if (field->is_repeated()) {

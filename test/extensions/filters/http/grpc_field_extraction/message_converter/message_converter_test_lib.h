@@ -39,7 +39,7 @@ void checkSerializedData(Envoy::Buffer::Instance& data,
 
 apikeys::CreateApiKeyRequest parseFromStreamMessage(StreamMessage& msg) {
   apikeys::CreateApiKeyRequest parsed_request;
-  auto* c = dynamic_cast<Protobuf::field_extraction::CordMessageData*>(msg.message());
+  auto* c = dynamic_cast<ProtobufWkt::field_extraction::CordMessageData*>(msg.message());
   parsed_request.ParseFromCord(c->Cord());
   return parsed_request;
 }
@@ -48,7 +48,7 @@ apikeys::CreateApiKeyRequest parseFromStreamMessage(StreamMessage& msg) {
 // Serialization overwrites pre-existing date in the buffer.
 void serializeToStreamMessage(StreamMessage& msg, apikeys::CreateApiKeyRequest& request) {
   apikeys::CreateApiKeyRequest parsed_request;
-  auto* c = dynamic_cast<Protobuf::field_extraction::CordMessageData*>(msg.message());
+  auto* c = dynamic_cast<ProtobufWkt::field_extraction::CordMessageData*>(msg.message());
   request.SerializeToCord(&(c->Cord()));
 }
 } // namespace GrpcFieldExtraction

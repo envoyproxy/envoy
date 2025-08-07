@@ -149,7 +149,7 @@ private:
   using ValueSubsetMap = absl::node_hash_map<HashedValue, LbSubsetEntryPtr>;
   using LbSubsetMap = absl::node_hash_map<std::string, ValueSubsetMap>;
   using SubsetSelectorFallbackParamsRef = std::reference_wrapper<SubsetSelectorFallbackParams>;
-  using MetadataFallbacks = ProtobufWkt::RepeatedPtrField<ProtobufWkt::Value>;
+  using MetadataFallbacks = Protobuf::RepeatedPtrField<ProtobufWkt::Value>;
 
 public:
   class LoadBalancerContextWrapper : public LoadBalancerContext {
