@@ -34,7 +34,7 @@ android_library(
     visibility = ["//visibility:public"],
     deps = [
         ":utilities",
-        "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
+        "//library/java/io/envoyproxy/envoymobile/engine:envoy_base_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         artifact("androidx.annotation:annotation"),
     ],
