@@ -387,34 +387,26 @@ virtual_hosts:
 )EOF";
 
   initializeWithYaml(filter_config, route_config);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  IntegrationStreamDecoderPtr response;
 
-  // Request path
+  codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
                                                  {":authority", "foo.lyft.com"},
                                                  {"x-forwarded-for", "10.0.0.1"}};
+
+  IntegrationStreamDecoderPtr response;
   EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"trace", "foo"},
                                  {"trace", "bar"},
-                             }),
-                             {
-                               response = codec_client_->makeHeaderOnlyRequest(request_headers);
-
-                               waitForNextUpstreamRequest();
-                             });
-
-  // Response path
-  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
-  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
                                  {"trace", "baz"},
                                  {"trace", "bat"},
                              }),
                              {
-                               upstream_request_->encodeHeaders(response_headers, true);
+                               response = codec_client_->makeHeaderOnlyRequest(request_headers);
+                               waitForNextUpstreamRequest();
 
+                               upstream_request_->encodeHeaders(default_response_headers_, true);
                                ASSERT_TRUE(response->waitForEndStream());
                              });
 
