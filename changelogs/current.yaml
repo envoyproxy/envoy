@@ -47,15 +47,36 @@ removed_config_or_runtime:
 - area: udp_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.report_stream_reset_error_code`` and legacy code paths.
+- area: http3
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
+- area: network
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips`` and legacy code paths.
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: dns_resolver
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.getaddrinfo_num_retries`` and legacy code paths.
+- area: proxy_filter
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_ssl_port`` and legacy code paths.
 - area: gcp_authn
   change: |
     Removed runtime guard ``envoy.reloadable_features.gcp_authn_use_fixed_url`` and legacy code paths.
 - area: jwt_authn
   change: |
     Removed runtime guard ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` and legacy code paths.
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_authn_validate_uri`` and legacy code paths.
 - area: dispatcher
   change: |
     Removed runtime guard ``envoy.restart_features.fix_dispatcher_approximate_now`` and legacy code paths.
