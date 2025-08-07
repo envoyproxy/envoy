@@ -4377,9 +4377,8 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingMultipleLevels) {
   EXPECT_EQ(merged_extensions.at("wc_key"), "wc_value");
   EXPECT_EQ(merged_extensions.at("shared_key"), "wc_shared_value"); // Most specific wins
 
-  // Verify gRPC service is from route level (most specific that had it)
-  EXPECT_TRUE(final_merged.grpcService().has_value());
-  EXPECT_EQ(final_merged.grpcService().value().envoy_grpc().cluster_name(), "route_cluster");
+  // Verify gRPC service override is NOT inherited from less specific levels.
+  EXPECT_FALSE(final_merged.grpcService().has_value());
 }
 
 // Test per-route context extensions take precedence over check_settings context extensions.
