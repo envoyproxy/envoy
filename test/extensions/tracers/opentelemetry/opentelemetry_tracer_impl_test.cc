@@ -866,14 +866,15 @@ TEST_F(OpenTelemetryDriverTest, IgnoreNotSampledSpan) {
   EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
-TEST_F(OpenTelemetryDriverTest, UpdateDecisionTrue) {
+TEST_F(OpenTelemetryDriverTest, UseLocalDecisionTrue) {
   setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
 
   Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                                             operation_name_, {Tracing::Reason::Sampling, false});
-  span->setDecision(true);
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  // The `useLocalDecision` should be true because there is no traceparent header in the request.
+  EXPECT_TRUE(span->useLocalDecision());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)
@@ -883,22 +884,7 @@ TEST_F(OpenTelemetryDriverTest, UpdateDecisionTrue) {
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
 }
 
-TEST_F(OpenTelemetryDriverTest, UpdateDecisionFalse) {
-  setupValidDriver();
-  Tracing::TestTraceContextImpl request_headers{
-      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
-
-  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
-                                             operation_name_, {Tracing::Reason::Sampling, true});
-  span->setDecision(false);
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U)).Times(0);
-  EXPECT_CALL(*mock_client_, sendRaw(_, _, _, _, _, _)).Times(0);
-  span->finishSpan();
-  EXPECT_EQ(0U, stats_.counter("tracing.opentelemetry.spans_sent").value());
-}
-
-TEST_F(OpenTelemetryDriverTest, UpdateDecisionButIgnored) {
+TEST_F(OpenTelemetryDriverTest, UseLocalDecisionFalse) {
   setupValidDriver();
   Tracing::TestTraceContextImpl request_headers{
       {":authority", "test.com"},
@@ -911,7 +897,8 @@ TEST_F(OpenTelemetryDriverTest, UpdateDecisionButIgnored) {
   Tracing::SpanPtr span =
       driver_->startSpan(mock_tracing_config_, request_headers, stream_info_, operation_name_,
                          {Tracing::Reason::NotTraceable, false});
-  span->setDecision(false);
+  // The `useLocalDecision` should be false because there is a traceparent header in the request.
+  EXPECT_FALSE(span->useLocalDecision());
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.opentelemetry.min_flush_spans", 5U))
       .Times(1)

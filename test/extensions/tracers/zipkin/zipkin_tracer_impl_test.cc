@@ -875,12 +875,12 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
   EXPECT_EQ(SAMPLED, sampled_entry.value());
 }
 
-TEST_F(ZipkinDriverTest, UpdateDecisionTrue) {
+TEST_F(ZipkinDriverTest, UseLocalDecisionTrue) {
   setupValidDriver("HTTP_JSON");
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
-                                             operation_name_, {Tracing::Reason::Sampling, false});
-  span->setDecision(true);
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_TRUE(span->useLocalDecision());
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
 
@@ -890,30 +890,14 @@ TEST_F(ZipkinDriverTest, UpdateDecisionTrue) {
   EXPECT_EQ(SAMPLED, sampled_entry.value());
 }
 
-TEST_F(ZipkinDriverTest, UpdateDecisionFalse) {
-  setupValidDriver("HTTP_JSON");
-
-  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
-                                             operation_name_, {Tracing::Reason::Sampling, true});
-
-  span->setDecision(false);
-
-  request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
-
-  span->injectContext(request_headers_, Tracing::UpstreamContext());
-
-  auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
-  EXPECT_EQ(NOT_SAMPLED, sampled_entry.value());
-}
-
-TEST_F(ZipkinDriverTest, UpdateDecisionIgnored) {
+TEST_F(ZipkinDriverTest, UseLocalDecisionFalse) {
   setupValidDriver("HTTP_JSON");
   request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED.key(), NOT_SAMPLED);
 
   // Envoy tracing decision is ignored if the B3 sampled header is set to not sample.
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
-  span->setDecision(true);
+  EXPECT_FALSE(span->useLocalDecision());
 
   request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
 

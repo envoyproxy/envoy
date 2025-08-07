@@ -97,7 +97,7 @@ TEST_F(TracerTest, TracerTestCreateNewSpanWithNoPropagationHeaders) {
     span->setSampled(false);
     EXPECT_TRUE(span->spanEntity()->skipAnalysis());
 
-    span->setDecision(true); // No-op for now.
+    EXPECT_FALSE(span->useLocalDecision()); // Always false for now.
     EXPECT_TRUE(span->spanEntity()->skipAnalysis());
 
     // The initial operation name is consistent with the 'operation' parameter in the 'startSpan'

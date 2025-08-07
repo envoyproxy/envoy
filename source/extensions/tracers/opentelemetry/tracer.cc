@@ -60,9 +60,9 @@ void callSampler(SamplerSharedPtr sampler, const StreamInfo::StreamInfo& stream_
 
 Span::Span(const std::string& name, const StreamInfo::StreamInfo& stream_info,
            SystemTime start_time, Envoy::TimeSource& time_source, Tracer& parent_tracer,
-           OTelSpanKind span_kind, bool ignore_decision)
+           OTelSpanKind span_kind, bool use_local_decision)
     : stream_info_(stream_info), parent_tracer_(parent_tracer), time_source_(time_source),
-      ignore_decision_(ignore_decision) {
+      use_local_decision_(use_local_decision) {
   span_ = ::opentelemetry::proto::trace::v1::Span();
 
   span_.set_kind(span_kind);
@@ -273,12 +273,12 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
                                    OTelSpanKind span_kind) {
   // If reached here, then this is main span for request and there is no previous span context.
   // If the custom sampler is set, then the Envoy tracing decision is ignored and the custom sampler
-  // should make a sampling decision.
-  const bool ignore_decision = sampler_ != nullptr;
+  // should make a sampling decision, otherwise the local Envoy tracing decision is used.
+  const bool use_local_decision = sampler_ == nullptr;
 
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
-                                         *this, span_kind, ignore_decision);
+                                         *this, span_kind, use_local_decision);
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
   new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
@@ -302,7 +302,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
 
   // Create a new span and populate details from the span context.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
-                                         *this, span_kind, true);
+                                         *this, span_kind, false);
   new_span->setTraceId(parent_context.traceId());
   if (!parent_context.spanId().empty()) {
     new_span->setParentId(parent_context.spanId());

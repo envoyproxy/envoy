@@ -107,16 +107,15 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   //
   // If Envoy is telling us to keep the trace, then we leave it up to the
   // tracer's internal sampler (which might decide to drop the trace anyway).
-  const bool ignore_envoy_decision = span.trace_segment().sampling_decision().has_value();
-  if (!ignore_envoy_decision && !tracing_decision.traced) {
+  const bool use_local_decision = !span.trace_segment().sampling_decision().has_value();
+  if (use_local_decision && !tracing_decision.traced) {
     // TODO(wbpcode): use USER_KEEP to indicate that the trace should be kept if the
-    // Envoy is telling us to keep the trace. By this way, this will be consistent with
-    // the setDecision() method.
+    // Envoy is telling us to keep the trace.
     span.trace_segment().override_sampling_priority(
         int(datadog::tracing::SamplingPriority::USER_DROP));
   }
 
-  return std::make_unique<Span>(std::move(span), ignore_envoy_decision);
+  return std::make_unique<Span>(std::move(span), use_local_decision);
 }
 
 datadog::tracing::Span Tracer::extractOrCreateSpan(datadog::tracing::Tracer& tracer,

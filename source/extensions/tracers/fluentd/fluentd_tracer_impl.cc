@@ -182,10 +182,10 @@ FluentdTracerImpl::FluentdTracerImpl(Upstream::ThreadLocalCluster& cluster,
 
 // Initialize a span object
 Span::Span(SystemTime start_time, const std::string& operation_name, FluentdTracerSharedPtr tracer,
-           SpanContext&& span_context, TimeSource& time_source, bool ignore_decision)
+           SpanContext&& span_context, TimeSource& time_source, bool use_local_decision)
     : start_time_(start_time), operation_(operation_name), tracer_(std::move(tracer)),
       span_context_(std::move(span_context)), time_source_(time_source),
-      ignore_decision_(ignore_decision) {}
+      use_local_decision_(use_local_decision) {}
 
 // Set the operation name for the span
 void Span::setOperation(absl::string_view operation) { operation_ = std::string(operation); }
@@ -279,7 +279,7 @@ Tracing::SpanPtr FluentdTracerImpl::startSpan(SystemTime start_time,
       Hex::uint64ToHex(span_id), tracing_decision.traced, "");
 
   return std::make_unique<Span>(start_time, operation_name, shared_from_this(),
-                                std::move(span_context), time_source_, false);
+                                std::move(span_context), time_source_, true);
 }
 
 // Start a new span with a parent context
@@ -291,7 +291,7 @@ Tracing::SpanPtr FluentdTracerImpl::startSpan(SystemTime start_time,
                            Hex::uint64ToHex(random_.random()), parent_context.sampled(),
                            parent_context.tracestate());
   return std::make_unique<Span>(start_time, operation_name, shared_from_this(),
-                                std::move(span_context), time_source_, true);
+                                std::move(span_context), time_source_, false);
 }
 
 void FluentdTracerImpl::packMessage(MessagePackPacker& packer) {

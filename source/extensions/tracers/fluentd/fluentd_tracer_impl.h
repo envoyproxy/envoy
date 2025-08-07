@@ -158,7 +158,7 @@ private:
 class Span : public Tracing::Span {
 public:
   Span(SystemTime start_time, const std::string& operation_name, FluentdTracerSharedPtr tracer,
-       SpanContext&& span_context, TimeSource& time_source, bool ignore_decision);
+       SpanContext&& span_context, TimeSource& time_source, bool use_local_decision);
 
   // Tracing::Span
   void setOperation(absl::string_view operation) override;
@@ -171,11 +171,7 @@ public:
                               SystemTime start_time) override;
   void setSampled(bool sampled) override { span_context_.setSampled(sampled); }
   bool sampled() const { return span_context_.sampled(); }
-  void setDecision(bool decision) override {
-    if (!ignore_decision_) {
-      setSampled(decision);
-    }
-  }
+  bool useLocalDecision() const override { return use_local_decision_; }
 
   std::string getBaggage(absl::string_view key) override;
   void setBaggage(absl::string_view key, absl::string_view value) override;
@@ -191,7 +187,7 @@ private:
   SpanContext span_context_;
   std::map<std::string, std::string> tags_;
   Envoy::TimeSource& time_source_;
-  const bool ignore_decision_{false};
+  const bool use_local_decision_{false};
 };
 
 } // namespace Fluentd

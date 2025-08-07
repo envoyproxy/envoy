@@ -73,7 +73,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   SpanPtr new_zipkin_span;
   SpanContextExtractor extractor(trace_context);
   const absl::optional<bool> sampled = extractor.extractSampled();
-  bool ignore_decision = sampled.has_value();
+  bool use_local_decision = !sampled.has_value();
   TRY_NEEDS_AUDIT {
     auto ret_span_context = extractor.extractSpanContext(sampled.value_or(tracing_decision.traced));
     if (!ret_span_context.second) {
@@ -82,14 +82,14 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
           tracer.startSpan(config, std::string(trace_context.host()), stream_info.startTime());
       new_zipkin_span->setSampled(sampled.value_or(tracing_decision.traced));
     } else {
-      ignore_decision = true;
+      use_local_decision = false;
       new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()),
                                          stream_info.startTime(), ret_span_context.first);
     }
   }
   END_TRY catch (const ExtractorException& e) { return std::make_unique<Tracing::NullSpan>(); }
 
-  new_zipkin_span->setIgnoreDecision(ignore_decision);
+  new_zipkin_span->setUseLocalDecision(use_local_decision);
   // Return the active Zipkin span.
   return new_zipkin_span;
 }

@@ -1750,7 +1750,9 @@ void ConnectionManagerImpl::ActiveStream::refreshTracing() {
   filter_manager_.streamInfo().setTraceReason(trace_reason);
   const Tracing::Decision tracing_decision =
       Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
-  active_span_->setDecision(tracing_decision.traced);
+  if (active_span_->useLocalDecision()) {
+    active_span_->setSampled(tracing_decision.traced);
+  }
 
   setRequestDecorator(*request_headers_);
 }

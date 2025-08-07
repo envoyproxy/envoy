@@ -543,9 +543,7 @@ public:
    */
   SpanContext spanContext() const;
 
-  void setIgnoreDecision(bool ignore_decision) {
-    ignore_decision_ = ignore_decision;
-  }
+  void setUseLocalDecision(bool use_local_decision) { use_local_decision_ = use_local_decision; }
 
   // Tracing::Span
 
@@ -561,11 +559,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void setSampled(bool val) override { sampled_ = val; }
-  void setDecision(bool decision) override {
-    if(!ignore_decision_) {
-      setSampled(decision);
-    }
-  }
+  bool useLocalDecision() const override { return use_local_decision_; }
   void setOperation(absl::string_view operation) override { setName(std::string(operation)); }
   void injectContext(Tracing::TraceContext& trace_context,
                      const Tracing::UpstreamContext&) override;
@@ -593,7 +587,7 @@ private:
   int64_t monotonic_start_time_{0};
   TimeSource& time_source_;
   TracerInterface& tracer_;
-  bool ignore_decision_{false};
+  bool use_local_decision_{false};
 };
 
 using SpanPtr = std::unique_ptr<Span>;

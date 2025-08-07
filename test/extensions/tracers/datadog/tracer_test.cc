@@ -207,7 +207,7 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   EXPECT_EQ(5678, *dd_span.parent_id());
 }
 
-TEST_F(DatadogTracerTest, UpdateDecisionTrue) {
+TEST_F(DatadogTracerTest, UseLocalDecisionTrue) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
 
@@ -224,46 +224,13 @@ TEST_F(DatadogTracerTest, UpdateDecisionTrue) {
   const Tracing::SpanPtr span =
       tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name,
                        {Tracing::Reason::NotTraceable, false});
-  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
 
-  // Initial decision from Envoy is false and the span is set to `USER_DROP`.
-  EXPECT_EQ(as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority,
-            int(datadog::tracing::SamplingPriority::USER_DROP));
-
-  span->setDecision(true);
-  EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_KEEP),
-            as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority);
+  // The `useLocalDecision` method is true because the span has no external trace sampling
+  // decision.
+  EXPECT_EQ(true, span->useLocalDecision());
 }
 
-TEST_F(DatadogTracerTest, UpdateDecisionFalse) {
-  datadog::tracing::TracerConfig config;
-  config.service = "envoy";
-
-  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
-                thread_local_slot_allocator_, time_);
-
-  const std::string operation_name = "do.thing";
-  const SystemTime start = time_.timeSystem().systemTime();
-  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
-
-  // trace context in the Datadog style
-  Tracing::TestTraceContextImpl context{};
-
-  const Tracing::SpanPtr span = tracer.startSpan(Tracing::MockConfig{}, context, stream_info_,
-                                                 operation_name, {Tracing::Reason::Sampling, true});
-  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
-
-  // Initial decision from Envoy is true and the span is set to `USER_KEEP`.
-  EXPECT_FALSE(as_dd_span_wrapper->impl()->trace_segment().sampling_decision().has_value());
-
-  span->setDecision(false);
-  EXPECT_EQ(int(datadog::tracing::SamplingPriority::USER_DROP),
-            as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority);
-}
-
-TEST_F(DatadogTracerTest, UpdateDecisionButIgnored) {
-  // Verify that if `setDecision` is called on a span with `ignore_decision_`
-  // set to true, then the sampling decision is not updated.
+TEST_F(DatadogTracerTest, UseLocalDecisionFalse) {
   datadog::tracing::TracerConfig config;
   config.service = "envoy";
 
@@ -284,19 +251,9 @@ TEST_F(DatadogTracerTest, UpdateDecisionButIgnored) {
   const Tracing::SpanPtr span =
       tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name,
                        {Tracing::Reason::NotTraceable, false});
-  const auto as_dd_span_wrapper = dynamic_cast<Span*>(span.get());
-
-  // Initial decision from External is '0' and the span is set to `AUTO_DROP`.
-  EXPECT_EQ(as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority,
-            int(datadog::tracing::SamplingPriority::AUTO_DROP));
-
-  span->setDecision(true);
-  EXPECT_EQ(as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority,
-            int(datadog::tracing::SamplingPriority::AUTO_DROP));
-
-  span->setDecision(false);
-  EXPECT_EQ(as_dd_span_wrapper->impl()->trace_segment().sampling_decision()->priority,
-            int(datadog::tracing::SamplingPriority::AUTO_DROP));
+  // The `useLocalDecision` method is false because the span has an external trace sampling
+  // decision.
+  EXPECT_EQ(false, span->useLocalDecision());
 }
 
 TEST_F(DatadogTracerTest, ExtractionFailure) {
