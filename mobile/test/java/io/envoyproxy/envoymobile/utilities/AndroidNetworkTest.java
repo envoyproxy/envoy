@@ -1,12 +1,13 @@
 package io.envoyproxy.envoymobile.utilities;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 import static org.robolectric.Shadows.shadowOf;
 
 import io.envoyproxy.envoymobile.engine.JniLibrary;
 import io.envoyproxy.envoymobile.engine.EnvoyEngine;
 import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2;
+import io.envoyproxy.envoymobile.engine.types.EnvoyConnectionType;
 
 import java.nio.charset.StandardCharsets;
 
@@ -26,8 +27,10 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.shadows.ShadowNetworkInfo;
+import org.robolectric.shadows.ShadowNetworkCapabilities;
 
 @RunWith(RobolectricTestRunner.class)
 public final class AndroidNetworkTest {
@@ -55,6 +58,11 @@ public final class AndroidNetworkTest {
     mConnectivityManager = mAndroidNetworkMonitor.getConnectivityManager();
   }
 
+  @After
+  public void tearDown() throws Exception {
+    AndroidNetworkMonitorV2.shutdown();
+  }
+
   @Test
   public void testGetDefaultNetworkHandle() {
     Network activeNetwork = mConnectivityManager.getActiveNetwork();
@@ -68,5 +76,39 @@ public final class AndroidNetworkTest {
     Network wifiNetwork = mConnectivityManager.getActiveNetwork();
     long wifiNetworkHandle = JniLibrary.callGetDefaultNetworkHandleFromNative();
     assertEquals(wifiNetwork.getNetworkHandle(), wifiNetworkHandle);
+  }
+
+  @Test
+  public void testGetAllConnectedNetworks() {
+    // Make all networks connected to the internet.
+    Network[] networks = mConnectivityManager.getAllNetworks();
+    for (Network network : networks) {
+      NetworkCapabilities capabilities = mConnectivityManager.getNetworkCapabilities(network);
+      shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+      NetworkInfo netInfo = mConnectivityManager.getNetworkInfo(network);
+      shadowOf(netInfo).setConnectionStatus(NetworkInfo.State.CONNECTED);
+    }
+    long[][] networkArray = JniLibrary.callGetAllConnectedNetworksFromNative();
+    assertEquals(networks.length, networkArray.length);
+    // The ShadowConnectivityManager should have 2 networks cached, one default WIFI network and
+    // another cellular one.
+    Network cellNetwork = null;
+    for (int i = 0; i < networks.length; ++i) {
+      assertEquals(networks[i].getNetworkHandle(), networkArray[i][0]);
+      NetworkCapabilities capabilities = mConnectivityManager.getNetworkCapabilities(networks[i]);
+      if (capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+        assertEquals(EnvoyConnectionType.CONNECTION_WIFI.getValue(), networkArray[i][1]);
+      } else {
+        cellNetwork = networks[i];
+        assertTrue(capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR));
+        assertEquals(EnvoyConnectionType.CONNECTION_2G.getValue(), networkArray[i][1]);
+      }
+    }
+
+    assertNotNull(cellNetwork);
+    shadowOf(mConnectivityManager).removeNetwork(cellNetwork);
+    networkArray = JniLibrary.callGetAllConnectedNetworksFromNative();
+    assertEquals(1, networkArray.length);
+    assertEquals(EnvoyConnectionType.CONNECTION_WIFI.getValue(), networkArray[0][1]);
   }
 }

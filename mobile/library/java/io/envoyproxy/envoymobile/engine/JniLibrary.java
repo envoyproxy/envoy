@@ -312,6 +312,12 @@ public class JniLibrary {
   public static native long callGetDefaultNetworkHandleFromNative();
 
   /**
+   * Mimic a call to AndroidNetworkLibrary#getAllConnectedNetworks from native code.
+   * To be used for testing only.
+   */
+  public static native long[][] callGetAllConnectedNetworksFromNative();
+
+  /**
    * Given a filter name, create the proto config for adding the native filter
    *
    * @param filterName the name of the native filter

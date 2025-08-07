@@ -370,20 +370,23 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
   EXPECT_EQ(4, current_change_event);
 }
 
-/*
 TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
-    absl::Notification handled_network_change;
+  absl::Notification found_force_dns_refresh;
+  std::atomic<bool> handled_network_change{false};
   auto logger = std::make_unique<EnvoyLogger>();
   logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
     if (msg.find("Default network state has been changed. Current net configuration key") !=
-std::string::npos) { handled_network_change.Notify();
+        std::string::npos) {
+      handled_network_change = true;
+    }
+    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+      found_force_dns_refresh.Notify();
     }
   };
   builder_.setLogger(std::move(logger));
   builder_.setDisableDnsRefreshOnNetworkChange(false);
 
   initialize();
-  EXPECT_EQ(0, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
 
   // A new WIFI network appears and becomes the default network. Even though
   // the test is initialized with a WIFI network, this should still have triggred
@@ -391,11 +394,10 @@ std::string::npos) { handled_network_change.Notify();
   internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_WIFI, 123);
   internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 123);
   // The HTTP status reset and DNS refresh should have been posted to the network thread and to be
-handled there. handled_network_change.WaitForNotification();
-  // DNS has been force refreshed.
-  EXPECT_EQ(1, getCounterValue("dns_cache.base_dns_cache.dns_query_attempt"));
+  // handled there.
+  found_force_dns_refresh.WaitForNotification();
+  EXPECT_TRUE(handled_network_change);
 }
-*/
 
 TEST_P(ClientIntegrationTest, LargeResponse) {
   initialize();
