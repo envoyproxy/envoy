@@ -13,6 +13,7 @@
 #include "source/common/common/stl_helpers.h"
 #include "source/common/common/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/protovalidate_util.h"
 #include "source/common/singleton/const_singleton.h"
 
 #include "absl/status/status.h"
@@ -306,15 +307,15 @@ public:
                                      bool recurse_into_any = false);
 
   /**
-   * Perform a PGV check on the entire message tree, recursing into Any messages as needed.
+   * Perform validation checks on the entire message tree, recursing into Any messages as needed.
+   * Uses protovalidate for modern CEL-based validation.
    */
   static void recursivePgvCheck(const Protobuf::Message& message);
 
   /**
-   * Validate protoc-gen-validate constraints on a given protobuf as well as performing
+   * Validate protovalidate constraints on a given protobuf as well as performing
    * unexpected field validation.
-   * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
-   * of caller.
+   * Uses the modern CEL-based protovalidate system for validation.
    * @param message message to validate.
    * @param validation_visitor the validation visitor to use.
    * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
@@ -334,24 +335,24 @@ public:
     }
 
     // Throw an exception if the config has an invalid Duration field. This is needed
-    // because Envoy validates the duration in a strict way that is not supported by PGV.
+    // because Envoy validates the duration in a strict way using custom validation logic.
     validateDurationFields(message, recurse_into_any);
 
-    // TODO(mattklein123): This will recurse the message twice, once above and once for PGV. When
-    // we move to always recursing, satisfying the TODO below, we should merge into a single
-    // recursion for performance reasons.
+    // TODO(mattklein123): This will recurse the message twice, once above and once for
+    // protovalidate. When we move to always recursing, satisfying the TODO below, we should merge
+    // into a single recursion for performance reasons.
     if (recurse_into_any) {
       return recursivePgvCheck(message);
     }
 
-    // TODO(mattklein123): Now that PGV is capable of doing recursive message checks on abstract
-    // types, we can remove bottom up validation from the entire codebase and only validate
+    // TODO(mattklein123): Now that protovalidate is capable of doing recursive message checks on
+    // abstract types, we can remove bottom up validation from the entire codebase and only validate
     // at top level ingestion (bootstrap, discovery response). This is a large change and will be
     // done as a separate PR. This change will also allow removing templating from most/all of
     // related functions.
-    std::string err;
-    if (!Validate(message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, message);
+    auto status = Envoy::ProtobufMessage::ProtovalidateUtil::validate(message);
+    if (!status.ok()) {
+      ProtoExceptionUtil::throwProtoValidationException(std::string(status.message()), message);
     }
   }
 
@@ -365,9 +366,8 @@ public:
 #endif
 
   /**
-   * Downcast and validate protoc-gen-validate constraints on a given protobuf.
-   * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
-   * of caller.
+   * Downcast and validate protovalidate constraints on a given protobuf.
+   * Uses the modern CEL-based protovalidate system for validation.
    * @param message const Protobuf::Message& to downcast and validate.
    * @return const MessageType& the concrete message type downcasted to on success.
    * @throw EnvoyException if the message does not satisfy its type constraints.

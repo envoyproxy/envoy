@@ -2,9 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.h"
-#include "envoy/extensions/filters/http/custom_response/v3/custom_response.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/http/matching/data_impl.h"

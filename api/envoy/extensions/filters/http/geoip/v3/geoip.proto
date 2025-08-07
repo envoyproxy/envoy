@@ -7,7 +7,7 @@ import "envoy/config/core/v3/extension.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.geoip.v3";
 option java_outer_classname = "GeoipProto";
@@ -41,5 +41,5 @@ message Geoip {
   //
   // - :ref:`MaxMindConfig <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
   // [#extension-category: envoy.geoip_providers]
-  config.core.v3.TypedExtensionConfig provider = 3 [(validate.rules).message = {required: true}];
+  config.core.v3.TypedExtensionConfig provider = 3 [(buf.validate.field).required = true];
 }

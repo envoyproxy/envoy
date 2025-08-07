@@ -2,7 +2,6 @@
 
 #include "contrib/dynamo/filters/http/source/config.h"
 #include "contrib/envoy/extensions/filters/http/dynamo/v3/dynamo.pb.h"
-#include "contrib/envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

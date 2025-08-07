@@ -1,5 +1,4 @@
 #include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
-#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/event/dispatcher_impl.h"

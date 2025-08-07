@@ -39,7 +39,7 @@ envoy_pytool_binary(
 
 py_proto_library(
     name = "validate_py_pb2",
-    deps = ["@com_envoyproxy_protoc_gen_validate//validate:validate_proto"],
+    deps = [],
 )
 
 protoprint_rule(

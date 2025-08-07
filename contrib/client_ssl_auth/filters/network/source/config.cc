@@ -5,7 +5,6 @@
 
 #include "contrib/client_ssl_auth/filters/network/source/client_ssl_auth.h"
 #include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
-#include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

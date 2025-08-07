@@ -1,6 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
-#include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 
 #include "source/extensions/filters/http/match_delegate/config.h"
 

@@ -4,7 +4,7 @@ package envoy.type.metadata.v2;
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.metadata.v2";
 option java_outer_classname = "MetadataProto";
@@ -43,16 +43,16 @@ message MetadataKey {
   // Currently it is only supported to specify the key, i.e. field name, as one segment of a path.
   message PathSegment {
     oneof segment {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, use the key to retrieve the value in a Struct.
-      string key = 1 [(validate.rules).string = {min_bytes: 1}];
+      string key = 1 [(buf.validate.field).string.min_len = 1];
     }
   }
 
   // The key name of Metadata to retrieve the Struct from the metadata.
   // Typically, it represents a builtin subsystem or custom extension.
-  string key = 1 [(validate.rules).string = {min_bytes: 1}];
+  string key = 1 [(buf.validate.field).string.min_len = 1];
 
   // The path to retrieve the Value from the Struct. It can be a prefix or a full path,
   // e.g. ``[prop, xyz]`` for a struct or ``[prop, foo]`` for a string in the example,
@@ -60,7 +60,7 @@ message MetadataKey {
   //
   // Note: Due to that only the key type segment is supported, the path can not specify a list
   // unless the list is the last segment.
-  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated PathSegment path = 2 [(buf.validate.field).repeated.min_items = 1];
 }
 
 // Describes what kind of metadata.
@@ -83,7 +83,7 @@ message MetadataKind {
   }
 
   oneof kind {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Request kind of metadata.
     Request request = 1;

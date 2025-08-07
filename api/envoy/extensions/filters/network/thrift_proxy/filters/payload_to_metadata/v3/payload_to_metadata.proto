@@ -5,7 +5,7 @@ package envoy.extensions.filters.network.thrift_proxy.filters.payload_to_metadat
 import "envoy/type/matcher/v3/regex.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.filters.payload_to_metadata.v3";
 option java_outer_classname = "PayloadToMetadataProto";
@@ -33,7 +33,7 @@ message PayloadToMetadata {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string = {min_len: 1}];
+    string key = 2 [(buf.validate.field).string.min_len = 1];
 
     oneof value_type {
       // The value to pair with the given key.
@@ -52,14 +52,14 @@ message PayloadToMetadata {
     }
 
     // The value's type — defaults to string.
-    ValueType type = 5 [(validate.rules).enum = {defined_only: true}];
+    ValueType type = 5 [(buf.validate.field).enum.defined_only = true];
   }
 
   // A Rule defines what metadata to apply when a field is present or missing.
   // [#next-free-field: 6]
   message Rule {
     oneof match_specifier {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, the route must exactly match the request method name. As a special case,
       // an empty string matches any request method name.
@@ -72,7 +72,7 @@ message PayloadToMetadata {
     }
 
     // Specifies that a match will be performed on the value of a field.
-    FieldSelector field_selector = 3 [(validate.rules).message = {required: true}];
+    FieldSelector field_selector = 3 [(buf.validate.field).required = true];
 
     // If the field is present, apply this metadata KeyValuePair.
     KeyValuePair on_present = 4;
@@ -86,15 +86,15 @@ message PayloadToMetadata {
 
   message FieldSelector {
     // field name to log
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string.min_len = 1];
 
     // field id to match
-    int32 id = 2 [(validate.rules).int32 = {lte: 32767 gte: -32768}];
+    int32 id = 2 [(buf.validate.field).int32 = {lte: 32767 gte: -32768}];
 
     // next node of the field selector
     FieldSelector child = 3;
   }
 
   // The list of rules to apply to requests.
-  repeated Rule request_rules = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated Rule request_rules = 1 [(buf.validate.field).repeated.min_items = 1];
 }

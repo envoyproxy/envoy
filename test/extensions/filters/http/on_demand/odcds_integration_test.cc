@@ -3,7 +3,6 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.h"
-#include "envoy/extensions/filters/http/on_demand/v3/on_demand.pb.validate.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"

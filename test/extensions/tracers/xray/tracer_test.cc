@@ -5,7 +5,6 @@
 
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/tracers/xray/daemon.pb.h"
-#include "source/extensions/tracers/xray/daemon.pb.validate.h"
 #include "source/extensions/tracers/xray/tracer.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"
 

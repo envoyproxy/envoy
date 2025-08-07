@@ -8,7 +8,7 @@ import "envoy/config/core/v3/grpc_service.proto";
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.sip_proxy.tra.v3alpha";
 option java_outer_classname = "TraProto";
@@ -39,12 +39,12 @@ message TraServiceConfig {
   // Specifies the gRPC service that hosts the rate limit service. The client
   // will connect to this cluster when it needs to make rate limit service
   // requests.
-  config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.GrpcService grpc_service = 1 [(buf.validate.field).required = true];
 
   // API version for rate limit transport protocol. This describes the rate limit gRPC endpoint and
   // version of messages used on the wire.
   config.core.v3.ApiVersion transport_api_version = 2
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum = {defined_only: true}];
 
   google.protobuf.Duration timeout = 3;
 }

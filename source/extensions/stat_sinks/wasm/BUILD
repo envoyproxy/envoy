@@ -34,7 +34,6 @@ envoy_cc_library(
     deps = [
         "//envoy/stats:stats_interface",
         "//source/extensions/common/wasm:wasm_lib",
-        "@envoy_api//envoy/extensions/filters/network/wasm/v3:pkg_cc_proto",
     ],
     alwayslink = 1,
 )

@@ -9,7 +9,7 @@ import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.common.matching.v3";
 option java_outer_classname = "ExtensionMatcherProto";
@@ -32,7 +32,7 @@ message ExtensionWithMatcher {
 
   // The underlying extension config.
   config.core.v3.TypedExtensionConfig extension_config = 2
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 }
 
 // Extra settings on a per virtualhost/route/weighted-cluster level.

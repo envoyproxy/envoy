@@ -3,7 +3,6 @@
 #include "envoy/registry/registry.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.h"
-#include "contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha/router.pb.validate.h"
 #include "contrib/sip_proxy/filters/network/source/router/router_impl.h"
 
 namespace Envoy {

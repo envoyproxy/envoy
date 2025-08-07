@@ -2,7 +2,6 @@
 #include "envoy/server/filter_config.h"
 
 #include "test/integration/filters/inspect_data_listener_filter_config.pb.h"
-#include "test/integration/filters/inspect_data_listener_filter_config.pb.validate.h"
 
 namespace Envoy {
 

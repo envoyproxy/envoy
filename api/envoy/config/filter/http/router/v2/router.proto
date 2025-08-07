@@ -8,7 +8,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.router.v2";
 option java_outer_classname = "RouterProto";
@@ -61,7 +61,7 @@ message Router {
   // * :ref:`config_http_filters_router_x-envoy-max-retries`
   // * :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`
   // * :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`
-  repeated string strict_check_headers = 5 [(validate.rules).repeated = {
+  repeated string strict_check_headers = 5 [(buf.validate.field).repeated = {
     items {
       string {
         in: "x-envoy-upstream-rq-timeout-ms"

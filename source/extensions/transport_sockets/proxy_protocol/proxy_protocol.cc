@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
-#include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.validate.h"
 #include "envoy/network/transport_socket.h"
 
 #include "source/common/buffer/buffer_impl.h"

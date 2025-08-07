@@ -1,6 +1,5 @@
 #include "source/extensions/transport_sockets/tcp_stats/config.h"
 
-#include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 

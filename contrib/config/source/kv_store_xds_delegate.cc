@@ -11,7 +11,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
 #include "contrib/envoy/extensions/config/v3alpha/kv_store_xds_delegate_config.pb.h"
-#include "contrib/envoy/extensions/config/v3alpha/kv_store_xds_delegate_config.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

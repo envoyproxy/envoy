@@ -3,7 +3,6 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.h"
-#include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

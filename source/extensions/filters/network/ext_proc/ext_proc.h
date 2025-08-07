@@ -7,7 +7,6 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.h"
-#include "envoy/extensions/filters/network/ext_proc/v3/ext_proc.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/service/network_ext_proc/v3/network_external_processor.pb.h"

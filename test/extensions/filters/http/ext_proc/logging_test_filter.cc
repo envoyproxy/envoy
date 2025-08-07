@@ -9,7 +9,6 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.h"
-#include "test/extensions/filters/http/ext_proc/logging_test_filter.pb.validate.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"

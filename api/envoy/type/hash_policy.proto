@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.type;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type";
 option java_outer_classname = "HashPolicyProto";
@@ -21,7 +21,7 @@ message HashPolicy {
   }
 
   oneof policy_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     SourceIp source_ip = 1;
   }

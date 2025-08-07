@@ -1,11 +1,9 @@
 #include <string>
 
 #include "envoy/admin/v3/config_dump_shared.pb.h"
-#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
-#include "envoy/config/route/v3/scoped_route.pb.validate.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/init/manager.h"

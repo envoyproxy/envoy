@@ -12,9 +12,7 @@
 #include "test/test_common/registry.h"
 
 #include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/postgres_proxy/v3alpha/postgres_proxy.pb.validate.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_integration_test.pb.h"
-#include "contrib/postgres_proxy/filters/network/test/postgres_integration_test.pb.validate.h"
 #include "contrib/postgres_proxy/filters/network/test/postgres_test_utils.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

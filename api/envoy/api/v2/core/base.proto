@@ -14,7 +14,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 import public "envoy/api/v2/core/socket_option.proto";
 
@@ -229,7 +229,7 @@ message RuntimeUInt32 {
   uint32 default_value = 2;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 3 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 3 [(buf.validate.field).string.min_len = 1];
 }
 
 // Runtime derived double with a default when not specified.
@@ -238,26 +238,25 @@ message RuntimeDouble {
   double default_value = 1;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 // Runtime derived bool with a default when not specified.
 message RuntimeFeatureFlag {
   // Default value if runtime value is not available.
-  google.protobuf.BoolValue default_value = 1 [(validate.rules).message = {required: true}];
+  google.protobuf.BoolValue default_value = 1 [(buf.validate.field).required = true];
 
   // Runtime key to get value for comparison. This value is used if defined. The boolean value must
   // be represented via its
   // `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
-  string runtime_key = 2 [(validate.rules).string = {min_bytes: 1}];
+  string runtime_key = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 // Header name/value pair.
 message HeaderValue {
   // Header name.
   string key = 1
-      [(validate.rules).string =
-           {min_bytes: 1 max_bytes: 16384 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string = {min_bytes: 1 max_bytes: 16384}];
 
   // Header value.
   //
@@ -265,14 +264,14 @@ message HeaderValue {
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of `-`.
   string value = 2 [
-    (validate.rules).string = {max_bytes: 16384 well_known_regex: HTTP_HEADER_VALUE strict: false}
+    (buf.validate.field).string = {max_len: 16384}
   ];
 }
 
 // Header name/value pair plus option to control append behavior.
 message HeaderValueOption {
   // Header name/value pair that this option applies to.
-  HeaderValue header = 1 [(validate.rules).message = {required: true}];
+  HeaderValue header = 1 [(buf.validate.field).required = true];
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values.
@@ -287,16 +286,16 @@ message HeaderMap {
 // Data source consisting of either a file or an inline value.
 message DataSource {
   oneof specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Local filesystem data source.
-    string filename = 1 [(validate.rules).string = {min_bytes: 1}];
+    string filename = 1 [(buf.validate.field).string.min_len = 1];
 
     // Bytes inlined in the configuration.
-    bytes inline_bytes = 2 [(validate.rules).bytes = {min_len: 1}];
+    bytes inline_bytes = 2 [(buf.validate.field).bytes.min_len = 1];
 
     // String inlined in the configuration.
-    string inline_string = 3 [(validate.rules).string = {min_bytes: 1}];
+    string inline_string = 3 [(buf.validate.field).string.min_len = 1];
   }
 }
 
@@ -315,10 +314,10 @@ message RetryPolicy {
 // The message specifies how to fetch data from remote and how to verify it.
 message RemoteDataSource {
   // The HTTP URI to fetch the remote data.
-  HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
+  HttpUri http_uri = 1 [(buf.validate.field).required = true];
 
   // SHA256 string for verifying data.
-  string sha256 = 2 [(validate.rules).string = {min_bytes: 1}];
+  string sha256 = 2 [(buf.validate.field).string.min_len = 1];
 
   // Retry policy for fetching remote data.
   RetryPolicy retry_policy = 3;
@@ -327,7 +326,7 @@ message RemoteDataSource {
 // Async data source which support async data fetch.
 message AsyncDataSource {
   oneof specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Local async data source.
     DataSource local = 1;
@@ -344,7 +343,7 @@ message AsyncDataSource {
 message TransportSocket {
   // The name of the transport socket to instantiate. The name must match a supported transport
   // socket implementation.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported transport socket implementations for further documentation.
@@ -367,7 +366,7 @@ message TransportSocket {
 //   as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.
 message RuntimeFractionalPercent {
   // Default value if the runtime value's for the numerator/denominator keys are not available.
-  type.FractionalPercent default_value = 1 [(validate.rules).message = {required: true}];
+  type.FractionalPercent default_value = 1 [(buf.validate.field).required = true];
 
   // Runtime key for a YAML representation of a FractionalPercent.
   string runtime_key = 2;

@@ -6,7 +6,7 @@ import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.proxy_protocol.v3";
 option java_outer_classname = "UpstreamProxyProtocolProto";
@@ -23,7 +23,7 @@ message ProxyProtocolUpstreamTransport {
   config.core.v3.ProxyProtocolConfig config = 1;
 
   // The underlying transport socket being wrapped.
-  config.core.v3.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
+  config.core.v3.TransportSocket transport_socket = 2 [(buf.validate.field).required = true];
 
   // If this is set to true, the null addresses are allowed in the PROXY protocol header.
   // The proxy protocol header encodes the null addresses to AF_UNSPEC.

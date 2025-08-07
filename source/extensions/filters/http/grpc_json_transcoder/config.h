@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
-#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

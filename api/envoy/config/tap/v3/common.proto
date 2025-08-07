@@ -14,7 +14,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.tap.v3";
 option java_outer_classname = "CommonProto";
@@ -48,7 +48,7 @@ message TapConfig {
 
   // The tap output configuration. If a match configuration matches a data source being tapped,
   // a tap will occur and the data will be written to the configured output.
-  OutputConfig output_config = 2 [(validate.rules).message = {required: true}];
+  OutputConfig output_config = 2 [(buf.validate.field).required = true];
 
   // [#not-implemented-hide:] Specify if Tap matching is enabled. The % of requests\connections for
   // which the tap matching is enabled. When not enabled, the request\connection will not be
@@ -74,11 +74,11 @@ message MatchPredicate {
         "envoy.service.tap.v2alpha.MatchPredicate.MatchSet";
 
     // The list of rules that make up the set.
-    repeated MatchPredicate rules = 1 [(validate.rules).repeated = {min_items: 2}];
+    repeated MatchPredicate rules = 1 [(buf.validate.field).repeated.min_items = 2];
   }
 
   oneof rule {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set that describes a logical OR. If any member of the set matches, the match configuration
     // matches.
@@ -92,7 +92,7 @@ message MatchPredicate {
     MatchPredicate not_match = 3;
 
     // The match configuration will always match.
-    bool any_match = 4 [(validate.rules).bool = {const: true}];
+    bool any_match = 4 [(buf.validate.field).bool.const = true];
 
     // HTTP request headers match configuration.
     HttpHeadersMatch http_request_headers_match = 5;
@@ -136,13 +136,13 @@ message HttpHeadersMatch {
 message HttpGenericBodyMatch {
   message GenericTextMatch {
     oneof rule {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Text string to be located in HTTP body.
-      string string_match = 1 [(validate.rules).string = {min_len: 1}];
+      string string_match = 1 [(buf.validate.field).string.min_len = 1];
 
       // Sequence of bytes to be located in HTTP body.
-      bytes binary_match = 2 [(validate.rules).bytes = {min_len: 1}];
+      bytes binary_match = 2 [(buf.validate.field).bytes.min_len = 1];
     }
   }
 
@@ -150,7 +150,7 @@ message HttpGenericBodyMatch {
   uint32 bytes_limit = 1;
 
   // List of patterns to match.
-  repeated GenericTextMatch patterns = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated GenericTextMatch patterns = 2 [(buf.validate.field).repeated.min_items = 1];
 }
 
 // Tap output configuration.
@@ -161,7 +161,7 @@ message OutputConfig {
 
   // Output sinks for tap data. Currently a single sink is allowed in the list. Once multiple
   // sink types are supported this constraint will be relaxed.
-  repeated OutputSink sinks = 1 [(validate.rules).repeated = {min_items: 1 max_items: 1}];
+  repeated OutputSink sinks = 1 [(buf.validate.field).repeated = {min_items: 1 max_items: 1}];
 
   // For buffered tapping, the maximum amount of received body that will be buffered prior to
   // truncation. If truncation occurs, the :ref:`truncated
@@ -235,10 +235,10 @@ message OutputSink {
   }
 
   // Sink output format.
-  Format format = 1 [(validate.rules).enum = {defined_only: true}];
+  Format format = 1 [(buf.validate.field).enum.defined_only = true];
 
   oneof output_sink_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Tap output will be streamed out the :http:post:`/tap` admin endpoint.
     //
@@ -286,7 +286,7 @@ message StreamingAdminSink {
 message BufferedAdminSink {
   // Stop collecting traces when the specified number are collected.
   // If other criteria for ending collection are reached first, this value will not be used.
-  uint64 max_traces = 1 [(validate.rules).uint64 = {gt: 0}];
+  uint64 max_traces = 1 [(buf.validate.field).uint64.gt = 0];
 
   // Acts as a fallback to prevent the client from waiting for long periods of time.
   // After timeout has occurred, a buffer flush will be triggered, returning the traces buffered so far.
@@ -304,7 +304,7 @@ message FilePerTapSink {
   // Path prefix. The output file will be of the form <path_prefix>_<id>.pb, where <id> is an
   // identifier distinguishing the recorded trace for stream instances (the Envoy
   // connection ID, HTTP stream ID, etc.).
-  string path_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string path_prefix = 1 [(buf.validate.field).string.min_len = 1];
 }
 
 // [#not-implemented-hide:] Streaming gRPC sink configuration sends the taps to an external gRPC
@@ -317,5 +317,5 @@ message StreamingGrpcSink {
   string tap_id = 1;
 
   // The gRPC server that hosts the Tap Sink Service.
-  core.v3.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+  core.v3.GrpcService grpc_service = 2 [(buf.validate.field).required = true];
 }

@@ -1,7 +1,6 @@
 #include "source/extensions/access_loggers/open_telemetry/config.h"
 
 #include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.h"
-#include "envoy/extensions/access_loggers/open_telemetry/v3/logs_service.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

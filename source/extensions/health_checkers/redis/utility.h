@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
-#include "envoy/extensions/health_checkers/redis/v3/redis.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/protobuf/protobuf.h"

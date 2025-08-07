@@ -11,7 +11,7 @@ import "envoy/type/matcher/string.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.rbac.v2";
 option java_outer_classname = "RbacProto";
@@ -90,12 +90,12 @@ message Policy {
   // Required. The set of permissions that define a role. Each permission is matched with OR
   // semantics. To match all actions for this policy, a single Permission with the `any` field set
   // to true should be used.
-  repeated Permission permissions = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated Permission permissions = 1 [(buf.validate.field).repeated.min_items = 1];
 
   // Required. The set of principals that are assigned/denied the role based on “action”. Each
   // principal is matched with OR semantics. To match all downstreams for this policy, a single
   // Principal with the `any` field set to true should be used.
-  repeated Principal principals = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated Principal principals = 2 [(buf.validate.field).repeated.min_items = 1];
 
   // An optional symbolic expression specifying an access control
   // :ref:`condition <arch_overview_condition>`. The condition is combined
@@ -109,11 +109,11 @@ message Permission {
   // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
-    repeated Permission rules = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated Permission rules = 1 [(buf.validate.field).repeated.min_items = 1];
   }
 
   oneof rule {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set of rules that all must match in order to define the action.
     Set and_rules = 1;
@@ -122,7 +122,7 @@ message Permission {
     Set or_rules = 2;
 
     // When any is set, it matches any action.
-    bool any = 3 [(validate.rules).bool = {const: true}];
+    bool any = 3 [(buf.validate.field).bool.const = true];
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
@@ -137,7 +137,7 @@ message Permission {
     api.v2.core.CidrRange destination_ip = 5;
 
     // A port number that describes the destination port connecting to.
-    uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];
+    uint32 destination_port = 6 [(buf.validate.field).uint32.lte = 65535];
 
     // Metadata that describes additional information about the action.
     type.matcher.MetadataMatcher metadata = 7;
@@ -176,7 +176,7 @@ message Principal {
   // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
-    repeated Principal ids = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated Principal ids = 1 [(buf.validate.field).repeated.min_items = 1];
   }
 
   // Authentication attributes for a downstream.
@@ -190,7 +190,7 @@ message Principal {
   }
 
   oneof identifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set of identifiers that all must match in order to define the downstream.
     Set and_ids = 1;
@@ -199,7 +199,7 @@ message Principal {
     Set or_ids = 2;
 
     // When any is set, it matches any downstream.
-    bool any = 3 [(validate.rules).bool = {const: true}];
+    bool any = 3 [(buf.validate.field).bool.const = true];
 
     // Authenticated attributes that identify the downstream.
     Authenticated authenticated = 4;

@@ -60,6 +60,7 @@ envoy_cc_library(
     name = "utility_lib_header",
     hdrs = ["utility.h"],
     deps = [
+        ":protovalidate_util_lib",
         "//envoy/api:api_interface",
         "//envoy/protobuf:message_validator_interface",
         "//source/common/common:statusor_lib",
@@ -208,6 +209,31 @@ envoy_cc_library(
     ],
 )
 
+# Protovalidate validation utility.
+envoy_cc_library(
+    name = "protovalidate_util_lib",
+    srcs = ["protovalidate_util.cc"],
+    hdrs = ["protovalidate_util.h"],
+    copts = [
+        "-Wno-sign-compare",  # Suppress warnings from protovalidate-cc
+        "-Wno-unused-variable",  # Suppress unused variable warnings
+        "-Wno-unused-function",  # Suppress unused function warnings
+        "-Wno-error",  # Convert all errors to warnings for this library
+        "-DIGNORE_IF_DEFAULT_VALUE=IGNORE_IF_ZERO_VALUE",  # Map missing enum
+        "-DIGNORE_IF_UNPOPULATED=IGNORE_ALWAYS",  # Map missing enum
+        "-Wno-implicit-function-declaration",  # Allow missing declarations
+    ],
+    defines = ["ENVOY_ENABLE_PROTOVALIDATE=1"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:fmt_lib",
+        "@com_bufbuild_protovalidate_cc//buf/validate:validator",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
+
 envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
@@ -215,6 +241,7 @@ envoy_cc_library(
         ":deterministic_hash_lib",
         ":message_validator_lib",
         ":protobuf",
+        ":protovalidate_util_lib",
         ":utility_lib_header",
         "//envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",

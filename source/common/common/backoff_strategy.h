@@ -6,7 +6,6 @@
 #include "envoy/common/backoff_strategy.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/backoff.pb.h"
-#include "envoy/config/core/v3/backoff.pb.validate.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"

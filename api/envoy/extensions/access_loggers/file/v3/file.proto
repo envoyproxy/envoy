@@ -9,7 +9,7 @@ import "google/protobuf/struct.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.access_loggers.file.v3";
 option java_outer_classname = "FileProto";
@@ -29,7 +29,7 @@ message FileAccessLog {
       "envoy.config.accesslog.v2.FileAccessLog";
 
   // A path to a local file to which to write the access log entries.
-  string path = 1 [(validate.rules).string = {min_len: 1}];
+  string path = 1 [(buf.validate.field).string.min_len = 1];
 
   oneof access_log_format {
     // Access log :ref:`format string<config_access_log_format_strings>`.
@@ -58,6 +58,6 @@ message FileAccessLog {
     // Configuration to form access log data and format.
     // If not specified, use :ref:`default format <config_access_log_default_format>`.
     config.core.v3.SubstitutionFormatString log_format = 5
-        [(validate.rules).message = {required: true}];
+        [(buf.validate.field).required = true];
   }
 }

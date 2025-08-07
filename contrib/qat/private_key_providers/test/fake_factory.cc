@@ -11,7 +11,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "contrib/envoy/extensions/private_key_providers/qat/v3alpha/qat.pb.h"
-#include "contrib/envoy/extensions/private_key_providers/qat/v3alpha/qat.pb.validate.h"
 #include "contrib/qat/private_key_providers/source/qat_private_key_provider.h"
 #include "openssl/rsa.h"
 #include "openssl/ssl.h"

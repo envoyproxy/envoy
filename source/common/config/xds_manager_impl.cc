@@ -1,7 +1,5 @@
 #include "source/common/config/xds_manager_impl.h"
 
-#include "envoy/config/core/v3/config_source.pb.validate.h"
-
 #include "source/common/common/thread.h"
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/null_grpc_mux_impl.h"

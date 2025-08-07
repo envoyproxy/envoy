@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/grpc_web/v3/grpc_web.pb.h"
-#include "envoy/extensions/filters/http/grpc_web/v3/grpc_web.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

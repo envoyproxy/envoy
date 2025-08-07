@@ -9,7 +9,7 @@ import "google/protobuf/duration.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.fault.v2";
 option java_outer_classname = "FaultProto";
@@ -41,7 +41,7 @@ message FaultDelay {
   FaultDelayType type = 1 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   oneof fault_delay_secifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Add a fixed delay before forwarding the operation upstream. See
     // https://developers.google.com/protocol-buffers/docs/proto3#json for
@@ -49,7 +49,7 @@ message FaultDelay {
     // delay will be injected before a new request/operation. For TCP
     // connections, the proxying of the connection upstream will be delayed
     // for the specified period. This is required if type is FIXED.
-    google.protobuf.Duration fixed_delay = 3 [(validate.rules).duration = {gt {}}];
+    google.protobuf.Duration fixed_delay = 3 [(buf.validate.field).duration = {gt {}}];
 
     // Fault delays are controlled via an HTTP header (if applicable).
     HeaderDelay header_delay = 5;
@@ -64,7 +64,7 @@ message FaultRateLimit {
   // Describes a fixed/constant rate limit.
   message FixedLimit {
     // The limit supplied in KiB/s.
-    uint64 limit_kbps = 1 [(validate.rules).uint64 = {gte: 1}];
+    uint64 limit_kbps = 1 [(buf.validate.field).uint64.gte = 1];
   }
 
   // Rate limits are controlled via an HTTP header (if applicable). See the
@@ -74,7 +74,7 @@ message FaultRateLimit {
   }
 
   oneof limit_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A fixed rate limit.
     FixedLimit fixed_limit = 1;

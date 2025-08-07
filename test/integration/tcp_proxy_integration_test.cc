@@ -20,7 +20,6 @@
 #include "test/integration/fake_access_log.h"
 #include "test/integration/ssl_utility.h"
 #include "test/integration/tcp_proxy_integration_test.pb.h"
-#include "test/integration/tcp_proxy_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 

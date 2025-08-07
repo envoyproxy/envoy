@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
-#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

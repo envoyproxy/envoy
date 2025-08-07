@@ -1,7 +1,6 @@
 #include "source/extensions/common/tap/admin.h"
 
 #include "envoy/admin/v3/tap.pb.h"
-#include "envoy/admin/v3/tap.pb.validate.h"
 #include "envoy/config/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 

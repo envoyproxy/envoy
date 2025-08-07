@@ -3,7 +3,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/ratelimit/ratelimit.h"
 
 #include "source/common/network/address_impl.h"

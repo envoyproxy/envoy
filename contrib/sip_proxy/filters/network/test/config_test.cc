@@ -4,7 +4,6 @@
 #include "test/test_common/registry.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/sip_proxy/v3alpha/sip_proxy.pb.validate.h"
 #include "contrib/sip_proxy/filters/network/source/config.h"
 #include "contrib/sip_proxy/filters/network/source/filters/factory_base.h"
 #include "contrib/sip_proxy/filters/network/test/mocks.h"

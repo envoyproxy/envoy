@@ -3,12 +3,12 @@ syntax = "proto3";
 // The structures are used for the purpose of JSON (de)serialization.
 package source.extensions.filters.http.aws_lambda;
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message Request {
-  string raw_path = 1 [(validate.rules).string = {min_len: 1}];
+  string raw_path = 1 [(buf.validate.field).string.min_len = 1];
 
-  string method = 2 [(validate.rules).string = {min_len: 1}];
+  string method = 2 [(buf.validate.field).string.min_len = 1];
   // HTTP headers with the same name are coalesced into a single comma-separated value.
   map<string, string> headers = 3;
 

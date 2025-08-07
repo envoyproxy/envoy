@@ -8,7 +8,7 @@ import "google/protobuf/wrappers.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.key_value.file_based.v3";
 option java_outer_classname = "ConfigProto";
@@ -25,7 +25,7 @@ message FileBasedKeyValueStoreConfig {
 
   // The filename to read the keys and values from, and write the keys and
   // values to.
-  string filename = 1 [(validate.rules).string = {min_len: 1}];
+  string filename = 1 [(buf.validate.field).string.min_len = 1];
 
   // The interval at which the key value store should be flushed to the file.
   google.protobuf.Duration flush_interval = 2;

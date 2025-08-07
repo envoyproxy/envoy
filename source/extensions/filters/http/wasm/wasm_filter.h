@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/wasm/v3/wasm.pb.validate.h"
+#include "envoy/extensions/filters/http/wasm/v3/wasm.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"

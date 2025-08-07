@@ -3,7 +3,6 @@
 
 #include <algorithm>
 
-#include "test/common/http/http2/hpack_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
 

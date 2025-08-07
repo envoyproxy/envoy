@@ -8,7 +8,6 @@
 
 #include "envoy/common/hashable.h"
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/type/v3/percent.pb.h"

@@ -8,7 +8,7 @@ import "envoy/config/core/v3/grpc_service.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.stat_sinks.open_telemetry.v3";
 option java_outer_classname = "OpenTelemetryProto";
@@ -23,10 +23,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 8]
 message SinkConfig {
   oneof protocol_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The upstream gRPC cluster that implements the OTLP/gRPC collector.
-    config.core.v3.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+    config.core.v3.GrpcService grpc_service = 1 [(buf.validate.field).required = true];
   }
 
   // Attributes to be associated with the resource in the OTLP message.

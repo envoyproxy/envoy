@@ -1,7 +1,6 @@
 #include "source/extensions/resource_monitors/cgroup_memory/config.h"
 
 #include "envoy/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.pb.h"
-#include "envoy/extensions/resource_monitors/cgroup_memory/v3/cgroup_memory.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"

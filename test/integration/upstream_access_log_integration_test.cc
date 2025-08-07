@@ -16,7 +16,6 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/upstream_socket.pb.h"
-#include "test/integration/upstream_socket.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"

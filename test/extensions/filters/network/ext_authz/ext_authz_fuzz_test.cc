@@ -5,7 +5,6 @@
 #include "source/extensions/filters/network/ext_authz/ext_authz.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
-#include "test/extensions/filters/network/ext_authz/ext_authz_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"

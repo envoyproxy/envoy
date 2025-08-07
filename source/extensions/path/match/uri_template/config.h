@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.h"
-#include "envoy/extensions/path/match/uri_template/v3/uri_template_match.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/router/path_matcher.h"
 

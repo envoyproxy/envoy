@@ -14,7 +14,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.common.dynamic_forward_proxy.v3";
 option java_outer_classname = "DnsCacheProto";
@@ -43,7 +43,7 @@ message DnsCacheConfig {
   // configurations with the same name *must* otherwise have the same settings when referenced
   // from different configuration components. Configuration will fail to load if this is not
   // the case.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // The DNS lookup family to use during resolution.
   //
@@ -54,7 +54,7 @@ message DnsCacheConfig {
   // address and return the one that wins. This same method could potentially also be used for
   // QUIC to TCP fall back.]
   config.cluster.v3.Cluster.DnsLookupFamily dns_lookup_family = 2
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // The DNS refresh rate for unresolved DNS hosts. If not specified defaults to 60s.
   //
@@ -63,13 +63,13 @@ message DnsCacheConfig {
   // Once a host has been resolved, the refresh rate will be the DNS TTL, capped
   // at a minimum of ``dns_min_refresh_rate``.
   google.protobuf.Duration dns_refresh_rate = 3
-      [(validate.rules).duration = {gte {nanos: 1000000}}];
+      [(buf.validate.field).duration = {gte {nanos: 1000000}}];
 
   // The minimum rate that DNS resolution will occur. Per ``dns_refresh_rate``, once a host is
   // resolved, the DNS TTL will be used, with a minimum set by ``dns_min_refresh_rate``.
   // ``dns_min_refresh_rate`` defaults to 5s and must also be >= 1s.
   google.protobuf.Duration dns_min_refresh_rate = 14
-      [(validate.rules).duration = {gte {seconds: 1}}];
+      [(buf.validate.field).duration = {gte {seconds: 1}}];
 
   // The TTL for hosts that are unused. Hosts that have not been used in the configured time
   // interval will be purged. If not specified defaults to 5m.
@@ -83,7 +83,7 @@ message DnsCacheConfig {
   //  .. note:
   //
   //   The TTL has no relation to DNS TTL and is only used to control Envoy's resource usage.
-  google.protobuf.Duration host_ttl = 4 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration host_ttl = 4 [(buf.validate.field).duration = {gt {}}];
 
   // The maximum number of hosts that the cache will hold. If not specified defaults to 1024.
   //
@@ -92,7 +92,7 @@ message DnsCacheConfig {
   //   The implementation is approximate and enforced independently on each worker thread, thus
   //   it is possible for the maximum hosts in the cache to go slightly above the configured
   //   value depending on timing. This is similar to how other circuit breakers work.
-  google.protobuf.UInt32Value max_hosts = 5 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_hosts = 5 [(buf.validate.field).uint32.gt = 0];
 
   // Disable the DNS refresh on failure. If this field is set to true, it will ignore the
   // :ref:`typed_dns_resolver_config <envoy_v3_api_field_extensions.common.dynamic_forward_proxy.v3.DnsCacheConfig.dns_failure_refresh_rate>`.
@@ -144,7 +144,7 @@ message DnsCacheConfig {
   // Setting this timeout will ensure that queries succeed or fail within the specified time frame
   // and are then retried using the standard refresh rates. Setting it to 0 will disable the Envoy DNS
   // query timeout and use the underlying DNS implementation timeout. Defaults to 5s if not set.
-  google.protobuf.Duration dns_query_timeout = 11 [(validate.rules).duration = {gte {}}];
+  google.protobuf.Duration dns_query_timeout = 11 [(buf.validate.field).duration = {gte {}}];
 
   // Configuration to flush the DNS cache to long term storage.
   config.common.key_value.v3.KeyValueStoreConfig key_value_config = 13;

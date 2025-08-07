@@ -8,7 +8,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/set_response_code_filter_config.pb.h"
-#include "test/integration/filters/set_response_code_filter_config.pb.validate.h"
 
 #include "absl/strings/match.h"
 

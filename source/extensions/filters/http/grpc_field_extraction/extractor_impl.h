@@ -4,7 +4,6 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
-#include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/grpc_field_extraction/extractor.h"

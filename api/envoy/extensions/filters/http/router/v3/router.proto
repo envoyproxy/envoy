@@ -11,7 +11,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.router.v3";
 option java_outer_classname = "RouterProto";
@@ -42,7 +42,7 @@ message Router {
     // case of long-lived requests, such as CONNECT and Websockets.
     // The interval must be at least 1 millisecond.
     google.protobuf.Duration upstream_log_flush_interval = 2
-        [(validate.rules).duration = {gte {nanos: 1000000}}];
+        [(buf.validate.field).duration = {gte {nanos: 1000000}}];
   }
 
   // Whether the router generates dynamic cluster statistics. Defaults to
@@ -92,7 +92,7 @@ message Router {
   // * :ref:`config_http_filters_router_x-envoy-max-retries`
   // * :ref:`config_http_filters_router_x-envoy-upstream-rq-timeout-ms`
   // * :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`
-  repeated string strict_check_headers = 5 [(validate.rules).repeated = {
+  repeated string strict_check_headers = 5 [(buf.validate.field).repeated = {
     items {
       string {
         in: "x-envoy-upstream-rq-timeout-ms"

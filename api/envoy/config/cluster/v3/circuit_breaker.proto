@@ -9,7 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.cluster.v3";
 option java_outer_classname = "CircuitBreakerProto";
@@ -52,7 +52,7 @@ message CircuitBreakers {
 
     // The :ref:`RoutingPriority<envoy_v3_api_enum_config.core.v3.RoutingPriority>`
     // the specified CircuitBreaker settings apply to.
-    core.v3.RoutingPriority priority = 1 [(validate.rules).enum = {defined_only: true}];
+    core.v3.RoutingPriority priority = 1 [(buf.validate.field).enum.defined_only = true];
 
     // The maximum number of connections that Envoy will make to the upstream
     // cluster. If not specified, the default is 1024.

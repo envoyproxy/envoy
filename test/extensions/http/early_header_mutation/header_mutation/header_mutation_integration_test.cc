@@ -1,5 +1,4 @@
 #include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.h"
-#include "envoy/extensions/http/early_header_mutation/header_mutation/v3/header_mutation.pb.validate.h"
 
 #include "test/integration/filters/common.h"
 #include "test/integration/http_integration.h"

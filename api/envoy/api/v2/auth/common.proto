@@ -12,7 +12,7 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.auth";
 option java_outer_classname = "CommonProto";
@@ -43,11 +43,11 @@ message TlsParameters {
   }
 
   // Minimum TLS protocol version. By default, it's ``TLSv1_2`` for both clients and servers.
-  TlsProtocol tls_minimum_protocol_version = 1 [(validate.rules).enum = {defined_only: true}];
+  TlsProtocol tls_minimum_protocol_version = 1 [(buf.validate.field).enum.defined_only = true];
 
   // Maximum TLS protocol version. By default, it's ``TLSv1_2`` for clients and ``TLSv1_3`` for
   // servers.
-  TlsProtocol tls_maximum_protocol_version = 2 [(validate.rules).enum = {defined_only: true}];
+  TlsProtocol tls_maximum_protocol_version = 2 [(buf.validate.field).enum.defined_only = true];
 
   // If specified, the TLS listener will only support the specified `cipher list
   // <https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html#Cipher-suite-configuration>`_
@@ -113,7 +113,7 @@ message TlsParameters {
 message PrivateKeyProvider {
   // Private key method provider name. The name must match a
   // supported private key method provider type.
-  string provider_name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string provider_name = 1 [(buf.validate.field).string.min_len = 1];
 
   // Private key method provider specific configuration.
   oneof config_type {
@@ -176,7 +176,7 @@ message TlsSessionTicketKeys {
   //   * Rotate session ticket keys at least daily, and preferably hourly
   //   * Always generate keys using a cryptographically-secure random data source
   repeated core.DataSource keys = 1
-      [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
+      [(buf.validate.field).repeated.min_items = 1, (udpa.annotations.sensitive) = true];
 }
 
 // [#next-free-field: 11]
@@ -244,7 +244,7 @@ message CertificateValidationContext {
   //   because SPKI is tied to a private key, so it doesn't change when the certificate
   //   is renewed using the same private key.
   repeated string verify_certificate_spki = 3
-      [(validate.rules).repeated = {items {string {min_bytes: 44 max_bytes: 44}}}];
+      [(buf.validate.field).repeated = {items {string {min_bytes: 44 max_bytes: 44}}}];
 
   // An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will verify that
   // the SHA-256 of the DER-encoded presented certificate matches one of the specified values.
@@ -273,7 +273,7 @@ message CertificateValidationContext {
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
   // a hash matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
-      [(validate.rules).repeated = {items {string {min_bytes: 64 max_bytes: 95}}}];
+      [(buf.validate.field).repeated = {items {string {min_bytes: 64 max_bytes: 95}}}];
 
   // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified values.
@@ -323,5 +323,5 @@ message CertificateValidationContext {
 
   // Certificate trust chain verification mode.
   TrustChainVerification trust_chain_verification = 10
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 }

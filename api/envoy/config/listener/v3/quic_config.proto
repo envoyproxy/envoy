@@ -14,7 +14,7 @@ import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.listener.v3";
 option java_outer_classname = "QuicConfigProto";
@@ -55,7 +55,7 @@ message QuicProtocolOptions {
   // The actual number of packets to read in total by the UDP listener is also
   // bound by 6000, regardless of this field or how many connections there are.
   google.protobuf.UInt32Value packets_to_read_to_connection_count_ratio = 5
-      [(validate.rules).uint32 = {gte: 1}];
+      [(buf.validate.field).uint32.gte = 1];
 
   // Configure which implementation of ``quic::QuicCryptoClientStreamBase`` to be used for this listener.
   // If not specified the :ref:`QUICHE default one configured by <envoy_v3_api_msg_extensions.quic.crypto_stream.v3.CryptoServerStreamConfig>` will be used.
@@ -93,7 +93,7 @@ message QuicProtocolOptions {
   // Cmsg may be truncated or omitted if expected size is not set.
   // If not specified, no cmsg will be saved to QuicReceivedPacket.
   repeated core.v3.SocketCmsgHeaders save_cmsg_config = 12
-      [(validate.rules).repeated = {max_items: 1}];
+      [(buf.validate.field).repeated.max_items = 1];
 
   // If true, the listener will reject connection-establishing packets at the
   // QUIC layer by replying with an empty version negotiation packet to the

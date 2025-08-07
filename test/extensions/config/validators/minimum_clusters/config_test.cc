@@ -1,5 +1,4 @@
 #include "envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.pb.h"
-#include "envoy/extensions/config/validators/minimum_clusters/v3/minimum_clusters.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/message_validator_impl.h"

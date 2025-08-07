@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/network/direct_response/v3/config.pb.h"
-#include "envoy/extensions/filters/network/direct_response/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

@@ -11,7 +11,7 @@ import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.dubbo_proxy.v3";
 option java_outer_classname = "DubboProxyProto";
@@ -38,7 +38,7 @@ enum SerializationType {
 message Drds {
   // Configuration source specifier.
   // In case of ``api_config_source`` only aggregated ``api_type`` is supported.
-  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource config_source = 1 [(buf.validate.field).required = true];
 
   // The name of the multiple route configuration. This allows to use different multiple route
   // configurations. Tells which multiple route configuration should be fetched from the configuration
@@ -52,13 +52,13 @@ message DubboProxy {
       "envoy.config.filter.network.dubbo_proxy.v2alpha1.DubboProxy";
 
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string.min_len = 1];
 
   // Configure the protocol used.
-  ProtocolType protocol_type = 2 [(validate.rules).enum = {defined_only: true}];
+  ProtocolType protocol_type = 2 [(buf.validate.field).enum.defined_only = true];
 
   // Configure the serialization protocol used.
-  SerializationType serialization_type = 3 [(validate.rules).enum = {defined_only: true}];
+  SerializationType serialization_type = 3 [(buf.validate.field).enum.defined_only = true];
 
   // The route table for the connection manager is static and is specified in this property.
   //
@@ -89,7 +89,7 @@ message DubboFilter {
 
   // The name of the filter to instantiate. The name must match a supported
   // filter.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.

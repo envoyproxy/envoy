@@ -1,5 +1,4 @@
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/route.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 
 #include "source/common/http/header_map_impl.h"

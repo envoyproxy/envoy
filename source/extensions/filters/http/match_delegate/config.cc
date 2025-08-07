@@ -5,7 +5,6 @@
 #include "envoy/http/filter.h"
 #include "envoy/registry/registry.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"

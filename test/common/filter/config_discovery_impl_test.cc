@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/extension.pb.h"
-#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 

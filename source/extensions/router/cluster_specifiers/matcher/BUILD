@@ -38,6 +38,5 @@ envoy_cc_extension(
         ":matcher_cluster_specifier_lib",
         "//envoy/registry",
         "//source/common/router:matcher_visitor_lib",
-        "@envoy_api//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg_cc_proto",
     ],
 )

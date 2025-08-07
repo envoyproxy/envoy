@@ -1,4 +1,3 @@
-#include "envoy/extensions/stat_sinks/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/protobuf.h"

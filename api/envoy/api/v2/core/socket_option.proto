@@ -4,7 +4,7 @@ package envoy.api.v2.core;
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "SocketOptionProto";
@@ -41,7 +41,7 @@ message SocketOption {
   int64 name = 3;
 
   oneof value {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Because many sockopts take an int value.
     int64 int_value = 4;
@@ -52,5 +52,5 @@ message SocketOption {
 
   // The state in which the option will be applied. When used in BindConfig
   // STATE_PREBIND is currently the only valid value.
-  SocketState state = 6 [(validate.rules).enum = {defined_only: true}];
+  SocketState state = 6 [(buf.validate.field).enum.defined_only = true];
 }

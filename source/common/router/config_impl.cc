@@ -9,14 +9,12 @@
 #include <vector>
 
 #include "envoy/config/common/matcher/v3/matcher.pb.h"
-#include "envoy/config/common/matcher/v3/matcher.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"

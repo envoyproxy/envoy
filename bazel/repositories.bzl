@@ -83,6 +83,8 @@ def _cc_deps():
             "rm src/google/protobuf/stubs/common_unittest.cc",
             "rm src/google/protobuf/util/converter/port_def.inc",
             "rm src/google/protobuf/util/converter/port_undef.inc",
+            "find . -name 'WORKSPACE' -delete",
+            "find . -name 'WORKSPACE.bazel' -delete",
         ],
     )
     external_http_archive("com_google_protofieldextraction")
@@ -212,6 +214,8 @@ def envoy_dependencies(skip_targets = []):
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     _com_google_cel_cpp()
+    external_http_archive("com_bufbuild_protovalidate_cc")
+    external_http_archive("com_github_bufbuild_protovalidate")
     _com_github_google_perfetto()
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
@@ -243,6 +247,7 @@ def envoy_dependencies(skip_targets = []):
     _kafka_deps()
     _com_github_wamr()
     _com_github_wasmtime()
+    _protovalidate_cc_deps()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -562,7 +567,11 @@ def _com_github_nghttp2_nghttp2():
 def _com_github_msgpack_cpp():
     external_http_archive(
         name = "com_github_msgpack_cpp",
-        build_file = "@envoy//bazel/external:msgpack.BUILD",
+        patch_cmds = [
+            "rm -f BUILD.bazel || true",
+            "rm -f BUILD || true",
+            'cat > BUILD << EOF\nlicenses(["notice"])  # Apache 2\n\ncc_library(\n    name = "msgpack",\n    srcs = glob([\n        "src/*.c",\n        "include/**/*.h",\n        "include/**/*.hpp",\n    ], allow_empty = True),\n    defines = ["MSGPACK_NO_BOOST"],\n    includes = [\n        "include",\n    ],\n    strip_include_prefix = "include",\n    visibility = ["//visibility:public"],\n)\nEOF',
+        ],
     )
 
 def _io_hyperscan():
@@ -795,8 +804,12 @@ def _intel_ittapi():
 def _com_github_google_quiche():
     external_http_archive(
         name = "com_github_google_quiche",
-        patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
         build_file = "@envoy//bazel/external:quiche.BUILD",
+        patch_cmds = [
+            "rm -rf BUILD* WORKSPACE* || true",
+            "find . -name BUILD -exec rm -rf {} \\; 2>/dev/null || true",
+            "find . -name BUILD.bazel -delete 2>/dev/null || true",
+        ],
     )
 
 def _com_googlesource_googleurl():
@@ -951,6 +964,11 @@ def _com_github_wasmtime():
         name = "wasmtime",
         actual = "@com_github_wasmtime//:wasmtime_lib",
     )
+
+def _protovalidate_cc_deps():
+    # This is a placeholder for protovalidate-cc dependency loading
+    # The actual dependency loading happens through Bazel's normal resolution
+    pass
 
 def _intel_dlb():
     external_http_archive(

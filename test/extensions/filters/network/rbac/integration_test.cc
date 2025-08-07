@@ -1,7 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
 #include "source/extensions/filters/network/rbac/config.h"
 

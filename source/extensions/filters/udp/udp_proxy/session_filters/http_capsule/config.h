@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3/http_capsule.pb.h"
-#include "envoy/extensions/filters/udp/udp_proxy/session/http_capsule/v3/http_capsule.pb.validate.h"
 
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
 

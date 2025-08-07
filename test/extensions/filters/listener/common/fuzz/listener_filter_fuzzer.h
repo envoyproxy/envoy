@@ -6,7 +6,6 @@
 #include "source/common/network/connection_balancer_impl.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fakes.h"
-#include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"

@@ -3,7 +3,6 @@
 #include <cstdint>
 
 #include "envoy/extensions/filters/network/generic_proxy/router/v3/router.pb.h"
-#include "envoy/extensions/filters/network/generic_proxy/router/v3/router.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/server/factory_context.h"
 

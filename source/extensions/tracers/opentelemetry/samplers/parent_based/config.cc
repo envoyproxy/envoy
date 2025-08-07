@@ -1,6 +1,5 @@
 #include "source/extensions/tracers/opentelemetry/samplers/parent_based/config.h"
 
-#include "envoy/extensions/tracers/opentelemetry/samplers/v3/parent_based_sampler.pb.validate.h"
 #include "envoy/server/tracer_config.h"
 
 #include "source/common/config/utility.h"

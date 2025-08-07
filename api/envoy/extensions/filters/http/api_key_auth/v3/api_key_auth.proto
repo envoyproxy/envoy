@@ -6,7 +6,7 @@ import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.api_key_auth.v3";
 option java_outer_classname = "ApiKeyAuthProto";
@@ -84,10 +84,10 @@ message ApiKeyAuthPerRoute {
 // Single credential entry that contains the API key and the related client id.
 message Credential {
   // The value of the unique API key.
-  string key = 1 [(validate.rules).string = {min_len: 1}];
+  string key = 1 [(buf.validate.field).string.min_len = 1];
 
   // The unique id or identity that used to identify the client or consumer.
-  string client = 2 [(validate.rules).string = {min_len: 1}];
+  string client = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 message KeySource {
@@ -97,21 +97,19 @@ message KeySource {
   //
   // If set, takes precedence over ``query`` and ``cookie``.
   string header = 1
-      [(validate.rules).string =
-           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+      [(buf.validate.field).string.max_len = 1024];
 
   // The query parameter name to fetch the key. If multiple query values are present, the first one
   // will be used.
   //
   // The field will be used if ``header`` is not set. If set, takes precedence over ``cookie``.
-  string query = 2 [(validate.rules).string = {max_len: 1024}];
+  string query = 2 [(buf.validate.field).string.max_len = 1024];
 
   // The cookie name to fetch the key.
   //
   // The field will be used if the ``header`` and ``query`` are not set.
   string cookie = 3
-      [(validate.rules).string =
-           {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false ignore_empty: true}];
+      [(buf.validate.field).string.max_len = 1024];
 }
 
 message Forwarding {
@@ -119,7 +117,7 @@ message Forwarding {
   // the client string associated with the matched credential will be injected into
   // the request before forwarding upstream.
   string header = 1
-      [(validate.rules).string = {max_len: 1024 well_known_regex: HTTP_HEADER_NAME strict: false}];
+      [(buf.validate.field).string.max_len = 1024];
 
   // If true, remove the API key from the request before forwarding upstream.
   //

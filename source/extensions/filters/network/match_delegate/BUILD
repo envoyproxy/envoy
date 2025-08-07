@@ -20,7 +20,6 @@ envoy_cc_extension(
         "//source/common/network/matching:data_impl_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/common/matching/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/common/matcher/action/v3:pkg_cc_proto",
     ],
 )

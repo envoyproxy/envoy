@@ -4,7 +4,6 @@
 #include "envoy/matcher/matcher.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/type/matcher/v3/http_inputs.pb.h"
-#include "envoy/type/matcher/v3/http_inputs.pb.validate.h"
 
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"

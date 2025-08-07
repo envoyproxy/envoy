@@ -1,5 +1,4 @@
 #include "envoy/common/exception.h"
-#include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/stats/isolated_store_impl.h"

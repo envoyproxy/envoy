@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.pb.h"
-#include "envoy/extensions/filters/http/api_key_auth/v3/api_key_auth.pb.validate.h"
 
 #include "source/extensions/filters/http/api_key_auth/api_key_auth.h"
 #include "source/extensions/filters/http/common/factory_base.h"

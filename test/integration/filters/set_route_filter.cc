@@ -11,7 +11,6 @@
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 #include "test/integration/filters/set_route_filter_config.pb.h"
-#include "test/integration/filters/set_route_filter_config.pb.validate.h"
 #include "test/test_common/delegating_route_utility.h"
 
 namespace Envoy {

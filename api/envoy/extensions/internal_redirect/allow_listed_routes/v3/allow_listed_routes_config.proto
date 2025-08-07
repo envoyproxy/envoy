@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.internal_redirect.allow_listed_routes.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.internal_redirect.allow_listed_routes.v3";
 option java_outer_classname = "AllowListedRoutesConfigProto";
@@ -20,5 +20,5 @@ message AllowListedRoutesConfig {
   // identified by the route's :ref:`name <envoy_v3_api_field_config.route.v3.Route.route>`.
   // Empty route names are not allowed.
   repeated string allowed_route_names = 1
-      [(validate.rules).repeated = {items {string {min_len: 1}}}];
+      [(buf.validate.field).repeated = {items {string {min_len: 1}}}];
 }

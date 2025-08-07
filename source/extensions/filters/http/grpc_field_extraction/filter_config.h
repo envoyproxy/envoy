@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.h"
-#include "envoy/extensions/filters/http/grpc_field_extraction/v3/config.pb.validate.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 

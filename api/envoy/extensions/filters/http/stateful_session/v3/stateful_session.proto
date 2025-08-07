@@ -5,7 +5,7 @@ package envoy.extensions.filters.http.stateful_session.v3;
 import "envoy/config/core/v3/extension.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.stateful_session.v3";
 option java_outer_classname = "StatefulSessionProto";
@@ -33,11 +33,11 @@ message StatefulSession {
 
 message StatefulSessionPerRoute {
   oneof override {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Disable the stateful session filter for this particular vhost or route. If disabled is
     // specified in multiple per-filter-configs, the most specific one will be used.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
+    bool disabled = 1 [(buf.validate.field).bool.const = true];
 
     // Per-route stateful session configuration that can be served by RDS or static route table.
     StatefulSession stateful_session = 2;

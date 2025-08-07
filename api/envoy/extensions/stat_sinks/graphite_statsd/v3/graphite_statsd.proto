@@ -7,7 +7,7 @@ import "envoy/config/core/v3/address.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.stat_sinks.graphite_statsd.v3";
 option java_outer_classname = "GraphiteStatsdProto";
@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 message GraphiteStatsdSink {
   oneof statsd_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The UDP address of a running Graphite-compliant listener. If specified,
     // statistics will be flushed to this address.
@@ -41,5 +41,5 @@ message GraphiteStatsdSink {
   // size should not exceed your network's MTU.
   //
   // Note that this value may not be respected if smaller than a single metric.
-  google.protobuf.UInt64Value max_bytes_per_datagram = 4 [(validate.rules).uint64 = {gt: 0}];
+  google.protobuf.UInt64Value max_bytes_per_datagram = 4 [(buf.validate.field).uint64.gt = 0];
 }

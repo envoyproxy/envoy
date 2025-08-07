@@ -34,13 +34,16 @@ licenses(["notice"])  # Apache 2
 # //source/common/quic/platform/ or //test/common/quic/platform/ and are
 # defined with include_prefix set to "quiche_platform_impl".
 
-src_files = glob([
-    "**/*.h",
-    "**/*.c",
-    "**/*.cc",
-    "**/*.inc",
-    "**/*.proto",
-])
+src_files = glob(
+    [
+        "**/*.h",
+        "**/*.c",
+        "**/*.cc",
+        "**/*.inc",
+        "**/*.proto",
+    ],
+    allow_empty = True,
+)
 
 test_suite(
     name = "ci_tests",

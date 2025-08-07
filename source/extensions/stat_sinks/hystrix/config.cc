@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/config/metrics/v3/stats.pb.h"
-#include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/stat_sinks/hystrix/hystrix.h"

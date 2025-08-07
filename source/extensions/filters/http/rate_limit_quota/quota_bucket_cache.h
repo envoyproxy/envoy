@@ -8,9 +8,7 @@
 #include "envoy/common/token_bucket.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.h"
-#include "envoy/extensions/filters/http/rate_limit_quota/v3/rate_limit_quota.pb.validate.h"
 #include "envoy/service/rate_limit_quota/v3/rlqs.pb.h"
-#include "envoy/service/rate_limit_quota/v3/rlqs.pb.validate.h"
 #include "envoy/thread_local/thread_local_object.h"
 
 #include "source/common/common/token_bucket_impl.h"

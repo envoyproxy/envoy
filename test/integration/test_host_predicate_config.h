@@ -4,7 +4,6 @@
 
 #include "test/integration/test_host_predicate.h"
 #include "test/integration/test_host_predicate.pb.h"
-#include "test/integration/test_host_predicate.pb.validate.h"
 
 #include "gmock/gmock.h"
 

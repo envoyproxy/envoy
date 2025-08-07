@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.pb.h"
-#include "envoy/extensions/quic/server_preferred_address/v3/fixed_server_preferred_address_config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/quic/envoy_quic_server_preferred_address_config_factory.h"

@@ -7,7 +7,7 @@ import "envoy/type/matcher/v3/string.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "ValueProto";
@@ -31,7 +31,7 @@ message ValueMatcher {
 
   // Specifies how to match a value.
   oneof match_pattern {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, a match occurs if and only if the target value is a NullValue.
     NullMatch null_match = 1;
@@ -67,7 +67,7 @@ message ListMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.ListMatcher";
 
   oneof match_pattern {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // If specified, at least one of the values in the list must match the value specified.
     ValueMatcher one_of = 1;
@@ -76,5 +76,5 @@ message ListMatcher {
 
 // Specifies a list of alternatives for the match.
 message OrMatcher {
-  repeated ValueMatcher value_matchers = 1 [(validate.rules).repeated = {min_items: 2}];
+  repeated ValueMatcher value_matchers = 1 [(buf.validate.field).repeated.min_items = 2];
 }

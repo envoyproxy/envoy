@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
-#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
 
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/well_known_names.h"

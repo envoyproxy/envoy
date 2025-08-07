@@ -9,7 +9,6 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "contrib/envoy/extensions/filters/network/golang/v3alpha/golang.pb.h"
-#include "contrib/envoy/extensions/filters/network/golang/v3alpha/golang.pb.validate.h"
 #include "contrib/golang/common/dso/dso.h"
 #include "contrib/golang/filters/network/source/golang.h"
 #include "contrib/golang/filters/network/source/upstream.h"

@@ -97,7 +97,7 @@ BAZEL_BUILD_OPTIONS=(
   "${BAZEL_OPTIONS[@]}"
   "${BAZEL_GLOBAL_OPTIONS[@]}"
   "--verbose_failures"
-  "--experimental_generate_json_trace_profile"
+  "--generate_json_trace_profile"
   "${BAZEL_BUILD_EXTRA_OPTIONS[@]}"
   "${BAZEL_EXTRA_TEST_OPTIONS[@]}")
 

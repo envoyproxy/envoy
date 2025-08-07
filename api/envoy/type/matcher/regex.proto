@@ -5,7 +5,7 @@ package envoy.type.matcher;
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher";
 option java_outer_classname = "RegexProto";
@@ -42,14 +42,14 @@ message RegexMatcher {
   }
 
   oneof engine_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Google's RE2 regex engine.
-    GoogleRE2 google_re2 = 1 [(validate.rules).message = {required: true}];
+    GoogleRE2 google_re2 = 1 [(buf.validate.field).required = true];
   }
 
   // The regex match string. The string must be supported by the configured engine.
-  string regex = 2 [(validate.rules).string = {min_len: 1}];
+  string regex = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 // Describes how to match a string and then produce a new string using a regular

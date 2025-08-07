@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/listener/local_ratelimit/v3/local_ratelimit.pb.h"
-#include "envoy/extensions/filters/listener/local_ratelimit/v3/local_ratelimit.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

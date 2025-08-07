@@ -7,7 +7,7 @@ import "envoy/extensions/outlier_detection_monitors/common/v3/error_types.proto"
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.outlier_detection_monitors.consecutive_errors.v3";
 option java_outer_classname = "ConsecutiveErrorsProto";
@@ -24,10 +24,10 @@ message ConsecutiveErrors {
   string name = 1;
 
   // The number of consecutive errors before ejection occurs.
-  google.protobuf.UInt32Value threshold = 2 [(validate.rules).uint32 = {lte: 100}];
+  google.protobuf.UInt32Value threshold = 2 [(buf.validate.field).uint32.lte = 100];
 
   // The % chance that a host is actually ejected. Defaults to 100.
-  google.protobuf.UInt32Value enforcing = 3 [(validate.rules).uint32 = {lte: 100}];
+  google.protobuf.UInt32Value enforcing = 3 [(buf.validate.field).uint32.lte = 100];
 
   // Error buckets.
   common.v3.ErrorBuckets error_buckets = 4;

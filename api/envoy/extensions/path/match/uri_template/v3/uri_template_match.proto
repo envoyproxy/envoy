@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.path.match.uri_template.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.path.match.uri_template.v3";
 option java_outer_classname = "UriTemplateMatchProto";
@@ -40,5 +40,5 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // * ``/**.mpd`` would match ``/content/123/india/dash/55/manifest.mpd``
 message UriTemplateMatchConfig {
-  string path_template = 1 [(validate.rules).string = {min_len: 1 max_len: 256}];
+  string path_template = 1 [(buf.validate.field).string = {min_len: 1 max_len: 256}];
 }

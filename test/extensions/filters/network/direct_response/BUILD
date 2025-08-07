@@ -35,6 +35,5 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/direct_response:filter",
         "//test/mocks/api:api_mocks",
         "//test/mocks/network:network_mocks",
-        "@envoy_api//envoy/extensions/filters/network/direct_response/v3:pkg_cc_proto",
     ],
 )

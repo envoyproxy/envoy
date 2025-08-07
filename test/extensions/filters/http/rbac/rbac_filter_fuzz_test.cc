@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/rbac/rbac_filter.h"
 
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
-#include "test/extensions/filters/http/rbac/rbac_filter_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"

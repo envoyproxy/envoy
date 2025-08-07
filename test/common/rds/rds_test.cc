@@ -3,10 +3,7 @@
 #include <string>
 
 #include "envoy/admin/v3/config_dump_shared.pb.h"
-#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/config/route/v3/route.pb.h"
-#include "envoy/config/route/v3/route.pb.validate.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
