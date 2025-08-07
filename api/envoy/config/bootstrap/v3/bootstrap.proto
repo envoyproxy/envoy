@@ -456,10 +456,8 @@ message Admin {
   // Example:
   // allow_interfaces:
   // - prefix: /healthcheck
-  // - prefix: /HealthCheck
-  //   ignore_case: true
   // - exact: /healthecheck/ok
-  // - exact: logging
+  // - exact: /logging
   repeated type.matcher.v3.StringMatcher allow_interfaces = 7;
 }
 
