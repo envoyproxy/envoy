@@ -1301,6 +1301,44 @@ TEST_F(Http1ConnPoolImplTest, RequestTrackingSingleRequest) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+// Test that upstream_rq_per_cx metric is NOT recorded for failed connections
+TEST_F(Http1ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
+  // This test verifies that failed connections don't record our specific metric
+  // We'll allow other histograms but specifically check that upstream_rq_per_cx is never called
+
+  // Allow any other histogram calls
+  EXPECT_CALL(cluster_->stats_store_, deliverHistogramToSinks(_, _)).Times(testing::AnyNumber());
+
+  // But specifically ensure upstream_rq_per_cx is NEVER called
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _))
+      .Times(0);
+
+  InSequence s;
+
+  // Request should kick off a new connection
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_->expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle =
+      conn_pool_->newStream(outer_decoder, callbacks, {false, true});
+  EXPECT_NE(nullptr, handle);
+
+  // Simulate connection failure before handshake completion
+  EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+
+  // Verify that the connection failure stats are incremented
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_failure_eject_.value());
+
+  // The key validation: our specific metric should never have been called
+  // (This is verified by the EXPECT_CALL with Times(0) above)
+}
+
 } // namespace
 } // namespace Http1
 } // namespace Http

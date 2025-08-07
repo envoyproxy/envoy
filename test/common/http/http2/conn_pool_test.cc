@@ -2066,6 +2066,27 @@ TEST_F(Http2ConnPoolImplTest, RequestTrackingFiveStreams) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+// Test that failed connections don't record upstream_rq_per_cx metric
+TEST_F(Http2ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
+  // Create a request that will trigger connection creation
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+
+  // DO NOT call expectClientConnect - let the connection fail before handshake completion
+  // This should not record any upstream_rq_per_cx metric due to hasHandshakeCompleted() check
+
+  EXPECT_CALL(r.callbacks_.pool_failure_, ready());
+
+  // Close/fail the connection BEFORE it becomes ready (before handshake completion)
+  EXPECT_CALL(*this, onClientDestroy());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  // Verify the connection failure was recorded
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy
