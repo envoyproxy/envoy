@@ -320,7 +320,13 @@ TEST(UtilityTest, CanonicalizeQueryStringEncoded) {
 TEST(UtilityTest, CanonicalizeQueryStringWithPlus) {
   const absl::string_view query = "a=1+2";
   const auto canonical_query = Utility::canonicalizeQueryString(query);
-  EXPECT_EQ("a=1%202", canonical_query);
+  EXPECT_EQ("a=1%2B2", canonical_query);
+}
+
+TEST(UtilityTest, CanonicalizeQueryStringWithPlusEncoded) {
+  const absl::string_view query = "a=1%2B2";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=1%2B2", canonical_query);
 }
 
 TEST(UtilityTest, CanonicalizeQueryStringWithTilde) {

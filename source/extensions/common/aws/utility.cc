@@ -253,9 +253,6 @@ std::string Utility::encodeQueryComponent(absl::string_view decoded) {
     if (isReservedChar(c)) {
       // Escape unreserved chars from RFC 3986
       encoded.push_back(c);
-    } else if (c == '+') {
-      // Encode '+' as space
-      absl::StrAppend(&encoded, "%20");
     } else {
       absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
     }
