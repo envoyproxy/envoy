@@ -109,7 +109,7 @@ protected:
     buckets_tls_->set([initial_tl_buckets_cache](Unused) { return initial_tl_buckets_cache; });
 
     mock_stream_client->expectClientCreation();
-    global_client_ = std::make_shared<GlobalRateLimitClientImpl>(
+    global_client_ = std::make_unique<GlobalRateLimitClientImpl>(
         mock_stream_client->config_with_hash_key_, mock_stream_client->context_, mock_domain_,
         reporting_interval_, *buckets_tls_, *mock_stream_client->dispatcher_);
     // Set callbacks to handle asynchronous timing.
@@ -121,7 +121,7 @@ protected:
   }
 
   std::unique_ptr<RateLimitTestClient> mock_stream_client = nullptr;
-  std::shared_ptr<GlobalRateLimitClientImpl> global_client_ = nullptr;
+  std::unique_ptr<GlobalRateLimitClientImpl> global_client_ = nullptr;
   ThreadLocal::TypedSlotPtr<ThreadLocalBucketsCache> buckets_tls_ = nullptr;
   GlobalClientCallbacks* cb_ptr_ = nullptr;
 
@@ -1258,22 +1258,11 @@ protected:
 
   void SetUp() override {
     GlobalClientTest::SetUp();
-    // Initialize the TLS slot.
-    client_tls_ = std::make_unique<ThreadLocal::TypedSlot<ThreadLocalGlobalRateLimitClientImpl>>(
-        mock_stream_client->context_.server_factory_context_.thread_local_);
-    // Create a ThreadLocal wrapper for the global client initialized in the
-    // GlobalClientTest.
-    auto tl_global_client = std::make_shared<ThreadLocalGlobalRateLimitClientImpl>(global_client_);
-    // Set the TLS slot to return copies of the shared_ptr holding that
-    // ThreadLocal object.
-    client_tls_->set([tl_global_client](Unused) { return tl_global_client; });
-
     // Create the local client for testing.
-    local_client_ = std::make_unique<LocalRateLimitClientImpl>(*client_tls_, *buckets_tls_);
+    local_client_ = std::make_unique<LocalRateLimitClientImpl>(global_client_.get(), *buckets_tls_);
   }
 
   std::unique_ptr<LocalRateLimitClientImpl> local_client_ = nullptr;
-  ThreadLocal::TypedSlotPtr<ThreadLocalGlobalRateLimitClientImpl> client_tls_ = nullptr;
 };
 
 TEST_F(LocalClientTest, TestLocalClient) {
