@@ -274,6 +274,92 @@ TEST(IPMatcher, IPMatcher) {
   checkMatcher(*downstream_remote_matcher2.value(), false, conn, headers, info);
 }
 
+// Ensure non-IP addresses (e.g., pipe) do not crash IPMatcher and simply return false.
+TEST(IPMatcher, NonIpAddressesReturnFalseAndDoNotCrash) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Principal: source_ip (ConnectionRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_source_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Permission: destination_ip (DownstreamLocal)
+  {
+    envoy::config::rbac::v3::Permission permission;
+    auto* cidr = permission.mutable_destination_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher =
+        Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setLocalAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Principal: direct_remote_ip (DownstreamDirectRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_direct_remote_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Principal: remote_ip (DownstreamRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_remote_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setRemoteAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+}
+
 TEST(PortMatcher, PortMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
