@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/grpc_json_transcoder/http_body_utils.h"
 
+#include <ranges>
+
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 
 #include "google/api/httpbody.pb.h"
@@ -87,8 +89,7 @@ void HttpBodyUtils::appendHttpBodyEnvelope(
                              CodedOutputStream::VarintSize64(content_length);
     std::vector<uint32_t> message_sizes;
     message_sizes.reserve(request_body_field_path.size());
-    for (auto it = request_body_field_path.rbegin(); it != request_body_field_path.rend(); ++it) {
-      const ProtobufWkt::Field* field = *it;
+    for (const auto* field : std::ranges::reverse_view(request_body_field_path)) {
       const uint64_t message_size = envelope_size + content_length;
       const uint32_t field_number = (field->number() << 3) | ProtobufLengthDelimitedField;
       const uint64_t field_size = CodedOutputStream::VarintSize32(field_number) +

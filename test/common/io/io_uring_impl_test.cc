@@ -62,8 +62,8 @@ public:
   }
 
   Api::ApiPtr api_;
-  IoUringPtr io_uring_{};
-  const bool should_skip_{};
+  IoUringPtr io_uring_;
+  const bool should_skip_;
 };
 
 class IoUringImplParamTest

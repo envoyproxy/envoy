@@ -328,7 +328,12 @@ TEST(DubboCodecTest, DecodeDataTest) {
     MessageMetadata metadata;
     auto context = std::make_unique<Context>();
 
+#ifdef __clang_analyzer__
+    // Skip this test under static analysis as it intentionally uses invalid enum value
+    GTEST_SKIP();
+#else
     context->setMessageType(static_cast<MessageType>(6));
+#endif
     context->setRequestId(1);
     context->setBodySize(buffer.length());
     context->setResponseStatus(ResponseStatus::Ok);
@@ -603,7 +608,12 @@ TEST(DubboCodecTest, EncodeTest) {
     MessageMetadata metadata;
 
     auto context = std::make_unique<Context>();
+#ifdef __clang_analyzer__
+    // Skip this test under static analysis as it intentionally uses invalid enum value
+    GTEST_SKIP();
+#else
     context->setMessageType(static_cast<MessageType>(6));
+#endif
     context->setResponseStatus(ResponseStatus::Ok);
     context->setRequestId(12345);
 
@@ -621,7 +631,12 @@ TEST(DubboCodecTest, EncodeHeaderForTestTest) {
     Buffer::OwnedImpl buffer;
 
     auto context = std::make_unique<Context>();
+#ifdef __clang_analyzer__
+    // Skip this test under static analysis as it intentionally uses invalid enum value
+    GTEST_SKIP();
+#else
     context->setMessageType(static_cast<MessageType>(6));
+#endif
     context->setResponseStatus(ResponseStatus::Ok);
     context->setRequestId(12345);
 

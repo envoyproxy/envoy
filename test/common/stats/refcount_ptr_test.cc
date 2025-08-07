@@ -61,7 +61,7 @@ TEST(RefcountPtr, Operators) {
   EXPECT_EQ(&ref, ptr);
   SharedString shared2(new RefcountedString("Hello, World!"));
   EXPECT_NE(&ref, shared2.get());
-  SharedString shared3(shared2.get());
+  SharedString shared3(shared2);
   EXPECT_EQ(shared2, shared3);
   EXPECT_EQ(2, shared2.use_count());
   shared2.reset();

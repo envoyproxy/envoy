@@ -44,7 +44,7 @@ using MockRequestCallbackSharedPtr = std::shared_ptr<MockRequestCallback>;
 class RequestCodecUnitTest : public testing::Test, public BufferBasedTest {
 protected:
   MockParserFactory initial_parser_factory_{};
-  MockRequestParserResolver parser_resolver_{};
+  MockRequestParserResolver parser_resolver_;
   MockRequestCallbackSharedPtr callback_{std::make_shared<MockRequestCallback>()};
 };
 

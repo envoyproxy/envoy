@@ -273,16 +273,15 @@ void InstanceBase::updateServerStats() {
   server_stats_->total_connections_.set(listener_manager_->numConnections() +
                                         parent_stats.parent_connections_);
   server_stats_->days_until_first_cert_expiring_.set(
-      sslContextManager().daysUntilFirstCertExpires().value_or(0));
+      (*ssl_context_manager_).daysUntilFirstCertExpires().value_or(0));
 
   auto secs_until_ocsp_response_expires =
-      sslContextManager().secondsUntilFirstOcspResponseExpires();
+      (*ssl_context_manager_).secondsUntilFirstOcspResponseExpires();
   if (secs_until_ocsp_response_expires) {
     server_stats_->seconds_until_first_ocsp_response_expiring_.set(
         secs_until_ocsp_response_expires.value());
   }
-  server_stats_->state_.set(
-      enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
+  server_stats_->state_.set(enumToInt(Utility::serverState(init_manager_.state(), !live_.load())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
 }
@@ -290,8 +289,8 @@ void InstanceBase::updateServerStats() {
 void InstanceBase::flushStatsInternal() {
   updateServerStats();
   auto& stats_config = config_.statsConfig();
-  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
-                                    timeSource());
+  InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, *config_.clusterManager(),
+                                    time_source_);
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(stats_config.flushInterval());
@@ -1095,7 +1094,7 @@ void InstanceBase::terminate() {
 
   // Only flush if we have not been hot restarted.
   if (stat_flush_timer_) {
-    flushStats();
+    flushStatsInternal();
   }
 
   if (config_.clusterManager() != nullptr) {

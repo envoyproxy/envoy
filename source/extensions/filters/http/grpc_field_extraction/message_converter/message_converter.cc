@@ -60,9 +60,9 @@ absl::StatusOr<StreamMessagePtr> MessageConverter::accumulateMessage(Envoy::Buff
   conversions_to_message_data_++;
 
   ENVOY_LOG_MISC(info, "len(parsing_buffer_)={}", parsing_buffer_.length());
-  if (parsed_output->owned_bytes != nullptr) {
+  if (auto* owned_bytes_ptr = parsed_output->owned_bytes.get(); owned_bytes_ptr != nullptr) {
     ABSL_DCHECK(!parsed_output->needs_more_data);
-    ENVOY_LOG_MISC(info, "len(parsed owned_bytes)={}", parsed_output->owned_bytes->length());
+    ENVOY_LOG_MISC(info, "len(parsed owned_bytes)={}", owned_bytes_ptr->length());
   }
   return message_data;
 }
