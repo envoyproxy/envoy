@@ -21,10 +21,13 @@ The hot restart functionality has the following general architecture:
   draining.
 * During the draining phase, the old process attempts to gracefully close existing connections. How
   this is done depends on the configured filters. The drain time is configurable via the
-  :option:`--drain-time-s` option and as more time passes draining becomes more aggressive.
-* After the drain sequence, the new Envoy process tells the old Envoy process to shut itself down.
-  This time is configurable via the :option:`--parent-shutdown-time-s` option. Any remaining
-  connections to the old envoy process will be closed. They are not transferred to the new process.
+  :option:`--drain-time-s` option and as more time passes draining becomes more aggressive. 
+  Once the drain time completes, any remaining connections to the old envoy process will be closed. 
+  They are not transferred to the new process.
+* Later, usually after the drain sequence, the new Envoy process tells the old Envoy process to shut 
+  itself down. This time is configurable via the :option:`--parent-shutdown-time-s` option. Note
+  that the `--parent-shutdown-time-s` option is independent of the `--drain-time-s` value, and so
+  the parent shutdown time should be set to a larger value.
 * Envoy’s hot restart support was designed so that it will work correctly even if the new Envoy
   process and the old Envoy process are running inside different containers. Communication between
   the processes takes place only using unix domain sockets.
