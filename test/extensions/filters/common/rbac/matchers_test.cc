@@ -14,6 +14,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/test_common/status_utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -227,28 +228,50 @@ TEST(IPMatcher, IPMatcher) {
   downstream_remote_cidr.set_address_prefix("8.9.10.11");
   downstream_remote_cidr.mutable_prefix_len()->set_value(32);
 
-  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), true, conn,
-               headers, info);
-  checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), true, conn,
-               headers, info);
-  checkMatcher(IPMatcher(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote),
-               true, conn, headers, info);
-  checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), true, conn,
-               headers, info);
+  auto connection_remote_matcher =
+      IPMatcher::create(connection_remote_cidr, IPMatcher::Type::ConnectionRemote);
+  ASSERT_OK(connection_remote_matcher);
+  checkMatcher(*connection_remote_matcher.value(), true, conn, headers, info);
+
+  auto downstream_local_matcher =
+      IPMatcher::create(downstream_local_cidr, IPMatcher::Type::DownstreamLocal);
+  ASSERT_OK(downstream_local_matcher);
+  checkMatcher(*downstream_local_matcher.value(), true, conn, headers, info);
+
+  auto downstream_direct_remote_matcher =
+      IPMatcher::create(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote);
+  ASSERT_OK(downstream_direct_remote_matcher);
+  checkMatcher(*downstream_direct_remote_matcher.value(), true, conn, headers, info);
+
+  auto downstream_remote_matcher =
+      IPMatcher::create(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote);
+  ASSERT_OK(downstream_remote_matcher);
+  checkMatcher(*downstream_remote_matcher.value(), true, conn, headers, info);
 
   connection_remote_cidr.set_address_prefix("4.5.6.7");
   downstream_local_cidr.set_address_prefix("1.2.4.8");
   downstream_direct_remote_cidr.set_address_prefix("4.5.6.0");
   downstream_remote_cidr.set_address_prefix("4.5.6.7");
 
-  checkMatcher(IPMatcher(connection_remote_cidr, IPMatcher::Type::ConnectionRemote), false, conn,
-               headers, info);
-  checkMatcher(IPMatcher(downstream_local_cidr, IPMatcher::Type::DownstreamLocal), false, conn,
-               headers, info);
-  checkMatcher(IPMatcher(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote),
-               false, conn, headers, info);
-  checkMatcher(IPMatcher(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote), false, conn,
-               headers, info);
+  auto connection_remote_matcher2 =
+      IPMatcher::create(connection_remote_cidr, IPMatcher::Type::ConnectionRemote);
+  ASSERT_OK(connection_remote_matcher2);
+  checkMatcher(*connection_remote_matcher2.value(), false, conn, headers, info);
+
+  auto downstream_local_matcher2 =
+      IPMatcher::create(downstream_local_cidr, IPMatcher::Type::DownstreamLocal);
+  ASSERT_OK(downstream_local_matcher2);
+  checkMatcher(*downstream_local_matcher2.value(), false, conn, headers, info);
+
+  auto downstream_direct_remote_matcher2 =
+      IPMatcher::create(downstream_direct_remote_cidr, IPMatcher::Type::DownstreamDirectRemote);
+  ASSERT_OK(downstream_direct_remote_matcher2);
+  checkMatcher(*downstream_direct_remote_matcher2.value(), false, conn, headers, info);
+
+  auto downstream_remote_matcher2 =
+      IPMatcher::create(downstream_remote_cidr, IPMatcher::Type::DownstreamRemote);
+  ASSERT_OK(downstream_remote_matcher2);
+  checkMatcher(*downstream_remote_matcher2.value(), false, conn, headers, info);
 }
 
 TEST(PortMatcher, PortMatcher) {
@@ -1179,7 +1202,9 @@ TEST(IPMatcher, MatchesWithNullIpAddress) {
   range.set_address_prefix("192.168.1.0");
   range.mutable_prefix_len()->set_value(24);
 
-  IPMatcher matcher(range, IPMatcher::Type::ConnectionRemote);
+  auto matcher_result = IPMatcher::create(range, IPMatcher::Type::ConnectionRemote);
+  ASSERT_OK(matcher_result);
+  const auto& matcher = *matcher_result.value();
 
   NiceMock<Envoy::Network::MockConnection> conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -1191,15 +1216,16 @@ TEST(IPMatcher, MatchesWithNullIpAddress) {
   EXPECT_FALSE(matcher.matches(conn, headers, info));
 }
 
-TEST(IPMatcher, ExtractIpAddressWithInvalidType) {
-  // Tests line 247: return nullptr fallback in extractIpAddress
-  // This test exercises the default case that should never be reached in normal operation
+TEST(IPMatcher, MatchesWithConnectionRemoteAddress) {
+  // Tests that IPMatcher correctly extracts and matches connection remote addresses.
   envoy::config::core::v3::CidrRange range;
   range.set_address_prefix("192.168.1.0");
   range.mutable_prefix_len()->set_value(24);
 
   // Create matcher with a specific type
-  IPMatcher matcher(range, IPMatcher::Type::ConnectionRemote);
+  auto matcher_result = IPMatcher::create(range, IPMatcher::Type::ConnectionRemote);
+  ASSERT_OK(matcher_result);
+  const auto& matcher = *matcher_result.value();
 
   NiceMock<Envoy::Network::MockConnection> conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -1251,6 +1277,139 @@ TEST(IPMatcher, MultipleRangesCreateSuccess) {
   addr = Envoy::Network::Utility::parseInternetAddressNoThrow("172.16.1.1", 123, false);
   conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr);
   EXPECT_FALSE(result.value()->matches(conn, headers, info));
+}
+
+// Tests for kDestinationIp case in Permission matcher creation.
+TEST(Matcher, CreatePermissionDestinationIp) {
+  envoy::config::rbac::v3::Permission permission;
+  auto* cidr = permission.mutable_destination_ip();
+  cidr->set_address_prefix("192.168.1.0");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto matcher = Matcher::create(permission, validation_visitor, context);
+  EXPECT_NE(matcher, nullptr);
+}
+
+// Tests error handling in kDestinationIp case with invalid CIDR.
+TEST(Matcher, CreatePermissionDestinationIpInvalidCidr) {
+  envoy::config::rbac::v3::Permission permission;
+  auto* cidr = permission.mutable_destination_ip();
+  cidr->set_address_prefix("invalid.ip.address");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(Matcher::create(permission, validation_visitor, context), EnvoyException,
+                          "Failed to create CIDR range:.*malformed IP address");
+}
+
+// Tests for RULE_NOT_SET case that falls through to PANIC.
+TEST(Matcher, CreatePermissionRuleNotSet) {
+  EXPECT_DEATH(
+      {
+        envoy::config::rbac::v3::Permission permission;
+
+        NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+        NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+        Matcher::create(permission, validation_visitor, context);
+      },
+      "panic: corrupted enum");
+}
+
+// Tests for kSourceIp case in Principal matcher creation.
+TEST(Matcher, CreatePrincipalSourceIp) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_source_ip();
+  cidr->set_address_prefix("10.0.0.0");
+  cidr->mutable_prefix_len()->set_value(16);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto matcher = Matcher::create(principal, context);
+  EXPECT_NE(matcher, nullptr);
+}
+
+// Tests error handling in kSourceIp case with invalid CIDR.
+TEST(Matcher, CreatePrincipalSourceIpInvalidCidr) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_source_ip();
+  cidr->set_address_prefix("999.999.999.999");
+  cidr->mutable_prefix_len()->set_value(24);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
+                          "Failed to create CIDR range:.*malformed IP address");
+}
+
+// Tests for kDirectRemoteIp case in Principal matcher creation.
+TEST(Matcher, CreatePrincipalDirectRemoteIp) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_direct_remote_ip();
+  cidr->set_address_prefix("172.16.0.0");
+  cidr->mutable_prefix_len()->set_value(12);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto matcher = Matcher::create(principal, context);
+  EXPECT_NE(matcher, nullptr);
+}
+
+// Tests error handling in kDirectRemoteIp case with invalid CIDR.
+TEST(Matcher, CreatePrincipalDirectRemoteIpInvalidCidr) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_direct_remote_ip();
+  cidr->set_address_prefix(""); // Empty IP address
+  cidr->mutable_prefix_len()->set_value(24);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
+                          "Failed to create CIDR range:.*malformed IP address");
+}
+
+// Tests for kRemoteIp case in Principal matcher creation.
+TEST(Matcher, CreatePrincipalRemoteIp) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_remote_ip();
+  cidr->set_address_prefix("2001:db8::");
+  cidr->mutable_prefix_len()->set_value(32);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  auto matcher = Matcher::create(principal, context);
+  EXPECT_NE(matcher, nullptr);
+}
+
+// Tests error handling in kRemoteIp case with invalid CIDR.
+TEST(Matcher, CreatePrincipalRemoteIpInvalidCidr) {
+  envoy::config::rbac::v3::Principal principal;
+  auto* cidr = principal.mutable_remote_ip();
+  cidr->set_address_prefix("2001:db8::gggg"); // Invalid IPv6
+  cidr->mutable_prefix_len()->set_value(32);
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+  EXPECT_THROW_WITH_REGEX(Matcher::create(principal, context), EnvoyException,
+                          "Failed to create CIDR range:.*malformed IP address");
+}
+
+// Tests for IDENTIFIER_NOT_SET case that falls through to PANIC.
+TEST(Matcher, CreatePrincipalIdentifierNotSet) {
+  EXPECT_DEATH(
+      {
+        envoy::config::rbac::v3::Principal principal;
+
+        NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+        Matcher::create(principal, context);
+      },
+      "panic: corrupted enum");
 }
 
 } // namespace
