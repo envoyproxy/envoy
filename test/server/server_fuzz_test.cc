@@ -1,6 +1,5 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/core/v3/address.pb.h"
 
 #include "source/common/common/random_generator.h"

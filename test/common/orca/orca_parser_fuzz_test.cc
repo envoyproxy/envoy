@@ -3,7 +3,6 @@
 #include "source/common/common/base64.h"
 #include "source/common/orca/orca_parser.h"
 
-#include "test/common/orca/orca_parser_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"

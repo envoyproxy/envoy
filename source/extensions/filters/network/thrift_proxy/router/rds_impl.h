@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "source/common/rds/common/route_config_provider_manager_impl.h"

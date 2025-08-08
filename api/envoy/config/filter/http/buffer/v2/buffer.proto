@@ -6,7 +6,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.buffer.v2";
 option java_outer_classname = "BufferProto";
@@ -25,17 +25,17 @@ message Buffer {
   // The maximum request size that the filter will buffer before the connection
   // manager will stop buffering and return a 413 response.
   google.protobuf.UInt32Value max_request_bytes = 1
-      [(validate.rules).uint32 = {gt: 0}, (validate.rules).message = {required: true}];
+      [(buf.validate.field).uint32.gt = 0, (buf.validate.field).required = true];
 }
 
 message BufferPerRoute {
   oneof override {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Disable the buffer filter for this particular vhost or route.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
+    bool disabled = 1 [(buf.validate.field).bool.const = true];
 
     // Override the global configuration of the filter with this new config.
-    Buffer buffer = 2 [(validate.rules).message = {required: true}];
+    Buffer buffer = 2 [(buf.validate.field).required = true];
   }
 }

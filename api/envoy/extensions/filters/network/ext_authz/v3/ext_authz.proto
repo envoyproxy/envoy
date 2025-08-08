@@ -8,7 +8,7 @@ import "envoy/type/matcher/v3/metadata.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.ext_authz.v3";
 option java_outer_classname = "ExtAuthzProto";
@@ -31,7 +31,7 @@ message ExtAuthz {
       "envoy.config.filter.network.ext_authz.v2.ExtAuthz";
 
   // The prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string.min_len = 1];
 
   // The external authorization gRPC service configuration.
   // The default timeout is set to 200ms by this filter.
@@ -52,7 +52,7 @@ message ExtAuthz {
   // API version for ext_authz transport protocol. This describes the ext_authz gRPC endpoint and
   // version of Check{Request,Response} used on the wire.
   config.core.v3.ApiVersion transport_api_version = 5
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // Specifies if the filter is enabled with metadata matcher.
   // If this field is not specified, the filter will be enabled for all requests.

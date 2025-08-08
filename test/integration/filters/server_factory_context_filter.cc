@@ -10,7 +10,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/server_factory_context_filter_config.pb.h"
-#include "test/integration/filters/server_factory_context_filter_config.pb.validate.h"
 #include "test/proto/helloworld.pb.h"
 
 namespace Envoy {

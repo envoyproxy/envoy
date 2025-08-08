@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/extensions/common/matching/v3/extension_matcher.pb.validate.h"
 #include "envoy/extensions/filters/common/matcher/action/v3/skip_action.pb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/listen_socket.h"

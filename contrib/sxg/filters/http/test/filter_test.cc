@@ -10,7 +10,6 @@
 #include "test/test_common/utility.h"
 
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
-#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
 #include "contrib/sxg/filters/http/source/filter.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

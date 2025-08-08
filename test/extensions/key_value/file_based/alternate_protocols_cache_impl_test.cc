@@ -1,4 +1,3 @@
-#include "envoy/config/common/key_value/v3/config.pb.validate.h"
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
 
 #include "source/common/http/http_server_properties_cache_manager_impl.h"

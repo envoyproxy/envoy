@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.cdn_loop.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.cdn_loop.v3";
 option java_outer_classname = "CdnLoopProto";
@@ -24,7 +24,7 @@ message CdnLoopConfig {
   // pseudonym or hostname the CDN is in control of.
   //
   // cdn_id must not be empty.
-  string cdn_id = 1 [(validate.rules).string = {min_len: 1}];
+  string cdn_id = 1 [(buf.validate.field).string.min_len = 1];
 
   // The maximum allowed count of cdn_id in the downstream CDN-Loop
   // request header.

@@ -11,7 +11,7 @@ import "google/protobuf/empty.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.jwt_authn.v2alpha";
 option java_outer_classname = "ConfigProto";
@@ -62,7 +62,7 @@ message JwtProvider {
   // Example: https://securetoken.google.com
   // Example: 1234567-compute@developer.gserviceaccount.com
   //
-  string issuer = 1 [(validate.rules).string = {min_bytes: 1}];
+  string issuer = 1 [(buf.validate.field).string.min_len = 1];
 
   // The list of JWT `audiences <https://tools.ietf.org/html/rfc7519#section-4.1.3>`_ are
   // allowed to access. A JWT containing any of these audiences will be accepted. If not specified,
@@ -81,7 +81,7 @@ message JwtProvider {
   // `JSON Web Key Set (JWKS) <https://tools.ietf.org/html/rfc7517#appendix-A>`_ is needed to
   // validate signature of a JWT. This field specifies where to fetch JWKS.
   oneof jwks_source_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // JWKS can be fetched from remote server via HTTP/HTTPS. This field specifies the remote HTTP
     // URI and how the fetched JWKS should be cached.
@@ -212,7 +212,7 @@ message RemoteJwks {
 // This message specifies a header location to extract JWT.
 message JwtHeader {
   // The HTTP header name.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // The value prefix. The value format is "value_prefix<token>"
   // For example, for "Authorization: Bearer <token>", value_prefix="Bearer " with a space at the
@@ -320,14 +320,14 @@ message JwtRequirement {
 // Their results are OR-ed; if any one of them passes, the result is passed
 message JwtRequirementOrList {
   // Specify a list of JwtRequirement.
-  repeated JwtRequirement requirements = 1 [(validate.rules).repeated = {min_items: 2}];
+  repeated JwtRequirement requirements = 1 [(buf.validate.field).repeated.min_items = 2];
 }
 
 // This message specifies a list of RequiredProvider.
 // Their results are AND-ed; all of them must pass, if one of them fails or missing, it fails.
 message JwtRequirementAndList {
   // Specify a list of JwtRequirement.
-  repeated JwtRequirement requirements = 1 [(validate.rules).repeated = {min_items: 2}];
+  repeated JwtRequirement requirements = 1 [(buf.validate.field).repeated.min_items = 2];
 }
 
 // This message specifies a Jwt requirement for a specific Route condition.
@@ -362,7 +362,7 @@ message RequirementRule {
   //    match:
   //      prefix: /
   //
-  api.v2.route.RouteMatch match = 1 [(validate.rules).message = {required: true}];
+  api.v2.route.RouteMatch match = 1 [(buf.validate.field).required = true];
 
   // Specify a Jwt Requirement. Please detail comment in message JwtRequirement.
   JwtRequirement requires = 2;
@@ -387,7 +387,7 @@ message RequirementRule {
 // jwt_authn filter will use JwtRequirement{"provider_name": "issuer1"} to verify.
 message FilterStateRule {
   // The filter state name to retrieve the `Router::StringAccessor` object.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // A map of string keys to requirements. The string key is the string value
   // in the FilterState with the name specified in the *name* field above.

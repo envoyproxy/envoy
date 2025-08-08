@@ -4,7 +4,6 @@
 #include "test/test_common/registry.h"
 
 #include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.validate.h"
 #include "contrib/rocketmq_proxy/filters/network/source/config.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

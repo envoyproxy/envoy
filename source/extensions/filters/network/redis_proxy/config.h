@@ -5,7 +5,6 @@
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/empty_string.h"

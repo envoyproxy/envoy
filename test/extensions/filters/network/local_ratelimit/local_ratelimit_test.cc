@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.h"
-#include "envoy/extensions/filters/network/local_ratelimit/v3/local_rate_limit.pb.validate.h"
 
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/stats/isolated_store_impl.h"

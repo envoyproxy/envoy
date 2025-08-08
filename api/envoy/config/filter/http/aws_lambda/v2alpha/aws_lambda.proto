@@ -4,7 +4,7 @@ package envoy.config.filter.http.aws_lambda.v2alpha;
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.aws_lambda.v2alpha";
 option java_outer_classname = "AwsLambdaProto";
@@ -35,13 +35,13 @@ message Config {
   // The ARN of the AWS Lambda to invoke when the filter is engaged
   // Must be in the following format:
   // arn:<partition>:lambda:<region>:<account-number>:function:<function-name>
-  string arn = 1 [(validate.rules).string = {min_len: 1}];
+  string arn = 1 [(buf.validate.field).string.min_len = 1];
 
   // Whether to transform the request (headers and body) to a JSON payload or pass it as is.
   bool payload_passthrough = 2;
 
   // Determines the way to invoke the Lambda function.
-  InvocationMode invocation_mode = 3 [(validate.rules).enum = {defined_only: true}];
+  InvocationMode invocation_mode = 3 [(buf.validate.field).enum.defined_only = true];
 }
 
 // Per-route configuration for AWS Lambda. This can be useful when invoking a different Lambda function or a different

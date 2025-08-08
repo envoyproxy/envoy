@@ -2,7 +2,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "test/config/utility.h"
-#include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.validate.h"
 #include "test/extensions/filters/http/common/fuzz/uber_filter.h"
 #include "test/fuzz/fuzz_runner.h"
 

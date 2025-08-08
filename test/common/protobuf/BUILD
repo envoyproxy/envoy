@@ -24,6 +24,16 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "protovalidate_util_test",
+    srcs = ["protovalidate_util_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/protobuf:protovalidate_util_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "deterministic_hash_test_proto",
     srcs = ["deterministic_hash_test.proto"],

@@ -3,7 +3,6 @@
 #include <fstream>
 
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "source/common/config/utility.h"

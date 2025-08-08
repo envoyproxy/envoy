@@ -32,6 +32,5 @@ envoy_cc_contrib_extension(
         "//envoy/registry",
         "//source/common/network:utility_lib",
         "//source/extensions/common/tap:tap_interface",
-        "@envoy_api//contrib/envoy/extensions/tap_sinks/udp_sink/v3alpha:pkg_cc_proto",
     ],
 )

@@ -5,7 +5,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.pb.h"
-#include "envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/extensions/common/async_files/async_file_manager_factory.h"

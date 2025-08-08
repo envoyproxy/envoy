@@ -2,7 +2,6 @@
 
 #include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
-#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.validate.h"
 
 #include "source/common/http/headers.h"
 #include "source/extensions/compression/common/compressor/factory_base.h"

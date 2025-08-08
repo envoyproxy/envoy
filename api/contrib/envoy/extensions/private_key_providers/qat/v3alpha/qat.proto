@@ -8,7 +8,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/sensitive.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.private_key_providers.qat.v3alpha";
 option java_outer_classname = "QatProto";
@@ -33,8 +33,5 @@ message QatPrivateKeyMethodConfig {
   // quicker answers from the hardware but causes more polling loop
   // spins, leading to potentially larger CPU usage. The duration needs
   // to be set to a value greater than or equal to 1 millisecond.
-  google.protobuf.Duration poll_delay = 2 [(validate.rules).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  google.protobuf.Duration poll_delay = 2 [(buf.validate.field).duration = {gte {nanos: 1000000}}];
 }

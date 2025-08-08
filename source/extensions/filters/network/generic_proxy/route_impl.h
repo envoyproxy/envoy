@@ -7,9 +7,7 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/extensions/filters/network/generic_proxy/action/v3/action.pb.h"
-#include "envoy/extensions/filters/network/generic_proxy/action/v3/action.pb.validate.h"
 #include "envoy/extensions/filters/network/generic_proxy/v3/route.pb.h"
-#include "envoy/extensions/filters/network/generic_proxy/v3/route.pb.validate.h"
 #include "envoy/server/factory_context.h"
 
 #include "source/common/common/matchers.h"

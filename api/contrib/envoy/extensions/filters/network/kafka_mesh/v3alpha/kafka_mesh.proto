@@ -5,7 +5,7 @@ package envoy.extensions.filters.network.kafka_mesh.v3alpha;
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.kafka_mesh.v3alpha";
 option java_outer_classname = "KafkaMeshProto";
@@ -33,10 +33,10 @@ message KafkaMesh {
   // Has the same meaning as corresponding Kafka broker properties.
   // Usually equal to filter chain's listener config, but needs to be reachable by clients
   // (so 0.0.0.0 will not work).
-  string advertised_host = 1 [(validate.rules).string = {min_len: 1}];
+  string advertised_host = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Envoy's port that's advertised to clients.
-  int32 advertised_port = 2 [(validate.rules).int32 = {gt: 0}];
+  int32 advertised_port = 2 [(buf.validate.field).int32 = {gt: 0}];
 
   // Upstream clusters this filter will connect to.
   repeated KafkaClusterDefinition upstream_clusters = 3;
@@ -51,15 +51,15 @@ message KafkaMesh {
 // [#next-free-field: 6]
 message KafkaClusterDefinition {
   // Cluster name.
-  string cluster_name = 1 [(validate.rules).string = {min_len: 1}];
+  string cluster_name = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Kafka cluster address.
-  string bootstrap_servers = 2 [(validate.rules).string = {min_len: 1}];
+  string bootstrap_servers = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // Default number of partitions present in this cluster.
   // This is especially important for clients that do not specify partition in their payloads and depend on this value for hashing.
   // The same number of partitions is going to be used by upstream-pointing Kafka consumers for consumer proxying scenarios.
-  int32 partition_count = 3 [(validate.rules).int32 = {gt: 0}];
+  int32 partition_count = 3 [(buf.validate.field).int32 = {gt: 0}];
 
   // Custom configuration passed to Kafka producer.
   map<string, string> producer_config = 4;

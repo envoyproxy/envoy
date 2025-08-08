@@ -11,7 +11,7 @@ import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.common.v3";
 option java_outer_classname = "CommonProto";
@@ -75,7 +75,7 @@ message LocalityLbConfig {
   }
 
   oneof locality_config_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Configuration for local zone aware load balancing.
     ZoneAwareLbConfig zone_aware_lb_config = 1;
@@ -136,7 +136,7 @@ message ConsistentHashingLbConfig {
   //
   // This is an O(N) algorithm, unlike other load balancers. Using a lower ``hash_balance_factor`` results in more hosts
   // being probed, so use a higher value if you require better performance.
-  google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
+  google.protobuf.UInt32Value hash_balance_factor = 2 [(buf.validate.field).uint32.gte = 100];
 
   //  Specifies a list of hash policies to use for ring hash load balancing. If ``hash_policy`` is
   // set, then

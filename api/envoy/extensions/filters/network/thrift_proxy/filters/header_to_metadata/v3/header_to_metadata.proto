@@ -5,7 +5,7 @@ package envoy.extensions.filters.network.thrift_proxy.filters.header_to_metadata
 import "envoy/type/matcher/v3/regex.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.filters.header_to_metadata.v3";
 option java_outer_classname = "HeaderToMetadataProto";
@@ -49,7 +49,7 @@ message HeaderToMetadata {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string = {min_len: 1}];
+    string key = 2 [(buf.validate.field).string.min_len = 1];
 
     oneof value_type {
       // The value to pair with the given key.
@@ -68,7 +68,7 @@ message HeaderToMetadata {
     }
 
     // The value's type — defaults to string.
-    ValueType type = 5 [(validate.rules).enum = {defined_only: true}];
+    ValueType type = 5 [(buf.validate.field).enum.defined_only = true];
 
     // How is the value encoded, default is NONE (not encoded).
     // The value will be decoded accordingly before storing to metadata.
@@ -81,7 +81,7 @@ message HeaderToMetadata {
     //
     // The header to be extracted.
     string header = 1
-        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {min_len: 1}];
 
     // If the header is present, apply this metadata KeyValuePair.
     //
@@ -102,5 +102,5 @@ message HeaderToMetadata {
   }
 
   // The list of rules to apply to requests.
-  repeated Rule request_rules = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated Rule request_rules = 1 [(buf.validate.field).repeated.min_items = 1];
 }

@@ -4,7 +4,6 @@
 
 #include "source/common/upstream/load_balancer_context_base.h"
 
-#include "test/extensions/load_balancing_policies/common/load_balancer_fuzz.pb.validate.h"
 #include "test/fuzz/random.h"
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"

@@ -6,7 +6,6 @@
 #include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz_base.h"
-#include "test/extensions/load_balancing_policies/round_robin/round_robin_load_balancer_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
 
