@@ -971,9 +971,9 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   EXPECT_CALL(cluster_->stats_store_,
-              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
-  EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
