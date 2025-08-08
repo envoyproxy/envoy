@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/grpc/async_client.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -43,7 +44,6 @@
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
 
 #include "absl/status/status.h"
-#include "envoy/grpc/async_client.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
