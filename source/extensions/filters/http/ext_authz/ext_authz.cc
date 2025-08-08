@@ -480,15 +480,13 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
 
   if (response->saw_invalid_append_actions) {
     if (config_->validateMutations()) {
-      ENVOY_STREAM_LOG(trace,
-                       "Rejecting response with invalid header append action.",
+      ENVOY_STREAM_LOG(trace, "Rejecting response with invalid header append action.",
                        *decoder_callbacks_);
       rejectResponse();
       return;
     }
-    ENVOY_STREAM_LOG(trace,
-                      "Ignoring response headers with invalid header append action.",
-                      *decoder_callbacks_);
+    ENVOY_STREAM_LOG(trace, "Ignoring response headers with invalid header append action.",
+                     *decoder_callbacks_);
   }
 
   if (!response->dynamic_metadata.fields().empty()) {

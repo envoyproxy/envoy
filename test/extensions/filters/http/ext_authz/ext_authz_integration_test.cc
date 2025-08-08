@@ -1,6 +1,5 @@
-#include "envoy/config/core/v3/base.pb.h"
-
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
@@ -522,14 +521,15 @@ public:
 
     if (add_sentinel_header_append_action) {
       auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
-      entry->set_append_action(static_cast<envoy::config::core::v3::HeaderValueOption::HeaderAppendAction>(
-                               std::numeric_limits<int32_t>::max()));
+      entry->set_append_action(
+          static_cast<envoy::config::core::v3::HeaderValueOption::HeaderAppendAction>(
+              std::numeric_limits<int32_t>::max()));
       const auto key = std::string("invalid-append-action");
       const auto value = std::string("invalid-append-action-value");
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace,
-                    "sendExtAuthzResponse: set response header with invalid append action {}={}",
+                     "sendExtAuthzResponse: set response header with invalid append action {}={}",
                      key, value);
     }
 
