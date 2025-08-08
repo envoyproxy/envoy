@@ -18,22 +18,54 @@ TEST(TraceContextHandlerTest, TraceContextHandlerGetTest) {
   }
 
   TraceContextHandler normal_key("key");
-  TraceContextHandler inline_key("content-type"); // This key is inline key for HTTP.
+  TraceContextHandler inline_key("x-forwarded-for"); // This key is inline key for HTTP.
+
+  TraceContextHandler unknown_normal_key("unknown_normal_key");
+  TraceContextHandler unknown_inline_key("x-envoy-original-path");
 
   // Test get.
   {
     auto headers = Http::RequestHeaderMapImpl::create();
-    headers->setContentType("text/plain");
     headers->addCopy(Http::LowerCaseString("key"), "value");
+    headers->addCopy(Http::LowerCaseString("x-forwarded-for"), "127.0.0.1");
 
     HttpTraceContext http_tracer_context(*headers);
-    TestTraceContextImpl trace_context{{"key", "value"}, {"content-type", "text/plain"}};
+    TestTraceContextImpl trace_context{{"key", "value"}, {"x-forwarded-for", "127.0.0.1"}};
 
     EXPECT_EQ("value", normal_key.get(trace_context).value());
-    EXPECT_EQ("text/plain", inline_key.get(trace_context).value());
+    EXPECT_EQ("127.0.0.1", inline_key.get(trace_context).value());
 
     EXPECT_EQ("value", normal_key.get(http_tracer_context).value());
-    EXPECT_EQ("text/plain", inline_key.get(http_tracer_context).value());
+    EXPECT_EQ("127.0.0.1", inline_key.get(http_tracer_context).value());
+  }
+
+  // Test get all.
+  {
+
+    Http::TestRequestHeaderMapImpl headers{{"key", "value1"},
+                                           {"key", "value2"},
+                                           {"x-forwarded-for", "127.0.0.1"},
+                                           {"x-forwarded-for", "127.0.0.2"},
+                                           {"other", "other_value"}};
+    HttpTraceContext http_tracer_context(headers);
+    TestTraceContextImpl trace_context{{"key", "value"}, {"x-forwarded-for", "127.0.0.1"}};
+
+    EXPECT_EQ(normal_key.getAll(trace_context)[0], "value");
+    EXPECT_EQ(inline_key.getAll(trace_context)[0], "127.0.0.1");
+
+    auto multiple_values_of_normal_key = normal_key.getAll(http_tracer_context);
+    EXPECT_EQ(multiple_values_of_normal_key.size(), 2);
+    EXPECT_EQ(multiple_values_of_normal_key[0], "value1");
+    EXPECT_EQ(multiple_values_of_normal_key[1], "value2");
+
+    auto multiple_values_of_inline_key = inline_key.getAll(http_tracer_context);
+    EXPECT_EQ(multiple_values_of_inline_key.size(), 1);
+    EXPECT_EQ(multiple_values_of_inline_key[0], "127.0.0.1,127.0.0.2");
+
+    EXPECT_TRUE(unknown_normal_key.getAll(http_tracer_context).empty());
+    EXPECT_TRUE(unknown_inline_key.getAll(http_tracer_context).empty());
+    EXPECT_TRUE(!unknown_normal_key.get(trace_context).has_value());
+    EXPECT_TRUE(!unknown_inline_key.get(trace_context).has_value());
   }
 }
 

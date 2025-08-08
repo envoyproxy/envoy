@@ -503,6 +503,11 @@ public:
   MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getRandomSampling, (), (const));
   MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getOverallSampling, (), (const));
   MOCK_METHOD(const Tracing::CustomTagMap&, getCustomTags, (), (const));
+
+  envoy::type::v3::FractionalPercent client_sampling_;
+  envoy::type::v3::FractionalPercent random_sampling_;
+  envoy::type::v3::FractionalPercent overall_sampling_;
+  Tracing::CustomTagMap custom_tags_;
 };
 
 class MockRoute : public RouteEntryAndRoute {

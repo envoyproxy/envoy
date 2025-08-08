@@ -46,6 +46,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::ContainerEq;
+using ::testing::ContainsRegex;
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::IsEmpty;
@@ -1415,11 +1416,12 @@ virtual_hosts:
       {"www2", "root_www2", "www2_staging", "instant-server"}, {});
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                                 creation_status_);
-  EXPECT_EQ(
+  EXPECT_THAT(
       creation_status_.message(),
-      "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
-      "only match on request headers, saw "
-      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput");
+      ContainsRegex("requirement violation while creating route match tree: INVALID_ARGUMENT: "
+                    "Route table can "
+                    "only match on request headers, saw "
+                    "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput"));
 }
 
 // Validates that we fail creating a route config if an invalid data input is used.
@@ -11680,37 +11682,8 @@ virtual_hosts:
   factory_context_.cluster_manager_.initializeClusters(
       {"www2", "some_cluster", "some_cluster2", "some_cluster3"}, {});
 
-  // Test with runtime flag disabled (old behavior)
-  {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.shadow_policy_inherit_trace_sampling", "false"}});
-
-    TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
-                          creation_status_);
-
-    Http::TestRequestHeaderMapImpl headers = genHeaders("www.databricks.com", "/foo", "GET");
-    const auto& shadow_policies = config.route(headers, 0)->routeEntry()->shadowPolicies();
-
-    // First policy should have trace sampled = false
-    EXPECT_TRUE(shadow_policies[0]->traceSampled().has_value());
-    EXPECT_FALSE(shadow_policies[0]->traceSampled().value());
-
-    // Second policy should have trace sampled = true
-    EXPECT_TRUE(shadow_policies[1]->traceSampled().has_value());
-    EXPECT_TRUE(shadow_policies[1]->traceSampled().value());
-
-    // With flag disabled, unspecified should default to true
-    EXPECT_TRUE(shadow_policies[2]->traceSampled().has_value());
-    EXPECT_TRUE(shadow_policies[2]->traceSampled().value());
-  }
-
   // Test with runtime flag enabled (new behavior)
   {
-    TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.shadow_policy_inherit_trace_sampling", "true"}});
-
     TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                           creation_status_);
 

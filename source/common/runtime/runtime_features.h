@@ -1,14 +1,10 @@
 #pragma once
 
-#include <string>
+#include <cstdint>
 
 #include "envoy/runtime/runtime.h"
 
-#include "source/common/singleton/const_singleton.h"
-
-#include "absl/container/flat_hash_set.h"
-#include "absl/flags/flag.h"
-#include "absl/flags/reflection.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Runtime {
