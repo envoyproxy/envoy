@@ -133,6 +133,10 @@ MATCHER_P(AuthzOkResponse, response, "") {
     return false;
   }
 
+  if (response.saw_invalid_append_actions != arg->saw_invalid_append_actions) {
+    return false;
+  }
+
   if (!TestCommon::compareQueryParamsVector(response.query_parameters_to_set,
                                             arg->query_parameters_to_set)) {
     return false;
