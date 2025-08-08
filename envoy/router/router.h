@@ -677,21 +677,18 @@ public:
   virtual bool includeIsTimeoutRetryHeader() const PURE;
 
   /**
-   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
-   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
-   *         as other limits may apply.
-   *         If a per route limit exists, it takes precedence over this configuration.
-   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
-   *         rather than no limit applies.
-   */
-  virtual uint32_t perRequestBufferLimit() const PURE;
-
-  /**
    * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
    *         buffering larger request bodies beyond the connection buffer limit for use cases
-   *         with large payloads. If not set, falls back to perRequestBufferLimit() behavior.
-   *         When set, this limit supersedes per_connection_buffer_limit_bytes for request body
-   *         buffering but perRequestBufferLimit() still controls flow control.
+   *         with large payloads, shadowing, or retries.
+   *
+   *         This method consolidates the functionality of the previous
+   *         per_request_buffer_limit_bytes and request_body_buffer_limit fields. It supports both
+   *         legacy configurations using per_request_buffer_limit_bytes and new configurations using
+   *         request_body_buffer_limit.
+   *
+   *         If neither is set, falls back to connection buffer limits. Unlike some other buffer
+   *         limits, 0 here indicates buffering should not be performed rather than no limit
+   * applies.
    */
   virtual uint64_t requestBodyBufferLimit() const PURE;
 
@@ -1004,21 +1001,18 @@ public:
   virtual const PathRewriterSharedPtr& pathRewriter() const PURE;
 
   /**
-   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
-   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
-   *         as other limits may apply.
-   *         If a per route limit exists, it takes precedence over this configuration.
-   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
-   *         rather than no limit applies.
-   */
-  virtual uint32_t perRequestBufferLimit() const PURE;
-
-  /**
    * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
    *         buffering larger request bodies beyond the connection buffer limit for use cases
-   *         with large payloads. If not set, falls back to perRequestBufferLimit() behavior.
-   *         When set, this limit supersedes per_connection_buffer_limit_bytes for request body
-   *         buffering but perRequestBufferLimit() still controls flow control.
+   *         with large payloads, shadowing, or retries.
+   *
+   *         This method consolidates the functionality of the previous
+   *         per_request_buffer_limit_bytes and request_body_buffer_limit fields. It supports both
+   *         legacy configurations using per_request_buffer_limit_bytes and new configurations using
+   *         request_body_buffer_limit.
+   *
+   *         If neither is set, falls back to connection buffer limits. Unlike some other buffer
+   *         limits, 0 here indicates buffering should not be performed rather than no limit
+   * applies.
    */
   virtual uint64_t requestBodyBufferLimit() const PURE;
 

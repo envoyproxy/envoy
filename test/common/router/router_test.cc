@@ -2968,9 +2968,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyBufferLimitExceeded) {
   EXPECT_CALL(callbacks_, decodingBuffer()).WillRepeatedly(Return(&decoding_buffer));
   EXPECT_CALL(callbacks_, addDecodedData(_, true))
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillOnce(Return(10));
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(10));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3010,7 +3008,6 @@ TEST_F(RouterTest, RequestBodyBufferLimitExceeded) {
   // Configure a large request body buffer limit (50 bytes) but small request buffer limit (10
   // bytes).
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(50));
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillOnce(Return(10));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3051,9 +3048,8 @@ TEST_F(RouterTest, BufferLimitLogicCase1RequestBodyBufferLimitSet) {
       .WillRepeatedly(Invoke([&](Buffer::Instance& data, bool) { decoding_buffer.move(data); }));
 
   // Case 1: request_body_buffer_limit=60, per_request_buffer_limit_bytes=20
-  // Should use request_body_buffer_limit = 60 (highest precedence)
+  // Should use request_body_buffer_limit = 60
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(60));
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillRepeatedly(Return(20));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3097,9 +3093,7 @@ TEST_F(RouterTest, BufferLimitLogicCase2PerRequestSetRequestBodyNotSet) {
 
   // Case 2: per_request_buffer_limit_bytes=20, request_body_buffer_limit=not set
   // Should use min(20, connection_buffer_limit) = 20 (since connection limit is default 40)
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
-      .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max())); // Not set
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillRepeatedly(Return(20));
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(20));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3143,9 +3137,8 @@ TEST_F(RouterTest, BufferLimitLogicCase2ConnectionLimitSmaller) {
 
   // Case 2: per_request_buffer_limit_bytes=50, request_body_buffer_limit=not set
   // Should use min(50, connection_limit) = min(50, 40) = 40
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
-      .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max())); // Not set
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillRepeatedly(Return(50));
+  // With consolidated approach, the effective limit should be 40
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(40));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3190,8 +3183,6 @@ TEST_F(RouterTest, BufferLimitLogicCase3NeitherFieldSet) {
   // Should use connection_limit = 40 (default from RouterTestBase)
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
       .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max())); // Not set
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit())
-      .WillRepeatedly(Return(std::numeric_limits<uint32_t>::max())); // Not set
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3232,7 +3223,6 @@ TEST_F(RouterTest, BufferLimitLogicEdgeCaseZeroLimits) {
 
   // Set request_body_buffer_limit to 0 (should prevent any buffering)
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(0));
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillRepeatedly(Return(10));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3271,7 +3261,6 @@ TEST_F(RouterTest, BufferLimitLogicMultipleDataChunks) {
 
   // Buffer limit that should allow multiple small chunks but fail on larger ones
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillRepeatedly(Return(25));
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillRepeatedly(Return(100));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3322,7 +3311,6 @@ TEST_F(RouterTest, BufferLimitLogicMaxUint32Boundary) {
   const uint64_t large_limit = static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()) + 100;
   EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
       .WillRepeatedly(Return(large_limit));
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillRepeatedly(Return(20));
 
   NiceMock<Http::MockRequestEncoder> encoder1;
   Http::ResponseDecoder* response_decoder = nullptr;
@@ -3829,9 +3817,7 @@ TEST_F(RouterTest, NoRetryWithBodyLimit) {
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   // Set a per route body limit which disallows any buffering.
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(0));
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);
@@ -3863,9 +3849,7 @@ TEST_F(RouterTest, NoRetryWithBodyLimitWithUpstreamHalfCloseEnabled) {
   expectNewStreamWithImmediateEncoder(encoder1, &response_decoder, Http::Protocol::Http10);
 
   // Set a per route body limit which disallows any buffering.
-  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
-      .WillOnce(Return(std::numeric_limits<uint64_t>::max()));
-  EXPECT_CALL(callbacks_.route_->route_entry_, perRequestBufferLimit()).WillOnce(Return(0));
+  EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit()).WillOnce(Return(0));
   Http::TestRequestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-internal", "true"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_->decodeHeaders(headers, false);

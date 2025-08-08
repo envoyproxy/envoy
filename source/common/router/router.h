@@ -514,9 +514,8 @@ public:
   bool awaitingHost() { return host_selection_cancelable_ != nullptr; }
 
 protected:
-  void setPerRequestBufferLimit(uint32_t per_request_buffer_limit) {
-    ASSERT(per_request_buffer_limit_ > per_request_buffer_limit);
-    per_request_buffer_limit_ = per_request_buffer_limit;
+  void setRequestBodyBufferLimit(uint64_t buffer_limit) {
+    request_body_buffer_limit_ = buffer_limit;
   }
 
   uint64_t calculateEffectiveBufferLimit() const;
@@ -637,7 +636,6 @@ private:
   absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  uint32_t per_request_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
   uint32_t connection_buffer_limit_{0};
   uint32_t attempt_count_{0};

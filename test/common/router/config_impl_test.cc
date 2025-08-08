@@ -4831,10 +4831,9 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
-  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
-            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                ->routeEntry()
-                ->perRequestBufferLimit());
+  EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->requestBodyBufferLimit());
@@ -4860,10 +4859,9 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
-  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
-            config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                ->routeEntry()
-                ->perRequestBufferLimit());
+  EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->requestBodyBufferLimit());
@@ -4882,10 +4880,9 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
-  EXPECT_EQ(std::numeric_limits<uint32_t>::max(),
-            config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
-                ->routeEntry()
-                ->perRequestBufferLimit());
+  EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                    ->routeEntry()
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->requestBodyBufferLimit());
@@ -11725,7 +11722,7 @@ virtual_hosts:
 
   Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
   const RouteEntry* route = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ(std::numeric_limits<uint32_t>::max(), route->perRequestBufferLimit());
+  EXPECT_EQ(4194304U, route->requestBodyBufferLimit());
 }
 
 } // namespace
