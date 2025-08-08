@@ -16,4 +16,10 @@ DefaultSystemHelper::validateCertificateChain(const std::vector<std::string>& /*
 
 void DefaultSystemHelper::cleanupAfterCertificateValidation() {}
 
+int64_t DefaultSystemHelper::getDefaultNetworkHandle() { return -1; }
+
+std::vector<std::pair<int64_t, ConnectionType>> DefaultSystemHelper::getAllConnectedNetworks() {
+  return {};
+}
+
 } // namespace Envoy
