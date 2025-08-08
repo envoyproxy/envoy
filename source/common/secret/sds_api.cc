@@ -259,6 +259,11 @@ std::vector<std::string> TlsCertificateSdsApi::getDataSourceFilenames() {
           envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
     files.push_back(sds_tls_certificate_secrets_->private_key().filename());
   }
+  if (sds_tls_certificate_secrets_ && sds_tls_certificate_secrets_->has_ocsp_staple() &&
+      sds_tls_certificate_secrets_->ocsp_staple().specifier_case() ==
+          envoy::config::core::v3::DataSource::SpecifierCase::kFilename) {
+    files.push_back(sds_tls_certificate_secrets_->ocsp_staple().filename());
+  }
   return files;
 }
 
