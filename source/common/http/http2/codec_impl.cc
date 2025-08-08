@@ -2271,17 +2271,15 @@ Status ServerConnectionImpl::onBeginHeaders(int32_t stream_id) {
 }
 
 int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, HeaderString&& value) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_discard_host_header")) {
-    StreamImpl* stream = getStreamUnchecked(stream_id);
-    if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
-      // Check if there is already the :authority header
-      const auto result = stream->headers().get(Http::Headers::get().Host);
-      if (!result.empty()) {
-        // Discard the host header value
-        return 0;
-      }
-      // Otherwise use host value as :authority
+  StreamImpl* stream = getStreamUnchecked(stream_id);
+  if (stream && name == static_cast<absl::string_view>(Http::Headers::get().HostLegacy)) {
+    // Check if there is already the :authority header
+    const auto result = stream->headers().get(Http::Headers::get().Host);
+    if (!result.empty()) {
+      // Discard the host header value
+      return 0;
     }
+    // Otherwise use host value as :authority
   }
   return saveHeader(stream_id, std::move(name), std::move(value));
 }
