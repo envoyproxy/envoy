@@ -3917,6 +3917,31 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
 }
 
 // Checks that the per-route filter can override the check_settings set on the main filter.
+TEST_F(HttpFilterTest, NullRouteSkipsCheck) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  stat_prefix: "ext_authz"
+  )EOF");
+
+  prepareCheck();
+
+  // Set up a null route return value.
+  ON_CALL(decoder_filter_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  // With null route, no authorization check should be performed.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  // Call the filter directly.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  // With null route, the filter should continue without an auth check.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
 TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
   InSequence s;
 
@@ -4784,6 +4809,109 @@ TEST_P(HttpFilterTestParam, PerRouteHttpClientCreationNoServerContext) {
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue,
             new_filter->decodeHeaders(request_headers_, false));
+}
+
+// Test gRPC client error handling for per-route config.
+TEST_F(HttpFilterTest, GrpcClientPerRouteError) {
+  // Initialize with gRPC client configuration.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  stat_prefix: "ext_authz"
+  )EOF");
+
+  prepareCheck();
+
+  // Create per-route configuration with gRPC service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
+  grpc_service->mutable_envoy_grpc()->set_cluster_name("nonexistent_cluster");
+
+  FilterConfigPerRoute per_route_filter_config(per_route_config);
+
+  // Set up route config to use the per-route configuration.
+  ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(Return(&per_route_filter_config));
+
+  // Since cluster doesn't exist, per-route client creation should fail
+  // and we'll use the default client instead.
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        Filters::Common::ExtAuthz::Response response{};
+        response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  // Verify filter processes the request with the default client.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test HTTP client with per-route configuration.
+TEST_F(HttpFilterTest, HttpClientPerRouteOverride) {
+  // Initialize with HTTP client configuration.
+  initialize(R"EOF(
+  http_service:
+    server_uri:
+      uri: "https://ext-authz.example.com"
+      cluster: "ext_authz_server"
+    path_prefix: "/api/v1/auth"
+  failure_mode_allow: false
+  stat_prefix: "ext_authz"
+  )EOF");
+
+  prepareCheck();
+
+  // Create per-route configuration with HTTP service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* http_service = per_route_config.mutable_check_settings()->mutable_http_service();
+  http_service->mutable_server_uri()->set_uri("https://per-route-ext-authz.example.com");
+  http_service->mutable_server_uri()->set_cluster("per_route_http_cluster");
+  http_service->set_path_prefix("/api/v2/auth");
+
+  FilterConfigPerRoute per_route_filter_config(per_route_config);
+
+  // Set up route config to use the per-route configuration.
+  ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(Return(&per_route_filter_config));
+
+  // Set up a check expectation that will be satisfied by the default client.
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        Filters::Common::ExtAuthz::Response response{};
+        response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  // Verify filter processes the request.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test invalid response header validation via response_headers_to_add.
+TEST_F(InvalidMutationTest, InvalidResponseHeadersToAddName) {
+  Filters::Common::ExtAuthz::Response r;
+  r.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  r.response_headers_to_add = {{"invalid header name", "value"}};
+  testResponse(r);
+}
+
+// Test invalid response header validation via response_headers_to_add value.
+TEST_F(InvalidMutationTest, InvalidResponseHeadersToAddValue) {
+  Filters::Common::ExtAuthz::Response r;
+  r.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  r.response_headers_to_add = {{"valid-name", getInvalidValue()}};
+  testResponse(r);
 }
 
 // Test per-route timeout configuration is correctly used in gRPC client creation.
