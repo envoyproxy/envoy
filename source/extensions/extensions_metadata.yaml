@@ -84,7 +84,7 @@ envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface:
   - envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.UpstreamReverseConnectionSocketInterface
 envoy.clusters.reverse_connection:
   categories:
-  - envoy.cluster
+  - envoy.clusters
   security_posture: unknown
   status: wip
   type_urls:

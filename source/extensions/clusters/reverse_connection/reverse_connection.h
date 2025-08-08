@@ -112,7 +112,7 @@ private:
     const Network::Address::Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return 0; }
     Network::Address::IpVersion version() const override { return Network::Address::IpVersion::v4; }
-    
+
     // Additional pure virtual methods that need implementation
     bool isLinkLocalAddress() const override { return false; }
     bool isUniqueLocalAddress() const override { return false; }
