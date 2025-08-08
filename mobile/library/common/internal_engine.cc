@@ -2,8 +2,6 @@
 
 #include <sys/resource.h>
 
-#include <filesystem>
-
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/common/lock_guard.h"
 #include "source/common/common/utility.h"
