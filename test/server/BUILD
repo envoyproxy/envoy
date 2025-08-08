@@ -364,7 +364,7 @@ envoy_cc_test(
         "//source/common/common:notification_lib",
         "//source/common/version:version_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
         "//source/extensions/filters/http/health_check:config",
