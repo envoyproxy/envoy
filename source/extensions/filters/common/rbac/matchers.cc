@@ -267,7 +267,15 @@ bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http
                         const StreamInfo::StreamInfo& info) const {
   // Extract IP address using reference to avoid shared_ptr copies.
   const auto& address = extractIpAddress(connection, info);
-  return address && !trie_->getData(address).empty();
+  // Guard against non-IP addresses (e.g., pipe) or missing address.
+  if (!address) {
+    return false;
+  }
+  const auto* ip = address->ip();
+  if (ip == nullptr) {
+    return false;
+  }
+  return !trie_->getData(address).empty();
 }
 
 bool PortMatcher::matches(const Network::Connection&, const Envoy::Http::RequestHeaderMap&,
