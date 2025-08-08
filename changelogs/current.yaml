@@ -58,6 +58,9 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` and legacy code paths.
 - area: http
   change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags`` and legacy code paths.
+- area: http
+  change: |
     Removed runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips`` and legacy code paths.
 - area: http
   change: |
