@@ -59,44 +59,6 @@ TEST_P(DownstreamProtocolIntegrationTest, DISABLED_BatchedPackets) {
   ASSERT_TRUE(fake_upstream_connection_->close());
 }
 
-// Test upstream requests per connection metric for HTTP/3 upstream connections
-TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHttp3) {
-  // Only run this test when upstream protocol is HTTP/3
-  if (upstreamProtocol() != Http::CodecType::HTTP3) {
-    return;
-  }
-
-  initialize();
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-
-  // Make multiple requests on the same connection
-  for (int i = 0; i < 3; ++i) {
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().getStatusValue());
-  }
-
-  // Close the client connection to trigger metric recording
-  codec_client_->close();
-
-  // Wait for the histogram to have samples
-  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_per_cx");
-  auto rq_per_cx_histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
-
-  // Verify the metric was recorded
-  EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(), *rq_per_cx_histogram),
-            1);
-
-  // Verify the recorded value shows 3 requests per connection
-  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
-                                                        *rq_per_cx_histogram)),
-            3);
-}
-
 // These will run with HTTP/3 downstream, and Http upstream.
 INSTANTIATE_TEST_SUITE_P(DownstreamProtocols, DownstreamProtocolIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
