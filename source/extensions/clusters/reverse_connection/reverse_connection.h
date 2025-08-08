@@ -28,7 +28,7 @@ namespace ReverseConnection {
 
 namespace BootstrapReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
-// Constants for reverse connection headers
+// Constants for reverse connection headers.
 const Http::LowerCaseString EnvoyDstNodeUUID{"x-remote-node-id"};
 const Http::LowerCaseString EnvoyDstClusterUUID{"x-dst-cluster-uuid"};
 
@@ -41,10 +41,10 @@ class UpstreamReverseConnectionAddress
     : public Network::Address::Instance,
       public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
-  UpstreamReverseConnectionAddress(const std::string& cluster_id)
-      : cluster_id_(cluster_id), address_string_("127.0.0.1:0") {
+  UpstreamReverseConnectionAddress(const std::string& node_id)
+      : node_id_(node_id), address_string_("127.0.0.1:0") {
 
-    // Create a simple socket address for filter chain matching
+    // Create a simple socket address for filter chain matching.
     // Use 127.0.0.1:0 which will match the catch-all filter chain
     synthetic_sockaddr_.sin_family = AF_INET;
     synthetic_sockaddr_.sin_port = htons(0);                 // Port 0 for reverse connections
@@ -53,20 +53,20 @@ public:
 
     ENVOY_LOG(
         debug,
-        "UpstreamReverseConnectionAddress: cluster: {} using 127.0.0.1:0 for filter chain matching",
-        cluster_id_);
+        "UpstreamReverseConnectionAddress: node: {} using 127.0.0.1:0 for filter chain matching",
+        node_id_);
   }
 
-  // Network::Address::Instance
+  // Network::Address::Instance.
   bool operator==(const Instance& rhs) const override {
     const auto* other = dynamic_cast<const UpstreamReverseConnectionAddress*>(&rhs);
-    return other && cluster_id_ == other->cluster_id_;
+    return other && node_id_ == other->node_id_;
   }
 
   Network::Address::Type type() const override { return Network::Address::Type::Ip; }
   const std::string& asString() const override { return address_string_; }
   absl::string_view asStringView() const override { return address_string_; }
-  const std::string& logicalName() const override { return cluster_id_; }
+  const std::string& logicalName() const override { return node_id_; }
   const Network::Address::Ip* ip() const override { return &ip_; }
   const Network::Address::Pipe* pipe() const override { return nullptr; }
   const Network::Address::EnvoyInternalAddress* envoyInternalAddress() const override {
@@ -76,34 +76,29 @@ public:
     return reinterpret_cast<const sockaddr*>(&synthetic_sockaddr_);
   }
   socklen_t sockAddrLen() const override { return sizeof(synthetic_sockaddr_); }
-  // Set to default so that the default client connection factory is used to initiate connections to
-  // the address.
+  // Set to default so that the default client connection factory is used to initiate connections
+  // to. the address.
   absl::string_view addressType() const override { return "default"; }
   absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
 
-  // Override socketInterface to use the ReverseTunnelAcceptor
+  // Override socketInterface to use the ReverseTunnelAcceptor.
   const Network::SocketInterface& socketInterface() const override {
-    ENVOY_LOG(debug, "UpstreamReverseConnectionAddress: socketInterface() called for cluster: {}",
-              cluster_id_);
+    ENVOY_LOG(debug, "UpstreamReverseConnectionAddress: socketInterface() called for node: {}",
+              node_id_);
     auto* upstream_interface = Network::socketInterface(
         "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
     if (upstream_interface) {
-      ENVOY_LOG(debug,
-                "UpstreamReverseConnectionAddress: Using ReverseTunnelAcceptor for cluster: {}",
-                cluster_id_);
+      ENVOY_LOG(debug, "UpstreamReverseConnectionAddress: Using ReverseTunnelAcceptor for node: {}",
+                node_id_);
       return *upstream_interface;
     }
-    // Fallback to default socket interface if upstream interface is not available
-    ENVOY_LOG(debug,
-              "UpstreamReverseConnectionAddress: ReverseTunnelAcceptor not available, "
-              "falling back to default for cluster: {}",
-              cluster_id_);
+    // Fallback to default socket interface if upstream interface is not available.
     return *Network::socketInterface(
         "envoy.extensions.network.socket_interface.default_socket_interface");
   }
 
 private:
-  // Simple IPv4 implementation for upstream reverse connection addresses
+  // Simple IPv4 implementation for upstream reverse connection addresses.
   struct UpstreamReverseConnectionIp : public Network::Address::Ip {
     const std::string& addressAsString() const override { return address_string_; }
     bool isAnyAddress() const override { return true; }
@@ -113,7 +108,7 @@ private:
     uint32_t port() const override { return 0; }
     Network::Address::IpVersion version() const override { return Network::Address::IpVersion::v4; }
 
-    // Additional pure virtual methods that need implementation
+    // Additional pure virtual methods that need implementation.
     bool isLinkLocalAddress() const override { return false; }
     bool isUniqueLocalAddress() const override { return false; }
     bool isSiteLocalAddress() const override { return false; }
@@ -122,7 +117,7 @@ private:
     std::string address_string_{"0.0.0.0:0"};
   };
 
-  std::string cluster_id_;
+  std::string node_id_;
   std::string address_string_;
   UpstreamReverseConnectionIp ip_;
   struct sockaddr_in synthetic_sockaddr_; // Socket address for filter chain matching
@@ -145,7 +140,7 @@ public:
 
   ~RevConCluster() override { cleanup_timer_->disableTimer(); }
 
-  // Upstream::Cluster
+  // Upstream::Cluster.
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
   class LoadBalancer : public Upstream::LoadBalancer {
@@ -153,8 +148,8 @@ public:
     LoadBalancer(const std::shared_ptr<RevConCluster>& parent) : parent_(parent) {}
 
     // Chooses a host to send a downstream request over to a reverse connection endpoint.
-    // A request intended for a reverse connection has to have either of the below set and are
-    // checked in the given order:
+    // A request intended for a reverse connection has to have either of the below set and are.
+    // checked in the given order:.
     // 1. If the host_id is set, it is used for creating the host.
     // 2. The request should have either of the HTTP headers given in the RevConClusterConfig's
     // http_header_names set. If any of the headers are set, the first found header is used to
@@ -164,11 +159,11 @@ public:
     // and is used to create the host.
     Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
 
-    // Helper function to verify that the host header is of the format
+    // Helper function to verify that the host header is of the format.
     // "<uuid>.tcpproxy.envoy.remote:<remote_port>" and extract the uuid from the header.
     absl::optional<absl::string_view> getUUIDFromHost(const Http::RequestHeaderMap& headers);
 
-    // Helper function to extract UUID from SNI (Server Name Indication) if it follows the format
+    // Helper function to extract UUID from SNI (Server Name Indication) if it follows the format.
     // "<uuid>.tcpproxy.envoy.remote".
     absl::optional<absl::string_view> getUUIDFromSNI(const Network::Connection* connection);
 
@@ -196,7 +191,7 @@ private:
   struct LoadBalancerFactory : public Upstream::LoadBalancerFactory {
     LoadBalancerFactory(const std::shared_ptr<RevConCluster>& cluster) : cluster_(cluster) {}
 
-    // Upstream::LoadBalancerFactory
+    // Upstream::LoadBalancerFactory.
     Upstream::LoadBalancerPtr create() { return std::make_unique<LoadBalancer>(cluster_); }
     Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override { return create(); }
 
@@ -206,7 +201,7 @@ private:
   struct ThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
     ThreadAwareLoadBalancer(const std::shared_ptr<RevConCluster>& cluster) : cluster_(cluster) {}
 
-    // Upstream::ThreadAwareLoadBalancer
+    // Upstream::ThreadAwareLoadBalancer.
     Upstream::LoadBalancerFactorySharedPtr factory() override {
       return std::make_shared<LoadBalancerFactory>(cluster_);
     }
@@ -218,7 +213,7 @@ private:
   // Periodically cleans the stale hosts from host_map_.
   void cleanup();
 
-  // Checks if a host exists for a given `host_id` and if not it creates and caches
+  // Checks if a host exists for a given `host_id` and if not it creates and caches.
   // that host to the map.
   Upstream::HostSelectionResponse checkAndCreateHost(const std::string host_id);
 
@@ -226,7 +221,7 @@ private:
   // If such header is present, it return that header value.
   absl::string_view getHostIdValue(const Http::RequestHeaderMap* request_headers);
 
-  // Get the upstream socket manager from the thread-local registry
+  // Get the upstream socket manager from the thread-local registry.
   BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;
 
   // No pre-initialize work needs to be completed by REVERSE CONNECTION cluster.
