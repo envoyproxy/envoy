@@ -166,5 +166,5 @@ new_features:
 - area: tls_inspector
   change: |
     Added filter state when failing to parse the ``ClientHello``.
-    
+
 deprecated:
