@@ -2224,7 +2224,6 @@ TEST(TypedRoundRobinLbConfigTest, TypedRoundRobinLbConfig) {
     common.mutable_zone_aware_lb_config()->mutable_min_cluster_size()->set_value(3);
     common.mutable_zone_aware_lb_config()->mutable_routing_enabled()->set_value(23.0);
     common.mutable_zone_aware_lb_config()->set_fail_traffic_on_panic(true);
-    common.mutable_zone_aware_lb_config()->set_use_host_weight(true);
 
     TypedRoundRobinLbConfig typed_config(common, legacy);
 
@@ -2238,7 +2237,6 @@ TEST(TypedRoundRobinLbConfigTest, TypedRoundRobinLbConfig) {
     EXPECT_EQ(zone_aware_lb_config.min_cluster_size().value(), 3);
     EXPECT_DOUBLE_EQ(zone_aware_lb_config.routing_enabled().value(), 23.0);
     EXPECT_TRUE(zone_aware_lb_config.fail_traffic_on_panic());
-    EXPECT_TRUE(zone_aware_lb_config.use_host_weight());
   }
 }
 
