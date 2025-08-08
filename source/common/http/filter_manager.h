@@ -1181,9 +1181,7 @@ public:
                      std::move(parent_filter_state)),
         local_reply_(local_reply), filter_chain_factory_(filter_chain_factory),
         downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
-            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)),
-        use_filter_manager_state_for_downstream_end_stream_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream")) {
+            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)) {
     ENVOY_LOG_ONCE_IF(
         trace, downstream_filter_load_shed_point_ == nullptr,
         "LoadShedPoint envoy.load_shed_points.http_downstream_filter_check is not found. "
@@ -1219,15 +1217,7 @@ public:
   /**
    * Whether downstream has observed end_stream.
    */
-  bool decoderObservedEndStream() const override {
-    // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream
-    // runtime flag.
-    if (use_filter_manager_state_for_downstream_end_stream_) {
-      return state_.observed_decode_end_stream_;
-    }
-
-    return hasLastDownstreamByteReceived();
-  }
+  bool decoderObservedEndStream() const override { return state_.observed_decode_end_stream_; }
 
   /**
    * Return true if the timestamp of the downstream end_stream was recorded.
@@ -1284,9 +1274,6 @@ private:
   const FilterChainFactory& filter_chain_factory_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
   Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
-  // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream runtime
-  // flag.
-  const bool use_filter_manager_state_for_downstream_end_stream_{};
 };
 
 } // namespace Http
