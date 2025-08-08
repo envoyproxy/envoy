@@ -163,5 +163,8 @@ new_features:
 - area: rbac
   change: |
     Switch the IP matcher to use LC-Trie for performance improvements.
-
+- area: tls_inspector
+  change: |
+    Added filter state when failing to parse the ClientHello.
+    
 deprecated:
