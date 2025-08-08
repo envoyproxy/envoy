@@ -79,7 +79,7 @@ envoy_extension_cc_test(
     deps = [
         ":ext_authz_fuzz_proto_cc_proto",
         ":logging_test_filter_lib",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/filters/http/ext_authz:config",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
         "//source/server/config_validation:server_lib",
