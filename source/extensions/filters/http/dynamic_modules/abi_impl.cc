@@ -71,6 +71,76 @@ bool getSslInfo(
   return true;
 }
 
+envoy_dynamic_module_type_metric_counter_envoy_ptr envoy_dynamic_module_callback_metric_counter_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig const*>(filter_config_envoy_ptr);
+  absl::string_view name_view(name, name_length);
+  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_.symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  Stats::Counter* c = &Stats::Utility::counterFromStatNames(
+      filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name});
+  return c;
+}
+
+void envoy_dynamic_module_callback_metric_increment_counter(
+    envoy_dynamic_module_type_metric_counter_envoy_ptr counter_envoy_ptr, uint64_t value) {
+  Stats::Counter* counter = static_cast<Stats::Counter*>(counter_envoy_ptr);
+  counter->add(value);
+}
+
+envoy_dynamic_module_type_metric_gauge_envoy_ptr envoy_dynamic_module_callback_metric_gauge_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig const*>(filter_config_envoy_ptr);
+  absl::string_view name_view(name, name_length);
+  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_.symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  Stats::Gauge* c = &Stats::Utility::gaugeFromStatNames(
+      filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name},
+      Stats::Gauge::ImportMode::Accumulate);
+  return c;
+}
+
+void envoy_dynamic_module_callback_metric_increase_gauge(
+    envoy_dynamic_module_type_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value) {
+  Stats::Gauge* gauge = static_cast<Stats::Gauge*>(gauge_envoy_ptr);
+  gauge->add(value);
+}
+
+void envoy_dynamic_module_callback_metric_decrease_gauge(
+    envoy_dynamic_module_type_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value) {
+  Stats::Gauge* gauge = static_cast<Stats::Gauge*>(gauge_envoy_ptr);
+  gauge->sub(value);
+}
+
+void envoy_dynamic_module_callback_metric_set_gauge(
+    envoy_dynamic_module_type_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value) {
+  Stats::Gauge* gauge = static_cast<Stats::Gauge*>(gauge_envoy_ptr);
+  gauge->set(value);
+}
+
+envoy_dynamic_module_type_metric_histogram_envoy_ptr
+envoy_dynamic_module_callback_metric_histogram_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig const*>(filter_config_envoy_ptr);
+  absl::string_view name_view(name, name_length);
+  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_.symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  Stats::Histogram* c = &Stats::Utility::histogramFromStatNames(
+      filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name},
+      // TODO should we allow callers to specify this?
+      Stats::Histogram::Unit::Unspecified);
+  return c;
+}
+
+void envoy_dynamic_module_callback_metric_record_histogram_value(
+    envoy_dynamic_module_type_metric_histogram_envoy_ptr histogram_envoy_ptr, uint64_t value) {
+  Stats::Histogram* histogram = static_cast<Stats::Histogram*>(histogram_envoy_ptr);
+  histogram->recordValue(value);
+}
+
 size_t envoy_dynamic_module_callback_http_get_request_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,

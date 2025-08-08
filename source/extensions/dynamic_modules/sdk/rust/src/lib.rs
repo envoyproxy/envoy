@@ -271,20 +271,122 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 pub trait EnvoyHttpFilterConfig {
-  // TODO: add methods like defining metrics, filter metadata, etc.
+  /// Define a new counter scoped to this filter config with the given name.
+  fn new_counter(&self, name: &str) -> EnvoyCounter;
+
+  /// Define a new gauge scoped to this filter config with the given name.
+  fn new_gauge(&self, name: &str) -> EnvoyGauge;
+
+  /// Define a new histogram scoped to this filter config with the given name.
+  fn new_histogram(&self, name: &str) -> EnvoyHistogram;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
   raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
-impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {}
+impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
+  fn new_counter(&self, name: &str) -> EnvoyCounter {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let counter_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_metric_counter_new(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+      )
+    };
+    EnvoyCounter {
+      raw_ptr: counter_ptr,
+    }
+  }
+
+  fn new_gauge(&self, name: &str) -> EnvoyGauge {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let gauge_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_metric_gauge_new(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+      )
+    };
+    EnvoyGauge { raw_ptr: gauge_ptr }
+  }
+
+  fn new_histogram(&self, name: &str) -> EnvoyHistogram {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let histogram_ptr = unsafe {
+      abi::envoy_dynamic_module_callback_metric_histogram_new(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+      )
+    };
+    EnvoyHistogram {
+      raw_ptr: histogram_ptr,
+    }
+  }
+}
+
+/// An opaque object that represents an underlying Envoy Stats::Counter that's
+/// been previously defined on an EnvoyHttpFilterConfig.
+#[derive(Copy, Clone)]
+pub struct EnvoyCounter {
+  raw_ptr: abi::envoy_dynamic_module_type_metric_counter_envoy_ptr,
+}
+
+impl EnvoyCounter {
+  /// Increment this counter by the given value.
+  pub fn increment(self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_metric_increment_counter(self.raw_ptr, value) }
+  }
+}
+
+/// An opaque object that represents an underlying Envoy Stats::Gauge that's
+/// been previously defined on an EnvoyHttpFilterConfig.
+#[derive(Copy, Clone)]
+pub struct EnvoyGauge {
+  raw_ptr: abi::envoy_dynamic_module_type_metric_gauge_envoy_ptr,
+}
+
+impl EnvoyGauge {
+  /// Increase this gauge by the given value.
+  pub fn increase(self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_metric_increase_gauge(self.raw_ptr, value) }
+  }
+
+  /// Decrease this gauge by the given value.
+  pub fn decrease(self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_metric_decrease_gauge(self.raw_ptr, value) }
+  }
+
+  /// Set this gauge to the given value.
+  pub fn set(self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_metric_set_gauge(self.raw_ptr, value) }
+  }
+}
+
+/// An opaque object that represents an underlying Envoy Stats::Histogram that's
+/// been previously defined on an EnvoyHttpFilterConfig.
+#[derive(Copy, Clone)]
+pub struct EnvoyHistogram {
+  raw_ptr: abi::envoy_dynamic_module_type_metric_histogram_envoy_ptr,
+}
+
+impl EnvoyHistogram {
+  /// Record the given value in this histogram.
+  pub fn record_value(self, value: u64) {
+    unsafe { abi::envoy_dynamic_module_callback_metric_record_histogram_value(self.raw_ptr, value) }
+  }
+}
 
 /// An opaque object that represents the underlying Envoy Http filter. This has one to one
 /// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
 ///
 /// The Envoy filter object is inherently not thread-safe, and it is always recommended to
-/// access it from the same thread as the one that [`HttpFilter`] even hooks are called.
+/// access it from the same thread as the one that [`HttpFilter`] event hooks are called.
 #[automock]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyHttpFilter {
@@ -1347,7 +1449,7 @@ impl EnvoyHttpFilterImpl {
     // At this point, we assume at least one value is present.
     results.push(unsafe { EnvoyBuffer::new_from_raw(result_ptr, result_size) });
     // So, we iterate from 1 to counts - 1.
-    for i in 1 .. counts {
+    for i in 1..counts {
       let mut result_ptr: *const u8 = std::ptr::null();
       let mut result_size: usize = 0;
       unsafe {
@@ -1370,7 +1472,7 @@ impl EnvoyHttpFilterImpl {
 /// This represents a thin thread-safe object that can be used to schedule a generic event to the
 /// Envoy HTTP filter on the work thread.
 ///
-/// For eaxmple, this can be used to offload some blocking work from the HTTP filter processing
+/// For example, this can be used to offload some blocking work from the HTTP filter processing
 /// thread to a module-managed thread, and then schedule an event to continue
 /// processing the request.
 ///

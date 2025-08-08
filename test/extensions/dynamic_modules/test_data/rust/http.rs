@@ -14,11 +14,16 @@ fn init() -> bool {
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewHttpFilterConfigFunction`]
 /// signature.
 fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
   match name {
+    "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
+      streams_total: envoy_filter_config.new_counter("streams_total"),
+      concurrent_streams: envoy_filter_config.new_gauge("concurrent_streams"),
+      ones: envoy_filter_config.new_histogram("ones"),
+    })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
@@ -26,6 +31,52 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "config_init_failure" => None,
     _ => panic!("Unknown filter name: {}", name),
+  }
+}
+
+/// An HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the stats
+/// related callbacks.
+struct StatsCallbacksFilterConfig {
+  streams_total: EnvoyCounter,
+  concurrent_streams: EnvoyGauge,
+  // It's full of 1s.
+  ones: EnvoyHistogram,
+}
+
+impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
+  for StatsCallbacksFilterConfig
+{
+  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    self.streams_total.increment(1);
+    self.concurrent_streams.increase(1);
+    // Copy the stats handles onto the filter so that we can observe stats while
+    // handling requests.
+    Box::new(StatsCallbacksFilter {
+      concurrent_streams: self.concurrent_streams,
+      ones: self.ones,
+    })
+  }
+}
+
+/// An HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
+struct StatsCallbacksFilter {
+  concurrent_streams: EnvoyGauge,
+  ones: EnvoyHistogram,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    self.ones.record_value(1);
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_stream_complete(&mut self, _envoy_filter: &mut EHF) {
+    self.concurrent_streams.decrease(1);
   }
 }
 
@@ -89,9 +140,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[3].0.as_slice(), b"new");
     assert_eq!(all_headers[3].1.as_slice(), b"value");
 
-    let downstrean_port =
+    let downstream_port =
       envoy_filter.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::SourcePort);
-    assert_eq!(downstrean_port, Some(1234));
+    assert_eq!(downstream_port, Some(1234));
     let downstream_addr =
       envoy_filter.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress);
     assert!(downstream_addr.is_some());
@@ -626,7 +677,7 @@ impl std::io::Read for BodyReader<'_> {
       let slice = self.data[self.vec_idx].as_slice();
       let remaining = slice.len() - self.buf_idx;
       let to_copy = std::cmp::min(remaining, buf.len() - n);
-      buf[n .. n + to_copy].copy_from_slice(&slice[self.buf_idx .. self.buf_idx + to_copy]);
+      buf[n..n + to_copy].copy_from_slice(&slice[self.buf_idx..self.buf_idx + to_copy]);
       n += to_copy;
       self.buf_idx += to_copy;
       if self.buf_idx >= slice.len() {
@@ -715,7 +766,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     let mut reader = BodyReader::new(body);
     let mut buf = vec![0; 1024];
     let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-    self.request_body.extend_from_slice(&buf[.. n]);
+    self.request_body.extend_from_slice(&buf[..n]);
     // Drop the reader and try writing to the writer.
     drop(reader);
 

@@ -125,6 +125,33 @@ typedef void* envoy_dynamic_module_type_http_filter_envoy_ptr;
 typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
 
 /**
+ * envoy_dynamic_module_type_metric_counter_envoy_ptr is a raw pointer to the Stats::Counter class
+ * in Envoy. This is passed to the module when creating a new Counter during filter initialization.
+ * It can be used to manipulate the counter through various callbacks into Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_metric_counter_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_metric_gauge_envoy_ptr is a raw pointer to the Stats::Gauge class in
+ * Envoy. This is passed to the module when creating a new Gauge during filter initialization. It
+ * can be used to manipulate the gauge through various callbacks into Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_metric_gauge_envoy_ptr;
+
+/**
+ * envoy_dynamic_module_type_metric_histogram_envoy_ptr is a raw pointer to the Stats::Histogram
+ * class in Envoy. This is passed to the module when creating a new Histogram during filter
+ * initialization. It can be used to manipulate the histogram through various callbacks into Envoy.
+ *
+ * OWNERSHIP: Envoy owns the pointer.
+ */
+typedef void* envoy_dynamic_module_type_metric_histogram_envoy_ptr;
+
+/**
  * envoy_dynamic_module_type_http_filter_scheduler_ptr is a raw pointer to the
  * DynamicModuleHttpFilterScheduler class in Envoy.
  *
@@ -726,6 +753,106 @@ void envoy_dynamic_module_on_http_filter_scheduled(
 //
 // Callbacks are functions implemented by Envoy that can be called by the module to interact with
 // Envoy. The name of a callback must be prefixed with "envoy_dynamic_module_callback_".
+
+// ----------------------------- Metrics callbacks -----------------------------
+
+/**
+ * envoy_dynamic_module_callback_metric_counter_new is called by the module during initialization to
+ * create a new Stats::Counter with the given name.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param name_length is the length of the name.
+ * @return a pointer to the defined counter that may be used to increment it later.
+ */
+envoy_dynamic_module_type_metric_counter_envoy_ptr envoy_dynamic_module_callback_metric_counter_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length);
+
+/**
+ * envoy_dynamic_module_callback_metric_increment_counter is called by the module to increment a
+ * previously defined counter.
+ *
+ * @param counter_envoy_ptr is a pointer to a counter previously defined using
+ * envoy_dynamic_module_callback_metric_counter_new.
+ * @param value is the value to increment the counter by.
+ */
+void envoy_dynamic_module_callback_metric_increment_counter(
+    envoy_dynamic_module_type_metric_counter_envoy_ptr counter_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_metric_gauge_new is called by the module during initialization to
+ * create a new Stats::Gauge with the given name.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param name_length is the length of the name.
+ * @return a pointer to the defined gauge that may be used to manipulate it later.
+ */
+envoy_dynamic_module_type_metric_gauge_envoy_ptr envoy_dynamic_module_callback_metric_gauge_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length);
+
+/**
+ * envoy_dynamic_module_callback_metric_increase_gauge is called by the module to increase the value
+ * of a previously defined gauge.
+ *
+ * @param gauge_envoy_ptr is a pointer to a gauge previously defined using
+ * envoy_dynamic_module_callback_metric_gauge_new.
+ * @param value is the value to increase the gauge by.
+ */
+void envoy_dynamic_module_callback_metric_increase_gauge(
+    envoy_dynamic_module_type_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_metric_decrease_gauge is called by the module to decrease the value
+ * of a previously defined gauge.
+ *
+ * @param gauge_envoy_ptr is a pointer to a gauge previously defined using
+ * envoy_dynamic_module_callback_metric_gauge_new.
+ * @param value is the value to decrease the gauge by.
+ */
+void envoy_dynamic_module_callback_metric_decrease_gauge(
+    envoy_dynamic_module_type_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_metric_decrease_gauge is called by the module to set the value
+ * of a previously defined gauge.
+ *
+ * @param gauge_envoy_ptr is a pointer to a gauge previously defined using
+ * envoy_dynamic_module_callback_metric_gauge_new.
+ * @param value is the value to set the gauge to.
+ */
+void envoy_dynamic_module_callback_metric_set_gauge(
+    envoy_dynamic_module_type_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_metric_histogram_new is called by the module during initialization to
+ * create a new Stats::Histogram with the given name.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param name_length is the length of the name.
+ * @return a pointer to the defined histogram that may be used to record values to it later.
+ */
+envoy_dynamic_module_type_metric_histogram_envoy_ptr
+envoy_dynamic_module_callback_metric_histogram_new(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length);
+
+/**
+ * envoy_dynamic_module_callback_metric_record_histogram_value is called by the module to record a
+ * value in a previously defined histogram.
+ *
+ * @param histogram_envoy_ptr is a pointer to a histogram previously defined using
+ * envoy_dynamic_module_callback_metric_histogram_new.
+ * @param value is the value to record in the histogram.
+ */
+void envoy_dynamic_module_callback_metric_record_histogram_value(
+    envoy_dynamic_module_type_metric_histogram_envoy_ptr histogram_envoy_ptr, uint64_t value);
 
 // ---------------------- HTTP Header/Trailer callbacks ------------------------
 
