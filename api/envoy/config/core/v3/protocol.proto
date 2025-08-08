@@ -111,6 +111,7 @@ message QuicProtocolOptions {
   // default 600s will be applied.
   // For internal corporate network, a long timeout is often fine.
   // But for client facing network, 30s is usually a good choice.
+  // Do not add an upper bound here. A long idle timeout is useful for maintaining warm connections at non-front-line proxy for low QPS services."
   google.protobuf.Duration idle_network_timeout = 8
       [(validate.rules).duration = {gte {seconds: 1}}];
 
