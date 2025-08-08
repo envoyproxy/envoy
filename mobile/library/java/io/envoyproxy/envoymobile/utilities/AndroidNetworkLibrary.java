@@ -129,10 +129,16 @@ public final class AndroidNetworkLibrary {
   }
 
   public static long getDefaultNetworkHandle() {
+    if (io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2.getInstance() == null) {
+      return -1;
+    }
     return io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2.getInstance().getDefaultNetId();
   }
 
   public static long[][] getAllConnectedNetworks() {
+    if (io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2.getInstance() == null) {
+      return new long[0][0];
+    }
     NetworkWithType[] networks =
         io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2.getInstance()
             .getAllNetworksAndTypes();
