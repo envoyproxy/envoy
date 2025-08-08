@@ -210,12 +210,17 @@ protected:
   Filesystem::MockInstance filesystem_;
 };
 
-class TlsCertificateSdsRotationApiTest : public testing::TestWithParam<bool>,
+class TlsCertificateSdsRotationApiTest : public testing::TestWithParam<std::tuple<bool, bool>>,
                                          public SdsRotationApiTest {
 protected:
   TlsCertificateSdsRotationApiTest()
-      : watched_directory_(GetParam()), cert_path_("/foo/bar/cert.pem"),
-        key_path_("/foo/bar/key.pem"), expected_watch_path_("/foo/bar/"), trigger_path_("/foo") {
+      : watched_directory_(std::get<0>(GetParam())),
+        ocsp_stapling_enabled_(std::get<1>(GetParam())),
+        cert_path_("/foo/bar/cert.pem"),
+        key_path_("/foo/bar/key.pem"),
+        ocsp_staple_path_("/foo/bar/ocsp-staple.pem"),
+        expected_watch_path_("/foo/bar/"),
+        trigger_path_("/foo") {
     envoy::config::core::v3::ConfigSource config_source;
     sds_api_ = std::make_unique<TlsCertificateSdsApi>(
         config_source, "abc.com", subscription_factory_, time_system_, validation_visitor_, stats_,
@@ -226,9 +231,25 @@ protected:
         sds_api_->addUpdateCallback([this]() { return secret_callback_.onAddOrUpdateSecret(); });
   }
 
-  void onConfigUpdate(const std::string& cert_value, const std::string& key_value) {
-    const std::string yaml = fmt::format(
-        R"EOF(
+  void onConfigUpdate(const std::string& cert_value, const std::string& key_value,
+                      const std::string& ocsp_staple_value) {
+    std::string yaml;
+    if (ocsp_stapling_enabled_) {
+      yaml = fmt::format(
+          R"EOF(
+  name: "abc.com"
+  tls_certificate:
+    certificate_chain:
+      filename: "{}"
+    private_key:
+      filename: "{}"
+    ocsp_staple:
+      filename: "{}"
+    )EOF",
+          cert_path_, key_path_, ocsp_staple_path_);
+    } else {
+      yaml = fmt::format(
+          R"EOF(
   name: "abc.com"
   tls_certificate:
     certificate_chain:
@@ -236,7 +257,8 @@ protected:
     private_key:
       filename: "{}"
     )EOF",
-        cert_path_, key_path_);
+          cert_path_, key_path_);
+    }
     envoy::extensions::transport_sockets::tls::v3::Secret typed_secret;
     TestUtility::loadFromYaml(yaml, typed_secret);
     if (watched_directory_) {
@@ -255,14 +277,22 @@ protected:
               }));
       EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return(cert_value));
       EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
+      if (ocsp_stapling_enabled_) {
+        EXPECT_CALL(
+          filesystem_, fileReadToEnd(ocsp_staple_path_)).WillOnce(Return(ocsp_staple_value));
+      }
       EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
     } else {
       EXPECT_CALL(filesystem_, fileReadToEnd(cert_path_)).WillOnce(Return(cert_value));
       EXPECT_CALL(filesystem_, fileReadToEnd(key_path_)).WillOnce(Return(key_value));
+      if (ocsp_stapling_enabled_) {
+        EXPECT_CALL(
+          filesystem_, fileReadToEnd(ocsp_staple_path_)).WillOnce(Return(ocsp_staple_value));
+      }
       EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
       EXPECT_CALL(mock_dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
       EXPECT_CALL(*watcher, addWatch(expected_watch_path_, Filesystem::Watcher::Events::MovedTo, _))
-          .Times(2)
+          .Times(ocsp_stapling_enabled_ ? 3 : 2)
           .WillRepeatedly(
               Invoke([this](absl::string_view, uint32_t, Filesystem::Watcher::OnChangedCb cb) {
                 watch_cbs_.push_back(cb);
@@ -274,15 +304,18 @@ protected:
   }
 
   const bool watched_directory_;
+  const bool ocsp_stapling_enabled_;
   std::string cert_path_;
   std::string key_path_;
+  std::string ocsp_staple_path_;
   std::string expected_watch_path_;
   std::string trigger_path_;
   std::unique_ptr<TlsCertificateSdsApi> sds_api_;
 };
 
 INSTANTIATE_TEST_SUITE_P(TlsCertificateSdsRotationApiTestParams, TlsCertificateSdsRotationApiTest,
-                         testing::Values(false, true));
+                         testing::Values(std::make_tuple(false, false), std::make_tuple(false, true),
+                                         std::make_tuple(true, false), std::make_tuple(true, true)));
 
 class CertificateValidationContextSdsRotationApiTest : public testing::TestWithParam<bool>,
                                                        public SdsRotationApiTest {
@@ -345,80 +378,147 @@ INSTANTIATE_TEST_SUITE_P(CertificateValidationContextSdsRotationApiTestParams,
 // Initial onConfigUpdate() of TlsCertificate secret.
 TEST_P(TlsCertificateSdsRotationApiTest, InitialUpdate) {
   InSequence s;
-  onConfigUpdate("a", "b");
+  onConfigUpdate("a", "b", "c");
 
   const auto& secret = *sds_api_->secret();
   EXPECT_EQ("a", secret.certificate_chain().inline_bytes());
   EXPECT_EQ("b", secret.private_key().inline_bytes());
+  if (ocsp_stapling_enabled_) {
+    EXPECT_EQ("c", secret.ocsp_staple().inline_bytes());
+  }
 }
 
 // Two distinct updates with onConfigUpdate() of TlsCertificate secret.
 TEST_P(TlsCertificateSdsRotationApiTest, MultiUpdate) {
   InSequence s;
-  onConfigUpdate("a", "b");
+  onConfigUpdate("a", "b", "c");
   {
     const auto& secret = *sds_api_->secret();
     EXPECT_EQ("a", secret.certificate_chain().inline_bytes());
     EXPECT_EQ("b", secret.private_key().inline_bytes());
+    if (ocsp_stapling_enabled_) {
+      EXPECT_EQ("c", secret.ocsp_staple().inline_bytes());
+    }
   }
 
   cert_path_ = "/new/foo/bar/cert.pem";
   key_path_ = "/new/foo/bar/key.pem";
+  ocsp_staple_path_ = "/new/foo/bar/ocsp-staple.pem";
   expected_watch_path_ = "/new/foo/bar/";
-  onConfigUpdate("c", "d");
+  onConfigUpdate("d", "e", "f");
   {
     const auto& secret = *sds_api_->secret();
-    EXPECT_EQ("c", secret.certificate_chain().inline_bytes());
-    EXPECT_EQ("d", secret.private_key().inline_bytes());
+    EXPECT_EQ("d", secret.certificate_chain().inline_bytes());
+    EXPECT_EQ("e", secret.private_key().inline_bytes());
+    if (ocsp_stapling_enabled_) {
+      EXPECT_EQ("f", secret.ocsp_staple().inline_bytes());
+    }
   }
 }
 
 // Watch trigger without file change has no effect.
 TEST_P(TlsCertificateSdsRotationApiTest, NopWatchTrigger) {
   InSequence s;
-  onConfigUpdate("a", "b");
+  onConfigUpdate("a", "b", "c");
 
   for (const auto& cb : watch_cbs_) {
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
+    if (ocsp_stapling_enabled_) {
+      EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("c"));
+    }
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
+    if (ocsp_stapling_enabled_) {
+      EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("c"));
+    }
     EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   const auto& secret = *sds_api_->secret();
   EXPECT_EQ("a", secret.certificate_chain().inline_bytes());
   EXPECT_EQ("b", secret.private_key().inline_bytes());
+  if (ocsp_stapling_enabled_) {
+    EXPECT_EQ("c", secret.ocsp_staple().inline_bytes());
+  }
 }
 
 // Basic rotation of TlsCertificate.
 TEST_P(TlsCertificateSdsRotationApiTest, RotationWatchTrigger) {
   InSequence s;
-  onConfigUpdate("a", "b");
+  onConfigUpdate("a", "b", "c");
 
-  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
-  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
-  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
-  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("e"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("f"));
+  }
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("e"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("f"));
+  }
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
   EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   if (!watched_directory_) {
-    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
-    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
-    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
-    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("d"));
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("e"));
+    if (ocsp_stapling_enabled_) {
+      EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("f"));
+    }
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("d"));
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("e"));
+    if (ocsp_stapling_enabled_) {
+      EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("f"));
+    }
     EXPECT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   const auto& secret = *sds_api_->secret();
-  EXPECT_EQ("c", secret.certificate_chain().inline_bytes());
-  EXPECT_EQ("d", secret.private_key().inline_bytes());
+  EXPECT_EQ("d", secret.certificate_chain().inline_bytes());
+  EXPECT_EQ("e", secret.private_key().inline_bytes());
+  if (ocsp_stapling_enabled_) {
+    EXPECT_EQ("f", secret.ocsp_staple().inline_bytes());
+  }
+}
+
+// Basic rotation of OCSP staple only.
+TEST_P(TlsCertificateSdsRotationApiTest, OcspStapleOnlyRotation) {
+  if (!ocsp_stapling_enabled_) {
+    GTEST_SKIP() << "OCSP stapling not enabled for this test configuration";
+  }
+
+  InSequence s;
+  onConfigUpdate("a", "b", "c");
+
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
+  EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("d"));
+  EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
+  EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  if (!watched_directory_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("d"));
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("b"));
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("d"));
+    EXPECT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
+  }
+
+  const auto& secret = *sds_api_->secret();
+  EXPECT_EQ("a", secret.certificate_chain().inline_bytes());
+  EXPECT_EQ("b", secret.private_key().inline_bytes());
+  EXPECT_EQ("d", secret.ocsp_staple().inline_bytes());
 }
 
 // Failed rotation of TlsCertificate.
 TEST_P(TlsCertificateSdsRotationApiTest, FailedRotation) {
   InSequence s;
-  onConfigUpdate("a", "b");
+  onConfigUpdate("a", "b", "c");
 
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem"))
       .WillOnce(Throw(EnvoyException("fail")));
@@ -429,6 +529,9 @@ TEST_P(TlsCertificateSdsRotationApiTest, FailedRotation) {
   const auto& secret = *sds_api_->secret();
   EXPECT_EQ("a", secret.certificate_chain().inline_bytes());
   EXPECT_EQ("b", secret.private_key().inline_bytes());
+  if (ocsp_stapling_enabled_) {
+    EXPECT_EQ("c", secret.ocsp_staple().inline_bytes());
+  }
 }
 
 // Basic rotation of CertificateValidationContext.
@@ -452,46 +555,82 @@ TEST_P(CertificateValidationContextSdsRotationApiTest, CertificateValidationCont
 // Hash consistency verification prevents races.
 TEST_P(TlsCertificateSdsRotationApiTest, RotationConsistency) {
   InSequence s;
-  onConfigUpdate("a", "b");
+  onConfigUpdate("a", "b", "s");
 
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("s"));
+  }
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("t"));
+  }
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("t"));
+  }
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
   EXPECT_TRUE(watch_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
   if (!watched_directory_) {
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+    if (ocsp_stapling_enabled_) {
+      EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("t"));
+    }
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+    if (ocsp_stapling_enabled_) {
+      EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("t"));
+    }
     EXPECT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
   }
 
   const auto& secret = *sds_api_->secret();
   EXPECT_EQ("c", secret.certificate_chain().inline_bytes());
   EXPECT_EQ("d", secret.private_key().inline_bytes());
+  if (ocsp_stapling_enabled_) {
+    EXPECT_EQ("t", secret.ocsp_staple().inline_bytes());
+  }
 }
 
 // Hash consistency verification failure, no callback.
 TEST_P(TlsCertificateSdsRotationApiTest, RotationConsistencyExhaustion) {
   InSequence s;
-  onConfigUpdate("a", "b");
+  onConfigUpdate("a", "b", "o");
 
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("a"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("o"));
+  }
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("c"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("o"));
+  }
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("d"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("o"));
+  }
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("e"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("o"));
+  }
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("f"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("d"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("o"));
+  }
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("f"));
   EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("g"));
+  if (ocsp_stapling_enabled_) {
+    EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("o"));
+  }
   // We've exhausted the bounded retries, but continue with the non-atomic rotation.
   EXPECT_CALL(secret_callback_, onAddOrUpdateSecret());
   EXPECT_LOG_CONTAINS(
@@ -500,8 +639,14 @@ TEST_P(TlsCertificateSdsRotationApiTest, RotationConsistencyExhaustion) {
   if (!watched_directory_) {
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("f"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("g"));
+    if (ocsp_stapling_enabled_) {
+      EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("o"));
+    }
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/cert.pem")).WillOnce(Return("f"));
     EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/key.pem")).WillOnce(Return("g"));
+    if (ocsp_stapling_enabled_) {
+      EXPECT_CALL(filesystem_, fileReadToEnd("/foo/bar/ocsp-staple.pem")).WillOnce(Return("o"));
+    }
     EXPECT_TRUE(watch_cbs_[1](Filesystem::Watcher::Events::MovedTo).ok());
   }
 
