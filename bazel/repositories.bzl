@@ -506,7 +506,29 @@ def _com_github_facebook_zstd():
 
 def _com_google_cel_cpp():
     external_http_archive(
-        "com_google_cel_cpp",
+        name = "com_google_cel_cpp",
+        patch_args = ["-p1"],
+        patches = ["@envoy//bazel/foreign_cc:cel-cpp.patch"],
+    )
+
+    # Load required dependencies that cel-cpp expects.
+    external_http_archive("com_google_cel_spec")
+
+    # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime`` but it internally
+    # defines ``antlr4_runtimes`` with a cpp target.
+    # We are creating a repository alias to avoid duplicating the ANTLR4 dependency.
+    native.new_local_repository(
+        name = "antlr4-cpp-runtime",
+        path = ".",
+        build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+# Alias to cel-cpp's embedded ANTLR4 runtime.
+alias(
+    name = "antlr4-cpp-runtime",
+    actual = "@antlr4_runtimes//:cpp",
+)
+""",
     )
 
 def _com_github_google_perfetto():
