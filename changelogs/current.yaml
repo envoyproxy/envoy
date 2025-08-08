@@ -47,6 +47,12 @@ removed_config_or_runtime:
 - area: udp_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.report_stream_reset_error_code`` and legacy code paths.
+- area: http3
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
 - area: network
   change: |
     Removed runtime guard ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` and legacy code paths.
