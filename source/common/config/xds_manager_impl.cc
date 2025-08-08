@@ -51,7 +51,7 @@ absl::Status createGrpcClients(Grpc::AsyncClientManager& async_client_manager,
                                Grpc::RawAsyncClientSharedPtr& primary_client,
                                Grpc::RawAsyncClientSharedPtr& failover_client) {
   auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-      async_client_manager, config_source, stats_scope, skip_cluster_check, 0 /*gprc_service_idx*/,
+      async_client_manager, config_source, stats_scope, skip_cluster_check, 0 /*grpc_service_idx*/,
       xdstp_config_source);
   RETURN_IF_NOT_OK_REF(factory_primary_or_error.status());
   Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
