@@ -165,6 +165,6 @@ new_features:
     Switch the IP matcher to use LC-Trie for performance improvements.
 - area: tls_inspector
   change: |
-    Added filter state when failing to parse the ClientHello.
+    Added filter state when failing to parse the ``ClientHello``.
     
 deprecated:
