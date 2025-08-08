@@ -20,6 +20,10 @@ bug_fixes:
     Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
     reverted by setting the runtime guard
     ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
+- area: listeners
+  change: |
+    fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` timed out
+    when used with other listener_filters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

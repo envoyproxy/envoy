@@ -22,6 +22,53 @@
 namespace Envoy {
 namespace {
 
+class LargeBufferListenerFilter : public Network::ListenerFilter {
+public:
+  static constexpr int BUFFER_SIZE = 512;
+  // Network::ListenerFilter
+  Network::FilterStatus onAccept(Network::ListenerFilterCallbacks&) override {
+    ENVOY_LOG_MISC(debug, "LargeBufferListenerFilter::onAccept");
+    return Network::FilterStatus::StopIteration;
+  }
+
+  // this needs to be smaller than the client hello, but larger than tls inspector's initial read
+  // buffer size.
+  size_t maxReadBytes() const override { return BUFFER_SIZE; }
+
+  Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override {
+    auto raw_slice = buffer.rawSlice();
+    ENVOY_LOG_MISC(debug, "LargeBufferListenerFilter::onData: recv: {}", raw_slice.len_);
+    return Network::FilterStatus::Continue;
+  }
+};
+
+class LargeBufferListenerFilterConfigFactory
+    : public Server::Configuration::NamedListenerFilterConfigFactory {
+public:
+  // NamedListenerFilterConfigFactory
+  Network::ListenerFilterFactoryCb createListenerFilterFactoryFromProto(
+      const Protobuf::Message&,
+      const Network::ListenerFilterMatcherSharedPtr& listener_filter_matcher,
+      Server::Configuration::ListenerFactoryContext&) override {
+    return [listener_filter_matcher](Network::ListenerFilterManager& filter_manager) -> void {
+      filter_manager.addAcceptFilter(listener_filter_matcher,
+                                     std::make_unique<LargeBufferListenerFilter>());
+    };
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override {
+    // This fake original_dest should be used only in integration test!
+    return "envoy.filters.listener.large_buffer";
+  }
+};
+static Registry::RegisterFactory<LargeBufferListenerFilterConfigFactory,
+                                 Server::Configuration::NamedListenerFilterConfigFactory>
+    register_;
+
 class TlsInspectorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                     public BaseIntegrationTest {
 public:
@@ -90,6 +137,38 @@ filter_disabled:
     }
 
     useListenerAccessLog(log_format);
+    BaseIntegrationTest::initialize();
+
+    context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
+        server_factory_context_);
+  }
+
+  void initializeWithTlsInspectorWithLargeBufferFilter() {
+    config_helper_.renameListener("echo");
+    // note that initial_read_buffer_size should be smaller than the
+    // LargeBufferListenerFilter::BUFFER_SIZE for the test scenario to be effective.
+    config_helper_.addListenerFilter(R"EOF(
+name: "envoy.filters.listener.tls_inspector"
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
+  initial_read_buffer_size: 256
+)EOF");
+    // filters are prepended, so this filter will be the first one.
+    config_helper_.addListenerFilter(R"EOF(
+name: "envoy.filters.listener.large_buffer"
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Struct
+)EOF");
+
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* timeout = bootstrap.mutable_static_resources()
+                          ->mutable_listeners(0)
+                          ->mutable_listener_filters_timeout();
+      timeout->MergeFrom(ProtobufUtil::TimeUtil::MillisecondsToDuration(1000));
+      bootstrap.mutable_static_resources()
+          ->mutable_listeners(0)
+          ->set_continue_on_listener_filters_timeout(true);
+    });
     BaseIntegrationTest::initialize();
 
     context_manager_ = std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(
@@ -282,6 +361,47 @@ TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanGrow) {
   EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
                                                         *bytes_processed_histogram)),
             515);
+}
+
+TEST_P(TlsInspectorIntegrationTest, RequestedBufferSizeCanStartBig) {
+  initializeWithTlsInspectorWithLargeBufferFilter();
+
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("echo"));
+
+  Ssl::ClientSslTransportOptions ssl_options;
+  ssl_options.setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
+  ssl_options.setTlsVersion(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2);
+  const std::string really_long_sni(absl::StrCat(std::string(240, 'a'), ".foo.com"));
+  ssl_options.setSni(really_long_sni);
+  context_ = Ssl::createClientSslTransportSocketFactory(ssl_options, *context_manager_, *api_);
+  Network::TransportSocketPtr transport_socket = context_->createTransportSocket(
+      std::make_shared<Network::TransportSocketOptionsImpl>(
+          absl::string_view(""), std::vector<std::string>(), std::vector<std::string>{}),
+      nullptr);
+
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                std::move(transport_socket), nullptr, nullptr);
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+
+  client_->close(Network::ConnectionCloseType::NoFlush);
+
+  test_server_->waitUntilHistogramHasSamples("tls_inspector.bytes_processed");
+  auto bytes_processed_histogram = test_server_->histogram("tls_inspector.bytes_processed");
+  EXPECT_EQ(
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *bytes_processed_histogram),
+      1);
+  auto bytes_processed = static_cast<int>(
+      TestUtility::readSampleSum(test_server_->server().dispatcher(), *bytes_processed_histogram));
+  EXPECT_EQ(bytes_processed, 515);
+  // Double check that the test is effective by ensuring that the
+  // LargeBufferListenerFilter::BUFFER_SIZE is smaller than the client hello.
+  EXPECT_GT(bytes_processed, LargeBufferListenerFilter::BUFFER_SIZE);
 }
 
 // This test verifies that `JA4` fingerprinting works with a malformed ClientHello that
