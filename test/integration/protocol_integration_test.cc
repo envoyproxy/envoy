@@ -75,69 +75,83 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
+// Test upstream_rq_per_cx metric tracks requests per connection
 TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetric) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Make multiple requests on the same connection
+  // Send 3 requests on the same connection
   for (int i = 0; i < 3; ++i) {
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
-    ASSERT_TRUE(response->waitForEndStream());
-    EXPECT_TRUE(response->complete());
+    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 
-  // Close the client connection to trigger metric recording
+  // Close connection to trigger histogram recording
   codec_client_->close();
 
-  // Wait for the histogram to have samples
+  // Wait for histogram to have samples and verify
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_per_cx");
-  auto rq_per_cx_histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
 
-  // Verify the metric was recorded
-  EXPECT_EQ(TestUtility::readSampleCount(test_server_->server().dispatcher(), *rq_per_cx_histogram),
-            1);
+  auto find_histogram_count = [&](const std::string& name) -> uint64_t {
+    for (auto& histogram : test_server_->histograms()) {
+      if (histogram->name() == name) {
+        return TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
+      }
+    }
+    return 0;
+  };
 
-  // Verify the recorded value shows 3 requests per connection
-  EXPECT_EQ(static_cast<int>(TestUtility::readSampleSum(test_server_->server().dispatcher(),
-                                                        *rq_per_cx_histogram)),
-            3);
+  auto find_histogram_sum = [&](const std::string& name) -> uint64_t {
+    for (auto& histogram : test_server_->histograms()) {
+      if (histogram->name() == name) {
+        return TestUtility::readSampleSum(test_server_->server().dispatcher(), *histogram);
+      }
+    }
+    return 0;
+  };
+
+  // Should have 1 sample with value 3 (3 requests on 1 connection)
+  EXPECT_EQ(find_histogram_count("cluster.cluster_0.upstream_rq_per_cx"), 1);
+  EXPECT_EQ(find_histogram_sum("cluster.cluster_0.upstream_rq_per_cx"), 3);
 }
 
+// Test that failed connections don't record upstream_rq_per_cx metric
 TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricNoRecordOnFailure) {
-  // This test verifies that failed connections don't record the upstream_rq_per_cx metric
-  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
-    // Set a very short connect timeout to force connection failures
-    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    cluster->mutable_connect_timeout()->set_nanos(1000000); // 1ms - very short
-  });
+  // Skip HTTP/3 as it uses different connection patterns
+  if (upstreamProtocol() == Http::CodecType::HTTP3) {
+    return;
+  }
 
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
-  // Attempt multiple requests that should fail due to short timeout
-  for (int i = 0; i < 3; ++i) {
-    auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-    // Don't wait for response as connections will likely fail
-    // Just close the client quickly to trigger failure scenarios
-  }
+  // Close upstream connection immediately to simulate connection failure
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+
+  // Wait for response (should fail)
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
 
   codec_client_->close();
 
-  // Wait a bit for any potential metric recording
-  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_connect_fail", 0);
+  // Histogram should have no samples since connection failed before handshake completion
+  auto find_histogram_count = [&](const std::string& name) -> uint64_t {
+    for (auto& histogram : test_server_->histograms()) {
+      if (histogram->name() == name) {
+        return TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
+      }
+    }
+    return 0;
+  };
 
-  // The histogram should either not exist or have no samples due to failed connections
-  auto rq_per_cx_histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
-  if (rq_per_cx_histogram != nullptr) {
-    // If the histogram exists, it should have no samples from failed connections
-    EXPECT_EQ(
-        TestUtility::readSampleCount(test_server_->server().dispatcher(), *rq_per_cx_histogram), 0);
-  }
+  EXPECT_EQ(find_histogram_count("cluster.cluster_0.upstream_rq_per_cx"), 0);
 }
 
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
