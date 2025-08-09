@@ -1137,7 +1137,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
 
-        route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
+        route->mutable_request_body_buffer_limit()->set_value(1024);
         route->mutable_route()
             ->mutable_retry_policy()
             ->mutable_retry_back_off()
@@ -1401,7 +1401,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
 // Very similar set-up to RetryHittingBufferLimits but using the route specific cap.
 TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
   auto host = config_helper_.createVirtualHost("routelimit.lyft.com", "/");
-  host.mutable_per_request_buffer_limit_bytes()->set_value(0);
+  host.mutable_request_body_buffer_limit()->set_value(0);
   config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

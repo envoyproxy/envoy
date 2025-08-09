@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 25]
+// [#next-free-field: 26]
 message VirtualHost {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -205,10 +205,37 @@ message VirtualHost {
   // request header in retries initiated by per try timeouts.
   bool include_is_timeout_retry_header = 23;
 
-  // The maximum bytes which will be buffered for retries and shadowing.
-  // If set and a route-specific limit is not set, the bytes actually buffered will be the minimum
-  // value of this and the listener per_connection_buffer_limit_bytes.
-  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
+  // The maximum bytes which will be buffered for retries and shadowing. If set, the bytes actually buffered will be
+  // the minimum value of this and the listener ``per_connection_buffer_limit_bytes``.
+  //
+  // .. attention::
+  //
+  //   This field has been deprecated. Please use :ref:`request_body_buffer_limit
+  //   <envoy_v3_api_field_config.route.v3.VirtualHost.request_body_buffer_limit>` instead.
+  //   Only one of ``per_request_buffer_limit_bytes`` and ``request_body_buffer_limit`` could be set.
+  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
+
+  // The maximum bytes which will be buffered for request bodies to support large request body
+  // buffering beyond the ``per_connection_buffer_limit_bytes``.
+  //
+  // This limit is specifically for the request body buffering and allows buffering larger payloads while maintaining
+  // flow control.
+  //
+  // Buffer limit precedence (from highest to lowest priority):
+  //
+  // 1. If ``request_body_buffer_limit`` is set, then ``request_body_buffer_limit`` will be used.
+  // 2. If :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
+  //    is set but ``request_body_buffer_limit`` is not, then ``min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes)``
+  //    will be used.
+  // 3. If neither is set, then ``per_connection_buffer_limit_bytes`` will be used.
+  //
+  // For flow control chunk sizes, ``min(per_connection_buffer_limit_bytes, 16KB)`` will be used.
+  //
+  // Only one of :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.VirtualHost.per_request_buffer_limit_bytes>`
+  // and ``request_body_buffer_limit`` could be set.
+  google.protobuf.UInt64Value request_body_buffer_limit = 25
+      [(validate.rules).message = {required: false}];
 
   // Specify a set of default request mirroring policies for every route under this virtual host.
   // It takes precedence over the route config mirror policy entirely.
@@ -244,7 +271,7 @@ message RouteList {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_v3_api_msg_config.route.v3.HeaderMatcher>`.
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message Route {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
@@ -341,7 +368,14 @@ message Route {
   // The maximum bytes which will be buffered for retries and shadowing.
   // If set, the bytes actually buffered will be the minimum value of this and the
   // listener per_connection_buffer_limit_bytes.
-  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16;
+  //
+  // .. attention::
+  //
+  //   This field has been deprecated. Please use :ref:`request_body_buffer_limit
+  //   <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` instead.
+  //   Only one of ``per_request_buffer_limit_bytes`` and ``request_body_buffer_limit`` may be set.
+  google.protobuf.UInt32Value per_request_buffer_limit_bytes = 16
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // The human readable prefix to use when emitting statistics for this endpoint.
   // The statistics are rooted at vhost.<virtual host name>.route.<stat_prefix>.
@@ -357,6 +391,25 @@ message Route {
   //    every application endpoint. This is both not easily maintainable and
   //    statistics use a non-trivial amount of memory(approximately 1KiB per route).
   string stat_prefix = 19;
+
+  // The maximum bytes which will be buffered for request bodies to support large request body
+  // buffering beyond the ``per_connection_buffer_limit_bytes``.
+  //
+  // This limit is specifically for the request body buffering and allows buffering larger payloads while maintaining
+  // flow control.
+  //
+  // Buffer limit precedence (from highest to lowest priority):
+  //
+  // 1. If ``request_body_buffer_limit`` is set: use ``request_body_buffer_limit``
+  // 2. If :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`
+  //    is set but ``request_body_buffer_limit`` is not: use ``min(per_request_buffer_limit_bytes, per_connection_buffer_limit_bytes)``
+  // 3. If neither is set: use ``per_connection_buffer_limit_bytes``
+  //
+  // For flow control chunk sizes, use ``min(per_connection_buffer_limit_bytes, 16KB)``.
+  //
+  // Only one of :ref:`per_request_buffer_limit_bytes <envoy_v3_api_field_config.route.v3.Route.per_request_buffer_limit_bytes>`
+  // and ``request_body_buffer_limit`` may be set.
+  google.protobuf.UInt64Value request_body_buffer_limit = 20;
 }
 
 // Compared to the :ref:`cluster <envoy_v3_api_field_config.route.v3.RouteAction.cluster>` field that specifies a
