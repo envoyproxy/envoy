@@ -168,6 +168,12 @@ new_features:
     Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
     implemented is ``metadata()``, allowing Lua scripts to access virtual host metadata scoped to the specific filter name. See
     :ref:`Virtual host object API <config_http_filters_lua_virtual_host_wrapper>` for more details.
+- area: tracing
+  change: |
+    Added :ref:`w3c_fallback <envoy_v3_api_field_config.trace.v3.ZipkinConfig.w3c_fallback>`
+    to the Zipkin tracer config. This allows the Zipkin tracer to extract trace information from W3C trace headers
+    when x-b3 headers are not present or cannot be extracted. This feature is disabled by default to maintain
+    backward compatibility.
 - area: rbac
   change: |
     Switch the IP matcher to use LC-Trie for performance improvements.
@@ -176,5 +182,6 @@ new_features:
     Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
     implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
     :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
+
 
 deprecated:
