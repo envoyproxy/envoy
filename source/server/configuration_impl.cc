@@ -246,6 +246,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v3::Bootstrap& bootstra
 
   admin_.profile_path_ =
       admin.profile_path().empty() ? "/var/log/envoy/envoy.prof" : admin.profile_path();
+
   if (admin.has_address()) {
     auto address_or_error = Network::Address::resolveProtoAddress(admin.address());
     if (!address_or_error.status().ok()) {
