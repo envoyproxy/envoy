@@ -1079,6 +1079,36 @@ void envoy_dynamic_module_callback_http_filter_continue_encoding(
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   filter->continueEncoding();
 }
+
+bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level) {
+  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level() <=
+         static_cast<spdlog::level::level_enum>(level);
+}
+
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       const char* message_ptr, size_t message_length) {
+  absl::string_view message_view(static_cast<const char*>(message_ptr), message_length);
+  spdlog::logger& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
+  switch (level) {
+  case envoy_dynamic_module_type_log_level_Debug:
+    ENVOY_LOG_TO_LOGGER(logger, debug, message_view);
+    break;
+  case envoy_dynamic_module_type_log_level_Info:
+    ENVOY_LOG_TO_LOGGER(logger, info, message_view);
+    break;
+  case envoy_dynamic_module_type_log_level_Warn:
+    ENVOY_LOG_TO_LOGGER(logger, warn, message_view);
+    break;
+  case envoy_dynamic_module_type_log_level_Error:
+    ENVOY_LOG_TO_LOGGER(logger, error, message_view);
+    break;
+  case envoy_dynamic_module_type_log_level_Critical:
+    ENVOY_LOG_TO_LOGGER(logger, critical, message_view);
+    break;
+  default:
+    break;
+  }
+}
 }
 } // namespace HttpFilters
 } // namespace DynamicModules

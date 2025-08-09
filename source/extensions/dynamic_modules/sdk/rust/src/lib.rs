@@ -88,6 +88,107 @@ macro_rules! declare_init_functions {
   };
 }
 
+/// Log a trace message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_trace {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Trace, $($arg)*)
+    };
+}
+
+/// Log a debug message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_debug {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Debug, $($arg)*)
+    };
+}
+
+/// Log an info message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_info {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Info, $($arg)*)
+    };
+}
+
+/// Log a warning message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_warn {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Warn, $($arg)*)
+    };
+}
+
+/// Log an error message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_error {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Error, $($arg)*)
+    };
+}
+
+/// Log a critical message to Envoy's logging system with [dynamic_modules] Id. Messages won't be
+/// allocated if the log level is not enabled on the Envoy side.
+///
+/// This accepts the exact same arguments as the `format!` macro, so you can use it to log formatted
+/// messages.
+#[macro_export]
+macro_rules! envoy_log_critical {
+    ($($arg:tt)*) => {
+        $crate::envoy_log!($crate::abi::envoy_dynamic_module_type_log_level::Critical, $($arg)*)
+    };
+}
+
+/// Internal logging macro that handles the actual call to the Envoy logging callback
+/// used by envoy_log_* macros.
+#[macro_export]
+macro_rules! envoy_log {
+  ($level:expr, $($arg:tt)*) => {
+    {
+      #[cfg(not(test))]
+      unsafe {
+        // Avoid allocating the message if the log level is not enabled.
+        if $crate::abi::envoy_dynamic_module_callback_log_enabled($level) {
+          let message = format!($($arg)*);
+          let message_bytes = message.as_bytes();
+          $crate::abi::envoy_dynamic_module_callback_log(
+            $level,
+            message_bytes.as_ptr() as *const ::std::os::raw::c_char,
+            message_bytes.len()
+          );
+        }
+      }
+      // In unit tests, just print to stderr since the Envoy symbols are not available.
+      #[cfg(test)]
+      {
+        let message = format!($($arg)*);
+        eprintln!("[{}] {}", stringify!($level), message);
+      }
+    }
+  };
+}
+
 /// The function signature for the program init function.
 ///
 /// This is called when the dynamic module is loaded, and it must return true on success, and false
