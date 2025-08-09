@@ -5,6 +5,8 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/common/aws/utility.h"
 
+#include "absl/strings/str_replace.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -80,11 +82,35 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   // Phase 1: Create a canonical request
   const auto credential_scope = createCredentialScope(short_date, override_region);
 
-  // Handle query string parameters by appending them all to the path. Case is important for these
-  // query parameters.
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
+
+  // Replace '+' with '%2B' in query parameter keys and values - #40523
+  for (auto& param : query_params.data()) {
+    std::string key = param.first;
+    absl::StrReplaceAll({{std::make_pair("+", "%2B")}}, &key);
+
+    std::vector<std::string> new_values;
+    for (const auto& value : param.second) {
+      std::string new_value = value;
+      absl::StrReplaceAll({{std::make_pair("+", "%2B")}}, &new_value);
+      new_values.push_back(new_value);
+    }
+
+    // Update the parameter if changed
+    if (key != param.first || new_values != param.second) {
+      query_params.remove(param.first);
+      for (const auto& value : new_values) {
+        query_params.add(key, value);
+      }
+    }
+  }
+
+  headers.setPath(query_params.replaceQueryString(headers.Path()->value()));
+
   if (query_string_) {
+    // Handle query string parameters by appending them all to the path. Case is important for these
+    // query parameters.
     addRegionQueryParam(query_params, override_region);
     createQueryParams(
         query_params,
