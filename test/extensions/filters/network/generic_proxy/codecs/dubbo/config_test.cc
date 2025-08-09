@@ -230,19 +230,19 @@ TEST(DubboResponseTest, DubboResponseTest) {
 }
 
 TEST(DubboServerCodecTest, DubboServerCodecTest) {
-  auto codec = std::make_unique<DubboCodec>();
-  codec->initilize(std::make_unique<MockSerializer>());
+  NiceMock<MockServerCodecCallbacks> callbacks;
+  NiceMock<Network::MockServerConnection> mock_connection_;
 
-  MockServerCodecCallbacks callbacks;
-  DubboServerCodec server_codec(std::move(codec));
-  server_codec.setCodecCallbacks(callbacks);
-
-  auto raw_serializer = const_cast<MockSerializer*>(
-      dynamic_cast<const MockSerializer*>(server_codec.codec_->serializer().get()));
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
+  ON_CALL(mock_connection_, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
 
   // Decode failure.
   {
-    server_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int64_t>(0);
     buffer.writeBEInt<int64_t>(0);
@@ -253,7 +253,10 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
 
   // Waiting for header.
   {
-    server_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
 
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
@@ -264,7 +267,10 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
 
   // Waiting for data.
   {
-    server_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
 
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
@@ -277,7 +283,13 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
 
   // Decode request.
   {
-    server_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
+
+    auto raw_serializer = const_cast<MockSerializer*>(
+        dynamic_cast<const MockSerializer*>(server_codec.codec_->serializer().get()));
 
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
@@ -294,7 +306,13 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
 
   // Decode heartbeat request.
   {
-    server_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
+
+    auto raw_serializer = const_cast<MockSerializer*>(
+        dynamic_cast<const MockSerializer*>(server_codec.codec_->serializer().get()));
 
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xe2', 00}));
@@ -309,7 +327,13 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
 
   // Encode response.
   {
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
 
+    auto raw_serializer = const_cast<MockSerializer*>(
+        dynamic_cast<const MockSerializer*>(server_codec.codec_->serializer().get()));
     MockEncodingContext encoding_context;
     DubboRequest request(createDubboRequst(false));
     DubboResponse response(
@@ -322,6 +346,11 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
   }
 
   {
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
+
     Status status = absl::OkStatus();
     DubboRequest request(createDubboRequst(false));
 
@@ -336,6 +365,11 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
   }
 
   {
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
+
     Status status(StatusCode::kInvalidArgument, "test_message");
     DubboRequest request(createDubboRequst(false));
 
@@ -351,6 +385,11 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
   }
 
   {
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
+
     Status status(StatusCode::kAborted, "test_message2");
     DubboRequest request(createDubboRequst(false));
 
@@ -364,22 +403,42 @@ TEST(DubboServerCodecTest, DubboServerCodecTest) {
     EXPECT_EQ("anything", typed_inner_response.content().result()->toString().value().get());
     EXPECT_EQ("test_message2", typed_inner_response.content().attachments().at("reason"));
   }
+
+  // Decode buffer limit.
+  {
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboServerCodec server_codec(std::move(codec));
+    server_codec.setCodecCallbacks(callbacks);
+
+    ON_CALL(mock_connection_, bufferLimit()).WillByDefault(testing::Return(4));
+
+    Buffer::OwnedImpl buffer;
+    buffer.add(std::string({'\xda', '\xbb', '\xc2', 0x00}));
+    buffer.writeBEInt<int64_t>(1);
+    buffer.writeBEInt<int32_t>(8);
+    buffer.add("anything");
+
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
+    server_codec.decode(buffer, false);
+  }
 }
 
 TEST(DubboClientCodecTest, DubboClientCodecTest) {
-  auto codec = std::make_unique<DubboCodec>();
-  codec->initilize(std::make_unique<MockSerializer>());
 
-  MockClientCodecCallbacks callbacks;
-  DubboClientCodec client_codec(std::move(codec));
-  client_codec.setCodecCallbacks(callbacks);
+  NiceMock<MockClientCodecCallbacks> callbacks;
+  NiceMock<Network::MockServerConnection> mock_connection_;
 
-  auto raw_serializer = const_cast<MockSerializer*>(
-      dynamic_cast<const MockSerializer*>(client_codec.codec_->serializer().get()));
+  ON_CALL(callbacks, connection())
+      .WillByDefault(testing::Return(makeOptRef<Network::Connection>(mock_connection_)));
+  ON_CALL(mock_connection_, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
 
   // Decode failure.
   {
-    client_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboClientCodec client_codec(std::move(codec));
+    client_codec.setCodecCallbacks(callbacks);
 
     Buffer::OwnedImpl buffer;
     buffer.writeBEInt<int64_t>(0);
@@ -391,7 +450,10 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
 
   // Waiting for header.
   {
-    client_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboClientCodec client_codec(std::move(codec));
+    client_codec.setCodecCallbacks(callbacks);
 
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
@@ -402,7 +464,10 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
 
   // Waiting for data.
   {
-    client_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboClientCodec client_codec(std::move(codec));
+    client_codec.setCodecCallbacks(callbacks);
 
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
@@ -415,7 +480,13 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
 
   // Decode response.
   {
-    client_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboClientCodec client_codec(std::move(codec));
+    client_codec.setCodecCallbacks(callbacks);
+
+    auto raw_serializer = const_cast<MockSerializer*>(
+        dynamic_cast<const MockSerializer*>(client_codec.codec_->serializer().get()));
 
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\x02', 20}));
@@ -435,7 +506,13 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
 
   // Decode heartbeat request.
   {
-    client_codec.metadata_.reset();
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboClientCodec client_codec(std::move(codec));
+    client_codec.setCodecCallbacks(callbacks);
+
+    auto raw_serializer = const_cast<MockSerializer*>(
+        dynamic_cast<const MockSerializer*>(client_codec.codec_->serializer().get()));
 
     Buffer::OwnedImpl buffer;
     buffer.add(std::string({'\xda', '\xbb', '\xe2', 00}));
@@ -450,6 +527,14 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
 
   // Encode normal request.
   {
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboClientCodec client_codec(std::move(codec));
+    client_codec.setCodecCallbacks(callbacks);
+
+    auto raw_serializer = const_cast<MockSerializer*>(
+        dynamic_cast<const MockSerializer*>(client_codec.codec_->serializer().get()));
+
     MockEncodingContext encoding_context;
 
     DubboRequest request(createDubboRequst(false));
@@ -462,6 +547,14 @@ TEST(DubboClientCodecTest, DubboClientCodecTest) {
 
   // Encode one-way request.
   {
+    auto codec = std::make_unique<DubboCodec>();
+    codec->initilize(std::make_unique<MockSerializer>());
+    DubboClientCodec client_codec(std::move(codec));
+    client_codec.setCodecCallbacks(callbacks);
+
+    auto raw_serializer = const_cast<MockSerializer*>(
+        dynamic_cast<const MockSerializer*>(client_codec.codec_->serializer().get()));
+
     MockEncodingContext encoding_context;
 
     DubboRequest request(createDubboRequst(true));
