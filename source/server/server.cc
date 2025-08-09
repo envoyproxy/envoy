@@ -292,6 +292,12 @@ void InstanceBase::flushStatsInternal() {
   auto& stats_config = config_.statsConfig();
   InstanceUtil::flushMetricsToSinks(stats_config.sinks(), stats_store_, clusterManager(),
                                     timeSource());
+  if (const auto evict_on_flush = stats_config.evictOnFlush(); evict_on_flush > 0) {
+    stats_eviction_counter_ = (stats_eviction_counter_ + 1) % evict_on_flush;
+    if (stats_eviction_counter_ == 0) {
+      stats_store_.evictUnused();
+    }
+  }
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
     stat_flush_timer_->enableTimer(stats_config.flushInterval());

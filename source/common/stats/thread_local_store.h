@@ -60,6 +60,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
+  void markUnused() override { used_ = false; }
   bool hidden() const override { return false; }
 
 private:
@@ -116,6 +117,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
+  void markUnused() override;
   bool hidden() const override;
 
   // RefcountInterface
@@ -183,6 +185,8 @@ public:
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
   void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
+
+  void evictUnused() override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -277,7 +281,7 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix);
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable);
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -290,8 +294,8 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name) override;
-    ScopeSharedPtr scopeFromStatName(StatName name) override;
+    ScopeSharedPtr createScope(const std::string& name, bool evictale) override;
+    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -429,6 +433,11 @@ private:
       return central_cache_;
     }
 
+    CentralCacheEntrySharedPtr&
+    centralCacheMutableNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
+      return central_cache_;
+    }
+
     // Returns the central cache, bypassing thread analysis.
     //
     // This is used only when passing references to maps held in the central
@@ -441,6 +450,7 @@ private:
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
+    const bool evictable_{};
 
   private:
     StatNameStorage prefix_;

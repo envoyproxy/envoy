@@ -94,6 +94,11 @@ public:
   virtual bool used() const PURE;
 
   /**
+   * Clear any indicator on whether this metric has been updated.
+   */
+  virtual void markUnused() PURE;
+
+  /**
    * Indicates whether this metric is hidden.
    */
   virtual bool hidden() const PURE;

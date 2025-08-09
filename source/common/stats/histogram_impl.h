@@ -111,6 +111,7 @@ public:
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
 
   bool used() const override { return true; }
+  void markUnused() override {}
   bool hidden() const override { return false; }
   SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -132,6 +133,7 @@ public:
   ~NullHistogramImpl() override { MetricImpl::clear(symbol_table_); }
 
   bool used() const override { return false; }
+  void markUnused() override {}
   bool hidden() const override { return false; }
   SymbolTable& symbolTable() override { return symbol_table_; }
 

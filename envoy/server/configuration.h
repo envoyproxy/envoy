@@ -89,6 +89,11 @@ public:
    * @return true if deferred creation of stats is enabled.
    */
   virtual bool enableDeferredCreationStats() const PURE;
+
+  /**
+   * @return uint32_t a multiple of the flush interval to perform stats eviction, or 0 if disabled.
+   */
+  virtual uint32_t evictOnFlush() const PURE;
 };
 
 /**
