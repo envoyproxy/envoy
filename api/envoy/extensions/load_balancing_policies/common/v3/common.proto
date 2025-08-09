@@ -68,6 +68,8 @@ message LocalityLbConfig {
 
     ForceLocalZone force_local_zone = 5;
 
+    // If set to true, Envoy will use the weight of each healthy host to calculate locality percentages
+    // in zone aware routing. Default value is false.
     bool use_host_weight = 6;
   }
 
