@@ -18,11 +18,11 @@ bool validSamplingFlags(char c) {
   return false;
 }
 
-bool getSamplingFlags(char c, const Tracing::Decision tracing_decision) {
+absl::optional<bool> getSamplingFlags(char c) {
   if (validSamplingFlags(c)) {
     return c == '0' ? false : true;
   } else {
-    return tracing_decision.traced;
+    return absl::nullopt;
   }
 }
 
@@ -33,8 +33,7 @@ SpanContextExtractor::SpanContextExtractor(Tracing::TraceContext& trace_context)
 
 SpanContextExtractor::~SpanContextExtractor() = default;
 
-bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decision) {
-  bool sampled(false);
+absl::optional<bool> SpanContextExtractor::extractSampled() {
   auto b3_header_entry = ZipkinCoreConstants::get().B3.get(trace_context_);
   if (b3_header_entry.has_value()) {
     // This is an implicitly untrusted header, so only the first value is used.
@@ -56,21 +55,20 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
       sampled_pos = 50;
       break;
     default:
-      return tracing_decision.traced;
+      return absl::nullopt; // invalid length
     }
-    return getSamplingFlags(b3[sampled_pos], tracing_decision);
+    return getSamplingFlags(b3[sampled_pos]);
   }
 
   auto x_b3_sampled_entry = ZipkinCoreConstants::get().X_B3_SAMPLED.get(trace_context_);
   if (!x_b3_sampled_entry.has_value()) {
-    return tracing_decision.traced;
+    return absl::nullopt;
   }
   // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
   // zipkin tracers may still use that value, although should be 0 or 1.
   // This is an implicitly untrusted header, so only the first value is used.
   absl::string_view xb3_sampled = x_b3_sampled_entry.value();
-  sampled = xb3_sampled == SAMPLED || xb3_sampled == "true";
-  return sampled;
+  return xb3_sampled == SAMPLED || xb3_sampled == "true";
 }
 
 std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sampled) {

@@ -775,6 +775,19 @@ TEST(HttpTraceContextTest, HttpTraceContextTest) {
   }
 
   {
+    size_t size = 0;
+    Http::TestRequestHeaderMapImpl request_headers{{"host", "foo"}, {"bar", "var"}, {"ok", "no"}};
+    HttpTraceContext trace_context(request_headers);
+    trace_context.forEach([&size](absl::string_view key, absl::string_view val) {
+      size += key.size();
+      size += val.size();
+      return false;
+    });
+    // 'host' will be converted to ':authority'.
+    EXPECT_EQ(13, size);
+  }
+
+  {
     Http::TestRequestHeaderMapImpl request_headers;
     ReadOnlyHttpTraceContext trace_context(request_headers);
 
@@ -782,6 +795,7 @@ TEST(HttpTraceContextTest, HttpTraceContextTest) {
     trace_context.set("key", "value");
     trace_context.remove("key");
     trace_context.requestHeaders();
+    const_cast<const ReadOnlyHttpTraceContext&>(trace_context).requestHeaders();
   }
 }
 
