@@ -392,11 +392,12 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMe
     return false;
   }
 
-  MessageType type = static_cast<MessageType>(buffer.peekInt<int8_t>(name_len + 4));
-  if (type < MessageType::Call || type > MessageType::LastMessageType) {
-    throw EnvoyException(
-        fmt::format("invalid (lax) binary protocol message type {}", static_cast<int8_t>(type)));
+  int8_t type_value = buffer.peekInt<int8_t>(name_len + 4);
+  if (type_value < static_cast<int8_t>(MessageType::Call) ||
+      type_value > static_cast<int8_t>(MessageType::LastMessageType)) {
+    throw EnvoyException(fmt::format("invalid (lax) binary protocol message type {}", type_value));
   }
+  MessageType type = static_cast<MessageType>(type_value);
 
   buffer.drain(4);
   if (name_len > 0) {

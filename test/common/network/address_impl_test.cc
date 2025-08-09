@@ -30,7 +30,7 @@ namespace Address {
 namespace {
 
 Ipv6Instance v4MappedV6Instance(const std::string& address) {
-  return Ipv6Instance(address, /*port=*/0, /*sock_interface=*/nullptr, /*v6only=*/false);
+  return {address, /*port=*/0, /*sock_interface=*/nullptr, /*v6only=*/false};
 }
 
 bool addressesEqual(const InstanceConstSharedPtr& a, const Instance& b) {

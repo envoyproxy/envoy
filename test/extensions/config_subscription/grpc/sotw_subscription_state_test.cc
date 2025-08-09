@@ -68,6 +68,7 @@ public:
       if (resource_name == std::string(BAD_CLA_RESOURCE_NAME)) {
         // If the bad resource is requested, set an invalid enum value (1000) for the Policy's
         // drop percentage denominator.
+        // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
         cla.mutable_policy()->add_drop_overloads()->mutable_drop_percentage()->set_denominator(
             static_cast<envoy::type::v3::FractionalPercent_DenominatorType>(1000));
       }

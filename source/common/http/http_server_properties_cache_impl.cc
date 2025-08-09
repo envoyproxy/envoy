@@ -34,7 +34,7 @@ HttpServerPropertiesCacheImpl::stringToOrigin(const std::string& str) {
   std::string scheme;
   std::string hostname;
   int port = 0;
-  if (re2::RE2::FullMatch(str.c_str(), origin_regex, &scheme, &hostname, &port)) {
+  if (re2::RE2::FullMatch(str, origin_regex, &scheme, &hostname, &port)) {
     return HttpServerPropertiesCache::Origin(scheme, hostname, port);
   }
   return {};

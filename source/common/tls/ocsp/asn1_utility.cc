@@ -63,7 +63,7 @@ absl::StatusOr<Envoy::SystemTime> Asn1Utility::parseGeneralizedTime(CBS& cbs) {
   // Local time or time differential, though a part of the `ASN.1`
   // `GENERALIZEDTIME` spec, are not supported.
   // Reference: https://tools.ietf.org/html/rfc5280#section-4.1.2.5.2
-  if (time_str.length() > 0 && absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
+  if (!time_str.empty() && absl::ascii_toupper(time_str.at(time_str.length() - 1)) != 'Z') {
     return absl::InvalidArgumentError("GENERALIZEDTIME must be in UTC");
   }
 

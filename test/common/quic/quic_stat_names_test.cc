@@ -30,6 +30,7 @@ TEST_F(QuicStatNamesTest, QuicConnectionCloseStats) {
 
 TEST_F(QuicStatNamesTest, OutOfRangeQuicConnectionCloseStats) {
   uint64_t bad_error_code = quic::QUIC_LAST_ERROR + 1;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   quic_stat_names_.chargeQuicConnectionCloseStats(scope_,
                                                   static_cast<quic::QuicErrorCode>(bad_error_code),
                                                   quic::ConnectionCloseSource::FROM_SELF, false);
@@ -48,6 +49,7 @@ TEST_F(QuicStatNamesTest, ResetStreamErrorStats) {
 
 TEST_F(QuicStatNamesTest, OutOfRangeResetStreamErrorStats) {
   uint64_t bad_error_code = quic::QUIC_STREAM_LAST_ERROR + 1;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   quic_stat_names_.chargeQuicResetStreamErrorStats(
       scope_,
       quic::QuicResetStreamError::FromInternal(

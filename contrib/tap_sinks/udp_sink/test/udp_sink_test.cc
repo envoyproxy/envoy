@@ -19,13 +19,10 @@ namespace TapSinks {
 namespace UDP {
 
 // Test Udp sink
-using ::testing::_;
-using ::testing::Return;
-
 class UdpTapSinkTest : public testing::Test {
 protected:
-  UdpTapSinkTest() {}
-  ~UdpTapSinkTest() {}
+  UdpTapSinkTest() = default;
+  ~UdpTapSinkTest() override = default;
 
 public:
   envoy::config::core::v3::SocketAddress socket_address_;
@@ -103,8 +100,8 @@ TEST_F(UdpTapSinkTest, TestSubmitTraceForNotSUpportedFormat) {
 // re Mock class UdpPacketWriter and not use existing Network::MockUdpPacketWriter
 class MockUdpPacketWriterNew : public Network::UdpPacketWriter {
 public:
-  MockUdpPacketWriterNew(bool isReturnOk) : isReturnOkForwritePacket_(isReturnOk) {};
-  ~MockUdpPacketWriterNew() override {};
+  MockUdpPacketWriterNew(bool is_return_ok) : is_return_ok_forwrite_packet_(is_return_ok) {};
+  ~MockUdpPacketWriterNew() override = default;
 
   Api::IoCallUint64Result writePacket(const Buffer::Instance& buffer,
                                       const Network::Address::Ip* local_ip,
@@ -112,10 +109,10 @@ public:
     (void)buffer;
     (void)local_ip;
     (void)peer_address;
-    if (isReturnOkForwritePacket_) {
+    if (is_return_ok_forwrite_packet_) {
       return Api::IoCallUint64Result(99, Api::IoError::none());
     } else {
-      return Api::IoCallUint64Result(0, Network::IoSocketError::getIoSocketEagainError());
+      return {0, Network::IoSocketError::getIoSocketEagainError()};
     }
   }
   MOCK_METHOD(bool, isWriteBlocked, (), (const));
@@ -129,16 +126,16 @@ public:
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
 
 private:
-  const bool isReturnOkForwritePacket_;
+  const bool is_return_ok_forwrite_packet_;
 };
 
 class UtSpecialUdpTapSink : public UdpTapSink {
 public:
   UtSpecialUdpTapSink(const envoy::extensions::tap_sinks::udp_sink::v3alpha::UdpSink& config)
       : UdpTapSink(config) {}
-  ~UtSpecialUdpTapSink() {}
-  void replaceOrigUdpPacketWriter(Network::UdpPacketWriterPtr&& utUdpPacketWriter) {
-    udp_packet_writer_ = std::move(utUdpPacketWriter);
+  ~UtSpecialUdpTapSink() override = default;
+  void replaceOrigUdpPacketWriter(Network::UdpPacketWriterPtr&& ut_udp_packet_writer) {
+    udp_packet_writer_ = std::move(ut_udp_packet_writer);
   }
 };
 

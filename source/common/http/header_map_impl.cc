@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <ranges>
 #include <string>
 
 #include "envoy/http/header_map.h"
@@ -394,8 +395,8 @@ void HeaderMapImpl::iterate(HeaderMap::ConstIterateCb cb) const {
 }
 
 void HeaderMapImpl::iterateReverse(HeaderMap::ConstIterateCb cb) const {
-  for (auto it = headers_.rbegin(); it != headers_.rend(); it++) {
-    if (cb(*it) == HeaderMap::Iterate::Break) {
+  for (const auto& header : std::ranges::reverse_view(headers_)) {
+    if (cb(header) == HeaderMap::Iterate::Break) {
       break;
     }
   }

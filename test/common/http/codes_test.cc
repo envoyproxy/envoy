@@ -66,6 +66,7 @@ TEST_F(CodeUtilityTest, GroupStrings) {
   EXPECT_EQ("3xx", CodeUtility::groupStringForResponseCode(Code::Found));
   EXPECT_EQ("4xx", CodeUtility::groupStringForResponseCode(Code::NotFound));
   EXPECT_EQ("5xx", CodeUtility::groupStringForResponseCode(Code::NotImplemented));
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   EXPECT_EQ("", CodeUtility::groupStringForResponseCode(static_cast<Code>(600)));
 }
 
@@ -154,8 +155,7 @@ TEST_F(CodeUtilityTest, All) {
   const std::vector<std::pair<Code, std::string>> test_set = {
       std::make_pair(Code::Continue, "Continue"),
       std::make_pair(Code::SwitchingProtocols, "Switching Protocols"),
-      std::make_pair(Code::OK, "OK"),
-      std::make_pair(Code::Created, "Created"),
+      std::make_pair(Code::OK, "OK"), std::make_pair(Code::Created, "Created"),
       std::make_pair(Code::Accepted, "Accepted"),
       std::make_pair(Code::NonAuthoritativeInformation, "Non-Authoritative Information"),
       std::make_pair(Code::NoContent, "No Content"),
@@ -166,8 +166,7 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::IMUsed, "IM Used"),
       std::make_pair(Code::MultipleChoices, "Multiple Choices"),
       std::make_pair(Code::MovedPermanently, "Moved Permanently"),
-      std::make_pair(Code::Found, "Found"),
-      std::make_pair(Code::SeeOther, "See Other"),
+      std::make_pair(Code::Found, "Found"), std::make_pair(Code::SeeOther, "See Other"),
       std::make_pair(Code::NotModified, "Not Modified"),
       std::make_pair(Code::UseProxy, "Use Proxy"),
       std::make_pair(Code::TemporaryRedirect, "Temporary Redirect"),
@@ -175,14 +174,12 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::BadRequest, "Bad Request"),
       std::make_pair(Code::Unauthorized, "Unauthorized"),
       std::make_pair(Code::PaymentRequired, "Payment Required"),
-      std::make_pair(Code::Forbidden, "Forbidden"),
-      std::make_pair(Code::NotFound, "Not Found"),
+      std::make_pair(Code::Forbidden, "Forbidden"), std::make_pair(Code::NotFound, "Not Found"),
       std::make_pair(Code::MethodNotAllowed, "Method Not Allowed"),
       std::make_pair(Code::NotAcceptable, "Not Acceptable"),
       std::make_pair(Code::ProxyAuthenticationRequired, "Proxy Authentication Required"),
       std::make_pair(Code::RequestTimeout, "Request Timeout"),
-      std::make_pair(Code::Conflict, "Conflict"),
-      std::make_pair(Code::Gone, "Gone"),
+      std::make_pair(Code::Conflict, "Conflict"), std::make_pair(Code::Gone, "Gone"),
       std::make_pair(Code::LengthRequired, "Length Required"),
       std::make_pair(Code::PreconditionFailed, "Precondition Failed"),
       std::make_pair(Code::PayloadTooLarge, "Payload Too Large"),
@@ -209,12 +206,14 @@ TEST_F(CodeUtilityTest, All) {
       std::make_pair(Code::LoopDetected, "Loop Detected"),
       std::make_pair(Code::NotExtended, "Not Extended"),
       std::make_pair(Code::NetworkAuthenticationRequired, "Network Authentication Required"),
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       std::make_pair(static_cast<Code>(600), "Unknown")};
 
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, CodeUtility::toString(test_case.first));
   }
 
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   EXPECT_EQ(std::string("Unknown"), CodeUtility::toString(static_cast<Code>(600)));
 }
 

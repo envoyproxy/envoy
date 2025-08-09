@@ -22,7 +22,6 @@ namespace CgroupMemory {
 
 using testing::NiceMock;
 using testing::Return;
-using testing::StartsWith;
 
 // Basic test to verify factory registration
 TEST(CgroupMemoryConfigTest, BasicTest) {
