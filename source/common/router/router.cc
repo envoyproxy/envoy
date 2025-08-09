@@ -47,7 +47,7 @@
 namespace Envoy {
 namespace Router {
 namespace {
-constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
+constexpr absl::string_view NumInternalRedirectsFilterStateName = "num_internal_redirects";
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
