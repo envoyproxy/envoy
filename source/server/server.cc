@@ -648,8 +648,8 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
 
   auto typed_admin_impl_ = dynamic_cast<AdminImpl*>(admin_.get());
 
-  if (!bootstrap_.admin().allow_interfaces().empty()) {
-    for (const auto& allow_listed_route : bootstrap_.admin().allow_interfaces()) {
+  if (!bootstrap_.admin().allow_paths().empty()) {
+    for (const auto& allow_listed_route : bootstrap_.admin().allow_paths()) {
       typed_admin_impl_->addAllowListedRoute(
           std::make_unique<Matchers::StringMatcherImpl>(allow_listed_route, server_contexts_));
     }

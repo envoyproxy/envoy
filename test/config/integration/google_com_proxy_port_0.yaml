@@ -1,5 +1,5 @@
 admin:
-  allow_interfaces:
+  allow_paths:
   - exact: /quitquitquit
   - exact: "/stats"
   - exact: "/contention"
