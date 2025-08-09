@@ -82,6 +82,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2 and above) circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination
   upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection
+  upstream_rq_per_cx, Histogram, Number of requests handled per upstream connection for all HTTP protocols
   upstream_rq_cancelled, Counter, Total requests cancelled before obtaining a connection pool connection
   upstream_rq_maintenance_mode, Counter, Total requests that resulted in an immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response

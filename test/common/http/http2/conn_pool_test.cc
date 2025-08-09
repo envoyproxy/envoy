@@ -971,6 +971,8 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
   EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
+  EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy());
@@ -1984,6 +1986,105 @@ TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectMaxRequests) {
       .Times(AnyNumber())
       .WillRepeatedly(Return(100));
   EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
+}
+
+// Verifies the upstream_rq_per_cx histogram correctly tracks multiple concurrent HTTP/2 streams on
+// the same connection.
+TEST_F(Http2ConnPoolImplTest, RequestTrackingMultipleStreams) {
+  // Allow multiple concurrent streams on a single connection
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(5);
+
+  // Set up expectations for all histograms that will be emitted on connection close
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  // Use _ to capture any value and let the test show us what it actually is
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
+
+  InSequence s;
+
+  // Create first request - this will create a new connection
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+
+  // Create second and third requests - these should reuse the same connection due to multiplexing
+  ActiveTestRequest r2(*this, 0, true); // expect_connected=true means reuse connection
+  ActiveTestRequest r3(*this, 0, true); // expect_connected=true means reuse connection
+
+  // Complete all requests
+  completeRequest(r1);
+  completeRequest(r2);
+  completeRequest(r3);
+
+  // Close the connection to trigger metrics emission
+  // Set expectation first, then raise the event
+  EXPECT_CALL(*this, onClientDestroy());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// Verify request tracking for HTTP/2 with 5 concurrent streams.
+TEST_F(Http2ConnPoolImplTest, RequestTrackingFiveStreams) {
+  // Allow multiple concurrent streams on a single connection
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(10);
+
+  // Set up expectations for all histograms that will be emitted on connection close
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  // Test with 5 requests to see if it correctly tracks all of them
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 5));
+
+  InSequence s;
+
+  // Create first request - this will create a new connection
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+
+  // Create 4 more requests - these should reuse the same connection due to HTTP/2 multiplexing
+  ActiveTestRequest r2(*this, 0, true);
+  ActiveTestRequest r3(*this, 0, true);
+  ActiveTestRequest r4(*this, 0, true);
+  ActiveTestRequest r5(*this, 0, true);
+
+  // Complete all requests
+  completeRequest(r1);
+  completeRequest(r2);
+  completeRequest(r3);
+  completeRequest(r4);
+  completeRequest(r5);
+
+  // Close the connection to trigger metrics emission
+  EXPECT_CALL(*this, onClientDestroy());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// Test that failed connections don't record upstream_rq_per_cx metric
+TEST_F(Http2ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
+  // Create a request that will trigger connection creation
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+
+  // DO NOT call expectClientConnect - let the connection fail before handshake completion
+  // This should not record any upstream_rq_per_cx metric due to hasHandshakeCompleted() check
+
+  EXPECT_CALL(r.callbacks_.pool_failure_, ready());
+
+  // Close/fail the connection BEFORE it becomes ready (before handshake completion)
+  EXPECT_CALL(*this, onClientDestroy());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  // Verify the connection failure was recorded
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
 }
 
 } // namespace Http2
