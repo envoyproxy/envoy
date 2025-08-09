@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <string>
 
@@ -190,6 +191,20 @@ public:
    *         Returns {} if there is no local certificate, or no extensions.
    **/
   virtual absl::Span<const std::string> oidsLocalCertificate() const PURE;
+
+  /**
+   * @return const std::map<std::string, std::string>& the map of OID entries to their values
+   *         from peer certificate extensions. Returns empty map if there is no peer certificate,
+   *         or no extensions.
+   **/
+  virtual const std::map<std::string, std::string>& oidMapPeerCertificate() const PURE;
+
+  /**
+   * @return const std::map<std::string, std::string>& the map of OID entries to their values
+   *         from local certificate extensions. Returns empty map if there is no local certificate,
+   *         or no extensions.
+   **/
+  virtual const std::map<std::string, std::string>& oidMapLocalCertificate() const PURE;
 
   /**
    * @return absl::optional<SystemTime> the time that the peer certificate was issued and should be

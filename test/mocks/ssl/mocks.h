@@ -71,6 +71,8 @@ public:
   MOCK_METHOD(absl::Span<const std::string>, othernameSansLocalCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, oidsPeerCertificate, (), (const));
   MOCK_METHOD(absl::Span<const std::string>, oidsLocalCertificate, (), (const));
+  MOCK_METHOD((const std::map<std::string, std::string>&), oidMapPeerCertificate, (), (const));
+  MOCK_METHOD((const std::map<std::string, std::string>&), oidMapLocalCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, validFromPeerCertificate, (), (const));
   MOCK_METHOD(absl::optional<SystemTime>, expirationPeerCertificate, (), (const));
   MOCK_METHOD(const std::string&, sessionId, (), (const));
