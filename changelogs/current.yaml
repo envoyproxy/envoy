@@ -20,6 +20,10 @@ bug_fixes:
     Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
     reverted by setting the runtime guard
     ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
+- area: load_balancing
+  change: |
+    Fixed a bug in ClientSideWeightedRoundRobinLoadBalancer with worker lbs iterating over priorities
+    included in owning thread aware lb priority set that might have different number of priorities.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
