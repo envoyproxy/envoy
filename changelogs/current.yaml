@@ -163,5 +163,10 @@ new_features:
 - area: rbac
   change: |
     Switch the IP matcher to use LC-Trie for performance improvements.
+- area: lua
+  change: |
+    Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
+    implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
+    :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
 
 deprecated:
