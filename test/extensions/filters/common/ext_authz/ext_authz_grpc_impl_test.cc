@@ -445,6 +445,10 @@ ok_response:
       key: overwrite-if-exists-or-add
       value: overwrite-if-exists-or-add-value
     append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - header:
+      key: invalid-append-action
+      value: invalid-append-action-value
+    append_action: 404
 )EOF",
                             check_response);
 
@@ -458,6 +462,7 @@ ok_response:
           UnsafeHeaderVector{{"add-if-absent", "add-if-absent-value"}},
       .response_headers_to_overwrite_if_exists =
           UnsafeHeaderVector{{"overwrite-if-exists", "overwrite-if-exists-value"}},
+      .saw_invalid_append_actions = true,
       .status_code = Http::Code::OK,
       .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
   };
