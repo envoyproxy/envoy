@@ -33,6 +33,24 @@ local_repository(
     path = "..",
 )
 
+# Bazel 8 Java rules compatibility proxy
+new_local_repository(
+    name = "compatibility_proxy",
+    path = "../bazel",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "proxy.bzl",
+    "java_compatibility_proxy.bzl",
+])
+""",
+)
+
+# rules_android override for Bazel 8 compatibility
+load("@envoy//bazel:rules_android_override.bzl", "rules_android_override")
+rules_android_override(name = "rules_android")
+
 local_repository(
     name = "envoy_build_config",
     path = "envoy_build_config",

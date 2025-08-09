@@ -1,5 +1,20 @@
 workspace(name = "envoy")
 
+# Bazel 8 compatibility proxy for externalized Java rules
+# This resolves the compatibility_proxy cycle issue in Bazel 8
+new_local_repository(
+    name = "compatibility_proxy",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "proxy.bzl",
+    "java_compatibility_proxy.bzl",
+])
+""",
+    path = "bazel",
+)
+
 load("//bazel:api_binding.bzl", "envoy_api_binding")
 
 envoy_api_binding()
