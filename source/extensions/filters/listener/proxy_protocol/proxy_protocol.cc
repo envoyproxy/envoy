@@ -557,26 +557,23 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
                                      ? "envoy.filters.listener.proxy_protocol"
                                      : key_value_pair->metadata_namespace();
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener")) {
-        auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
+      auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
 
-        const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
-        envoy::data::core::v3::TlvsMetadata tlvs_metadata;
-        auto status = absl::OkStatus();
-        if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
-          status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
-        }
-        if (!status.ok()) {
-          ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
-                             "proxy_protocol: Failed to unpack typed metadata for TLV type ",
-                             tlv_type);
-        } else {
-          (*tlvs_metadata.mutable_typed_metadata())[key_value_pair->key()] = tlv_value;
-          ProtobufWkt::Any typed_metadata;
-          typed_metadata.PackFrom(tlvs_metadata);
-          cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
-        }
+      const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
+      envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+      auto status = absl::OkStatus();
+      if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
+        status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
+      }
+      if (!status.ok()) {
+        ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
+                           "proxy_protocol: Failed to unpack typed metadata for TLV type ",
+                           tlv_type);
+      } else {
+        (*tlvs_metadata.mutable_typed_metadata())[key_value_pair->key()] = tlv_value;
+        ProtobufWkt::Any typed_metadata;
+        typed_metadata.PackFrom(tlvs_metadata);
+        cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
       }
       // Always populate untyped metadata for backwards compatibility.
       ProtobufWkt::Value metadata_value;
