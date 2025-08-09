@@ -25,6 +25,9 @@ bug_fixes:
     Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
     reverted by setting the runtime guard
     ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
+- area: aws
+  change: |
+    Adds missing session name, session duration and externalid parameters in assumerole credentials provider.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
