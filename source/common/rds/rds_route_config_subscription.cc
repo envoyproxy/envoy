@@ -49,9 +49,14 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       resource_decoder_(std::move(resource_decoder)) {
   const auto resource_type = route_config_provider_manager_.protoTraits().resourceType();
   auto subscription_or_error =
-      factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
-          resource_decoder_, {});
+      Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")
+          ? factory_context.xdsManager().subscribeToSingletonResource(
+                route_config_name_, config_source, Envoy::Grpc::Common::typeUrl(resource_type),
+                *scope_, *this, resource_decoder_, {})
+          : factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+                config_source, Envoy::Grpc::Common::typeUrl(resource_type), *scope_, *this,
+                resource_decoder_, {});
   SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
   subscription_ = std::move(*subscription_or_error);
   local_init_manager_.add(local_init_target_);

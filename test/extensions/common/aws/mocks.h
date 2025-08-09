@@ -49,10 +49,12 @@ public:
   MockSigner();
   ~MockSigner() override;
 
-  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&, bool, absl::string_view));
-  MOCK_METHOD(absl::Status, sign, (Http::RequestHeaderMap&, const std::string&, absl::string_view));
-  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, absl::string_view));
-  MOCK_METHOD(absl::Status, signUnsignedPayload, (Http::RequestHeaderMap&, absl::string_view));
+  MOCK_METHOD(absl::Status, sign, (Http::RequestMessage&, bool, const absl::string_view));
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestHeaderMap&, const std::string&, const absl::string_view));
+  MOCK_METHOD(absl::Status, signEmptyPayload, (Http::RequestHeaderMap&, const absl::string_view));
+  MOCK_METHOD(absl::Status, signUnsignedPayload,
+              (Http::RequestHeaderMap&, const absl::string_view));
   MOCK_METHOD(bool, addCallbackIfCredentialsPending, (CredentialsPendingCallback&&));
 };
 
@@ -194,6 +196,8 @@ public:
   MOCK_METHOD(absl::Status, sign,
               (Http::RequestMessage & message, bool sign_body,
                const absl::string_view override_region));
+  MOCK_METHOD(absl::Status, sign,
+              (Http::RequestHeaderMap&, const std::string&, const absl::string_view));
 
 private:
   MOCK_METHOD(std::string, createCredentialScope,

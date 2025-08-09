@@ -40,7 +40,6 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/extensions/clusters/common:logical_host_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:registry_lib",

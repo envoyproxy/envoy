@@ -81,9 +81,6 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   Endpoint endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), root_span->tracer());
-
   // Duration is not set at span-creation time
   EXPECT_FALSE(root_span->isSetDuration());
 
@@ -93,7 +90,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
 
-  SpanContext root_span_context(*root_span);
+  SpanContext root_span_context = root_span->spanContext();
   SpanPtr server_side_shared_context_span =
       tracer.startSpan(config, "my_span", timestamp, root_span_context);
 
@@ -125,9 +122,6 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), server_side_shared_context_span->tracer());
-
   // Duration is not set at span-creation time
   EXPECT_FALSE(server_side_shared_context_span->isSetDuration());
 
@@ -137,7 +131,7 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
 
   ON_CALL(random_generator, random()).WillByDefault(Return(2000));
-  SpanContext server_side_context(*server_side_shared_context_span);
+  SpanContext server_side_context = server_side_shared_context_span->spanContext();
   SpanPtr child_span = tracer.startSpan(config, "my_child_span", timestamp, server_side_context);
 
   EXPECT_EQ("my_child_span", child_span->name());
@@ -170,9 +164,6 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), child_span->tracer());
 
   // Duration is not set at span-creation time
   EXPECT_FALSE(child_span->isSetDuration());
@@ -217,9 +208,6 @@ TEST_F(ZipkinTracerTest, SpanCreation) {
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), new_shared_context_span->tracer());
 
   // Duration is not set at span-creation time
   EXPECT_FALSE(new_shared_context_span->isSetDuration());
@@ -266,9 +254,6 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxy) {
   Endpoint endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), root_span->tracer());
-
   // Duration is not set at span-creation time
   EXPECT_FALSE(root_span->isSetDuration());
 
@@ -278,7 +263,7 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxy) {
   // ==============
 
   ON_CALL(random_generator, random()).WillByDefault(Return(2000));
-  SpanContext root_span_context(*root_span);
+  SpanContext root_span_context = root_span->spanContext();
   SpanPtr child_span = tracer.startSpan(config, "my_child_span", timestamp, root_span_context);
 
   EXPECT_EQ("my_child_span", child_span->name());
@@ -312,9 +297,6 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxy) {
   endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), child_span->tracer());
-
   // Duration is not set at span-creation time
   EXPECT_FALSE(child_span->isSetDuration());
 
@@ -322,7 +304,13 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxy) {
   // Test the downstream span with parent context and the shared context is enabled. If the
   // independent proxy is set to true, the downstream span will be server span.
   // ==============
-  SpanContext child_span_context(*child_span, false);
+  SpanContext child_span_context = child_span->spanContext();
+
+  // By default the context that from an existing span is an inner context. But here we want to
+  // test the case there the context is an external context from the downstream request. So
+  // we set the inner context to false manually for test.
+  child_span_context.setInnerContextForTest(false);
+
   SpanPtr server_side_shared_context_span =
       tracer.startSpan(config, "my_span", timestamp, child_span_context);
 
@@ -353,9 +341,6 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxy) {
   EXPECT_TRUE(ann.isSetEndpoint());
   endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
-
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), server_side_shared_context_span->tracer());
 
   // Duration is not set at span-creation time
   EXPECT_FALSE(server_side_shared_context_span->isSetDuration());
@@ -402,9 +387,6 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxyByTracingConfig) {
   Endpoint endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), root_span->tracer());
-
   // Duration is not set at span-creation time
   EXPECT_FALSE(root_span->isSetDuration());
 
@@ -414,7 +396,7 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxyByTracingConfig) {
   // ==============
 
   ON_CALL(random_generator, random()).WillByDefault(Return(2000));
-  SpanContext root_span_context(*root_span);
+  SpanContext root_span_context = root_span->spanContext();
   SpanPtr child_span = tracer.startSpan(config, "my_child_span", timestamp, root_span_context);
 
   EXPECT_EQ("my_child_span", child_span->name());
@@ -448,9 +430,6 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxyByTracingConfig) {
   endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), child_span->tracer());
-
   // Duration is not set at span-creation time
   EXPECT_FALSE(child_span->isSetDuration());
 
@@ -458,7 +437,13 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxyByTracingConfig) {
   // Test the downstream span with parent context and the shared context is enabled. If the
   // independent proxy is set to true, the downstream span will be server span.
   // ==============
-  SpanContext child_span_context(*child_span, false);
+  SpanContext child_span_context = child_span->spanContext();
+
+  // By default the context that from an existing span is an inner context. But here we want to
+  // test the case there the context is an external context from the downstream request. So
+  // we set the inner context to false manually for test.
+  child_span_context.setInnerContextForTest(false);
+
   SpanPtr server_side_shared_context_span =
       tracer.startSpan(config, "my_span", timestamp, child_span_context);
 
@@ -490,9 +475,6 @@ TEST_F(ZipkinTracerTest, SpanCreationWithIndependentProxyByTracingConfig) {
   endpoint = ann.endpoint();
   EXPECT_EQ("my_service_name", endpoint.serviceName());
 
-  // The tracer must have been properly set
-  EXPECT_EQ(dynamic_cast<TracerInterface*>(&tracer), server_side_shared_context_span->tracer());
-
   // Duration is not set at span-creation time
   EXPECT_FALSE(server_side_shared_context_span->isSetDuration());
 }
@@ -516,7 +498,7 @@ TEST_F(ZipkinTracerTest, FinishSpan) {
   span->setSampled(true);
 
   // Finishing a root span with a CS annotation must add a CR annotation
-  span->finish();
+  span->finishSpan();
   EXPECT_EQ(2ULL, span->annotations().size());
 
   // Check the CS annotation added at span-creation time
@@ -545,7 +527,7 @@ TEST_F(ZipkinTracerTest, FinishSpan) {
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
 
-  SpanContext context(*span);
+  SpanContext context = span->spanContext();
   SpanPtr server_side = tracer.startSpan(config, "my_span", timestamp, context);
 
   // Associate a reporter with the tracer
@@ -554,7 +536,7 @@ TEST_F(ZipkinTracerTest, FinishSpan) {
   tracer.setReporter(std::move(reporter_ptr));
 
   // Finishing a server-side span with an SR annotation must add an SS annotation
-  server_side->finish();
+  server_side->finishSpan();
   EXPECT_EQ(2ULL, server_side->annotations().size());
 
   // Test if the reporter's reportSpan method was actually called upon finishing the span
@@ -602,7 +584,7 @@ TEST_F(ZipkinTracerTest, FinishNotSampledSpan) {
   // Creates a root-span with a CS annotation
   SpanPtr span = tracer.startSpan(config, "my_span", timestamp);
   span->setSampled(false);
-  span->finish();
+  span->finishSpan();
 
   // Test if the reporter's reportSpan method was NOT called upon finishing the span
   EXPECT_EQ(0ULL, reporter_object->reportedSpans().size());
@@ -622,14 +604,14 @@ TEST_F(ZipkinTracerTest, SpanSampledPropagatedToChild) {
   SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
   parent_span->setSampled(true);
 
-  SpanContext parent_context1(*parent_span);
+  SpanContext parent_context1 = parent_span->spanContext();
   SpanPtr child_span1 = tracer.startSpan(config, "child_span 1", timestamp, parent_context1);
 
   // Test that child span sampled flag is true
   EXPECT_TRUE(child_span1->sampled());
 
   parent_span->setSampled(false);
-  SpanContext parent_context2(*parent_span);
+  SpanContext parent_context2 = parent_span->spanContext();
   SpanPtr child_span2 = tracer.startSpan(config, "child_span 2", timestamp, parent_context2);
 
   // Test that sampled flag is false
@@ -670,7 +652,7 @@ TEST_F(ZipkinTracerTest, SharedSpanContext) {
 
   // Create parent span
   SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
-  SpanContext parent_context(*parent_span);
+  SpanContext parent_context = parent_span->spanContext();
 
   // An CS annotation must have been added
   EXPECT_EQ(1ULL, parent_span->annotations().size());
@@ -706,7 +688,7 @@ TEST_F(ZipkinTracerTest, NotSharedSpanContext) {
 
   // Create parent span
   SpanPtr parent_span = tracer.startSpan(config, "parent_span", timestamp);
-  SpanContext parent_context(*parent_span);
+  SpanContext parent_context = parent_span->spanContext();
 
   // An CS annotation must have been added
   EXPECT_EQ(1ULL, parent_span->annotations().size());

@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
 
