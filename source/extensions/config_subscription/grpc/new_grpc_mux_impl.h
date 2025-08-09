@@ -79,8 +79,8 @@ public:
   void start() override;
 
   absl::Status
-  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
                   BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
 
@@ -159,8 +159,8 @@ private:
   // Helper function to create the grpc_stream_ object.
   std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                       envoy::service::discovery::v3::DeltaDiscoveryResponse>>
-  createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
-                         Grpc::RawAsyncClientPtr&& failover_async_client,
+  createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_client,
+                         Grpc::RawAsyncClientSharedPtr&& failover_async_client,
                          const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
                          BackOffStrategyPtr&& backoff_strategy,
                          const RateLimitSettings& rate_limit_settings);

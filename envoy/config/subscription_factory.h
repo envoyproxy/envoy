@@ -140,8 +140,8 @@ public:
   std::string category() const override { return "envoy.config_mux"; }
   virtual void shutdownAll() PURE;
   virtual std::shared_ptr<GrpcMux>
-  create(std::unique_ptr<Grpc::RawAsyncClient>&& async_client,
-         std::unique_ptr<Grpc::RawAsyncClient>&& async_failover_client,
+  create(std::shared_ptr<Grpc::RawAsyncClient>&& async_client,
+         std::shared_ptr<Grpc::RawAsyncClient>&& async_failover_client,
          Event::Dispatcher& dispatcher, Random::RandomGenerator& random, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info,

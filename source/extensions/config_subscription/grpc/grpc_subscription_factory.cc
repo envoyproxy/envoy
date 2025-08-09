@@ -35,7 +35,7 @@ GrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::SubscriptionDat
   GrpcMuxContext grpc_mux_context{
       /*async_client_=*/THROW_OR_RETURN_VALUE(
           factory_primary_or_error.value()->createUncachedRawAsyncClient(),
-          Grpc::RawAsyncClientPtr),
+          Grpc::RawAsyncClientSharedPtr),
       /*failover_async_client_=*/nullptr, // Failover is only supported for ADS.
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/sotwGrpcMethod(data.type_url_),
@@ -86,7 +86,7 @@ DeltaGrpcConfigSubscriptionFactory::create(ConfigSubscriptionFactory::Subscripti
   GrpcMuxContext grpc_mux_context{
       /*async_client_=*/THROW_OR_RETURN_VALUE(
           factory_primary_or_error.value()->createUncachedRawAsyncClient(),
-          Grpc::RawAsyncClientPtr),
+          Grpc::RawAsyncClientSharedPtr),
       /*failover_async_client_=*/nullptr, // Failover is only supported for ADS.
       /*dispatcher_=*/data.dispatcher_,
       /*service_method_=*/deltaGrpcMethod(data.type_url_),

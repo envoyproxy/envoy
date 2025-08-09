@@ -57,8 +57,8 @@ NewGrpcMuxImpl::NewGrpcMuxImpl(GrpcMuxContext& grpc_mux_context)
 
 std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                     envoy::service::discovery::v3::DeltaDiscoveryResponse>>
-NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientPtr&& async_client,
-                                       Grpc::RawAsyncClientPtr&& failover_async_client,
+NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_client,
+                                       Grpc::RawAsyncClientSharedPtr&& failover_async_client,
                                        const Protobuf::MethodDescriptor& service_method,
                                        Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
                                        const RateLimitSettings& rate_limit_settings) {
@@ -252,8 +252,8 @@ GrpcMuxWatchPtr NewGrpcMuxImpl::addWatch(const std::string& type_url,
 }
 
 absl::Status
-NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                                Grpc::RawAsyncClientPtr&& failover_async_client,
+NewGrpcMuxImpl::updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                                Grpc::RawAsyncClientSharedPtr&& failover_async_client,
                                 Stats::Scope& scope, BackOffStrategyPtr&& backoff_strategy,
                                 const envoy::config::core::v3::ApiConfigSource& ads_config_source) {
   // Process the rate limit settings.
@@ -455,8 +455,9 @@ public:
   std::string name() const override { return "envoy.config_mux.new_grpc_mux_factory"; }
   void shutdownAll() override { return NewGrpcMuxImpl::shutdownAll(); }
   std::shared_ptr<GrpcMux>
-  create(Grpc::RawAsyncClientPtr&& async_client, Grpc::RawAsyncClientPtr&& failover_async_client,
-         Event::Dispatcher& dispatcher, Random::RandomGenerator&, Stats::Scope& scope,
+  create(Grpc::RawAsyncClientSharedPtr&& async_client,
+         Grpc::RawAsyncClientSharedPtr&& failover_async_client, Event::Dispatcher& dispatcher,
+         Random::RandomGenerator&, Stats::Scope& scope,
          const envoy::config::core::v3::ApiConfigSource& ads_config,
          const LocalInfo::LocalInfo& local_info, CustomConfigValidatorsPtr&& config_validators,
          BackOffStrategyPtr&& backoff_strategy, XdsConfigTrackerOptRef xds_config_tracker,

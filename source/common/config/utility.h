@@ -387,6 +387,11 @@ public:
    */
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
 
+  static absl::StatusOr<absl::optional<envoy::config::core::v3::GrpcService>>
+  getGrpcConfigFromApiConfigSource(
+      const envoy::config::core::v3::ApiConfigSource& api_config_source, int grpc_service_idx,
+      bool xdstp_config_source);
+
   /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.

@@ -120,8 +120,8 @@ public:
    * Updates the current gRPC-Mux object to use a new gRPC client, and config.
    */
   virtual absl::Status
-  updateMuxSource(Grpc::RawAsyncClientPtr&& primary_async_client,
-                  Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
                   BackOffStrategyPtr&& backoff_strategy,
                   const envoy::config::core::v3::ApiConfigSource& ads_config_source) PURE;
 };
