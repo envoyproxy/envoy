@@ -104,8 +104,8 @@ def _cc_deps():
 def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
-    if "io_bazel_rules_go" not in skip_targets:
-        external_http_archive(name = "io_bazel_rules_go")
+    if "rules_go" not in skip_targets:
+        external_http_archive(name = "rules_go")
         external_http_archive("bazel_gazelle")
 
 def _rust_deps():

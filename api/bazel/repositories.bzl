@@ -57,7 +57,7 @@ def api_dependencies():
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
     name = "client_model",
@@ -78,7 +78,7 @@ go_proto_library(
 ZIPKINAPI_BUILD_CONTENT = """
 
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_go//proto:def.bzl", "go_proto_library")
 
 api_cc_py_proto_library(
     name = "zipkin",
@@ -101,7 +101,7 @@ OPENTELEMETRY_BUILD_CONTENT = """
 load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
 load("@com_github_grpc_grpc//bazel:python_rules.bzl", "py_proto_library", "py_grpc_library")
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
+load("@rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
 package(default_visibility = ["//visibility:public"])

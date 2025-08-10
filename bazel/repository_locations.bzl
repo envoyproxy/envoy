@@ -1030,7 +1030,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Apache-2.0",
         license_url = "https://github.com/opencomputeproject/ocp-diag-core/blob/{version}/LICENSE",
     ),
-    io_bazel_rules_go = dict(
+    rules_go = dict(
         project_name = "Go rules for Bazel",
         project_desc = "Bazel rules for the Go language",
         project_url = "https://github.com/bazelbuild/rules_go",
