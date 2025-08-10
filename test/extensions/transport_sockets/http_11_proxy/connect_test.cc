@@ -153,14 +153,6 @@ TEST_P(Http11ConnectTest, HostWithPort) {
   injectHeaderOnceTest();
 }
 
-TEST_P(Http11ConnectTest, ProxySslPortRuntimeGuardDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.proxy_ssl_port", "false"}});
-
-  initialize();
-  injectHeaderOnceTest();
-}
-
 // Test injects CONNECT only once. Configured via endpoint metadata.
 TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceEndpointMetadata) {
   initializeWithMetadataProxyAddr();

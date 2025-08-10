@@ -2,6 +2,7 @@
 
 #include "envoy/server/transport_socket_config.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -208,6 +209,10 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
   RETURN_IF_NOT_OK_REF(server_id_or_result.status());
 
   std::string server_id = server_id_or_result.value();
+
+  if (config.server_id_base64_encoded()) {
+    server_id = Base64::decodeWithoutPadding(server_id);
+  }
 
   if (config.expected_server_id_length() > 0 &&
       config.expected_server_id_length() != server_id.size()) {

@@ -123,7 +123,8 @@ public:
   enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
 
   // Single IP range constructor.
-  IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type);
+  static absl::StatusOr<std::unique_ptr<IPMatcher>>
+  create(const envoy::config::core::v3::CidrRange& range, Type type);
 
   // Multiple IP ranges constructor.
   static absl::StatusOr<std::unique_ptr<IPMatcher>>
@@ -136,8 +137,8 @@ private:
   // Private constructor for LC Trie-based matcher.
   IPMatcher(std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie, Type type);
 
-  // Extract IP address based on matcher type.
-  Network::Address::InstanceConstSharedPtr
+  // Helper method to extract IP address based on type, returning a reference to avoid copies.
+  const Network::Address::InstanceConstSharedPtr&
   extractIpAddress(const Network::Connection& connection, const StreamInfo::StreamInfo& info) const;
 
   std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie_;
