@@ -20,7 +20,9 @@ def _android_autoconf_impl(repository_ctx):
     sdk_rule = ""
     if sdk_home:
         sdk_rule = """
-    native.android_sdk_repository(
+    # Use rules_android override for android_sdk_repository
+    load("@rules_android//android:rules.bzl", "android_sdk_repository")
+    android_sdk_repository(
         name="androidsdk",
         path="{}",
         api_level={},
@@ -36,7 +38,7 @@ def _android_autoconf_impl(repository_ctx):
         path="{}",
         api_level={},
     )
-    native.register_toolchains("@androidndk//:all")
+    register_toolchains("@androidndk//:all")
 
 """.format(ndk_home, ndk_api_level)
 
@@ -48,6 +50,7 @@ def _android_autoconf_impl(repository_ctx):
 load("@rules_android_ndk//:rules.bzl", "android_ndk_repository")
 
 def android_workspace():
+    # Use compatibility proxy for all Android rules
     {}
     {}
     """.format(sdk_rule, ndk_rule))
