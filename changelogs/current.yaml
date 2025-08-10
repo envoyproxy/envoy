@@ -141,7 +141,7 @@ new_features:
     will take precedence over this field.
 - area: redis
   change: |
-    Added support for ``GEOSEARCH``.
+    Added support for ``GEOSEARCH``and ``GETEX``.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in produiction environments.
