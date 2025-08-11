@@ -415,7 +415,7 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackDisabledByDefault) {
   SpanContextExtractor extractor(request_headers); // w3c_fallback disabled by default
   auto context = extractor.extractSpanContext(true);
   EXPECT_FALSE(context.second); // Should not extract context from W3C headers
-  EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_FALSE(extractor.extractSampled().has_value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, W3CFallbackEnabled) {
@@ -425,7 +425,7 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackEnabled) {
   SpanContextExtractor extractor(request_headers, true); // w3c_fallback enabled
   auto context = extractor.extractSpanContext(true);
   EXPECT_TRUE(context.second); // Should extract context from W3C headers
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_TRUE(extractor.extractSampled().value());
 
   // Verify the converted values
   EXPECT_EQ(0xb7ad6b7169203331, context.first.id()); // W3C span-id becomes span-id
@@ -457,7 +457,7 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidHeaders) {
   SpanContextExtractor extractor(request_headers, true); // w3c_fallback enabled
   auto context = extractor.extractSpanContext(true);
   EXPECT_FALSE(context.second); // Should not extract context from invalid W3C headers
-  EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_FALSE(extractor.extractSampled().has_value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidTraceIdLength) {

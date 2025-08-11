@@ -36,7 +36,6 @@ SpanContextExtractor::~SpanContextExtractor() = default;
 
 absl::optional<bool> SpanContextExtractor::extractSampled() {
   bool sampled(false);
-
   // Try B3 single format first.
   auto b3_header_entry = ZipkinCoreConstants::get().B3.get(trace_context_);
   if (b3_header_entry.has_value()) {
@@ -66,7 +65,7 @@ absl::optional<bool> SpanContextExtractor::extractSampled() {
 
   // Try individual B3 sampled header.
   auto x_b3_sampled_entry = ZipkinCoreConstants::get().X_B3_SAMPLED.get(trace_context_);
-  
+
   if (x_b3_sampled_entry.has_value()) {
     // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
     // zipkin tracers may still use that value, although should be 0 or 1.
