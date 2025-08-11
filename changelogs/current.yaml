@@ -12,6 +12,10 @@ bug_fixes:
   change: |
     Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
     Secure attribute.
+- area: dns
+  change: |
+    Fixed an UAF in DNS cache that can occur when the Host header is modified between the Dynamic Forwarding and Router
+    filters.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
