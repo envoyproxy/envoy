@@ -2470,7 +2470,7 @@ TEST_F(AsyncClientImplUnitTest, NullConfig) {
 }
 
 TEST_F(AsyncClientImplUnitTest, NullVirtualHost) {
-  EXPECT_EQ(std::numeric_limits<uint32_t>::max(), vhost_.retryShadowBufferLimit());
+  EXPECT_EQ(std::numeric_limits<uint64_t>::max(), vhost_.requestBodyBufferLimit());
 }
 
 } // namespace Http

@@ -1259,8 +1259,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                 ->internalRedirectPolicy()
                 .shouldRedirectForResponseCode(Code::OK));
 
-        EXPECT_EQ(default_route->routeEntry()->retryShadowBufferLimit(),
-                  delegating_route_foo->routeEntry()->retryShadowBufferLimit());
+        EXPECT_EQ(default_route->routeEntry()->requestBodyBufferLimit(),
+                  delegating_route_foo->routeEntry()->requestBodyBufferLimit());
         EXPECT_EQ(default_route->routeEntry()->shadowPolicies().empty(),
                   delegating_route_foo->routeEntry()->shadowPolicies().empty());
         EXPECT_EQ(default_route->routeEntry()->timeout(),

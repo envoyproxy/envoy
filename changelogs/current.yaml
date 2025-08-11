@@ -183,7 +183,13 @@ new_features:
         that sends ``GOAWAY`` AND closes connections for HTTP2 server processing of requests.  When
         a ``GOAWAY`` frame is submitted by this the counter ``http2.goaway_sent`` will be
         incremented.
-
+- area: router
+  change: |
+    Added :ref:`request_body_buffer_limit
+    <envoy_v3_api_field_config.route.v3.VirtualHost.request_body_buffer_limit>` and
+    :ref:`request_body_buffer_limit
+    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` configuration fields
+    to enable buffering of large request bodies beyond connection buffer limits.
 - area: otlp_stat_sink
   change: |
     Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
