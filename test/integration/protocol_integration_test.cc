@@ -1586,8 +1586,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done", "false");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
@@ -1617,8 +1615,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done", "true");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 

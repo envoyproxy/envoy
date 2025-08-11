@@ -73,6 +73,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: balsa
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` and legacy code paths.
 - area: geoip_providers
   change: |
     Removed runtime guard ``envoy.reloadable_features.mmdb_files_reload_enabled`` and legacy code paths.
