@@ -476,6 +476,32 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidTraceIdLength) {
   EXPECT_FALSE(context2.second);
 }
 
+TEST(ZipkinSpanContextExtractorTest, W3CTraceIdLengthValidation) {
+  // Test that invalid W3C trace ID lengths are properly rejected
+  // Invalid headers should not extract a valid context (context.second should be false)
+  
+  // Too short trace ID (31 chars instead of 32)
+  Tracing::TestTraceContextImpl request_headers1{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor1(request_headers1, true);
+  auto context1 = extractor1.extractSpanContext(true);
+  EXPECT_FALSE(context1.second); // Should not extract context from invalid trace ID length
+
+  // Too long trace ID (33 chars instead of 32)  
+  Tracing::TestTraceContextImpl request_headers2{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319c1-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor2(request_headers2, true);
+  auto context2 = extractor2.extractSpanContext(true);
+  EXPECT_FALSE(context2.second); // Should not extract context from invalid trace ID length
+
+  // Empty trace ID
+  Tracing::TestTraceContextImpl request_headers3{
+      {"traceparent", "00--b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor3(request_headers3, true);
+  auto context3 = extractor3.extractSpanContext(true);
+  EXPECT_FALSE(context3.second); // Should not extract context from empty trace ID
+}
+
 TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidSpanIdLength) {
   // Test invalid W3C span ID length (too short)
   Tracing::TestTraceContextImpl request_headers{
@@ -506,6 +532,79 @@ TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithInvalidHexCharacters) {
   SpanContextExtractor extractor2(request_headers2, true);
   auto context2 = extractor2.extractSpanContext(true);
   EXPECT_FALSE(context2.second);
+}
+
+TEST(ZipkinSpanContextExtractorTest, W3CTraceIdHexValidation) {
+  // Test that invalid hex characters in W3C trace IDs are properly rejected
+  // Invalid headers should not extract a valid context (context.second should be false)
+  
+  // Invalid hex character 'g' in high part of trace ID
+  Tracing::TestTraceContextImpl request_headers1{
+      {"traceparent", "00-0af7651916cd43dg8448eb211c80319c-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor1(request_headers1, true);
+  auto context1 = extractor1.extractSpanContext(true);
+  EXPECT_FALSE(context1.second); // Should not extract context from invalid hex in trace ID
+
+  // Invalid hex character 'z' in low part of trace ID  
+  Tracing::TestTraceContextImpl request_headers2{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319z-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor2(request_headers2, true);
+  auto context2 = extractor2.extractSpanContext(true);
+  EXPECT_FALSE(context2.second); // Should not extract context from invalid hex in trace ID
+
+  // Invalid character at start of trace ID
+  Tracing::TestTraceContextImpl request_headers3{
+      {"traceparent", "00-xaf7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor3(request_headers3, true);
+  auto context3 = extractor3.extractSpanContext(true);
+  EXPECT_FALSE(context3.second); // Should not extract context from invalid hex in trace ID
+
+  // Invalid character at end of trace ID
+  Tracing::TestTraceContextImpl request_headers4{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319x-b7ad6b7169203331-01"}};
+  SpanContextExtractor extractor4(request_headers4, true);
+  auto context4 = extractor4.extractSpanContext(true);
+  EXPECT_FALSE(context4.second); // Should not extract context from invalid hex in trace ID
+}
+
+TEST(ZipkinSpanContextExtractorTest, W3CSpanIdHexValidation) {
+  // Test that invalid hex characters in W3C span IDs are properly rejected
+  // Invalid headers should not extract a valid context (context.second should be false)
+  
+  // Invalid hex character 'g' in span ID
+  Tracing::TestTraceContextImpl request_headers1{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331g-01"}};
+  SpanContextExtractor extractor1(request_headers1, true);
+  auto context1 = extractor1.extractSpanContext(true);
+  EXPECT_FALSE(context1.second); // Should not extract context from invalid hex in span ID
+
+  // Invalid hex character 'z' in span ID  
+  Tracing::TestTraceContextImpl request_headers2{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331z-01"}};
+  SpanContextExtractor extractor2(request_headers2, true);
+  auto context2 = extractor2.extractSpanContext(true);
+  EXPECT_FALSE(context2.second); // Should not extract context from invalid hex in span ID
+
+  // Invalid character at start of span ID
+  Tracing::TestTraceContextImpl request_headers3{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-x7ad6b7169203331-01"}};
+  SpanContextExtractor extractor3(request_headers3, true);
+  auto context3 = extractor3.extractSpanContext(true);
+  EXPECT_FALSE(context3.second); // Should not extract context from invalid hex in span ID
+
+  // Invalid character in middle of span ID
+  Tracing::TestTraceContextImpl request_headers4{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b71692x3331-01"}};
+  SpanContextExtractor extractor4(request_headers4, true);
+  auto context4 = extractor4.extractSpanContext(true);
+  EXPECT_FALSE(context4.second); // Should not extract context from invalid hex in span ID
+
+  // Non-hex character like space
+  Tracing::TestTraceContextImpl request_headers5{
+      {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203 31-01"}};
+  SpanContextExtractor extractor5(request_headers5, true);
+  auto context5 = extractor5.extractSpanContext(true);
+  EXPECT_FALSE(context5.second); // Should not extract context from invalid hex in span ID
 }
 
 TEST(ZipkinSpanContextExtractorTest, W3CFallbackWithMalformedTraceparent) {
