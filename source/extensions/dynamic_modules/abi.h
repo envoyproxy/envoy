@@ -829,8 +829,8 @@ void envoy_dynamic_module_callback_metric_set_gauge(
     envoy_dynamic_module_type_metric_gauge_envoy_ptr gauge_envoy_ptr, uint64_t value);
 
 /**
- * envoy_dynamic_module_callback_metric_histogram_new is called by the module during initialization to
- * create a new Stats::Histogram with the given name.
+ * envoy_dynamic_module_callback_metric_histogram_new is called by the module during initialization
+ * to create a new Stats::Histogram with the given name.
  *
  * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
  * histogram will be defined.
