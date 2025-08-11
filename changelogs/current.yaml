@@ -56,9 +56,15 @@ removed_config_or_runtime:
 - area: udp_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
+- area: rds
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.normalize_rds_provider_config`` and legacy code paths.
 - area: quic
   change: |
     Removed runtime guard ``envoy.reloadable_features.report_stream_reset_error_code`` and legacy code paths.
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.streaming_shadow`` and legacy code paths.
 - area: http3
   change: |
     Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
@@ -74,6 +80,12 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: balsa
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` and legacy code paths.
+- area: geoip_providers
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.mmdb_files_reload_enabled`` and legacy code paths.
 - area: proxy_protocol
   change: |
     Removed runtime guard ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` and legacy code paths.
@@ -145,7 +157,7 @@ new_features:
     will take precedence over this field.
 - area: redis
   change: |
-    Added support for ``GEOSEARCH``.
+    Added support for ``GEOSEARCH``and ``GETEX``.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in produiction environments.
