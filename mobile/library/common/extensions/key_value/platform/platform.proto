@@ -8,7 +8,7 @@ import "validate/validate.proto";
 
 message PlatformKeyValueStoreConfig {
   // The key to save the contents to.
-  string key = 1 [(validate.rules).string = {min_len: 1}];
+  string key = 1 [(buf.validate.field).string.min_len = 1];
 
   // The interval at which the key value store should be saved.
   google.protobuf.Duration save_interval = 2;

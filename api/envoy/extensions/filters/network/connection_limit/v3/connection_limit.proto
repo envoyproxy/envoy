@@ -8,7 +8,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.connection_limit.v3";
 option java_outer_classname = "ConnectionLimitProto";
@@ -23,12 +23,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ConnectionLimit {
   // The prefix to use when emitting :ref:`statistics
   // <config_network_filters_connection_limit_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string.min_len = 1];
 
   // The max connections configuration to use for new incoming connections that are processed
   // by the filter's filter chain. When max_connection is reached, the incoming connection
   // will be closed after delay duration.
-  google.protobuf.UInt64Value max_connections = 2 [(validate.rules).uint64 = {gte: 1}];
+  google.protobuf.UInt64Value max_connections = 2 [(buf.validate.field).uint64.gte = 1];
 
   // The delay configuration to use for rejecting the connection after some specified time duration
   // instead of immediately rejecting the connection. That way, a malicious user is not able to

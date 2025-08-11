@@ -1,6 +1,5 @@
 #include "source/extensions/filters/common/rbac/matchers/upstream_ip_port.h"
 
-#include "envoy/config/core/v3/extension.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/stream_info/upstream_address.h"

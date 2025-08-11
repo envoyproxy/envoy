@@ -5,7 +5,7 @@ package envoy.extensions.common.async_files.v3;
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.common.async_files.v3";
 option java_outer_classname = "AsyncFileManagerProto";
@@ -22,7 +22,7 @@ message AsyncFileManagerConfig {
     // The number of threads to use. If unset or zero, will default to the number
     // of concurrent threads the hardware supports. This default is subject to
     // change if performance analysis suggests it.
-    uint32 thread_count = 1 [(validate.rules).uint32 = {lte: 1024}];
+    uint32 thread_count = 1 [(buf.validate.field).uint32.lte = 1024];
   }
 
   // An optional identifier for the manager. An empty string is a valid identifier
@@ -33,7 +33,7 @@ message AsyncFileManagerConfig {
   string id = 1;
 
   oneof manager_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Configuration for a thread-pool based async file manager.
     ThreadPool thread_pool = 2;

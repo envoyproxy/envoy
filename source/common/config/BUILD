@@ -311,6 +311,5 @@ envoy_cc_library(
         "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:thread_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

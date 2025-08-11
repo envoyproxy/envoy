@@ -8,7 +8,6 @@
 #include "source/extensions/filters/network/http_connection_manager/config.h"
 
 #include "test/extensions/filters/network/http_connection_manager/config.pb.h"
-#include "test/extensions/filters/network/http_connection_manager/config.pb.validate.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"

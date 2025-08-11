@@ -1,6 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/config/cluster/v3/cluster.pb.validate.h"
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 

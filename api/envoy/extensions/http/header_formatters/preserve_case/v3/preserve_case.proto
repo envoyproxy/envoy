@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.http.header_formatters.preserve_case.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.http.header_formatters.preserve_case.v3";
 option java_outer_classname = "PreserveCaseProto";
@@ -35,5 +35,5 @@ message PreserveCaseFormatterConfig {
   // Type of formatter to use on headers which are added by Envoy (which are lower case by default).
   // The default type is DEFAULT, use LowerCase on Envoy headers.
   FormatterTypeOnEnvoyHeaders formatter_type_on_envoy_headers = 2
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
-#include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.validate.h"
 
 #include "source/extensions/filters/http/common/factory_base.h"
 

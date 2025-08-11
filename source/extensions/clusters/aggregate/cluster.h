@@ -3,7 +3,6 @@
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/thread_local/thread_local_object.h"
 #include "envoy/upstream/thread_local_cluster.h"

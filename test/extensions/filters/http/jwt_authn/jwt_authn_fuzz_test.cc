@@ -1,7 +1,5 @@
 #include <memory>
 
-#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
-
 #include "source/common/common/regex.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/router/string_accessor_impl.h"
@@ -9,7 +7,6 @@
 #include "source/extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
-#include "test/extensions/filters/http/jwt_authn/jwt_authn_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/server/factory_context.h"
 

@@ -1,6 +1,5 @@
 #include "envoy/config/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
 #include "source/extensions/filters/network/rbac/config.h"
 #include "source/extensions/filters/network/rbac/rbac_filter.h"

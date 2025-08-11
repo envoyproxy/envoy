@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3/header_to_metadata.pb.validate.h"
 
 #include "source/extensions/filters/network/thrift_proxy/filters/factory_base.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/header_to_metadata/header_to_metadata_filter.h"

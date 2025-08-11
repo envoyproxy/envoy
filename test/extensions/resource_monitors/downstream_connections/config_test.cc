@@ -1,5 +1,4 @@
 #include "envoy/extensions/resource_monitors/downstream_connections/v3/downstream_connections.pb.h"
-#include "envoy/extensions/resource_monitors/downstream_connections/v3/downstream_connections.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/resource_monitors/downstream_connections/config.h"

@@ -10,7 +10,7 @@ import "google/protobuf/struct.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "XrayProto";
@@ -100,7 +100,7 @@ message XRayConfig {
   core.v3.SocketAddress daemon_endpoint = 1;
 
   // The name of the X-Ray segment.
-  string segment_name = 2 [(validate.rules).string = {min_len: 1}];
+  string segment_name = 2 [(buf.validate.field).string.min_len = 1];
 
   // The location of a local custom sampling rules JSON file.
   // For an example of the sampling rules see:

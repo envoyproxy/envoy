@@ -9,7 +9,7 @@ import "google/protobuf/struct.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "SubstitutionFormatStringProto";
@@ -35,7 +35,7 @@ message JsonFormatOptions {
 // [#next-free-field: 8]
 message SubstitutionFormatString {
   oneof format {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Specify a format with command operators to form a text string.
     // Its details is described in :ref:`format string<config_access_log_format_strings>`.
@@ -79,7 +79,7 @@ message SubstitutionFormatString {
     //    "message": "My error message"
     //  }
     //
-    google.protobuf.Struct json_format = 2 [(validate.rules).message = {required: true}];
+    google.protobuf.Struct json_format = 2 [(buf.validate.field).required = true];
 
     // Specify a format with command operators to form a text string.
     // Its details is described in :ref:`format string<config_access_log_format_strings>`.
@@ -123,8 +123,7 @@ message SubstitutionFormatString {
   //
   //   content_type: "text/html; charset=UTF-8"
   //
-  string content_type = 4
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+  string content_type = 4;
 
   // Specifies a collection of Formatter plugins that can be called from the access log configuration.
   // See the formatters extensions documentation for details.

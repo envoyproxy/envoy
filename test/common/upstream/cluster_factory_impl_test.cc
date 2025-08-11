@@ -16,7 +16,6 @@
 #include "source/server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
-#include "test/integration/clusters/cluster_factory_config.pb.validate.h"
 #include "test/integration/clusters/custom_static_cluster.h"
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"

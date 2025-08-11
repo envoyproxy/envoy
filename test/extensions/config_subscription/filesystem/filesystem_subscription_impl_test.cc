@@ -1,7 +1,6 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/listener/v3/listener.pb.h"
-#include "envoy/config/listener/v3/listener.pb.validate.h"
 
 #include "test/extensions/config_subscription/filesystem/filesystem_subscription_test_harness.h"
 #include "test/mocks/event/mocks.h"

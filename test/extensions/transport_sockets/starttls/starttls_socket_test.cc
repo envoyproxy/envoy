@@ -2,7 +2,6 @@
 #include <gtest/gtest.h>
 
 #include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.h"
-#include "envoy/extensions/transport_sockets/starttls/v3/starttls.pb.validate.h"
 #include "envoy/network/connection.h"
 
 #include "source/common/network/transport_socket_options_impl.h"

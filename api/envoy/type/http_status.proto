@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.type;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type";
 option java_outer_classname = "HttpStatusProto";
@@ -136,5 +136,5 @@ enum StatusCode {
 // HTTP status.
 message HttpStatus {
   // Supplies HTTP response code.
-  StatusCode code = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+  StatusCode code = 1 [(buf.validate.field).enum = {defined_only: true not_in: 0}];
 }

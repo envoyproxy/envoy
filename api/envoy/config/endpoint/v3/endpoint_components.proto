@@ -14,7 +14,7 @@ import "xds/core/v3/collection_entry.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.endpoint.v3";
 option java_outer_classname = "EndpointComponentsProto";
@@ -39,7 +39,7 @@ message Endpoint {
     // as the host's serving address port. This provides an alternative health
     // check port. Setting this with a non-zero value allows an upstream host
     // to have different health check address port.
-    uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
+    uint32 port_value = 1 [(buf.validate.field).uint32.lte = 65535];
 
     // By default, the host header for L7 health checks is controlled by cluster level configuration
     // (see: :ref:`host <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.host>` and
@@ -133,7 +133,7 @@ message LbEndpoint {
   // LocalityLbEndpoints. If unspecified, will be treated as 1. The sum
   // of the weights of all endpoints in the endpoint's locality must not
   // exceed uint32_t maximal value (4294967295).
-  google.protobuf.UInt32Value load_balancing_weight = 4 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value load_balancing_weight = 4 [(buf.validate.field).uint32.gte = 1];
 }
 
 // LbEndpoint list collection. Entries are `LbEndpoint` resources or references.
@@ -206,7 +206,7 @@ message LocalityLbEndpoints {
   // configured. These weights are ignored otherwise. If no weights are
   // specified when locality weighted load balancing is enabled, the locality is
   // assigned no load.
-  google.protobuf.UInt32Value load_balancing_weight = 3 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value load_balancing_weight = 3 [(buf.validate.field).uint32.gte = 1];
 
   // Optional: the priority for this LocalityLbEndpoints. If unspecified this will
   // default to the highest priority (0).
@@ -217,7 +217,7 @@ message LocalityLbEndpoints {
   // next highest priority group. Read more at :ref:`priority levels <arch_overview_load_balancing_priority_levels>`.
   //
   // Priorities should range from 0 (highest) to N (lowest) without skipping.
-  uint32 priority = 5 [(validate.rules).uint32 = {lte: 128}];
+  uint32 priority = 5 [(buf.validate.field).uint32.lte = 128];
 
   // Optional: Per locality proximity value which indicates how close this
   // locality is from the source locality. This value only provides ordering

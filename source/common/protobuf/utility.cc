@@ -13,6 +13,7 @@
 #include "source/common/protobuf/deterministic_hash.h"
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/protovalidate_util.h"
 #include "source/common/protobuf/visitor.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -369,16 +370,9 @@ public:
   absl::Status onMessage(const Protobuf::Message& message,
                          absl::Span<const Protobuf::Message* const>,
                          bool was_any_or_top_level) override {
-    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
-    std::string err;
-    // PGV verification is itself recursive up to the point at which it hits an Any message. As
-    // such, to avoid N^2 checking of the tree, we only perform an additional check at the point
-    // at which PGV would have stopped because it does not itself check within Any messages.
-    if (was_any_or_top_level &&
-        !pgv::BaseValidator::AbstractCheckMessage(*reflectable_message, &err)) {
-      std::string error = fmt::format("{}: Proto constraint validation failed ({})",
-                                      reflectable_message->DebugString(), err);
-      return absl::InvalidArgumentError(error);
+    // Perform protovalidate validation on top-level and Any messages.
+    if (was_any_or_top_level) {
+      return ProtobufMessage::ProtovalidateUtil::validate(message);
     }
     return absl::OkStatus();
   }

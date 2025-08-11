@@ -9,7 +9,7 @@ import "google/protobuf/struct.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.thrift_to_metadata.v3";
 option java_outer_classname = "ThriftToMetadataProto";
@@ -59,7 +59,7 @@ message KeyValuePair {
   string metadata_namespace = 1;
 
   // The key to use within the namespace.
-  string key = 2 [(validate.rules).string = {min_len: 1}];
+  string key = 2 [(buf.validate.field).string.min_len = 1];
 
   // When used for on_present case, if value is non-empty it'll be used instead
   // of the field value.
@@ -72,10 +72,10 @@ message FieldSelector {
   option (xds.annotations.v3.message_status).work_in_progress = true;
 
   // field name to log
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // field id to match
-  int32 id = 2 [(validate.rules).int32 = {lte: 32767 gte: -32768}];
+  int32 id = 2 [(buf.validate.field).int32 = {lte: 32767 gte: -32768}];
 
   // next node of the field selector
   FieldSelector child = 3;
@@ -157,7 +157,7 @@ message ThriftToMetadata {
   // Supplies the type of transport that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`.
   network.thrift_proxy.v3.TransportType transport = 3
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // Supplies the type of protocol that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`.
@@ -166,7 +166,7 @@ message ThriftToMetadata {
   // which is the same with :ref:`thrift_proxy network filter <envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.ThriftProxy>`.
   // Note that :ref:`TWITTER<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.TWITTER>` is
   // not supported due to deprecation in envoy.
-  network.thrift_proxy.v3.ProtocolType protocol = 4 [(validate.rules).enum = {defined_only: true}];
+  network.thrift_proxy.v3.ProtocolType protocol = 4 [(buf.validate.field).enum.defined_only = true];
 
   // Allowed content-type for thrift payload to filter metadata transformation.
   // Default to ``{"application/x-thrift"}``.
@@ -174,7 +174,7 @@ message ThriftToMetadata {
   // Set ``allow_empty_content_type`` if empty/missing content-type header
   // is allowed.
   repeated string allow_content_types = 5
-      [(validate.rules).repeated = {items {string {min_len: 1}}}];
+      [(buf.validate.field).repeated = {items {string {min_len: 1}}}];
 
   // Allowed empty content-type for thrift payload to filter metadata transformation.
   // Default to false.

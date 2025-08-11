@@ -1,6 +1,5 @@
 #if defined(__linux__)
 #include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
-#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.validate.h"
 #include "envoy/extensions/transport_sockets/tcp_stats/v3/tcp_stats.pb.h"
 
 #include "test/integration/integration.h"

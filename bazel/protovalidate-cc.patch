@@ -1,0 +1,55 @@
+--- protovalidate-cc-0.8.0/buf/validate/internal/rules.h	2025-06-13 10:36:43
++++ protovalidate-cc-0.8.0-patched/buf/validate/internal/rules.h	2025-08-06 10:20:26
+@@ -43,10 +43,10 @@
+         field_(desc),
+         mapEntryField_(desc->containing_type()->options().map_entry()),
+         ignoreEmpty_(
+-            field.ignore() == IGNORE_IF_DEFAULT_VALUE || field.ignore() == IGNORE_IF_UNPOPULATED ||
++            field.ignore() == IGNORE_IF_ZERO_VALUE || field.ignore() == IGNORE_ALWAYS ||
+             (desc->has_presence() && !mapEntryField_)),
+         ignoreDefault_(
+-            field.ignore() == IGNORE_IF_DEFAULT_VALUE && (desc->has_presence() && !mapEntryField_)),
++            field.ignore() == IGNORE_IF_ZERO_VALUE && (desc->has_presence() && !mapEntryField_)),
+         required_(field.required()),
+         anyRules_(anyRules) {}
+ 
+--- protovalidate-cc-0.8.0/buf/validate/internal/validation_rules.h	2025-06-13 10:36:43
++++ protovalidate-cc-0.8.0-patched/buf/validate/internal/validation_rules.h	2025-08-06 10:20:28
+@@ -61,32 +61,32 @@
+   }
+ 
+   void appendFieldPathElement(const FieldPathElement& element, int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       *violations[i].proto_.mutable_field()->mutable_elements()->Add() = element;
+     }
+   }
+ 
+   void appendRulePathElement(std::initializer_list<FieldPathElement> suffix, int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       auto* elements = violations[i].proto_.mutable_rule()->mutable_elements();
+       std::copy(suffix.begin(), suffix.end(), RepeatedPtrFieldBackInserter(elements));
+     }
+   }
+ 
+   void setFieldValue(ProtoField field, int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       violations[i].fieldValue_ = field;
+     }
+   }
+ 
+   void setRuleValue(ProtoField rule, int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       violations[i].ruleValue_ = rule;
+     }
+   }
+ 
+   void setForKey(int start) {
+-    for (int i = start; i < violations.size(); i++) {
++    for (size_t i = static_cast<size_t>(start); i < violations.size(); i++) {
+       violations[i].proto_.set_for_key(true);
+     }
+   }

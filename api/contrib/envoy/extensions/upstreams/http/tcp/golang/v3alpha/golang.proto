@@ -7,7 +7,7 @@ import "google/protobuf/any.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.upstreams.http.tcp.golang.v3alpha";
 option java_outer_classname = "GolangProto";
@@ -26,18 +26,18 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension-category: envoy.upstreams]
 message Config {
   // Globally unique ID for a dynamic library file.
-  string library_id = 1 [(validate.rules).string = {min_len: 1}];
+  string library_id = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Path to a dynamic library implementing the
   // :repo:`HttpTcpBridge API <contrib/golang/common/go/api.HttpTcpBridge>`
   // interface.
-  string library_path = 2 [(validate.rules).string = {min_len: 1}];
+  string library_path = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // Globally unique name of the Go plugin.
   //
   // This name **must** be consistent with the name registered in ``tcp::RegisterHttpTcpBridgeFactoryAndConfigParser``
   //
-  string plugin_name = 3 [(validate.rules).string = {min_len: 1}];
+  string plugin_name = 3 [(buf.validate.field).string = {min_len: 1}];
 
   // Configuration for the Go plugin.
   //

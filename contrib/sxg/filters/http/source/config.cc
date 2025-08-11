@@ -10,7 +10,6 @@
 #include "source/common/protobuf/utility.h"
 
 #include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.h"
-#include "contrib/envoy/extensions/filters/http/sxg/v3alpha/sxg.pb.validate.h"
 #include "contrib/sxg/filters/http/source/encoder.h"
 #include "contrib/sxg/filters/http/source/filter.h"
 

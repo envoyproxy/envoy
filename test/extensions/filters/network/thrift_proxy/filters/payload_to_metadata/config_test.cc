@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3/payload_to_metadata.pb.validate.h"
 
 #include "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/config.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/payload_to_metadata_filter.h"
