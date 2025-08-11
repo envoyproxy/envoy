@@ -70,6 +70,9 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: geoip_providers
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.mmdb_files_reload_enabled`` and legacy code paths.
 - area: proxy_protocol
   change: |
     Removed runtime guard ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` and legacy code paths.
