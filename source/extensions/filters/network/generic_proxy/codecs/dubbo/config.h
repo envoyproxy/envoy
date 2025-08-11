@@ -165,9 +165,12 @@ public:
 
   void decode(Buffer::Instance& buffer, bool) override {
     decoding_buffer_.move(buffer);
-    if (decoding_buffer_.length() > callback_->connection()->bufferLimit()) {
-      callback_->onDecodingFailure();
-      return;
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.generic_proxy_codec_buffer_limit")) {
+      if (decoding_buffer_.length() > callback_->connection()->bufferLimit()) {
+        callback_->onDecodingFailure();
+        return;
+      }
     }
     while (decoding_buffer_.length() > 0) {
       // Continue decoding if the buffer has more data and the previous decoding is
