@@ -54,10 +54,10 @@ jobs:
       request: ${{ needs.load.outputs.request }}
       # TODO: Remove these hardcoded branches when no longer supported
       runs-on: >-
-        ${{ (contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.31')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.32')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.33')
-             || contains(fromJSON(needs.load.outputs.request).request.target-branch, 'v1.34'))
+        ${{ (contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.31')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.32')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.33')
+             || contains(fromJSON(needs.load.outputs.request).request.target-branch, '1.34'))
             && 'macos-14-xlarge'
             || 'macos-15-xlarge' }}
       source: ${{ matrix.source }}
