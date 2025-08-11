@@ -208,7 +208,8 @@ public:
             {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost},
             {"clearRouteCache", static_luaClearRouteCache},
             {"filterContext", static_luaFilterContext},
-            {"virtualHost", static_luaVirtualHost}};
+            {"virtualHost", static_luaVirtualHost},
+            {"route", static_luaRoute}};
   }
 
 private:
@@ -350,6 +351,11 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVirtualHost);
 
+  /**
+   * @return a handle to the route.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRoute);
+
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
@@ -375,6 +381,7 @@ private:
     public_key_wrapper_.reset();
     connection_stream_info_wrapper_.reset();
     virtual_host_wrapper_.reset();
+    route_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -405,6 +412,7 @@ private:
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
   Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> virtual_host_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> route_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
