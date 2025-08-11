@@ -233,27 +233,5 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
       });
 }
 
-absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                           Upstream::ClusterFactoryContext& context) {
-  absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>> cluster_or_error;
-  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
-  RETURN_IF_NOT_OK(dns_resolver_or_error.status());
-
-  envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
-  createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
-  cluster_or_error = StrictDnsClusterImpl::create(cluster, proto_config_legacy, context,
-                                                  std::move(*dns_resolver_or_error));
-
-  RETURN_IF_NOT_OK(cluster_or_error.status());
-  return std::make_pair(std::shared_ptr<StrictDnsClusterImpl>(std::move(*cluster_or_error)),
-                        nullptr);
-}
-
-/**
- * Static registration for the strict dns cluster factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(StrictDnsClusterFactory, ClusterFactory);
-
 } // namespace Upstream
 } // namespace Envoy

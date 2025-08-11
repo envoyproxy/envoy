@@ -2694,7 +2694,7 @@ TEST_F(RouterTest, RetryRequestBeforeBody) {
 
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
@@ -2747,7 +2747,7 @@ TEST_F(RouterTest, RetryRequestDuringBody) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1), false));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -2805,7 +2805,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyDataBetweenAttemptsNotEndStream) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1 + body2), false));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -2888,7 +2888,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyCompleteBetweenAttempts) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1 + body2), true));
   router_->retry_state_->callback_();
   EXPECT_EQ(2U,
@@ -2938,7 +2938,7 @@ TEST_F(RouterTest, RetryRequestDuringBodyTrailerBetweenAttempts) {
   NiceMock<Http::MockRequestEncoder> encoder2;
   expectNewStreamWithImmediateEncoder(encoder2, &response_decoder, Http::Protocol::Http10);
 
-  EXPECT_CALL(encoder2, encodeHeaders(HeaderHasValueRef("myheader", "present"), false));
+  EXPECT_CALL(encoder2, encodeHeaders(ContainsHeader("myheader", "present"), false));
   EXPECT_CALL(encoder2, encodeData(BufferStringEqual(body1), false));
   EXPECT_CALL(encoder2, encodeTrailers(HeaderMapEqualRef(&trailers)));
   router_->retry_state_->callback_();
@@ -4733,9 +4733,8 @@ protected:
 INSTANTIATE_TEST_SUITE_P(StreamingShadow, RouterShadowingTest, testing::Bool());
 
 TEST_P(RouterShadowingTest, BufferingShadowWithClusterHeader) {
-  if (streaming_shadow_) {
-    GTEST_SKIP();
-  }
+  // Always skip this test as streaming_shadow is now always enabled
+  GTEST_SKIP();
   ShadowPolicyPtr policy = makeShadowPolicy("", "some_header", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
@@ -4811,9 +4810,8 @@ TEST_P(RouterShadowingTest, ShadowNoClusterHeaderInHeader) {
   router_->decodeHeaders(headers, false);
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-  if (!streaming_shadow_) {
-    EXPECT_CALL(callbacks_, addDecodedData(_, true));
-  }
+  // With streaming shadows always enabled, we never call addDecodedData.
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -4852,9 +4850,8 @@ TEST_P(RouterShadowingTest, ShadowClusterNameEmptyInHeader) {
   router_->decodeHeaders(headers, false);
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-  if (!streaming_shadow_) {
-    EXPECT_CALL(callbacks_, addDecodedData(_, true));
-  }
+  // With streaming shadows always enabled, we never call addDecodedData.
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -4930,73 +4927,8 @@ TEST_P(RouterShadowingTest, StreamingShadow) {
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
   EXPECT_CALL(callbacks_, decodingBuffer()).Times(0);
-  EXPECT_CALL(foo_request, captureAndSendTrailers_(Http::HeaderValueOf("some", "trailer")));
-  EXPECT_CALL(fizz_request, captureAndSendTrailers_(Http::HeaderValueOf("some", "trailer")));
-  router_->decodeTrailers(trailers);
-  EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-}
-
-TEST_P(RouterShadowingTest, BufferingShadow) {
-  if (streaming_shadow_) {
-    GTEST_SKIP();
-  }
-  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
-  policy = makeShadowPolicy("fizz", "", "buzz", envoy::type::v3::FractionalPercent(), false);
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
-  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
-
-  NiceMock<Http::MockRequestEncoder> encoder;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
-
-  expectResponseTimerCreate();
-
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
-                     43))
-      .WillOnce(Return(true));
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("buzz",
-                     testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)), 43))
-      .WillOnce(Return(true));
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, false);
-
-  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
-
-  Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
-  EXPECT_CALL(callbacks_, decodingBuffer())
-      .Times(AtLeast(2))
-      .WillRepeatedly(Return(body_data.get()));
-  EXPECT_CALL(*shadow_writer_, shadow_("foo", _, _))
-      .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
-                          const Http::AsyncClient::RequestOptions& options) -> void {
-        EXPECT_NE(request->body().length(), 0);
-        EXPECT_NE(nullptr, request->trailers());
-        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_.value());
-      }));
-  EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, _))
-      .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
-                          const Http::AsyncClient::RequestOptions& options) -> void {
-        EXPECT_NE(request->body().length(), 0);
-        EXPECT_NE(nullptr, request->trailers());
-        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_FALSE(options.sampled_.value());
-      }));
+  EXPECT_CALL(foo_request, captureAndSendTrailers_(ContainsHeader("some", "trailer")));
+  EXPECT_CALL(fizz_request, captureAndSendTrailers_(ContainsHeader("some", "trailer")));
   router_->decodeTrailers(trailers);
   EXPECT_EQ(1U,
             callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
@@ -5024,53 +4956,6 @@ TEST_P(RouterShadowingTest, NoShadowForConnect) {
   router_->onDestroy();
 }
 
-// If the shadow stream watermark callbacks are invoked in the Router filter destructor,
-// it causes a potential use-after-free bug, as the FilterManager may have already been freed.
-TEST_P(RouterShadowingTest, ShadowCallbacksNotCalledInDestructor) {
-  if (!streaming_shadow_) {
-    GTEST_SKIP();
-  }
-  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
-  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
-
-  NiceMock<Http::MockRequestEncoder> encoder;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
-
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
-                     43))
-      .WillOnce(Return(true));
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  NiceMock<Http::MockAsyncClient> foo_client;
-  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
-  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
-      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
-                           const Http::AsyncClient::RequestOptions& options) {
-        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_.value());
-        return &foo_request;
-      }));
-  router_->decodeHeaders(headers, false);
-
-  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-  EXPECT_CALL(callbacks_, addDecodedData(_, _)).Times(0);
-  EXPECT_CALL(foo_request, sendData(BufferStringEqual("hello"), false));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
-
-  // Guarantee that callbacks are invoked in onDestroy instead of destructor.
-  {
-    EXPECT_CALL(foo_request, removeWatermarkCallbacks());
-    EXPECT_CALL(foo_request, cancel());
-    router_->onDestroy();
-  }
-  EXPECT_CALL(foo_request, removeWatermarkCallbacks()).Times(0);
-  EXPECT_CALL(foo_request, cancel()).Times(0);
-}
-
 TEST_P(RouterShadowingTest, ShadowRequestCarriesParentContext) {
   ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
@@ -5090,31 +4975,18 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesParentContext) {
   NiceMock<Http::MockAsyncClient> foo_client;
   NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
 
-  if (streaming_shadow_) {
-    EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
-        .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
-                             const Http::AsyncClient::RequestOptions& options) {
-          EXPECT_NE(options.parent_context.stream_info, nullptr);
-          EXPECT_EQ(callbacks_.streamInfo().route(), options.parent_context.stream_info->route());
-          return &foo_request;
-        }));
-  } else {
-    EXPECT_CALL(*shadow_writer_, shadow_("foo", _, _))
-        .WillOnce(Invoke([&](const std::string&, Http::RequestMessagePtr&,
-                             const Http::AsyncClient::RequestOptions& options) {
-          EXPECT_NE(options.parent_context.stream_info, nullptr);
-          EXPECT_EQ(callbacks_.streamInfo().route(), options.parent_context.stream_info->route());
-          return &foo_request;
-        }));
-  }
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr&,
+                           const Http::AsyncClient::RequestOptions& options) {
+        EXPECT_NE(options.parent_context.stream_info, nullptr);
+        EXPECT_EQ(callbacks_.streamInfo().route(), options.parent_context.stream_info->route());
+        return &foo_request;
+      }));
 
-  const auto should_end_stream = !streaming_shadow_;
-  router_->decodeHeaders(headers, should_end_stream);
+  router_->decodeHeaders(headers, false);
 
-  if (streaming_shadow_) {
-    EXPECT_CALL(foo_request, removeWatermarkCallbacks());
-    EXPECT_CALL(foo_request, cancel());
-  }
+  EXPECT_CALL(foo_request, removeWatermarkCallbacks());
+  EXPECT_CALL(foo_request, cancel());
 
   router_->onDestroy();
 }

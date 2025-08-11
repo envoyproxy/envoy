@@ -123,12 +123,9 @@ void SamplingController::calculateSamplingExponents(
     return;
   }
 
-  // number of requests which are allowed for every entry
-  const uint32_t allowed_per_entry = total_wanted / top_k_size;
-
   for (auto& counter : top_k) {
     // allowed multiplicity for this entry
-    auto wanted_multiplicity = counter.getValue() / allowed_per_entry;
+    auto wanted_multiplicity = counter.getValue() * top_k_size / total_wanted;
     auto sampling_state = new_sampling_exponents.find(counter.getItem());
     // sampling exponent has to be a power of 2. Find the exponent to have multiplicity near to
     // wanted_multiplicity

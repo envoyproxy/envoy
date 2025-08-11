@@ -81,20 +81,5 @@ private:
   bool weighted_priority_health_;
 };
 
-/**
- * Factory for StrictDnsClusterImpl
- */
-class StrictDnsClusterFactory : public ClusterFactoryImplBase {
-public:
-  StrictDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
-
-private:
-  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
-};
-
-DECLARE_FACTORY(StrictDnsClusterFactory);
-
 } // namespace Upstream
 } // namespace Envoy

@@ -619,6 +619,7 @@ class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
                            public DirectResponseEntry,
                            public PathMatchCriterion,
+                           public Matcher::ActionBase<envoy::config::route::v3::Route>,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
 protected:
@@ -846,26 +847,24 @@ private:
   };
 
   /**
-   * Returns a vector of request header parsers which applied or will apply header transformations
+   * Returns an array of request header parsers which applied or will apply header transformations
    * to the request in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of request header parsers.
+   * @return an array of request header parsers.
    */
-  absl::InlinedVector<const HeaderParser*, 3>
-  getRequestHeaderParsers(bool specificity_ascend) const;
+  std::array<const HeaderParser*, 3> getRequestHeaderParsers(bool specificity_ascend) const;
 
   /**
-   * Returns a vector of response header parsers which applied or will apply header transformations
+   * Returns an array of response header parsers which applied or will apply header transformations
    * to the response in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of request header parsers.
+   * @return an array of request header parsers.
    */
-  absl::InlinedVector<const HeaderParser*, 3>
-  getResponseHeaderParsers(bool specificity_ascend) const;
+  std::array<const HeaderParser*, 3> getResponseHeaderParsers(bool specificity_ascend) const;
 
   std::unique_ptr<const RuntimeData>
   loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
@@ -1193,9 +1192,9 @@ private:
 // Registered factory for RouteMatchAction.
 class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, RouteActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::route::v3::Route>();
@@ -1219,9 +1218,9 @@ private:
 // Registered factory for RouteListMatchAction.
 class RouteListMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, RouteActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route_match_action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::route::v3::RouteList>();

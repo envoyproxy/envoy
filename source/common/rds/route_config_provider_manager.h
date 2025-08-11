@@ -45,20 +45,15 @@ public:
 
     uint64_t manager_identifier;
 
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.normalize_rds_provider_config")) {
-      // Normalize the config_source part of the passed config. Some parts of the config_source
-      // do not affect selection of the RDS provider. They will be cleared (zeroed) and restored
-      // after calculating hash.
-      // Since rds is passed as const, the constness must be casted away before modifying rds.
-      auto* orig_initial_timeout =
-          const_cast<RdsConfig&>(rds).mutable_config_source()->release_initial_fetch_timeout();
-      manager_identifier = MessageUtil::hash(rds);
-      const_cast<RdsConfig&>(rds).mutable_config_source()->set_allocated_initial_fetch_timeout(
-          orig_initial_timeout);
-
-    } else {
-      manager_identifier = MessageUtil::hash(rds);
-    }
+    // Normalize the config_source part of the passed config. Some parts of the config_source
+    // do not affect selection of the RDS provider. They will be cleared (zeroed) and restored
+    // after calculating hash.
+    // Since rds is passed as const, the constness must be casted away before modifying rds.
+    auto* orig_initial_timeout =
+        const_cast<RdsConfig&>(rds).mutable_config_source()->release_initial_fetch_timeout();
+    manager_identifier = MessageUtil::hash(rds);
+    const_cast<RdsConfig&>(rds).mutable_config_source()->set_allocated_initial_fetch_timeout(
+        orig_initial_timeout);
 
     auto existing_provider =
         reuseDynamicProvider(manager_identifier, init_manager, route_config_name);

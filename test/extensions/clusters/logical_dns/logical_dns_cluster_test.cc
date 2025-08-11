@@ -13,6 +13,7 @@
 
 #include "source/common/network/utility.h"
 #include "source/common/singleton/manager_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 #include "source/extensions/clusters/common/dns_cluster_backcompat.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
 #include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
@@ -29,6 +30,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -59,7 +61,7 @@ protected:
     envoy::config::cluster::v3::Cluster cluster_config = parseClusterFromV3Yaml(yaml);
     Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
                                                                false);
-    absl::StatusOr<std::unique_ptr<LogicalDnsCluster>> status_or_cluster;
+    absl::StatusOr<std::unique_ptr<ClusterImplBase>> status_or_cluster;
 
     envoy::extensions::clusters::dns::v3::DnsCluster dns_cluster{};
     if (cluster_config.has_cluster_type()) {
@@ -76,8 +78,15 @@ protected:
       createDnsClusterFromLegacyFields(cluster_config, dns_cluster);
     }
 
-    status_or_cluster =
-        LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    // Here we tell the DnsClusterImpl it's going to behave like a logic DNS cluster:
+    dns_cluster.set_all_addresses_in_single_endpoint(true);
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+      status_or_cluster =
+          DnsClusterImpl::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    } else {
+      status_or_cluster =
+          LogicalDnsCluster::create(cluster_config, dns_cluster, factory_context, dns_resolver_);
+    }
     THROW_IF_NOT_OK_REF(status_or_cluster.status());
     cluster_ = std::move(*status_or_cluster);
     priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
@@ -100,7 +109,12 @@ protected:
     auto status_or_cluster = ClusterFactoryImplBase::create(cluster_config, server_context_,
                                                             resolver_fn, nullptr, false);
     if (status_or_cluster.ok()) {
-      cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_new_dns_implementation")) {
+        cluster_ = std::dynamic_pointer_cast<DnsClusterImpl>(status_or_cluster->first);
+      } else {
+        cluster_ = std::dynamic_pointer_cast<LogicalDnsCluster>(status_or_cluster->first);
+      }
       priority_update_cb_ = cluster_->prioritySet().addPriorityUpdateCb(
           [&](uint32_t, const HostVector&, const HostVector&) {
             membership_updated_.ready();
@@ -141,6 +155,16 @@ protected:
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
+    const auto previous_update_no_rebuild =
+        cluster_->info()->configUpdateStats().update_no_rebuild_.value();
+
+    EXPECT_CALL(*resolve_timer_, enableTimer(std::chrono::milliseconds(4000), _));
+    dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
+                  TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
+
+    EXPECT_EQ(previous_update_no_rebuild + 1,
+              cluster_->info()->configUpdateStats().update_no_rebuild_.value());
+
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
     EXPECT_EQ(1UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
     EXPECT_EQ(1UL,
@@ -167,11 +191,14 @@ protected:
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     resolve_timer_->invokeCallback();
 
-    // Should not cause any changes.
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+      EXPECT_CALL(membership_updated_, ready());
+    }
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
 
+    logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
     EXPECT_EQ("127.0.0.1:" + std::to_string(expected_port), logical_host->address()->asString());
@@ -208,9 +235,13 @@ protected:
 
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_, _));
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+      EXPECT_CALL(membership_updated_, ready());
+    }
     dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                   TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
 
+    logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_hc_port),
               logical_host->healthCheckAddress()->asString());
     EXPECT_EQ("127.0.0.3:" + std::to_string(expected_port), logical_host->address()->asString());
@@ -267,7 +298,8 @@ protected:
   Event::MockTimer* resolve_timer_;
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
-  std::shared_ptr<LogicalDnsCluster> cluster_;
+  std::shared_ptr<ClusterImplBase> cluster_;
+  TestScopedRuntime scoped_runtime_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Common::CallbackHandlePtr priority_update_cb_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -275,35 +307,39 @@ protected:
 
 namespace {
 using LogicalDnsConfigTuple =
-    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>>;
+    std::tuple<std::string, Network::DnsLookupFamily, std::list<std::string>, std::string>;
 std::vector<LogicalDnsConfigTuple> generateLogicalDnsParams() {
   std::vector<LogicalDnsConfigTuple> dns_config;
   {
     std::string family_yaml("");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: v4_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V4Only);
     std::list<std::string> dns_response{"127.0.0.1", "127.0.0.2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: v6_only
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::V6Only);
     std::list<std::string> dns_response{"::1", "::2"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
   }
   {
     std::string family_yaml(R"EOF(dns_lookup_family: auto
                             )EOF");
     Network::DnsLookupFamily family(Network::DnsLookupFamily::Auto);
     std::list<std::string> dns_response{"::1"};
-    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "false"));
+    dns_config.push_back(std::make_tuple(family_yaml, family, dns_response, "true"));
   }
   return dns_config;
 }
@@ -318,6 +354,9 @@ INSTANTIATE_TEST_SUITE_P(DnsParam, LogicalDnsParamTest,
 // constructor, we have the expected host state and initialization callback
 // invocation.
 TEST_P(LogicalDnsParamTest, ImmediateResolve) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
+
   const std::string yaml = R"EOF(
   name: name
   connect_timeout: 0.25s
@@ -354,7 +393,16 @@ TEST_P(LogicalDnsParamTest, ImmediateResolve) {
       HealthCheckHostMonitor::UnhealthyType::ImmediateHealthCheckFail);
 }
 
-TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+class LogicalDnsImplementationsTest : public LogicalDnsClusterTest,
+                                      public testing::WithParamInterface<const char*> {};
+
+INSTANTIATE_TEST_SUITE_P(DnsImplementations, LogicalDnsImplementationsTest,
+                         testing::ValuesIn({"true", "false"}));
+
+TEST_P(LogicalDnsImplementationsTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -402,7 +450,10 @@ TEST_F(LogicalDnsParamTest, FailureRefreshRateBackoffResetsWhenSuccessHappens) {
   dns_callback_(Network::DnsResolver::ResolutionStatus::Failure, "", {});
 }
 
-TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
+TEST_P(LogicalDnsImplementationsTest, TtlAsDnsRefreshRate) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+
   const std::string yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -444,7 +495,9 @@ TEST_F(LogicalDnsParamTest, TtlAsDnsRefreshRate) {
                 TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
 }
 
-TEST_F(LogicalDnsClusterTest, BadConfig) {
+TEST_P(LogicalDnsImplementationsTest, BadConfig) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string multiple_hosts_yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -692,10 +745,26 @@ TEST_F(LogicalDnsClusterTest, BadConfig) {
 
   EXPECT_EQ(factorySetupFromV3Yaml(custom_resolver_cluster_type_yaml).message(),
             "LOGICAL_DNS clusters must NOT have a custom resolver name set");
+
+  const std::string no_load_assignment_yaml = R"EOF(
+    name: name
+    cluster_type:
+      name: abc
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+        all_addresses_in_single_endpoint: true
+    connect_timeout: 0.25s
+    lb_policy: ROUND_ROBIN
+    )EOF";
+
+  EXPECT_EQ(factorySetupFromV3Yaml(no_load_assignment_yaml).message(),
+            "LOGICAL_DNS clusters must have a single host");
 }
 
 // Test using both types of names in the cluster type.
-TEST_F(LogicalDnsClusterTest, UseDnsExtension) {
+TEST_P(LogicalDnsImplementationsTest, UseDnsExtension) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   cluster_type:
@@ -732,7 +801,9 @@ TEST_F(LogicalDnsClusterTest, UseDnsExtension) {
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 
-TEST_F(LogicalDnsClusterTest, TypedConfigBackcompat) {
+TEST_P(LogicalDnsImplementationsTest, TypedConfigBackcompat) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   cluster_type:
@@ -766,7 +837,9 @@ TEST_F(LogicalDnsClusterTest, TypedConfigBackcompat) {
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 
-TEST_F(LogicalDnsClusterTest, Basic) {
+TEST_P(LogicalDnsImplementationsTest, Basic) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string basic_yaml_hosts = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -819,7 +892,9 @@ TEST_F(LogicalDnsClusterTest, Basic) {
   testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 443, 8000);
 }
 
-TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
+TEST_P(LogicalDnsImplementationsTest, DontWaitForDNSOnInit) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -853,7 +928,9 @@ TEST_F(LogicalDnsClusterTest, DontWaitForDNSOnInit) {
                 TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 }
 
-TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
+TEST_P(LogicalDnsImplementationsTest, DNSRefreshHasJitter) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string config = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -893,7 +970,9 @@ TEST_F(LogicalDnsClusterTest, DNSRefreshHasJitter) {
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
 }
 
-TEST_F(LogicalDnsClusterTest, NegativeDnsJitter) {
+TEST_P(LogicalDnsImplementationsTest, NegativeDnsJitter) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   const std::string yaml = R"EOF(
   name: name
   type: LOGICAL_DNS
@@ -913,7 +992,9 @@ TEST_F(LogicalDnsClusterTest, NegativeDnsJitter) {
                           "(?s)Invalid duration: Expected positive duration:.*seconds: -1\n");
 }
 
-TEST_F(LogicalDnsClusterTest, ExtremeJitter) {
+TEST_P(LogicalDnsImplementationsTest, ExtremeJitter) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
   // When random returns large values, they were being reinterpreted as very negative values causing
   // negative refresh rates.
   const std::string jitter_yaml = R"EOF(
@@ -948,6 +1029,87 @@ TEST_F(LogicalDnsClusterTest, ExtremeJitter) {
   dns_callback_(
       Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+}
+
+// This test makes sure that the logical DNS cluster updates not only the
+// primary address of a host, but also the following addresses returned by
+// the DNS response. This is important for Happy Eyeballs.
+TEST_P(LogicalDnsImplementationsTest, LogicalDnsUpdatesEntireAddressList) {
+  scoped_runtime_.mergeValues(
+      {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
+  const std::string config = R"EOF(
+  name: name
+  cluster_type:
+    name: cluster1
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.dns.v3.DnsCluster
+      dns_refresh_rate: 4s
+      dns_lookup_family: V4_ONLY
+      all_addresses_in_single_endpoint: true # logical DNS
+  lb_policy: ROUND_ROBIN
+  load_assignment:
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: foo.bar.com
+                    port_value: 443
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  ASSERT_TRUE(factorySetupFromV3Yaml(config).ok());
+
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(*resolve_timer_, enableTimer(testing::Ge(std::chrono::milliseconds(3000)), _))
+      .Times(AnyNumber());
+
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}, std::chrono::seconds(3000)));
+
+  auto logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_CALL(server_context_.dispatcher_,
+              createClientConnection_(
+                  PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
+      .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
+  EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).Times(AnyNumber());
+
+  auto data = logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
+  ASSERT_NE(data.host_description_->addressListOrNull(), nullptr);
+  std::vector<std::string> expected_addresses = {"127.0.0.1:443", "127.0.0.2:443"};
+  std::vector<std::string> actual_addresses;
+  for (const auto& addr : *data.host_description_->addressListOrNull()) {
+    actual_addresses.push_back(addr->asString());
+  }
+  EXPECT_THAT(actual_addresses, ::testing::UnorderedElementsAreArray(expected_addresses));
+
+  expectResolve(Network::DnsLookupFamily::V4Only, "foo.bar.com");
+  resolve_timer_->invokeCallback();
+
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_new_dns_implementation")) {
+    EXPECT_CALL(membership_updated_, ready());
+  }
+
+  dns_callback_(
+      Network::DnsResolver::ResolutionStatus::Completed, "",
+      TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.3"}, std::chrono::seconds(3000)));
+
+  logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
+  EXPECT_CALL(server_context_.dispatcher_,
+              createClientConnection_(
+                  PointeesEq(*Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
+      .WillOnce(Return(new NiceMock<Network::MockClientConnection>()));
+  EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).Times(AnyNumber());
+  data = logical_host->createConnection(server_context_.dispatcher_, nullptr, nullptr);
+  ASSERT_NE(data.host_description_->addressListOrNull(), nullptr);
+  expected_addresses = {"127.0.0.1:443", "127.0.0.3:443"};
+  actual_addresses.clear();
+  for (const auto& addr : *data.host_description_->addressListOrNull()) {
+    actual_addresses.push_back(addr->asString());
+  }
+  EXPECT_THAT(actual_addresses, ::testing::UnorderedElementsAreArray(expected_addresses));
 }
 
 } // namespace
