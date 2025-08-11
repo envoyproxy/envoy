@@ -102,25 +102,8 @@ public:
                      "Already connected to an xDS server, skipping establishNewStream() call");
       return;
     }
-    if (!Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.xds_failover_to_primary_enabled")) {
-      // Allow stickiness, so if Envoy was ever connected to the primary source only
-      // retry to reconnect to the primary source, If Envoy was ever connected to the
-      // failover source then only retry to reconnect to the failover source.
-      if (previously_connected_to_ == ConnectedTo::Primary) {
-        ENVOY_LOG_MISC(
-            info, "Previously connected to the primary xDS source, attempting to reconnect to it");
-        connection_state_ = ConnectionState::ConnectingToPrimary;
-        primary_grpc_stream_->establishNewStream();
-        return;
-      } else if (previously_connected_to_ == ConnectedTo::Failover) {
-        ENVOY_LOG_MISC(
-            info, "Previously connected to the failover xDS source, attempting to reconnect to it");
-        connection_state_ = ConnectionState::ConnectingToFailover;
-        failover_grpc_stream_->establishNewStream();
-        return;
-      }
-    }
+    // Always try to connect to the primary first unless we're already connecting
+    // to the failover.
     // connection_state_ is either None, ConnectingToPrimary or
     // ConnectingToFailover. In the first 2 cases try to connect to the primary
     // (preferring the primary in the case of None), and in the third case
@@ -308,25 +291,7 @@ private:
       // This will be called when the failover stream fails to establish a connection, or after the
       // connection was closed.
       ASSERT(parent_.connectingToOrConnectedToFailover());
-      if (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.xds_failover_to_primary_enabled")) {
-        // If previously Envoy was connected to the failover, keep using that.
-        // Otherwise let the retry mechanism try to access the primary (similar
-        // to if the runtime flag was not set).
-        if (parent_.previously_connected_to_ == ConnectedTo::Failover) {
-          ENVOY_LOG(debug,
-                    "Failover xDS stream disconnected (either after establishing a connection or "
-                    "before). Attempting to reconnect to Failover because Envoy successfully "
-                    "connected to it previously.");
-          // Not closing the failover stream, allows it to use its retry timer
-          // to reconnect to the failover source.
-          // Next attempt will be to the failover after Envoy was already
-          // connected to it. Allowing to send the initial_resource_versions on reconnect.
-          parent_.grpc_mux_callbacks_.onEstablishmentFailure(true);
-          parent_.connection_state_ = ConnectionState::ConnectingToFailover;
-          return;
-        }
-      }
+      // After the failover connection disconnection, we always try to connect back to the primary.
       // Either this was an intentional disconnection from the failover source,
       // or unintentional. Either way, try to connect to the primary next.
       ENVOY_LOG(debug,

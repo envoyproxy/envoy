@@ -409,9 +409,6 @@ TEST_F(GrpcMuxFailoverTest, PrimaryOnlyAttemptsAfterPrimaryAvailable) {
 // will try to reconnect to the primary (and then failover), and keep
 // alternating between the two.
 TEST_F(GrpcMuxFailoverTest, AlternatingPrimaryAndFailoverAttemptsAfterFailoverAvailable) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.xds_failover_to_primary_enabled", "true"}});
   connectToFailover();
 
   // Emulate a 5 times disconnects.
@@ -447,34 +444,6 @@ TEST_F(GrpcMuxFailoverTest, AlternatingPrimaryAndFailoverAttemptsAfterFailoverAv
   // emulate a successful primary stream.
   EXPECT_CALL(failover_stream_, establishNewStream()).Times(0);
   EXPECT_CALL(primary_stream_, establishNewStream());
-  grpc_mux_failover_->establishNewStream();
-}
-
-// Validation that when envoy.reloadable_features.xds_failover_to_primary_enabled is disabled
-// and after the failover is available (a response is received), Envoy will only
-// try to reconnect to the failover.
-// This test will be removed once envoy.reloadable_features.xds_failover_to_primary_enabled
-// is deprecated.
-TEST_F(GrpcMuxFailoverTest, StickToFailoverAfterFailoverAvailable) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.xds_failover_to_primary_enabled", "false"}});
-  connectToFailover();
-
-  // Emulate 5 disconnects, and ensure the primary reconnection isn't attempted.
-  for (int attempt = 0; attempt < 5; ++attempt) {
-    // Emulate a failover source failure that will not result in an attempt to
-    // connect to the primary. It should not close the failover stream (so
-    // the retry mechanism will kick in).
-    EXPECT_CALL(failover_stream_, closeStream()).Times(0);
-    EXPECT_CALL(grpc_mux_callbacks_, onEstablishmentFailure(true));
-    EXPECT_CALL(primary_stream_, establishNewStream()).Times(0);
-    failover_callbacks_->onEstablishmentFailure(true);
-  }
-
-  // Emulate a call to establishNewStream() of the failover stream.
-  EXPECT_CALL(primary_stream_, establishNewStream()).Times(0);
-  EXPECT_CALL(failover_stream_, establishNewStream());
   grpc_mux_failover_->establishNewStream();
 }
 
