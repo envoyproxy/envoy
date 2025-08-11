@@ -1176,30 +1176,27 @@ virtual_hosts:
                      ->dynamic_route_configs()
                      .size());
 
-  for (bool normalize_config : std::vector<bool>({true, false})) {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.normalize_rds_provider_config",
-                                  normalize_config);
-    envoy::extensions::filters::network::http_connection_manager::v3::Rds rds2;
-    rds2 = rds_;
-    // The following is valid only when normalize_config is true:
-    // Modify parameters which should not affect the provider. In other words, the same provider
-    // should be picked, regardless of the fact that initial_fetch_timeout is different for both
-    // configs.
-    rds2.mutable_config_source()->mutable_initial_fetch_timeout()->set_seconds(
-        rds_.config_source().initial_fetch_timeout().seconds() + 1);
+  // Test that modifying the initial_fetch_timeout in the config_source doesn't affect
+  // provider selection due to config normalization.
+  envoy::extensions::filters::network::http_connection_manager::v3::Rds rds2;
+  rds2 = rds_;
+  // Modify parameters which should not affect the provider. The same provider should be picked,
+  // regardless of the fact that initial_fetch_timeout is different for both configs.
+  rds2.mutable_config_source()->mutable_initial_fetch_timeout()->set_seconds(
+      rds_.config_source().initial_fetch_timeout().seconds() + 1);
 
-    RouteConfigProviderSharedPtr provider2 =
-        route_config_provider_manager_->createRdsRouteConfigProvider(
-            rds2, server_factory_context_, "foo_prefix", outer_init_manager_);
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds2, server_factory_context_, "foo_prefix", outer_init_manager_);
 
-    EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
-                    ->onConfigUpdate(decoded_resources.refvec_, "provider2")
-                    .ok());
-    EXPECT_EQ(normalize_config ? 1UL : 2UL,
-              route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
-                  ->dynamic_route_configs()
-                  .size());
-  }
+  EXPECT_TRUE(server_factory_context_.cluster_manager_.subscription_factory_.callbacks_
+                  ->onConfigUpdate(decoded_resources.refvec_, "provider2")
+                  .ok());
+  // We expect only 1 provider since the configurations are considered equivalent after
+  // normalization.
+  EXPECT_EQ(1UL, route_config_provider_manager_->dumpRouteConfigs(universal_name_matcher)
+                     ->dynamic_route_configs()
+                     .size());
 }
 
 } // namespace
