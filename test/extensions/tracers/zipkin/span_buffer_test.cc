@@ -19,6 +19,18 @@ namespace Tracers {
 namespace Zipkin {
 namespace {
 
+class EmptyTracer : public TracerInterface {
+public:
+  SpanPtr startSpan(const Tracing::Config&, const std::string&, SystemTime) override {
+    return nullptr;
+  }
+  SpanPtr startSpan(const Tracing::Config&, const std::string&, SystemTime,
+                    const SpanContext&) override {
+    return nullptr;
+  }
+  void reportSpan(Span&&) override {}
+};
+
 // If this default timestamp is wrapped as double (using ValueUtil::numberValue()) and then it is
 // serialized using Protobuf::util::MessageToJsonString, it renders as: 1.58432429547687e+15.
 constexpr uint64_t DEFAULT_TEST_TIMESTAMP = 1584324295476870;
@@ -68,7 +80,8 @@ BinaryAnnotation createTag() {
 
 Span createSpan(const std::vector<absl::string_view>& annotation_values, const IpType ip_type) {
   Event::SimulatedTimeSystem simulated_time_system;
-  Span span(simulated_time_system);
+  EmptyTracer tracer;
+  Span span(simulated_time_system, tracer);
   span.setId(1);
   span.setTraceId(1);
   span.setDuration(DEFAULT_TEST_DURATION);
@@ -114,8 +127,10 @@ void expectSerializedBuffer(SpanBuffer& buffer, const bool delay_allocation,
     buffer.allocateBuffer(expected_list.size() + 1);
   }
 
+  EmptyTracer tracer;
+
   // Add span after allocation, but missing required annotations should be false.
-  EXPECT_FALSE(buffer.addSpan(Span(test_time.timeSystem())));
+  EXPECT_FALSE(buffer.addSpan(Span(test_time.timeSystem(), tracer)));
   EXPECT_FALSE(buffer.addSpan(createSpan({"aa"}, IpType::V4)));
 
   for (uint64_t i = 0; i < expected_list.size(); i++) {

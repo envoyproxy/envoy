@@ -100,11 +100,11 @@ TEST_P(ConnectIntegrationTest, ConnectFilterUnaryRequestE2E) {
   EXPECT_THAT(grpc_request, ProtoEq(connect_request));
 
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderHasValueRef(Http::Headers::get().ContentType, "application/grpc+proto"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc+proto"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderHasValueRef(Http::Headers::get().Path, "/Service/Method"));
+              ContainsHeader(Http::Headers::get().Path, "/Service/Method"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderHasValueRef(Http::CustomHeaders::get().GrpcTimeout, "10000m"));
+              ContainsHeader(Http::CustomHeaders::get().GrpcTimeout, "10000m"));
 
   helloworld::HelloReply grpc_response;
   grpc_response.set_message("success");
@@ -119,7 +119,7 @@ TEST_P(ConnectIntegrationTest, ConnectFilterUnaryRequestE2E) {
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   EXPECT_THAT(response->headers(),
-              HeaderHasValueRef(Http::Headers::get().ContentType, "application/proto"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/proto"));
 
   helloworld::HelloReply connect_response;
   ASSERT_TRUE(connect_response.ParseFromString(response->body()));
@@ -150,11 +150,11 @@ TEST_P(ConnectIntegrationTest, ConnectFilterStreamingRequestE2E) {
   EXPECT_THAT(grpc_request, ProtoEq(connect_request));
 
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderHasValueRef(Http::Headers::get().ContentType, "application/grpc+proto"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/grpc+proto"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderHasValueRef(Http::Headers::get().Path, "/Service/Method"));
+              ContainsHeader(Http::Headers::get().Path, "/Service/Method"));
   EXPECT_THAT(upstream_request_->headers(),
-              HeaderHasValueRef(Http::CustomHeaders::get().GrpcTimeout, "10000m"));
+              ContainsHeader(Http::CustomHeaders::get().GrpcTimeout, "10000m"));
 
   helloworld::HelloReply grpc_response;
   grpc_response.set_message("success");
@@ -170,7 +170,7 @@ TEST_P(ConnectIntegrationTest, ConnectFilterStreamingRequestE2E) {
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   EXPECT_THAT(response->headers(),
-              HeaderHasValueRef(Http::Headers::get().ContentType, "application/connect+proto"));
+              ContainsHeader(Http::Headers::get().ContentType, "application/connect+proto"));
 
   Buffer::OwnedImpl response_body{response->body()};
   ASSERT_THAT(response_body.length(), testing::Gt(5));

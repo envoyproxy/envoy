@@ -96,6 +96,10 @@ TEST_F(FluentdTracerIntegrationTest, Span) {
 
   EXPECT_EQ(span->getTraceId(), trace_id_hex);
 
+  // The `useLocalDecision` method is false because the span has an external trace sampling
+  // decision.
+  EXPECT_EQ(false, span->useLocalDecision());
+
   // Test Span functions
   span->setOperation("test_new");
   span->setTag("test_tag", "test_value");
@@ -139,6 +143,10 @@ TEST_F(FluentdTracerIntegrationTest, ParseSpanContextFromHeadersTest) {
 
   EXPECT_EQ(span->getTraceId(), trace_id_hex);
 
+  // The `useLocalDecision` method is false because the span has an external trace sampling
+  // decision.
+  EXPECT_EQ(false, span->useLocalDecision());
+
   // Remove headers, then inject context into header from the span.
   trace_context.remove(FluentdConstants::get().TRACE_PARENT.key());
   trace_context.remove(FluentdConstants::get().TRACE_STATE.key());
@@ -180,6 +188,10 @@ TEST_F(FluentdTracerIntegrationTest, GenerateSpanContextWithoutHeadersTest) {
 
   Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, trace_context, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
+
+  // The `useLocalDecision` method is true because the span has no external trace sampling
+  // decision.
+  EXPECT_EQ(true, span->useLocalDecision());
 
   // Remove headers, then inject context into header from the span.
   trace_context.remove(FluentdConstants::get().TRACE_PARENT.key());

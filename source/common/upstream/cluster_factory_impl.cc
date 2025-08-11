@@ -105,6 +105,19 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
   return context.dnsResolver();
 }
 
+absl::StatusOr<Network::DnsResolverSharedPtr> ClusterFactoryImplBase::selectDnsResolver(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+    ClusterFactoryContext& context) {
+  if (typed_dns_resolver_config.has_typed_config()) {
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+    auto& server_context = context.serverFactoryContext();
+    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
+                                                  server_context.api(), typed_dns_resolver_config);
+  }
+  return context.dnsResolver();
+}
+
 absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                ClusterFactoryContext& context) {

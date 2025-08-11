@@ -311,8 +311,7 @@ public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")),
+        request_buffer_overflowed_(false), streaming_shadows_(true),
         allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
         upstream_request_started_(false), orca_load_report_received_(false) {}
@@ -547,8 +546,6 @@ private:
   UpstreamRequestPtr createUpstreamRequest();
   absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
                                                      const Http::HeaderMap& headers) const;
-
-  void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();

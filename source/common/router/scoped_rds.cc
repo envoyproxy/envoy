@@ -411,9 +411,7 @@ absl::Status ScopedRdsConfigSubscription::onConfigUpdate(
   // Pause RDS to not send a burst of RDS requests until we start all the new subscriptions.
   // In the case that localInitManager is uninitialized, RDS is already paused
   // either by Server init or LDS init.
-  if (factory_context_.clusterManager().adsMux()) {
-    resume_rds = factory_context_.clusterManager().adsMux()->pause(type_url);
-  }
+  resume_rds = factory_context_.xdsManager().pause(type_url);
   // if local init manager is initialized, the parent init manager may have gone away.
   if (localInitManager().state() == Init::Manager::State::Initialized) {
     srds_init_mgr =

@@ -176,6 +176,7 @@ For details on each command's usage see the official
   GEOPOS, Geo
   GEORADIUS_RO, Geo
   GEORADIUSBYMEMBER_RO, Geo
+  GEOSEARCH, Geo
   HDEL, Hash
   HEXISTS, Hash
   HGET, Hash
@@ -251,6 +252,7 @@ For details on each command's usage see the official
   GET, String
   GETBIT, String
   GETDEL, String
+  GETEX, String
   GETRANGE, String
   GETSET, String
   INCR, String
