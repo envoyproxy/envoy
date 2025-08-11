@@ -1,6 +1,16 @@
 date: Pending
 
 behavior_changes:
+- area: http
+  change: |
+    The route refresh will now results in a tracing refresh. The trace sampling decision and decoration
+    of new route will be applied to the active span.
+    This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.trace_refresh_after_route_refresh`` to ``false``.
+    Note, if :ref:`pack_trace_reason
+    <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>` is set
+    to ``true`` (it is ``true`` by default), then a request have been marked as traced may cannot be
+    unmarked as traced after the tracing refresh.
 - area: ext_proc
   change: |
     Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
