@@ -42,7 +42,8 @@ public:
                           const std::string& override_auto_sni_header = "",
                           const std::string& typed_dns_resolver_config = "",
                           bool use_sub_cluster = false, double dns_query_timeout = 5,
-                          bool disable_dns_refresh_on_failure = false) {
+                          bool disable_dns_refresh_on_failure = false,
+                          bool use_dfp_even_when_cluster_resolves_hosts = false) {
     const std::string filter_use_sub_cluster = R"EOF(
 name: dynamic_forward_proxy
 typed_config:
@@ -69,7 +70,8 @@ typed_config:
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
         disable_dns_refresh_on_failure, max_pending_requests, key_value_config_,
         typed_dns_resolver_config);
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
+        use_dfp_even_when_cluster_resolves_hosts) {
       config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
     } else if (use_sub_cluster) {
       config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
@@ -1678,6 +1680,31 @@ TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("504", response->headers().getStatusValue());
+}
+
+// This test validates that processing of DNS resolutions on worker threads is handled correctly.
+// The test uses specific scenario where DFP filter AND async resolution in DFP cluster are enabled.
+// Normally DFP filter is not needed, however this configuration can occur as the
+// envoy.reloadable_features.dfp_cluster_resolves_hosts flag is now enabled by default. The test
+// also requires the Host header to be modified between DFP and Router filters to trigger abnormal
+// behavior in the DNS resolution processing loop.
+TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "true");
+  upstream_tls_ = false;
+  autonomous_upstream_ = true;
+  // Add DFP filter even if async DNS resolution is enabled.
+  config_helper_.prependFilter("{ name: modify-host-filter }");
+  initializeWithArgs(1024, 1024, "", "", false, 5, false, true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  // The host modification filter sets a non-existing host which should result in a 503.
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 } // namespace
