@@ -815,47 +815,45 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
       allow_multiplexed_upstream_half_close_ /*enable_half_close*/);
   LinkedList::moveIntoList(std::move(upstream_request), upstream_requests_);
   upstream_requests_.front()->acceptHeadersFromRouter(end_stream);
-  if (streaming_shadows_) {
-    // start the shadow streams.
-    for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
-      const auto& shadow_policy = shadow_policy_wrapper.get();
-      const absl::optional<absl::string_view> shadow_cluster_name =
-          getShadowCluster(shadow_policy, *downstream_headers_);
-      if (!shadow_cluster_name.has_value()) {
-        continue;
-      }
-      auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
-      const auto options =
-          Http::AsyncClient::RequestOptions()
-              .setTimeout(timeout_.global_timeout_)
-              .setParentSpan(callbacks_->activeSpan())
-              .setChildSpanName("mirror")
-              .setSampled(shadow_policy.traceSampled())
-              .setIsShadow(true)
-              .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
-              .setBufferAccount(callbacks_->account())
-              // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
-              // because a buffer limit of zero on async clients is interpreted as no buffer limit.
-              .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
-              .setDiscardResponseBody(true)
-              .setFilterConfig(config_)
-              .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
-      if (end_stream) {
-        // This is a header-only request, and can be dispatched immediately to the shadow
-        // without waiting.
-        Http::RequestMessagePtr request(new Http::RequestMessageImpl(
-            Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
-        config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
-                                       options);
-      } else {
-        Http::AsyncClient::OngoingRequest* shadow_stream = config_->shadowWriter().streamingShadow(
-            std::string(shadow_cluster_name.value()), std::move(shadow_headers), options);
-        if (shadow_stream != nullptr) {
-          shadow_streams_.insert(shadow_stream);
-          shadow_stream->setDestructorCallback(
-              [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
-          shadow_stream->setWatermarkCallbacks(watermark_callbacks_);
-        }
+  // Start the shadow streams.
+  for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
+    const auto& shadow_policy = shadow_policy_wrapper.get();
+    const absl::optional<absl::string_view> shadow_cluster_name =
+        getShadowCluster(shadow_policy, *downstream_headers_);
+    if (!shadow_cluster_name.has_value()) {
+      continue;
+    }
+    auto shadow_headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_);
+    const auto options =
+        Http::AsyncClient::RequestOptions()
+            .setTimeout(timeout_.global_timeout_)
+            .setParentSpan(callbacks_->activeSpan())
+            .setChildSpanName("mirror")
+            .setSampled(shadow_policy.traceSampled())
+            .setIsShadow(true)
+            .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
+            .setBufferAccount(callbacks_->account())
+            // A buffer limit of 1 is set in the case that retry_shadow_buffer_limit_ == 0,
+            // because a buffer limit of zero on async clients is interpreted as no buffer limit.
+            .setBufferLimit(1 > retry_shadow_buffer_limit_ ? 1 : retry_shadow_buffer_limit_)
+            .setDiscardResponseBody(true)
+            .setFilterConfig(config_)
+            .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
+    if (end_stream) {
+      // This is a header-only request, and can be dispatched immediately to the shadow
+      // without waiting.
+      Http::RequestMessagePtr request(new Http::RequestMessageImpl(
+          Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
+      config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
+                                     options);
+    } else {
+      Http::AsyncClient::OngoingRequest* shadow_stream = config_->shadowWriter().streamingShadow(
+          std::string(shadow_cluster_name.value()), std::move(shadow_headers), options);
+      if (shadow_stream != nullptr) {
+        shadow_streams_.insert(shadow_stream);
+        shadow_stream->setDestructorCallback(
+            [this, shadow_stream]() { shadow_streams_.erase(shadow_stream); });
+        shadow_stream->setWatermarkCallbacks(watermark_callbacks_);
       }
     }
   }
@@ -931,7 +929,6 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   ASSERT(upstream_requests_.size() <= 1);
 
   bool buffering = (retry_state_ && retry_state_->enabled()) ||
-                   (!active_shadow_policies_.empty() && !streaming_shadows_) ||
                    (route_entry_ && route_entry_->internalRedirectPolicy().enabled());
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
@@ -1085,41 +1082,6 @@ absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& p
   }
 }
 
-void Filter::maybeDoShadowing() {
-  for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
-    const auto& shadow_policy = shadow_policy_wrapper.get();
-
-    const absl::optional<absl::string_view> shadow_cluster_name =
-        getShadowCluster(shadow_policy, *downstream_headers_);
-
-    // The cluster name got from headers is empty.
-    if (!shadow_cluster_name.has_value()) {
-      continue;
-    }
-
-    Http::RequestMessagePtr request(new Http::RequestMessageImpl(
-        Http::createHeaderMap<Http::RequestHeaderMapImpl>(*shadow_headers_)));
-    if (callbacks_->decodingBuffer()) {
-      request->body().add(*callbacks_->decodingBuffer());
-    }
-    if (shadow_trailers_) {
-      request->trailers(Http::createHeaderMap<Http::RequestTrailerMapImpl>(*shadow_trailers_));
-    }
-    const auto options =
-        Http::AsyncClient::RequestOptions()
-            .setTimeout(timeout_.global_timeout_)
-            .setParentSpan(callbacks_->activeSpan())
-            .setChildSpanName("mirror")
-            .setSampled(shadow_policy.traceSampled())
-            .setIsShadow(true)
-            .setIsShadowSuffixDisabled(shadow_policy.disableShadowHostSuffixAppend())
-            .setFilterConfig(config_)
-            .setParentContext(Http::AsyncClient::ParentContext{&callbacks_->streamInfo()});
-    config_->shadowWriter().shadow(std::string(shadow_cluster_name.value()), std::move(request),
-                                   options);
-  }
-}
-
 void Filter::onRequestComplete() {
   // This should be called exactly once, when the downstream request has been received in full.
   ASSERT(!downstream_end_stream_);
@@ -1131,10 +1093,6 @@ void Filter::onRequestComplete() {
   if (!upstream_requests_.empty()) {
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
-    if (!streaming_shadows_) {
-      maybeDoShadowing();
-    }
-
     if (timeout_.global_timeout_.count() > 0) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);

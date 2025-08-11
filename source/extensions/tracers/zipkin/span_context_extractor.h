@@ -24,7 +24,7 @@ class SpanContextExtractor {
 public:
   SpanContextExtractor(Tracing::TraceContext& trace_context, bool w3c_fallback_enabled = false);
   ~SpanContextExtractor();
-  bool extractSampled(const Tracing::Decision tracing_decision);
+  absl::optional<bool> extractSampled();
   std::pair<SpanContext, bool> extractSpanContext(bool is_sampled);
 
 private:
