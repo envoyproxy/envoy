@@ -165,8 +165,6 @@ public:
   Event::MockSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<MockResponseDecoder> outer_decoder_;
-  ConnPoolCallbacks callbacks_;
 };
 
 /**

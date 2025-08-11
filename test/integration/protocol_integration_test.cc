@@ -83,21 +83,23 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetric) {
 
   // Send 3 requests on the same connection
   for (int i = 0; i < 3; ++i) {
-    auto response = sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
     ASSERT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 
   // Use the proper cleanup pattern that triggers histogram recording
   cleanupUpstreamAndDownstream();
-  
+
   // Wait for the histogram to actually have samples using the proper integration test pattern
   test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_per_cx");
-  
+
   // Get the histogram and read values using the proper pattern
   auto histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
-  
-  uint64_t sample_count = TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
+
+  uint64_t sample_count =
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
   uint64_t sample_sum = TestUtility::readSampleSum(test_server_->server().dispatcher(), *histogram);
 
   // Should have 1 sample with value 3 (3 requests on 1 connection)
