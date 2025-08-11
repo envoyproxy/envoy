@@ -58,6 +58,9 @@ removed_config_or_runtime:
 - area: quic
   change: |
     Removed runtime guard ``envoy.reloadable_features.report_stream_reset_error_code`` and legacy code paths.
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.streaming_shadow`` and legacy code paths.
 - area: http3
   change: |
     Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
