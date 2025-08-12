@@ -129,6 +129,7 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
 
   {
     // Test decode() method.
+    ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
     EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
         .WillOnce(testing::Invoke([](RequestHeaderFramePtr request, absl::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaRequestFrame*>(request.get())
@@ -136,6 +137,24 @@ TEST(KafkaCodecTest, KafkaServerCodecTest) {
                     3);
         }));
 
+    auto request =
+        std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
+            NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
+                                                 absl::nullopt),
+            NetworkFilters::Kafka::FetchRequest({}, {}, {}, {}));
+
+    Buffer::OwnedImpl buffer;
+    const uint32_t size = htobe32(request->computeSize());
+    buffer.add(&size, sizeof(size)); // Encode data length.
+
+    request->encode(buffer);
+    server_codec.decode(buffer, false);
+  }
+
+  {
+    // Test decode buffer limit.
+    ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(4));
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
     auto request =
         std::make_shared<NetworkFilters::Kafka::Request<NetworkFilters::Kafka::FetchRequest>>(
             NetworkFilters::Kafka::RequestHeader(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0, 3,
@@ -217,6 +236,7 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
 
   {
     // Test decode() method.
+    ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(1024 * 1024));
     EXPECT_CALL(callbacks, onDecodingSuccess(_, _))
         .WillOnce(testing::Invoke([](ResponseHeaderFramePtr response, absl::optional<StartTime>) {
           EXPECT_EQ(dynamic_cast<KafkaResponseFrame*>(response.get())
@@ -237,6 +257,24 @@ TEST(KafkaCodecTest, KafkaClientCodecTest) {
     response->encode(buffer);
 
     client_codec.response_decoder_->expectResponse(3, 0, 0);
+    client_codec.decode(buffer, false);
+  }
+
+  {
+    // Test decode buffer limit.
+    ON_CALL(mock_connection, bufferLimit()).WillByDefault(testing::Return(4));
+    EXPECT_CALL(callbacks, onDecodingFailure(_));
+    auto response =
+        std::make_shared<NetworkFilters::Kafka::Response<NetworkFilters::Kafka::FetchResponse>>(
+            NetworkFilters::Kafka::ResponseMetadata(NetworkFilters::Kafka::FETCH_REQUEST_API_KEY, 0,
+                                                    3),
+            NetworkFilters::Kafka::FetchResponse({}, {}));
+
+    Buffer::OwnedImpl buffer;
+    const uint32_t size = htobe32(response->computeSize());
+    buffer.add(&size, sizeof(size)); // Encode data length.
+
+    response->encode(buffer);
     client_codec.decode(buffer, false);
   }
 
