@@ -262,6 +262,14 @@ void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap&
 
 void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   local_end_stream_ = end_stream;
+
+  uint64_t total_header_bytes = 0;
+  headers.iterate([&total_header_bytes](const HeaderEntry& header) {
+    total_header_bytes += header.key().getStringView().size() + header.value().getStringView().size();
+    return HeaderMap::Iterate::Continue;
+  });
+  bytes_meter_.addDecompressedHeaderBytesSent(total_header_bytes);
+
   submitHeaders(headers, end_stream);
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
@@ -1780,6 +1788,11 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
+  StreamImpl* stream = getStreamUnchecked(stream_id);
+  if (!stream) {
+    return OnHeaderResult::HEADER_RST_STREAM;
+  }
+  stream->bytes_meter_->addDecompressedHeaderBytesReceived(name_view.size() + value_view.size());
   // TODO PERF: Can reference count here to avoid copies.
   HeaderString name;
   name.setCopy(name_view.data(), name_view.size());

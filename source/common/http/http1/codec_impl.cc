@@ -120,7 +120,9 @@ void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view va
 
   const uint64_t header_size = connection_.buffer().addFragments({key, COLON_SPACE, value, CRLF});
 
+  // There is no header field compression in HTTP/1.1, so the wire representation is the same as the decompressed representation.
   bytes_meter_->addHeaderBytesSent(header_size);
+  bytes_meter_->addDecompressedHeaderBytesSent(header_size);
 }
 
 void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::string_view value,
@@ -547,6 +549,7 @@ Status ConnectionImpl::completeCurrentHeader() {
 
   // Account for ":" and "\r\n" bytes between the header key value pair.
   getBytesMeter().addHeaderBytesReceived(CRLF_SIZE + 1);
+  getBytesMeter().addDecompressedHeaderBytesReceived(CRLF_SIZE + 1);
 
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   RETURN_IF_ERROR(checkHeaderNameForUnderscores());
@@ -780,6 +783,7 @@ Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
   ASSERT(dispatching_);
 
   getBytesMeter().addHeaderBytesReceived(length);
+  getBytesMeter().addDecompressedHeaderBytesReceived(length);
 
   // We previously already finished up the headers, these headers are
   // now trailers.
@@ -805,6 +809,7 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   ASSERT(dispatching_);
 
   getBytesMeter().addHeaderBytesReceived(length);
+  getBytesMeter().addDecompressedHeaderBytesReceived(length);
 
   if (header_parsing_state_ == HeaderParsingState::Done && !enableTrailers()) {
     // Ignore trailers.
