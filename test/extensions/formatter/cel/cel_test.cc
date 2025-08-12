@@ -169,6 +169,12 @@ TEST_F(CELFormatterTest, TestFormatMapValue) {
   auto typed_formatter = cel_parser->parse("TYPED_CEL", "{\"foo\": \"42\"}", max_length);
   EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
               ProtoEq(ValueUtil::structValue(MessageUtil::keyValueStruct("foo", "42"))));
+
+  // Test something that fails to format. For whatever reason,
+  // ExportAsProtoValue will not tolerate boolean keys.
+  auto invalid_typed_formatter = cel_parser->parse("TYPED_CEL", "{true: \"42\"}", max_length);
+  EXPECT_THAT(invalid_typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::nullValue()));
 }
 
 TEST_F(CELFormatterTest, TestTruncation) {
