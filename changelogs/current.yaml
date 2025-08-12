@@ -17,6 +17,10 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: websocket
+  change: |
+      Allow 4xx and 5xx to go through the filter chain for websocket handshake response check, and the behaviour can be disabled
+      by a runtime ``envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain``.
 - area: testing
   change: |
     In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader`` and ``HeaderHasValueRef``
