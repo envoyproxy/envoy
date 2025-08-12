@@ -90,7 +90,7 @@ public:
   enum class ErrorType { ClientHelloTooLarge, ClientHelloNotDetected };
 
   FilterState(ErrorType error_type) : error_type_(error_type) {}
-  ErrorType error_type() const { return error_type_; }
+  ErrorType errorType() const { return error_type_; }
 
   static const std::string& key();
 

@@ -288,7 +288,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
   EXPECT_THAT(cb_.filterState().getDataReadOnly<FilterState>(FilterState::key()),
-              Pointee(testing::Property(&FilterState::error_type,
+              Pointee(testing::Property(&FilterState::errorType,
                                         FilterState::ErrorType::ClientHelloTooLarge)));
 }
 
@@ -420,7 +420,7 @@ TEST_P(TlsInspectorTest, NotSsl) {
   ASSERT_EQ(1, bytes_processed.size());
   EXPECT_EQ(5, bytes_processed[0]);
   EXPECT_THAT(cb_.filterState().getDataReadOnly<FilterState>(FilterState::key()),
-              Pointee(testing::Property(&FilterState::error_type,
+              Pointee(testing::Property(&FilterState::errorType,
                                         FilterState::ErrorType::ClientHelloNotDetected)));
 }
 
