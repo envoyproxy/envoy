@@ -90,17 +90,20 @@ bool ProcessorState::restartMessageTimer(const uint32_t message_timeout_ms) {
   }
 }
 
+// Process the data being buffered in STREAMED or FULL_DUPLEX_STREAMED mode.
 void ProcessorState::sendBufferedDataInStreamedMode(bool end_stream) {
-  // Process the data being buffered in streaming mode.
-  // Move the current buffer into the queue for remote processing and clear the buffered data.
   if (hasBufferedData()) {
     Buffer::OwnedImpl buffered_chunk;
     modifyBufferedData([&buffered_chunk](Buffer::Instance& data) { buffered_chunk.move(data); });
     ENVOY_STREAM_LOG(debug, "Sending a chunk of buffered data ({})", *filter_callbacks_,
                      buffered_chunk.length());
-    // Need to first enqueue the data into the chunk queue before sending.
     auto req = filter_.setupBodyChunk(*this, buffered_chunk, end_stream);
-    enqueueStreamingChunk(buffered_chunk, end_stream);
+    if (body_mode_ != ProcessingMode::FULL_DUPLEX_STREAMED) {
+      // Move the current buffer into the queue for remote processing and clear the buffered data.
+      enqueueStreamingChunk(buffered_chunk, end_stream);
+    } else {
+      buffered_chunk.drain(buffered_chunk.length());
+    }
     filter_.sendBodyChunk(*this, ProcessorState::CallbackState::StreamedBodyCallback, req);
   }
   if (queueBelowLowLimit()) {
@@ -224,13 +227,9 @@ absl::Status ProcessorState::handleHeaderContinue(const HeadersResponse& respons
     clearWatermark();
     filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
     return absl::OkStatus();
-  } else if (body_mode_ == ProcessingMode::STREAMED) {
+  } else if (body_mode_ == ProcessingMode::STREAMED ||
+             body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
     sendBufferedDataInStreamedMode(false);
-    filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
-    continueIfNecessary();
-    return absl::OkStatus();
-  } else if (body_mode_ == ProcessingMode::FULL_DUPLEX_STREAMED) {
-    // There is no buffered data in this mode.
     filter_.onProcessHeadersResponse(response, absl::OkStatus(), trafficDirection());
     continueIfNecessary();
     return absl::OkStatus();
