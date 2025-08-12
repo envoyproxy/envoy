@@ -74,6 +74,9 @@ removed_config_or_runtime:
 - area: rds
   change: |
     Removed runtime guard ``envoy.reloadable_features.normalize_rds_provider_config`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` and legacy code paths.
 - area: quic
   change: |
     Removed runtime guard ``envoy.reloadable_features.report_stream_reset_error_code`` and legacy code paths.
