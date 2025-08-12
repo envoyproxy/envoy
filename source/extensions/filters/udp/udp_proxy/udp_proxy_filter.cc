@@ -893,7 +893,9 @@ const std::string HttpUpstreamImpl::resolveTargetTunnelPath() {
   return absl::StrCat("/.well-known/masque/udp/", target_host, "/", target_port, "/");
 }
 
-HttpUpstreamImpl::~HttpUpstreamImpl() { resetEncoder(Network::ConnectionEvent::LocalClose, /*by_local_close=*/true); }
+HttpUpstreamImpl::~HttpUpstreamImpl() {
+  resetEncoder(Network::ConnectionEvent::LocalClose, /*by_local_close=*/true);
+}
 
 void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_local_close) {
   if (!request_encoder_) {
