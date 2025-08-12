@@ -43,15 +43,13 @@ public:
           uint64_t manager_identifier)>
           create_dynamic_provider) {
 
-    uint64_t manager_identifier;
-
     // Normalize the config_source part of the passed config. Some parts of the config_source
     // do not affect selection of the RDS provider. They will be cleared (zeroed) and restored
     // after calculating hash.
     // Since rds is passed as const, the constness must be casted away before modifying rds.
     auto* orig_initial_timeout =
         const_cast<RdsConfig&>(rds).mutable_config_source()->release_initial_fetch_timeout();
-    manager_identifier = MessageUtil::hash(rds);
+    const uint64_t manager_identifier = MessageUtil::hash(rds);
     const_cast<RdsConfig&>(rds).mutable_config_source()->set_allocated_initial_fetch_timeout(
         orig_initial_timeout);
 
