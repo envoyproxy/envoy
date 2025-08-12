@@ -1,0 +1,245 @@
+module(
+    name = "envoy",
+    version = "0.0.0-dev",
+)
+
+bazel_dep(
+    name = "abseil-cpp",
+    version = "20250127.0",
+    repo_name = "com_google_absl",
+)
+bazel_dep(
+    name = "aspect_bazel_lib",
+    version = "2.20.0",
+)
+bazel_dep(
+    name = "bazel_skylib",
+    version = "1.8.1",
+)
+bazel_dep(
+    name = "bazel_features",
+    version = "1.33.0",
+)
+bazel_dep(
+    name = "c-ares",
+    version = "1.34.5",
+    repo_name = "com_github_c_ares_c_ares",
+)
+bazel_dep(
+    name = "envoy_api",
+    version = "0.0.0-dev",
+)
+bazel_dep(
+    name = "envoy_build_config",
+    version = "0.0.0-dev",
+)
+bazel_dep(
+    name = "fmt",
+    version = "11.2.0",
+    repo_name = "com_github_fmtlib_fmt",
+)
+bazel_dep(
+    name = "platforms",
+    version = "1.0.0",
+)
+bazel_dep(
+    name = "protobuf",
+    version = "29.1",
+    repo_name = "com_google_protobuf",
+)
+bazel_dep(
+    name = "rules_cc",
+    version = "0.2.0",
+)
+bazel_dep(
+    name = "rules_go",
+    version = "0.53.0",
+    repo_name = "io_bazel_rules_go",
+)
+bazel_dep(
+    name = "rules_pkg",
+    version = "1.1.0",
+)
+bazel_dep(
+    name = "rules_python",
+    version = "1.4.1",
+)
+bazel_dep(
+    name = "rules_rust",
+    version = "0.56.0",
+)
+bazel_dep(
+    name = "rules_shell",
+    version = "0.5.1",
+)
+bazel_dep(
+    name = "rules_fuzzing",
+    version = "0.6.0",
+)
+bazel_dep(
+    name = "google_benchmark",
+    version = "1.9.4",
+    repo_name = "com_github_google_benchmark",
+)
+bazel_dep(
+    name = "googleapis",
+    version = "0.0.0-20250703-f9d6fe4a",
+    repo_name = "com_google_googleapis",
+)
+bazel_dep(
+    name = "grpc",
+    version = "1.74.1",
+    repo_name = "com_github_grpc_grpc",
+)
+bazel_dep(
+    name = "libcircllhist",
+    version = "0.3.2",
+    repo_name = "com_github_openhistogram_libcircllhist",
+)
+bazel_dep(
+    name = "protoc-gen-validate",
+    version = "1.2.1.bcr.1",
+    repo_name = "com_envoyproxy_protoc_gen_validate",
+)
+bazel_dep(
+    name = "rules_foreign_cc",
+    version = "0.15.0",
+)
+bazel_dep(
+    name = "rules_java",
+    version = "8.6.1",
+)
+bazel_dep(
+    name = "rules_proto",
+    version = "7.1.0",
+)
+bazel_dep(
+    name = "spdlog",
+    version = "1.15.3",
+    repo_name = "com_github_gabime_spdlog",
+)
+bazel_dep(
+    name = "tclap",
+    version = "1.2.5",
+    repo_name = "com_github_mirror_tclap",
+)
+bazel_dep(
+    name = "xds",
+    version = "0.0.0-20240423-555b57e",
+    repo_name = "com_github_cncf_xds",
+)
+bazel_dep(
+    name = "xxhash",
+    version = "0.8.3",
+    repo_name = "com_github_cyan4973_xxhash",
+)
+bazel_dep(
+    name = "yaml-cpp",
+    version = "0.8.0",
+    repo_name = "com_github_jbeder_yaml_cpp",
+)
+
+bazel_dep(
+    name = "googletest",
+    version = "1.17.0",
+    dev_dependency = True,
+    repo_name = "com_google_googletest",
+)
+bazel_dep(
+    name = "re2",
+    version = "2023-11-01",
+    dev_dependency = True,
+    repo_name = "com_googlesource_code_re2",
+)
+
+local_path_override(
+    module_name = "envoy_api",
+    path = "api",
+)
+
+local_path_override(
+    module_name = "envoy_build_config",
+    path = "mobile/envoy_build_config",
+)
+
+switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
+switched_rules.use_languages(
+    cc = True,
+    go = True,
+    python = True,
+)
+
+crate = use_extension(
+    "@rules_rust//crate_universe:extensions.bzl",
+    "crate",
+)
+crate.from_cargo(
+    name = "dynamic_modules_rust_sdk_crate_index",
+    cargo_lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+    manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
+)
+use_repo(crate, "dynamic_modules_rust_sdk_crate_index")
+
+non_module_dependencies = use_extension("//bazel:extensions.bzl", "non_module_dependencies")
+use_repo(
+    non_module_dependencies,
+    "bazel_toolchains",
+    "boringssl",
+    "com_github_axboe_liburing",
+    "com_github_datadog_dd_trace_cpp",
+    "com_github_envoyproxy_sqlparser",
+    "com_github_facebook_zstd",
+    "com_github_google_libsxg",
+    "com_github_google_quiche",
+    "com_github_google_tcmalloc",
+    "com_github_gperftools_gperftools",
+    "com_github_libevent_libevent",
+    "com_github_luajit_luajit",
+    "com_github_lz4_lz4",
+    "com_github_maxmind_libmaxminddb",
+    "com_github_nghttp2_nghttp2",
+    "com_github_unicode_org_icu",
+    "com_github_wamr",
+    "com_google_protoconverter",
+    "com_google_protofieldextraction",
+    "com_google_protoprocessinglib",
+    "com_googlesource_googleurl",
+    "confluentinc_librdkafka",
+    "envoy_toolshed",
+    "grpc_httpjson_transcoding",
+    "kafka_source",
+    "net_colm_open_source_colm",
+    "net_colm_open_source_ragel",
+    "net_zlib",
+    "proxy_wasm_cpp_sdk",
+    "proxy_wasm_rust_sdk",
+    "rules_proto_grpc",
+)
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python", dev_dependency = True)
+python.toolchain(
+    python_version = "3.12",
+)
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip", dev_dependency = True)
+pip.parse(
+    hub_name = "base_pip3",
+    python_version = "3.12",
+    requirements_lock = "//tools/base:requirements.txt",
+)
+pip.parse(
+    hub_name = "dev_pip3",
+    python_version = "3.12",
+    requirements_lock = "//tools/dev:requirements.txt",
+)
+pip.parse(
+    hub_name = "fuzzing_pip3",
+    python_version = "3.12",
+    requirements_lock = "@rules_fuzzing//fuzzing:requirements.txt",
+)
+use_repo(
+    pip,
+    "base_pip3",
+    "dev_pip3",
+    "fuzzing_pip3",
+)

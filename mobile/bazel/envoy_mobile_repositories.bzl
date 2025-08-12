@@ -1,6 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file")
 
-def envoy_mobile_repositories():
+def envoy_mobile_repositories(bzlmod = False):
     http_archive(
         name = "google_bazel_common",
         sha256 = "d8c9586b24ce4a5513d972668f94b62eb7d705b92405d4bc102131f294751f1d",
