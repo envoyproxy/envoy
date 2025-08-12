@@ -343,6 +343,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
 }
 
 void UdpProxyFilter::ActiveSession::onSessionComplete() {
+  ENVOY_BUG(!on_session_complete_called_, "onSessionComplete() called twice");
   ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
@@ -892,21 +893,21 @@ const std::string HttpUpstreamImpl::resolveTargetTunnelPath() {
   return absl::StrCat("/.well-known/masque/udp/", target_host, "/", target_port, "/");
 }
 
-HttpUpstreamImpl::~HttpUpstreamImpl() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+HttpUpstreamImpl::~HttpUpstreamImpl() { resetEncoder(Network::ConnectionEvent::LocalClose, /*by_local_close=*/true); }
 
-void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_downstream) {
+void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_local_close) {
   if (!request_encoder_) {
     return;
   }
 
   request_encoder_->getStream().removeCallbacks(*this);
-  if (by_downstream) {
+  if (by_local_close) {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
 
   request_encoder_ = nullptr;
 
-  if (!by_downstream) {
+  if (!by_local_close) {
     // If we did not receive a valid CONNECT response yet we treat this as a pool
     // failure, otherwise we forward the event downstream.
     if (tunnel_creation_callbacks_.has_value()) {
@@ -1061,7 +1062,6 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
   ENVOY_LOG(debug, "Failed to create upstream stream: {}", failure_reason);
 
   conn_pool_.reset();
-  upstream_.reset();
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
@@ -1074,9 +1074,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    if (connecting_) {
-      udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
-    }
+    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;

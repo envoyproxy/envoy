@@ -293,7 +293,7 @@ public:
   void onDownstreamEvent(Network::ConnectionEvent event) override {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
-      resetEncoder(event, /*by_downstream=*/true);
+      resetEncoder(event, /*by_local_close=*/true);
     }
   };
 
@@ -360,7 +360,7 @@ private:
   };
 
   const std::string resolveTargetTunnelPath();
-  void resetEncoder(Network::ConnectionEvent event, bool by_downstream = false);
+  void resetEncoder(Network::ConnectionEvent event, bool by_local_close = false);
 
   ResponseDecoder response_decoder_;
   Http::RequestEncoder* request_encoder_{};

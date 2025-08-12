@@ -12,6 +12,7 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
+#include "test/integration/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -536,6 +537,16 @@ typed_config:
 
     nghttp2_hd_deflate_del(deflater);
     return deflated_size;
+  }
+
+  void drainListeners() {
+    Network::Address::InstanceConstSharedPtr admin = test_server_->adminAddress();
+    if (admin != nullptr) {
+      BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+          admin, "POST", "/drain_listeners", "", Http::CodecType::HTTP1);
+      ASSERT_TRUE(response->complete());
+      EXPECT_EQ("200", response->headers().getStatusValue());
+    }
   }
 
   TestConfig config_;
@@ -1550,6 +1561,25 @@ TEST_P(UdpTunnelingIntegrationTest, BytesMeterAccessLog) {
   auto expected_received_wire_bytes = expected_response_wire_size + response_capsule_size;
   EXPECT_EQ(std::to_string(expected_received_wire_bytes), access_log_parts[6]);
 
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, DrainListenersWhileTunnelingActiveSessionIsStillActive) {
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
+  setup(config);
+
+  const std::string datagram = "hello";
+  establishConnection(datagram);
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+
+  // Send a response and keep the session alive.
+  sendCapsuleDownstream("response", false);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+
+  // Drain listeners while udp session is still active.
+  drainListeners();
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 
