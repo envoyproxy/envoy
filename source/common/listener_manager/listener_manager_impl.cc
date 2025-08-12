@@ -21,6 +21,7 @@
 #include "source/common/network/filter_matcher.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/socket_interface.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -316,6 +317,22 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
   ASSERT(socket_type == Network::Socket::Type::Stream ||
          socket_type == Network::Socket::Type::Datagram);
 
+  // Use the address's socket interface for socket creation.
+  const Network::SocketInterface& socket_interface = address->socketInterface();
+  const Network::SocketInterface& default_interface = Network::SocketInterfaceSingleton::get();
+
+  // Check if this address specifies a custom socket interface.
+  if (&socket_interface != &default_interface) {
+    ENVOY_LOG(debug, "creating socket using custom interface for address: {}",
+              address->logicalName());
+    auto io_handle = socket_interface.socket(socket_type, address, creation_options);
+    if (!io_handle) {
+      return absl::InvalidArgumentError("failed to create socket using custom interface");
+    }
+    return std::make_shared<Network::TcpListenSocket>(std::move(io_handle), address, options);
+  }
+
+  // Continue with standard socket creation for addresses using the default interface.
   // First we try to get the socket from our parent if applicable in each case below.
   if (address->type() == Network::Address::Type::Pipe) {
     if (socket_type != Network::Socket::Type::Stream) {
@@ -392,7 +409,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
     factory_ = std::make_unique<ProdListenerComponentFactory>(server);
   }
   if (server.admin().has_value()) {
-    config_tracker_entry_ = server.admin()->getConfigTracker().add(
+    listeners_config_tracker_entry_ = server.admin()->getConfigTracker().add(
         "listeners", [this](const Matchers::StringMatcher& name_matcher) {
           return dumpListenerConfigs(name_matcher);
         });
@@ -401,6 +418,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(worker_factory.createWorker(
         i, server.overloadManager(), server.nullOverloadManager(), absl::StrCat("worker_", i)));
+    ENVOY_LOG(debug, "starting worker: {}", i);
   }
 }
 
@@ -461,7 +479,7 @@ ListenerManagerImpl::dumpListenerConfigs(const Matchers::StringMatcher& name_mat
     fillState(*dump_listener, *listener);
   }
 
-  for (const auto& [error_name, error_state] : error_state_tracker_) {
+  for (const auto& [error_name, error_state] : lds_error_state_tracker_) {
     DynamicListener* dynamic_listener =
         getOrCreateDynamicListener(error_name, *config_dump, listener_map);
 
@@ -527,7 +545,7 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
         fmt::format("error adding listener named '{}': address is necessary", name));
   }
 
-  auto it = error_state_tracker_.find(name);
+  auto it = lds_error_state_tracker_.find(name);
   absl::StatusOr<bool> add_or_update_status;
   TRY_ASSERT_MAIN_THREAD {
     add_or_update_status = addOrUpdateListenerInternal(config, version_info, added_via_api, name);
@@ -535,8 +553,8 @@ ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::List
   END_TRY
   CATCH(const EnvoyException& e, { add_or_update_status = absl::InvalidArgumentError(e.what()); })
   if (!add_or_update_status.status().ok()) {
-    if (it == error_state_tracker_.end()) {
-      it = error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
+    if (it == lds_error_state_tracker_.end()) {
+      it = lds_error_state_tracker_.emplace(name, std::make_unique<UpdateFailureState>()).first;
     }
     TimestampUtil::systemClockToTimestamp(server_.api().timeSource().systemTime(),
                                           *(it->second->mutable_last_update_attempt()));
@@ -1110,15 +1128,16 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
 absl::StatusOr<Network::DrainableFilterChainSharedPtr>
 ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    FilterChainFactoryContextCreator& context_creator) const {
-  return buildFilterChainInternal(filter_chain,
-                                  context_creator.createFilterChainFactoryContext(&filter_chain));
+    FilterChainFactoryContextCreator& context_creator, bool added_via_api) const {
+  return buildFilterChainInternal(
+      filter_chain, context_creator.createFilterChainFactoryContext(&filter_chain), added_via_api);
 }
 
 absl::StatusOr<Network::DrainableFilterChainSharedPtr>
 ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3::FilterChain& filter_chain,
-    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context) const {
+    Configuration::FilterChainFactoryContextPtr&& filter_chain_factory_context,
+    bool added_via_api) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -1177,7 +1196,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
       std::move(factory_or_error.value()), std::move(*factory_list_or_error),
       std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
-      filter_chain.name());
+      filter_chain.name(), added_via_api);
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;

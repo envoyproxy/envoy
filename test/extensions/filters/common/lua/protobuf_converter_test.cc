@@ -1137,6 +1137,48 @@ TEST_F(LuaProtobufConverterTest, NestedMessageWithRecursion) {
   lua_pop(lua_state_, 1);
 }
 
+TEST_F(LuaProtobufConverterTest, TypeURLEndingWithSlash) {
+  // Create Any with type URL ending with slash and no type name after slash
+  ProtobufWkt::Any any_message;
+  any_message.set_type_url("type.googleapis.com/");
+
+  Protobuf::Map<std::string, ProtobufWkt::Any> typed_metadata_map;
+  typed_metadata_map["test.filter"] = any_message;
+
+  // Push dummy value at index 1, then filter name at index 2 (function expects index 2)
+  lua_pushnil(lua_state_);
+  lua_pushstring(lua_state_, "test.filter");
+
+  int result = ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(lua_state_,
+                                                                              typed_metadata_map);
+
+  EXPECT_EQ(result, 1);
+  EXPECT_TRUE(lua_isnil(lua_state_, -1));
+  lua_pop(lua_state_, 3); // Pop result + the 2 values we pushed
+}
+
+TEST_F(LuaProtobufConverterTest, PrototypeNotFound) {
+  // Create Any with a valid but invalid message type
+  // Using a well-known type that exists in descriptor pool but might not have a prototype
+  ProtobufWkt::Any any_message;
+  any_message.set_type_url("type.googleapis.com/google.protobuf.FileDescriptorSet");
+  any_message.set_value("dummy_data");
+
+  Protobuf::Map<std::string, ProtobufWkt::Any> typed_metadata_map;
+  typed_metadata_map["test.filter"] = any_message;
+
+  // Push dummy value at index 1, then filter name at index 2 (function expects index 2)
+  lua_pushnil(lua_state_);
+  lua_pushstring(lua_state_, "test.filter");
+
+  int result = ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(lua_state_,
+                                                                              typed_metadata_map);
+
+  EXPECT_EQ(result, 1);
+  EXPECT_TRUE(lua_isnil(lua_state_, -1));
+  lua_pop(lua_state_, 3); // Pop result + the 2 values we pushed
+}
+
 } // namespace
 } // namespace Lua
 } // namespace Common

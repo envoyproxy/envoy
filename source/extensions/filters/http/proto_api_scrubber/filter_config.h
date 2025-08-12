@@ -71,6 +71,10 @@ private:
   absl::Status initialize(const ProtoApiScrubberConfig& proto_config,
                           Envoy::Server::Configuration::FactoryContext& context);
 
+  // Initializes the descriptor pool from the provided 'data_source'.
+  absl::Status initializeDescriptorPool(Api::Api& api,
+                                        const ::envoy::config::core::v3::DataSource& data_source);
+
   // Initializes the method's request and response restrictions using the restrictions configured
   // in the proto config.
   absl::Status initializeMethodRestrictions(absl::string_view method_name,
@@ -79,6 +83,8 @@ private:
                                             Server::Configuration::FactoryContext& context);
 
   FilteringMode filtering_mode_;
+
+  std::unique_ptr<const Envoy::Protobuf::DescriptorPool> descriptor_pool_;
 
   // A map from {method_name, field_mask} to the respective match tree for request fields.
   StringPairToMatchTreeMap request_field_restrictions_;
@@ -112,10 +118,10 @@ class RemoveFieldAction : public Matcher::ActionBase<ProtoApiScrubberRemoveField
 // ActionFactory for the RemoveFieldAction.
 class RemoveFilterActionFactory : public Matcher::ActionFactory<ProtoApiScrubberRemoveFieldAction> {
 public:
-  Matcher::ActionFactoryCb createActionFactoryCb(const Protobuf::Message&,
-                                                 ProtoApiScrubberRemoveFieldAction&,
-                                                 ProtobufMessage::ValidationVisitor&) override {
-    return []() { return std::make_unique<RemoveFieldAction>(); };
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message&,
+                                             ProtoApiScrubberRemoveFieldAction&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    return std::make_shared<RemoveFieldAction>();
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

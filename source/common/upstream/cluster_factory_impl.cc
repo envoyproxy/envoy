@@ -17,8 +17,7 @@ namespace Upstream {
 absl::StatusOr<std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>>
 ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluster,
                                Server::Configuration::ServerFactoryContext& server_context,
-                               ClusterManager& cm, LazyCreateDnsResolver dns_resolver_fn,
-                               Ssl::ContextManager& ssl_context_manager,
+                               LazyCreateDnsResolver dns_resolver_fn,
                                Outlier::EventLoggerSharedPtr outlier_event_logger,
                                bool added_via_api) {
   std::string cluster_name;
@@ -75,7 +74,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
         cluster_name));
   }
 
-  ClusterFactoryContextImpl context(server_context, cm, dns_resolver_fn, ssl_context_manager,
+  ClusterFactoryContextImpl context(server_context, dns_resolver_fn,
                                     std::move(outlier_event_logger), added_via_api);
   return factory->create(cluster, context);
 }
@@ -103,6 +102,19 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
                                                   server_context.api(), typed_dns_resolver_config);
   }
 
+  return context.dnsResolver();
+}
+
+absl::StatusOr<Network::DnsResolverSharedPtr> ClusterFactoryImplBase::selectDnsResolver(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+    ClusterFactoryContext& context) {
+  if (typed_dns_resolver_config.has_typed_config()) {
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+    auto& server_context = context.serverFactoryContext();
+    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
+                                                  server_context.api(), typed_dns_resolver_config);
+  }
   return context.dnsResolver();
 }
 

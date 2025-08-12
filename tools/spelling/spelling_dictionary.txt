@@ -37,6 +37,8 @@ Millicores
 NID
 NIST
 NORMALISATION
+Radix
+SQLSTATE
 bm
 BSON
 BPF
@@ -46,6 +48,7 @@ CIO
 cbegin
 cend
 constness
+cstr
 deadcode
 DFP
 Dynatrace
@@ -90,6 +93,7 @@ ETB
 ETX
 FS
 FIXME
+decrypted
 gperf
 HEXDIG
 HEXDIGIT
@@ -111,6 +115,7 @@ STX
 SkyWalking
 TIDs
 Timedout
+ULA
 WRSQ
 WASI
 ceil
@@ -1182,6 +1187,8 @@ querydetails
 quiesce
 quitquitquit
 qvalue
+radix
+radixtree
 rapidjson
 ratelimit
 ratelimited
@@ -1412,6 +1419,7 @@ templating
 templatize
 templatized
 templatizing
+teredo
 testability
 testcase
 testcases

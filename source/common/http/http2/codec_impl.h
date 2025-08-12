@@ -877,6 +877,7 @@ private:
   envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
       headers_with_underscores_action_;
   Server::LoadShedPoint* should_send_go_away_on_dispatch_{nullptr};
+  Server::LoadShedPoint* should_send_go_away_and_close_on_dispatch_{nullptr};
   bool sent_go_away_on_dispatch_{false};
 };
 

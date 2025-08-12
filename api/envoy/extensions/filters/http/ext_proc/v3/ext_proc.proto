@@ -12,6 +12,7 @@ import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
 
 import "xds/annotations/v3/status.proto";
 
@@ -167,17 +168,22 @@ message ExternalProcessor {
     (xds.annotations.v3.field_status).work_in_progress = true
   ];
 
-  // If the ``BodySendMode`` in the
-  // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
-  // is set to ``FULL_DUPLEX_STREAMED``, ``failure_mode_allow`` can not be set to true.
+  // By default, if in the following cases:
   //
-  // Otherwise, by default, if the gRPC stream cannot be established, or if it is closed
-  // prematurely with an error, the filter will fail. Specifically, if the
-  // response headers have not yet been delivered, then it will return a 500
-  // error downstream. If they have been delivered, then instead the HTTP stream to the
-  // downstream client will be reset.
-  // With this parameter set to true, however, then if the gRPC stream is prematurely closed
-  // or could not be opened, processing continues without error.
+  // 1. The gRPC stream cannot be established.
+  //
+  // 2. The gRPC stream is closed prematurely with an error.
+  //
+  // 3. The external processing timeouts.
+  //
+  // 4. The ext_proc server sends back spurious response messages.
+  //
+  // The filter will fail and a local reply with error code
+  // 504(for timeout case) or 500(for all other cases), will be sent to the downstream.
+  //
+  // However, with this parameter set to true and if the above cases happen, the processing
+  // continues without error.
+  //
   bool failure_mode_allow = 2;
 
   // Specifies default options for how HTTP headers, trailers, and bodies are
@@ -417,7 +423,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
@@ -451,4 +457,9 @@ message ExtProcOverrides {
   // authorization headers (e.g. ``x-foo-bar: baz-key``) are to be injected or
   // when a route needs to partially override inherited metadata.
   repeated config.core.v3.HeaderValue grpc_initial_metadata = 7;
+
+  // If true, the filter will not fail closed if the gRPC stream is prematurely closed
+  // or could not be opened. This field is the per-route override of
+  // :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`.
+  google.protobuf.BoolValue failure_mode_allow = 8;
 }

@@ -24,20 +24,22 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::Return;
-using ::testing::ReturnRef;
-
 namespace Envoy {
 namespace Config {
 namespace {
+
+using ::testing::_;
+using ::testing::Eq;
+using ::testing::Invoke;
+using ::testing::Return;
+using ::testing::ReturnRef;
 
 enum class LegacyOrUnified { Legacy, Unified };
 
@@ -49,12 +51,23 @@ public:
         api_(Api::createApiForTest(stats_store_, random_)),
         subscription_factory_(local_info_, dispatcher_, cm_, validation_visitor_, *api_, server_,
                               /*xds_resources_delegate=*/XdsResourcesDelegateOptRef(),
-                              /*xds_config_tracker=*/XdsConfigTrackerOptRef()) {}
+                              /*xds_config_tracker=*/XdsConfigTrackerOptRef()) {
+    ON_CALL(cm_, adsMux()).WillByDefault(Return(nullptr));
+  }
 
   SubscriptionPtr
   subscriptionFromConfigSource(const envoy::config::core::v3::ConfigSource& config) {
     return THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionFromConfigSource(
-                                     config, Config::TypeUrl::get().ClusterLoadAssignment,
+                                     config, Config::TestTypeUrl::get().ClusterLoadAssignment,
+                                     *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
+                                 SubscriptionPtr);
+  }
+
+  SubscriptionPtr subscriptionOverAdsGrpcMux(GrpcMuxSharedPtr grpc_mux,
+                                             const envoy::config::core::v3::ConfigSource& config) {
+    return THROW_OR_RETURN_VALUE(subscription_factory_.subscriptionOverAdsGrpcMux(
+                                     grpc_mux, config,
+                                     Config::TestTypeUrl::get().ClusterLoadAssignment,
                                      *stats_store_.rootScope(), callbacks_, resource_decoder_, {}),
                                  SubscriptionPtr);
   }
@@ -70,7 +83,7 @@ public:
                                  SubscriptionPtr);
   }
 
-  Upstream::MockClusterManager cm_;
+  NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   NiceMock<Random::MockRandomGenerator> random_;
   MockSubscriptionCallbacks callbacks_;
@@ -109,6 +122,25 @@ TEST_F(SubscriptionFactoryTest, NoConfigSpecifier) {
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config), EnvoyException,
       "Missing config source specifier in envoy::config::core::v3::ConfigSource");
+}
+
+// Exercise the path of subscription creation when no factory exists.
+TEST_F(SubscriptionFactoryTest, NoFactoryForSubscription) {
+  // Temporarily remove the config mux factories.
+  auto saved_factories = Registry::FactoryRegistry<ConfigSubscriptionFactory>::factories();
+  Registry::FactoryRegistry<ConfigSubscriptionFactory>::factories().clear();
+  Registry::InjectFactory<ConfigSubscriptionFactory>::resetTypeMappings();
+
+  envoy::config::core::v3::ConfigSource config;
+  // Validate subscriptionFromConfigSource.
+  {
+    EXPECT_THROW_WITH_MESSAGE(
+        subscriptionFromConfigSource(config), EnvoyException,
+        "Missing config source specifier in envoy::config::core::v3::ConfigSource");
+  }
+  // Restore the mux factories.
+  Registry::FactoryRegistry<ConfigSubscriptionFactory>::factories() = saved_factories;
+  Registry::InjectFactory<ConfigSubscriptionFactory>::resetTypeMappings();
 }
 
 // The API type AGGREGATED_GRPC is not supported at the moment. Validate that an
@@ -247,7 +279,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultiton) {
   EXPECT_CALL(cm_, primaryClusters()).WillRepeatedly(ReturnRef(primary_clusters));
 
   EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
-                          fmt::format("{}::.DELTA_.GRPC must have no "
+                          fmt::format("{}::.AGGREGATED_..DELTA_.GRPC must have no "
                                       "more than 1 gRPC services specified:",
                                       config.mutable_api_config_source()->GetTypeName()));
 }
@@ -327,7 +359,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcClusterMultitonFailover) {
     EXPECT_CALL(cm_, grpcAsyncClientManager()).WillRepeatedly(ReturnRef(cm_.async_client_manager_));
 
     EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
-                            fmt::format("{}::.DELTA_.GRPC must have no "
+                            fmt::format("{}::.AGGREGATED_..DELTA_.GRPC must have no "
                                         "more than 2 gRPC services specified:",
                                         config.mutable_api_config_source()->GetTypeName()));
   }
@@ -339,7 +371,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
   config.set_path(test_path);
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-  EXPECT_CALL(*watcher, addWatch(test_path, _, _));
+  EXPECT_CALL(*watcher, addWatch(Eq(test_path), _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
   subscriptionFromConfigSource(config)->start({"foo"});
 }
@@ -356,7 +388,7 @@ TEST_F(SubscriptionFactoryTest, FilesystemCollectionSubscription) {
   std::string test_path = TestEnvironment::temporaryDirectory();
   auto* watcher = new Filesystem::MockWatcher();
   EXPECT_CALL(dispatcher_, createFilesystemWatcher_()).WillOnce(Return(watcher));
-  EXPECT_CALL(*watcher, addWatch(test_path, _, _));
+  EXPECT_CALL(*watcher, addWatch(Eq(test_path), _, _));
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _));
   // Unix paths start with /, Windows with c:/.
   const std::string file_path = test_path[0] == '/' ? test_path.substr(1) : test_path;
@@ -541,7 +573,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSubscr
   primary_clusters.insert("static_cluster");
   EXPECT_CALL(cm_, primaryClusters()).WillOnce(ReturnRef(primary_clusters));
   auto ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
-  EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
+  EXPECT_CALL(cm_, adsMux()).WillRepeatedly(Return(ads_mux));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
@@ -566,7 +598,7 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionAggregatedSotwSu
   const std::string xds_url = "xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/bar";
 
   GrpcMuxSharedPtr ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
-  EXPECT_CALL(cm_, adsMux()).WillOnce(Return(ads_mux));
+  EXPECT_CALL(cm_, adsMux()).WillRepeatedly(Return(ads_mux));
   EXPECT_CALL(dispatcher_, createTimer_(_));
   collectionSubscriptionFromUrl(xds_url, config)->start({});
 }
@@ -589,6 +621,29 @@ TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcCollectionDeltaSubscriptio
       ->start({});
 }
 
+// Validate that subscriptionOverAdsGrpcMux sends subscriptions over the given
+// mux, regardless of the value of the config.
+TEST_P(SubscriptionFactoryTestUnifiedOrLegacyMux, GrpcOverAdsGrpcMuxSubscription) {
+  envoy::config::core::v3::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+  api_config_source->set_transport_api_version(envoy::config::core::v3::V3);
+  api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("static_cluster");
+  EXPECT_CALL(cm_, primaryClusters()).Times(0);
+  auto cm_ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  EXPECT_CALL(cm_, adsMux()).WillRepeatedly(Return(cm_ads_mux));
+  auto non_cm_ads_mux = std::make_shared<NiceMock<MockGrpcMux>>();
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  EXPECT_CALL(callbacks_, onConfigUpdateFailed(_, _)).Times(0);
+  // Since this is ADS, the mux's start() should not be called (which attempts to create a gRPC
+  // stream).
+  EXPECT_CALL(*cm_ads_mux, start()).Times(0);
+  EXPECT_CALL(*non_cm_ads_mux, start()).Times(0);
+  subscriptionOverAdsGrpcMux(non_cm_ads_mux, config)
+      ->start({"xdstp://foo/envoy.config.endpoint.v3.ClusterLoadAssignment/r"});
+}
+
 // Use of the V2 transport fails by default.
 TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
   envoy::config::core::v3::ConfigSource config;
@@ -606,7 +661,7 @@ TEST_F(SubscriptionFactoryTest, LogWarningOnDeprecatedV2Transport) {
 
   EXPECT_THAT(subscription_factory_
                   .subscriptionFromConfigSource(
-                      config, Config::TypeUrl::get().ClusterLoadAssignment,
+                      config, Config::TestTypeUrl::get().ClusterLoadAssignment,
                       *stats_store_.rootScope(), callbacks_, resource_decoder_, {})
                   .status()
                   .message(),

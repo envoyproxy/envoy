@@ -143,8 +143,6 @@ struct ActiveStreamFilterBase : public virtual StreamFilterCallbacks,
   // TODO(soya3129): make this pure when adding impl to encoder filter.
   virtual void handleMetadataAfterHeadersCallback() PURE;
 
-  virtual void onMatchCallback(const Matcher::Action& action) PURE;
-
   // Http::StreamFilterCallbacks
   OptRef<const Network::Connection> connection() override;
   Event::Dispatcher& dispatcher() override;
@@ -265,9 +263,6 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void drainSavedRequestMetadata();
   // This function is called after the filter calls decodeHeaders() to drain accumulated metadata.
   void handleMetadataAfterHeadersCallback() override;
-  void onMatchCallback(const Matcher::Action& action) override {
-    handle_->onMatchCallback(std::move(action));
-  }
 
   // Http::StreamDecoderFilterCallbacks
   void addDecodedData(Buffer::Instance& data, bool streaming) override;
@@ -325,7 +320,7 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   StreamDecoderFilters::Iterator entry() const { return entry_; }
 
   StreamDecoderFilterSharedPtr handle_;
-  StreamDecoderFilters::Iterator entry_{};
+  StreamDecoderFilters::Iterator entry_;
   bool is_grpc_request_{};
 };
 
@@ -351,7 +346,6 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   void doData(bool end_stream) override;
   void drainSavedResponseMetadata();
   void handleMetadataAfterHeadersCallback() override;
-  void onMatchCallback(const Matcher::Action& action) override { handle_->onMatchCallback(action); }
 
   void doMetadata() override {
     if (saved_response_metadata_ != nullptr) {
@@ -383,7 +377,7 @@ struct ActiveStreamEncoderFilter : public ActiveStreamFilterBase,
   StreamEncoderFilters::Iterator entry() const { return entry_; }
 
   StreamEncoderFilterSharedPtr handle_;
-  StreamEncoderFilters::Iterator entry_{};
+  StreamEncoderFilters::Iterator entry_;
 };
 
 /**
@@ -972,7 +966,7 @@ protected:
     bool destroyed_{false};
 
     // Result of filter chain creation.
-    CreateChainResult create_chain_result_{};
+    CreateChainResult create_chain_result_;
 
     // Used to track which filter is the latest filter that has received data.
     ActiveStreamEncoderFilter* latest_data_encoding_filter_{};
@@ -1187,9 +1181,7 @@ public:
                      std::move(parent_filter_state)),
         local_reply_(local_reply), filter_chain_factory_(filter_chain_factory),
         downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
-            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)),
-        use_filter_manager_state_for_downstream_end_stream_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream")) {
+            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)) {
     ENVOY_LOG_ONCE_IF(
         trace, downstream_filter_load_shed_point_ == nullptr,
         "LoadShedPoint envoy.load_shed_points.http_downstream_filter_check is not found. "
@@ -1225,15 +1217,7 @@ public:
   /**
    * Whether downstream has observed end_stream.
    */
-  bool decoderObservedEndStream() const override {
-    // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream
-    // runtime flag.
-    if (use_filter_manager_state_for_downstream_end_stream_) {
-      return state_.observed_decode_end_stream_;
-    }
-
-    return hasLastDownstreamByteReceived();
-  }
+  bool decoderObservedEndStream() const override { return state_.observed_decode_end_stream_; }
 
   /**
    * Return true if the timestamp of the downstream end_stream was recorded.
@@ -1290,9 +1274,6 @@ private:
   const FilterChainFactory& filter_chain_factory_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
   Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
-  // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream runtime
-  // flag.
-  const bool use_filter_manager_state_for_downstream_end_stream_{};
 };
 
 } // namespace Http
