@@ -433,6 +433,13 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
         if (local_priority_set_ && priority == 0) {
           regenerateLocalityRoutingStructures();
         }
+
+        if (locality_weighted_balancing_ && locality_scheduler_on_lb_) {
+          auto seed = random_.random();
+          auto& host_set = *priority_set_.hostSetsPerPriority()[priority];
+          per_priority_state_[priority]->locality_wrr_ =
+              std::make_unique<LocalityWrr>(host_set, seed);
+        }
         return absl::OkStatus();
       });
   if (local_priority_set_) {
@@ -765,9 +772,9 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   if (locality_weighted_balancing_) {
     absl::optional<uint32_t> locality;
     if (host_availability == HostAvailability::Degraded) {
-      locality = host_set.chooseDegradedLocality();
+      locality = chooseDegradedLocality(host_set);
     } else {
-      locality = host_set.chooseHealthyLocality();
+      locality = chooseHealthyLocality(host_set);
     }
 
     if (locality.has_value()) {

@@ -20,9 +20,11 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/locality_wrr.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -435,6 +437,22 @@ private:
     return absl::nullopt;
   }
 
+  absl::optional<uint32_t> chooseHealthyLocality(HostSet& host_set) const {
+    if (locality_scheduler_on_lb_) {
+      ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
+      return per_priority_state_[host_set.priority()]->locality_wrr_->chooseHealthyLocality();
+    }
+    return host_set.chooseHealthyLocality();
+  };
+
+  absl::optional<uint32_t> chooseDegradedLocality(HostSet& host_set) const {
+    if (locality_scheduler_on_lb_) {
+      ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
+      return per_priority_state_[host_set.priority()]->locality_wrr_->chooseDegradedLocality();
+    }
+    return host_set.chooseDegradedLocality();
+  };
+
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
@@ -447,6 +465,9 @@ private:
     // for each of the non-local localities to determine what traffic should be
     // routed where.
     std::vector<uint64_t> residual_capacity_;
+
+    // Locality Weighted Round Robin config.
+    std::unique_ptr<LocalityWrr> locality_wrr_;
   };
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
   // Routing state broken out for each priority level in priority_set_.
@@ -463,6 +484,8 @@ private:
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;
+  const bool locality_scheduler_on_lb_{
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.move_locality_schedulers_to_lb")};
 
   friend class TestZoneAwareLoadBalancer;
 };

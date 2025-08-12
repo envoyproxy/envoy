@@ -4,6 +4,12 @@ behavior_changes:
 - area: ext_proc
   change: |
     Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
+- area: load balancing
+  change: |
+    Moved locality WRR structures out of HostSetImpl and into a separate class. Locality WRR schedulers are now by default owned
+    and constructed by the underlying Zone Aware LB, instead of owned and constructed by the Host Set. This behavior can be
+    reverted by setting the runtime guard ``envoy.restart_features.move_locality_schedulers_to_lb``. There should be no visible
+    behavior change for existing users of Zona Aware LBs.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*

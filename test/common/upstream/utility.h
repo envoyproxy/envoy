@@ -193,6 +193,20 @@ inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& 
       std::move(locality_hosts), !force_no_local_locality && !locality_hosts.empty());
 }
 
+template <class HostsT = HostVector>
+std::shared_ptr<const HostsT>
+makeHostsFromHostsPerLocality(HostsPerLocalityConstSharedPtr hosts_per_locality) {
+  HostVector hosts;
+
+  for (const auto& locality_hosts : hosts_per_locality->get()) {
+    for (const auto& host : locality_hosts) {
+      hosts.emplace_back(host);
+    }
+  }
+
+  return std::make_shared<const HostsT>(hosts);
+}
+
 inline LocalityWeightsSharedPtr
 makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
   return std::make_shared<LocalityWeights>(locality_weights);

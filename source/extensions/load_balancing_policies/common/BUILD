@@ -50,6 +50,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_protos_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/common/upstream:locality_wrr_lib",
         "//source/common/upstream:scheduler_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
