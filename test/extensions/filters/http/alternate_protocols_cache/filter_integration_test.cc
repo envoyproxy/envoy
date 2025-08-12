@@ -428,7 +428,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
-        route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
+        route->mutable_request_body_buffer_limit()->set_value(4096);
       });
 
   initialize();

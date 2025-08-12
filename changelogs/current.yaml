@@ -1,6 +1,16 @@
 date: Pending
 
 behavior_changes:
+- area: http
+  change: |
+    The route refresh will now results in a tracing refresh. The trace sampling decision and decoration
+    of new route will be applied to the active span.
+    This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.trace_refresh_after_route_refresh`` to ``false``.
+    Note, if :ref:`pack_trace_reason
+    <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>` is set
+    to ``true`` (it is ``true`` by default), then a request have been marked as traced may cannot be
+    unmarked as traced after the tracing refresh.
 - area: ext_proc
   change: |
     Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
@@ -12,9 +22,19 @@ minor_behavior_changes:
     In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader`` and ``HeaderHasValueRef``
     must be replaced with ``ContainsHeader``.
     Any uses of matcher ``HeaderHasValue(...)`` should be replaced with ``::testing::Pointee(ContainsHeader(...))``.
+- area: generic_proxy
+  change: |
+    Generic proxy codec add the same buffer limit as connection buffer limit, if the buffer limit is
+    exceeded, the connection is disconnected. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.generic_proxy_codec_buffer_limit`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: geoip
+  change: |
+    Fixed a bug in the maxmind provider where the found_entry field in the lookup result was not checked before trying to populate
+    headers  with data. If this field is not checked the provider could try to populate headers with wrong data, as per the
+    documentation for the Maxmind library https://github.com/maxmind/libmaxminddb/blob/main/doc/libmaxminddb.md#mmdb_lookup_result_s.
 - area: http3
   change: |
     Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
@@ -47,9 +67,15 @@ removed_config_or_runtime:
 - area: udp_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
+- area: rds
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.normalize_rds_provider_config`` and legacy code paths.
 - area: quic
   change: |
     Removed runtime guard ``envoy.reloadable_features.report_stream_reset_error_code`` and legacy code paths.
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.streaming_shadow`` and legacy code paths.
 - area: http3
   change: |
     Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
@@ -65,6 +91,18 @@ removed_config_or_runtime:
 - area: http
   change: |
     Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream`` and legacy code paths.
+- area: balsa
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` and legacy code paths.
+- area: geoip_providers
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.mmdb_files_reload_enabled`` and legacy code paths.
+- area: proxy_protocol
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` and legacy code paths.
 - area: dns_resolver
   change: |
     Removed runtime guard ``envoy.reloadable_features.getaddrinfo_num_retries`` and legacy code paths.
@@ -133,7 +171,7 @@ new_features:
     will take precedence over this field.
 - area: redis
   change: |
-    Added support for ``GEOSEARCH``.
+    Added support for ``GEOSEARCH``and ``GETEX``.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in produiction environments.
@@ -150,7 +188,13 @@ new_features:
         that sends ``GOAWAY`` AND closes connections for HTTP2 server processing of requests.  When
         a ``GOAWAY`` frame is submitted by this the counter ``http2.goaway_sent`` will be
         incremented.
-
+- area: router
+  change: |
+    Added :ref:`request_body_buffer_limit
+    <envoy_v3_api_field_config.route.v3.VirtualHost.request_body_buffer_limit>` and
+    :ref:`request_body_buffer_limit
+    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` configuration fields
+    to enable buffering of large request bodies beyond connection buffer limits.
 - area: otlp_stat_sink
   change: |
     Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
@@ -166,5 +210,15 @@ new_features:
 - area: tls_inspector
   change: |
     Added filter state when failing to parse the ``ClientHello``.
+- area: lua
+  change: |
+    Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
+    implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
+    :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
+
+- area: dynamic_modules
+  change: |
+    Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.
+    In the Rust SDK, they are available as ``envoy_log_info``, etc.
 
 deprecated:

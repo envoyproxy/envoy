@@ -104,7 +104,7 @@ public:
   const Router::PathMatcherSharedPtr& pathMatcher() const override;
   const Router::PathRewriterSharedPtr& pathRewriter() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
-  uint32_t retryShadowBufferLimit() const override;
+  uint64_t requestBodyBufferLimit() const override;
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;
   std::chrono::milliseconds timeout() const override;
   absl::optional<std::chrono::milliseconds> idleTimeout() const override;

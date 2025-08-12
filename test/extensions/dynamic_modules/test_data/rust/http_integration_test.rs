@@ -53,13 +53,35 @@ impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
   for PassthroughHttpFilterConfig
 {
   fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+    // Just to test that loggers can be accessible in a filter config callback.
+    envoy_log_trace!("new_http_filter called");
+    envoy_log_debug!("new_http_filter called");
+    envoy_log_info!("new_http_filter called");
+    envoy_log_warn!("new_http_filter called");
+    envoy_log_error!("new_http_filter called");
+    envoy_log_critical!("new_http_filter called");
     Box::new(PassthroughHttpFilter {})
   }
 }
 
 struct PassthroughHttpFilter {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PassthroughHttpFilter {}
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for PassthroughHttpFilter {
+  fn on_request_headers(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Just to test that loggers can be accessible in a filter callback.
+    envoy_log_trace!("on_request_headers called");
+    envoy_log_debug!("on_request_headers called");
+    envoy_log_info!("on_request_headers called");
+    envoy_log_warn!("on_request_headers called");
+    envoy_log_error!("on_request_headers called");
+    envoy_log_critical!("on_request_headers called");
+    envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+}
 
 struct HeadersHttpFilterConfig {
   headers_to_add: String,
