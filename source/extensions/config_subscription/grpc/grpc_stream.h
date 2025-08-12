@@ -35,7 +35,7 @@ public:
   };
 
   GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks,
-             Grpc::RawAsyncClientSharedPtr async_client,
+             Grpc::RawAsyncClientSharedPtr&& async_client,
              const Protobuf::MethodDescriptor& service_method, Event::Dispatcher& dispatcher,
              Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
              const RateLimitSettings& rate_limit_settings, ConnectedStateValue connected_state_val)

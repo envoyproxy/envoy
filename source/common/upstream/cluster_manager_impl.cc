@@ -507,7 +507,7 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
         factory_or_error.value()->createUncachedRawAsyncClient();
     RETURN_IF_NOT_OK_REF(client_or_error.status());
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, *this, *stats_.rootScope(), client_or_error.value(), dispatcher_);
+        local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
   }
   return absl::OkStatus();
 }

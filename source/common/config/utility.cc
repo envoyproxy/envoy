@@ -242,7 +242,7 @@ bool isApiTypeNonAggregated(const envoy::config::core::v3::ApiConfigSource::ApiT
 }
 } // namespace
 
-absl::StatusOr<absl::optional<envoy::config::core::v3::GrpcService>>
+absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>>
 Utility::getGrpcConfigFromApiConfigSource(
     const envoy::config::core::v3::ApiConfigSource& api_config_source, int grpc_service_idx,
     bool xdstp_config_source) {
@@ -269,10 +269,7 @@ Utility::getGrpcConfigFromApiConfigSource(
     return absl::nullopt;
   }
 
-  envoy::config::core::v3::GrpcService grpc_service;
-  grpc_service.MergeFrom(api_config_source.grpc_services(grpc_service_idx));
-
-  return grpc_service;
+  return Envoy::makeOptRef(api_config_source.grpc_services(grpc_service_idx));
 }
 
 absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
@@ -280,7 +277,7 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
     const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
     bool skip_cluster_check, int grpc_service_idx, bool xdstp_config_source) {
 
-  absl::StatusOr<absl::optional<envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+  absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
       getGrpcConfigFromApiConfigSource(api_config_source, grpc_service_idx, xdstp_config_source);
   RETURN_IF_NOT_OK(maybe_grpc_service.status());
 
