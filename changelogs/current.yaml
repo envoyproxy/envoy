@@ -67,6 +67,9 @@ removed_config_or_runtime:
 - area: udp_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
+- area: xds
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.xds_prevent_resource_copy`` and legacy code paths.
 - area: rds
   change: |
     Removed runtime guard ``envoy.reloadable_features.normalize_rds_provider_config`` and legacy code paths.
