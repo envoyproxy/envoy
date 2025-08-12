@@ -937,7 +937,6 @@ TEST_F(OAuth2Test, RequestSignoutUnsecureWhenEndSessionEndpointIsConfigured) {
             filter_->decodeHeaders(request_headers, false));
 }
 
-
 /**
  * Scenario: The OAuth filter receives a request to an arbitrary path with valid OAuth cookies
  * (cookie values and validation are mocked out)
