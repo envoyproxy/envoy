@@ -5907,16 +5907,17 @@ TEST_P(ExtProcIntegrationTest, ModeOverrideNoneToFullDuplex) {
         return true;
       });
 
-  processRequestBodyMessage(*grpc_upstreams_[0], false, [&body_str, &upstream_body_str]
-                            (const HttpBody& body, BodyResponse& resp) {
-    EXPECT_TRUE(body.end_of_stream());
-    EXPECT_EQ(body.body(), body_str);
-    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()
-                              ->mutable_streamed_response();
-    streamed_response->set_body(upstream_body_str);
-    streamed_response->set_end_of_stream(true);
-    return true;
-  });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false,
+      [&body_str, &upstream_body_str](const HttpBody& body, BodyResponse& resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        EXPECT_EQ(body.body(), body_str);
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(upstream_body_str);
+        streamed_response->set_end_of_stream(true);
+        return true;
+      });
   handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->body().toString(), upstream_body_str);
   verifyDownstreamResponse(*response, 200);
