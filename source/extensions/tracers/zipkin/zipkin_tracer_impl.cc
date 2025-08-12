@@ -72,21 +72,24 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
   SpanContextExtractor extractor(trace_context);
-  bool sampled{extractor.extractSampled(tracing_decision)};
+  const absl::optional<bool> sampled = extractor.extractSampled();
+  bool use_local_decision = !sampled.has_value();
   TRY_NEEDS_AUDIT {
-    auto ret_span_context = extractor.extractSpanContext(sampled);
+    auto ret_span_context = extractor.extractSpanContext(sampled.value_or(tracing_decision.traced));
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
       new_zipkin_span =
           tracer.startSpan(config, std::string(trace_context.host()), stream_info.startTime());
-      new_zipkin_span->setSampled(sampled);
+      new_zipkin_span->setSampled(sampled.value_or(tracing_decision.traced));
     } else {
+      use_local_decision = false;
       new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()),
                                          stream_info.startTime(), ret_span_context.first);
     }
   }
   END_TRY catch (const ExtractorException& e) { return std::make_unique<Tracing::NullSpan>(); }
 
+  new_zipkin_span->setUseLocalDecision(use_local_decision);
   // Return the active Zipkin span.
   return new_zipkin_span;
 }
