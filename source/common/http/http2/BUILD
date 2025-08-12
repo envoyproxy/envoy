@@ -50,7 +50,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/http:codec_helper_lib",
         "//source/common/http:codes_lib",
-        "//source/common/http:exception_lib",
         "//source/common/http:header_map_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
