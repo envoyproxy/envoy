@@ -1137,7 +1137,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
 
-        route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
+        route->mutable_request_body_buffer_limit()->set_value(1024);
         route->mutable_route()
             ->mutable_retry_policy()
             ->mutable_retry_back_off()
@@ -1401,7 +1401,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
 // Very similar set-up to RetryHittingBufferLimits but using the route specific cap.
 TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
   auto host = config_helper_.createVirtualHost("routelimit.lyft.com", "/");
-  host.mutable_per_request_buffer_limit_bytes()->set_value(0);
+  host.mutable_request_body_buffer_limit()->set_value(0);
   config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1586,8 +1586,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done", "false");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
@@ -1617,8 +1615,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done", "true");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
