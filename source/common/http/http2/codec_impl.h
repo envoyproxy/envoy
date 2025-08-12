@@ -15,14 +15,12 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
-#include "source/common/common/statusor.h"
-#include "source/common/common/thread.h"
 #include "source/common/http/codec_helper.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/http2/codec_stats.h"
@@ -30,7 +28,6 @@
 #include "source/common/http/http2/metadata_encoder.h"
 #include "source/common/http/http2/protocol_constraints.h"
 #include "source/common/http/status.h"
-#include "source/common/http/utility.h"
 
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
