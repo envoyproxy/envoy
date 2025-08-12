@@ -1060,6 +1060,31 @@ TEST(ABIImpl, HttpCallout) {
             envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
 }
 
+TEST(ABIImpl, Log) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::err);
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Trace));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Debug));
+  EXPECT_FALSE(envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Info));
+  EXPECT_FALSE(envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Warn));
+  EXPECT_TRUE(envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Error));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Critical));
+
+  // Use all log levels, mostly for coverage.
+  const std::string msg = "test log message";
+  envoy_dynamic_module_type_buffer_module_ptr ptr = const_cast<char*>(msg.data());
+  size_t len = msg.size();
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Trace, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Debug, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Warn, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Critical, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off, ptr, len);
+}
+
 } // namespace HttpFilters
 } // namespace DynamicModules
 } // namespace Extensions
