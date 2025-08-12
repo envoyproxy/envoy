@@ -265,10 +265,11 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 
   uint64_t total_header_bytes = 0;
   headers.iterate([&total_header_bytes](const HeaderEntry& header) {
-    total_header_bytes += header.key().getStringView().size() + header.value().getStringView().size();
+    total_header_bytes +=
+        header.key().getStringView().size() + header.value().getStringView().size();
     return HeaderMap::Iterate::Continue;
   });
-  bytes_meter_.addDecompressedHeaderBytesSent(total_header_bytes);
+  bytes_meter_->addDecompressedHeaderBytesSent(total_header_bytes);
 
   submitHeaders(headers, end_stream);
   if (parent_.sendPendingFramesAndHandleError()) {
@@ -1788,7 +1789,7 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
-  StreamImpl* stream = getStreamUnchecked(stream_id);
+  StreamImpl* stream = connection_->getStreamUnchecked(stream_id);
   if (!stream) {
     return OnHeaderResult::HEADER_RST_STREAM;
   }

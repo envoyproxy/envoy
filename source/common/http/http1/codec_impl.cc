@@ -120,7 +120,8 @@ void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view va
 
   const uint64_t header_size = connection_.buffer().addFragments({key, COLON_SPACE, value, CRLF});
 
-  // There is no header field compression in HTTP/1.1, so the wire representation is the same as the decompressed representation.
+  // There is no header field compression in HTTP/1.1, so the wire representation is the same as the
+  // decompressed representation.
   bytes_meter_->addHeaderBytesSent(header_size);
   bytes_meter_->addDecompressedHeaderBytesSent(header_size);
 }

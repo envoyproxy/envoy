@@ -234,9 +234,7 @@ protected:
     bytes_meter_->addDecompressedHeaderBytesReceived(total_header_bytes);
   }
 
-
   void encodeTrailersImpl(quiche::HttpHeaderBlock&& trailers);
-
 
   // Converts `header_list` into a new `Http::MetadataMap`.
   std::unique_ptr<Http::MetadataMap>

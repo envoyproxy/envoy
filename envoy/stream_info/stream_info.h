@@ -443,8 +443,12 @@ struct BytesMeter {
 
   void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
   void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
-  void addDecompressedHeaderBytesSent(uint64_t added_bytes) { decompressed_header_bytes_sent_ += added_bytes; }
-  void addDecompressedHeaderBytesReceived(uint64_t added_bytes) { decompressed_header_bytes_received_ += added_bytes; }
+  void addDecompressedHeaderBytesSent(uint64_t added_bytes) {
+    decompressed_header_bytes_sent_ += added_bytes;
+  }
+  void addDecompressedHeaderBytesReceived(uint64_t added_bytes) {
+    decompressed_header_bytes_received_ += added_bytes;
+  }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
 
@@ -463,8 +467,10 @@ struct BytesMeter {
     downstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
     downstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
     downstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
-    downstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_sent = decompressed_header_bytes_sent_;
-    downstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_received = decompressed_header_bytes_received_;
+    downstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_sent =
+        decompressed_header_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_received =
+        decompressed_header_bytes_received_;
     downstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
     downstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
   }
@@ -474,8 +480,10 @@ struct BytesMeter {
     upstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
     upstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
     upstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
-    upstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_sent = decompressed_header_bytes_sent_;
-    upstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_received = decompressed_header_bytes_received_;
+    upstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_sent =
+        decompressed_header_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_received =
+        decompressed_header_bytes_received_;
     upstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
     upstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
   }

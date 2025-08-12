@@ -375,10 +375,13 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   size_t offset = receiveRequestHeaders(false);
   // Received header bytes do not include the HTTP/3 frame overhead.
   EXPECT_EQ(quic_stream_->stream_bytes_read() - 2,
             quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_LE(quic_stream_->stream_bytes_read() - 2,
+            quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
   size_t body_size = receiveRequestBody(offset, request_body_, true, request_body_.size() * 2);
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
@@ -389,13 +392,18 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
             quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   EXPECT_GE(27, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(27, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_GE(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(),
+            quic_stream_->bytesMeter()->headerBytesSent());
 
   quic_stream_->encodeTrailers(response_trailers_);
   EXPECT_GE(52, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(52, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_GE(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(),
+            quic_stream_->bytesMeter()->headerBytesSent());
 }
 
 TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {

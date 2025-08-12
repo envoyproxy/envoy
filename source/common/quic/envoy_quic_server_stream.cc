@@ -84,8 +84,7 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     quiche::HttpHeaderBlock header_block = envoyHeadersToHttp2HeaderBlock(*header_map);
     addDecompressedHeaderBytesSent(header_block);
-    size_t bytes_sent =
-        WriteHeaders(std::move(header_block), end_stream, nullptr);
+    size_t bytes_sent = WriteHeaders(std::move(header_block), end_stream, nullptr);
     stats_gatherer_->addBytesSent(bytes_sent, end_stream);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
   }
