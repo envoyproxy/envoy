@@ -1530,6 +1530,8 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
     return 0;
   }
 
+  stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
+
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
   if (should_return) {
@@ -1789,11 +1791,6 @@ bool ConnectionImpl::Http2Visitor::OnBeginHeadersForStream(Http2StreamId stream_
 OnHeaderResult ConnectionImpl::Http2Visitor::OnHeaderForStream(Http2StreamId stream_id,
                                                                absl::string_view name_view,
                                                                absl::string_view value_view) {
-  StreamImpl* stream = connection_->getStreamUnchecked(stream_id);
-  if (!stream) {
-    return OnHeaderResult::HEADER_RST_STREAM;
-  }
-  stream->bytes_meter_->addDecompressedHeaderBytesReceived(name_view.size() + value_view.size());
   // TODO PERF: Can reference count here to avoid copies.
   HeaderString name;
   name.setCopy(name_view.data(), name_view.size());
