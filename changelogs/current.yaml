@@ -208,4 +208,9 @@ new_features:
     implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
     :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
 
+- area: dynamic_modules
+  change: |
+    Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.
+    In the Rust SDK, they are available as ``envoy_log_info``, etc.
+
 deprecated:
