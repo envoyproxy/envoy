@@ -593,7 +593,9 @@ TEST_F(OAuth2Test, PreservesQueryParametersInAuthorizationEndpointWithUrlEncodin
  *
  * Expected behavior: the filter should redirect to the server name with cleared OAuth cookies.
  */
-TEST_F(OAuth2Test, DEPRECATED_FEATURE_TEST(RequestSignoutUnsecure)) {
+TEST_F(OAuth2Test, RequestSignoutUnsecure) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_secure_cookie_delete", "false"}});
   Http::TestRequestHeaderMapImpl request_headers{
       {Http::Headers::get().Path.get(), "/_signout"},
       {Http::Headers::get().Host.get(), "traffic.example.com"},
@@ -725,7 +727,9 @@ TEST_F(OAuth2Test, RequestSignoutWhenEndSessionEndpointIsConfigured) {
  *
  * Expected behavior: the filter should redirect to the end session endpoint.
  */
-TEST_F(OAuth2Test, DEPRECATED_FEATURE_TEST(RequestSignoutUnsecureWhenEndSessionEndpointIsConfigured)) {
+TEST_F(OAuth2Test, RequestSignoutUnsecureWhenEndSessionEndpointIsConfigured) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_secure_cookie_delete", "false"}});
   // Create a filter config with end session endpoint and openid scope.
   envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
   auto* endpoint = p.mutable_token_endpoint();
@@ -3423,7 +3427,9 @@ TEST_F(OAuth2Test, CookiesDeletedWhenTokensCleared) {
 }
 
 // Ensure that the token cookies are deleted when the tokens are cleared
-TEST_F(OAuth2Test, DEPRECATED_FEATURE_TEST(CookiesDeletedUnsecureWhenTokensCleared)) {
+TEST_F(OAuth2Test, CookiesDeletedUnsecureWhenTokensCleared) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_secure_cookie_delete", "false"}});
   // Initialize with use_refresh_token set to false
   init(getConfig(true /* forward_bearer_token */, false /* use_refresh_token */));
 
