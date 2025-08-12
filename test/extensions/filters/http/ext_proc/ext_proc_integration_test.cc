@@ -5944,25 +5944,29 @@ TEST_P(ExtProcIntegrationTest, NoneToFullDuplexMoreDataAfterModeOverride) {
         return true;
       });
 
-  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
-    EXPECT_FALSE(body.end_of_stream());
-    EXPECT_EQ(body.body().size(), 10);
-    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-    streamed_response->set_body("bbbbb");
-    streamed_response->set_end_of_stream(false);
-    return true;
-  });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
+        EXPECT_FALSE(body.end_of_stream());
+        EXPECT_EQ(body.body().size(), 10);
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body("bbbbb");
+        streamed_response->set_end_of_stream(false);
+        return true;
+      });
 
   codec_client_->sendData(*request_encoder_, 20, true);
 
-  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
-    EXPECT_TRUE(body.end_of_stream());
-    EXPECT_EQ(body.body().size(), 20);
-    auto* streamed_response = resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-    streamed_response->set_body("0123456789");
-    streamed_response->set_end_of_stream(true);
-    return true;
-  });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        EXPECT_EQ(body.body().size(), 20);
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body("0123456789");
+        streamed_response->set_end_of_stream(true);
+        return true;
+      });
 
   handleUpstreamRequest();
   EXPECT_EQ(upstream_request_->body().toString(), "bbbbb0123456789");
