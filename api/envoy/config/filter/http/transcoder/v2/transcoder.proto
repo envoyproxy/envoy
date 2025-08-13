@@ -119,7 +119,7 @@ message GrpcJsonTranscoder {
   //     message Shelf {}
   //
   // The client could ``post`` a json body ``{"shelf": 1234}`` with the path of
-  // ``/bookstore.Bookstore/GetShelfRequest`` to call ``GetShelfRequest``.
+  // ``/bookstore.Bookstore/GetShelf`` to call ``GetShelfRequest``.
   bool auto_mapping = 7;
 
   // Whether to ignore query parameters that cannot be mapped to a corresponding
