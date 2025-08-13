@@ -89,6 +89,7 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
           if (socket_->ioHandle().isOpen()) {
             // The listener filter should not wait for more data when it has already received
             // all the data it requested.
+            ASSERT(filter_buffer.rawSlice().len_ < (*iter_)->maxReadBytes());
             // Check if the maxReadBytes is changed or not. If change,
             // reset the buffer capacity.
             if ((*iter_)->maxReadBytes() > filter_buffer.capacity()) {
