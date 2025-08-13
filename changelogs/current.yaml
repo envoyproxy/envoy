@@ -236,6 +236,5 @@ new_features:
 - area: http
   change: |
     Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
-  credit: Premnath Nenavath
 
 deprecated:
