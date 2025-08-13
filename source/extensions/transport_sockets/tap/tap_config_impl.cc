@@ -158,51 +158,21 @@ void PerSocketTapperImpl::handleSendingStreamTappedMsgPerConfigSize(const Buffer
                                                                     const uint32_t total_bytes,
                                                                     const bool is_read,
                                                                     const bool is_end_stream) {
-  // Submit firstly and make the data size is closed to configured size.
-  if ((streamed_trace_ != nullptr) &&
-      (current_streamed_rx_tx_bytes_ + total_bytes) >= config_->minStreamedSentBytes()) {
-    submitStreamedDataPerConfiguredSize();
-    pegSubmitCounter(true);
-  }
-
-  // Set the initial offset for data copying.
+  // Set the offset for data copying.
   uint32_t copy_start_offset = 0;
   if (is_read) {
     copy_start_offset = data.length() - total_bytes;
   }
-  if (total_bytes < config_->minStreamedSentBytes()) {
-    // Only store the data in new event.
-    setStreamedDataPerConfiguredSize(data, copy_start_offset, total_bytes, is_read, is_end_stream);
-  } else {
-    // The data size is equal or bigger than configured size.
-    // Make the submitted data size is closed to configured size and split the data if needed.
-    uint32_t per_split_bytes = config_->minStreamedSentBytes();
-    uint32_t remaining_bytes = 0;
-    uint32_t split_cnt = 0;
-    while (true) {
-      split_cnt++;
-      setStreamedDataPerConfiguredSize(data, copy_start_offset, per_split_bytes, is_read,
-                                       is_end_stream);
-      submitStreamedDataPerConfiguredSize();
-      pegSubmitCounter(true);
+  setStreamedDataPerConfiguredSize(data, copy_start_offset, total_bytes, is_read, is_end_stream);
 
-      remaining_bytes = total_bytes - split_cnt * per_split_bytes;
-      if (remaining_bytes == 0) {
-        // By coincidence, the data size evenly divides by the configured size.
-        break;
-      }
-
-      copy_start_offset += per_split_bytes;
-      if (remaining_bytes < per_split_bytes) {
-        // Few data left, store it and submit later.
-        setStreamedDataPerConfiguredSize(data, copy_start_offset, remaining_bytes, is_read,
-                                         is_end_stream);
-        break;
-      }
-    }
+  // Try to submit.
+  if (streamed_trace_ != nullptr &&
+      current_streamed_rx_tx_bytes_ >= config_->minStreamedSentBytes()) {
+    submitStreamedDataPerConfiguredSize();
+    pegSubmitCounter(true);
   }
 
-  // Submit the data if it is meet streamed buffer aged duration threshold.
+  // Submit the data when the streamed buffer age exceeds the duration threshold.
   if (shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration()) {
     submitStreamedDataPerConfiguredSize();
     pegSubmitCounter(true);
