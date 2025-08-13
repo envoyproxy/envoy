@@ -93,6 +93,7 @@ using ::google::protobuf::RepeatedPtrFieldBackInserter; // NOLINT(misc-unused-us
 using ::google::protobuf::StringValue;                  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Struct;                       // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::TextFormat;                   // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Timestamp;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Type;                         // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::UInt32Value;                  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Value;                        // NOLINT(misc-unused-using-decls)
