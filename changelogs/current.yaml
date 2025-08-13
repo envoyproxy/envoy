@@ -79,6 +79,7 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
 - area: xds
   change: |
+<<<<<<< HEAD
     Removed runtime guard ``envoy.reloadable_features.xds_prevent_resource_copy`` and legacy code paths.
 - area: rds
   change: |
@@ -233,5 +234,9 @@ new_features:
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.
     In the Rust SDK, they are available as ``envoy_log_info``, etc.
+- area: http
+  change: |
+    Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
+  credit: Premnath Nenavath
 
 deprecated:
