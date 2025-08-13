@@ -355,6 +355,7 @@ envoy_cc_library(
     ],
     hdrs = [
         "router.h",
+        "router_cluster_config.h",
         "upstream_request.h",
     ],
     deps = [
@@ -384,6 +385,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//envoy/upstream:upstream_interface",
         "//source/common/access_log:access_log_lib",
+        "//source/common/buffer:copy_on_write_buffer_lib",
         "//source/common/buffer:watermark_buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:cleanup_lib",
@@ -411,6 +413,7 @@ envoy_cc_library(
         "//source/common/network:upstream_socket_options_filter_state_lib",
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/orca:orca_parser",
+        "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
