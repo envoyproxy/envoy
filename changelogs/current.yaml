@@ -22,6 +22,9 @@ minor_behavior_changes:
     In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader`` and ``HeaderHasValueRef``
     must be replaced with ``ContainsHeader``.
     Any uses of matcher ``HeaderHasValue(...)`` should be replaced with ``::testing::Pointee(ContainsHeader(...))``.
+- area: http
+  change: |
+    Adds accounting for decompressed HTTP header bytes sent and received. Existing stats only count wire-encoded header bytes.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
