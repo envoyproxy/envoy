@@ -67,6 +67,7 @@ using Closure = ::google::protobuf::Closure;
 
 using ::google::protobuf::Any;                          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Arena;                        // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::BoolValue;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::BytesValue;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Descriptor;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPool;               // NOLINT(misc-unused-using-decls)
