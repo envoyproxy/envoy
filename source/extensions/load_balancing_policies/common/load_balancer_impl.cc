@@ -424,6 +424,12 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
+  if (locality_weighted_balancing_ && locality_scheduler_on_lb_) {
+    for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
+      rebuildLocalityWrrForPriority(priority);
+    }
+  }
+
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
@@ -435,10 +441,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
         }
 
         if (locality_weighted_balancing_ && locality_scheduler_on_lb_) {
-          auto seed = random_.random();
-          auto& host_set = *priority_set_.hostSetsPerPriority()[priority];
-          per_priority_state_[priority]->locality_wrr_ =
-              std::make_unique<LocalityWrr>(host_set, seed);
+          rebuildLocalityWrrForPriority(priority);
         }
         return absl::OkStatus();
       });
@@ -457,6 +460,13 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
           return absl::OkStatus();
         });
   }
+}
+
+void ZoneAwareLoadBalancerBase::rebuildLocalityWrrForPriority(uint32_t priority) {
+  ASSERT(priority < priority_set_.hostSetsPerPriority().size());
+  auto& host_set = *priority_set_.hostSetsPerPriority()[priority];
+  per_priority_state_[priority]->locality_wrr_ =
+      std::make_unique<LocalityWrr>(host_set, random_.random());
 }
 
 void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {

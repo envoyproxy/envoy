@@ -470,6 +470,9 @@ private:
     std::unique_ptr<LocalityWrr> locality_wrr_;
   };
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
+
+  void rebuildLocalityWrrForPriority(uint32_t priority);
+
   // Routing state broken out for each priority level in priority_set_.
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandlePtr priority_update_cb_;
