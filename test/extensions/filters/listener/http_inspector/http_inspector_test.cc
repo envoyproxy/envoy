@@ -785,6 +785,109 @@ TEST_P(HttpInspectorTest, HttpExceedInitialBufferSize) {
   EXPECT_EQ(1, cfg_->stats().http10_found_.value());
 }
 
+TEST_P(HttpInspectorTest, HttpWithVeryLongUrlNoNewline) {
+  // This test replicates the issue from test_curl.sh where a very long URL
+  // without a newline within the buffer causes the http_inspector to keep
+  // waiting for more data and eventually timeout.
+  init();
+
+  // Create a long URL similar to the one in test_curl.sh (3000+ characters)
+  std::string long_query;
+  for (int i = 0; i < 150; ++i) {
+    long_query +=
+        "handle:%22item-name-very-long-product-handle-" + std::to_string(i) + "%22%20OR%20";
+  }
+
+  // Build request without newline to simulate incomplete read
+  const std::string request_without_newline =
+      "GET /search?tracing=1&cache=no-cache&q=" + long_query + "&type=product HTTP/1.1";
+
+  // Simulate multiple reads without finding a newline
+  InSequence s;
+
+#ifdef WIN32
+  // Initial attempt - no data available
+  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+
+  // First read - return initial buffer size worth of data (8KB)
+  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+      .WillOnce(Invoke([&request_without_newline](os_fd_t, void* buffer, size_t length,
+                                                  int) -> Api::SysCallSizeResult {
+        size_t copy_size =
+            std::min(length, static_cast<size_t>(Config::DEFAULT_INITIAL_BUFFER_SIZE));
+        copy_size = std::min(copy_size, request_without_newline.size());
+        memcpy(buffer, request_without_newline.data(), copy_size);
+        return Api::SysCallSizeResult{ssize_t(copy_size), 0};
+      }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+
+  // Second read - buffer doubles to 16KB
+  EXPECT_CALL(os_sys_calls_, recv(_, _, _, _))
+      .WillOnce(Invoke([&request_without_newline](os_fd_t, void* buffer, size_t length,
+                                                  int) -> Api::SysCallSizeResult {
+        size_t copy_size =
+            std::min(length, static_cast<size_t>(2 * Config::DEFAULT_INITIAL_BUFFER_SIZE));
+        copy_size = std::min(copy_size, request_without_newline.size());
+        memcpy(buffer, request_without_newline.data(), copy_size);
+        return Api::SysCallSizeResult{ssize_t(copy_size), 0};
+      }))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+#else
+  // Initial attempt - no data available
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Return(Api::SysCallSizeResult{ssize_t(-1), SOCKET_ERROR_AGAIN}));
+
+  // First read - return initial buffer size worth of data (8KB)
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke([&request_without_newline](os_fd_t, void* buffer, size_t length,
+                                                  int) -> Api::SysCallSizeResult {
+        size_t copy_size =
+            std::min(length, static_cast<size_t>(Config::DEFAULT_INITIAL_BUFFER_SIZE));
+        copy_size = std::min(copy_size, request_without_newline.size());
+        memcpy(buffer, request_without_newline.data(), copy_size);
+        return Api::SysCallSizeResult{ssize_t(copy_size), 0};
+      }));
+
+  // Second read - buffer doubles to 16KB
+  EXPECT_CALL(os_sys_calls_, recv(42, _, _, MSG_PEEK))
+      .WillOnce(Invoke([&request_without_newline](os_fd_t, void* buffer, size_t length,
+                                                  int) -> Api::SysCallSizeResult {
+        size_t copy_size =
+            std::min(length, static_cast<size_t>(2 * Config::DEFAULT_INITIAL_BUFFER_SIZE));
+        copy_size = std::min(copy_size, request_without_newline.size());
+        memcpy(buffer, request_without_newline.data(), copy_size);
+        return Api::SysCallSizeResult{ssize_t(copy_size), 0};
+      }));
+#endif
+
+  EXPECT_CALL(socket_, setRequestedApplicationProtocols(_)).Times(0);
+
+  auto accepted = filter_->onAccept(cb_);
+  EXPECT_EQ(accepted, Network::FilterStatus::StopIteration);
+
+  // First read - should continue looking for more data
+  ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto status = filter_->onData(*buffer_);
+  EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+
+  // Verify buffer size doubled
+  EXPECT_EQ(filter_->maxReadBytes(), 2 * Config::DEFAULT_INITIAL_BUFFER_SIZE);
+  buffer_->resetCapacity(2 * Config::DEFAULT_INITIAL_BUFFER_SIZE);
+
+  // Second read - still no newline, continues waiting
+  ASSERT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  status = filter_->onData(*buffer_);
+  EXPECT_EQ(status, Network::FilterStatus::StopIteration);
+
+  // Verify buffer size doubled again
+  EXPECT_EQ(filter_->maxReadBytes(), 4 * Config::DEFAULT_INITIAL_BUFFER_SIZE);
+
+  // At this point in real scenario, the connection would timeout
+  // We're demonstrating that the filter keeps waiting for a newline
+  // that never comes within the timeout period
+}
+
 } // namespace
 } // namespace HttpInspector
 } // namespace ListenerFilters
