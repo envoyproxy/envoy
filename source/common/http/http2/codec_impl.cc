@@ -263,13 +263,7 @@ void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap&
 void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   local_end_stream_ = end_stream;
 
-  uint64_t total_header_bytes = 0;
-  headers.iterate([&total_header_bytes](const HeaderEntry& header) {
-    total_header_bytes +=
-        header.key().getStringView().size() + header.value().getStringView().size();
-    return HeaderMap::Iterate::Continue;
-  });
-  bytes_meter_->addDecompressedHeaderBytesSent(total_header_bytes);
+  bytes_meter_->addDecompressedHeaderBytesSent(headers.byteSize());
 
   submitHeaders(headers, end_stream);
   if (parent_.sendPendingFramesAndHandleError()) {
@@ -341,6 +335,9 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
+
+  bytes_meter_->addDecompressedHeaderBytesSent(trailers.byteSize());
+
   if (pending_send_data_->length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.

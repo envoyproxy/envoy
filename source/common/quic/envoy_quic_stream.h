@@ -219,11 +219,7 @@ protected:
   StreamInfo::BytesMeterSharedPtr& mutableBytesMeter() { return bytes_meter_; }
 
   void addDecompressedHeaderBytesSent(const quiche::HttpHeaderBlock& headers) {
-    uint64_t total_header_bytes = 0;
-    for (const auto& [key, value] : headers) {
-      total_header_bytes += key.size() + value.size();
-    }
-    bytes_meter_->addDecompressedHeaderBytesSent(total_header_bytes);
+    bytes_meter_->addDecompressedHeaderBytesSent(headers.TotalBytesUsed());
   }
 
   void addDecompressedHeaderBytesReceived(const quic::QuicHeaderList& header_list) {
