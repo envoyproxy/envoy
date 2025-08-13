@@ -5076,62 +5076,6 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(StreamingShadow, RouterShadowingTest, testing::Bool());
 
-TEST_P(RouterShadowingTest, BufferingShadowWithClusterHeader) {
-  // Always skip this test as streaming_shadow is now always enabled
-  GTEST_SKIP();
-  ShadowPolicyPtr policy = makeShadowPolicy("", "some_header", "bar");
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
-  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
-
-  NiceMock<Http::MockRequestEncoder> encoder;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
-
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
-                     43))
-      .WillOnce(Return(true));
-
-  expectResponseTimerCreate();
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  headers.addCopy("some_header", "some_cluster");
-
-  router_->decodeHeaders(headers, false);
-
-  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-
-  EXPECT_CALL(callbacks_, addDecodedData(_, true));
-
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, false));
-
-  Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
-  EXPECT_CALL(callbacks_, decodingBuffer())
-      .Times(AtLeast(2))
-      .WillRepeatedly(Return(body_data.get()));
-  EXPECT_CALL(*shadow_writer_, shadow_("some_cluster", _, _))
-      .WillOnce(Invoke([](const std::string&, Http::RequestMessagePtr& request,
-                          const Http::AsyncClient::RequestOptions& options) -> void {
-        EXPECT_NE(request->body().length(), 0);
-        EXPECT_NE(nullptr, request->trailers());
-        EXPECT_EQ(absl::optional<std::chrono::milliseconds>(10), options.timeout);
-        EXPECT_TRUE(options.sampled_.value());
-      }));
-
-  router_->decodeTrailers(trailers);
-  EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
-
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putResult(_, absl::optional<uint64_t>(200)));
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-}
-
 TEST_P(RouterShadowingTest, ShadowNoClusterHeaderInHeader) {
   ShadowPolicyPtr policy = makeShadowPolicy("", "some_header", "bar");
   callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
