@@ -546,6 +546,7 @@ typed_config:
           admin, "POST", "/drain_listeners", "", Http::CodecType::HTTP1);
       ASSERT_TRUE(response->complete());
       EXPECT_EQ("200", response->headers().getStatusValue());
+      test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
     }
   }
 
