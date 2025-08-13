@@ -65,6 +65,7 @@ namespace Protobuf {
 
 using Closure = ::google::protobuf::Closure;
 
+using ::google::protobuf::Any;                          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Arena;                        // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::BytesValue;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Descriptor;                   // NOLINT(misc-unused-using-decls)
@@ -88,6 +89,7 @@ using ::google::protobuf::RepeatedField;                // NOLINT(misc-unused-us
 using ::google::protobuf::RepeatedFieldBackInserter;    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrField;             // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrFieldBackInserter; // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Struct;                       // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::TextFormat;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Type;                         // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::UInt32Value;                  // NOLINT(misc-unused-using-decls)
