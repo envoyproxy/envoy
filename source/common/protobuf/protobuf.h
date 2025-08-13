@@ -71,6 +71,7 @@ using ::google::protobuf::BytesValue;                   // NOLINT(misc-unused-us
 using ::google::protobuf::Descriptor;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPool;               // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPoolDatabase;       // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Duration;                     // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DynamicCastMessage;           // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DynamicMessageFactory;        // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::EnumValueDescriptor;          // NOLINT(misc-unused-using-decls)
@@ -89,10 +90,12 @@ using ::google::protobuf::RepeatedField;                // NOLINT(misc-unused-us
 using ::google::protobuf::RepeatedFieldBackInserter;    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrField;             // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrFieldBackInserter; // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::StringValue;                  // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Struct;                       // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::TextFormat;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Type;                         // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::UInt32Value;                  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Value;                        // NOLINT(misc-unused-using-decls)
 
 using Message = ::google::protobuf::MessageLite;
 
