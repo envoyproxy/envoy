@@ -641,17 +641,13 @@ Host::CreateConnectionData HostImplBase::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
-    // TODO(adisuissa): convert from OptRef to reference once the runtime flag
-    // envoy.reloadable_features.use_config_in_happy_eyeballs is deprecated.
+    ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
     OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
-      ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
-      if (cluster.happyEyeballsConfig().has_value()) {
-        happy_eyeballs_config = cluster.happyEyeballsConfig();
-      } else {
-        happy_eyeballs_config = defaultHappyEyeballsConfig();
-      }
+    if (cluster.happyEyeballsConfig().has_value()) {
+      happy_eyeballs_config = cluster.happyEyeballsConfig();
+    } else {
+      happy_eyeballs_config = defaultHappyEyeballsConfig();
     }
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
         dispatcher, *address_list_or_null, source_address_selector, socket_factory,

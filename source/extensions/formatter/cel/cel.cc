@@ -17,8 +17,7 @@ namespace Expr = Filters::Common::Expr;
 
 CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
                            Expr::BuilderInstanceSharedPtr expr_builder,
-                           const google::api::expr::v1alpha1::Expr& input_expr,
-                           absl::optional<size_t>& max_length)
+                           const cel::expr::Expr& input_expr, absl::optional<size_t>& max_length)
     : local_info_(local_info), expr_builder_(expr_builder), parsed_expr_(input_expr),
       max_length_(max_length) {
   compiled_expr_ = Expr::createExpression(expr_builder_->builder(), parsed_expr_);
@@ -66,9 +65,20 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
     Server::Configuration::ServerFactoryContext& context =
         Server::Configuration::ServerFactoryContextInstance::get();
 
+    const auto& parsed_expr = parse_status.value();
+    std::string serialized_expr;
+    if (!parsed_expr.expr().SerializeToString(&serialized_expr)) {
+      throw EnvoyException("Failed to serialize expression");
+    }
+
+    cel::expr::Expr cel_expr;
+    if (!cel_expr.ParseFromString(serialized_expr)) {
+      throw EnvoyException("Failed to parse expression into cel::expr::Expr format");
+    }
+
     return std::make_unique<CELFormatter>(context.localInfo(),
                                           Extensions::Filters::Common::Expr::getBuilder(context),
-                                          parse_status.value().expr(), max_length);
+                                          cel_expr, max_length);
   }
 
   return nullptr;

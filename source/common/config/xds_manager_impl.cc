@@ -266,6 +266,27 @@ absl::StatusOr<SubscriptionPtr> XdsManagerImpl::subscribeToSingletonResource(
       fmt::format("No valid authority was found for the given xDS-TP resource {}.", resource_name));
 }
 
+ScopedResume XdsManagerImpl::pause(const std::vector<std::string>& type_urls) {
+  // Apply the pause on all "ADS" based sources (old-ADS-mux, and
+  // xdstp-config-based sources) by collecting the per-xDS-mux scopes under a
+  // single scope. Using a shared_ptr here so we can pass it to the Cleanup
+  // object that is created at the return statement.
+  auto scoped_resume_collection = std::make_shared<std::vector<ScopedResume>>();
+  if (ads_mux_ != nullptr) {
+    scoped_resume_collection->emplace_back(ads_mux_->pause(type_urls));
+  }
+  for (auto& authority : authorities_) {
+    scoped_resume_collection->emplace_back(authority.grpc_mux_->pause(type_urls));
+  }
+  if (default_authority_ != nullptr) {
+    scoped_resume_collection->emplace_back(default_authority_->grpc_mux_->pause(type_urls));
+  }
+  return std::make_unique<Cleanup>([scoped_resume_collection]() {
+    // Do nothing. After this function is called the scoped_resume_collection
+    // will be destroyed, and all the internal cleanups will be invoked.
+  });
+}
+
 absl::Status
 XdsManagerImpl::setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();

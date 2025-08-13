@@ -189,7 +189,9 @@ std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const ProtobufWkt::Any
       Protobuf::MessageFactory::generated_factory()->GetPrototype(descriptor);
   ASSERT(prototype != nullptr, "should be impossible since the descriptor is known");
   std::unique_ptr<Protobuf::Message> msg(prototype->New());
-  any.UnpackTo(msg.get());
+  if (!any.UnpackTo(msg.get())) {
+    return nullptr;
+  }
   return msg;
 }
 

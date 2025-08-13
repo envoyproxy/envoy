@@ -46,6 +46,7 @@ namespace {
 
 using ::testing::_;
 using ::testing::ContainerEq;
+using ::testing::ContainsRegex;
 using ::testing::ElementsAre;
 using ::testing::Eq;
 using ::testing::IsEmpty;
@@ -1415,11 +1416,12 @@ virtual_hosts:
       {"www2", "root_www2", "www2_staging", "instant-server"}, {});
   TestConfigImpl give_me_a_name(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
                                 creation_status_);
-  EXPECT_EQ(
+  EXPECT_THAT(
       creation_status_.message(),
-      "requirement violation while creating route match tree: INVALID_ARGUMENT: Route table can "
-      "only match on request headers, saw "
-      "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput");
+      ContainsRegex("requirement violation while creating route match tree: INVALID_ARGUMENT: "
+                    "Route table can "
+                    "only match on request headers, saw "
+                    "type.googleapis.com/envoy.type.matcher.v3.HttpResponseHeaderMatchInput"));
 }
 
 // Validates that we fail creating a route config if an invalid data input is used.
@@ -4780,7 +4782,7 @@ TEST_F(RouteMatcherTest, RetryVirtualHostLevel) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - domains: [www.lyft.com]
-  per_request_buffer_limit_bytes: 8
+  request_body_buffer_limit: 8
   name: www
   retry_policy:
     num_retries: 3
@@ -4792,7 +4794,7 @@ virtual_hosts:
         "@type": type.googleapis.com/google.protobuf.Struct
   routes:
   - match: {prefix: /foo}
-    per_request_buffer_limit_bytes: 7
+    request_body_buffer_limit: 7
     route:
       cluster: www
       retry_policy:
@@ -4831,7 +4833,10 @@ virtual_hosts:
                 .retryOn());
   EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
-                    ->retryShadowBufferLimit());
+                    ->requestBodyBufferLimit());
+  EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                    ->routeEntry()
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -4854,6 +4859,12 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .retryOn());
+  EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->requestBodyBufferLimit());
+  EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                    ->routeEntry()
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(std::chrono::milliseconds(1000),
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
@@ -4871,7 +4882,10 @@ virtual_hosts:
                 .retryOn());
   EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
-                    ->retryShadowBufferLimit());
+                    ->requestBodyBufferLimit());
+  EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
+                    ->routeEntry()
+                    ->requestBodyBufferLimit());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -11684,6 +11698,31 @@ virtual_hosts:
     // With flag enabled, unspecified should be nullopt
     EXPECT_FALSE(shadow_policies[2]->traceSampled().has_value());
   }
+}
+
+// Test that route-level request_body_buffer_limit takes precedence over virtual_host
+// request_body_buffer_limit
+TEST_F(RouteConfigurationV2, RequestBodyBufferLimitPrecedenceRouteOverridesVirtualHost) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- domains: [test.example.com]
+  name: test_host
+  request_body_buffer_limit: 32768
+  routes:
+  - match: {prefix: /test}
+    route:
+      cluster: backend
+    request_body_buffer_limit: 4194304
+)EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"backend"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  EXPECT_TRUE(creation_status_.ok());
+
+  Http::TestRequestHeaderMapImpl headers = genHeaders("test.example.com", "/test", "GET");
+  const RouteEntry* route = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(4194304U, route->requestBodyBufferLimit());
 }
 
 } // namespace

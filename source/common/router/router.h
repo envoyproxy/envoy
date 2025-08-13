@@ -311,8 +311,7 @@ public:
   Filter(const FilterConfigSharedPtr& config, FilterStats& stats)
       : config_(config), stats_(stats), grpc_request_(false), exclude_http_code_stats_(false),
         downstream_response_started_(false), downstream_end_stream_(false), is_retry_(false),
-        request_buffer_overflowed_(false), streaming_shadows_(Runtime::runtimeFeatureEnabled(
-                                               "envoy.reloadable_features.streaming_shadow")),
+        request_buffer_overflowed_(false), streaming_shadows_(true),
         allow_multiplexed_upstream_half_close_(Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.allow_multiplexed_upstream_half_close")),
         upstream_request_started_(false), orca_load_report_received_(false) {}
@@ -514,10 +513,11 @@ public:
   bool awaitingHost() { return host_selection_cancelable_ != nullptr; }
 
 protected:
-  void setRetryShadowBufferLimit(uint32_t retry_shadow_buffer_limit) {
-    ASSERT(retry_shadow_buffer_limit_ > retry_shadow_buffer_limit);
-    retry_shadow_buffer_limit_ = retry_shadow_buffer_limit;
+  void setRequestBodyBufferLimit(uint64_t buffer_limit) {
+    request_body_buffer_limit_ = buffer_limit;
   }
+
+  uint64_t calculateEffectiveBufferLimit() const;
 
 private:
   friend class UpstreamRequest;
@@ -547,8 +547,6 @@ private:
   UpstreamRequestPtr createUpstreamRequest();
   absl::optional<absl::string_view> getShadowCluster(const ShadowPolicy& shadow_policy,
                                                      const Http::HeaderMap& headers) const;
-
-  void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();
@@ -635,7 +633,8 @@ private:
   absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
+  uint32_t connection_buffer_limit_{0};
   uint32_t attempt_count_{0};
   uint32_t pending_retries_{0};
   Http::Code timeout_response_code_ = Http::Code::GatewayTimeout;

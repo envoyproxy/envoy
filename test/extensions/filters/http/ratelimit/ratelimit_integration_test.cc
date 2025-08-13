@@ -286,8 +286,8 @@ TEST_P(RatelimitIntegrationTest, OverLimit) {
   waitForFailedUpstreamResponse(429, 0);
 
   EXPECT_THAT(responses_[0].get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited,
-                                  Http::Headers::get().EnvoyRateLimitedValues.True));
+              ContainsHeader(Http::Headers::get().EnvoyRateLimited,
+                             Http::Headers::get().EnvoyRateLimitedValues.True));
 
   cleanup();
 
@@ -313,8 +313,8 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
       });
 
   EXPECT_THAT(responses_[0].get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited,
-                                  Http::Headers::get().EnvoyRateLimitedValues.True));
+              ContainsHeader(Http::Headers::get().EnvoyRateLimited,
+                             Http::Headers::get().EnvoyRateLimitedValues.True));
 
   cleanup();
 
@@ -412,17 +412,17 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OkWithFilterHeaders) {
 
   EXPECT_THAT(
       responses_[0].get()->headers(),
-      Http::HeaderValueOf(
+      ContainsHeader(
           Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
           "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""));
   EXPECT_THAT(
       responses_[0].get()->headers(),
-      Http::HeaderValueOf(
+      ContainsHeader(
           Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
           "2"));
   EXPECT_THAT(
       responses_[0].get()->headers(),
-      Http::HeaderValueOf(
+      ContainsHeader(
           Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
           "3"));
 
@@ -449,17 +449,17 @@ TEST_P(RatelimitFilterHeadersEnabledIntegrationTest, OverLimitWithFilterHeaders)
 
   EXPECT_THAT(
       responses_[0].get()->headers(),
-      Http::HeaderValueOf(
+      ContainsHeader(
           Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitLimit,
           "1, 1;w=60;name=\"first\", 4;w=3600;name=\"second\""));
   EXPECT_THAT(
       responses_[0].get()->headers(),
-      Http::HeaderValueOf(
+      ContainsHeader(
           Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitRemaining,
           "2"));
   EXPECT_THAT(
       responses_[0].get()->headers(),
-      Http::HeaderValueOf(
+      ContainsHeader(
           Extensions::HttpFilters::Common::RateLimit::XRateLimitHeaders::get().XRateLimitReset,
           "3"));
 
@@ -479,7 +479,7 @@ TEST_P(RatelimitFilterEnvoyRatelimitedHeaderDisabledIntegrationTest,
   waitForFailedUpstreamResponse(429, 0);
 
   EXPECT_THAT(responses_[0].get()->headers(),
-              ::testing::Not(Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited, _)));
+              ::testing::Not(ContainsHeader(Http::Headers::get().EnvoyRateLimited, _)));
 
   cleanup();
 
@@ -526,10 +526,10 @@ TEST_P(RatelimitIntegrationTest, OverLimitResponseHeadersToAdd) {
   waitForFailedUpstreamResponse(429, 0);
 
   EXPECT_THAT(responses_[0].get()->headers(),
-              Http::HeaderValueOf(Http::Headers::get().EnvoyRateLimited,
-                                  Http::Headers::get().EnvoyRateLimitedValues.True));
+              ContainsHeader(Http::Headers::get().EnvoyRateLimited,
+                             Http::Headers::get().EnvoyRateLimitedValues.True));
   EXPECT_THAT(responses_[0].get()->headers(),
-              Http::HeaderValueOf("x-global-ratelimit-service", "rate_limit_service"));
+              ContainsHeader("x-global-ratelimit-service", "rate_limit_service"));
   cleanup();
 
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));

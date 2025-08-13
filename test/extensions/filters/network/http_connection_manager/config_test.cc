@@ -154,6 +154,21 @@ http_filters:
                             "chain.");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, NonXdsTpRouteWithoutConfigSource) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+rds:
+  route_config_name: route1
+http_filters:
+- name: foo
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "An RDS config must have either a 'config_source' or an xDS-TP based 'route_config_name'");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string yaml_string = R"EOF(
 codec_type: http1

@@ -1,19 +1,58 @@
 date: Pending
 
 behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
+- area: http
+  change: |
+    The route refresh will now results in a tracing refresh. The trace sampling decision and decoration
+    of new route will be applied to the active span.
+    This change can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.trace_refresh_after_route_refresh`` to ``false``.
+    Note, if :ref:`pack_trace_reason
+    <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>` is set
+    to ``true`` (it is ``true`` by default), then a request have been marked as traced may cannot be
+    unmarked as traced after the tracing refresh.
+- area: ext_proc
+  change: |
+    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: websocket
+  change: |
+      Allow 4xx and 5xx to go through the filter chain for websocket handshake response check, and the behaviour can be disabled
+      by a runtime ``envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain``.
+- area: testing
+  change: |
+    In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader`` and ``HeaderHasValueRef``
+    must be replaced with ``ContainsHeader``.
+    Any uses of matcher ``HeaderHasValue(...)`` should be replaced with ``::testing::Pointee(ContainsHeader(...))``.
+- area: generic_proxy
+  change: |
+    Generic proxy codec add the same buffer limit as connection buffer limit, if the buffer limit is
+    exceeded, the connection is disconnected. This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.generic_proxy_codec_buffer_limit`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: geoip
+  change: |
+    Fixed a bug in the maxmind provider where the found_entry field in the lookup result was not checked before trying to populate
+    headers  with data. If this field is not checked the provider could try to populate headers with wrong data, as per the
+    documentation for the Maxmind library https://github.com/maxmind/libmaxminddb/blob/main/doc/libmaxminddb.md#mmdb_lookup_result_s.
+- area: http3
+  change: |
+    Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
+    reverted by setting the runtime guard
+    ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 - area: router
   change: |
     Removed runtime guard ``envoy.reloadable_features.shadow_policy_inherit_trace_sampling`` and legacy code paths.
+- area: dns
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.prefer_ipv6_dns_on_macos`` and legacy code paths.
 - area: dynamic_forward_proxy
   change: |
     Removed runtime guard ``envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update`` and legacy code paths.
@@ -23,17 +62,97 @@ removed_config_or_runtime:
 - area: http_connection_manager
   change: |
     Removed runtime guard ``envoy.reloadable_features.explicit_internal_address_config`` and legacy code paths.
+- area: dfp
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.dfp_fail_on_empty_host_header`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.prefer_quic_client_udp_gro`` and legacy code paths.
+- area: udp_proxy
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.enable_udp_proxy_outlier_detection`` and legacy code paths.
+- area: xds
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.xds_prevent_resource_copy`` and legacy code paths.
+- area: rds
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.normalize_rds_provider_config`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx`` and legacy code paths.
+- area: quic
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.report_stream_reset_error_code`` and legacy code paths.
+- area: router
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.streaming_shadow`` and legacy code paths.
+- area: http3
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
+- area: network
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_status_mapping_more_core_response_flags`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.filter_chain_aborted_can_not_continue`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream`` and legacy code paths.
+- area: balsa
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done`` and legacy code paths.
+- area: geoip_providers
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.mmdb_files_reload_enabled`` and legacy code paths.
+- area: proxy_protocol
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener`` and legacy code paths.
+- area: dns_resolver
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.getaddrinfo_num_retries`` and legacy code paths.
+- area: proxy_filter
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_ssl_port`` and legacy code paths.
+- area: gcp_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.gcp_authn_use_fixed_url`` and legacy code paths.
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params`` and legacy code paths.
+- area: jwt_authn
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.jwt_authn_validate_uri`` and legacy code paths.
+- area: dispatcher
+  change: |
+    Removed runtime guard ``envoy.restart_features.fix_dispatcher_approximate_now`` and legacy code paths.
+- area: upstream
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.use_config_in_happy_eyeballs`` and legacy code paths.
+- area: http
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
+- area: quic
+  change: |
+    Added new option to support :ref:`base64 encoded server ID
+    <envoy_v3_api_field_extensions.quic.connection_id_generator.quic_lb.v3.Config.server_id_base64_encoded>`
+    in QUIC-LB.
 - area: health_check
   change: |
     Added support for request payloads in HTTP health checks. The ``send`` field in ``HttpHealthCheck`` can now be
     used to specify a request body to be sent during health checking. This feature supports both hex-encoded text
     and binary payloads, similar to TCP health checks. The payload can only be used with HTTP methods that support
-    request bodies (POST, PUT, PATCH, OPTIONS). Methods that must not have request bodies (GET, HEAD, DELETE, TRACE)
-    are validated and will throw an error if combined with payloads. The implementation is optimized to process the
-    payload once during configuration and reuse it for all health check requests. See :ref:`HttpHealthCheck
-    <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
+    request bodies (``POST``, ``PUT``, ``PATCH``, ``OPTIONS``). Methods that must not have request bodies
+    (``GET``, ``HEAD``, ``DELETE``, ``TRACE``) are validated and will throw an error if combined with payloads.
+    The implementation is optimized to process the payload once during configuration and reuse it for all health
+    check requests. See :ref:`HttpHealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
 - area: router_check_tool
   change: |
     Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
@@ -48,7 +167,9 @@ new_features:
     for more details.
 - area: socket
   change: |
-    Added ``network_namespace_filepath`` to ``SocketAddress``.
+    Added :ref:``network_namespace_filepath <envoy_v3_api_msg_config.core.v3.SocketAddress.network_namespace_filepath>`` to
+    :ref:`SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`. This field allows specifying a Linux network namespace filepath
+    for socket creation, enabling network isolation in containerized environments.
 - area: ratelimit
   change: |
     Add the :ref:`rate_limits
@@ -58,9 +179,12 @@ new_features:
     :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields will be ignored. However,
     :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
     will take precedence over this field.
+- area: redis
+  change: |
+    Added support for ``GEOSEARCH``and ``GETEX``.
 - area: observability
   change: |
-    Added ENVOY_NOTIFICATION macro to track specific conditions in produiction environments.
+    Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in produiction environments.
 - area: dns_filter, redis_proxy and prefix_matcher_map
   change: |
     Switch to using Radix Tree instead of Trie for performance improvements.
@@ -70,5 +194,43 @@ new_features:
     <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.stat_prefix>` field is configured,
     the filter emits detailed counters for rule processing, metadata operations, etc. See
     :ref:`Header-To-Metadata filter statistics <config_http_filters_header_to_metadata>` for details.
+- area: load_reporting
+  change: |
+    Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
+    endpoint statistics and metrics, but only for endpoints with updated stats, optimizing report size and efficiency.
+- area: overload management
+  change: |
+        Added load shed point ``envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch``
+        that sends ``GOAWAY`` AND closes connections for HTTP2 server processing of requests.  When
+        a ``GOAWAY`` frame is submitted by this the counter ``http2.goaway_sent`` will be
+        incremented.
+- area: router
+  change: |
+    Added :ref:`request_body_buffer_limit
+    <envoy_v3_api_field_config.route.v3.VirtualHost.request_body_buffer_limit>` and
+    :ref:`request_body_buffer_limit
+    <envoy_v3_api_field_config.route.v3.Route.request_body_buffer_limit>` configuration fields
+    to enable buffering of large request bodies beyond connection buffer limits.
+- area: otlp_stat_sink
+  change: |
+    Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
+    :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
+- area: lua
+  change: |
+    Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
+    implemented is ``metadata()``, allowing Lua scripts to access virtual host metadata scoped to the specific filter name. See
+    :ref:`Virtual host object API <config_http_filters_lua_virtual_host_wrapper>` for more details.
+- area: rbac
+  change: |
+    Switch the IP matcher to use LC-Trie for performance improvements.
+- area: lua
+  change: |
+    Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
+    implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
+    :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
+- area: dynamic_modules
+  change: |
+    Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.
+    In the Rust SDK, they are available as ``envoy_log_info``, etc.
 
 deprecated:

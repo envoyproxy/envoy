@@ -46,7 +46,7 @@ mattklein123:
   slack: U5CALEVSL
 mathetake:
   maintainer: true
-  opsgenie: Mathetake
+  opsgenie: mathetake
   slack: UG9TD2FSB
 nezdolik:
   maintainer: true
@@ -73,7 +73,7 @@ silverstar194:
   slack: U03LNPC8JN9
 tonya11en:
   maintainer: true
-  opsgenie: Tony
+  opsgenie: tony
   slack: U989BG2CW
 tyxia:
   maintainer: true

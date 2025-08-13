@@ -77,7 +77,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level
-  // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
+  // flow-control. Valid values range from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
   // to 25165824 (24 * 1024 * 1024).
   //
   // .. note::
