@@ -50,6 +50,12 @@ bug_fixes:
     when used with other listener filters. The bug was triggered when a previous listener filter processed more data
     than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
     The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.
+- area: http_inspector
+  change: |
+    Fixed timeout issue where :ref:`HTTP inspector listener filter <config_listener_filters_http_inspector>` would time out
+    after 15 seconds when receiving HTTP requests with long URLs (>8KB) that span multiple buffer reads. The fix corrects
+    the newline search to look in the entire buffer instead of just the unparsed portion, allowing proper detection of
+    request lines that exceed the initial buffer size.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`

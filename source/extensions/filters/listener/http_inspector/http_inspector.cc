@@ -106,45 +106,44 @@ ParseState Filter::parseHttpHeader(absl::string_view data) {
       return ParseState::Error;
     }
 
+    // Look for end of request line in the entire buffer
+    const size_t pos = data.find_first_of('\n');
     absl::string_view new_data = data.substr(nread_);
-    const size_t pos = new_data.find_first_of('\n');
+
     if (pos != absl::string_view::npos) {
-      // Include \n
-      new_data = new_data.substr(0, pos + 1);
-
-      ssize_t rc = parser_->execute(new_data.data(), new_data.length());
-      nread_ += rc;
-      ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
-                parser_->errorMessage());
-
-      // Errors in parsing HTTP.
-      if (parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
-          parser_->getStatus() != Http::Http1::ParserStatus::Paused) {
-        return ParseState::Error;
-      }
-
-      if (parser_->isHttp11()) {
-        protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
-      } else {
-        // Set other HTTP protocols to HTTP/1.0
-        protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
-      }
-
-      return ParseState::Done;
-    } else {
-      ssize_t rc = parser_->execute(new_data.data(), new_data.length());
-      nread_ += rc;
-      ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
-                parser_->errorMessage());
-
-      // Errors in parsing HTTP.
-      if (parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
-          parser_->getStatus() != Http::Http1::ParserStatus::Paused) {
-        return ParseState::Error;
-      } else {
-        return ParseState::Continue;
+      // Found newline - only feed up to the end of the request line
+      size_t bytes_to_parse = pos + 1 - nread_;
+      if (bytes_to_parse > 0 && bytes_to_parse <= new_data.length()) {
+        new_data = new_data.substr(0, bytes_to_parse);
       }
     }
+    // If no newline found, we'll feed all new_data to the parser
+
+    if (!new_data.empty()) {
+      ssize_t rc = parser_->execute(new_data.data(), new_data.length());
+      nread_ += rc;
+      ENVOY_LOG(trace, "http inspector: http_parser parsed {} chars, error code: {}", rc,
+                parser_->errorMessage());
+
+      // Errors in parsing HTTP.
+      if (parser_->getStatus() != Http::Http1::ParserStatus::Ok &&
+          parser_->getStatus() != Http::Http1::ParserStatus::Paused) {
+        return ParseState::Error;
+      }
+
+      // If we found and fed the complete request line, check the version
+      if (pos != absl::string_view::npos) {
+        if (parser_->isHttp11()) {
+          protocol_ = Http::Headers::get().ProtocolStrings.Http11String;
+        } else {
+          // Set other HTTP protocols to HTTP/1.0
+          protocol_ = Http::Headers::get().ProtocolStrings.Http10String;
+        }
+        return ParseState::Done;
+      }
+    }
+
+    return ParseState::Continue;
   }
 }
 
