@@ -52,3 +52,14 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "copy_on_write_buffer_lib",
+    srcs = ["copy_on_write_buffer.cc"],
+    hdrs = ["copy_on_write_buffer.h"],
+    deps = [
+        ":buffer_lib",
+        "//envoy/buffer:buffer_interface",
+        "//source/common/common:assert_lib",
+    ],
+)

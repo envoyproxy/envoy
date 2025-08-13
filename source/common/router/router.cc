@@ -36,7 +36,7 @@
 #include "source/common/orca/orca_parser.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/retry_state_impl.h"
-#include "source/common/runtime/runtime_features.h"
+#include "source/common/router/router_cluster_config.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 
 namespace Envoy {
@@ -941,6 +941,16 @@ uint64_t Filter::calculateEffectiveBufferLimit() const {
   return std::numeric_limits<uint64_t>::max();
 }
 
+bool Filter::copyOnWriteEnabled() const {
+  if (!cluster_) {
+    return false;
+  }
+
+  const auto options = cluster_->extensionProtocolOptionsTyped<RouterClusterProtocolOptionsConfig>(
+      "envoy.filters.http.router");
+  return options != nullptr && options->enableCopyOnWrite();
+}
+
 Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_stream) {
   // upstream_requests_.size() cannot be > 1 because that only happens when a per
   // try timeout occurs with hedge_on_per_try_timeout enabled but the per
@@ -1019,16 +1029,35 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
       shadow_stream->removeDestructorCallback();
       shadow_stream->removeWatermarkCallbacks();
     }
-    Buffer::OwnedImpl copy(data);
-    shadow_stream->sendData(copy, end_stream);
+    if (copyOnWriteEnabled()) {
+      if (!shared_request_buffer_) {
+        auto owned_copy = std::make_unique<Buffer::OwnedImpl>(data);
+        shared_request_buffer_ = std::make_shared<Buffer::SharedBuffer>(std::move(owned_copy));
+      }
+      Buffer::CopyOnWriteBuffer cow(shared_request_buffer_);
+      shadow_stream->sendData(cow, end_stream);
+    } else {
+      Buffer::OwnedImpl copy(data);
+      shadow_stream->sendData(copy, end_stream);
+    }
   }
   if (end_stream) {
     shadow_streams_.clear();
+    shared_request_buffer_.reset();
   }
   if (buffering) {
     if (!upstream_requests_.empty()) {
-      Buffer::OwnedImpl copy(data);
-      upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
+      if (copyOnWriteEnabled()) {
+        if (!shared_request_buffer_) {
+          auto owned_copy = std::make_unique<Buffer::OwnedImpl>(data);
+          shared_request_buffer_ = std::make_shared<Buffer::SharedBuffer>(std::move(owned_copy));
+        }
+        Buffer::CopyOnWriteBuffer cow(shared_request_buffer_);
+        upstream_requests_.front()->acceptDataFromRouter(cow, end_stream);
+      } else {
+        Buffer::OwnedImpl copy(data);
+        upstream_requests_.front()->acceptDataFromRouter(copy, end_stream);
+      }
     }
 
     // If we are potentially going to retry or buffer shadow this request we need to buffer.
@@ -1055,6 +1084,7 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
 
   if (end_stream) {
     onRequestComplete();
+    shared_request_buffer_.reset();
   }
 
   return Http::FilterDataStatus::StopIterationNoBuffer;

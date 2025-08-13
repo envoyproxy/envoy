@@ -22,6 +22,10 @@
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/buffer/copy_on_write_buffer.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/cleanup.h"
 #include "source/common/common/hash.h"
 #include "source/common/common/hex.h"
 #include "source/common/common/logger.h"
@@ -540,6 +544,8 @@ private:
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request,
                        TimeoutRetry is_timeout_retry);
   uint32_t numRequestsAwaitingHeaders();
+  // Returns true if copy-on-write request body handling is enabled for the current cluster.
+  bool copyOnWriteEnabled() const;
   void onGlobalTimeout();
   void onRequestComplete();
   void onResponseTimeout();
@@ -621,6 +627,9 @@ private:
   Network::Socket::OptionsSharedPtr upstream_options_;
   // Set of ongoing shadow streams which have not yet received end stream.
   absl::flat_hash_set<Http::AsyncClient::OngoingRequest*> shadow_streams_;
+  // Shared buffer for copy-on-write optimization when duplicating request body to multiple
+  // consumers (e.g., upstream + mirrors).
+  Buffer::SharedBufferPtr shared_request_buffer_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};

@@ -5,6 +5,7 @@
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/router_cluster_config.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
@@ -19,6 +20,15 @@ class RouterFilterConfig : public Common::ExceptionFreeFactoryBase<
                                envoy::extensions::filters::http::router::v3::Router> {
 public:
   RouterFilterConfig() : ExceptionFreeFactoryBase("envoy.filters.http.router") {}
+
+  // ProtocolOptionsFactory
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
+    return std::make_unique<envoy::extensions::filters::http::router::v3::RouterClusterConfig>();
+  }
+
+  absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr> createProtocolOptionsConfig(
+      const Protobuf::Message& proto_config,
+      Server::Configuration::ProtocolOptionsFactoryContext& factory_context) override;
 
 private:
   bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::http::router::v3::Router&,

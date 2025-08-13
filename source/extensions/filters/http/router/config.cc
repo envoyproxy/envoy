@@ -28,6 +28,18 @@ absl::StatusOr<Http::FilterFactoryCb> RouterFilterConfig::createFilterFactoryFro
   };
 }
 
+absl::StatusOr<Upstream::ProtocolOptionsConfigConstSharedPtr>
+RouterFilterConfig::createProtocolOptionsConfig(
+    const Protobuf::Message& proto_config,
+    Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
+  const auto& config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::filters::http::router::v3::RouterClusterConfig&>(
+      proto_config, factory_context.messageValidationVisitor());
+
+  return std::make_shared<Router::RouterClusterProtocolOptionsConfig>(
+      config.enable_copy_on_write());
+}
+
 /**
  * Static registration for the router filter. @see RegisterFactory.
  */
