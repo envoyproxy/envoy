@@ -194,7 +194,7 @@ void HeaderToMetadataFilter::setEncoderFilterCallbacks(
 bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::string& meta_namespace,
                                          const std::string& key, std::string value, ValueType type,
                                          ValueEncode encode) const {
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
 
   ASSERT(!value.empty());
 

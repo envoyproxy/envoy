@@ -17,9 +17,8 @@ public:
   formatWithContext(const HttpFormatterContext& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
 
-  ProtobufWkt::Value
-  formatValueWithContext(const HttpFormatterContext& context,
-                         const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class TestCommandParser : public CommandParser {
@@ -45,9 +44,8 @@ public:
   formatWithContext(const HttpFormatterContext& context,
                     const StreamInfo::StreamInfo& stream_info) const override;
 
-  ProtobufWkt::Value
-  formatValueWithContext(const HttpFormatterContext& context,
-                         const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValueWithContext(const HttpFormatterContext& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override;
 };
 
 class AdditionalCommandParser : public CommandParser {

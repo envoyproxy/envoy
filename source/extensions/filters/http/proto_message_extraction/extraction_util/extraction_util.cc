@@ -48,7 +48,9 @@ namespace {
 
 using ::Envoy::Protobuf::Field;
 using ::Envoy::Protobuf::Map;
+using ::Envoy::Protobuf::Struct;
 using ::Envoy::Protobuf::Type;
+using ::Envoy::Protobuf::Value;
 using ::Envoy::Protobuf::field_extraction::FieldExtractor;
 using ::Envoy::Protobuf::internal::WireFormatLite;
 using ::Envoy::Protobuf::io::CodedInputStream;
@@ -57,8 +59,6 @@ using ::Envoy::Protobuf::io::CordOutputStream;
 using ::Envoy::Protobuf::util::JsonParseOptions;
 using ::Envoy::Protobuf::util::converter::JsonObjectWriter;
 using ::Envoy::Protobuf::util::converter::ProtoStreamObjectSource;
-using ::Envoy::ProtobufWkt::Struct;
-using ::Envoy::ProtobufWkt::Value;
 
 std::string kLocationRegionExtractorPattern = R"((?:^|/)(?:locations|regions)/([^/]+))";
 
@@ -388,7 +388,7 @@ absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator pa
 }
 
 absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
-                             const Envoy::ProtobufWkt::Type& type,
+                             const Envoy::Protobuf::Type& type,
                              ::Envoy::Protobuf::util::TypeResolver* type_resolver,
                              Struct* message_struct) {
   // Convert from message data to JSON using absl::Cord.
@@ -418,10 +418,10 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
 }
 
 bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
-                   const Envoy::ProtobufWkt::Type& type,
+                   const Envoy::Protobuf::Type& type,
                    const ::google::grpc::transcoding::TypeHelper& type_helper,
                    Protobuf::field_extraction::MessageData* message,
-                   Envoy::ProtobufWkt::Struct* message_struct) {
+                   Envoy::Protobuf::Struct* message_struct) {
   message_struct->Clear();
 
   // When scrubber or message is nullptr, it indicates that there's nothing to

@@ -40,7 +40,7 @@ public:
   MockOpaqueResourceDecoder();
   ~MockOpaqueResourceDecoder() override;
 
-  MOCK_METHOD(ProtobufTypes::MessagePtr, decodeResource, (const ProtobufWkt::Any& resource));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, decodeResource, (const Protobuf::Any& resource));
   MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
 };
 
@@ -50,7 +50,7 @@ public:
   ~MockUntypedConfigUpdateCallbacks() override;
 
   MOCK_METHOD(void, onConfigUpdate,
-              (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+              (const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
                const std::string& version_info));
 
   MOCK_METHOD(void, onConfigUpdate,

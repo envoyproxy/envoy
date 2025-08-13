@@ -519,7 +519,7 @@ TEST_F(RocketmqCodecTest, EncodeResponseSendMessageSuccess) {
       Decoder::FRAME_LENGTH_FIELD_SIZE + Decoder::FRAME_HEADER_LENGTH_FIELD_SIZE;
   response_buffer.copyOut(frame_header_content_offset, header_length, header_data.get());
   std::string header_json(header_data.get(), header_length);
-  ProtobufWkt::Struct doc;
+  Protobuf::Struct doc;
   MessageUtil::loadFromJson(header_json, doc);
   const auto& members = doc.fields();
 

@@ -41,7 +41,7 @@ CELFormatter::formatWithContext(const Envoy::Formatter::HttpFormatterContext& co
   return result;
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
                                      const StreamInfo::StreamInfo& stream_info) const {
   auto result = formatWithContext(context, stream_info);

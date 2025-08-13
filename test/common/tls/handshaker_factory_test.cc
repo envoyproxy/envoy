@@ -65,7 +65,7 @@ public:
   std::string name() const override { return kFactoryName; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new ProtobufWkt::StringValue()};
+    return ProtobufTypes::MessagePtr{new Protobuf::StringValue()};
   }
 
   Ssl::HandshakerFactoryCb
@@ -103,7 +103,7 @@ protected:
     envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
         tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
     custom_handshaker->set_name(HandshakerFactoryImplForTest::kFactoryName);
-    custom_handshaker->mutable_typed_config()->PackFrom(ProtobufWkt::StringValue());
+    custom_handshaker->mutable_typed_config()->PackFrom(Protobuf::StringValue());
   }
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
@@ -213,7 +213,7 @@ public:
   std::string name() const override { return kFactoryName; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new ProtobufWkt::BoolValue()};
+    return ProtobufTypes::MessagePtr{new Protobuf::BoolValue()};
   }
 
   Ssl::HandshakerFactoryCb
@@ -278,7 +278,7 @@ TEST_F(HandshakerFactoryDownstreamTest, ServerHandshakerProvidesCertificates) {
   envoy::config::core::v3::TypedExtensionConfig* custom_handshaker =
       tls_context_.mutable_common_tls_context()->mutable_custom_handshaker();
   custom_handshaker->set_name(HandshakerFactoryImplForDownstreamTest::kFactoryName);
-  custom_handshaker->mutable_typed_config()->PackFrom(ProtobufWkt::BoolValue());
+  custom_handshaker->mutable_typed_config()->PackFrom(Protobuf::BoolValue());
 
   CustomProcessObjectForTest custom_process_object_for_test(
       /*cb=*/[](SSL_CTX* ssl_ctx) { SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_TLSv1); });

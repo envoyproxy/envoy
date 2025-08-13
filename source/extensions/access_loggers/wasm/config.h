@@ -25,7 +25,7 @@ public:
   std::string name() const override;
 
 private:
-  absl::flat_hash_map<std::string, std::string> convertJsonFormatToMap(ProtobufWkt::Struct config);
+  absl::flat_hash_map<std::string, std::string> convertJsonFormatToMap(Protobuf::Struct config);
 };
 
 } // namespace Wasm

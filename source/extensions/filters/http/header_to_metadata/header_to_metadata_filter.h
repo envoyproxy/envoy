@@ -177,7 +177,7 @@ public:
 private:
   friend class HeaderToMetadataTest;
 
-  using StructMap = std::map<std::string, ProtobufWkt::Struct>;
+  using StructMap = std::map<std::string, Protobuf::Struct>;
 
   const ConfigSharedPtr config_;
   mutable const Config* effective_config_{nullptr};

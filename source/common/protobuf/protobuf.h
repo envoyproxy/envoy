@@ -147,10 +147,6 @@ namespace Envoy {
 // Allows mapping from google::protobuf::util to other util libraries.
 namespace ProtobufUtil = ::google::protobuf::util;
 
-// Protobuf well-known types (WKT) should be referenced via the ProtobufWkt
-// namespace.
-namespace ProtobufWkt = ::google::protobuf;
-
 // Alternative protobuf implementations might not have the same basic types.
 // Below we provide wrappers to facilitate remapping of the type during import.
 namespace ProtobufTypes {
