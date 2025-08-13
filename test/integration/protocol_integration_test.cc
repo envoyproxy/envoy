@@ -107,6 +107,52 @@ TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetric) {
   EXPECT_EQ(sample_sum, 3);
 }
 
+// Test that upstream_rq_per_cx metric is NOT recorded when handshake fails
+TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFailure) {
+  // This test intentionally causes upstream connection failures, so bypass the upstream validation
+  testing_upstream_intentionally_ = true;
+
+  // Configure upstream with invalid port to force connection failure before handshake completion
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    // Use port 1 which is invalid/inaccessible to force connection establishment failure
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+  config_helper_.skipPortUsageValidation();
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send request that will fail due to upstream connection failure
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for response (should fail with 503 Service Unavailable)
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  // Clean up
+  codec_client_->close();
+
+  // Wait for connection failure to be recorded
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_connect_fail", 1);
+
+  // Verify that NO upstream_rq_per_cx histogram samples were recorded
+  // because hasHandshakeCompleted() returned false (connection never established)
+  auto histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
+  uint64_t sample_count =
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
+
+  // Key assertion: No histogram samples should be recorded for failed connections
+  EXPECT_EQ(sample_count, 0);
+
+  // Also verify connection failure was recorded (proving connection attempt was made)
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_connect_fail")->value(), 1);
+}
+
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
   if (use_universal_header_validator_) {
     // TODO(#27132): auto_host_rewrite is broken for IPv6 and is failing UHV validation
