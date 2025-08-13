@@ -75,6 +75,7 @@ using ::google::protobuf::DescriptorPoolDatabase;       // NOLINT(misc-unused-us
 using ::google::protobuf::Duration;                     // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DynamicCastMessage;           // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DynamicMessageFactory;        // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Empty;                        // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::EnumValueDescriptor;          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldDescriptor;              // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldMask;                    // NOLINT(misc-unused-using-decls)
