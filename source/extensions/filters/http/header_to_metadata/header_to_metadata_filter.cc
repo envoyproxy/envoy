@@ -170,6 +170,45 @@ HeaderToMetadataFilterStats Config::generateStats(const std::string& stat_prefix
   return {ALL_HEADER_TO_METADATA_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
+void Config::chargeStat(StatsEvent event, HeaderDirection direction) const {
+  if (!stats_.has_value()) {
+    return;
+  }
+
+  switch (event) {
+  case StatsEvent::RulesProcessed:
+    if (direction == HeaderDirection::Request) {
+      stats_->request_rules_processed_.inc();
+    } else {
+      stats_->response_rules_processed_.inc();
+    }
+    break;
+  case StatsEvent::MetadataAdded:
+    if (direction == HeaderDirection::Request) {
+      stats_->request_metadata_added_.inc();
+    } else {
+      stats_->response_metadata_added_.inc();
+    }
+    break;
+  case StatsEvent::HeaderNotFound:
+    if (direction == HeaderDirection::Request) {
+      stats_->request_header_not_found_.inc();
+    } else {
+      stats_->response_header_not_found_.inc();
+    }
+    break;
+  case StatsEvent::Base64DecodeFailed:
+    stats_->base64_decode_failed_.inc();
+    break;
+  case StatsEvent::HeaderValueTooLong:
+    stats_->header_value_too_long_.inc();
+    break;
+  case StatsEvent::RegexSubstitutionFailed:
+    stats_->regex_substitution_failed_.inc();
+    break;
+  }
+}
+
 HeaderToMetadataFilter::HeaderToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
 HeaderToMetadataFilter::~HeaderToMetadataFilter() = default;
@@ -216,9 +255,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::strin
   if (value.size() >= MAX_HEADER_VALUE_LEN) {
     // Too long, go away.
     ENVOY_LOG(debug, "metadata value is too long");
-    if (config->stats().has_value()) {
-      config->stats().value().header_value_too_long_.inc();
-    }
+    config->chargeStat(StatsEvent::HeaderValueTooLong, direction);
     return false;
   }
 
@@ -226,9 +263,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::strin
     value = Base64::decodeWithoutPadding(value);
     if (value.empty()) {
       ENVOY_LOG(debug, "Base64 decode failed");
-      if (config->stats().has_value()) {
-        config->stats().value().base64_decode_failed_.inc();
-      }
+      config->chargeStat(StatsEvent::Base64DecodeFailed, direction);
       return false;
     }
   }
@@ -262,13 +297,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& struct_map, const std::strin
   (*keyval.mutable_fields())[key] = std::move(val);
 
   // Increment metadata_added stat if stats are enabled.
-  if (config->stats().has_value()) {
-    if (direction == HeaderDirection::Request) {
-      config->stats().value().request_metadata_added_.inc();
-    } else {
-      config->stats().value().response_metadata_added_.inc();
-    }
-  }
+  config->chargeStat(StatsEvent::MetadataAdded, direction);
 
   return true;
 }
@@ -293,9 +322,7 @@ void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule
       // If we had a non-empty input but got an empty result from regex, it could indicate a
       // failure.
       if (!original_value.empty() && value.empty()) {
-        if (config->stats().has_value()) {
-          config->stats().value().regex_substitution_failed_.inc();
-        }
+        config->chargeStat(StatsEvent::RegexSubstitutionFailed, direction);
       }
     }
   }
@@ -319,26 +346,14 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
     absl::optional<std::string> value = rule.selector_->extract(headers);
 
     // Increment rules_processed stat if stats are enabled.
-    if (config->stats().has_value()) {
-      if (direction == HeaderDirection::Request) {
-        config->stats().value().request_rules_processed_.inc();
-      } else {
-        config->stats().value().response_rules_processed_.inc();
-      }
-    }
+    config->chargeStat(StatsEvent::RulesProcessed, direction);
 
     if (value && proto_rule.has_on_header_present()) {
       applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_present(),
                     structs_by_namespace, direction);
     } else if (!value && proto_rule.has_on_header_missing()) {
       // Increment header_not_found stat if stats are enabled.
-      if (config->stats().has_value()) {
-        if (direction == HeaderDirection::Request) {
-          config->stats().value().request_header_not_found_.inc();
-        } else {
-          config->stats().value().response_header_not_found_.inc();
-        }
-      }
+      config->chargeStat(StatsEvent::HeaderNotFound, direction);
       applyKeyValue(std::move(value).value_or(""), rule, proto_rule.on_header_missing(),
                     structs_by_namespace, direction);
     }

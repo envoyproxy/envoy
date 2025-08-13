@@ -48,6 +48,18 @@ using KeyValuePair = envoy::extensions::filters::http::header_to_metadata::v3::C
  */
 enum class HeaderDirection { Request, Response };
 
+/**
+ * Enum of all discrete events for which the filter records statistics.
+ */
+enum class StatsEvent {
+  RulesProcessed,
+  MetadataAdded,
+  HeaderNotFound,
+  Base64DecodeFailed,
+  HeaderValueTooLong,
+  RegexSubstitutionFailed,
+};
+
 // Interface for getting values from a cookie or a header.
 class ValueSelector {
 public:
@@ -132,6 +144,12 @@ public:
   bool doRequest() const { return request_set_; }
   const absl::optional<HeaderToMetadataFilterStats>& stats() const { return stats_; }
 
+  /**
+   * Increment the appropriate statistic for the given event and traffic direction.
+   * No-op if statistics were not configured.
+   */
+  void chargeStat(StatsEvent event, HeaderDirection direction) const;
+
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
 
@@ -168,7 +186,8 @@ private:
   HeaderToMetadataRules response_rules_;
   bool response_set_;
   bool request_set_;
-  absl::optional<HeaderToMetadataFilterStats> stats_;
+  // Mutable to allow stats charging from const contexts.
+  mutable absl::optional<HeaderToMetadataFilterStats> stats_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
