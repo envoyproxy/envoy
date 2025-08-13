@@ -279,11 +279,11 @@ void ConnectivityManagerImpl::refreshDns(envoy_netconf_t configuration_key,
       return;
     }
   }
-  reallyRefreshDns(configuration_key, drain_connections);
+  doRefreshDns(configuration_key, drain_connections);
 }
 
-void ConnectivityManagerImpl::reallyRefreshDns(envoy_netconf_t configuration_key,
-                                               bool drain_connections) {
+void ConnectivityManagerImpl::doRefreshDns(envoy_netconf_t configuration_key,
+                                           bool drain_connections) {
   if (auto dns_cache = dnsCache()) {
     ENVOY_LOG_EVENT(debug, "netconf_refresh_dns", "{}", std::to_string(configuration_key));
 
@@ -583,15 +583,9 @@ void ConnectivityManagerImpl::purgeActiveNetworkListAndroid(
   std::vector<int64_t> disconnected_networks;
   {
     Thread::LockGuard lock{network_mutex_};
-    for (auto i : connected_networks_) {
-      bool skip = false;
-      for (auto j : active_network_ids) {
-        if (j == i.first) {
-          skip = true;
-          break;
-        }
-      }
-      if (!skip) {
+    for (auto& i : connected_networks_) {
+      if (std::find(active_network_ids.begin(), active_network_ids.end(), i.first) ==
+          active_network_ids.end()) {
         disconnected_networks.push_back(i.first);
       }
     }

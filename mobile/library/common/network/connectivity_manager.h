@@ -285,7 +285,8 @@ public:
   }
   void setNetworkChangeObserver(NetworkChangeObserver* observer) { observer_ = observer; }
 
-  void reallyRefreshDns(envoy_netconf_t configuration_key, bool drain_connections);
+  // Refresh DNS regardless of configuration key change.
+  void doRefreshDns(envoy_netconf_t configuration_key, bool drain_connections);
 
 private:
   // The states of the current default network picked by the platform.

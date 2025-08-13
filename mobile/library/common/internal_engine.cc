@@ -234,8 +234,8 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
                   resetHttpPropertiesAndDrainHosts(probeAndGetLocalAddr(AF_INET6) != nullptr);
                   if (!disable_dns_refresh_on_network_change_) {
                     // This call will possibly drain all connections asynchronously.
-                    connectivity_manager_->reallyRefreshDns(current_configuration_key,
-                                                            /*drain_connections=*/true);
+                    connectivity_manager_->doRefreshDns(current_configuration_key,
+                                                        /*drain_connections=*/true);
                   }
                 });
               };
@@ -428,7 +428,7 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
   }
 }
 
-void InternalEngine::resetHttpPropertiesAndDrainHosts(const bool has_ipv6_connectivity) {
+void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
       Runtime::runtimeFeatureEnabled(

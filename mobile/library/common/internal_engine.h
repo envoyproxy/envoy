@@ -229,7 +229,7 @@ private:
   static Network::Address::InstanceConstSharedPtr probeAndGetLocalAddr(int domain);
 
   // Called when it's been determined that the default network has changed.
-  void resetHttpPropertiesAndDrainHosts(const bool has_ipv6_connectivity);
+  void resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity);
 
   Thread::PosixThreadFactoryPtr thread_factory_;
   Event::Dispatcher* event_dispatcher_{};
